@@ -175,7 +175,6 @@ message HttpConnectionManager {
   // option is not specified.
   google.protobuf.Duration drain_timeout = 12 [(gogoproto.stdduration) = true];
 
-  // [#not-implemented-hide:]
   // The delayed close timeout is for downstream connections managed by the HTTP connection manager.
   // It is defined as a grace period after connection close processing has been locally initiated
   // during which Envoy will flush the write buffers for the connection and await the peer to close

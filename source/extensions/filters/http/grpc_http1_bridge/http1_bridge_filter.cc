@@ -30,7 +30,7 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& head
     setupStatTracking(headers);
   }
 
-  const absl::optional<Http::Protocol>& protocol = decoder_callbacks_->requestInfo().protocol();
+  const absl::optional<Http::Protocol>& protocol = decoder_callbacks_->streamInfo().protocol();
   ASSERT(protocol);
   if (protocol.value() != Http::Protocol::Http2 && grpc_request) {
     do_bridging_ = true;

@@ -14,6 +14,7 @@ proto_library(
     deps = [
         "//envoy/admin/v2alpha:clusters",
         "//envoy/admin/v2alpha:config_dump",
+        "//envoy/admin/v2alpha:memory",
         "//envoy/api/v2:cds",
         "//envoy/api/v2:discovery",
         "//envoy/api/v2:eds",
@@ -36,6 +37,7 @@ proto_library(
         "//envoy/config/filter/http/header_to_metadata/v2:header_to_metadata",
         "//envoy/config/filter/http/health_check/v2:health_check",
         "//envoy/config/filter/http/ip_tagging/v2:ip_tagging",
+        "//envoy/config/filter/http/jwt_authn/v2alpha:jwt_authn",
         "//envoy/config/filter/http/lua/v2:lua",
         "//envoy/config/filter/http/rate_limit/v2:rate_limit",
         "//envoy/config/filter/http/rbac/v2:rbac",

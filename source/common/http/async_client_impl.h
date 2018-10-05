@@ -23,8 +23,8 @@
 #include "common/common/empty_string.h"
 #include "common/common/linked_object.h"
 #include "common/http/message_impl.h"
-#include "common/request_info/request_info_impl.h"
 #include "common/router/router.h"
+#include "common/stream_info/stream_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -182,10 +182,9 @@ private:
       return Http::Code::InternalServerError;
     }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
-    void finalizeRequestHeaders(Http::HeaderMap&, const RequestInfo::RequestInfo&,
+    void finalizeRequestHeaders(Http::HeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
-    void finalizeResponseHeaders(Http::HeaderMap&, const RequestInfo::RequestInfo&) const override {
-    }
+    void finalizeResponseHeaders(Http::HeaderMap&, const StreamInfo::StreamInfo&) const override {}
     const Router::HashPolicy* hashPolicy() const override { return nullptr; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
     Upstream::ResourcePriority priority() const override {
@@ -214,7 +213,7 @@ private:
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
     bool useOldStyleWebSocket() const override { return false; }
-    Http::WebSocketProxyPtr createWebSocketProxy(Http::HeaderMap&, RequestInfo::RequestInfo&,
+    Http::WebSocketProxyPtr createWebSocketProxy(Http::HeaderMap&, StreamInfo::StreamInfo&,
                                                  Http::WebSocketProxyCallbacks&,
                                                  Upstream::ClusterManager&,
                                                  Network::ReadFilterCallbacks*) const override {
@@ -270,7 +269,7 @@ private:
   Router::RouteConstSharedPtr route() override { return route_; }
   void clearRouteCache() override {}
   uint64_t streamId() override { return stream_id_; }
-  RequestInfo::RequestInfo& requestInfo() override { return request_info_; }
+  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -306,7 +305,7 @@ private:
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;
   Router::ProdFilter router_;
-  RequestInfo::RequestInfoImpl request_info_;
+  StreamInfo::StreamInfoImpl stream_info_;
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
   std::shared_ptr<RouteImpl> route_;

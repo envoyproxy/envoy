@@ -39,6 +39,7 @@ namespace Http {
   COUNTER  (downstream_cx_drain_close)                                                             \
   COUNTER  (downstream_cx_idle_timeout)                                                            \
   COUNTER  (downstream_cx_overload_disable_keepalive)                                              \
+  COUNTER  (downstream_cx_delayed_close_timeout)                                                   \
   COUNTER  (downstream_flow_control_paused_reading_total)                                          \
   COUNTER  (downstream_flow_control_resumed_reading_total)                                         \
   COUNTER  (downstream_rq_total)                                                                   \
@@ -224,6 +225,12 @@ public:
    *         disabled idle timeout.
    */
   virtual std::chrono::milliseconds streamIdleTimeout() const PURE;
+
+  /**
+   * @return delayed close timeout for downstream HTTP connections. Zero indicates a disabled
+   *         timeout. See http_connection_manager.proto for a detailed description of this timeout.
+   */
+  virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
 
   /**
    * @return Router::RouteConfigProvider& the configuration provider used to acquire a route

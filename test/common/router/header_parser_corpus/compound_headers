@@ -52,7 +52,7 @@ headers_to_add {
     value: "%UPSTREAM_METADATA([\"namespace\", \"%key%\"])%"
   }
 }
-request_info {
+stream_info {
   upstream_metadata {
     filter_metadata {
       key: "namespace"
