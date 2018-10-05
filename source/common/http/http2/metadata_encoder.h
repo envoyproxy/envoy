@@ -15,9 +15,11 @@ namespace Http2 {
  * A class that creates and sends METADATA payload. The METADATA payload is a group of string key
  * value pairs encoded in HTTP/2 header blocks.
  */
-class MetadataEncoder : Logger::Loggable<Logger::Id::metadata> {
+class MetadataEncoder : Logger::Loggable<Logger::Id::http2> {
 public:
-  MetadataEncoder(uint64_t stream_id) : stream_id_(stream_id) {}
+  MetadataEncoder(uint64_t stream_id) : stream_id_(stream_id) {
+    ENVOY_LOG(debug, "Created MetadataEncoder for stream id: {}", stream_id);
+  }
 
   /**
    * Creates wire format HTTP/2 header block from metadata_map. Only after previous payload is
@@ -39,17 +41,6 @@ public:
    * @return true if there is payload to be submitted.
    */
   bool hasNextFrame();
-
-  /**
-   * Submit METADATA frame to nghttp2.
-   * @return whether the operation succeeds.
-   */
-  bool submitMetadata() {
-    // TODO(soya3129): Implement this in MetadataHandler and update comments.
-    // metadata_handler_->submitMetadataFrame(stream_id_);
-    ENVOY_LOG(error, "Submit METADATA for stream_id: {}.", stream_id_);
-    return 0;
-  }
 
   /**
    * Returns payload to be submitted.

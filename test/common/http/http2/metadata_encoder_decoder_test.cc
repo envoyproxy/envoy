@@ -276,10 +276,6 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
 TEST_F(MetadataEncoderDecoderTest, TestUnqualifiedInput) {
   initialize();
 
-  MetadataMap metadata_map;
-  // Empty metadata_map will be rejected.
-  EXPECT_FALSE(encoder_.createPayload(metadata_map));
-
   MetadataMap metadata_map1 = {
       {"header_key1", "header_value1"},
       {"header_key2", "header_value2"},
@@ -291,12 +287,6 @@ TEST_F(MetadataEncoderDecoderTest, TestUnqualifiedInput) {
   EXPECT_TRUE(encoder_.createPayload(metadata_map1));
   // Multiple metadata_map will be rejected.
   EXPECT_FALSE(encoder_.createPayload(metadata_map2));
-
-  // Empty payload will be ignored.
-  uint8_t buf[1];
-  EXPECT_TRUE(decoder_.receiveMetadata(nullptr, 1));
-  EXPECT_TRUE(decoder_.receiveMetadata(buf, 0));
-  EXPECT_EQ(0, decoder_.payload().length());
 
   cleanUp();
 }
@@ -336,8 +326,6 @@ TEST_F(MetadataEncoderDecoderTest, TestDecodeCallbackSetAfterReceiveMetadata) {
   // Sets up callback function.
   MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
                                   std::placeholders::_1);
-  // Registers nullptr will do nothing.
-  decoder_.registerMetadataCallback(nullptr);
   decoder_.registerMetadataCallback(cb);
 
   cleanUp();
