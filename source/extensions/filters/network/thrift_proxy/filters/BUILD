@@ -34,7 +34,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:connection_interface",
-        "//include/envoy/request_info:request_info_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//source/extensions/filters/network/thrift_proxy:decoder_events_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_interface",
         "//source/extensions/filters/network/thrift_proxy:thrift_lib",

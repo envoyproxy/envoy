@@ -6,7 +6,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
-#include "envoy/request_info/request_info.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "extensions/filters/network/thrift_proxy/decoder_events.h"
 #include "extensions/filters/network/thrift_proxy/protocol.h"
@@ -95,9 +95,9 @@ public:
   virtual void resetDownstreamConnection() PURE;
 
   /**
-   * @return requestInfo for logging purposes.
+   * @return StreamInfo for logging purposes.
    */
-  virtual RequestInfo::RequestInfo& requestInfo() PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 };
 
 /**

@@ -83,7 +83,7 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
     callbacks_->sendLocalReply(
         ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "over limit"),
         false);
-    callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::RateLimited);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
   } else if (status == RateLimit::LimitStatus::Error) {
     if (config_->failureModeAllow()) {
       cluster_->statsScope().counter("ratelimit.failure_mode_allowed").inc();
@@ -95,7 +95,7 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
       callbacks_->sendLocalReply(
           ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "limiter error"),
           false);
-      callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::RateLimitServiceError);
+      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
     }
   } else if (!initiating_call_) {
     callbacks_->continueDecoding();
@@ -116,7 +116,7 @@ void Filter::populateRateLimitDescriptors(
       continue;
     }
     rate_limit.populateDescriptors(*route_entry, descriptors, config_->localInfo().clusterName(),
-                                   metadata, *callbacks_->requestInfo().downstreamRemoteAddress());
+                                   metadata, *callbacks_->streamInfo().downstreamRemoteAddress());
   }
 }
 

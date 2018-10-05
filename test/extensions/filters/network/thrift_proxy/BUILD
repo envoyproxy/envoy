@@ -27,7 +27,7 @@ envoy_extension_cc_mock(
         "//source/extensions/filters/network/thrift_proxy/router:router_interface",
         "//source/extensions/filters/network/thrift_proxy/router:router_ratelimit_interface",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/request_info:request_info_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
     ],
 )

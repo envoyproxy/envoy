@@ -13,7 +13,7 @@
 #include "extensions/filters/network/thrift_proxy/transport.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/request_info/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -241,11 +241,11 @@ public:
   MOCK_METHOD2(startUpstreamResponse, void(Transport&, Protocol&));
   MOCK_METHOD1(upstreamData, ResponseStatus(Buffer::Instance&));
   MOCK_METHOD0(resetDownstreamConnection, void());
-  MOCK_METHOD0(requestInfo, RequestInfo::RequestInfo&());
+  MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
 
   uint64_t stream_id_{1};
   NiceMock<Network::MockConnection> connection_;
-  NiceMock<RequestInfo::MockRequestInfo> request_info_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   std::shared_ptr<Router::MockRoute> route_;
 };
 

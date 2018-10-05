@@ -220,8 +220,8 @@ TEST_F(ThriftRateLimitFilterTest, OkResponse) {
   EXPECT_EQ(ThriftProxy::FilterStatus::StopIteration, filter_->messageBegin(request_metadata_));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(RequestInfo::ResponseFlag::RateLimited))
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimited))
       .Times(0);
   request_callbacks_->complete(RateLimit::LimitStatus::OK, nullptr);
 
@@ -294,8 +294,8 @@ TEST_F(ThriftRateLimitFilterTest, ErrorResponse) {
   request_callbacks_->complete(RateLimit::LimitStatus::Error, nullptr);
 
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageEnd());
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(RequestInfo::ResponseFlag::RateLimited))
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimited))
       .Times(0);
 
   EXPECT_EQ(
@@ -325,8 +325,8 @@ TEST_F(ThriftRateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
         EXPECT_STREQ("limiter error", app_ex.what());
         EXPECT_EQ(ThriftProxy::AppExceptionType::InternalError, app_ex.type_);
       }));
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(RequestInfo::ResponseFlag::RateLimitServiceError));
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError));
   request_callbacks_->complete(RateLimit::LimitStatus::Error, nullptr);
 
   EXPECT_EQ(
@@ -357,8 +357,8 @@ TEST_F(ThriftRateLimitFilterTest, LimitResponse) {
         EXPECT_EQ(ThriftProxy::AppExceptionType::InternalError, app_ex.type_);
       }));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(RequestInfo::ResponseFlag::RateLimited));
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
   request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, nullptr);
 
   EXPECT_EQ(1U,
@@ -386,8 +386,8 @@ TEST_F(ThriftRateLimitFilterTest, LimitResponseWithHeaders) {
 
   // TODO(zuercher): Headers are currently ignored, but sendLocalReply is the place to pass them.
   EXPECT_CALL(filter_callbacks_, sendLocalReply(_, false));
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(RequestInfo::ResponseFlag::RateLimited));
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
 
   Http::HeaderMapPtr h{new Http::TestHeaderMapImpl(*rl_headers)};
   request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, std::move(h));

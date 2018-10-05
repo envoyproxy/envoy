@@ -85,7 +85,7 @@ MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
   ON_CALL(*this, streamId()).WillByDefault(Return(stream_id_));
   ON_CALL(*this, connection()).WillByDefault(Return(&connection_));
   ON_CALL(*this, route()).WillByDefault(Return(route_));
-  ON_CALL(*this, requestInfo()).WillByDefault(ReturnRef(request_info_));
+  ON_CALL(*this, streamInfo()).WillByDefault(ReturnRef(stream_info_));
 }
 MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() {}
 
