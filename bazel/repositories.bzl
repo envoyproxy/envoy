@@ -3,8 +3,8 @@ load(
     "git_repository",
     "new_git_repository",
 )
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":genrule_repository.bzl", "genrule_repository")
-load(":patched_http_archive.bzl", "patched_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
 load(":target_recipes.bzl", "TARGET_RECIPES")
 load(
@@ -16,6 +16,10 @@ load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
+
+# Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
+# archives, e.g. cares.
+BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])"""
 
 def _repository_impl(name, **kwargs):
     # `existing_rule_keys` contains the names of repositories that have already
@@ -279,6 +283,9 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     if "envoy_build_config" not in native.existing_rules().keys():
         _default_envoy_build_config(name = "envoy_build_config")
 
+    # Setup rules_foreign_cc
+    _foreign_cc_dependencies()
+
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
@@ -286,6 +293,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_google_absl()
     _com_github_bombela_backward()
     _com_github_circonus_labs_libcircllhist()
+    _com_github_c_ares_c_ares()
     _com_github_cyan4973_xxhash()
     _com_github_eile_tclap()
     _com_github_fmtlib_fmt()
@@ -297,6 +305,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_grpc_grpc()
     _com_github_google_jwt_verify()
     _com_github_nanopb_nanopb()
+    _com_github_nghttp2_nghttp2()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
     _com_google_googletest()
@@ -335,6 +344,18 @@ def _com_github_circonus_labs_libcircllhist():
     native.bind(
         name = "libcircllhist",
         actual = "@com_github_circonus_labs_libcircllhist//:libcircllhist",
+    )
+
+def _com_github_c_ares_c_ares():
+    location = REPOSITORY_LOCATIONS["com_github_c_ares_c_ares"]
+    http_archive(
+        name = "com_github_c_ares_c_ares",
+        build_file_content = BUILD_ALL_CONTENT,
+        **location
+    )
+    native.bind(
+        name = "ares",
+        actual = "//bazel/foreign_cc:ares",
     )
 
 def _com_github_cyan4973_xxhash():
@@ -395,6 +416,21 @@ def _com_github_google_libprotobuf_mutator():
     native.bind(
         name = "libprotobuf_mutator",
         actual = "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
+    )
+
+def _com_github_nghttp2_nghttp2():
+    location = REPOSITORY_LOCATIONS["com_github_nghttp2_nghttp2"]
+    http_archive(
+        name = "com_github_nghttp2_nghttp2",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patch_cmds = ["find . -name '*.sh' -exec sed -i.orig '1s|#!/usr/bin/env sh\$|/bin/sh\$|' {} +"],
+        patches = ["//bazel/foreign_cc:nghttp2.patch"],
+        **location
+    )
+    native.bind(
+        name = "nghttp2",
+        actual = "//bazel/foreign_cc:nghttp2",
     )
 
 def _io_opentracing_cpp():
@@ -547,6 +583,14 @@ def _com_github_google_jwt_verify():
     native.bind(
         name = "jwt_verify_lib",
         actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
+    )
+
+def _foreign_cc_dependencies():
+    http_archive(
+        name = "rules_foreign_cc",
+        strip_prefix = "rules_foreign_cc-master",
+        # TODO(htuch): Pin to SHA or release.
+        url = "https://github.com/bazelbuild/rules_foreign_cc/archive/master.zip",
     )
 
 def _apply_dep_blacklist(ctxt, recipes):

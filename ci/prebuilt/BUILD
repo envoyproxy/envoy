@@ -8,16 +8,6 @@ config_setting(
 )
 
 cc_library(
-    name = "ares",
-    srcs = select({
-        ":windows_x86_64": ["thirdparty_build/lib/cares.lib"],
-        "//conditions:default": ["thirdparty_build/lib/libcares.a"],
-    }),
-    hdrs = glob(["thirdparty_build/include/ares*.h"]),
-    includes = ["thirdparty_build/include"],
-)
-
-cc_library(
     name = "benchmark",
     srcs = select({
         ":windows_x86_64": ["thirdparty_build/lib/benchmark.lib"],
@@ -47,16 +37,6 @@ cc_library(
     includes = ["thirdparty_build/include"],
     # TODO(mattklein123): We should strip luajit-2.0 here for consumers. However, if we do that
     # the headers get included using -I vs. -isystem which then causes old-style-cast warnings.
-)
-
-cc_library(
-    name = "nghttp2",
-    srcs = select({
-        ":windows_x86_64": ["thirdparty_build/lib/nghttp2.lib"],
-        "//conditions:default": ["thirdparty_build/lib/libnghttp2.a"],
-    }),
-    hdrs = glob(["thirdparty_build/include/nghttp2/**/*.h"]),
-    includes = ["thirdparty_build/include"],
 )
 
 cc_library(
