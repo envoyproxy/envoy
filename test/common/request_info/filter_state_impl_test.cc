@@ -134,6 +134,83 @@ TEST_F(FilterStateImplTest, WrongTypeGet) {
                             "Data stored under test_name cannot be coerced to specified type");
 }
 
+
+TEST_F(FilterStateImplTest, IterateThroughListTillEnd) {
+  size_t access_count = 0u;
+  size_t destruction_count = 0u;
+  filter_state().addToList<TestStoredTypeTracking>(
+      "test_name", std::make_unique<TestStoredTypeTracking>(5, &access_count, &destruction_count));
+  filter_state().addToList<TestStoredTypeTracking>(
+      "test_name", std::make_unique<TestStoredTypeTracking>(5, &access_count, &destruction_count));
+  EXPECT_EQ(0u, access_count);
+  EXPECT_EQ(0u, destruction_count);
+
+  filter_state().forEachListItem<TestStoredTypeTracking>("test_name", [&](const TestStoredTypeTracking& t){
+      EXPECT_EQ(5, t.access());
+      return true;
+  });
+
+  EXPECT_EQ(2u, access_count);
+  EXPECT_EQ(0u, destruction_count);
+
+  resetFilterState();
+  EXPECT_EQ(2u, access_count);
+  EXPECT_EQ(2u, destruction_count);
+}
+
+TEST_F(FilterStateImplTest, IterateThroughListAndBreak) {
+  size_t access_count = 0u;
+  size_t destruction_count = 0u;
+  filter_state().addToList<TestStoredTypeTracking>(
+      "test_name", std::make_unique<TestStoredTypeTracking>(5, &access_count, &destruction_count));
+  filter_state().addToList<TestStoredTypeTracking>(
+      "test_name", std::make_unique<TestStoredTypeTracking>(5, &access_count, &destruction_count));
+  EXPECT_EQ(0u, access_count);
+  EXPECT_EQ(0u, destruction_count);
+
+  filter_state().forEachListItem<TestStoredTypeTracking>("test_name", [&](const TestStoredTypeTracking& t){
+      EXPECT_EQ(5, t.access());
+      return false;
+  });
+
+  EXPECT_EQ(1u, access_count);
+  EXPECT_EQ(0u, destruction_count);
+
+  resetFilterState();
+  EXPECT_EQ(1u, access_count);
+  EXPECT_EQ(2u, destruction_count);
+}
+
+TEST_F(FilterStateImplTest, NoNameConflictBetweenDataAndList) {
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1));
+  filter_state().addToList<SimpleType>("test_1", std::make_unique<SimpleType>(2));
+  EXPECT_EQ(1, filter_state().getData<SimpleType>("test_1").access());
+  filter_state().forEachListItem<SimpleType>("test_1", [&](const SimpleType& t){
+      EXPECT_EQ(2, t.access());
+      return true;
+  });
+}
+
+TEST_F(FilterStateImplTest, NameConflictDifferentTypesOfList) {
+  filter_state().addToList<SimpleType>("test_1", std::make_unique<SimpleType>(1));
+  EXPECT_THROW_WITH_MESSAGE(filter_state().addToList<TestStoredTypeTracking>("test_1", std::make_unique<TestStoredTypeTracking>(2, nullptr, nullptr)),
+                            EnvoyException, "List test_1 does not conform to the specified type");
+}
+
+TEST_F(FilterStateImplTest, UnknownNameForList) {
+  EXPECT_THROW_WITH_MESSAGE(filter_state().forEachListItem<SimpleType>("test_1", [&](const SimpleType&){return true;}),
+                            EnvoyException,
+                            "List test_1 does not exist");
+}
+
+TEST_F(FilterStateImplTest, WrongTypeInforEachListItem) {
+  filter_state().addToList<TestStoredTypeTracking>("test_name",
+                         std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr));
+  EXPECT_THROW_WITH_MESSAGE(filter_state().forEachListItem<SimpleType>("test_name", [&](const SimpleType&){return true;}),
+                            EnvoyException,
+                            "Element in list test_name cannot be coerced to specified type");
+}
+
 namespace {
 
 class A : public FilterState::Object {};
@@ -150,10 +227,20 @@ TEST_F(FilterStateImplTest, FungibleInheritance) {
   EXPECT_TRUE(filter_state().hasData<A>("testB"));
   EXPECT_FALSE(filter_state().hasData<C>("testB"));
 
+  filter_state().addToList<B>("testB", std::make_unique<B>());
+  EXPECT_TRUE(filter_state().hasList<B>("testB"));
+  EXPECT_TRUE(filter_state().hasList<A>("testB"));
+  EXPECT_FALSE(filter_state().hasList<C>("testB"));
+
   filter_state().setData("testC", std::make_unique<C>());
   EXPECT_TRUE(filter_state().hasData<B>("testC"));
   EXPECT_TRUE(filter_state().hasData<A>("testC"));
   EXPECT_TRUE(filter_state().hasData<C>("testC"));
+
+  filter_state().addToList<C>("testC", std::make_unique<C>());
+  EXPECT_TRUE(filter_state().hasList<B>("testC"));
+  EXPECT_TRUE(filter_state().hasList<A>("testC"));
+  EXPECT_TRUE(filter_state().hasList<C>("testC"));
 }
 
 TEST_F(FilterStateImplTest, HasData) {
@@ -164,6 +251,14 @@ TEST_F(FilterStateImplTest, HasData) {
   EXPECT_FALSE(filter_state().hasData<TestStoredTypeTracking>("test_2"));
   EXPECT_TRUE(filter_state().hasDataWithName("test_1"));
   EXPECT_FALSE(filter_state().hasDataWithName("test_2"));
+}
+
+TEST_F(FilterStateImplTest, HasList) {
+  filter_state().addToList<SimpleType>("test_1", std::make_unique<SimpleType>(1));
+  EXPECT_TRUE(filter_state().hasList<SimpleType>("test_1"));
+  EXPECT_FALSE(filter_state().hasList<SimpleType>("test_2"));
+  EXPECT_FALSE(filter_state().hasList<TestStoredTypeTracking>("test_1"));
+  EXPECT_FALSE(filter_state().hasList<TestStoredTypeTracking>("test_2"));
 }
 
 } // namespace RequestInfo

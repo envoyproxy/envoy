@@ -56,20 +56,66 @@ public:
   }
 
   /**
-   * @param data_name the name of the data being added to the end of the list.
+   * The addToList, hasListWithName, forEachListItem are variants of the above
+   * functions, that operate on list data. Multiple elements could be added
+   * the list under the same data_name.
+   * @param data_name the name of the data being added to the end of a list.
    * @param data an owning pointer to the data to be stored.
    * Note that data_names for list elements have no relation to the data_names 
    * for singleton data objects added through setData. All items added to the list
    * must be of the same type.
    */
-  virtual void addListData(absl::string_view data_name, std::unique_ptr<Object>&& data) PURE;
+  template <typename T> void addToList(absl::string_view data_name, std::unique_ptr<Object>&& data) {
+      const auto list = getList(data_name);
+      if (list != nullptr) {
+          // Check type of first element in the list
+          const T* cast = dynamic_cast<const T*>(list->at(0).get());
+          if (!cast) {
+              throw EnvoyException(
+                                   fmt::format("List {} does not conform to the specified type", data_name));
+          }
+      }
+
+      addToListGeneric(data_name, std::move(data));
+  }
+
+  /**
+   * @param data_name the name of the list being probed.
+   * @return Whether a list of the type and name specified exists in the
+   * data store.
+   */
+  template <typename T> bool hasList(absl::string_view data_name) const {
+      const auto list = getList(data_name);
+      return ((list != nullptr) &&
+              (dynamic_cast<const T*>(list->at(0).get()) != nullptr));
+  }
 
   /**
    * @param data_name the name of the list data being looked up.
-   * @return a const vector reference to the stored data.
-   * Note that it is an error to access data that has not previously been set.
+   * @param operation a lambda function that operates on each element in the list.
+   * The iteration will stop if the lambda function returns false or reaches 
+   * the end of the list. The iteration order will be the same as the order in which
+   * the elements were added to the list. Note that if an element in the list cannot 
+   * be dynamically type-cast into the requested type, an exception will be thrown. 
+   * It is an error to access data that has not previously been set.
    */
-  const std::vector<std::unique_ptr<Object>>& getListData(absl::string_view data_name) const PURE;
+  template <typename T> void forEachListItem(absl::string_view data_name, std::function<bool(const T&)>op) const {
+    const auto list = getList(data_name);
+    if (!list) {
+            throw EnvoyException(fmt::format("List {} does not exist", data_name));
+    }
+
+    for (auto it = list->begin(); it != list->end(); it++) {
+        const T* data = dynamic_cast<const T*>(it->get());
+        if (!data) {
+            throw EnvoyException(fmt::format("Element in list {} cannot be coerced to specified type",
+                                             data_name));
+        }
+        if (!op(*data)) {
+            break;
+        }
+    }
+  }
 
   /**
    * @param data_name the name of the data being probed.
@@ -78,15 +124,10 @@ public:
    */
   virtual bool hasDataWithName(absl::string_view data_name) const PURE;
 
-  /**
-   * @param data_name the name of the list data being probed.
-   * @return Whether a list data of any type and the name specified exists in the
-   * data store.
-   */
-  virtual bool hasListDataWithName(absl::string_view data_name) const PURE;
-
 protected:
   virtual const Object* getDataGeneric(absl::string_view data_name) const PURE;
+  virtual const std::vector<std::unique_ptr<Object>>* getList(absl::string_view data_name) const PURE;
+  virtual void addToListGeneric(absl::string_view data_name, std::unique_ptr<Object>&& data) PURE;
 };
 
 } // namespace RequestInfo

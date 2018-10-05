@@ -31,5 +31,27 @@ const FilterState::Object* FilterStateImpl::getDataGeneric(absl::string_view dat
   return it->second.get();
 }
 
+void FilterStateImpl::addToListGeneric(absl::string_view data_name, std::unique_ptr<Object>&& data) {
+  // TODO(Google): Remove string conversion when fixed internally.
+  const std::string name(data_name);
+  if (list_storage_.find(name) == list_storage_.end()) {
+    list_storage_[name] = std::make_unique<std::vector<std::unique_ptr<FilterState::Object>>>();
+  }
+
+  // absl::string_view will not convert to std::string without an explicit case; see
+  // https://github.com/abseil/abseil-cpp/blob/master/absl/strings/string_view.h#L328
+  list_storage_[name]->push_back(std::move(data));
+}
+
+const std::vector<std::unique_ptr<FilterState::Object>>* FilterStateImpl::getList(absl::string_view data_name) const {
+  // TODO(Google): Remove string conversion when fixed internally.
+  const auto& it = list_storage_.find(std::string(data_name));
+
+  if (it == list_storage_.end()) {
+    return nullptr;
+  }
+  return it->second.get();
+}
+
 } // namespace RequestInfo
 } // namespace Envoy
