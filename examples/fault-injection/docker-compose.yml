@@ -1,0 +1,25 @@
+version: '2'
+services:
+  envoy:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+    command: /usr/local/bin/envoy -c /etc/envoy.yaml
+    volumes:
+      - ./envoy.yaml:/etc/envoy.yaml
+      - ./runtime:/srv/runtime
+    networks:
+      - envoymesh
+    ports:
+      - 9211:9211
+      - 9901:9901
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile-backend
+    networks:
+      - envoymesh
+    ports:
+      - 8080:8080
+networks:
+  envoymesh: {}
