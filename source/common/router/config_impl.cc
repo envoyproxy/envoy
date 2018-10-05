@@ -53,15 +53,21 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
 
   for (const auto& host_predicate : config.retry_policy().retry_host_predicate()) {
-    Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
-        host_predicate.name())
-        ->createHostPredicate(*this, host_predicate.config(), num_retries_);
+    auto& factory =
+        ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
+            host_predicate.name());
+
+    auto config = ::Envoy::Config::Utility::translateToFactoryConfig(host_predicate, factory);
+    factory.createHostPredicate(*this, *config, num_retries_);
   }
 
   const auto retry_priority = config.retry_policy().retry_priority();
   if (!retry_priority.name().empty()) {
-    Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(retry_priority.name())
-        ->createRetryPriority(*this, retry_priority.config(), num_retries_);
+    auto& factory = ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
+        retry_priority.name());
+
+    auto config = ::Envoy::Config::Utility::translateToFactoryConfig(retry_priority, factory);
+    factory.createRetryPriority(*this, *config, num_retries_);
   }
 
   auto host_selection_attempts = config.retry_policy().host_selection_retry_max_attempts();
@@ -373,24 +379,24 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
 Http::WebSocketProxyPtr RouteEntryImplBase::createWebSocketProxy(
-    Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+    Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
     Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
     Network::ReadFilterCallbacks* read_callbacks) const {
   return std::make_unique<Http::WebSocket::WsHandlerImpl>(
-      request_headers, request_info, *this, callbacks, cluster_manager, read_callbacks,
+      request_headers, stream_info, *this, callbacks, cluster_manager, read_callbacks,
       websocket_config_, time_system_);
 }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
-                                                const RequestInfo::RequestInfo& request_info,
+                                                const StreamInfo::StreamInfo& stream_info,
                                                 bool insert_envoy_original_path) const {
   // Append user-specified request headers in the following order: route-action-level headers,
   // route-level headers, virtual host level headers and finally global connection manager level
   // headers.
-  route_action_request_headers_parser_->evaluateHeaders(headers, request_info);
-  request_headers_parser_->evaluateHeaders(headers, request_info);
-  vhost_.requestHeaderParser().evaluateHeaders(headers, request_info);
-  vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, request_info);
+  route_action_request_headers_parser_->evaluateHeaders(headers, stream_info);
+  request_headers_parser_->evaluateHeaders(headers, stream_info);
+  vhost_.requestHeaderParser().evaluateHeaders(headers, stream_info);
+  vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, stream_info);
   if (!host_rewrite_.empty()) {
     headers.Host()->value(host_rewrite_);
   }
@@ -401,15 +407,15 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
   }
 }
 
-void RouteEntryImplBase::finalizeResponseHeaders(
-    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
+void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers,
+                                                 const StreamInfo::StreamInfo& stream_info) const {
   // Append user-specified response headers in the following order: route-action-level headers,
   // route-level headers, virtual host level headers and finally global connection manager level
   // headers.
-  route_action_response_headers_parser_->evaluateHeaders(headers, request_info);
-  response_headers_parser_->evaluateHeaders(headers, request_info);
-  vhost_.responseHeaderParser().evaluateHeaders(headers, request_info);
-  vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, request_info);
+  route_action_response_headers_parser_->evaluateHeaders(headers, stream_info);
+  response_headers_parser_->evaluateHeaders(headers, stream_info);
+  vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
+  vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, stream_info);
 }
 
 absl::optional<RouteEntryImplBase::RuntimeData>

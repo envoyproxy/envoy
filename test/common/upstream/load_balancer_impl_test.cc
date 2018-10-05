@@ -219,6 +219,12 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(34, 33, 33));
+
+  // Rounding errors should be picked up by the first healthy priority.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 67, 33));
 }
 
 TEST_P(LoadBalancerBaseTest, BoundaryConditions) {

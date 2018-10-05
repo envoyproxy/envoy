@@ -5,6 +5,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 
 using namespace std::chrono_literals;
 using testing::_;
@@ -99,10 +100,10 @@ class MetricsServiceSinkTest : public testing::Test {};
 
 TEST(MetricsServiceSinkTest, CheckSendCall) {
   NiceMock<Stats::MockSource> source;
-  NiceMock<MockTimeSystem> mock_time;
+  Event::SimulatedTimeSystem time_system;
   std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer()};
 
-  MetricsServiceSink sink(streamer_, mock_time);
+  MetricsServiceSink sink(streamer_, time_system);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
@@ -127,10 +128,10 @@ TEST(MetricsServiceSinkTest, CheckSendCall) {
 
 TEST(MetricsServiceSinkTest, CheckStatsCount) {
   NiceMock<Stats::MockSource> source;
-  NiceMock<MockTimeSystem> mock_time;
+  Event::SimulatedTimeSystem time_system;
   std::shared_ptr<TestGrpcMetricsStreamer> streamer_{new TestGrpcMetricsStreamer()};
 
-  MetricsServiceSink sink(streamer_, mock_time);
+  MetricsServiceSink sink(streamer_, time_system);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";

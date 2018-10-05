@@ -10,8 +10,8 @@
 #include "envoy/network/address.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
-#include "envoy/request_info/filter_state.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/stream_info/filter_state.h"
 
 namespace Envoy {
 namespace Event {
@@ -245,8 +245,8 @@ public:
    * consumed by many other objects.
    * @return the per-connection state associated with this connection.
    */
-  virtual RequestInfo::FilterState& perConnectionState() PURE;
-  virtual const RequestInfo::FilterState& perConnectionState() const PURE;
+  virtual StreamInfo::FilterState& perConnectionState() PURE;
+  virtual const StreamInfo::FilterState& perConnectionState() const PURE;
 
   /**
    * Set the timeout for delayed connection close()s.
