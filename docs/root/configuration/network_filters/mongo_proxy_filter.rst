@@ -147,7 +147,7 @@ mongo.mongo.drain_close_enabled
   % of connections that will be drain closed if the server is draining and would otherwise
   attempt a drain close. Defaults to 100.
 
-mongo.fault.fixed_delay.percentage
+mongo.fault.fixed_delay.percent
   Probability of an eligible MongoDB operation to be affected by
   the injected fault when there is no active fault.
   Defaults to the *percentage* specified in the config.
