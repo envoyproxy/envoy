@@ -160,7 +160,7 @@ private:
     iterator_.reset();
   }
 
-  // To get reference to parent's (StreamInfoWrapper) request info member.
+  // To get reference to parent's (StreamInfoWrapper) stream info member.
   StreamInfo::StreamInfo& streamInfo();
 
   StreamInfoWrapper& parent_;
@@ -170,7 +170,7 @@ private:
 };
 
 /**
- * Lua wrapper for a request info.
+ * Lua wrapper for a stream info.
  */
 class StreamInfoWrapper : public Filters::Common::Lua::BaseLuaObject<StreamInfoWrapper> {
 public:
@@ -187,7 +187,7 @@ private:
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaProtocol);
 
   /**
-   * Get reference to request info dynamic metadata object.
+   * Get reference to stream info dynamic metadata object.
    * @return DynamicMetadataMapWrapper representation of StreamInfo dynamic metadata.
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDynamicMetadata);
