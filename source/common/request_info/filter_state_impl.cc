@@ -31,7 +31,8 @@ const FilterState::Object* FilterStateImpl::getDataGeneric(absl::string_view dat
   return it->second.get();
 }
 
-void FilterStateImpl::addToListGeneric(absl::string_view data_name, std::unique_ptr<Object>&& data) {
+void FilterStateImpl::addToListGeneric(absl::string_view data_name,
+                                       std::unique_ptr<Object>&& data) {
   // TODO(Google): Remove string conversion when fixed internally.
   const std::string name(data_name);
   if (list_storage_.find(name) == list_storage_.end()) {
@@ -43,7 +44,8 @@ void FilterStateImpl::addToListGeneric(absl::string_view data_name, std::unique_
   list_storage_[name]->push_back(std::move(data));
 }
 
-const std::vector<std::unique_ptr<FilterState::Object>>* FilterStateImpl::getList(absl::string_view data_name) const {
+const std::vector<std::unique_ptr<FilterState::Object>>*
+FilterStateImpl::getList(absl::string_view data_name) const {
   // TODO(Google): Remove string conversion when fixed internally.
   const auto& it = list_storage_.find(std::string(data_name));
 
