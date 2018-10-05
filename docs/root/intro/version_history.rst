@@ -3,6 +3,7 @@ Version history
 
 1.9.0 (pending)
 ===============
+* admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * Renamed the `RequestInfo` namespace to `StreamInfo` to better match its
   behaviour within TCP and HTTP implementations.
 
@@ -14,7 +15,6 @@ Version history
 * access log: added REQUESTED_SERVER_NAME for SNI to tcp_proxy and http
 * admin: added :http:get:`/hystrix_event_stream` as an endpoint for monitoring envoy's statistics
   through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
-* admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * cli: Added support for :ref:`component log level <operations_cli>` command line option for configuring log levels of individual components.
 * cluster: added :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>` to merge
   health check/weight/metadata updates within the given duration.

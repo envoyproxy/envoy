@@ -277,8 +277,8 @@ TEST_F(SslContextImplTest, TestNoCert) {
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
   ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
-  EXPECT_EQ("", context->getCaCertInformation()->path());
-  EXPECT_EQ("", context->getCertChainInformation()->path());
+  EXPECT_EQ(nullptr, context->getCaCertInformation());
+  EXPECT_EQ(nullptr, context->getCertChainInformation());
 }
 
 class SslServerContextImplTicketTest : public SslContextImplTest {

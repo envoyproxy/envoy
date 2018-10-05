@@ -460,14 +460,14 @@ int32_t ContextImpl::getDaysUntilExpiration(const X509* cert) const {
 
 CertificateDetailsPtr ContextImpl::getCaCertInformation() const {
   if (ca_cert_ == nullptr) {
-    return std::make_unique<envoy::admin::v2alpha::CertificateDetails>();
+    return nullptr;
   }
   return certificateDetails(ca_cert_.get(), getCaFileName());
 }
 
 CertificateDetailsPtr ContextImpl::getCertChainInformation() const {
   if (cert_chain_ == nullptr) {
-    return std::make_unique<envoy::admin::v2alpha::CertificateDetails>();
+    return nullptr;
   }
   return certificateDetails(cert_chain_.get(), getCertChainFileName());
 }

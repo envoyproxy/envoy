@@ -762,9 +762,9 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap& response_
   server_.sslContextManager().iterateContexts([&](const Ssl::Context& context) -> void {
     envoy::admin::v2alpha::Certificate& certificate = *certificates.add_certificates();
     envoy::admin::v2alpha::CertificateDetails* ca_certificate = certificate.mutable_ca_cert();
-    ca_certificate->MergeFrom(*context.getCaCertInformation());
+    *ca_certificate = *context.getCaCertInformation();
     envoy::admin::v2alpha::CertificateDetails* cert_chain = certificate.mutable_cert_chain();
-    cert_chain->MergeFrom(*context.getCertChainInformation());
+    *cert_chain = *context.getCertChainInformation();
   });
   response.add(MessageUtil::getJsonStringFromMessage(certificates, true, true));
   return Http::Code::OK;
