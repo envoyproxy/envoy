@@ -28,7 +28,8 @@ def _repository_impl(name, **kwargs):
         # wants to override the version. Do nothing.
         return
 
-    location = REPOSITORY_LOCATIONS[name]
+    loc_key = kwargs.pop("repository_key", name)
+    location = REPOSITORY_LOCATIONS[loc_key]
 
     # Git tags are mutable. We want to depend on commit IDs instead. Give the
     # user a useful error if they accidentally specify a tag.
@@ -489,8 +490,10 @@ def _com_google_protobuf():
     # Needed for cc_proto_library, Bazel doesn't support aliases today for repos,
     # see https://groups.google.com/forum/#!topic/bazel-discuss/859ybHQZnuI and
     # https://github.com/bazelbuild/bazel/issues/3219.
-    location = REPOSITORY_LOCATIONS["com_google_protobuf"]
-    git_repository(name = "com_google_protobuf_cc", **location)
+    _repository_impl(
+        "com_google_protobuf_cc",
+        repository_key = "com_google_protobuf",
+    )
     native.bind(
         name = "protobuf",
         actual = "@com_google_protobuf//:protobuf",

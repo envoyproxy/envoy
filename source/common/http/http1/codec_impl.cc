@@ -21,6 +21,12 @@ namespace Http1 {
 const std::string StreamEncoderImpl::CRLF = "\r\n";
 const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n\r\n";
 
+StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {
+  if (connection_.connection().aboveHighWatermark()) {
+    runHighWatermarkCallbacks();
+  }
+}
+
 void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const char* value,
                                      uint32_t value_size) {
 

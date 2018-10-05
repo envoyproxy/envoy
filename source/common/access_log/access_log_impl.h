@@ -51,7 +51,7 @@ public:
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
+  bool evaluate(const StreamInfo::StreamInfo& info,
                 const Http::HeaderMap& request_headers) override;
 };
 
@@ -65,7 +65,7 @@ public:
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
+  bool evaluate(const StreamInfo::StreamInfo& info,
                 const Http::HeaderMap& request_headers) override;
 };
 
@@ -91,7 +91,7 @@ public:
             Runtime::RandomGenerator& random);
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
+  bool evaluate(const StreamInfo::StreamInfo& info,
                 const Http::HeaderMap& request_headers) override;
 };
 
@@ -104,7 +104,7 @@ public:
            Runtime::RandomGenerator& random);
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
+  bool evaluate(const StreamInfo::StreamInfo& info,
                 const Http::HeaderMap& request_headers) override;
 };
 
@@ -116,7 +116,7 @@ public:
   NotHealthCheckFilter() {}
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
+  bool evaluate(const StreamInfo::StreamInfo& info,
                 const Http::HeaderMap& request_headers) override;
 };
 
@@ -126,7 +126,7 @@ public:
 class TraceableRequestFilter : public Filter {
 public:
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
+  bool evaluate(const StreamInfo::StreamInfo& info,
                 const Http::HeaderMap& request_headers) override;
 };
 
@@ -139,7 +139,7 @@ public:
                 Runtime::Loader& runtime, Runtime::RandomGenerator& random);
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
+  bool evaluate(const StreamInfo::StreamInfo& info,
                 const Http::HeaderMap& request_headers) override;
 
 private:
@@ -158,7 +158,7 @@ public:
   HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
+  bool evaluate(const StreamInfo::StreamInfo& info,
                 const Http::HeaderMap& request_headers) override;
 
 private:
@@ -173,7 +173,7 @@ public:
   ResponseFlagFilter(const envoy::config::filter::accesslog::v2::ResponseFlagFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
+  bool evaluate(const StreamInfo::StreamInfo& info,
                 const Http::HeaderMap& request_headers) override;
 
 private:

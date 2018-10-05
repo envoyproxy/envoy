@@ -119,21 +119,11 @@ void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint6
 }
 
 Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, const std::string& name) {
-  for (auto counter : store.counters()) {
-    if (counter->name() == name) {
-      return counter;
-    }
-  }
-  return nullptr;
+  return findByName(store.counters(), name);
 }
 
 Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::string& name) {
-  for (auto gauge : store.gauges()) {
-    if (gauge->name() == name) {
-      return gauge;
-    }
-  }
-  return nullptr;
+  return findByName(store.gauges(), name);
 }
 
 std::list<Network::Address::InstanceConstSharedPtr>

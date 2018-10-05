@@ -215,8 +215,8 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_headers_));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(RequestInfo::ResponseFlag::RateLimited))
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimited))
       .Times(0);
   request_callbacks_->complete(RateLimit::LimitStatus::OK, nullptr);
 
@@ -258,8 +258,8 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_headers_));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(RequestInfo::ResponseFlag::RateLimited))
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimited))
       .Times(0);
 
   Http::HeaderMapPtr rl_headers{
@@ -357,8 +357,8 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponse) {
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(RequestInfo::ResponseFlag::RateLimited))
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimited))
       .Times(0);
 
   EXPECT_EQ(
@@ -385,8 +385,8 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
 
   request_callbacks_->complete(RateLimit::LimitStatus::Error, nullptr);
 
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(RequestInfo::ResponseFlag::RateLimitServiceError))
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError))
       .Times(0);
 
   EXPECT_EQ(
@@ -414,8 +414,8 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
   Http::TestHeaderMapImpl response_headers{{":status", "429"}};
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(RequestInfo::ResponseFlag::RateLimited));
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
 
   request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, nullptr);
 
@@ -456,8 +456,8 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
 
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(RequestInfo::ResponseFlag::RateLimited));
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
 
   Http::HeaderMapPtr h{new Http::TestHeaderMapImpl(*rl_headers)};
   request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, std::move(h));

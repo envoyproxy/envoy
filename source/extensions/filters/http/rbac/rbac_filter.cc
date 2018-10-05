@@ -62,7 +62,7 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
                 ", subjectPeerCertificate: " +
                 callbacks_->connection()->ssl()->subjectPeerCertificate()
           : "none",
-      headers, callbacks_->requestInfo().dynamicMetadata().DebugString());
+      headers, callbacks_->streamInfo().dynamicMetadata().DebugString());
 
   std::string effective_policy_id;
   const auto& shadow_engine =
@@ -71,7 +71,7 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
   if (shadow_engine.has_value()) {
     std::string shadow_resp_code = resp_code_200;
     if (shadow_engine->allowed(*callbacks_->connection(), headers,
-                               callbacks_->requestInfo().dynamicMetadata(), &effective_policy_id)) {
+                               callbacks_->streamInfo().dynamicMetadata(), &effective_policy_id)) {
       ENVOY_LOG(debug, "shadow allowed");
       config_->stats().shadow_allowed_.inc();
     } else {
@@ -89,14 +89,14 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
 
     *fields[shadow_resp_code_field].mutable_string_value() = shadow_resp_code;
 
-    callbacks_->requestInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
+    callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
   }
 
   const auto& engine =
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine.has_value()) {
     if (engine->allowed(*callbacks_->connection(), headers,
-                        callbacks_->requestInfo().dynamicMetadata(), nullptr)) {
+                        callbacks_->streamInfo().dynamicMetadata(), nullptr)) {
       ENVOY_LOG(debug, "enforced allowed");
       config_->stats().allowed_.inc();
       return Http::FilterHeadersStatus::Continue;

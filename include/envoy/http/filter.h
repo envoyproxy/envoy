@@ -123,10 +123,10 @@ public:
   virtual uint64_t streamId() PURE;
 
   /**
-   * @return requestInfo for logging purposes. Individual filter may add specific information to be
+   * @return streamInfo for logging purposes. Individual filter may add specific information to be
    * put into the access log.
    */
-  virtual RequestInfo::RequestInfo& requestInfo() PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   /**
    * @return span context used for tracing purposes. Individual filters may add or modify
