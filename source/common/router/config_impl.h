@@ -389,10 +389,6 @@ private:
     // Fields associated with the 'runtime_fractional_percent' field for the RouteMatch proto.
     std::string fractional_runtime_key;
     envoy::type::FractionalPercent fractional_default_value;
-
-    // Fields associated with the deprecated 'runtime' field for the RouteMatch proto.
-    std::string runtime_key;
-    uint64_t runtime_default_value;
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {

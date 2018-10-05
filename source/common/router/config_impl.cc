@@ -418,41 +418,33 @@ void RouteEntryImplBase::finalizeResponseHeaders(
 }
 
 bool RouteEntryImplBase::evaluateRuntimeKeys(const RuntimeData& runtime_data, const uint64_t random_value) const {
-  bool continue_matching = true;
-  if (!runtime_data.fractional_runtime_key.empty()) {
-    envoy::type::FractionalPercent fractional_percent;
-    const std::string& fraction_yaml = loader_.snapshot().get(runtime_data.fractional_runtime_key);
+  envoy::type::FractionalPercent fractional_percent;
+  const std::string& fraction_yaml = loader_.snapshot().get(runtime_data.fractional_runtime_key);
 
-    try {
-      MessageUtil::loadFromYamlAndValidate(fraction_yaml, fractional_percent);
-    } catch (const EnvoyException& ex) {
-      ENVOY_LOG(error, "failed to parse string value for runtime key {}: {}",
-                runtime_data.fractional_runtime_key, ex.what());
-      fractional_percent = runtime_data.fractional_default_value;
-    }
-
-    const auto numerator = fractional_percent.numerator();
-    const auto denominator =
-        ProtobufPercentHelper::fractionalPercentDenominatorToInt(fractional_percent.denominator());
-    continue_matching = random_value % denominator < numerator;
-  } else if (!runtime_data.runtime_key.empty()) {
-    continue_matching = loader_.snapshot().featureEnabled(runtime_data.runtime_key,
-                                                          runtime_data.runtime_default_value,
-                                                          random_value);
+  try {
+    MessageUtil::loadFromYamlAndValidate(fraction_yaml, fractional_percent);
+  } catch (const EnvoyException& ex) {
+    ENVOY_LOG(error, "failed to parse string value for runtime key {}: {}",
+              runtime_data.fractional_runtime_key, ex.what());
+    fractional_percent = runtime_data.fractional_default_value;
   }
 
-  return continue_matching;
+  const auto numerator = fractional_percent.numerator();
+  const auto denominator =
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(fractional_percent.denominator());
+   
+  return random_value % denominator < numerator;
 }
 
 absl::optional<RouteEntryImplBase::RuntimeData>
 RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& route_match) {
-  absl::optional<RuntimeData> runtime;
-  RuntimeData runtime_data;
+  if (!route_match.has_runtime_fraction()) {
+    return absl::optional<RouteEntryImplBase::RuntimeData>();
+  }
 
+  RouteEntryImplBase::RuntimeData runtime_data;
   runtime_data.fractional_runtime_key = route_match.runtime_fraction().runtime_key();
   runtime_data.fractional_default_value = route_match.runtime_fraction().default_value();
-  runtime_data.runtime_key = route_match.runtime().runtime_key();
-  runtime_data.runtime_default_value = route_match.runtime().default_value();
 
   return runtime_data;
 }
