@@ -9,16 +9,12 @@ namespace Http2 {
 MetadataDecoder::MetadataDecoder(uint64_t stream_id) : stream_id_(stream_id) {
   int rv = nghttp2_hd_inflate_new(&inflater_);
   ASSERT(rv == 0);
+  inflater_deleter_ = InflaterDeleter(inflater_);
 }
 
-MetadataDecoder::~MetadataDecoder() { nghttp2_hd_inflate_del(inflater_); }
-
 bool MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len) {
-  if (data == nullptr || len == 0) {
-    ENVOY_LOG(error, "No payload for the decoder to receive.");
-  } else {
-    payload_.add(data, len);
-  }
+  ASSERT(data != nullptr && len != 0);
+  payload_.add(data, len);
 
   return payload_.length() <= max_payload_size_bound_;
 }
@@ -56,7 +52,7 @@ bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
     auto slice = slices[i];
     // is_end indicates if the data in slice is the last data in the current
     // header block.
-    int is_end = (i == (num_slices - 1) && end_metadata) ? 1 : 0;
+    bool is_end = i == (num_slices - 1) && end_metadata;
 
     // Feeds data to nghttp2 to decode.
     while (slice.len_ > 0) {
@@ -93,10 +89,7 @@ bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
 }
 
 void MetadataDecoder::registerMetadataCallback(MetadataCallback callback) {
-  if (callback == nullptr) {
-    ENVOY_LOG(error, "Registered callback function is nullptr.");
-    return;
-  }
+  ASSERT(callback != nullptr);
   callback_ = std::move(callback);
   for (const auto& metadata_map : metadata_map_list_) {
     callback_(metadata_map);

@@ -8,16 +8,20 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+namespace {
+typedef CSmartPtr<nghttp2_hd_deflater, nghttp2_hd_deflate_del> DeflaterDeleter;
+}
+
 bool MetadataEncoder::createPayload(MetadataMap& metadata_map) {
-  if (payload_.length() > 0 || metadata_map.empty()) {
-    // |payload_| is not empty or |metadata_map| is empty. Return failure.
-    ENVOY_LOG(error, "payload_ size is {}, metadata_map is {}empty", payload_.length(),
-              metadata_map.empty() ? "" : "not ");
+  ASSERT(!metadata_map.empty());
+  if (payload_.length() > 0) {
+    // |payload_| is not empty.
+    ENVOY_LOG(error, "payload_ is not empty.");
     return false;
   }
 
   bool success = createHeaderBlockUsingNghttp2(metadata_map);
-  if (!success || !hasNextFrame()) {
+  if (!success) {
     ENVOY_LOG(error, "Failed to create payload.");
     return false;
   }
@@ -42,13 +46,14 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(MetadataMap& metadata_map) {
   int rv;
   nghttp2_hd_deflater* deflater;
   rv = nghttp2_hd_deflate_new(&deflater, header_table_size_);
+  // Ensure deflater will be automatically deleted.
+  DeflaterDeleter deflater_deleter(deflater);
   ASSERT(rv == 0);
 
   // Estimates the upper bound of output payload.
   size_t buflen = nghttp2_hd_deflate_bound(deflater, nva, nvlen);
   if (buflen > max_payload_size_bound_) {
     ENVOY_LOG(error, "Payload size {} exceeds the max bound.", buflen);
-    nghttp2_hd_deflate_del(deflater);
     return false;
   }
   Buffer::RawSlice iovec;
@@ -63,7 +68,6 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(MetadataMap& metadata_map) {
 
   payload_.commit(&iovec, 1);
 
-  nghttp2_hd_deflate_del(deflater);
   return true;
 }
 
