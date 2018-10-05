@@ -6,6 +6,7 @@ Version history
 * fault: removed integer percentage support.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
+* thrift_proxy: introduced thrift rate limiter filter
 
 1.8.0 (Oct 4, 2018)
 ===================
@@ -21,11 +22,11 @@ Version history
 * config: regex validation added to limit to a maximum of 1024 characters.
 * config: v1 disabled by default. v1 support remains available until October via flipping --v2-config-only=false.
 * config: v1 disabled by default. v1 support remains available until October via setting :option:`--allow-deprecated-v1-api`.
-* config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`  
-  stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented 
+* config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`
+  stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented
   in case of schema/validation error.
-* config: Added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with 
-  management server. 
+* config: Added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with
+  management server.
 * ext_authz: added support for configuring additional :ref:`authorization headers <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_headers_to_add>`
   to be sent from Envoy to the authorization service.
 * fault: added support for fractional percentages in :ref:`FaultDelay <envoy_api_field_config.filter.fault.v2.FaultDelay.percentage>`
@@ -83,7 +84,7 @@ Version history
   :ref:`use_data_plane_proto<envoy_api_field_config.ratelimit.v2.RateLimitServiceConfig.use_data_plane_proto>`
   boolean flag in the ratelimit configuration.
   Support for the legacy proto :repo:`source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
-* ratelimit: added :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in 
+* ratelimit: added :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in
   case of rate limit service error.
 * rbac config: added a :ref:`principal_name <envoy_api_field_config.rbac.v2alpha.Principal.Authenticated.principal_name>` field and
   removed the old `name` field to give more flexibility for matching certificate identity.
@@ -98,7 +99,6 @@ Version history
 * tls: implemented :ref:`Secret Discovery Service <config_secret_discovery_service>`.
 * tracing: added support for configuration of :ref:`tracing sampling
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
-* thrift_proxy: introduced thrift rate limiter filter
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
   selecting a host from a subset.
 * upstream: require opt-in to use the :ref:`x-envoy-orignal-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` header
