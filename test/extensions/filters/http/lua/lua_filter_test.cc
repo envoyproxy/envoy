@@ -1517,7 +1517,7 @@ TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-// Set and get request info dynamic metadata.
+// Set and get stream info dynamic metadata.
 TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
