@@ -110,7 +110,9 @@ message VirtualHost {
   // for if and how it is utilized.
   map<string, google.protobuf.Struct> per_filter_config = 12;
 
-  // Decides whether the x-envoy-attempt-count header should be included in upstream
+  // <config_http_filters_router_x-envoy-original-path>` header.
+  // Decides whether the :ref:`x-envoy-attempt-count
+  // <config_http_filters_router_x-envoy-attempt-count>` header should be included in upstream
   // request. Defaults to false.
   bool include_request_attempt_count = 14;
 }

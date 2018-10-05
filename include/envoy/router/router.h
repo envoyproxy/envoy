@@ -620,6 +620,8 @@ public:
   };
 
   /**
+   * True if the virtual host this RouteEntry belongs to is configured to include the attempt
+   * count header.
    * @return bool whether x-envoy-attempt-count should be included on the upstream request.
    */
   virtual bool includeAttemptCount() const PURE;

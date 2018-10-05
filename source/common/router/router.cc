@@ -289,7 +289,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   include_attempt_count_ = route_entry_->includeAttemptCount();
   if (include_attempt_count_) {
-    headers.insertEnvoyAttemptCount().value(1);
+    headers.insertEnvoyAttemptCount().value(attempt_count_);
   }
 
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
