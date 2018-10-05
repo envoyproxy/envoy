@@ -51,6 +51,7 @@ bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
 PROTO_RST="
   /envoy/admin/v2alpha/clusters/envoy/admin/v2alpha/clusters.proto.rst
   /envoy/admin/v2alpha/config_dump/envoy/admin/v2alpha/config_dump.proto.rst
+  /envoy/admin/v2alpha/memory/envoy/admin/v2alpha/memory.proto.rst
   /envoy/admin/v2alpha/clusters/envoy/admin/v2alpha/metrics.proto.rst
   /envoy/api/v2/core/address/envoy/api/v2/core/address.proto.rst
   /envoy/api/v2/core/base/envoy/api/v2/core/base.proto.rst

@@ -1146,7 +1146,7 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
 TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
   setup();
 
-  RequestInfo::FilterStateImpl per_connection_state;
+  StreamInfo::FilterStateImpl per_connection_state;
   per_connection_state.setData("envoy.tcp_proxy.cluster",
                                std::make_unique<PerConnectionCluster>("filter_state_cluster"));
   ON_CALL(connection_, perConnectionState()).WillByDefault(ReturnRef(per_connection_state));

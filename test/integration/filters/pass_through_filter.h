@@ -4,7 +4,6 @@
 
 namespace Envoy {
 
-// TODO(alyssawilk) move add_trailers_filter to use this.
 // A filter which passes all data through with Continue status.
 class PassThroughFilter : public Http::StreamFilter {
 public:

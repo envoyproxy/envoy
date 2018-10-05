@@ -30,7 +30,7 @@ public:
       return Grpc::AsyncClientPtr{async_client_};
     }));
     streamer_ = std::make_unique<GrpcMetricsStreamerImpl>(Grpc::AsyncClientFactoryPtr{factory_},
-                                                          tls_, local_info_);
+                                                          local_info_);
   }
 
   void expectStreamStart(MockMetricsStream& stream, MetricsServiceCallbacks** callbacks_to_set) {
@@ -42,7 +42,6 @@ public:
         }));
   }
 
-  NiceMock<ThreadLocal::MockInstance> tls_;
   LocalInfo::MockLocalInfo local_info_;
   Grpc::MockAsyncClient* async_client_{new Grpc::MockAsyncClient};
   Grpc::MockAsyncClientFactory* factory_{new Grpc::MockAsyncClientFactory};

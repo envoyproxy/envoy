@@ -1,17 +1,17 @@
 #pragma once
 
-#include "envoy/request_info/request_info.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
-#include "common/request_info/filter_state_impl.h"
+#include "common/stream_info/filter_state_impl.h"
 
 #include "test/test_common/test_time.h"
 
 namespace Envoy {
 
-class TestRequestInfo : public RequestInfo::RequestInfo {
+class TestStreamInfo : public StreamInfo::StreamInfo {
 public:
-  TestRequestInfo() {
+  TestStreamInfo() {
     tm fake_time;
     memset(&fake_time, 0, sizeof(fake_time));
     fake_time.tm_year = 99; // tm < 1901-12-13 20:45:52 is not valid on osx
@@ -36,11 +36,11 @@ public:
   bool intersectResponseFlags(uint64_t response_flags) const override {
     return (response_flags_ & response_flags) != 0;
   }
-  bool hasResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) const override {
+  bool hasResponseFlag(Envoy::StreamInfo::ResponseFlag response_flag) const override {
     return response_flags_ & response_flag;
   }
   bool hasAnyResponseFlag() const override { return response_flags_ != 0; }
-  void setResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) override {
+  void setResponseFlag(Envoy::StreamInfo::ResponseFlag response_flag) override {
     response_flags_ |= response_flag;
   }
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
@@ -159,10 +159,10 @@ public:
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  const Envoy::RequestInfo::FilterState& perRequestState() const override {
+  const Envoy::StreamInfo::FilterState& perRequestState() const override {
     return per_request_state_;
   }
-  Envoy::RequestInfo::FilterState& perRequestState() override { return per_request_state_; }
+  Envoy::StreamInfo::FilterState& perRequestState() override { return per_request_state_; }
 
   void setRequestedServerName(const absl::string_view requested_server_name) override {
     requested_server_name_ = std::string(requested_server_name);
@@ -194,7 +194,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
-  Envoy::RequestInfo::FilterStateImpl per_request_state_{};
+  Envoy::StreamInfo::FilterStateImpl per_request_state_{};
   std::string requested_server_name_;
   DangerousDeprecatedTestTime test_time_;
 };

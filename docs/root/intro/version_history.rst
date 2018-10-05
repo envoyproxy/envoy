@@ -1,8 +1,14 @@
 Version history
 ---------------
 
-1.8.0 (Pending)
+1.9.0 (pending)
 ===============
+* fault: removed integer percentage support.
+* stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
+  its behaviour within TCP and HTTP implementations.
+
+1.8.0 (Oct 4, 2018)
+===================
 * access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>`
   to filter based on the presence of Envoy response flags.
 * access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.
@@ -66,8 +72,8 @@ Version history
   :ref:`destination_port <envoy_api_field_listener.FilterChainMatch.destination_port>` and
   :ref:`prefix_ranges <envoy_api_field_listener.FilterChainMatch.prefix_ranges>`.
 * lua: added :ref:`connection() <config_http_filters_lua_connection_wrapper>` wrapper and *ssl()* API.
-* lua: added :ref:`requestInfo() <config_http_filters_lua_request_info_wrapper>` wrapper and *protocol()* API.
-* lua: added :ref:`requestInfo():dynamicMetadata() <config_http_filters_lua_request_info_dynamic_metadata_wrapper>` API.
+* lua: added :ref:`streamInfo() <config_http_filters_lua_stream_info_wrapper>` wrapper and *protocol()* API.
+* lua: added :ref:`streamInfo():dynamicMetadata() <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>` API.
 * network: introduced :ref:`sni_cluster <config_network_filters_sni_cluster>` network filter that forwards connections to the
   upstream cluster specified by the SNI value presented by the client during a TLS handshake.
 * proxy_protocol: added support for HAProxy Proxy Protocol v2 (AF_INET/AF_INET6 only).
@@ -99,8 +105,8 @@ Version history
   for overriding destination address when using the :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   load balancing policy.
 
-1.7.0
-===============
+1.7.0 (Jun 21, 2018)
+====================
 * access log: added ability to log response trailers.
 * access log: added ability to format START_TIME.
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.

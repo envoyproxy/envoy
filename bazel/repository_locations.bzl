@@ -1,4 +1,9 @@
 REPOSITORY_LOCATIONS = dict(
+    bazel_gazelle = dict(
+        sha256 = "1b959bd6b6ce88fc3fdfc28946adf1eafb1d5e4d470d2e08a51774d09078d031",
+        strip_prefix = "bazel-gazelle-0.14.0",
+        urls = ["https://github.com/bazelbuild/bazel-gazelle/archive/0.14.0.tar.gz"],
+    ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
         commit = "ab36a84b91b3116bacc85973995504818748d8a9",  # chromium-69.0.3497.81
@@ -129,17 +134,25 @@ REPOSITORY_LOCATIONS = dict(
         # that includes:
         # - https://github.com/google/protobuf/commit/f35669b8d3f46f7f1236bd21f14d744bba251e60
         # - https://github.com/google/protobuf/commit/6a4fec616ec4b20f54d5fb530808b855cb664390
-        commit = "6a4fec616ec4b20f54d5fb530808b855cb664390",
+        # - https://github.com/google/protobuf/commit/fa252ec2a54acb24ddc87d48fed1ecfd458445fd
+        commit = "fa252ec2a54acb24ddc87d48fed1ecfd458445fd",
         remote = "https://github.com/google/protobuf",
     ),
     grpc_httpjson_transcoding = dict(
         commit = "05a15e4ecd0244a981fdf0348a76658def62fa9c",  # 2018-05-30
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
+    com_github_golang_protobuf = dict(
+        # TODO(sesmith177): Remove this dependency when both:
+        #   1. There's a release of golang/protobuf that includes
+        #      https://github.com/golang/protobuf/commit/31e0d063dd98c052257e5b69eeb006818133f45c
+        #   2. That release is included in rules_go
+        commit = "31e0d063dd98c052257e5b69eeb006818133f45c",  # 2018-10-03
+        remote = "https://github.com/golang/protobuf",
+    ),
     io_bazel_rules_go = dict(
-        sha256 = "5a89e9c1fe89d45c4a45132fae94bf130842ce3c77e3a735a68f6991d4e00a25",
-        strip_prefix = "rules_go-0.11.2",
-        urls = ["https://github.com/bazelbuild/rules_go/archive/0.11.2.tar.gz"],
+        commit = "3d966375ff7971d43b863f785f495c7dcd6923da",  # 2018-10-02
+        remote = "https://github.com/bazelbuild/rules_go",
     ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",

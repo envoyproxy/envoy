@@ -3,7 +3,7 @@
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/utility.h"
-#include "common/request_info/utility.h"
+#include "common/stream_info/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -83,66 +83,66 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
 
 void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
-    const RequestInfo::RequestInfo& request_info) {
+    const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(RequestInfo::ResponseFlag::LastFlag == 0x2000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x2000,
                 "A flag has been added. Fix this code.");
 
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::FailedLocalHealthCheck)) {
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
     common_access_log.mutable_response_flags()->set_failed_local_healthcheck(true);
   }
 
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::NoHealthyUpstream)) {
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream)) {
     common_access_log.mutable_response_flags()->set_no_healthy_upstream(true);
   }
 
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::UpstreamRequestTimeout)) {
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout)) {
     common_access_log.mutable_response_flags()->set_upstream_request_timeout(true);
   }
 
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::LocalReset)) {
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::LocalReset)) {
     common_access_log.mutable_response_flags()->set_local_reset(true);
   }
 
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::UpstreamRemoteReset)) {
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRemoteReset)) {
     common_access_log.mutable_response_flags()->set_upstream_remote_reset(true);
   }
 
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure)) {
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure)) {
     common_access_log.mutable_response_flags()->set_upstream_connection_failure(true);
   }
 
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionTermination)) {
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionTermination)) {
     common_access_log.mutable_response_flags()->set_upstream_connection_termination(true);
   }
 
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::UpstreamOverflow)) {
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow)) {
     common_access_log.mutable_response_flags()->set_upstream_overflow(true);
   }
 
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::NoRouteFound)) {
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoRouteFound)) {
     common_access_log.mutable_response_flags()->set_no_route_found(true);
   }
 
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::DelayInjected)) {
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DelayInjected)) {
     common_access_log.mutable_response_flags()->set_delay_injected(true);
   }
 
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::FaultInjected)) {
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FaultInjected)) {
     common_access_log.mutable_response_flags()->set_fault_injected(true);
   }
 
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::RateLimited)) {
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::RateLimited)) {
     common_access_log.mutable_response_flags()->set_rate_limited(true);
   }
 
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::UnauthorizedExternalService)) {
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService)) {
     common_access_log.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
         envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
             ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
   }
 
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::RateLimitServiceError)) {
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError)) {
     common_access_log.mutable_response_flags()->set_rate_limit_service_error(true);
   }
 }
@@ -150,7 +150,7 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
 void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
                             const Http::HeaderMap* response_headers,
                             const Http::HeaderMap* response_trailers,
-                            const RequestInfo::RequestInfo& request_info) {
+                            const StreamInfo::StreamInfo& stream_info) {
   static Http::HeaderMapImpl empty_headers;
   if (!request_headers) {
     request_headers = &empty_headers;
@@ -163,7 +163,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   }
 
   if (filter_) {
-    if (!filter_->evaluate(request_info, *request_headers)) {
+    if (!filter_->evaluate(stream_info, *request_headers)) {
       return;
     }
   }
@@ -177,78 +177,78 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   // TODO(mattklein123): Populate metadata field and wire up to filters.
   auto* common_properties = log_entry->mutable_common_properties();
 
-  if (request_info.downstreamRemoteAddress() != nullptr) {
+  if (stream_info.downstreamRemoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
-        *request_info.downstreamRemoteAddress(),
+        *stream_info.downstreamRemoteAddress(),
         *common_properties->mutable_downstream_remote_address());
   }
-  if (request_info.downstreamLocalAddress() != nullptr) {
+  if (stream_info.downstreamLocalAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
-        *request_info.downstreamLocalAddress(),
+        *stream_info.downstreamLocalAddress(),
         *common_properties->mutable_downstream_local_address());
   }
   common_properties->mutable_start_time()->MergeFrom(
       Protobuf::util::TimeUtil::NanosecondsToTimestamp(
           std::chrono::duration_cast<std::chrono::nanoseconds>(
-              request_info.startTime().time_since_epoch())
+              stream_info.startTime().time_since_epoch())
               .count()));
 
-  absl::optional<std::chrono::nanoseconds> dur = request_info.lastDownstreamRxByteReceived();
+  absl::optional<std::chrono::nanoseconds> dur = stream_info.lastDownstreamRxByteReceived();
   if (dur) {
     common_properties->mutable_time_to_last_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = request_info.firstUpstreamTxByteSent();
+  dur = stream_info.firstUpstreamTxByteSent();
   if (dur) {
     common_properties->mutable_time_to_first_upstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = request_info.lastUpstreamTxByteSent();
+  dur = stream_info.lastUpstreamTxByteSent();
   if (dur) {
     common_properties->mutable_time_to_last_upstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = request_info.firstUpstreamRxByteReceived();
+  dur = stream_info.firstUpstreamRxByteReceived();
   if (dur) {
     common_properties->mutable_time_to_first_upstream_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = request_info.lastUpstreamRxByteReceived();
+  dur = stream_info.lastUpstreamRxByteReceived();
   if (dur) {
     common_properties->mutable_time_to_last_upstream_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = request_info.firstDownstreamTxByteSent();
+  dur = stream_info.firstDownstreamTxByteSent();
   if (dur) {
     common_properties->mutable_time_to_first_downstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = request_info.lastDownstreamTxByteSent();
+  dur = stream_info.lastDownstreamTxByteSent();
   if (dur) {
     common_properties->mutable_time_to_last_downstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  if (request_info.upstreamHost() != nullptr) {
+  if (stream_info.upstreamHost() != nullptr) {
     Network::Utility::addressToProtobufAddress(
-        *request_info.upstreamHost()->address(),
+        *stream_info.upstreamHost()->address(),
         *common_properties->mutable_upstream_remote_address());
-    common_properties->set_upstream_cluster(request_info.upstreamHost()->cluster().name());
+    common_properties->set_upstream_cluster(stream_info.upstreamHost()->cluster().name());
   }
-  if (request_info.upstreamLocalAddress() != nullptr) {
+  if (stream_info.upstreamLocalAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
-        *request_info.upstreamLocalAddress(), *common_properties->mutable_upstream_local_address());
+        *stream_info.upstreamLocalAddress(), *common_properties->mutable_upstream_local_address());
   }
-  responseFlagsToAccessLogResponseFlags(*common_properties, request_info);
+  responseFlagsToAccessLogResponseFlags(*common_properties, stream_info);
 
-  if (request_info.protocol()) {
-    switch (request_info.protocol().value()) {
+  if (stream_info.protocol()) {
+    switch (stream_info.protocol().value()) {
     case Http::Protocol::Http10:
       log_entry->set_protocol_version(envoy::data::accesslog::v2::HTTPAccessLogEntry::HTTP10);
       break;
@@ -289,7 +289,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     request_properties->set_original_path(request_headers->EnvoyOriginalPath()->value().c_str());
   }
   request_properties->set_request_headers_bytes(request_headers->byteSize());
-  request_properties->set_request_body_bytes(request_info.bytesReceived());
+  request_properties->set_request_body_bytes(stream_info.bytesReceived());
   if (request_headers->Method() != nullptr) {
     envoy::api::v2::core::RequestMethod method =
         envoy::api::v2::core::RequestMethod::METHOD_UNSPECIFIED;
@@ -310,11 +310,11 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
 
   // HTTP response properties.
   auto* response_properties = log_entry->mutable_response();
-  if (request_info.responseCode()) {
-    response_properties->mutable_response_code()->set_value(request_info.responseCode().value());
+  if (stream_info.responseCode()) {
+    response_properties->mutable_response_code()->set_value(stream_info.responseCode().value());
   }
   response_properties->set_response_headers_bytes(response_headers->byteSize());
-  response_properties->set_response_body_bytes(request_info.bytesSent());
+  response_properties->set_response_body_bytes(stream_info.bytesSent());
   if (!response_headers_to_log_.empty()) {
     auto* logged_headers = response_properties->mutable_response_headers();
 

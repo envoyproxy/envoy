@@ -34,7 +34,7 @@ std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%
 // is either literal text (with % escaped as %%) or part of a %VAR% or %VAR(["args"])% expression.
 // The statement machine does minimal validation of the arguments (if any) and does not know the
 // names of valid variables. Interpretation of the variable name and arguments is delegated to
-// RequestInfoHeaderFormatter.
+// StreamInfoHeaderFormatter.
 HeaderFormatterPtr
 parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option) {
   const std::string& key = header_value_option.header().key();
@@ -97,7 +97,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
       if (ch == '%') {
         // Found complete variable name, add formatter.
         formatters.emplace_back(
-            new RequestInfoHeaderFormatter(format.substr(start, pos - start), append));
+            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -178,7 +178,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
       // Search for closing % of a %VAR(...)% expression
       if (ch == '%') {
         formatters.emplace_back(
-            new RequestInfoHeaderFormatter(format.substr(start, pos - start), append));
+            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -253,9 +253,9 @@ HeaderParserPtr HeaderParser::configure(
 }
 
 void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const RequestInfo::RequestInfo& request_info) const {
+                                   const StreamInfo::StreamInfo& stream_info) const {
   for (const auto& formatter : headers_to_add_) {
-    const std::string value = formatter.second->format(request_info);
+    const std::string value = formatter.second->format(stream_info);
     if (!value.empty()) {
       if (formatter.second->append()) {
         headers.addReferenceKey(formatter.first, value);

@@ -3,17 +3,17 @@
 #include <chrono>
 #include <cstdint>
 
-#include "envoy/request_info/request_info.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
-namespace RequestInfo {
+namespace StreamInfo {
 
 /**
  * Util class for ResponseFlags.
  */
 class ResponseFlagUtils {
 public:
-  static const std::string toShortString(const RequestInfo& request_info);
+  static const std::string toShortString(const StreamInfo& stream_info);
   static absl::optional<ResponseFlag> toResponseFlag(const std::string& response_flag);
 
 private:
@@ -38,7 +38,7 @@ private:
 };
 
 /**
- * Utility class for RequestInfo.
+ * Utility class for StreamInfo.
  */
 class Utility {
 public:
@@ -50,5 +50,5 @@ public:
   formatDownstreamAddressNoPort(const Network::Address::Instance& address);
 };
 
-} // namespace RequestInfo
+} // namespace StreamInfo
 } // namespace Envoy
