@@ -112,7 +112,7 @@ message VirtualHost {
 
   // <config_http_filters_router_x-envoy-original-path>` header.
   // Decides whether the :ref:`x-envoy-attempt-count
-  // <config_http_filters_router_x-envoy-attempt-count>` header should be included 
+  // <config_http_filters_router_x-envoy-attempt-count>` header should be included
   // in the upstream request. Defaults to false.
   bool include_request_attempt_count = 14;
 }
