@@ -86,7 +86,6 @@ public:
 
   void setupDelayFault(bool enable_fault) {
     envoy::config::filter::fault::v2::FaultDelay fault{};
-    fault.set_percent(100);
     fault.mutable_percentage()->set_numerator(50);
     fault.mutable_percentage()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
     fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
