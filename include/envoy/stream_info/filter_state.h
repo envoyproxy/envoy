@@ -67,7 +67,7 @@ public:
    */
   template <typename T>
   void addToList(absl::string_view data_name, std::unique_ptr<Object>&& data) {
-    const auto list = getList(data_name);
+    const auto* list = getList(data_name);
     if (list != nullptr) {
       // Check type of first element in the list
       const T* cast = dynamic_cast<const T*>(list->at(0).get());
@@ -86,28 +86,28 @@ public:
    * data store.
    */
   template <typename T> bool hasList(absl::string_view data_name) const {
-    const auto list = getList(data_name);
+    const auto* list = getList(data_name);
     return ((list != nullptr) && (dynamic_cast<const T*>(list->at(0).get()) != nullptr));
   }
 
   /**
    * @param data_name the name of the list data being looked up.
-   * @param operation a lambda function that operates on each element in the list.
-   * The iteration will stop if the lambda function returns false or reaches
-   * the end of the list. The iteration order will be the same as the order in which
-   * the elements were added to the list. Note that if an element in the list cannot
-   * be dynamically type-cast into the requested type, an exception will be thrown.
-   * It is an error to access data that has not previously been set.
+   * @param operation a lambda function that operates on each element in the list,
+   * if it exists. The iteration will stop if the lambda function returns false or
+   * reaches the end of the list. The iteration order will be the same as the order
+   * in which the elements were added to the list. Note that if an element in the
+   * list cannot be dynamically type-cast into the requested type, an exception
+   * will be thrown.
    */
   template <typename T>
   void forEachListItem(absl::string_view data_name, std::function<bool(const T&)> op) const {
-    const auto list = getList(data_name);
+    const auto* list = getList(data_name);
     if (!list) {
-      throw EnvoyException(fmt::format("List {} does not exist", data_name));
+      return;
     }
 
-    for (auto it = list->begin(); it != list->end(); it++) {
-      const T* data = dynamic_cast<const T*>(it->get());
+    for (const auto& it : *list) {
+      const T* data = dynamic_cast<const T*>(it.get());
       if (!data) {
         throw EnvoyException(
             fmt::format("Element in list {} cannot be coerced to specified type", data_name));

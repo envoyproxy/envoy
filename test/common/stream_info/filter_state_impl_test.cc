@@ -200,12 +200,6 @@ TEST_F(FilterStateImplTest, NameConflictDifferentTypesOfList) {
       EnvoyException, "List test_1 does not conform to the specified type");
 }
 
-TEST_F(FilterStateImplTest, UnknownNameForList) {
-  EXPECT_THROW_WITH_MESSAGE(
-      filter_state().forEachListItem<SimpleType>("test_1", [&](const SimpleType&) { return true; }),
-      EnvoyException, "List test_1 does not exist");
-}
-
 TEST_F(FilterStateImplTest, WrongTypeInforEachListItem) {
   filter_state().addToList<TestStoredTypeTracking>(
       "test_name", std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr));
