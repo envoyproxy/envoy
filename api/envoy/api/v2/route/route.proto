@@ -292,7 +292,7 @@ message RouteMatch {
   google.protobuf.BoolValue case_sensitive = 4;
 
   // value deprecated by :ref:`runtime_fraction<envoy_api_field_route.RouteMatch.runtime_fraction>`
-  reserved 5; 
+  reserved 5;
 
   // Indicates that the route should additionally match on a runtime key. Every time the route
   // is considered for a match, it must also fall under the percentage of matches indicated by

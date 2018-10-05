@@ -417,7 +417,8 @@ void RouteEntryImplBase::finalizeResponseHeaders(
   vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, request_info);
 }
 
-bool RouteEntryImplBase::evaluateRuntimeKeys(const RuntimeData& runtime_data, const uint64_t random_value) const {
+bool RouteEntryImplBase::evaluateRuntimeKeys(const RuntimeData& runtime_data,
+                                             const uint64_t random_value) const {
   envoy::type::FractionalPercent fractional_percent;
   const std::string& fraction_yaml = loader_.snapshot().get(runtime_data.fractional_runtime_key);
 
@@ -432,7 +433,7 @@ bool RouteEntryImplBase::evaluateRuntimeKeys(const RuntimeData& runtime_data, co
   const auto numerator = fractional_percent.numerator();
   const auto denominator =
       ProtobufPercentHelper::fractionalPercentDenominatorToInt(fractional_percent.denominator());
-   
+
   return random_value % denominator < numerator;
 }
 

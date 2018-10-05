@@ -384,6 +384,7 @@ protected:
 
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path,
                           bool insert_envoy_original_path) const;
+
 private:
   struct RuntimeData {
     // Fields associated with the 'runtime_fractional_percent' field for the RouteMatch proto.
