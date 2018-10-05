@@ -245,7 +245,7 @@ Panic thresholds work in conjunction with priorities. If number of healthy hosts
 goes down, Envoy will try try shift some traffic to lower priorities. If it succeeds finding enough 
 healthy hosts in lower priorities, Envoy will disregard panic thresholds. In mathematical terms, 
 if total health across all priority levels is 100%, Envoy disregards panic thresholds but continues to
-distribute traffic load across priorities according to algorithm described :ref:`here <arch_overview_load_balancing_priority_levels`. 
+distribute traffic load across priorities according to algorithm described :ref:`here <arch_overview_load_balancing_priority_levels>`. 
 
 The following examples explain relationship between total health and panic threshold. It is 
 assumed that default value of 50% is used for panic threshold.
