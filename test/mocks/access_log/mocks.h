@@ -19,7 +19,7 @@ public:
 
   // AccessLog::Filter
   MOCK_METHOD2(evaluate,
-               bool(const RequestInfo::RequestInfo& info, const Http::HeaderMap& request_headers));
+               bool(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers));
 };
 
 class MockAccessLogManager : public AccessLogManager {
@@ -43,7 +43,7 @@ public:
   MOCK_METHOD4(log,
                void(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
                     const Http::HeaderMap* response_trailers,
-                    const RequestInfo::RequestInfo& request_info));
+                    const StreamInfo::StreamInfo& stream_info));
 };
 
 } // namespace AccessLog

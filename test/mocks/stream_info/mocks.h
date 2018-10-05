@@ -1,22 +1,22 @@
 #pragma once
 
-#include "envoy/request_info/request_info.h"
+#include "envoy/stream_info/stream_info.h"
 
-#include "common/request_info/filter_state_impl.h"
+#include "common/stream_info/filter_state_impl.h"
 
 #include "test/mocks/upstream/host.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
-namespace RequestInfo {
+namespace StreamInfo {
 
-class MockRequestInfo : public RequestInfo {
+class MockStreamInfo : public StreamInfo {
 public:
-  MockRequestInfo();
-  ~MockRequestInfo();
+  MockStreamInfo();
+  ~MockStreamInfo();
 
-  // RequestInfo::RequestInfo
+  // StreamInfo::StreamInfo
   MOCK_METHOD1(setResponseFlag, void(ResponseFlag response_flag));
   MOCK_CONST_METHOD1(intersectResponseFlags, bool(uint64_t));
   MOCK_METHOD1(onUpstreamHostSelected, void(Upstream::HostDescriptionConstSharedPtr host));
@@ -91,5 +91,5 @@ public:
   std::string requested_server_name_;
 };
 
-} // namespace RequestInfo
+} // namespace StreamInfo
 } // namespace Envoy

@@ -8,7 +8,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/http/protocol.h"
-#include "envoy/request_info/filter_state.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/upstream.h"
 
 #include "absl/types/optional.h"
@@ -19,7 +19,7 @@ namespace Router {
 class RouteEntry;
 } // namespace Router
 
-namespace RequestInfo {
+namespace StreamInfo {
 
 enum ResponseFlag {
   // Local server healthcheck failed.
@@ -57,9 +57,9 @@ enum ResponseFlag {
 /**
  * Additional information about a completed request for logging.
  */
-class RequestInfo {
+class StreamInfo {
 public:
-  virtual ~RequestInfo() {}
+  virtual ~StreamInfo() {}
 
   /**
    * @param response_flag the response flag. Each filter can set independent response flags. The
@@ -324,5 +324,5 @@ public:
   virtual const std::string& requestedServerName() const PURE;
 };
 
-} // namespace RequestInfo
+} // namespace StreamInfo
 } // namespace Envoy

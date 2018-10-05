@@ -1,13 +1,13 @@
 #include "envoy/common/exception.h"
 
-#include "common/request_info/filter_state_impl.h"
+#include "common/stream_info/filter_state_impl.h"
 
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace RequestInfo {
+namespace StreamInfo {
 namespace {
 
 class TestStoredTypeTracking : public FilterState::Object {
@@ -166,5 +166,5 @@ TEST_F(FilterStateImplTest, HasData) {
   EXPECT_FALSE(filter_state().hasDataWithName("test_2"));
 }
 
-} // namespace RequestInfo
+} // namespace StreamInfo
 } // namespace Envoy

@@ -10,5 +10,5 @@ import "test/fuzz/common.proto";
 message TestCase {
   repeated envoy.api.v2.core.HeaderValueOption headers_to_add = 1;
   repeated string headers_to_remove = 2;
-  test.fuzz.RequestInfo request_info = 3;
+  test.fuzz.StreamInfo stream_info = 3;
 }

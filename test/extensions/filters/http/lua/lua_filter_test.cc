@@ -1,6 +1,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/http/message_impl.h"
-#include "common/request_info/request_info_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "extensions/filters/http/lua/lua_filter.h"
 
@@ -95,7 +95,7 @@ public:
   envoy::api::v2::core::Metadata metadata_;
   NiceMock<Envoy::Ssl::MockConnection> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info_;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -1502,15 +1502,15 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoLuaMetadata) {
 TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      request_handle:logTrace(request_handle:requestInfo():protocol())
+      request_handle:logTrace(request_handle:streamInfo():protocol())
     end
   )EOF"};
 
   InSequence s;
   setup(SCRIPT);
 
-  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillOnce(ReturnRef(request_info_));
-  EXPECT_CALL(request_info_, protocol()).WillOnce(Return(Http::Protocol::Http11));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, protocol()).WillOnce(Return(Http::Protocol::Http11));
 
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("HTTP/1.1")));
@@ -1521,8 +1521,8 @@ TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
 TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      request_handle:requestInfo():dynamicMetadata():set("envoy.lb", "foo", "bar")
-      request_handle:logTrace(request_handle:requestInfo():dynamicMetadata():get("envoy.lb")["foo"])
+      request_handle:streamInfo():dynamicMetadata():set("envoy.lb", "foo", "bar")
+      request_handle:logTrace(request_handle:streamInfo():dynamicMetadata():get("envoy.lb")["foo"])
     end
   )EOF"};
 
@@ -1531,13 +1531,13 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
 
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   DangerousDeprecatedTestTime test_time;
-  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2, test_time.timeSystem());
-  EXPECT_EQ(0, request_info.dynamicMetadata().filter_metadata_size());
-  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillOnce(ReturnRef(request_info));
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time.timeSystem());
+  EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  EXPECT_EQ(1, request_info.dynamicMetadata().filter_metadata_size());
-  EXPECT_EQ("bar", request_info.dynamicMetadata()
+  EXPECT_EQ(1, stream_info.dynamicMetadata().filter_metadata_size());
+  EXPECT_EQ("bar", stream_info.dynamicMetadata()
                        .filter_metadata()
                        .at("envoy.lb")
                        .fields()
