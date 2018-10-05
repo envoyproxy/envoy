@@ -2,14 +2,14 @@
 #include <functional>
 
 #include "envoy/http/protocol.h"
-#include "envoy/request_info/filter_state.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
 
 #include "common/common/fmt.h"
 #include "common/protobuf/utility.h"
-#include "common/request_info/request_info_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 
-#include "test/common/request_info/test_int_accessor.h"
+#include "test/common/stream_info/test_int_accessor.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
@@ -17,7 +17,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace RequestInfo {
+namespace StreamInfo {
 namespace {
 
 std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
@@ -27,14 +27,14 @@ std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
   return timing.value();
 }
 
-class RequestInfoImplTest : public testing::Test {
+class StreamInfoImplTest : public testing::Test {
 protected:
   DangerousDeprecatedTestTime test_time_;
 };
 
-TEST_F(RequestInfoImplTest, TimingTest) {
+TEST_F(StreamInfoImplTest, TimingTest) {
   MonotonicTime pre_start = test_time_.timeSystem().monotonicTime();
-  RequestInfoImpl info(Http::Protocol::Http2, test_time_.timeSystem());
+  StreamInfoImpl info(Http::Protocol::Http2, test_time_.timeSystem());
   MonotonicTime post_start = test_time_.timeSystem().monotonicTime();
 
   const MonotonicTime& start = info.startTimeMonotonic();
@@ -76,20 +76,20 @@ TEST_F(RequestInfoImplTest, TimingTest) {
   dur = checkDuration(dur, info.requestComplete());
 }
 
-TEST_F(RequestInfoImplTest, BytesTest) {
-  RequestInfoImpl request_info(Http::Protocol::Http2, test_time_.timeSystem());
+TEST_F(StreamInfoImplTest, BytesTest) {
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
 
   const uint64_t bytes_sent = 7;
   const uint64_t bytes_received = 12;
 
-  request_info.addBytesSent(bytes_sent);
-  request_info.addBytesReceived(bytes_received);
+  stream_info.addBytesSent(bytes_sent);
+  stream_info.addBytesReceived(bytes_received);
 
-  EXPECT_EQ(bytes_sent, request_info.bytesSent());
-  EXPECT_EQ(bytes_received, request_info.bytesReceived());
+  EXPECT_EQ(bytes_sent, stream_info.bytesSent());
+  EXPECT_EQ(bytes_received, stream_info.bytesReceived());
 }
 
-TEST_F(RequestInfoImplTest, ResponseFlagTest) {
+TEST_F(StreamInfoImplTest, ResponseFlagTest) {
   const std::vector<ResponseFlag> responseFlags = {FailedLocalHealthCheck,
                                                    NoHealthyUpstream,
                                                    UpstreamRequestTimeout,
@@ -103,87 +103,86 @@ TEST_F(RequestInfoImplTest, ResponseFlagTest) {
                                                    FaultInjected,
                                                    RateLimited};
 
-  RequestInfoImpl request_info(Http::Protocol::Http2, test_time_.timeSystem());
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
 
-  EXPECT_FALSE(request_info.hasAnyResponseFlag());
-  EXPECT_FALSE(request_info.intersectResponseFlags(0));
+  EXPECT_FALSE(stream_info.hasAnyResponseFlag());
+  EXPECT_FALSE(stream_info.intersectResponseFlags(0));
   for (ResponseFlag flag : responseFlags) {
     // Test cumulative setting of response flags.
-    EXPECT_FALSE(request_info.hasResponseFlag(flag))
+    EXPECT_FALSE(stream_info.hasResponseFlag(flag))
         << fmt::format("Flag: {} was already set", flag);
-    request_info.setResponseFlag(flag);
-    EXPECT_TRUE(request_info.hasResponseFlag(flag))
+    stream_info.setResponseFlag(flag);
+    EXPECT_TRUE(stream_info.hasResponseFlag(flag))
         << fmt::format("Flag: {} was expected to be set", flag);
   }
-  EXPECT_TRUE(request_info.hasAnyResponseFlag());
+  EXPECT_TRUE(stream_info.hasAnyResponseFlag());
 
-  RequestInfoImpl request_info2(Http::Protocol::Http2, test_time_.timeSystem());
-  request_info2.setResponseFlag(FailedLocalHealthCheck);
+  StreamInfoImpl stream_info2(Http::Protocol::Http2, test_time_.timeSystem());
+  stream_info2.setResponseFlag(FailedLocalHealthCheck);
 
-  EXPECT_TRUE(request_info2.intersectResponseFlags(FailedLocalHealthCheck));
+  EXPECT_TRUE(stream_info2.intersectResponseFlags(FailedLocalHealthCheck));
 }
 
-TEST_F(RequestInfoImplTest, MiscSettersAndGetters) {
+TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
   {
-    RequestInfoImpl request_info(Http::Protocol::Http2, test_time_.timeSystem());
+    StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
 
-    EXPECT_EQ(Http::Protocol::Http2, request_info.protocol().value());
+    EXPECT_EQ(Http::Protocol::Http2, stream_info.protocol().value());
 
-    request_info.protocol(Http::Protocol::Http10);
-    EXPECT_EQ(Http::Protocol::Http10, request_info.protocol().value());
+    stream_info.protocol(Http::Protocol::Http10);
+    EXPECT_EQ(Http::Protocol::Http10, stream_info.protocol().value());
 
-    EXPECT_FALSE(request_info.responseCode());
-    request_info.response_code_ = 200;
-    ASSERT_TRUE(request_info.responseCode());
-    EXPECT_EQ(200, request_info.responseCode().value());
+    EXPECT_FALSE(stream_info.responseCode());
+    stream_info.response_code_ = 200;
+    ASSERT_TRUE(stream_info.responseCode());
+    EXPECT_EQ(200, stream_info.responseCode().value());
 
-    EXPECT_EQ(nullptr, request_info.upstreamHost());
+    EXPECT_EQ(nullptr, stream_info.upstreamHost());
     Upstream::HostDescriptionConstSharedPtr host(new NiceMock<Upstream::MockHostDescription>());
-    request_info.onUpstreamHostSelected(host);
-    EXPECT_EQ(host, request_info.upstreamHost());
+    stream_info.onUpstreamHostSelected(host);
+    EXPECT_EQ(host, stream_info.upstreamHost());
 
-    EXPECT_FALSE(request_info.healthCheck());
-    request_info.healthCheck(true);
-    EXPECT_TRUE(request_info.healthCheck());
+    EXPECT_FALSE(stream_info.healthCheck());
+    stream_info.healthCheck(true);
+    EXPECT_TRUE(stream_info.healthCheck());
 
-    EXPECT_EQ(nullptr, request_info.routeEntry());
+    EXPECT_EQ(nullptr, stream_info.routeEntry());
     NiceMock<Router::MockRouteEntry> route_entry;
-    request_info.route_entry_ = &route_entry;
-    EXPECT_EQ(&route_entry, request_info.routeEntry());
+    stream_info.route_entry_ = &route_entry;
+    EXPECT_EQ(&route_entry, stream_info.routeEntry());
 
-    request_info.perRequestState().setData("test", std::make_unique<TestIntAccessor>(1));
-    EXPECT_EQ(1, request_info.perRequestState().getData<TestIntAccessor>("test").access());
+    stream_info.perRequestState().setData("test", std::make_unique<TestIntAccessor>(1));
+    EXPECT_EQ(1, stream_info.perRequestState().getData<TestIntAccessor>("test").access());
 
-    EXPECT_EQ("", request_info.requestedServerName());
+    EXPECT_EQ("", stream_info.requestedServerName());
     absl::string_view sni_name = "stubserver.org";
-    request_info.setRequestedServerName(sni_name);
-    EXPECT_EQ(std::string(sni_name), request_info.requestedServerName());
+    stream_info.setRequestedServerName(sni_name);
+    EXPECT_EQ(std::string(sni_name), stream_info.requestedServerName());
   }
 }
 
-TEST_F(RequestInfoImplTest, DynamicMetadataTest) {
-  RequestInfoImpl request_info(Http::Protocol::Http2, test_time_.timeSystem());
+TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
 
-  EXPECT_EQ(0, request_info.dynamicMetadata().filter_metadata_size());
-  request_info.setDynamicMetadata("com.test",
-                                  MessageUtil::keyValueStruct("test_key", "test_value"));
+  EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
+  stream_info.setDynamicMetadata("com.test", MessageUtil::keyValueStruct("test_key", "test_value"));
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(request_info.dynamicMetadata(), "com.test", "test_key")
+            Config::Metadata::metadataValue(stream_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
   ProtobufWkt::Struct struct_obj2;
   ProtobufWkt::Value val2;
   val2.set_string_value("another_value");
   (*struct_obj2.mutable_fields())["another_key"] = val2;
-  request_info.setDynamicMetadata("com.test", struct_obj2);
-  EXPECT_EQ("another_value", Config::Metadata::metadataValue(request_info.dynamicMetadata(),
+  stream_info.setDynamicMetadata("com.test", struct_obj2);
+  EXPECT_EQ("another_value", Config::Metadata::metadataValue(stream_info.dynamicMetadata(),
                                                              "com.test", "another_key")
                                  .string_value());
   // make sure "test_key:test_value" still exists
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(request_info.dynamicMetadata(), "com.test", "test_key")
+            Config::Metadata::metadataValue(stream_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
   ProtobufTypes::String json;
-  const auto test_struct = request_info.dynamicMetadata().filter_metadata().at("com.test");
+  const auto test_struct = stream_info.dynamicMetadata().filter_metadata().at("com.test");
   const auto status = Protobuf::util::MessageToJsonString(test_struct, &json);
   EXPECT_TRUE(status.ok());
   // check json contains the key and values we set
@@ -192,5 +191,5 @@ TEST_F(RequestInfoImplTest, DynamicMetadataTest) {
 }
 
 } // namespace
-} // namespace RequestInfo
+} // namespace StreamInfo
 } // namespace Envoy

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/http/header_map.h"
-#include "envoy/request_info/request_info.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "extensions/filters/common/lua/lua.h"
 
@@ -100,7 +100,7 @@ private:
 };
 
 class DynamicMetadataMapWrapper;
-class RequestInfoWrapper;
+class StreamInfoWrapper;
 
 /**
  * Iterator over a dynamic metadata map.
@@ -125,7 +125,7 @@ private:
 class DynamicMetadataMapWrapper
     : public Filters::Common::Lua::BaseLuaObject<DynamicMetadataMapWrapper> {
 public:
-  DynamicMetadataMapWrapper(RequestInfoWrapper& parent) : parent_{parent} {}
+  DynamicMetadataMapWrapper(StreamInfoWrapper& parent) : parent_{parent} {}
 
   static ExportedFunctions exportedFunctions() {
     return {{"get", static_luaGet}, {"set", static_luaSet}, {"__pairs", static_luaPairs}};
@@ -160,10 +160,10 @@ private:
     iterator_.reset();
   }
 
-  // To get reference to parent's (RequestInfoWrapper) request info member.
-  RequestInfo::RequestInfo& requestInfo();
+  // To get reference to parent's (StreamInfoWrapper) request info member.
+  StreamInfo::StreamInfo& streamInfo();
 
-  RequestInfoWrapper& parent_;
+  StreamInfoWrapper& parent_;
   Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapIterator> iterator_;
 
   friend class DynamicMetadataMapIterator;
@@ -172,9 +172,9 @@ private:
 /**
  * Lua wrapper for a request info.
  */
-class RequestInfoWrapper : public Filters::Common::Lua::BaseLuaObject<RequestInfoWrapper> {
+class StreamInfoWrapper : public Filters::Common::Lua::BaseLuaObject<StreamInfoWrapper> {
 public:
-  RequestInfoWrapper(RequestInfo::RequestInfo& request_info) : request_info_{request_info} {}
+  StreamInfoWrapper(StreamInfo::StreamInfo& stream_info) : stream_info_{stream_info} {}
   static ExportedFunctions exportedFunctions() {
     return {{"protocol", static_luaProtocol}, {"dynamicMetadata", static_luaDynamicMetadata}};
   }
@@ -184,18 +184,18 @@ private:
    * Get current protocol being used.
    * @return string representation of Http::Protocol.
    */
-  DECLARE_LUA_FUNCTION(RequestInfoWrapper, luaProtocol);
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaProtocol);
 
   /**
    * Get reference to request info dynamic metadata object.
-   * @return DynamicMetadataMapWrapper representation of RequestInfo dynamic metadata.
+   * @return DynamicMetadataMapWrapper representation of StreamInfo dynamic metadata.
    */
-  DECLARE_LUA_FUNCTION(RequestInfoWrapper, luaDynamicMetadata);
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDynamicMetadata);
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override { dynamic_metadata_wrapper_.reset(); }
 
-  RequestInfo::RequestInfo& request_info_;
+  StreamInfo::StreamInfo& stream_info_;
   Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapWrapper> dynamic_metadata_wrapper_;
 
   friend class DynamicMetadataMapWrapper;

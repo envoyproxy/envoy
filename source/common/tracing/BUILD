@@ -34,7 +34,7 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
-        "//source/common/request_info:utility_lib",
         "//source/common/runtime:uuid_util_lib",
+        "//source/common/stream_info:utility_lib",
     ],
 )
