@@ -53,8 +53,9 @@ Tracing::SpanPtr ZipkinSpan::spawnChild(const Tracing::Config& config, const std
 Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
     : tracer_(std::move(tracer)), driver_(driver) {}
 
-Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-               Stats::Store& stats, ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
+Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
+               Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
+               ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                const LocalInfo::LocalInfo& local_info, Runtime::RandomGenerator& random_generator,
                TimeSource& time_source)
     : cm_(cluster_manager), tracer_stats_{ZIPKIN_TRACER_STATS(
@@ -62,21 +63,22 @@ Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_man
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
       time_source_(time_source) {
 
-  Upstream::ThreadLocalCluster* cluster = cm_.get(config.getString("collector_cluster"));
+  Upstream::ThreadLocalCluster* cluster = cm_.get(zipkin_config.collector_cluster());
   if (!cluster) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
-                                     config.getString("collector_cluster")));
+                                     zipkin_config.collector_cluster()));
   }
   cluster_ = cluster->info();
 
-  const std::string collector_endpoint =
-      config.getString("collector_endpoint", ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT);
+  std::string collector_endpoint = ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT;
+  if (zipkin_config.collector_endpoint().size() > 0) {
+    collector_endpoint = zipkin_config.collector_endpoint();
+  }
 
-  const bool trace_id_128bit =
-      config.getBoolean("trace_id_128bit", ZipkinCoreConstants::get().DEFAULT_TRACE_ID_128BIT);
+  const bool trace_id_128bit = zipkin_config.trace_id_128bit();
 
-  const bool shared_span_context = config.getBoolean(
-      "shared_span_context", ZipkinCoreConstants::get().DEFAULT_SHARED_SPAN_CONTEXT);
+  const bool shared_span_context = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      zipkin_config, shared_span_context, ZipkinCoreConstants::get().DEFAULT_SHARED_SPAN_CONTEXT);
 
   tls_->set([this, collector_endpoint, &random_generator, trace_id_128bit, shared_span_context](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {

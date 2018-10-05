@@ -65,11 +65,12 @@ public:
             }));
   }
 
+  Event::SimulatedTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Http::MockAsyncClientRequest request_;
   Http::AsyncClient::Callbacks* callbacks_{};
   Event::MockTimer* interval_timer_{};
-  NiceMock<MockTimeSource> time_source_;
 };
 
 class RdsImplTest : public RdsTestBase {
@@ -373,7 +374,6 @@ public:
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
     Upstream::MockCluster cluster;
     cluster_map.emplace("foo_cluster", cluster);
-    ON_CALL(factory_context_, timeSource()).WillByDefault(ReturnRef(time_source_));
     EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
@@ -428,9 +428,7 @@ virtual_hosts:
         route: { cluster: baz }
 )EOF";
 
-  EXPECT_CALL(time_source_, systemTime())
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
-  EXPECT_CALL(factory_context_, timeSource()).WillRepeatedly(ReturnRef(time_source_));
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
 
   // Only static route.
   RouteConfigProviderPtr static_config =

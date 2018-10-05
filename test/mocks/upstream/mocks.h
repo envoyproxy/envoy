@@ -124,6 +124,9 @@ public:
   }
 
   std::string name() const override { return "envoy.mock_retry_priority"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  }
 
 private:
   RetryPrioritySharedPtr retry_priority_;
@@ -231,6 +234,7 @@ private:
 
 class MockClusterManager : public ClusterManager {
 public:
+  explicit MockClusterManager(TimeSource& time_source);
   MockClusterManager();
   ~MockClusterManager();
 
@@ -241,7 +245,6 @@ public:
   }
 
   ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
-  TimeSource& timeSource() override { return time_source_; }
 
   // Upstream::ClusterManager
   MOCK_METHOD2(addOrUpdateCluster,
@@ -269,9 +272,6 @@ public:
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
   MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks,
                std::unique_ptr<ClusterUpdateCallbacksHandle>(ClusterUpdateCallbacks& callbacks));
-
-  // TODO(jmarantz): Switch these to using mock-time.
-  RealTimeSource time_source_;
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;

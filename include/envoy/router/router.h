@@ -43,10 +43,10 @@ public:
    * example, adding or removing headers. This should only be called ONCE immediately after
    * obtaining the initial response headers.
    * @param headers supplies the response headers, which may be modified during this call.
-   * @param request_info holds additional information about the request.
+   * @param stream_info holds additional information about the request.
    */
   virtual void finalizeResponseHeaders(Http::HeaderMap& headers,
-                                       const RequestInfo::RequestInfo& request_info) const PURE;
+                                       const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 /**
@@ -305,7 +305,7 @@ public:
 typedef std::shared_ptr<const RouteSpecificFilterConfig> RouteSpecificFilterConfigConstSharedPtr;
 
 /**
- * Virtual host defintion.
+ * Virtual host definition.
  */
 class VirtualHost {
 public:
@@ -485,11 +485,11 @@ public:
    * example URL prefix rewriting, adding headers, etc. This should only be called ONCE
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
    * @param headers supplies the request headers, which may be modified during this call.
-   * @param request_info holds additional information about the request.
+   * @param stream_info holds additional information about the request.
    * @param insert_envoy_original_path insert x-envoy-original-path header if path rewritten?
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                      const RequestInfo::RequestInfo& request_info,
+                                      const StreamInfo::StreamInfo& stream_info,
                                       bool insert_envoy_original_path) const PURE;
 
   /**
@@ -571,7 +571,7 @@ public:
    *         in this route.
    */
   virtual Http::WebSocketProxyPtr
-  createWebSocketProxy(Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+  createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
                        Http::WebSocketProxyCallbacks& callbacks,
                        Upstream::ClusterManager& cluster_manager,
                        Network::ReadFilterCallbacks* read_callbacks) const PURE;

@@ -108,7 +108,7 @@ message Permission {
     // When any is set, it matches any action.
     bool any = 3 [(validate.rules).bool.const = true];
 
-    // A header (or psuedo-header such as :path or :method) on the incoming HTTP request. Only
+    // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
     envoy.api.v2.route.HeaderMatcher header = 4;
 
@@ -166,7 +166,7 @@ message Principal {
     // A CIDR block that describes the downstream IP.
     envoy.api.v2.core.CidrRange source_ip = 5;
 
-    // A header (or psuedo-header such as :path or :method) on the incoming HTTP request. Only
+    // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
     envoy.api.v2.route.HeaderMatcher header = 6;
 

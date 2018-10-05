@@ -145,7 +145,7 @@ public:
  * - When a scope is destroyed, a cache flush operation is run on all threads to flush any cached
  *   data owned by the destroyed scope.
  * - Scopes use a unique incrementing ID for the cache key. This ensures that if a new scope is
- *   created at the same address as a recently deleted scope, cache references will not accidently
+ *   created at the same address as a recently deleted scope, cache references will not accidentally
  *   reference the old scope which may be about to be cache flushed.
  * - Since it's possible to have overlapping scopes, we de-dup stats when counters() or gauges() is
  *   called since these are very uncommon operations.
@@ -162,7 +162,7 @@ public:
  * If there is one it will write to it, otherwise creates new one and writes to it.
  * During the flush process the following sequence is followed.
  *  - The main thread starts the flush process by posting a message to every worker which tells the
- *    worker to swap its "active" histogram with its "backup" histogram. This is acheived via a call
+ *    worker to swap its "active" histogram with its "backup" histogram. This is achieved via a call
  *    to "beginMerge" method.
  *  - Each TLS histogram has 2 histograms it makes use of, swapping back and forth. It manages a
  *    current_active index via which it writes to the correct histogram.

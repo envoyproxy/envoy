@@ -273,7 +273,7 @@ public:
 
   /**
    * Crop characters from a string view starting at the first character of the matched
-   * delimiter string view until the begining of the source string view.
+   * delimiter string view until the beginning of the source string view.
    * @param source supplies the string view to be processed.
    * @param delimiter supplies the string view that delimits the starting point for deletion.
    * @return sub-string of the string view if any.

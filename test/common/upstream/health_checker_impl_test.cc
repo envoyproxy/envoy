@@ -21,6 +21,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1176,6 +1177,30 @@ TEST_F(HttpHealthCheckerImplTest, Timeout) {
 
   EXPECT_EQ(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->getActiveHealthFailureType(),
             Host::ActiveHealthFailureType::TIMEOUT);
+}
+
+TEST_F(HttpHealthCheckerImplTest, TimeoutAfterDisconnect) {
+  setupNoServiceValidationHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending)).Times(1);
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_)).Times(2);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  for (auto& session : test_sessions_) {
+    session->client_connection_->close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+
+  test_sessions_[0]->timeout_timer_->callback_();
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
 }
 
 TEST_F(HttpHealthCheckerImplTest, DynamicAddAndRemove) {
@@ -3262,12 +3287,11 @@ TEST(HealthCheckEventLoggerImplTest, All) {
   NiceMock<MockClusterInfo> cluster;
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster));
 
-  NiceMock<MockTimeSource> time_source;
-  EXPECT_CALL(time_source, systemTime())
-      // This is rendered as "2009-02-13T23:31:31.234Z".a
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
+  Event::SimulatedTimeSystem time_system;
+  // This is rendered as "2009-02-13T23:31:31.234Z".a
+  time_system.setSystemTime(std::chrono::milliseconds(1234567891234));
 
-  HealthCheckEventLoggerImpl event_logger(log_manager, time_source, "foo");
+  HealthCheckEventLoggerImpl event_logger(log_manager, time_system, "foo");
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"

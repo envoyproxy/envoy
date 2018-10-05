@@ -35,7 +35,7 @@ envoy_cc_library(
     hdrs = ["wrappers.h"],
     deps = [
         "//include/envoy/http:header_map_interface",
-        "//include/envoy/request_info:request_info_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/common/lua:lua_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",

@@ -70,11 +70,15 @@ protected:
   // The priority-ordered set of hosts to use for load balancing.
   const PrioritySet& priority_set_;
 
+public:
   // Called when a host set at the given priority level is updated. This updates
-  // per_priority_health_ for that priority level, and may update per_priority_load_ for all
+  // per_priority_health for that priority level, and may update per_priority_load for all
   // priority levels.
-  void recalculatePerPriorityState(uint32_t priority);
+  void static recalculatePerPriorityState(uint32_t priority, const PrioritySet& priority_set,
+                                          PriorityLoad& priority_load,
+                                          std::vector<uint32_t>& per_priority_health);
 
+protected:
   // The percentage load (0-100) for each priority level
   std::vector<uint32_t> per_priority_load_;
   // The health (0-100) for each priority level.
@@ -115,7 +119,7 @@ protected:
 
   // When deciding which hosts to use on an LB decision, we need to know how to index into the
   // priority_set. This priority_set cursor is used by ZoneAwareLoadBalancerBase subclasses, e.g.
-  // RoundRobinLoadBalancer, to index into auxillary data structures specific to the LB for
+  // RoundRobinLoadBalancer, to index into auxiliary data structures specific to the LB for
   // a given host set selection.
   struct HostsSource {
     enum class SourceType {
@@ -245,7 +249,7 @@ private:
  * with 1 / weight deadline, we will achieve the desired pick frequency for weighted RR in a given
  * interval. Naive implementations of weighted RR are either O(n) pick time or O(m * n) memory use,
  * where m is the weight range. We also explicitly check for the unweighted special case and use a
- * simple index to acheive O(1) scheduling in that case.
+ * simple index to achieve O(1) scheduling in that case.
  * TODO(htuch): We use EDF at Google, but the EDF scheduler may be overkill if we don't want to
  * support large ranges of weights or arbitrary precision floating weights, we could construct an
  * explicit schedule, since m will be a small constant factor in O(m * n). This

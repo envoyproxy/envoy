@@ -54,6 +54,7 @@ envoy_cc_library(
     name = "conn_manager_lib",
     srcs = ["conn_manager.cc"],
     hdrs = ["conn_manager.h"],
+    external_deps = ["abseil_any"],
     deps = [
         ":app_exception_lib",
         ":decoder_lib",

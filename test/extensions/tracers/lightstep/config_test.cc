@@ -21,16 +21,18 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
   ON_CALL(*server.cluster_manager_.thread_local_cluster_.cluster_.info_, features())
       .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
-  std::string valid_config = R"EOF(
-  {
-    "collector_cluster": "fake_cluster",
-    "access_token_file": "fake_file"
-  }
-  )EOF";
-  Json::ObjectSharedPtr valid_json = Json::Factory::loadFromString(valid_config);
+  const std::string yaml_string = R"EOF(
+  http:
+    name: envoy.lightstep
+    config:
+      collector_cluster: fake_cluster
+      access_token_file: fake_file
+   )EOF";
+  envoy::config::trace::v2::Tracing configuration;
+  MessageUtil::loadFromYaml(yaml_string, configuration);
 
   LightstepTracerFactory factory;
-  Tracing::HttpTracerPtr lightstep_tracer = factory.createHttpTracer(*valid_json, server);
+  Tracing::HttpTracerPtr lightstep_tracer = factory.createHttpTracer(configuration, server);
   EXPECT_NE(nullptr, lightstep_tracer);
 }
 
