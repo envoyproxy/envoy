@@ -28,7 +28,6 @@ def fixCompilationDatabase(args):
     db = json.load(db_file)
 
   db = [command for command in db if isCompileTarget(command, args)]
-  print "\n".join(command["file"] for command in db)
   with open("compile_commands.json", "w") as db_file:
     json.dump(db, db_file, indent=2)
 
