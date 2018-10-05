@@ -146,7 +146,7 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
     state_ = State::Responded;
     callbacks_->sendLocalReply(Http::Code::TooManyRequests, "",
                                [this](Http::HeaderMap& headers) { addHeaders(headers); });
-    callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::RateLimited);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
   } else if (status == RateLimit::LimitStatus::Error) {
     if (config_->failureModeAllow()) {
       cluster_->statsScope().counter("ratelimit.failure_mode_allowed").inc();
@@ -156,7 +156,7 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
     } else {
       state_ = State::Responded;
       callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr);
-      callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::RateLimitServiceError);
+      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
     }
   } else if (!initiating_call_) {
     callbacks_->continueDecoding();
@@ -176,7 +176,7 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
       continue;
     }
     rate_limit.populateDescriptors(*route_entry, descriptors, config_->localInfo().clusterName(),
-                                   headers, *callbacks_->requestInfo().downstreamRemoteAddress());
+                                   headers, *callbacks_->streamInfo().downstreamRemoteAddress());
   }
 }
 

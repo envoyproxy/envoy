@@ -6,7 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
-#include "envoy/request_info/request_info.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -41,7 +41,7 @@ public:
    * Evaluate whether an access log should be written based on request and response data.
    * @return TRUE if the log should be written.
    */
-  virtual bool evaluate(const RequestInfo::RequestInfo& info,
+  virtual bool evaluate(const StreamInfo::StreamInfo& info,
                         const Http::HeaderMap& request_headers) PURE;
 };
 
@@ -59,12 +59,12 @@ public:
    * @param request_headers supplies the incoming request headers after filtering.
    * @param response_headers supplies response headers.
    * @param response_trailers supplies response trailers.
-   * @param request_info supplies additional information about the request not contained in
-   *                      the request headers.
+   * @param stream_info supplies additional information about the request not
+   * contained in the request headers.
    */
   virtual void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
                    const Http::HeaderMap* response_trailers,
-                   const RequestInfo::RequestInfo& request_info) PURE;
+                   const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 typedef std::shared_ptr<Instance> InstanceSharedPtr;
@@ -79,7 +79,7 @@ public:
   virtual std::string format(const Http::HeaderMap& request_headers,
                              const Http::HeaderMap& response_headers,
                              const Http::HeaderMap& response_trailers,
-                             const RequestInfo::RequestInfo& request_info) const PURE;
+                             const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 typedef std::unique_ptr<Formatter> FormatterPtr;

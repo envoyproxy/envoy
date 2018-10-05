@@ -11,14 +11,14 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
-#include "common/request_info/utility.h"
 #include "common/runtime/uuid_util.h"
+#include "common/stream_info/utility.h"
 
 namespace Envoy {
 namespace Tracing {
 
 // TODO(mattklein123) PERF: Avoid string creations/copies in this entire file.
-static std::string buildResponseCode(const RequestInfo::RequestInfo& info) {
+static std::string buildResponseCode(const StreamInfo::StreamInfo& info) {
   return info.responseCode() ? std::to_string(info.responseCode().value()) : "0";
 }
 
@@ -53,10 +53,10 @@ const std::string& HttpTracerUtility::toString(OperationName operation_name) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-Decision HttpTracerUtility::isTracing(const RequestInfo::RequestInfo& request_info,
+Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
                                       const Http::HeaderMap& request_headers) {
   // Exclude HC requests immediately.
-  if (request_info.healthCheck()) {
+  if (stream_info.healthCheck()) {
     return {Reason::HealthCheck, false};
   }
 
@@ -83,7 +83,7 @@ Decision HttpTracerUtility::isTracing(const RequestInfo::RequestInfo& request_in
 }
 
 void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
-                                     const RequestInfo::RequestInfo& request_info,
+                                     const StreamInfo::StreamInfo& stream_info,
                                      const Config& tracing_config) {
   // Pre response data.
   if (request_headers) {
@@ -95,7 +95,7 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
     span.setTag(Tracing::Tags::get().USER_AGENT, valueOrDefault(request_headers->UserAgent(), "-"));
     span.setTag(Tracing::Tags::get().HTTP_PROTOCOL,
-                AccessLog::AccessLogFormatUtils::protocolToString(request_info.protocol()));
+                AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol()));
 
     if (request_headers->ClientTraceId()) {
       span.setTag(Tracing::Tags::get().GUID_X_CLIENT_TRACE_ID,
@@ -110,21 +110,20 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
       }
     }
   }
-  span.setTag(Tracing::Tags::get().REQUEST_SIZE, std::to_string(request_info.bytesReceived()));
+  span.setTag(Tracing::Tags::get().REQUEST_SIZE, std::to_string(stream_info.bytesReceived()));
 
-  if (nullptr != request_info.upstreamHost()) {
+  if (nullptr != stream_info.upstreamHost()) {
     span.setTag(Tracing::Tags::get().UPSTREAM_CLUSTER,
-                request_info.upstreamHost()->cluster().name());
+                stream_info.upstreamHost()->cluster().name());
   }
 
   // Post response data.
-  span.setTag(Tracing::Tags::get().HTTP_STATUS_CODE, buildResponseCode(request_info));
-  span.setTag(Tracing::Tags::get().RESPONSE_SIZE, std::to_string(request_info.bytesSent()));
+  span.setTag(Tracing::Tags::get().HTTP_STATUS_CODE, buildResponseCode(stream_info));
+  span.setTag(Tracing::Tags::get().RESPONSE_SIZE, std::to_string(stream_info.bytesSent()));
   span.setTag(Tracing::Tags::get().RESPONSE_FLAGS,
-              RequestInfo::ResponseFlagUtils::toShortString(request_info));
+              StreamInfo::ResponseFlagUtils::toShortString(stream_info));
 
-  if (!request_info.responseCode() ||
-      Http::CodeUtility::is5xx(request_info.responseCode().value())) {
+  if (!stream_info.responseCode() || Http::CodeUtility::is5xx(stream_info.responseCode().value())) {
     span.setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE);
   }
 
@@ -135,7 +134,7 @@ HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& l
     : driver_(std::move(driver)), local_info_(local_info) {}
 
 SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request_headers,
-                                  const RequestInfo::RequestInfo& request_info,
+                                  const StreamInfo::StreamInfo& stream_info,
                                   const Tracing::Decision tracing_decision) {
   std::string span_name = HttpTracerUtility::toString(config.operationName());
 
@@ -145,7 +144,7 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request
   }
 
   SpanPtr active_span = driver_->startSpan(config, request_headers, span_name,
-                                           request_info.startTime(), tracing_decision);
+                                           stream_info.startTime(), tracing_decision);
   if (active_span) {
     active_span->setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY);
     active_span->setTag(Tracing::Tags::get().NODE_ID, local_info_.nodeName());

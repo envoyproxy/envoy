@@ -9,11 +9,11 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "request_info_lib",
-    hdrs = ["request_info_impl.h"],
+    name = "stream_info_lib",
+    hdrs = ["stream_info_impl.h"],
     deps = [
         ":filter_state_lib",
-        "//include/envoy/request_info:request_info_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
     ],
 )
@@ -23,7 +23,7 @@ envoy_cc_library(
     srcs = ["filter_state_impl.cc"],
     hdrs = ["filter_state_impl.h"],
     deps = [
-        "//include/envoy/request_info:filter_state_interface",
+        "//include/envoy/stream_info:filter_state_interface",
     ],
 )
 
@@ -34,6 +34,6 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/common:time_interface",
-        "//include/envoy/request_info:request_info_interface",
+        "//include/envoy/stream_info:stream_info_interface",
     ],
 )

@@ -1,9 +1,9 @@
-#include "common/request_info/utility.h"
+#include "common/stream_info/utility.h"
 
 #include <string>
 
 namespace Envoy {
-namespace RequestInfo {
+namespace StreamInfo {
 
 const std::string ResponseFlagUtils::NONE = "-";
 const std::string ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK = "LH";
@@ -29,64 +29,64 @@ void ResponseFlagUtils::appendString(std::string& result, const std::string& app
   }
 }
 
-const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_info) {
+const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info) {
   std::string result;
 
   static_assert(ResponseFlag::LastFlag == 0x2000, "A flag has been added. Fix this code.");
 
-  if (request_info.hasResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
+  if (stream_info.hasResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
     appendString(result, FAILED_LOCAL_HEALTH_CHECK);
   }
 
-  if (request_info.hasResponseFlag(ResponseFlag::NoHealthyUpstream)) {
+  if (stream_info.hasResponseFlag(ResponseFlag::NoHealthyUpstream)) {
     appendString(result, NO_HEALTHY_UPSTREAM);
   }
 
-  if (request_info.hasResponseFlag(ResponseFlag::UpstreamRequestTimeout)) {
+  if (stream_info.hasResponseFlag(ResponseFlag::UpstreamRequestTimeout)) {
     appendString(result, UPSTREAM_REQUEST_TIMEOUT);
   }
 
-  if (request_info.hasResponseFlag(ResponseFlag::LocalReset)) {
+  if (stream_info.hasResponseFlag(ResponseFlag::LocalReset)) {
     appendString(result, LOCAL_RESET);
   }
 
-  if (request_info.hasResponseFlag(ResponseFlag::UpstreamRemoteReset)) {
+  if (stream_info.hasResponseFlag(ResponseFlag::UpstreamRemoteReset)) {
     appendString(result, UPSTREAM_REMOTE_RESET);
   }
 
-  if (request_info.hasResponseFlag(ResponseFlag::UpstreamConnectionFailure)) {
+  if (stream_info.hasResponseFlag(ResponseFlag::UpstreamConnectionFailure)) {
     appendString(result, UPSTREAM_CONNECTION_FAILURE);
   }
 
-  if (request_info.hasResponseFlag(ResponseFlag::UpstreamConnectionTermination)) {
+  if (stream_info.hasResponseFlag(ResponseFlag::UpstreamConnectionTermination)) {
     appendString(result, UPSTREAM_CONNECTION_TERMINATION);
   }
 
-  if (request_info.hasResponseFlag(ResponseFlag::UpstreamOverflow)) {
+  if (stream_info.hasResponseFlag(ResponseFlag::UpstreamOverflow)) {
     appendString(result, UPSTREAM_OVERFLOW);
   }
 
-  if (request_info.hasResponseFlag(ResponseFlag::NoRouteFound)) {
+  if (stream_info.hasResponseFlag(ResponseFlag::NoRouteFound)) {
     appendString(result, NO_ROUTE_FOUND);
   }
 
-  if (request_info.hasResponseFlag(ResponseFlag::DelayInjected)) {
+  if (stream_info.hasResponseFlag(ResponseFlag::DelayInjected)) {
     appendString(result, DELAY_INJECTED);
   }
 
-  if (request_info.hasResponseFlag(ResponseFlag::FaultInjected)) {
+  if (stream_info.hasResponseFlag(ResponseFlag::FaultInjected)) {
     appendString(result, FAULT_INJECTED);
   }
 
-  if (request_info.hasResponseFlag(ResponseFlag::RateLimited)) {
+  if (stream_info.hasResponseFlag(ResponseFlag::RateLimited)) {
     appendString(result, RATE_LIMITED);
   }
 
-  if (request_info.hasResponseFlag(ResponseFlag::UnauthorizedExternalService)) {
+  if (stream_info.hasResponseFlag(ResponseFlag::UnauthorizedExternalService)) {
     appendString(result, UNAUTHORIZED_EXTERNAL_SERVICE);
   }
 
-  if (request_info.hasResponseFlag(ResponseFlag::RateLimitServiceError)) {
+  if (stream_info.hasResponseFlag(ResponseFlag::RateLimitServiceError)) {
     appendString(result, RATELIMIT_SERVICE_ERROR);
   }
 
@@ -127,5 +127,5 @@ Utility::formatDownstreamAddressNoPort(const Network::Address::Instance& address
   }
 }
 
-} // namespace RequestInfo
+} // namespace StreamInfo
 } // namespace Envoy

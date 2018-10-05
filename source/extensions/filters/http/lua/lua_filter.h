@@ -70,10 +70,10 @@ public:
   virtual const ProtobufWkt::Struct& metadata() const PURE;
 
   /**
-   * @return RequestInfo::RequestInfo& the current request info handle. This handle is mutable to
+   * @return StreamInfo::StreamInfo& the current stream info handle. This handle is mutable to
    * accommodate write API e.g. setDynamicMetadata().
    */
-  virtual RequestInfo::RequestInfo& requestInfo() PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   /**
    * @return const const Network::Connection* the current network connection handle.
@@ -133,7 +133,7 @@ public:
             {"logDebug", static_luaLogDebug},       {"logInfo", static_luaLogInfo},
             {"logWarn", static_luaLogWarn},         {"logErr", static_luaLogErr},
             {"logCritical", static_luaLogCritical}, {"httpCall", static_luaHttpCall},
-            {"respond", static_luaRespond},         {"requestInfo", static_luaRequestInfo},
+            {"respond", static_luaRespond},         {"streamInfo", static_luaStreamInfo},
             {"connection", static_luaConnection}};
   }
 
@@ -191,7 +191,7 @@ private:
   /**
    * @return a handle to the request info.
    */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaRequestInfo);
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaStreamInfo);
 
   /**
    * @return a handle to the network connection.
@@ -224,7 +224,7 @@ private:
     body_wrapper_.reset();
     trailers_wrapper_.reset();
     metadata_wrapper_.reset();
-    request_info_wrapper_.reset();
+    stream_info_wrapper_.reset();
     connection_wrapper_.reset();
   }
 
@@ -245,7 +245,7 @@ private:
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<RequestInfoWrapper> request_info_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> stream_info_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::ConnectionWrapper> connection_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
@@ -338,7 +338,7 @@ private:
     void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
     const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
-    RequestInfo::RequestInfo& requestInfo() override { return callbacks_->requestInfo(); }
+    StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
 
     Filter& parent_;
@@ -358,7 +358,7 @@ private:
     void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
     const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
-    RequestInfo::RequestInfo& requestInfo() override { return callbacks_->requestInfo(); }
+    StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
 
     Filter& parent_;
