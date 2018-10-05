@@ -31,7 +31,7 @@ section describes this scenario in more detail.
 Traffic shifting between two upstreams
 --------------------------------------
 
-The :ref:`runtime <envoy_api_field_route.RouteMatch.runtime>` object
+The :ref:`runtime_fraction <envoy_api_field_route.RouteMatch.runtime_fraction>` object
 in the route configuration determines the probability of selecting a
 particular route (and hence its cluster). By using the runtime
 configuration, traffic to a particular route in a virtual host can be
@@ -52,9 +52,12 @@ envoy configuration file.
               {
                 "prefix": "/",
                 "cluster": "helloworld_v1",
-                "runtime": {
-                  "key": "routing.traffic_shift.helloworld",
-                  "default": 50
+                "runtime_fraction": {
+                  "runtime_key": "routing.traffic_shift.helloworld",
+                  "default_value": {
+                    "numerator": 50,
+                    "denominator": HUNDRED
+                  },
                 }
               },
               {
@@ -68,13 +71,11 @@ envoy configuration file.
     }
 
 Envoy matches routes with a :ref:`first match <config_http_conn_man_route_table_route_matching>` policy.
-If the route has a runtime object, the request will be additionally matched based on the runtime
-:ref:`value <envoy_api_field_route.RouteMatch.runtime>`
-(or the default, if no value is specified). Thus, by placing routes
-back-to-back in the above example and specifying a runtime object in the
-first route, traffic shifting can be accomplished by changing the runtime
-value. The following are the approximate sequence of actions required to
-accomplish the task.
+If the route has a runtime object, the request will be additionally matched based on the
+:ref:`runtime value <envoy_api_field_route.RouteMatch.runtime_fraction>` (or the default, if no
+value is specified). Thus, by placing routes back-to-back in the above example and specifying a
+runtime object in the first route, traffic shifting can be accomplished by changing the runtime
+value. The following are the approximate sequence of actions required to accomplish the task.
 
 1. In the beginning, set ``routing.traffic_shift.helloworld`` to ``100``,
    so that all requests to the ``helloworld`` virtual host would match with
