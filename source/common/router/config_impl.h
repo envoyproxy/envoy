@@ -384,12 +384,11 @@ protected:
 
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path,
                           bool insert_envoy_original_path) const;
-
 private:
   struct RuntimeData {
     // Fields associated with the 'runtime_fractional_percent' field for the RouteMatch proto.
     std::string fractional_runtime_key;
-    envoy::api::v2::core::RuntimeFractionalPercent fractional_default_value;
+    envoy::type::FractionalPercent fractional_default_value;
 
     // Fields associated with the deprecated 'runtime' field for the RouteMatch proto.
     std::string runtime_key;
@@ -525,6 +524,8 @@ private:
   typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
 
   absl::optional<RuntimeData> loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
+
+  bool evaluateRuntimeKeys(const RuntimeData& runtime_data, const uint64_t random_value) const;
 
   static std::multimap<std::string, std::string>
   parseOpaqueConfig(const envoy::api::v2::route::Route& route);

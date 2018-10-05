@@ -355,7 +355,7 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
   bool matches = true;
 
   if (runtime_) {
-    if (!evaluateRuntimeKeys(runtime_, random_value)) {
+    if (!evaluateRuntimeKeys(runtime_.value(), random_value)) {
       // No need to waste further cycles calculating a route match.
       return false;
     }
@@ -417,7 +417,7 @@ void RouteEntryImplBase::finalizeResponseHeaders(
   vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, request_info);
 }
 
-bool RouteEntryImplBase::evaluateRuntimeKeys(const RuntimeData& runtime_data, const uint64_t random_value) {
+bool RouteEntryImplBase::evaluateRuntimeKeys(const RuntimeData& runtime_data, const uint64_t random_value) const {
   bool continue_matching = true;
   if (!runtime_data.fractional_runtime_key.empty()) {
     envoy::type::FractionalPercent fractional_percent;
@@ -427,14 +427,14 @@ bool RouteEntryImplBase::evaluateRuntimeKeys(const RuntimeData& runtime_data, co
       MessageUtil::loadFromYamlAndValidate(fraction_yaml, fractional_percent);
     } catch (const EnvoyException& ex) {
       ENVOY_LOG(error, "failed to parse string value for runtime key {}: {}",
-                route_match.runtime_fraction().runtime_key(), ex.what());
-      fractional_percent = runtime_data.runtime_default_value;
+                runtime_data.fractional_runtime_key, ex.what());
+      fractional_percent = runtime_data.fractional_default_value;
     }
 
     const auto numerator = fractional_percent.numerator();
     const auto denominator =
         ProtobufPercentHelper::fractionalPercentDenominatorToInt(fractional_percent.denominator());
-    continue_matching = random_value % runtime_->denominator_val_ < runtime_->numerator_val_;
+    continue_matching = random_value % denominator < numerator;
   } else if (!runtime_data.runtime_key.empty()) {
     continue_matching = loader_.snapshot().featureEnabled(runtime_data.runtime_key,
                                                           runtime_data.runtime_default_value,
