@@ -3,6 +3,7 @@ Version history
 
 1.9.0 (pending)
 ===============
+* fault: removed integer percentage support.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
 
