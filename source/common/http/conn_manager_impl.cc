@@ -949,14 +949,16 @@ void ConnectionManagerImpl::startDrainSequence() {
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   Router::RouteConstSharedPtr route = snapped_route_config_->route(*request_headers_, stream_id_);
-  request_info_.route_entry_ = route ? route->routeEntry() : nullptr;
-  cached_route_ = std::move(route);
   if (!route) {
+    request_info_.route_entry_ = nullptr;
+    cached_route_ = nullptr;
     cached_cluster_info_ = nullptr;
   } else {
-    Upstream::ThreadLocalCluster* local_cluster =
-        connection_manager_.cluster_manager_.get(route->routeEntry()->clusterName());
-    cached_cluster_info_ = local_cluster->info();
+    request_info_.route_entry_ = route->routeEntry();
+    cached_route_ = std::move(route);
+    Upstream::ThreadLocalCluster* local_cluster = connection_manager_.cluster_manager_.get(
+        cached_route_.value()->routeEntry()->clusterName());
+    cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
 }
 
