@@ -27,7 +27,7 @@ private:
 TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
   DangerousDeprecatedTestTime test_time;
-  DispatcherImpl dispatcher(test_time.timeSource());
+  DispatcherImpl dispatcher(test_time.timeSystem());
   ReadyWatcher watcher1;
 
   dispatcher.deferredDelete(
@@ -58,7 +58,7 @@ TEST(DeferredDeleteTest, DeferredDelete) {
 class DispatcherImplTest : public ::testing::Test {
 protected:
   DispatcherImplTest()
-      : dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSource())),
+      : dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSystem())),
         work_finished_(false) {
     dispatcher_thread_ = std::make_unique<Thread::Thread>([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.

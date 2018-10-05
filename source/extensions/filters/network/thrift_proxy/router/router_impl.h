@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
+#include "envoy/router/router.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/load_balancer.h"
 
@@ -15,6 +16,7 @@
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "extensions/filters/network/thrift_proxy/router/router.h"
+#include "extensions/filters/network/thrift_proxy/thrift_object.h"
 
 #include "absl/types/optional.h"
 
@@ -33,18 +35,56 @@ public:
   // Router::RouteEntry
   const std::string& clusterName() const override;
 
+  const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+    return metadata_match_criteria_.get();
+  }
+
   // Router::Route
   const RouteEntry* routeEntry() const override;
 
-  virtual RouteConstSharedPtr matches(const MessageMetadata& metadata) const PURE;
+  virtual RouteConstSharedPtr matches(const MessageMetadata& metadata,
+                                      uint64_t random_value) const PURE;
 
 protected:
-  RouteConstSharedPtr clusterEntry() const;
+  RouteConstSharedPtr clusterEntry(uint64_t random_value) const;
   bool headersMatch(const Http::HeaderMap& headers) const;
 
 private:
+  class WeightedClusterEntry : public RouteEntry, public Route {
+  public:
+    WeightedClusterEntry(
+        const RouteEntryImplBase& parent,
+        const envoy::config::filter::network::thrift_proxy::v2alpha1::WeightedCluster_ClusterWeight&
+            cluster);
+
+    uint64_t clusterWeight() const { return cluster_weight_; }
+
+    // Router::RouteEntry
+    const std::string& clusterName() const override { return cluster_name_; }
+    const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+      if (metadata_match_criteria_) {
+        return metadata_match_criteria_.get();
+      }
+
+      return parent_.metadataMatchCriteria();
+    }
+
+    // Router::Route
+    const RouteEntry* routeEntry() const override { return this; }
+
+  private:
+    const RouteEntryImplBase& parent_;
+    const std::string cluster_name_;
+    const uint64_t cluster_weight_;
+    Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
+  };
+  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
+
   const std::string cluster_name_;
   std::vector<Http::HeaderUtility::HeaderData> config_headers_;
+  std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
+  uint64_t total_cluster_weight_;
+  Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
 };
 
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
@@ -57,7 +97,8 @@ public:
   const std::string& methodName() const { return method_name_; }
 
   // RouteEntryImplBase
-  RouteConstSharedPtr matches(const MessageMetadata& metadata) const override;
+  RouteConstSharedPtr matches(const MessageMetadata& metadata,
+                              uint64_t random_value) const override;
 
 private:
   const std::string method_name_;
@@ -72,7 +113,8 @@ public:
   const std::string& serviceName() const { return service_name_; }
 
   // RouteEntryImplBase
-  RouteConstSharedPtr matches(const MessageMetadata& metadata) const override;
+  RouteConstSharedPtr matches(const MessageMetadata& metadata,
+                              uint64_t random_value) const override;
 
 private:
   std::string service_name_;
@@ -83,7 +125,7 @@ class RouteMatcher {
 public:
   RouteMatcher(const envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration&);
 
-  RouteConstSharedPtr route(const MessageMetadata& metadata) const;
+  RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
 
 private:
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
@@ -102,7 +144,6 @@ public:
   // ThriftFilters::DecoderFilter
   void onDestroy() override;
   void setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) override;
-  void resetUpstreamConnection() override;
 
   // ProtocolConverter
   FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
@@ -112,6 +153,12 @@ public:
 
   // Upstream::LoadBalancerContext
   const Network::Connection* downstreamConnection() const override;
+  const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override {
+    if (route_entry_) {
+      return route_entry_->metadataMatchCriteria();
+    }
+    return nullptr;
+  }
 
   // Tcp::ConnectionPool::UpstreamCallbacks
   void onUpstreamData(Buffer::Instance& data, bool end_stream) override;
@@ -135,6 +182,7 @@ private:
     void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                      Upstream::HostDescriptionConstSharedPtr host) override;
 
+    void onRequestStart(bool continue_decoding);
     void onRequestComplete();
     void onResponseComplete();
     void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
@@ -147,8 +195,10 @@ private:
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
     Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
-    TransportType transport_type_;
-    ProtocolType protocol_type_;
+    ThriftConnectionState* conn_state_{};
+    TransportPtr transport_;
+    ProtocolPtr protocol_;
+    ThriftObjectPtr upgrade_response_;
 
     bool request_complete_ : 1;
     bool response_started_ : 1;

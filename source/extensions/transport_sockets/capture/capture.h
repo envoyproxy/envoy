@@ -4,6 +4,7 @@
 
 #include "envoy/config/transport_socket/capture/v2alpha/capture.pb.h"
 #include "envoy/data/tap/v2alpha/capture.pb.h"
+#include "envoy/event/timer.h"
 #include "envoy/network/transport_socket.h"
 
 namespace Envoy {
@@ -15,7 +16,7 @@ class CaptureSocket : public Network::TransportSocket {
 public:
   CaptureSocket(const std::string& path_prefix,
                 envoy::config::transport_socket::capture::v2alpha::FileSink::Format format,
-                Network::TransportSocketPtr&& transport_socket);
+                Network::TransportSocketPtr&& transport_socket, Event::TimeSystem& time_system);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -37,13 +38,15 @@ private:
   envoy::data::tap::v2alpha::Trace trace_;
   Network::TransportSocketPtr transport_socket_;
   Network::TransportSocketCallbacks* callbacks_{};
+  Event::TimeSystem& time_system_;
 };
 
 class CaptureSocketFactory : public Network::TransportSocketFactory {
 public:
   CaptureSocketFactory(const std::string& path_prefix,
                        envoy::config::transport_socket::capture::v2alpha::FileSink::Format format,
-                       Network::TransportSocketFactoryPtr&& transport_socket_factory);
+                       Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                       Event::TimeSystem& time_system);
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr createTransportSocket() const override;
@@ -53,6 +56,7 @@ private:
   const std::string path_prefix_;
   const envoy::config::transport_socket::capture::v2alpha::FileSink::Format format_;
   Network::TransportSocketFactoryPtr transport_socket_factory_;
+  Event::TimeSystem& time_system_;
 };
 
 } // namespace Capture

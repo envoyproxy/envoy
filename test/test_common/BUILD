@@ -124,8 +124,33 @@ envoy_cc_test_library(
     srcs = ["test_time.cc"],
     hdrs = ["test_time.h"],
     deps = [
+        ":test_time_system_interface",
         "//source/common/event:real_time_system_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "test_time_system_interface",
+    hdrs = ["test_time_system.h"],
+    deps = [
+        "//include/envoy/event:timer_interface",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "simulated_time_system_lib",
+    srcs = ["simulated_time_system.cc"],
+    hdrs = ["simulated_time_system.h"],
+    deps = [
+        ":test_time_system_interface",
+        "//source/common/event:real_time_system_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "simulated_time_system_test",
+    srcs = ["simulated_time_system_test.cc"],
+    deps = [":simulated_time_system_lib"],
 )
 
 envoy_cc_library(

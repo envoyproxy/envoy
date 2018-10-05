@@ -22,5 +22,9 @@ MockLoader::MockLoader() { ON_CALL(*this, snapshot()).WillByDefault(ReturnRef(sn
 
 MockLoader::~MockLoader() {}
 
+MockOverrideLayer::MockOverrideLayer() {}
+
+MockOverrideLayer::~MockOverrideLayer() {}
+
 } // namespace Runtime
 } // namespace Envoy

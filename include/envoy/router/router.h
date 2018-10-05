@@ -16,6 +16,7 @@
 #include "envoy/http/websocket.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
+#include "envoy/upstream/retry.h"
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -168,6 +169,23 @@ public:
    * @return uint32_t a local OR of RETRY_ON values above.
    */
   virtual uint32_t retryOn() const PURE;
+
+  /**
+   * Initializes the RetryHostPredicates to be used with this retry attempt.
+   * @return list of RetryHostPredicates to use
+   */
+  virtual std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const PURE;
+
+  /**
+   * @return the RetryPriority to use when determining priority load for retries.
+   */
+  virtual Upstream::RetryPrioritySharedPtr retryPriority() const PURE;
+
+  /**
+   * Number of times host selection should be reattempted when selecting a host
+   * for a retry attempt.
+   */
+  virtual uint32_t hostSelectionMaxAttempts() const PURE;
 };
 
 /**
@@ -203,6 +221,35 @@ public:
   virtual RetryStatus shouldRetry(const Http::HeaderMap* response_headers,
                                   const absl::optional<Http::StreamResetReason>& reset_reason,
                                   DoRetryCallback callback) PURE;
+
+  /**
+   * Called when a host was attempted but the request failed and is eligible for another retry.
+   * Should be used to update whatever internal state depends on previously attempted hosts.
+   * @param host the previously attempted host.
+   */
+  virtual void onHostAttempted(Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * Determine whether host selection should be reattempted. Applies to host selection during
+   * retries, and is used to provide configurable host selection for retries.
+   * @param host the host under consideration
+   * @return whether host selection should be reattempted
+   */
+  virtual bool shouldSelectAnotherHost(const Upstream::Host& host) PURE;
+
+  /**
+   * Returns a reference to the PriorityLoad that should be used for the next retry.
+   * @param priority_set current priority set.
+   * @param priority_load original priority load.
+   * @return PriorityLoad that should be used to select a priority for the next retry.
+   */
+  virtual const Upstream::PriorityLoad&
+  priorityLoadForRetry(const Upstream::PrioritySet& priority_set,
+                       const Upstream::PriorityLoad& priority_load) PURE;
+  /**
+   * return how many times host selection should be reattempted during host selection.
+   */
+  virtual uint32_t hostSelectionMaxAttempts() const PURE;
 };
 
 typedef std::unique_ptr<RetryState> RetryStatePtr;
@@ -258,7 +305,7 @@ public:
 typedef std::shared_ptr<const RouteSpecificFilterConfig> RouteSpecificFilterConfigConstSharedPtr;
 
 /**
- * Virtual host defintion.
+ * Virtual host definition.
  */
 class VirtualHost {
 public:

@@ -122,6 +122,12 @@ private:
     std::chrono::milliseconds perTryTimeout() const override {
       return std::chrono::milliseconds(0);
     }
+    std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override {
+      return {};
+    }
+    Upstream::RetryPrioritySharedPtr retryPriority() const override { return {}; }
+
+    uint32_t hostSelectionMaxAttempts() const override { return 1; }
     uint32_t numRetries() const override { return 0; }
     uint32_t retryOn() const override { return 0; }
   };

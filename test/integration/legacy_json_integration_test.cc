@@ -12,14 +12,17 @@ namespace Envoy {
 class LegacyJsonIntegrationTest : public BaseIntegrationTest,
                                   public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  LegacyJsonIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  LegacyJsonIntegrationTest() : BaseIntegrationTest(GetParam(), realTime()) {}
 
   void SetUp() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
     registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
     registerPort("cluster_with_buffer_limits",
                  fake_upstreams_.back()->localAddress()->ip()->port());
   }
@@ -59,7 +62,7 @@ TEST_P(LegacyJsonIntegrationTest, TestServerXfc) {
   param_map["set_current_client_cert_details"] = "";
   std::string config = TestEnvironment::temporaryFileSubstitute(
       "test/config/integration/server_xfcc.json", param_map, port_map_, version_);
-  IntegrationTestServer::create(config, version_, nullptr, false);
+  IntegrationTestServer::create(config, version_, nullptr, false, timeSystem());
 }
 
 TEST_P(LegacyJsonIntegrationTest, TestEchoServer) {

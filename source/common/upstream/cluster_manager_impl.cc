@@ -116,6 +116,7 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       for (auto iter = secondary_init_clusters_.begin(); iter != secondary_init_clusters_.end();) {
         Cluster* cluster = *iter;
         ++iter;
+        ENVOY_LOG(debug, "initializing secondary cluster {}", cluster->info()->name());
         cluster->initialize([cluster, this] { onClusterInit(*cluster); });
       }
     }
@@ -180,7 +181,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
-      time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher) {
+      time_source_(main_thread_dispatcher.timeSystem()), dispatcher_(main_thread_dispatcher) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls, time_source_);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
@@ -217,7 +218,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
         main_thread_dispatcher,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_));
+        random_, stats_));
   } else {
     ads_mux_.reset(new Config::NullGrpcMuxImpl());
   }
@@ -389,7 +390,7 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
 
   // Has an update_merge_window gone by since the last update? If so, don't schedule
   // the update so it can be applied immediately. Ditto if this is not a mergeable update.
-  const auto delta = std::chrono::steady_clock::now() - updates->last_updated_;
+  const auto delta = time_source_.monotonicTime() - updates->last_updated_;
   const uint64_t delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
   const bool out_of_merge_window = delta_ms > timeout;
   if (out_of_merge_window || !mergeable) {
@@ -412,7 +413,7 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
       cm_stats_.update_merge_cancelled_.inc();
     }
 
-    updates->last_updated_ = std::chrono::steady_clock::now();
+    updates->last_updated_ = time_source_.monotonicTime();
     return false;
   }
 
@@ -445,7 +446,7 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
 
   cm_stats_.cluster_updated_via_merge_.inc();
   updates.timer_enabled_ = false;
-  updates.last_updated_ = std::chrono::steady_clock::now();
+  updates.last_updated_ = time_source_.monotonicTime();
 }
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,

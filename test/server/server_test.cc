@@ -113,7 +113,7 @@ protected:
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
     }
     server_.reset(new InstanceImpl(
-        options_, test_time_.timeSource(),
+        options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_));
@@ -129,7 +129,7 @@ protected:
          {"health_check_interval", fmt::format("{}", interval).c_str()}},
         TestEnvironment::PortMap{}, version_);
     server_.reset(new InstanceImpl(
-        options_, test_time_.timeSource(),
+        options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_));
@@ -248,6 +248,16 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckValidTimeoutAndInterva
                                                   0.25, 0.5));
 }
 
+// Test that a Bootstrap proto with no address specified in its Admin field can go through
+// initialization properly, but without starting an admin listener.
+TEST_P(ServerInstanceImplTest, BootstrapNodeNoAdmin) {
+  EXPECT_NO_THROW(initialize("test/server/node_bootstrap_no_admin_port.yaml"));
+  // Admin::addListenerToHandler() calls one of handler's methods after checking that the Admin
+  // has a listener. So, the fact that passing a nullptr doesn't cause a segfault establishes
+  // that there is no listener.
+  server_->admin().addListenerToHandler(/*handler=*/nullptr);
+}
+
 // Negative test for protoc-gen-validate constraints.
 TEST_P(ServerInstanceImplTest, ValidateFail) {
   options_.service_cluster_name_ = "some_cluster_name";
@@ -298,7 +308,7 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   EXPECT_THROW_WITH_MESSAGE(
       server_.reset(new InstanceImpl(
-          options_, test_time_.timeSource(),
+          options_, test_time_.timeSystem(),
           Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_)),

@@ -71,7 +71,7 @@ TEST_F(BinaryProtocolTest, ReadMessageBegin) {
     Buffer::OwnedImpl buffer;
     resetMetadata();
 
-    addInt16(buffer, 0x0102);
+    buffer.writeBEInt<int16_t>(0x0102);
     addRepeated(buffer, 10, 'x');
 
     EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, metadata_), EnvoyException,
@@ -85,9 +85,9 @@ TEST_F(BinaryProtocolTest, ReadMessageBegin) {
     Buffer::OwnedImpl buffer;
     resetMetadata();
 
-    addInt16(buffer, 0x8001);
-    addInt8(buffer, 'x');
-    addInt8(buffer, static_cast<int8_t>(MessageType::LastMessageType) + 1);
+    buffer.writeBEInt<int16_t>(0x8001);
+    buffer.writeByte('x');
+    buffer.writeByte(static_cast<int8_t>(MessageType::LastMessageType) + 1);
     addRepeated(buffer, 8, 'x');
 
     EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, metadata_), EnvoyException,
@@ -102,11 +102,11 @@ TEST_F(BinaryProtocolTest, ReadMessageBegin) {
     Buffer::OwnedImpl buffer;
     resetMetadata();
 
-    addInt16(buffer, 0x8001);
-    addInt8(buffer, 'x');
-    addInt8(buffer, MessageType::Call);
-    addInt32(buffer, 0);
-    addInt32(buffer, 1234);
+    buffer.writeBEInt<int16_t>(0x8001);
+    buffer.writeByte('x');
+    buffer.writeByte(MessageType::Call);
+    buffer.writeBEInt<int32_t>(0);
+    buffer.writeBEInt<int32_t>(1234);
 
     EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
     expectMetadata("", MessageType::Call, 1234);
@@ -118,11 +118,11 @@ TEST_F(BinaryProtocolTest, ReadMessageBegin) {
     Buffer::OwnedImpl buffer;
     resetMetadata();
 
-    addInt16(buffer, 0x8001);
-    addInt8(buffer, 'x');
-    addInt8(buffer, MessageType::Call);
-    addInt32(buffer, 4); // name length
-    addString(buffer, "abcd");
+    buffer.writeBEInt<int16_t>(0x8001);
+    buffer.writeByte('x');
+    buffer.writeByte(MessageType::Call);
+    buffer.writeBEInt<int32_t>(4); // name length
+    buffer.add("abcd");
 
     EXPECT_FALSE(proto.readMessageBegin(buffer, metadata_));
     expectDefaultMetadata();
@@ -134,12 +134,12 @@ TEST_F(BinaryProtocolTest, ReadMessageBegin) {
     Buffer::OwnedImpl buffer;
     resetMetadata();
 
-    addInt16(buffer, 0x8001);
-    addInt8(buffer, 0);
-    addInt8(buffer, MessageType::Call);
-    addInt32(buffer, 8);
-    addString(buffer, "the_name");
-    addInt32(buffer, 5678);
+    buffer.writeBEInt<int16_t>(0x8001);
+    buffer.writeByte(0);
+    buffer.writeByte(MessageType::Call);
+    buffer.writeBEInt<int32_t>(8);
+    buffer.add("the_name");
+    buffer.writeBEInt<int32_t>(5678);
 
     EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
     expectMetadata("the_name", MessageType::Call, 5678);
@@ -193,7 +193,7 @@ TEST_F(BinaryProtocolTest, ReadFieldBegin) {
     FieldType field_type = FieldType::String;
     int16_t field_id = 1;
 
-    addInt8(buffer, FieldType::Stop);
+    buffer.writeByte(FieldType::Stop);
 
     EXPECT_TRUE(proto.readFieldBegin(buffer, name, field_type, field_id));
     EXPECT_EQ(name, "");
@@ -209,7 +209,7 @@ TEST_F(BinaryProtocolTest, ReadFieldBegin) {
     FieldType field_type = FieldType::String;
     int16_t field_id = 1;
 
-    addInt8(buffer, FieldType::I32);
+    buffer.writeByte(FieldType::I32);
 
     EXPECT_FALSE(proto.readFieldBegin(buffer, name, field_type, field_id));
     EXPECT_EQ(name, "-");
@@ -224,8 +224,8 @@ TEST_F(BinaryProtocolTest, ReadFieldBegin) {
     FieldType field_type = FieldType::String;
     int16_t field_id = 1;
 
-    addInt8(buffer, FieldType::I32);
-    addInt16(buffer, 99);
+    buffer.writeByte(FieldType::I32);
+    buffer.writeBEInt<int16_t>(99);
 
     EXPECT_TRUE(proto.readFieldBegin(buffer, name, field_type, field_id));
     EXPECT_EQ(name, "");
@@ -241,8 +241,8 @@ TEST_F(BinaryProtocolTest, ReadFieldBegin) {
     FieldType field_type = FieldType::String;
     int16_t field_id = 1;
 
-    addInt8(buffer, FieldType::I32);
-    addInt16(buffer, -1);
+    buffer.writeByte(FieldType::I32);
+    buffer.writeBEInt<int16_t>(-1);
 
     EXPECT_THROW_WITH_MESSAGE(proto.readFieldBegin(buffer, name, field_type, field_id),
                               EnvoyException, "invalid binary protocol field id -1");
@@ -285,9 +285,9 @@ TEST_F(BinaryProtocolTest, ReadMapBegin) {
     FieldType value_type = FieldType::String;
     uint32_t size = 1;
 
-    addInt8(buffer, FieldType::I32);
-    addInt8(buffer, FieldType::I32);
-    addInt32(buffer, -1);
+    buffer.writeByte(FieldType::I32);
+    buffer.writeByte(FieldType::I32);
+    buffer.writeBEInt<int32_t>(-1);
 
     EXPECT_THROW_WITH_MESSAGE(proto.readMapBegin(buffer, key_type, value_type, size),
                               EnvoyException, "negative binary protocol map size -1");
@@ -304,9 +304,9 @@ TEST_F(BinaryProtocolTest, ReadMapBegin) {
     FieldType value_type = FieldType::String;
     uint32_t size = 1;
 
-    addInt8(buffer, FieldType::I32);
-    addInt8(buffer, FieldType::Double);
-    addInt32(buffer, 10);
+    buffer.writeByte(FieldType::I32);
+    buffer.writeByte(FieldType::Double);
+    buffer.writeBEInt<int32_t>(10);
 
     EXPECT_TRUE(proto.readMapBegin(buffer, key_type, value_type, size));
     EXPECT_EQ(key_type, FieldType::I32);
@@ -345,8 +345,8 @@ TEST_F(BinaryProtocolTest, ReadListBegin) {
     FieldType elem_type = FieldType::String;
     uint32_t size = 1;
 
-    addInt8(buffer, FieldType::I32);
-    addInt32(buffer, -1);
+    buffer.writeByte(FieldType::I32);
+    buffer.writeBEInt<int32_t>(-1);
 
     EXPECT_THROW_WITH_MESSAGE(proto.readListBegin(buffer, elem_type, size), EnvoyException,
                               "negative binary protocol list/set size -1");
@@ -361,8 +361,8 @@ TEST_F(BinaryProtocolTest, ReadListBegin) {
     FieldType elem_type = FieldType::String;
     uint32_t size = 1;
 
-    addInt8(buffer, FieldType::I32);
-    addInt32(buffer, 10);
+    buffer.writeByte(FieldType::I32);
+    buffer.writeBEInt<int32_t>(10);
 
     EXPECT_TRUE(proto.readListBegin(buffer, elem_type, size));
     EXPECT_EQ(elem_type, FieldType::I32);
@@ -385,8 +385,8 @@ TEST_F(BinaryProtocolTest, ReadSetBegin) {
   FieldType elem_type = FieldType::String;
   uint32_t size = 1;
 
-  addInt8(buffer, FieldType::I32);
-  addInt32(buffer, 10);
+  buffer.writeByte(FieldType::I32);
+  buffer.writeBEInt<int32_t>(10);
 
   EXPECT_TRUE(proto.readSetBegin(buffer, elem_type, size));
   EXPECT_EQ(elem_type, FieldType::I32);
@@ -411,12 +411,12 @@ TEST_F(BinaryProtocolTest, ReadIntegerTypes) {
     EXPECT_FALSE(proto.readBool(buffer, value));
     EXPECT_FALSE(value);
 
-    addInt8(buffer, 1);
+    buffer.writeByte(1);
     EXPECT_TRUE(proto.readBool(buffer, value));
     EXPECT_TRUE(value);
     EXPECT_EQ(buffer.length(), 0);
 
-    addInt8(buffer, 0);
+    buffer.writeByte(0);
     EXPECT_TRUE(proto.readBool(buffer, value));
     EXPECT_FALSE(value);
     EXPECT_EQ(buffer.length(), 0);
@@ -430,12 +430,12 @@ TEST_F(BinaryProtocolTest, ReadIntegerTypes) {
     EXPECT_FALSE(proto.readByte(buffer, value));
     EXPECT_EQ(value, 1);
 
-    addInt8(buffer, 0);
+    buffer.writeByte(0);
     EXPECT_TRUE(proto.readByte(buffer, value));
     EXPECT_EQ(value, 0);
     EXPECT_EQ(buffer.length(), 0);
 
-    addInt8(buffer, 0xFF);
+    buffer.writeByte(0xFF);
     EXPECT_TRUE(proto.readByte(buffer, value));
     EXPECT_EQ(value, 0xFF);
     EXPECT_EQ(buffer.length(), 0);
@@ -446,17 +446,17 @@ TEST_F(BinaryProtocolTest, ReadIntegerTypes) {
     Buffer::OwnedImpl buffer;
     int16_t value = 1;
 
-    addInt8(buffer, 0);
+    buffer.writeByte(0);
     EXPECT_FALSE(proto.readInt16(buffer, value));
     EXPECT_EQ(value, 1);
 
-    addInt8(buffer, 0);
+    buffer.writeByte(0);
     EXPECT_TRUE(proto.readInt16(buffer, value));
     EXPECT_EQ(value, 0);
     EXPECT_EQ(buffer.length(), 0);
 
-    addInt8(buffer, 0x01);
-    addInt8(buffer, 0x02);
+    buffer.writeByte(0x01);
+    buffer.writeByte(0x02);
     EXPECT_TRUE(proto.readInt16(buffer, value));
     EXPECT_EQ(value, 0x0102);
     EXPECT_EQ(buffer.length(), 0);
@@ -476,7 +476,7 @@ TEST_F(BinaryProtocolTest, ReadIntegerTypes) {
     EXPECT_FALSE(proto.readInt32(buffer, value));
     EXPECT_EQ(value, 1);
 
-    addInt8(buffer, 0);
+    buffer.writeByte(0);
     EXPECT_TRUE(proto.readInt32(buffer, value));
     EXPECT_EQ(value, 0);
     EXPECT_EQ(buffer.length(), 0);
@@ -501,7 +501,7 @@ TEST_F(BinaryProtocolTest, ReadIntegerTypes) {
     EXPECT_FALSE(proto.readInt64(buffer, value));
     EXPECT_EQ(value, 1);
 
-    addInt8(buffer, 0);
+    buffer.writeByte(0);
     EXPECT_TRUE(proto.readInt64(buffer, value));
     EXPECT_EQ(value, 0);
     EXPECT_EQ(buffer.length(), 0);
@@ -566,7 +566,7 @@ TEST_F(BinaryProtocolTest, ReadString) {
     Buffer::OwnedImpl buffer;
     std::string value = "-";
 
-    addInt32(buffer, 1);
+    buffer.writeBEInt<int32_t>(1);
 
     EXPECT_FALSE(proto.readString(buffer, value));
     EXPECT_EQ(value, "-");
@@ -578,7 +578,7 @@ TEST_F(BinaryProtocolTest, ReadString) {
     Buffer::OwnedImpl buffer;
     std::string value = "-";
 
-    addInt32(buffer, -1);
+    buffer.writeBEInt<int32_t>(-1);
 
     EXPECT_THROW_WITH_MESSAGE(proto.readString(buffer, value), EnvoyException,
                               "negative binary protocol string/binary length -1");
@@ -591,7 +591,7 @@ TEST_F(BinaryProtocolTest, ReadString) {
     Buffer::OwnedImpl buffer;
     std::string value = "-";
 
-    addInt32(buffer, 0);
+    buffer.writeBEInt<int32_t>(0);
 
     EXPECT_TRUE(proto.readString(buffer, value));
     EXPECT_EQ(value, "");
@@ -603,8 +603,8 @@ TEST_F(BinaryProtocolTest, ReadString) {
     Buffer::OwnedImpl buffer;
     std::string value = "-";
 
-    addInt32(buffer, 6);
-    addString(buffer, "string");
+    buffer.writeBEInt<int32_t>(6);
+    buffer.add("string");
 
     EXPECT_TRUE(proto.readString(buffer, value));
     EXPECT_EQ(value, "string");
@@ -618,8 +618,8 @@ TEST_F(BinaryProtocolTest, ReadBinary) {
   Buffer::OwnedImpl buffer;
   std::string value = "-";
 
-  addInt32(buffer, 6);
-  addString(buffer, "binary");
+  buffer.writeBEInt<int32_t>(6);
+  buffer.add("binary");
 
   EXPECT_TRUE(proto.readBinary(buffer, value));
   EXPECT_EQ(value, "binary");
@@ -925,8 +925,8 @@ TEST_F(LaxBinaryProtocolTest, ReadMessageBegin) {
     Buffer::OwnedImpl buffer;
     resetMetadata();
 
-    addInt32(buffer, 0);
-    addInt8(buffer, static_cast<int8_t>(MessageType::LastMessageType) + 1);
+    buffer.writeBEInt<int32_t>(0);
+    buffer.writeByte(static_cast<int8_t>(MessageType::LastMessageType) + 1);
     addRepeated(buffer, 4, 'x');
 
     EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, metadata_), EnvoyException,
@@ -941,9 +941,9 @@ TEST_F(LaxBinaryProtocolTest, ReadMessageBegin) {
     Buffer::OwnedImpl buffer;
     resetMetadata();
 
-    addInt32(buffer, 0);
-    addInt8(buffer, MessageType::Call);
-    addInt32(buffer, 1234);
+    buffer.writeBEInt<int32_t>(0);
+    buffer.writeByte(MessageType::Call);
+    buffer.writeBEInt<int32_t>(1234);
 
     EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
     expectMetadata("", MessageType::Call, 1234);
@@ -955,9 +955,9 @@ TEST_F(LaxBinaryProtocolTest, ReadMessageBegin) {
     Buffer::OwnedImpl buffer;
     resetMetadata();
 
-    addInt32(buffer, 1); // name length
-    addInt8(buffer, MessageType::Call);
-    addInt32(buffer, 1234);
+    buffer.writeBEInt<int32_t>(1); // name length
+    buffer.writeByte(MessageType::Call);
+    buffer.writeBEInt<int32_t>(1234);
 
     EXPECT_FALSE(proto.readMessageBegin(buffer, metadata_));
     expectDefaultMetadata();
@@ -969,10 +969,10 @@ TEST_F(LaxBinaryProtocolTest, ReadMessageBegin) {
     Buffer::OwnedImpl buffer;
     resetMetadata();
 
-    addInt32(buffer, 8);
-    addString(buffer, "the_name");
-    addInt8(buffer, MessageType::Call);
-    addInt32(buffer, 5678);
+    buffer.writeBEInt<int32_t>(8);
+    buffer.add("the_name");
+    buffer.writeByte(MessageType::Call);
+    buffer.writeBEInt<int32_t>(5678);
 
     EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
     expectMetadata("the_name", MessageType::Call, 5678);

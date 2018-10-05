@@ -23,6 +23,7 @@
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/access_log/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -30,7 +31,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 
@@ -55,7 +56,7 @@ public:
   };
 
   FuzzConfig()
-      : route_config_provider_(test_time_.timeSource()),
+      : route_config_provider_(time_system_),
         stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_HISTOGRAM(fake_stats_))},
                "",
@@ -90,11 +91,15 @@ public:
   bool generateRequestId() override { return true; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
+  std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return server_name_; }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
+  const Http::InternalAddressConfig& internalAddressConfig() const override {
+    return internal_address_config_;
+  }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
   const std::string& via() const override { return EMPTY_STRING; }
@@ -117,7 +122,7 @@ public:
   MockStreamEncoderFilter* encoder_filter_{};
   NiceMock<MockFilterChainFactory> filter_factory_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
-  DangerousDeprecatedTestTime test_time_;
+  Event::SimulatedTimeSystem time_system_;
   RouteConfigProvider route_config_provider_;
   std::string server_name_;
   Stats::IsolatedStoreImpl fake_stats_;
@@ -125,6 +130,7 @@ public:
   ConnectionManagerTracingStats tracing_stats_;
   ConnectionManagerListenerStats listener_stats_;
   std::chrono::milliseconds stream_idle_timeout_{};
+  std::chrono::milliseconds delayed_close_timeout_{};
   bool use_remote_address_{true};
   Http::ForwardClientCertType forward_client_cert_{Http::ForwardClientCertType::Sanitize};
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
@@ -133,6 +139,7 @@ public:
   TracingConnectionManagerConfigPtr tracing_config_;
   bool proxy_100_continue_ = true;
   Http::Http1Settings http1_settings_;
+  Http::DefaultInternalAddressConfig internal_address_config_;
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks
@@ -155,6 +162,9 @@ public:
         .WillOnce(InvokeWithoutArgs([this, &request_headers, end_stream] {
           decoder_ = &conn_manager_.newStream(encoder_);
           auto headers = std::make_unique<TestHeaderMapImpl>(request_headers);
+          if (headers->Method() == nullptr) {
+            headers->setReferenceKey(Headers::get().Method, "GET");
+          }
           decoder_->decodeHeaders(std::move(headers), end_stream);
         }));
     fakeOnData();
@@ -387,7 +397,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
 
   ConnectionManagerImpl conn_manager(config, drain_close, random, tracer, runtime, local_info,
-                                     cluster_manager);
+                                     cluster_manager, nullptr, config.time_system_);
   conn_manager.initializeReadFilterCallbacks(filter_callbacks);
 
   std::vector<FuzzStreamPtr> streams;

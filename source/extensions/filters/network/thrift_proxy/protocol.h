@@ -11,8 +11,12 @@
 #include "common/config/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "extensions/filters/network/thrift_proxy/conn_state.h"
+#include "extensions/filters/network/thrift_proxy/decoder_events.h"
 #include "extensions/filters/network/thrift_proxy/metadata.h"
 #include "extensions/filters/network/thrift_proxy/thrift.h"
+#include "extensions/filters/network/thrift_proxy/thrift_object.h"
+#include "extensions/filters/network/thrift_proxy/transport.h"
 
 #include "absl/strings/string_view.h"
 
@@ -20,6 +24,9 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
+
+class DirectResponse;
+typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
 
 /**
  * Protocol represents the operations necessary to implement the a generic Thrift protocol.
@@ -52,7 +59,7 @@ public:
    * from the buffer.
    * @param buffer the buffer to read from
    * @param metadata MessageMetadata to be updated with name, message type, and sequence id.
-   * @return true if a message header was sucessfully read, false if more data is required
+   * @return true if a message header was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid message header
    */
   virtual bool readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) PURE;
@@ -61,7 +68,7 @@ public:
    * Reads the end of a Thrift protocol message from the buffer. If successful, the message footer
    * is removed from the buffer.
    * @param buffer the buffer to read from
-   * @return true if a message footer was sucessfully read, false if more data is required
+   * @return true if a message footer was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid message footer
    */
   virtual bool readMessageEnd(Buffer::Instance& buffer) PURE;
@@ -71,7 +78,7 @@ public:
    * value from the struct header. If successful, the struct header is removed from the buffer.
    * @param buffer the buffer to read from
    * @param name updated with the struct name on success only
-   * @return true if a struct header was sucessfully read, false if more data is required
+   * @return true if a struct header was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid struct header
    */
   virtual bool readStructBegin(Buffer::Instance& buffer, std::string& name) PURE;
@@ -80,7 +87,7 @@ public:
    * Reads the end of a Thrift struct from the buffer. If successful, the struct footer is removed
    * from the buffer.
    * @param buffer the buffer to read from
-   * @return true if a struct footer was sucessfully read, false if more data is required
+   * @return true if a struct footer was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid struct footer
    */
   virtual bool readStructEnd(Buffer::Instance& buffer) PURE;
@@ -93,7 +100,7 @@ public:
    * @param name updated with the field name on success only
    * @param field_type updated with the FieldType on success only
    * @param field_id updated with the field ID on success only
-   * @return true if a field header was sucessfully read, false if more data is required
+   * @return true if a field header was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid field header
    */
   virtual bool readFieldBegin(Buffer::Instance& buffer, std::string& name, FieldType& field_type,
@@ -103,7 +110,7 @@ public:
    * Reads the end of a Thrift struct field from the buffer. If successful, the field footer is
    * removed from the buffer.
    * @param buffer the buffer to read from
-   * @return true if a field footer was sucessfully read, false if more data is required
+   * @return true if a field footer was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid field footer
    */
   virtual bool readFieldEnd(Buffer::Instance& buffer) PURE;
@@ -116,7 +123,7 @@ public:
    * @param key_type updated with map key FieldType on success only
    * @param value_type updated with map value FieldType on success only
    * @param size updated with the number of key-value pairs in the map on success only
-   * @return true if a map header was sucessfully read, false if more data is required
+   * @return true if a map header was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid map header
    */
   virtual bool readMapBegin(Buffer::Instance& buffer, FieldType& key_type, FieldType& value_type,
@@ -126,7 +133,7 @@ public:
    * Reads the end of a Thrift map from the buffer. If successful, the map footer is removed from
    * the buffer.
    * @param buffer the buffer to read from
-   * @return true if a map footer was sucessfully read, false if more data is required
+   * @return true if a map footer was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid map footer
    */
   virtual bool readMapEnd(Buffer::Instance& buffer) PURE;
@@ -138,7 +145,7 @@ public:
    * @param buffer the buffer to read from
    * @param elem_type updated with list element FieldType on success only
    * @param size updated with the number of list members on success only
-   * @return true if a list header was sucessfully read, false if more data is required
+   * @return true if a list header was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid list header
    */
   virtual bool readListBegin(Buffer::Instance& buffer, FieldType& elem_type, uint32_t& size) PURE;
@@ -147,7 +154,7 @@ public:
    * Reads the end of a Thrift list from the buffer. If successful, the list footer is removed from
    * the buffer.
    * @param buffer the buffer to read from
-   * @return true if a list footer was sucessfully read, false if more data is required
+   * @return true if a list footer was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid list footer
    */
   virtual bool readListEnd(Buffer::Instance& buffer) PURE;
@@ -159,7 +166,7 @@ public:
    * @param buffer the buffer to read from
    * @param elem_type updated with set element FieldType on success only
    * @param size updated with the number of set members on success only
-   * @return true if a set header was sucessfully read, false if more data is required
+   * @return true if a set header was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid set header
    */
   virtual bool readSetBegin(Buffer::Instance& buffer, FieldType& elem_type, uint32_t& size) PURE;
@@ -168,7 +175,7 @@ public:
    * Reads the end of a Thrift set from the buffer. If successful, the set footer is removed from
    * the buffer.
    * @param buffer the buffer to read from
-   * @return true if a set footer was sucessfully read, false if more data is required
+   * @return true if a set footer was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid set footer
    */
   virtual bool readSetEnd(Buffer::Instance& buffer) PURE;
@@ -394,9 +401,98 @@ public:
    * @param value std::string to write
    */
   virtual void writeBinary(Buffer::Instance& buffer, const std::string& value) PURE;
+
+  /**
+   * Indicates whether a protocol uses start-of-connection messages to negotiate protocol options.
+   * If this method returns true, the Protocol must invoke setProtocolUpgradeMessage during
+   * readMessageBegin if it detects an upgrade request.
+   *
+   * @return true for protocols that exchange messages at the start of a connection to negotiate
+   *         protocol upgrade (or options)
+   */
+  virtual bool supportsUpgrade() { return false; }
+
+  /**
+   * Creates an opaque DecoderEventHandlerSharedPtr that can decode a downstream client's upgrade
+   * request. When the request is complete, the decoder is passed back to writeUpgradeResponse
+   * to allow the Protocol to update its internal state and generate a response to the request.
+   *
+   * @return a DecoderEventHandlerSharedPtr that decodes a downstream client's upgrade request
+   */
+  virtual DecoderEventHandlerSharedPtr upgradeRequestDecoder() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+  /**
+   * Writes a response to a downstream client's upgrade request.
+   * @param decoder DecoderEventHandlerSharedPtr created by upgradeRequestDecoder
+   * @return DirectResponsePtr containing an upgrade response
+   */
+  virtual DirectResponsePtr upgradeResponse(const DecoderEventHandler& decoder) {
+    UNREFERENCED_PARAMETER(decoder);
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  /**
+   * Checks whether a given upstream connection can be upgraded and generates an upgrade request
+   * message. If this method returns a ThriftObject it will be used to decode the upstream's next
+   * response.
+   *
+   * @param transport the Transport to use for decoding the response
+   * @param state ThriftConnectionState tracking whether upgrade has already been performed
+   * @param buffer Buffer::Instance to modify with an upgrade request
+   * @return a ThriftObject capable of decoding an upgrade response or nullptr if upgrade was
+   *         already completed (successfully or not)
+   */
+  virtual ThriftObjectPtr attemptUpgrade(Transport& transport, ThriftConnectionState& state,
+                                         Buffer::Instance& buffer) {
+    UNREFERENCED_PARAMETER(transport);
+    UNREFERENCED_PARAMETER(state);
+    UNREFERENCED_PARAMETER(buffer);
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  /**
+   * Completes an upgrade previously started via attemptUpgrade.
+   * @param response ThriftObject created by attemptUpgrade, after the response has completed
+   *        decoding
+   */
+  virtual void completeUpgrade(ThriftConnectionState& state, ThriftObject& response) {
+    UNREFERENCED_PARAMETER(state);
+    UNREFERENCED_PARAMETER(response);
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 };
 
 typedef std::unique_ptr<Protocol> ProtocolPtr;
+
+/**
+ * A DirectResponse manipulates a Protocol to directly create a Thrift response message.
+ */
+class DirectResponse {
+public:
+  virtual ~DirectResponse() {}
+
+  enum class ResponseType {
+    // DirectResponse encodes MessageType::Reply with success payload
+    SuccessReply,
+
+    // DirectResponse encodes MessageType::Reply with an exception payload
+    ErrorReply,
+
+    // DirectResponse encodes MessageType::Exception
+    Exception,
+  };
+
+  /**
+   * Encodes the response via the given Protocol.
+   * @param metadata the MessageMetadata for the request that generated this response
+   * @param proto the Protocol to be used for message encoding
+   * @param buffer the Buffer into which the message should be encoded
+   * @return ResponseType indicating whether the message is a successful or error reply or an
+   *         exception
+   */
+  virtual ResponseType encode(MessageMetadata& metadata, Protocol& proto,
+                              Buffer::Instance& buffer) const PURE;
+};
 
 /**
  * Implemented by each Thrift protocol and registered via Registry::registerFactory or the
@@ -443,25 +539,6 @@ protected:
 private:
   const std::string name_;
 };
-
-/**
- * A DirectResponse manipulates a Protocol to directly create a Thrift response message.
- */
-class DirectResponse {
-public:
-  virtual ~DirectResponse() {}
-
-  /**
-   * Encodes the response via the given Protocol.
-   * @param metadata the MessageMetadata for the request that generated this response
-   * @param proto the Protocol to be used for message encoding
-   * @param buffer the Buffer into which the message should be encoded
-   */
-  virtual void encode(MessageMetadata& metadata, Protocol& proto,
-                      Buffer::Instance& buffer) const PURE;
-};
-
-typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

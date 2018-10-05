@@ -5,6 +5,7 @@
 #include "envoy/upstream/thread_local_cluster.h"
 
 #include "common/common/utility.h"
+#include "common/router/metadatamatchcriteria_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -21,16 +22,63 @@ RouteEntryImplBase::RouteEntryImplBase(
   for (const auto& header_map : route.match().headers()) {
     config_headers_.push_back(header_map);
   }
+
+  if (route.route().has_metadata_match()) {
+    const auto filter_it = route.route().metadata_match().filter_metadata().find(
+        Envoy::Config::MetadataFilters::get().ENVOY_LB);
+    if (filter_it != route.route().metadata_match().filter_metadata().end()) {
+      metadata_match_criteria_.reset(
+          new Envoy::Router::MetadataMatchCriteriaImpl(filter_it->second));
+    }
+  }
+
+  if (route.route().cluster_specifier_case() ==
+      envoy::config::filter::network::thrift_proxy::v2alpha1::RouteAction::kWeightedClusters) {
+
+    total_cluster_weight_ = 0UL;
+    for (const auto& cluster : route.route().weighted_clusters().clusters()) {
+      std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(*this, cluster));
+      weighted_clusters_.emplace_back(std::move(cluster_entry));
+      total_cluster_weight_ += weighted_clusters_.back()->clusterWeight();
+    }
+  }
 }
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
 const RouteEntry* RouteEntryImplBase::routeEntry() const { return this; }
 
-RouteConstSharedPtr RouteEntryImplBase::clusterEntry() const { return shared_from_this(); }
+RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value) const {
+  if (weighted_clusters_.empty()) {
+    return shared_from_this();
+  }
+  return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_, random_value,
+                                          false);
+}
 
 bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
   return Http::HeaderUtility::matchHeaders(headers, config_headers_);
+}
+
+RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
+    const RouteEntryImplBase& parent,
+    const envoy::config::filter::network::thrift_proxy::v2alpha1::WeightedCluster_ClusterWeight&
+        cluster)
+    : parent_(parent), cluster_name_(cluster.name()),
+      cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)) {
+  if (cluster.has_metadata_match()) {
+    const auto filter_it = cluster.metadata_match().filter_metadata().find(
+        Envoy::Config::MetadataFilters::get().ENVOY_LB);
+    if (filter_it != cluster.metadata_match().filter_metadata().end()) {
+      if (parent.metadata_match_criteria_) {
+        metadata_match_criteria_ =
+            parent.metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
+      } else {
+        metadata_match_criteria_.reset(
+            new Envoy::Router::MetadataMatchCriteriaImpl(filter_it->second));
+      }
+    }
+  }
 }
 
 MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
@@ -42,13 +90,14 @@ MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
   }
 }
 
-RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
+RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata,
+                                                      uint64_t random_value) const {
   if (RouteEntryImplBase::headersMatch(metadata.headers())) {
     bool matches =
         method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
 
     if (matches ^ invert_) {
-      return clusterEntry();
+      return clusterEntry(random_value);
     }
   }
 
@@ -70,14 +119,15 @@ ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
   }
 }
 
-RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
+RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata,
+                                                       uint64_t random_value) const {
   if (RouteEntryImplBase::headersMatch(metadata.headers())) {
     bool matches = service_name_.empty() ||
                    (metadata.hasMethodName() &&
                     StringUtil::startsWith(metadata.methodName().c_str(), service_name_));
 
     if (matches ^ invert_) {
-      return clusterEntry();
+      return clusterEntry(random_value);
     }
   }
 
@@ -102,9 +152,10 @@ RouteMatcher::RouteMatcher(
   }
 }
 
-RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata) const {
+RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata,
+                                        uint64_t random_value) const {
   for (const auto& route : routes_) {
-    RouteConstSharedPtr route_entry = route->matches(metadata);
+    RouteConstSharedPtr route_entry = route->matches(metadata, random_value);
     if (nullptr != route_entry) {
       return route_entry;
     }
@@ -124,12 +175,6 @@ void Router::setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& ca
   callbacks_ = &callbacks;
 
   // TODO(zuercher): handle buffer limits
-}
-
-void Router::resetUpstreamConnection() {
-  if (upstream_request_ != nullptr) {
-    upstream_request_->resetStream();
-  }
 }
 
 FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
@@ -156,7 +201,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                      metadata->methodName());
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::UnknownMethod,
-                     fmt::format("no route for method '{}'", metadata->methodName())));
+                     fmt::format("no route for method '{}'", metadata->methodName())),
+        true);
     return FilterStatus::StopIteration;
   }
 
@@ -167,7 +213,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
-                     fmt::format("unknown cluster '{}'", route_entry_->clusterName())));
+                     fmt::format("unknown cluster '{}'", route_entry_->clusterName())),
+        true);
     return FilterStatus::StopIteration;
   }
 
@@ -176,9 +223,10 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                    route_entry_->clusterName(), metadata->methodName());
 
   if (cluster_->maintenanceMode()) {
-    callbacks_->sendLocalReply(AppException(
-        AppExceptionType::InternalError,
-        fmt::format("maintenance mode for cluster '{}'", route_entry_->clusterName())));
+    callbacks_->sendLocalReply(
+        AppException(AppExceptionType::InternalError,
+                     fmt::format("maintenance mode for cluster '{}'", route_entry_->clusterName())),
+        true);
     return FilterStatus::StopIteration;
   }
 
@@ -200,7 +248,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   if (!conn_pool) {
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
-                     fmt::format("no healthy upstream for '{}'", route_entry_->clusterName())));
+                     fmt::format("no healthy upstream for '{}'", route_entry_->clusterName())),
+        true);
     return FilterStatus::StopIteration;
   }
 
@@ -213,13 +262,12 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 FilterStatus Router::messageEnd() {
   ProtocolConverter::messageEnd();
 
-  TransportPtr transport =
-      NamedTransportConfigFactory::getFactory(upstream_request_->transport_type_).createTransport();
   Buffer::OwnedImpl transport_buffer;
 
-  upstream_request_->metadata_->setProtocol(upstream_request_->protocol_type_);
+  upstream_request_->metadata_->setProtocol(upstream_request_->protocol_->type());
 
-  transport->encodeFrame(transport_buffer, *upstream_request_->metadata_, upstream_request_buffer_);
+  upstream_request_->transport_->encodeFrame(transport_buffer, *upstream_request_->metadata_,
+                                             upstream_request_buffer_);
   upstream_request_->conn_data_->connection().write(transport_buffer, false);
   upstream_request_->onRequestComplete();
   return FilterStatus::Continue;
@@ -228,20 +276,46 @@ FilterStatus Router::messageEnd() {
 void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!upstream_request_->response_complete_);
 
-  if (!upstream_request_->response_started_) {
-    callbacks_->startUpstreamResponse(upstream_request_->transport_type_,
-                                      upstream_request_->protocol_type_);
-    upstream_request_->response_started_ = true;
-  }
+  if (upstream_request_->upgrade_response_ != nullptr) {
+    ENVOY_STREAM_LOG(trace, "reading upgrade response: {} bytes", *callbacks_, data.length());
+    // Handle upgrade response.
+    if (!upstream_request_->upgrade_response_->onData(data)) {
+      // Wait for more data.
+      return;
+    }
 
-  if (callbacks_->upstreamData(data)) {
-    upstream_request_->onResponseComplete();
-    cleanup();
-    return;
+    ENVOY_STREAM_LOG(debug, "upgrade response complete", *callbacks_);
+    upstream_request_->protocol_->completeUpgrade(*upstream_request_->conn_state_,
+                                                  *upstream_request_->upgrade_response_);
+
+    upstream_request_->upgrade_response_.reset();
+    upstream_request_->onRequestStart(true);
+  } else {
+    ENVOY_STREAM_LOG(trace, "reading response: {} bytes", *callbacks_, data.length());
+
+    // Handle normal response.
+    if (!upstream_request_->response_started_) {
+      callbacks_->startUpstreamResponse(*upstream_request_->transport_,
+                                        *upstream_request_->protocol_);
+      upstream_request_->response_started_ = true;
+    }
+
+    ThriftFilters::ResponseStatus status = callbacks_->upstreamData(data);
+    if (status == ThriftFilters::ResponseStatus::Complete) {
+      ENVOY_STREAM_LOG(debug, "response complete", *callbacks_);
+      upstream_request_->onResponseComplete();
+      cleanup();
+      return;
+    } else if (status == ThriftFilters::ResponseStatus::Reset) {
+      ENVOY_STREAM_LOG(debug, "upstream reset", *callbacks_);
+      upstream_request_->resetStream();
+      return;
+    }
   }
 
   if (end_stream) {
     // Response is incomplete, but no more data is coming.
+    ENVOY_STREAM_LOG(debug, "response underflow", *callbacks_);
     upstream_request_->onResponseComplete();
     upstream_request_->onResetStream(
         Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
@@ -284,9 +358,10 @@ void Router::cleanup() { upstream_request_.reset(); }
 Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
                                          MessageMetadataSharedPtr& metadata,
                                          TransportType transport_type, ProtocolType protocol_type)
-    : parent_(parent), conn_pool_(pool), metadata_(metadata), transport_type_(transport_type),
-      protocol_type_(protocol_type), request_complete_(false), response_started_(false),
-      response_complete_(false) {}
+    : parent_(parent), conn_pool_(pool), metadata_(metadata),
+      transport_(NamedTransportConfigFactory::getFactory(transport_type).createTransport()),
+      protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
+      request_complete_(false), response_started_(false), response_complete_(false) {}
 
 Router::UpstreamRequest::~UpstreamRequest() {}
 
@@ -295,6 +370,11 @@ FilterStatus Router::UpstreamRequest::start() {
   if (handle) {
     // Pause while we wait for a connection.
     conn_pool_handle_ = handle;
+    return FilterStatus::StopIteration;
+  }
+
+  if (upgrade_response_ != nullptr) {
+    // Pause while we wait for an upgrade response.
     return FilterStatus::StopIteration;
   }
 
@@ -307,6 +387,7 @@ void Router::UpstreamRequest::resetStream() {
   }
 
   if (conn_data_ != nullptr) {
+    conn_state_ = nullptr;
     conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
     conn_data_.reset();
   }
@@ -329,14 +410,30 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
   onUpstreamHostSelected(host);
   conn_data_ = std::move(conn_data);
   conn_data_->addUpstreamCallbacks(parent_);
-
   conn_pool_handle_ = nullptr;
 
-  parent_.initProtocolConverter(
-      NamedProtocolConfigFactory::getFactory(protocol_type_).createProtocol(),
-      parent_.upstream_request_buffer_);
+  conn_state_ = conn_data_->connectionStateTyped<ThriftConnectionState>();
+  if (conn_state_ == nullptr) {
+    conn_data_->setConnectionState(std::make_unique<ThriftConnectionState>());
+    conn_state_ = conn_data_->connectionStateTyped<ThriftConnectionState>();
+  }
 
-  // TODO(zuercher): need to use an upstream-connection-specific sequence id
+  if (protocol_->supportsUpgrade()) {
+    upgrade_response_ =
+        protocol_->attemptUpgrade(*transport_, *conn_state_, parent_.upstream_request_buffer_);
+    if (upgrade_response_ != nullptr) {
+      conn_data_->connection().write(parent_.upstream_request_buffer_, false);
+      return;
+    }
+  }
+
+  onRequestStart(continue_decoding);
+}
+
+void Router::UpstreamRequest::onRequestStart(bool continue_decoding) {
+  parent_.initProtocolConverter(*protocol_, parent_.upstream_request_buffer_);
+
+  metadata_->setSequenceId(conn_state_->nextSequenceId());
   parent_.convertMessageBegin(metadata_);
 
   if (continue_decoding) {
@@ -348,6 +445,7 @@ void Router::UpstreamRequest::onRequestComplete() { request_complete_ = true; }
 
 void Router::UpstreamRequest::onResponseComplete() {
   response_complete_ = true;
+  conn_state_ = nullptr;
   conn_data_.reset();
 }
 
@@ -365,18 +463,26 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
 
   switch (reason) {
   case Tcp::ConnectionPool::PoolFailureReason::Overflow:
-    parent_.callbacks_->sendLocalReply(AppException(
-        AppExceptionType::InternalError,
-        fmt::format("too many connections to '{}'", upstream_host_->address()->asString())));
+    parent_.callbacks_->sendLocalReply(
+        AppException(
+            AppExceptionType::InternalError,
+            fmt::format("too many connections to '{}'", upstream_host_->address()->asString())),
+        true);
     break;
   case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+    // Should only happen if we closed the connection, due to an error condition, in which case
+    // we've already handled any possible downstream response.
+    parent_.callbacks_->resetDownstreamConnection();
+    break;
   case Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
   case Tcp::ConnectionPool::PoolFailureReason::Timeout:
     // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
     if (!response_started_) {
-      parent_.callbacks_->sendLocalReply(AppException(
-          AppExceptionType::InternalError,
-          fmt::format("connection failure '{}'", upstream_host_->address()->asString())));
+      parent_.callbacks_->sendLocalReply(
+          AppException(
+              AppExceptionType::InternalError,
+              fmt::format("connection failure '{}'", upstream_host_->address()->asString())),
+          true);
       return;
     }
 

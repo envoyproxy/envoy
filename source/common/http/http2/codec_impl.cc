@@ -409,10 +409,9 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
           ASSERT(!nghttp2_session_check_server_session(session_));
           stream->waiting_for_non_informational_headers_ = false;
 
-          // This can only happen in the client case in a response, when we received a 1xx to
-          // start out with. In this case, raise as headers. nghttp2 message checking guarantees
-          // proper flow here.
-          ASSERT(!stream->headers_->Status() || stream->headers_->Status()->value() != "100");
+          // Even if we have :status 100 in the client case in a response, when
+          // we received a 1xx to start out with, nghttp2 message checking
+          // guarantees proper flow here.
           stream->decodeHeaders();
         }
       }
@@ -788,7 +787,7 @@ Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
 }
 
 int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
-  // The client code explicitly does not currently suport push promise.
+  // The client code explicitly does not currently support push promise.
   RELEASE_ASSERT(frame->hd.type == NGHTTP2_HEADERS, "");
   RELEASE_ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE ||
                      frame->headers.cat == NGHTTP2_HCAT_HEADERS,
@@ -804,7 +803,7 @@ int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
 
 int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& name,
                                    HeaderString&& value) {
-  // The client code explicitly does not currently suport push promise.
+  // The client code explicitly does not currently support push promise.
   ASSERT(frame->hd.type == NGHTTP2_HEADERS);
   ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE || frame->headers.cat == NGHTTP2_HCAT_HEADERS);
   return saveHeader(frame, std::move(name), std::move(value));

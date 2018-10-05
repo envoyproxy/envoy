@@ -577,6 +577,7 @@ void ClusterImplBase::onPreInitComplete() {
   }
   initialization_started_ = true;
 
+  ENVOY_LOG(debug, "initializing secondary cluster {} completed", info()->name());
   init_manager_.initialize([this]() { onInitDone(); });
 }
 
@@ -750,10 +751,10 @@ void PriorityStateManager::registerHostForPriority(
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
     const absl::optional<Upstream::Host::HealthFlag> health_checker_flag) {
-  const HostSharedPtr host(new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
-                                        lb_endpoint.load_balancing_weight().value(),
-                                        locality_lb_endpoint.locality(),
-                                        lb_endpoint.endpoint().health_check_config()));
+  const HostSharedPtr host(
+      new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
+                   lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
+                   lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority()));
   registerHostForPriority(host, locality_lb_endpoint, lb_endpoint, health_checker_flag);
 }
 
@@ -982,6 +983,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
         hosts_changed = true;
       }
 
+      // Did the priority change?
+      if (host->priority() != existing_host->second->priority()) {
+        existing_host->second->priority(host->priority());
+      }
+
       existing_host->second->weight(host->weight());
       final_hosts.push_back(existing_host->second);
       updated_hosts[existing_host->second->address()->asString()] = existing_host->second;
@@ -1003,13 +1009,22 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
   // Remove hosts from current_priority_hosts that were matched to an existing host in the previous
   // loop.
-  current_priority_hosts.erase(std::remove_if(current_priority_hosts.begin(),
-                                              current_priority_hosts.end(),
-                                              [&existing_hosts_for_current_priority](auto host) {
-                                                return existing_hosts_for_current_priority.count(
-                                                    host->address()->asString());
-                                              }),
-                               current_priority_hosts.end());
+  for (auto itr = current_priority_hosts.begin(); itr != current_priority_hosts.end();) {
+    auto existing_itr = existing_hosts_for_current_priority.find((*itr)->address()->asString());
+
+    if (existing_itr != existing_hosts_for_current_priority.end()) {
+      existing_hosts_for_current_priority.erase(existing_itr);
+      itr = current_priority_hosts.erase(itr);
+    } else {
+      itr++;
+    }
+  }
+
+  // If we saw existing hosts during this iteration from a different priority, then we've moved
+  // a host from another priority into this one, so we should mark the priority as having changed.
+  if (!existing_hosts_for_current_priority.empty()) {
+    hosts_changed = true;
+  }
 
   // The remaining hosts are hosts that are not referenced in the config update. We remove them from
   // the priority if any of the following is true:
@@ -1110,6 +1125,11 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
                                           uint32_t current_priority) {
   PriorityStateManager priority_state_manager(*this, local_info_);
   // At this point we know that we are different so make a new host list and notify.
+  //
+  // TODO(dio): The uniqueness of a host address resolved in STRICT_DNS cluster per priority is not
+  // guaranteed. Need a clear agreement on the behavior here, whether it is allowable to have
+  // duplicated hosts inside a priority. And if we want to enforce this behavior, it should be done
+  // inside the priority state manager.
   for (const ResolveTargetPtr& target : resolve_targets_) {
     priority_state_manager.initializePriorityFor(target->locality_lb_endpoint_);
     for (const HostSharedPtr& host : target->hosts_) {
@@ -1163,7 +1183,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           new_hosts.emplace_back(new HostImpl(
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
               lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
-              locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config()));
+              locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config(),
+              locality_lb_endpoint_.priority()));
         }
 
         HostVector hosts_added;
@@ -1171,9 +1192,31 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
                                           updated_hosts)) {
           ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
+          ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
+            return host->priority() == locality_lb_endpoint_.priority();
+          }));
           parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
+        } else {
+          parent_.info_->stats().update_no_rebuild_.inc();
         }
 
+        // TODO(dio): As reported in https://github.com/envoyproxy/envoy/issues/4548, we leaked
+        // cluster members. This happened since whenever a target resolved, it would set its hosts
+        // as all_hosts_, so that when another target resolved it wouldn't see its own hosts in
+        // all_hosts_. It would think that they're new hosts, so it would add them to its host list
+        // over and over again. To completely fix this issue, we need to think through on
+        // reconciling the differences in behavior between STRICT_DNS and EDS, especially on
+        // handling host sets updates. This is tracked in
+        // https://github.com/envoyproxy/envoy/issues/4590.
+        //
+        // The following block is acceptable for now as a patch to make sure parent_.all_hosts_ is
+        // updated with all resolved hosts from all priorities. This reconciliation is required
+        // since we check each new host against this list.
+        for (const auto& set : parent_.prioritySet().hostSetsPerPriority()) {
+          for (const auto& host : set->hosts()) {
+            updated_hosts.insert({host->address()->asString(), host});
+          }
+        }
         parent_.updateHostMap(std::move(updated_hosts));
 
         // If there is an initialize callback, fire it now. Note that if the cluster refers to

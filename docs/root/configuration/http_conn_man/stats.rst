@@ -34,6 +34,7 @@ statistics:
    downstream_cx_tx_bytes_buffered, Gauge, Total sent bytes currently buffered
    downstream_cx_drain_close, Counter, Total connections closed due to draining
    downstream_cx_idle_timeout, Counter, Total connections closed due to idle timeout
+   downstream_cx_overload_disable_keepalive, Counter, Total connections for which HTTP 1.x keepalive has been disabled due to envoy overload
    downstream_flow_control_paused_reading_total, Counter, Total number of times reads were disabled due to flow control
    downstream_flow_control_resumed_reading_total, Counter, Total number of times reads were enabled on the connection due to flow control
    downstream_rq_total, Counter, Total requests
@@ -54,6 +55,7 @@ statistics:
    downstream_rq_ws_on_non_ws_route, Counter, Total WebSocket upgrade requests rejected by non WebSocket routes
    downstream_rq_time, Histogram, Request time milliseconds
    downstream_rq_idle_timeout, Counter, Total requests closed due to idle timeout
+   downstream_rq_overload_close, Counter, Total requests closed due to envoy overload
    rs_too_large, Counter, Total response errors due to buffering an overly large body
 
 Per user agent statistics

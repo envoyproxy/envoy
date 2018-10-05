@@ -196,11 +196,11 @@ HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& 
                                      added_via_api_, cm, local_info, dispatcher, random);
 
   for (const auto& host : cluster.hosts()) {
-    initial_hosts_->emplace_back(
-        new HostImpl(info_, "", Network::Address::resolveProtoAddress(host),
-                     envoy::api::v2::core::Metadata::default_instance(), 1,
-                     envoy::api::v2::core::Locality().default_instance(),
-                     envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
+    initial_hosts_->emplace_back(new HostImpl(
+        info_, "", Network::Address::resolveProtoAddress(host),
+        envoy::api::v2::core::Metadata::default_instance(), 1,
+        envoy::api::v2::core::Locality().default_instance(),
+        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0));
   }
   initialize([] {});
 }

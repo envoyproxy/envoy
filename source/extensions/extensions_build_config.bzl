@@ -70,12 +70,14 @@ EXTENSIONS = {
     "envoy.filters.network.redis_proxy":                "//source/extensions/filters/network/redis_proxy:config",
     "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",
     "envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
+    "envoy.filters.network.sni_cluster":                "//source/extensions/filters/network/sni_cluster:config",
 
     #
     # Resource monitors
     #
 
     "envoy.resource_monitors.fixed_heap":               "//source/extensions/resource_monitors/fixed_heap:config",
+    "envoy.resource_monitors.injected_resource":        "//source/extensions/resource_monitors/injected_resource:config",
 
     #
     # Stat sinks
@@ -107,6 +109,12 @@ EXTENSIONS = {
     # TODO(lizan): switch to config target once a transport socket exists
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:tsi_handshaker",
     "envoy.transport_sockets.capture":                  "//source/extensions/transport_sockets/capture:config",
+
+    # Retry host predicates
+    "envoy.retry_host_predicates.other_hosts":          "//source/extensions/retry/host/other_hosts:config",
+
+    # Retry priorities
+    "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/other_priority:config",
 }
 
 WINDOWS_EXTENSIONS = {
@@ -177,6 +185,7 @@ WINDOWS_EXTENSIONS = {
     #"envoy.filters.network.ratelimit":                  "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",
     #"envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
+    #"envoy.filters.network.sni_cluster":                "//source/extensions/filters/network/sni_cluster:config",
 
     #
     # Stat sinks

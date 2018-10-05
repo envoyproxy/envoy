@@ -19,15 +19,15 @@ done
 # Bad config file
 echo testing bad config output
 BAD_CONFIG_OUTPUT=$(("${PATH_BIN}" "${PATH_CONFIG}/Redirect.golden.json" "${PATH_CONFIG}/TestRoutes.yaml") 2>&1) ||
-  if [[ "${BAD_CONFIG_OUTPUT}" != *"Unable to parse"* ]]; then
-    echo ${BAD_CONFIG_OUTPUT}
-    exit 1
-  fi
+  echo ${BAD_CONFIG_OUTPUT:-no-output}
+if [[ "${BAD_CONFIG_OUTPUT}" != *"Unable to parse"* ]]; then
+  exit 1
+fi
 
 # Failure test case
 echo testing failure test case
-FAILURE_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/TestRoutes.yaml" "${PATH_CONFIG}/Weighted.golden.json" "--details") ||
-echo ${FAILURE_OUTPUT}
-  if [[ "${FAILURE_OUTPUT}" != *"cluster1 instant-server cluster_name"* ]]; then
-    exit 1
-  fi
+FAILURE_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/TestRoutes.yaml" "${PATH_CONFIG}/Weighted.golden.json" "--details" 2>&1) ||
+  echo ${FAILURE_OUTPUT:-no-output}
+if [[ "${FAILURE_OUTPUT}" != *"expected: [cluster1], actual: [instant-server], test type: cluster_name"* ]]; then
+  exit 1
+fi

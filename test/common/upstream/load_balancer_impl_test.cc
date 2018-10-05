@@ -25,7 +25,7 @@ namespace Upstream {
 
 class LoadBalancerTestBase : public ::testing::TestWithParam<bool> {
 protected:
-  // Run all tests aginst both priority 0 and priority 1 host sets, to ensure
+  // Run all tests against both priority 0 and priority 1 host sets, to ensure
   // all the load balancers have equivalent functonality for failover host sets.
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
@@ -277,6 +277,12 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(100, _, _));
   ASSERT_THAT(getPanic(), ElementsAre(true, _, _));
+
+  // Rounding errors should be picked up by the first healthy priority.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 67, 33));
 }
 
 TEST_P(LoadBalancerBaseTest, BoundaryConditions) {

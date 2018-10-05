@@ -76,11 +76,28 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "locality_lib",
+    hdrs = ["locality.h"],
+    deps = [
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/core:base_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "outlier_detection_interface",
     hdrs = ["outlier_detection.h"],
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/common:time_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "retry_interface",
+    hdrs = ["retry.h"],
+    deps = [
+        "//include/envoy/upstream:upstream_interface",
     ],
 )
 
@@ -101,6 +118,7 @@ envoy_cc_library(
     deps = [
         ":health_check_host_monitor_interface",
         ":load_balancer_type_interface",
+        ":locality_lib",
         ":resource_manager_interface",
         "//include/envoy/common:callback",
         "//include/envoy/http:codec_interface",

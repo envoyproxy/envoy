@@ -42,6 +42,16 @@ FilterFactoryMap::const_iterator findUpgradeCaseInsensitive(const FilterFactoryM
   return upgrade_map.end();
 }
 
+std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
+    const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+        config) {
+  if (config.has_internal_address_config()) {
+    return std::make_unique<InternalAddressConfig>(config.internal_address_config());
+  }
+
+  return std::make_unique<Http::DefaultInternalAddressConfig>();
+}
+
 } // namespace
 
 // Singleton registration via macro defined in envoy/singleton/manager.h
@@ -76,7 +86,8 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
           date_provider](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.random(), context.httpTracer(),
-        context.runtime(), context.localInfo(), context.clusterManager())});
+        context.runtime(), context.localInfo(), context.clusterManager(),
+        &context.overloadManager(), context.dispatcher().timeSystem())});
   };
 }
 
@@ -113,6 +124,11 @@ HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& c
   return "";
 }
 
+InternalAddressConfig::InternalAddressConfig(
+    const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+        InternalAddressConfig& config)
+    : unix_sockets_(config.unix_sockets()) {}
+
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         config,
@@ -123,6 +139,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
+      internal_address_config_(createInternalAddressConfig(config)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
       route_config_provider_manager_(route_config_provider_manager),
@@ -136,7 +153,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       date_provider_(date_provider),
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
-      proxy_100_continue_(config.proxy_100_continue()) {
+      proxy_100_continue_(config.proxy_100_continue()),
+      delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(config, context_, stats_prefix_,
                                                                    route_config_provider_manager_);

@@ -8,6 +8,10 @@
 
 using testing::_;
 using testing::Invoke;
+using testing::MakeMatcher;
+using testing::Matcher;
+using testing::MatcherInterface;
+using testing::MatchResultListener;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -160,5 +164,10 @@ MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}
 
 } // namespace ConnectionPool
+
+IsSubsetOfHeadersMatcher IsSubsetOfHeaders(const HeaderMap& expected_headers) {
+  return IsSubsetOfHeadersMatcher(expected_headers);
+}
+
 } // namespace Http
 } // namespace Envoy

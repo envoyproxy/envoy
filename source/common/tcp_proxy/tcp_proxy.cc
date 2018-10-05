@@ -15,11 +15,14 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {
+
+const std::string PerConnectionCluster::Key = "envoy.tcp_proxy.cluster";
 
 Config::Route::Route(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute& config) {
@@ -37,6 +40,11 @@ Config::Route::Route(
   }
 }
 
+Config::WeightedClusterEntry::WeightedClusterEntry(
+    const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight&
+        config)
+    : cluster_name_(config.name()), cluster_weight_(config.weight()) {}
+
 Config::SharedConfig::SharedConfig(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
@@ -52,7 +60,8 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
                Server::Configuration::FactoryContext& context)
     : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
       upstream_drain_manager_slot_(context.threadLocal().allocateSlot()),
-      shared_config_(std::make_shared<SharedConfig>(config, context)) {
+      shared_config_(std::make_shared<SharedConfig>(config, context)),
+      random_generator_(context.random()) {
 
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     return ThreadLocal::ThreadLocalObjectSharedPtr(new UpstreamDrainManager());
@@ -71,6 +80,19 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
     routes_.emplace_back(default_route);
   }
 
+  // Weighted clusters will be enabled only if both the default cluster and
+  // deprecated v1 routes are absent.
+  if (routes_.empty() && config.has_weighted_clusters()) {
+    total_cluster_weight_ = 0;
+    for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::
+             ClusterWeight& cluster_desc : config.weighted_clusters().clusters()) {
+      std::unique_ptr<WeightedClusterEntry> cluster_entry(
+          std::make_unique<WeightedClusterEntry>(cluster_desc));
+      weighted_clusters_.emplace_back(std::move(cluster_entry));
+      total_cluster_weight_ += weighted_clusters_.back()->clusterWeight();
+    }
+  }
+
   if (config.has_metadata_match()) {
     const auto& filter_metadata = config.metadata_match().filter_metadata();
 
@@ -87,7 +109,14 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
   }
 }
 
-const std::string& Config::getRouteFromEntries(Network::Connection& connection) {
+const std::string& Config::getRegularRouteFromEntries(Network::Connection& connection) {
+  // First check if the per-connection state to see if we need to route to a pre-selected cluster
+  if (connection.perConnectionState().hasData<PerConnectionCluster>(PerConnectionCluster::Key)) {
+    const PerConnectionCluster& per_connection_cluster =
+        connection.perConnectionState().getData<PerConnectionCluster>(PerConnectionCluster::Key);
+    return per_connection_cluster.value();
+  }
+
   for (const Config::Route& route : routes_) {
     if (!route.source_port_ranges_.empty() &&
         !Network::Utility::portInRangeList(*connection.remoteAddress(),
@@ -118,13 +147,23 @@ const std::string& Config::getRouteFromEntries(Network::Connection& connection) 
   return EMPTY_STRING;
 }
 
+const std::string& Config::getRouteFromEntries(Network::Connection& connection) {
+  if (weighted_clusters_.empty()) {
+    return getRegularRouteFromEntries(connection);
+  }
+  return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_,
+                                          random_generator_.random(), false)
+      ->clusterName();
+}
+
 UpstreamDrainManager& Config::drainManager() {
   return upstream_drain_manager_slot_->getTyped<UpstreamDrainManager>();
 }
 
-Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
+Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager,
+               TimeSource& time_source)
     : config_(config), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
-      upstream_callbacks_(new UpstreamCallbacks(this)) {
+      upstream_callbacks_(new UpstreamCallbacks(this)), request_info_(time_source) {
   ASSERT(config != nullptr);
 }
 
@@ -135,13 +174,8 @@ Filter::~Filter() {
     access_log->log(nullptr, nullptr, nullptr, getRequestInfo());
   }
 
-  if (upstream_handle_) {
-    upstream_handle_->cancel();
-  }
-
-  if (upstream_conn_data_) {
-    upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
-  }
+  ASSERT(upstream_handle_ == nullptr);
+  ASSERT(upstream_conn_data_ == nullptr);
 }
 
 TcpProxyStats Config::SharedConfig::generateStats(Stats::Scope& scope) {
@@ -172,7 +206,7 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
         {config_->stats().downstream_cx_rx_bytes_total_,
          config_->stats().downstream_cx_rx_bytes_buffered_,
          config_->stats().downstream_cx_tx_bytes_total_,
-         config_->stats().downstream_cx_tx_bytes_buffered_, nullptr});
+         config_->stats().downstream_cx_tx_bytes_buffered_, nullptr, nullptr});
   }
 }
 
@@ -412,16 +446,28 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
     if (event == Network::ConnectionEvent::RemoteClose) {
       upstream_conn_data_->connection().close(Network::ConnectionCloseType::FlushWrite);
 
-      if (upstream_conn_data_ != nullptr &&
-          upstream_conn_data_->connection().state() != Network::Connection::State::Closed) {
-        config_->drainManager().add(config_->sharedConfig(), std::move(upstream_conn_data_),
-                                    std::move(upstream_callbacks_), std::move(idle_timer_),
-                                    read_callbacks_->upstreamHost());
+      // Events raised from the previous line may cause upstream_conn_data_ to be NULL if
+      // it was able to immediately flush all data.
+
+      if (upstream_conn_data_ != nullptr) {
+        if (upstream_conn_data_->connection().state() != Network::Connection::State::Closed) {
+          config_->drainManager().add(config_->sharedConfig(), std::move(upstream_conn_data_),
+                                      std::move(upstream_callbacks_), std::move(idle_timer_),
+                                      read_callbacks_->upstreamHost());
+        } else {
+          upstream_conn_data_.reset();
+        }
       }
     } else if (event == Network::ConnectionEvent::LocalClose) {
       upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
       upstream_conn_data_.reset();
       disableIdleTimer();
+    }
+  } else if (upstream_handle_) {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
+      upstream_handle_->cancel();
+      upstream_handle_ = nullptr;
     }
   }
 }

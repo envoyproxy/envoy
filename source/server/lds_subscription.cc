@@ -58,10 +58,11 @@ void LdsSubscription::onFetchComplete() {}
 
 void LdsSubscription::onFetchFailure(const EnvoyException* e) {
   callbacks_->onConfigUpdateFailed(e);
-  stats_.update_failure_.inc();
   if (e) {
+    stats_.update_rejected_.inc();
     ENVOY_LOG(warn, "lds: fetch failure: {}", e->what());
   } else {
+    stats_.update_failure_.inc();
     ENVOY_LOG(info, "lds: fetch failure: network error");
   }
 }

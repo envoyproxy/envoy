@@ -59,6 +59,8 @@ static const ProtocolTypeMap& protocolTypeMap() {
            ProtocolType::LaxBinary},
           {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::COMPACT,
            ProtocolType::Compact},
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::TWITTER,
+           ProtocolType::Twitter},
       });
 }
 
@@ -105,8 +107,9 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
     Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Config> filter_config(new ConfigImpl(proto_config, context));
 
-  return [filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<ConnectionManager>(*filter_config));
+  return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
+        *filter_config, context.random(), context.dispatcher().timeSystem()));
   };
 }
 
@@ -125,15 +128,17 @@ ConfigImpl::ConfigImpl(
       transport_(lookupTransport(config.transport())), proto_(lookupProtocol(config.protocol())),
       route_matcher_(new Router::RouteMatcher(config.route_config())) {
 
-  // Construct the only Thrift DecoderFilter: the Router
-  auto& factory =
-      Envoy::Config::Utility::getAndCheckFactory<ThriftFilters::NamedThriftFilterConfigFactory>(
-          ThriftFilters::ThriftFilterNames::get().ROUTER);
-  ThriftFilters::FilterFactoryCb callback;
+  if (config.thrift_filters().empty()) {
+    ENVOY_LOG(debug, "using default router filter");
 
-  auto empty_config = factory.createEmptyConfigProto();
-  callback = factory.createFilterFactoryFromProto(*empty_config, stats_prefix_, context_);
-  filter_factories_.push_back(callback);
+    envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftFilter router;
+    router.set_name(ThriftFilters::ThriftFilterNames::get().ROUTER);
+    processFilter(router);
+  } else {
+    for (const auto& filter : config.thrift_filters()) {
+      processFilter(filter);
+    }
+  }
 }
 
 void ConfigImpl::createFilterChain(ThriftFilters::FilterChainFactoryCallbacks& callbacks) {
@@ -142,16 +147,35 @@ void ConfigImpl::createFilterChain(ThriftFilters::FilterChainFactoryCallbacks& c
   }
 }
 
-DecoderPtr ConfigImpl::createDecoder(DecoderCallbacks& callbacks) {
-  return std::make_unique<Decoder>(createTransport(), createProtocol(), callbacks);
-}
-
 TransportPtr ConfigImpl::createTransport() {
   return NamedTransportConfigFactory::getFactory(transport_).createTransport();
 }
 
 ProtocolPtr ConfigImpl::createProtocol() {
   return NamedProtocolConfigFactory::getFactory(proto_).createProtocol();
+}
+
+void ConfigImpl::processFilter(
+    const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftFilter& proto_config) {
+  const ProtobufTypes::String& string_name = proto_config.name();
+
+  ENVOY_LOG(debug, "    thrift filter #{}", filter_factories_.size());
+  ENVOY_LOG(debug, "      name: {}", string_name);
+
+  const Json::ObjectSharedPtr filter_config =
+      MessageUtil::getJsonObjectFromMessage(proto_config.config());
+  ENVOY_LOG(debug, "      config: {}", filter_config->asJsonString());
+
+  auto& factory =
+      Envoy::Config::Utility::getAndCheckFactory<ThriftFilters::NamedThriftFilterConfigFactory>(
+          string_name);
+
+  ProtobufTypes::MessagePtr message =
+      Envoy::Config::Utility::translateToFactoryConfig(proto_config, factory);
+  ThriftFilters::FilterFactoryCb callback =
+      factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
+
+  filter_factories_.push_back(callback);
 }
 
 } // namespace ThriftProxy

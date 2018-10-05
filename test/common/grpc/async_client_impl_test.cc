@@ -25,7 +25,7 @@ public:
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     envoy::api::v2::core::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
-    grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSource());
+    grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
     ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
   }
 
