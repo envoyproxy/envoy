@@ -31,22 +31,6 @@ const std::string& PerConnectionCluster::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
 }
 
-Config::Route::Route(
-    const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute& config) {
-  cluster_name_ = config.cluster();
-
-  source_ips_ = Network::Address::IpList(config.source_ip_list());
-  destination_ips_ = Network::Address::IpList(config.destination_ip_list());
-
-  if (!config.source_ports().empty()) {
-    Network::Utility::parsePortRangeList(config.source_ports(), source_port_ranges_);
-  }
-
-  if (!config.destination_ports().empty()) {
-    Network::Utility::parsePortRangeList(config.destination_ports(), destination_port_ranges_);
-  }
-}
-
 Config::WeightedClusterEntry::WeightedClusterEntry(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight&
         config)
@@ -65,7 +49,8 @@ Config::SharedConfig::SharedConfig(
 
 Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
                Server::Configuration::FactoryContext& context)
-    : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
+    : cluster_(config.cluster()),
+      max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
       upstream_drain_manager_slot_(context.threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)),
       random_generator_(context.random()) {
@@ -74,22 +59,8 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
     return ThreadLocal::ThreadLocalObjectSharedPtr(new UpstreamDrainManager());
   });
 
-  if (config.has_deprecated_v1()) {
-    for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
-             route_desc : config.deprecated_v1().routes()) {
-      routes_.emplace_back(Route(route_desc));
-    }
-  }
-
-  if (!config.cluster().empty()) {
-    envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute default_route;
-    default_route.set_cluster(config.cluster());
-    routes_.emplace_back(default_route);
-  }
-
-  // Weighted clusters will be enabled only if both the default cluster and
-  // deprecated v1 routes are absent.
-  if (routes_.empty() && config.has_weighted_clusters()) {
+  // Weighted clusters will be enabled only if the cluster field is not set.
+  if (cluster_.empty() && config.has_weighted_clusters()) {
     total_cluster_weight_ = 0;
     for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::
              ClusterWeight& cluster_desc : config.weighted_clusters().clusters()) {
@@ -116,8 +87,8 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
   }
 }
 
-const std::string& Config::getRegularRouteFromEntries(Network::Connection& connection) {
-  // First check if the per-connection state to see if we need to route to a pre-selected cluster
+const std::string& Config::selectCluster(Network::Connection& connection) {
+  // First check if the per-connection state to see if we need to route to a pre-selected cluster.
   if (connection.streamInfo().filterState().hasData<PerConnectionCluster>(
           PerConnectionCluster::key())) {
     const PerConnectionCluster& per_connection_cluster =
@@ -126,40 +97,10 @@ const std::string& Config::getRegularRouteFromEntries(Network::Connection& conne
     return per_connection_cluster.value();
   }
 
-  for (const Config::Route& route : routes_) {
-    if (!route.source_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(*connection.remoteAddress(),
-                                           route.source_port_ranges_)) {
-      continue;
-    }
-
-    if (!route.source_ips_.empty() && !route.source_ips_.contains(*connection.remoteAddress())) {
-      continue;
-    }
-
-    if (!route.destination_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(*connection.localAddress(),
-                                           route.destination_port_ranges_)) {
-      continue;
-    }
-
-    if (!route.destination_ips_.empty() &&
-        !route.destination_ips_.contains(*connection.localAddress())) {
-      continue;
-    }
-
-    // if we made it past all checks, the route matches
-    return route.cluster_name_;
+  if (!cluster_.empty()) {
+    return cluster_;
   }
 
-  // no match, no more routes to try
-  return EMPTY_STRING;
-}
-
-const std::string& Config::getRouteFromEntries(Network::Connection& connection) {
-  if (weighted_clusters_.empty()) {
-    return getRegularRouteFromEntries(connection);
-  }
   return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_,
                                           random_generator_.random(), false)
       ->clusterName();

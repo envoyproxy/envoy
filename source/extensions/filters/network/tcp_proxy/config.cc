@@ -22,8 +22,10 @@ Network::FilterFactoryCb ConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.stat_prefix().empty());
-  if (proto_config.has_deprecated_v1()) {
-    ASSERT(proto_config.deprecated_v1().routes_size() > 0);
+
+  if (proto_config.cluster().empty() && (!proto_config.has_weighted_clusters() ||
+                                         proto_config.weighted_clusters().clusters_size() == 0)) {
+    throw EnvoyException("tcp_proxy: no cluster is defined in config");
   }
 
   Envoy::TcpProxy::ConfigSharedPtr filter_config(

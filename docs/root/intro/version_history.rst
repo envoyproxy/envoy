@@ -81,6 +81,7 @@ Version history
 * upstream: changed the default hash for :ref:`ring hash <envoy_api_msg_Cluster.RingHashLbConfig>` from std::hash to `xxHash <https://github.com/Cyan4973/xxHash>`_.
 * upstream: when using active health checking and STRICT_DNS with several addresses that resolve
   to the same hosts, Envoy will now health check each host independently.
+* tcp_proxy: removed support for v1 routes.
 
 1.8.0 (Oct 4, 2018)
 ===================

@@ -94,15 +94,12 @@ public:
          Server::Configuration::FactoryContext& context);
 
   /**
-   * Find out which cluster an upstream connection should be opened to based on the
-   * parameters of a downstream connection.
+   * Find out which cluster an upstream connection should be opened.
    * @param connection supplies the parameters of the downstream connection for
    * which the proxy needs to open the corresponding upstream.
    * @return the cluster name to be used for the upstream connection.
-   * If no route applies, returns the empty string.
    */
-  const std::string& getRouteFromEntries(Network::Connection& connection);
-  const std::string& getRegularRouteFromEntries(Network::Connection& connection);
+  const std::string& selectCluster(Network::Connection& connection);
 
   const TcpProxyStats& stats() { return shared_config_->stats(); }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
@@ -117,17 +114,6 @@ public:
   }
 
 private:
-  struct Route {
-    Route(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
-              config);
-
-    Network::Address::IpList source_ips_;
-    Network::PortRangeList source_port_ranges_;
-    Network::Address::IpList destination_ips_;
-    Network::PortRangeList destination_port_ranges_;
-    std::string cluster_name_;
-  };
-
   class WeightedClusterEntry {
   public:
     WeightedClusterEntry(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::
@@ -142,7 +128,7 @@ private:
   };
   typedef std::unique_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
 
-  std::vector<Route> routes_;
+  std::string cluster_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
@@ -255,7 +241,7 @@ protected:
 
   // Callbacks for different error and success states during connection establishment
   virtual const std::string& getUpstreamCluster() {
-    return config_->getRouteFromEntries(read_callbacks_->connection());
+    return config_->selectCluster(read_callbacks_->connection());
   }
 
   virtual void onInitFailure(UpstreamFailureReason) {

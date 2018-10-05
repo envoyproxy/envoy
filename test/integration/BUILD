@@ -90,7 +90,6 @@ envoy_cc_test(
         "//test/config/integration:server_ssl.json",
         "//test/config/integration:server_uds.json",
         "//test/config/integration:server_xfcc.json",
-        "//test/config/integration:tcp_proxy.json",
         "//test/config/integration/certs",
         "//test/proto:bookstore_proto_descriptor",
     ],
