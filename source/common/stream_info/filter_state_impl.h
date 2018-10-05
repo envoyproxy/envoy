@@ -2,12 +2,12 @@
 
 #include <map>
 
-#include "envoy/request_info/filter_state.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace RequestInfo {
+namespace StreamInfo {
 
 class FilterStateImpl : public FilterState {
 public:
@@ -23,5 +23,5 @@ private:
   std::map<std::string, std::unique_ptr<Object>, std::less<>> data_storage_;
 };
 
-} // namespace RequestInfo
+} // namespace StreamInfo
 } // namespace Envoy
