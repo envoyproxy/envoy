@@ -355,8 +355,7 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
   bool matches = true;
 
   if (runtime_) {
-    matches &= random_value % runtime_->denominator_val_ < runtime_->numerator_val_;
-    if (!matches) {
+    if (!evaluateRuntimeKeys(runtime_, random_value)) {
       // No need to waste further cycles calculating a route match.
       return false;
     }
@@ -418,37 +417,42 @@ void RouteEntryImplBase::finalizeResponseHeaders(
   vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, request_info);
 }
 
-absl::optional<RouteEntryImplBase::RuntimeData>
-RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& route_match) {
-  absl::optional<RuntimeData> runtime;
-  RuntimeData runtime_data;
-
-  if (route_match.runtime_specifier_case() == envoy::api::v2::route::RouteMatch::kRuntimeFraction) {
+bool RouteEntryImplBase::evaluateRuntimeKeys(const RuntimeData& runtime_data, const uint64_t random_value) {
+  bool continue_matching = true;
+  if (!runtime_data.fractional_runtime_key.empty()) {
     envoy::type::FractionalPercent fractional_percent;
-    const std::string& fraction_yaml =
-        loader_.snapshot().get(route_match.runtime_fraction().runtime_key());
+    const std::string& fraction_yaml = loader_.snapshot().get(runtime_data.fractional_runtime_key);
 
     try {
       MessageUtil::loadFromYamlAndValidate(fraction_yaml, fractional_percent);
     } catch (const EnvoyException& ex) {
       ENVOY_LOG(error, "failed to parse string value for runtime key {}: {}",
                 route_match.runtime_fraction().runtime_key(), ex.what());
-      fractional_percent = route_match.runtime_fraction().default_value();
+      fractional_percent = runtime_data.runtime_default_value;
     }
 
-    runtime_data.numerator_val_ = fractional_percent.numerator();
-    runtime_data.denominator_val_ =
+    const auto numerator = fractional_percent.numerator();
+    const auto denominator =
         ProtobufPercentHelper::fractionalPercentDenominatorToInt(fractional_percent.denominator());
-  } else if (route_match.runtime_specifier_case() == envoy::api::v2::route::RouteMatch::kRuntime) {
-    // For backwards compatibility, the deprecated 'runtime' field must be converted to a
-    // RuntimeData format with a variable denominator type. The 'runtime' field assumes a percentage
-    // (0-100), so the hard-coded denominator value reflects this.
-    runtime_data.denominator_val_ = 100;
-    runtime_data.numerator_val_ = loader_.snapshot().getInteger(
-        route_match.runtime().runtime_key(), route_match.runtime().default_value());
-  } else {
-    return runtime;
+    continue_matching = random_value % runtime_->denominator_val_ < runtime_->numerator_val_;
+  } else if (!runtime_data.runtime_key.empty()) {
+    continue_matching = loader_.snapshot().featureEnabled(runtime_data.runtime_key,
+                                                          runtime_data.runtime_default_value,
+                                                          random_value);
   }
+
+  return continue_matching;
+}
+
+absl::optional<RouteEntryImplBase::RuntimeData>
+RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& route_match) {
+  absl::optional<RuntimeData> runtime;
+  RuntimeData runtime_data;
+
+  runtime_data.fractional_runtime_key = route_match.runtime_fraction().runtime_key();
+  runtime_data.fractional_default_value = route_match.runtime_fraction().default_value();
+  runtime_data.runtime_key = route_match.runtime().runtime_key();
+  runtime_data.runtime_default_value = route_match.runtime().default_value();
 
   return runtime_data;
 }

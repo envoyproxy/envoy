@@ -387,8 +387,13 @@ protected:
 
 private:
   struct RuntimeData {
-    uint64_t numerator_val_{};
-    uint64_t denominator_val_{};
+    // Fields associated with the 'runtime_fractional_percent' field for the RouteMatch proto.
+    std::string fractional_runtime_key;
+    envoy::api::v2::core::RuntimeFractionalPercent fractional_default_value;
+
+    // Fields associated with the deprecated 'runtime' field for the RouteMatch proto.
+    std::string runtime_key;
+    uint64_t runtime_default_value;
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {
