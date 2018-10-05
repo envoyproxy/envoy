@@ -3,6 +3,7 @@ Version history
 
 1.9.0 (pending)
 ===============
+* router: Fixed bug related to runtime variable updates.
 
 1.8.0 (Oct 4, 2018)
 ===================
