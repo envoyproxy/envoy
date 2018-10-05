@@ -5,13 +5,14 @@ import os
 import json
 
 def generateCompilationDatabase():
-  os.system("bazel/gen_compilation_database.sh //source/... //test/...")
+  os.system("bazel/gen_compilation_database.sh //source/... //test/... //tools/...")
 
-def isCompileTarget(command, args):
-  filename = command["file"]
+def isCompileTarget(target, args):
+  filename = target["file"]
   if not args.include_headers:
-    if filename.endswith(".h") or filename.endswith(".hpp"):
-      return False
+    for ext in (".h", ".hh", ".hpp", ".hxx"):
+      if filename.endswith(".h") or filename.endswith(ext):
+        return False
 
   if not args.include_genfiles:
     if filename.startswith("bazel-out/"):
@@ -23,11 +24,22 @@ def isCompileTarget(command, args):
 
   return True
 
+def modifyCompileCommand(target):
+  cxx, options = target["command"].split(" ", 1)
+
+  # Workaround for bazel added C++11 options, those doesn't affect build itself but
+  # clang-tidy will misinterpret them.
+  options = options.replace("-std=c++0x ", "")
+  options = options.replace("-std=c++11 ", "")
+
+  target["command"] = " ".join(["clang++", options])
+  return target
+
 def fixCompilationDatabase(args):
   with open("compile_commands.json", "r") as db_file:
     db = json.load(db_file)
 
-  db = [command for command in db if isCompileTarget(command, args)]
+  db = [modifyCompileCommand(target) for target in db if isCompileTarget(target, args)]
   with open("compile_commands.json", "w") as db_file:
     json.dump(db, db_file, indent=2)
 
