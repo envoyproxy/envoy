@@ -86,7 +86,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   }
 
   router_.setDecoderFilterCallbacks(*this);
-  // TODO(mattklein123): Correctly set protocol in request info when we support access logging.
+  // TODO(mattklein123): Correctly set protocol in stream info when we support access logging.
 }
 
 void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {

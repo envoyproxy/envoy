@@ -262,7 +262,7 @@ TEST_F(LuaStreamInfoWrapperTest, ReturnCurrentProtocol) {
   expectToPrintCurrentProtocol(Http::Protocol::Http2);
 }
 
-// Set, get and iterate request info dynamic metadata.
+// Set, get and iterate stream info dynamic metadata.
 TEST_F(LuaStreamInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
   const std::string SCRIPT{R"EOF(
       function callMe(object)
