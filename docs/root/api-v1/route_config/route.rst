@@ -236,7 +236,7 @@ include_vh_rate_limits
 Runtime
 -------
 
-A :ref:`runtime <arch_overview_runtime>` route configuration can be used to roll out route changes
+A :ref:`runtime_fraction <arch_overview_runtime>` route configuration can be used to roll out route changes
 in a gradual manner without full code/config deploys. Refer to the
 :ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting_shift>` docs
 for additional documentation.
@@ -244,8 +244,11 @@ for additional documentation.
 .. code-block:: json
 
   {
-    "key": "...",
-    "default": "..."
+    "runtime_key": "...",
+    "default_value": {
+      "numerator": "...",
+      "denominator": "..."
+    }
   }
 
 key
