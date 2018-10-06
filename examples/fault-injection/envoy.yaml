@@ -43,7 +43,7 @@ static_resources:
     hosts:
     - socket_address:
         address: backend
-        port_value: 8080
+        port_value: 80
 admin:
   access_log_path: /dev/stdout
   address:
