@@ -189,7 +189,7 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaMetadata);
 
   /**
-   * @return a handle to the request info.
+   * @return a handle to the stream info.
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaStreamInfo);
 

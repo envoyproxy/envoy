@@ -258,8 +258,7 @@ TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
 
 TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   envoy::config::filter::http::fault::v2::HTTPFault fault;
-  fault.mutable_abort()->set_percent(50);
-  fault.mutable_abort()->mutable_percentage()->set_numerator(100); // should override int percent
+  fault.mutable_abort()->mutable_percentage()->set_numerator(100);
   fault.mutable_abort()->mutable_percentage()->set_denominator(
       envoy::type::FractionalPercent::HUNDRED);
   fault.mutable_abort()->set_http_status(429);
@@ -332,8 +331,7 @@ TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
 TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
   envoy::config::filter::http::fault::v2::HTTPFault fault;
   fault.mutable_delay()->set_type(envoy::config::filter::fault::v2::FaultDelay::FIXED);
-  fault.mutable_delay()->set_percent(100);
-  fault.mutable_delay()->mutable_percentage()->set_numerator(50); // should override int percent
+  fault.mutable_delay()->mutable_percentage()->set_numerator(50);
   fault.mutable_delay()->mutable_percentage()->set_denominator(
       envoy::type::FractionalPercent::HUNDRED);
   fault.mutable_delay()->mutable_fixed_delay()->set_seconds(5);

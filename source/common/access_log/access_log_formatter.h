@@ -99,7 +99,7 @@ private:
 };
 
 /**
- * Formatter for string literal. It ignores headers and request info and returns string by which it
+ * Formatter for string literal. It ignores headers and stream info and returns string by which it
  * was initialized.
  */
 class PlainStringFormatter : public Formatter {
