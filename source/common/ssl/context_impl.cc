@@ -482,14 +482,12 @@ CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::str
   for (auto& dns_san : Utility::getDnsSubjectAltNames(*cert)) {
     envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
         *certificate_details->add_subject_alt_names();
-    subject_alt_name.set_name(dns_san);
-    subject_alt_name.set_type(envoy::admin::v2alpha::SubjectAlternateName::DNS);
+    subject_alt_name.set_dns(dns_san);
   }
   for (auto& uri_san : Utility::getUriSubjectAltNames(*cert)) {
     envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
         *certificate_details->add_subject_alt_names();
-    subject_alt_name.set_name(uri_san);
-    subject_alt_name.set_type(envoy::admin::v2alpha::SubjectAlternateName::URI);
+    subject_alt_name.set_uri(uri_san);
   }
   return certificate_details;
 }

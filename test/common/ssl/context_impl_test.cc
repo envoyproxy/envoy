@@ -246,8 +246,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
  "serial_number": "b13ff63f2dbc118d",
  "subject_alt_names": [
   {
-   "type": "DNS",
-   "name": "server1.example.com"
+   "dns": "server1.example.com"
   }
  ],
 )EOF";

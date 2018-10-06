@@ -853,6 +853,10 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
  ]
 }
 )EOF";
+
+  // Validate that cert details are null and /certs handles it correctly.
+  EXPECT_EQ(nullptr, client_ctx->getCaCertInformation());
+  EXPECT_EQ(nullptr, client_ctx->getCertChainInformation());
   EXPECT_EQ(Http::Code::OK, getCallback("/certs", header_map, response));
   EXPECT_EQ(expected_empty_json, response.toString());
 }

@@ -31,19 +31,15 @@ message CertificateDetails {
   // List of Subject Alternate names.
   repeated SubjectAlternateName subject_alt_names = 3;
 
-  // Days until expiration of the Certificate.
+  // Minimum of days until expiration of certificate and it's chain.
   uint64 days_until_expiration = 4;
 }
 
 message SubjectAlternateName {
-  enum Type {
-    DNS = 0;
-    URI = 1;
-  }
-
-  // Type of the Subject Alternate Name.
-  Type type = 1;
 
   // Subject Alternate Name.
-  string name = 2;
+  oneof name {
+    string dns = 1;
+    string uri = 2;
+  }
 }
