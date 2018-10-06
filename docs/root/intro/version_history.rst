@@ -4,8 +4,6 @@ Version history
 1.9.0 (pending)
 ===============
 * admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
-* Renamed the `RequestInfo` namespace to `StreamInfo` to better match its
-  behaviour within TCP and HTTP implementations.
 * fault: removed integer percentage support.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
