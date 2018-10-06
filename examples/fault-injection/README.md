@@ -23,7 +23,7 @@ feature](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime).
 ```
 # in terminal 3
 docker-compose exec envoy bash
-bash enable_fault_jnjection.sh
+bash enable_fault_injection.sh
 ```
 
 This changes Envoy's fault injection filter config via runtime setting. Then `send_request.sh` script shows HTTP 503
