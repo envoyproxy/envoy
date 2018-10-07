@@ -130,7 +130,7 @@ public:
     wrapped_scope_->deliverHistogramToSinks(histogram, value);
   }
 
-  Counter& counter(const std::string& name) override {
+  Counter& counterHelper(const std::string& name, bool /* data_path_critical */) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->counter(name);
   }
@@ -161,7 +161,7 @@ class TestIsolatedStoreImpl : public StoreRoot {
 public:
   TestIsolatedStoreImpl() : source_(*this) {}
   // Stats::Scope
-  Counter& counter(const std::string& name) override {
+  Counter& counterHelper(const std::string& name, bool /* data_path_critical */) override {
     Thread::LockGuard lock(lock_);
     return store_.counter(name);
   }

@@ -149,7 +149,7 @@ public:
   ScopePtr createScope(const std::string& name) override { return ScopePtr{createScope_(name)}; }
 
   MOCK_METHOD2(deliverHistogramToSinks, void(const Histogram& histogram, uint64_t value));
-  MOCK_METHOD1(counter, Counter&(const std::string&));
+  MOCK_METHOD2(counterHelper, Counter&(const std::string&, bool));
   MOCK_CONST_METHOD0(counters, std::vector<CounterSharedPtr>());
   MOCK_METHOD1(createScope_, Scope*(const std::string& name));
   MOCK_METHOD1(gauge, Gauge&(const std::string&));

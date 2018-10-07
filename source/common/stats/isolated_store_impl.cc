@@ -36,7 +36,9 @@ struct IsolatedScopeImpl : public Scope {
     return ScopePtr{new IsolatedScopeImpl(parent_, prefix_ + name)};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Counter& counter(const std::string& name) override { return parent_.counter(prefix_ + name); }
+  Counter& counterHelper(const std::string& name, bool data_path_critical) override {
+    return parent_.counterHelper(prefix_ + name, data_path_critical);
+  }
   Gauge& gauge(const std::string& name) override { return parent_.gauge(prefix_ + name); }
   Histogram& histogram(const std::string& name) override {
     return parent_.histogram(prefix_ + name);

@@ -229,7 +229,8 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   return *central_ref;
 }
 
-Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
+Counter& ThreadLocalStoreImpl::ScopeImpl::counterHelper(const std::string& name,
+                                                        bool data_path_critical) {
   // Determine the final name based on the prefix and the passed name.
   std::string final_name = prefix_ + name;
 
@@ -237,7 +238,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // if we don't have TLS initialized currently. The de-referenced pointer might be null if there
   // is no cache entry.
   CounterSharedPtr* tls_ref = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_) {
+  if (data_path_critical && !parent_.shutting_down_ && parent_.tls_) {
     tls_ref =
         &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].counters_[final_name];
   }

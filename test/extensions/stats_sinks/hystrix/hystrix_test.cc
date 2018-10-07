@@ -55,7 +55,8 @@ public:
   // Attach the counter to cluster_stat_scope and set default value.
   void setCounterForTest(NiceMock<Stats::MockCounter>& counter, std::string counter_name) {
     counter.name_ = counter_name;
-    ON_CALL(cluster_stats_scope_, counter(counter_name)).WillByDefault(ReturnRef(counter));
+    ON_CALL(cluster_stats_scope_, counterHelper(counter_name, false))
+        .WillByDefault(ReturnRef(counter));
   }
 
   void setCountersToZero() {
