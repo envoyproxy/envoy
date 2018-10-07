@@ -213,7 +213,13 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
 
   EXPECT_EQ(2UL, store_->counters().size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
-  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
+
+  // Now reference "c1" as a fast-lookup, which will force population of
+  // the TLS cache.
+  EXPECT_EQ(&c1, &store_->fastFindCounter("c1"));
+  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count()); // 3rd ref for TLS cache.
+
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(3L, store_->gauges().front().use_count());
@@ -504,7 +510,7 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   store_->gauge("g2");
 
   // c1, g1 should have a thread local ref, but c2, g2 should not.
-  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(3L, TestUtility::findGauge(*store_, "g1").use_count());
   EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c2").use_count());
   EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g2").use_count());

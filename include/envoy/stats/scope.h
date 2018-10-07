@@ -41,10 +41,13 @@ public:
    */
   virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;
 
+  Counter& fastFindCounter(const std::string& name) { return counterHelper(name, true); }
+  Counter& counter(const std::string& name) { return counterHelper(name, false); }
+
   /**
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counter(const std::string& name) PURE;
+  virtual Counter& counterHelper(const std::string& name, bool data_path) PURE;
 
   /**
    * @return a gauge within the scope's namespace.

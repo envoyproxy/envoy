@@ -180,7 +180,9 @@ public:
   ~ThreadLocalStoreImpl();
 
   // Stats::Scope
-  Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
+  Counter& counterHelper(const std::string& name, bool data_path_critical) override {
+    return default_scope_->counterHelper(name, data_path_critical);
+  }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
@@ -231,7 +233,7 @@ private:
     ~ScopeImpl();
 
     // Stats::Scope
-    Counter& counter(const std::string& name) override;
+    Counter& counterHelper(const std::string& name, bool data_path_critical) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(prefix_ + name);
     }

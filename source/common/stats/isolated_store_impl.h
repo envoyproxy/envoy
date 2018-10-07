@@ -57,7 +57,9 @@ public:
   IsolatedStoreImpl();
 
   // Stats::Scope
-  Counter& counter(const std::string& name) override { return counters_.get(name); }
+  Counter& counterHelper(const std::string& name, bool /*data_path_critical*/) override {
+    return counters_.get(name);
+  }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gauge(const std::string& name) override { return gauges_.get(name); }
