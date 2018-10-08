@@ -296,6 +296,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
   }
 
+  include_attempt_count_ = route_entry_->includeAttemptCount();
+  if (include_attempt_count_) {
+    headers.insertEnvoyAttemptCount().value(attempt_count_);
+  }
+
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(headers, *cluster_);
@@ -762,11 +767,16 @@ bool Filter::setupRetry(bool end_stream) {
 
 void Filter::doRetry() {
   is_retry_ = true;
+  attempt_count_++;
   Http::ConnectionPool::Instance* conn_pool = getConnPool();
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();
     cleanup();
     return;
+  }
+
+  if (include_attempt_count_) {
+    downstream_headers_->insertEnvoyAttemptCount().value(attempt_count_);
   }
 
   ASSERT(response_timeout_ || timeout_.global_timeout_.count() == 0);
