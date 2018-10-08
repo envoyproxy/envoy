@@ -11,6 +11,7 @@
 #include "common/thread_local/thread_local_impl.h"
 
 #include "server/hot_restart_nop_impl.h"
+#include "server/options_impl.h"
 
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
@@ -21,6 +22,34 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Server {
+
+std::unique_ptr<OptionsImpl> createTestOptionsImpl(
+    const std::string& config_path,
+    const std::string& config_yaml,
+    Network::Address::IpVersion ip_version) {
+  std::unique_ptr<OptionsImpl> test_options =
+      absl::make_unique<OptionsImpl>("cluster_name", "node_name", "zone_name", spdlog::level::info);
+
+  test_options->setBaseId(0u);
+  test_options->setConcurrency(1u);
+  test_options->setConfigPath(config_path);
+  test_options->setConfigYaml(config_yaml);
+  test_options->setV2ConfigOnly(false);
+  test_options->setLocalAddressIpVersion(ip_version);
+  test_options->setLogFormat(Logger::Logger::DEFAULT_LOG_FORMAT);
+  test_options->setRestartEpoch(0u);
+  test_options->setFileFlushIntervalMsec(std::chrono::milliseconds(50));
+  test_options->setDrainTime(std::chrono::seconds(1));
+  test_options->setParentShutdownTime(std::chrono::seconds(2));
+  test_options->setMode(Server::Mode::Serve);
+  test_options->setMaxStats(16384u);
+  test_options->setHotRestartDisabled(false);
+
+  return test_options;
+}
+
+} // namespace Server
 
 IntegrationTestServerPtr
 IntegrationTestServer::create(const std::string& config_path,
@@ -66,7 +95,6 @@ IntegrationTestServer::~IntegrationTestServer() {
     EXPECT_TRUE(response->complete());
     EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   }
-
   thread_->join();
 }
 
