@@ -33,11 +33,11 @@ namespace {
 
 // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
 OptionsImpl asConfigYaml(const OptionsImpl& src) {
-  return Envoy::Server::createTestOptionsImpl(
-      "", Filesystem::fileReadToEnd(src.configPath()), src.localAddressIpVersion());
+  return Envoy::Server::createTestOptionsImpl("", Filesystem::fileReadToEnd(src.configPath()),
+                                              src.localAddressIpVersion());
 }
 
-}
+} // namespace
 
 class ConfigTest {
 public:
@@ -124,8 +124,8 @@ void testIncompatibleMerge() {
 uint32_t run(const std::string& directory) {
   uint32_t num_tested = 0;
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
-    OptionsImpl options(Envoy::Server::createTestOptionsImpl(
-        filename, "", Network::Address::IpVersion::v6));
+    OptionsImpl options(
+        Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
     ConfigTest test1(options);
     // Config flag --config-yaml is only supported for v2 configs.
     envoy::config::bootstrap::v2::Bootstrap bootstrap;

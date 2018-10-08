@@ -34,10 +34,8 @@ public:
               spdlog::level::level_enum default_log_level);
 
   // Test constructor; creates "reasonable" defaults, but desired values should be set explicitly.
-  OptionsImpl(const std::string& service_cluster,
-              const std::string& service_node,
-              const std::string& service_zone,
-              spdlog::level::level_enum log_level);
+  OptionsImpl(const std::string& service_cluster, const std::string& service_node,
+              const std::string& service_zone, spdlog::level::level_enum log_level);
 
   // Setters for option fields. These are not part of the Options interface.
   void setBaseId(uint64_t base_id) { base_id_ = base_id; };

@@ -24,10 +24,8 @@
 namespace Envoy {
 namespace Server {
 
-OptionsImpl createTestOptionsImpl(
-    const std::string& config_path,
-    const std::string& config_yaml,
-    Network::Address::IpVersion ip_version) {
+OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
+                                  Network::Address::IpVersion ip_version) {
   OptionsImpl test_options("cluster_name", "node_name", "zone_name", spdlog::level::info);
 
   test_options.setBaseId(0u);
