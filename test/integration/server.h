@@ -27,7 +27,7 @@ namespace Envoy {
 namespace Server {
 
 // Create OptionsImpl structures suitable for tests.
-std::unique_ptr<OptionsImpl> createTestOptionsImpl(
+OptionsImpl createTestOptionsImpl(
     const std::string& config_path,
     const std::string& config_yaml,
     Network::Address::IpVersion ip_version);

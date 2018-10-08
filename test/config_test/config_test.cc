@@ -33,8 +33,8 @@ namespace {
 
 // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
 OptionsImpl asConfigYaml(const OptionsImpl& src) {
-  std::unique_ptr<OptionsImpl> result(Envoy::Server::createTestOptionsImpl("", Filesystem::fileReadToEnd(src.configPath()), src.localAddressIpVersion()));
-  return *result;
+  return Envoy::Server::createTestOptionsImpl(
+      "", Filesystem::fileReadToEnd(src.configPath()), src.localAddressIpVersion());
 }
 
 }
@@ -104,19 +104,19 @@ public:
 
 void testMerge() {
   const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
-  std::unique_ptr<OptionsImpl> options(Server::createTestOptionsImpl("google_com_proxy.v2.yaml", overlay,
-                                                                     Network::Address::IpVersion::v6));
+  OptionsImpl options(Server::createTestOptionsImpl("google_com_proxy.v2.yaml", overlay,
+                                                    Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  Server::InstanceUtil::loadBootstrapConfig(bootstrap, *options);
+  Server::InstanceUtil::loadBootstrapConfig(bootstrap, options);
   EXPECT_EQ(2, bootstrap.static_resources().clusters_size());
 }
 
 void testIncompatibleMerge() {
   const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
-  std::unique_ptr<OptionsImpl> options(Server::createTestOptionsImpl("google_com_proxy.v1.yaml", overlay,
-                                                                     Network::Address::IpVersion::v6));
+  OptionsImpl options(Server::createTestOptionsImpl("google_com_proxy.v1.yaml", overlay,
+                                                    Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  EXPECT_THROW_WITH_MESSAGE(Server::InstanceUtil::loadBootstrapConfig(bootstrap, *options),
+  EXPECT_THROW_WITH_MESSAGE(Server::InstanceUtil::loadBootstrapConfig(bootstrap, options),
                             EnvoyException,
                             "V1 config (detected) with --config-yaml is not supported");
 }
@@ -124,13 +124,14 @@ void testIncompatibleMerge() {
 uint32_t run(const std::string& directory) {
   uint32_t num_tested = 0;
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
-    std::unique_ptr<OptionsImpl> options(Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
-    ConfigTest test1(*options);
+    OptionsImpl options(Envoy::Server::createTestOptionsImpl(
+        filename, "", Network::Address::IpVersion::v6));
+    ConfigTest test1(options);
     // Config flag --config-yaml is only supported for v2 configs.
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
-    if (Server::InstanceUtil::loadBootstrapConfig(bootstrap, *options) ==
+    if (Server::InstanceUtil::loadBootstrapConfig(bootstrap, options) ==
         Server::InstanceUtil::BootstrapVersion::V2) {
-      ConfigTest test2(asConfigYaml(*options));
+      ConfigTest test2(asConfigYaml(options));
     }
     num_tested++;
   }

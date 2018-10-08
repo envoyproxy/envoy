@@ -24,27 +24,26 @@
 namespace Envoy {
 namespace Server {
 
-std::unique_ptr<OptionsImpl> createTestOptionsImpl(
+OptionsImpl createTestOptionsImpl(
     const std::string& config_path,
     const std::string& config_yaml,
     Network::Address::IpVersion ip_version) {
-  std::unique_ptr<OptionsImpl> test_options =
-      absl::make_unique<OptionsImpl>("cluster_name", "node_name", "zone_name", spdlog::level::info);
+  OptionsImpl test_options("cluster_name", "node_name", "zone_name", spdlog::level::info);
 
-  test_options->setBaseId(0u);
-  test_options->setConcurrency(1u);
-  test_options->setConfigPath(config_path);
-  test_options->setConfigYaml(config_yaml);
-  test_options->setV2ConfigOnly(false);
-  test_options->setLocalAddressIpVersion(ip_version);
-  test_options->setLogFormat(Logger::Logger::DEFAULT_LOG_FORMAT);
-  test_options->setRestartEpoch(0u);
-  test_options->setFileFlushIntervalMsec(std::chrono::milliseconds(50));
-  test_options->setDrainTime(std::chrono::seconds(1));
-  test_options->setParentShutdownTime(std::chrono::seconds(2));
-  test_options->setMode(Server::Mode::Serve);
-  test_options->setMaxStats(16384u);
-  test_options->setHotRestartDisabled(false);
+  test_options.setBaseId(0u);
+  test_options.setConcurrency(1u);
+  test_options.setConfigPath(config_path);
+  test_options.setConfigYaml(config_yaml);
+  test_options.setV2ConfigOnly(false);
+  test_options.setLocalAddressIpVersion(ip_version);
+  test_options.setLogFormat(Logger::Logger::DEFAULT_LOG_FORMAT);
+  test_options.setRestartEpoch(0u);
+  test_options.setFileFlushIntervalMsec(std::chrono::milliseconds(50));
+  test_options.setDrainTime(std::chrono::seconds(1));
+  test_options.setParentShutdownTime(std::chrono::seconds(2));
+  test_options.setMode(Server::Mode::Serve);
+  test_options.setMaxStats(16384u);
+  test_options.setHotRestartDisabled(false);
 
   return test_options;
 }
@@ -118,7 +117,7 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic) {
-  std::unique_ptr<OptionsImpl> options(Server::createTestOptionsImpl(config_path_, "", version));
+  OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version));
   Server::HotRestartNopImpl restarter;
   Thread::MutexBasicLockable lock;
 
@@ -134,7 +133,7 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
     random_generator = std::make_unique<Runtime::RandomGeneratorImpl>();
   }
   server_.reset(new Server::InstanceImpl(
-      *options, time_system_, Network::Utility::getLocalAddress(version), *this, restarter,
+      options, time_system_, Network::Utility::getLocalAddress(version), *this, restarter,
       stats_store, lock, *this, std::move(random_generator), tls));
   pending_listeners_ = server_->listenerManager().listeners().size();
   ENVOY_LOG(info, "waiting for {} test server listeners", pending_listeners_);
