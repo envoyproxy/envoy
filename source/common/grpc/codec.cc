@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/platform.h"
+
 #include "common/buffer/buffer_impl.h"
 
 namespace Envoy {

@@ -19,11 +19,11 @@ public:
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     createApiTestServer(
         {
-           "test/config/integration/server_xds.bootstrap.yaml",
-           "test/config/integration/server_xds.cds.yaml",
-           "test/config/integration/server_xds.eds.yaml",
-           "test/config/integration/server_xds.lds.yaml",
-           "test/config/integration/server_xds.rds.yaml",
+            "test/config/integration/server_xds.bootstrap.yaml",
+            "test/config/integration/server_xds.cds.yaml",
+            "test/config/integration/server_xds.eds.yaml",
+            "test/config/integration/server_xds.lds.yaml",
+            "test/config/integration/server_xds.rds.yaml",
         },
         {"http"});
   }

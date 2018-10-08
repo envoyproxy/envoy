@@ -32,8 +32,12 @@ RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr rou
 
   const std::string& name = HttpFilterNames::get().Rbac;
   const auto* entry = route->routeEntry();
-  const auto* tmp = entry->perFilterConfigTyped<RoleBasedAccessControlRouteSpecificFilterConfig>(name);
-  const auto* route_local = tmp ? tmp : entry->virtualHost().perFilterConfigTyped<RoleBasedAccessControlRouteSpecificFilterConfig>(name);
+  const auto* tmp =
+      entry->perFilterConfigTyped<RoleBasedAccessControlRouteSpecificFilterConfig>(name);
+  const auto* route_local =
+      tmp ? tmp
+          : entry->virtualHost()
+                .perFilterConfigTyped<RoleBasedAccessControlRouteSpecificFilterConfig>(name);
 
   if (route_local) {
     return route_local->engine(mode);

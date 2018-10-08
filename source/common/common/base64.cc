@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/common/platform.h"
+
 #include "common/common/empty_string.h"
 
 namespace Envoy {
