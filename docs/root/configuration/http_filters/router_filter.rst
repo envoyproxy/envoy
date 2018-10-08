@@ -153,6 +153,8 @@ in addition to the status codes enabled for retry through other retry policies.
 The list is a comma delimited list of integers: "409" would cause 409 to be considered retriable, while "504,409"
 would consider both 504 and 409 retriable.
 
+This header will only be honored for requests from internal clients.
+
 .. _config_http_filters_router_x-envoy-upstream-alt-stat-name:
 
 x-envoy-upstream-alt-stat-name
