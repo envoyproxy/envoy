@@ -133,13 +133,14 @@ OverloadManagerImpl::OverloadManagerImpl(
 void OverloadManagerImpl::start() {
   ASSERT(!started_);
   started_ = true;
-  if (resources_.empty()) {
-    return;
-  }
 
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalOverloadState>();
   });
+
+  if (resources_.empty()) {
+    return;
+  }
 
   timer_ = dispatcher_.createTimer([this]() -> void {
     for (auto& resource : resources_) {
