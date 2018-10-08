@@ -22,6 +22,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
 
@@ -177,6 +178,7 @@ public:
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   std::shared_ptr<Router::MockRoute> route_;
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_info_;
 };
 
 class MockStreamDecoderFilterCallbacks : public StreamDecoderFilterCallbacks,
@@ -189,6 +191,7 @@ public:
   MOCK_METHOD0(connection, const Network::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
+  MOCK_METHOD0(clusterInfo, Upstream::ClusterInfoConstSharedPtr());
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
   MOCK_METHOD0(clearRouteCache, void());
   MOCK_METHOD0(streamId, uint64_t());
@@ -252,6 +255,7 @@ public:
   MOCK_METHOD0(connection, const Network::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
+  MOCK_METHOD0(clusterInfo, Upstream::ClusterInfoConstSharedPtr());
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
   MOCK_METHOD0(clearRouteCache, void());
   MOCK_METHOD0(streamId, uint64_t());
