@@ -127,7 +127,7 @@ AssertionResult FakeStream::waitForHeadersComplete(milliseconds timeout) {
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for headers.";
     }
-    decoder_event_.waitFor(lock_, 5ms);
+    time_system_.waitFor(lock_, decoder_event_, 5ms);
   }
   return AssertionSuccess();
 }
@@ -140,7 +140,7 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, ui
     if (time_system_.monotonicTime() >= start_time + timeout) {
       return AssertionFailure() << "Timed out waiting for data.";
     }
-    decoder_event_.waitFor(lock_, 5ms);
+    time_system_.waitFor(lock_, decoder_event_, 5ms);
     if (bodyLength() < body_length) {
       // Run the client dispatcher since we may need to process window updates, etc.
       client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
@@ -169,7 +169,7 @@ AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatche
     if (time_system_.monotonicTime() >= start_time + timeout) {
       return AssertionFailure() << "Timed out waiting for end of stream.";
     }
-    decoder_event_.waitFor(lock_, 5ms);
+    time_system_.waitFor(lock_, decoder_event_, 5ms);
     if (!end_stream_) {
       // Run the client dispatcher since we may need to process window updates, etc.
       client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
@@ -186,7 +186,7 @@ AssertionResult FakeStream::waitForReset(milliseconds timeout) {
       return AssertionFailure() << "Timed out waiting for reset.";
     }
     // Safe since CondVar::waitFor won't throw.
-    decoder_event_.waitFor(lock_, 5ms);
+    time_system_.waitFor(lock_, decoder_event_, 5ms);
   }
   return AssertionSuccess();
 }
@@ -254,7 +254,7 @@ AssertionResult FakeConnectionBase::waitForDisconnect(bool ignore_spurious_event
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for disconnect.";
     }
-    Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
+    Thread::CondVar::WaitStatus status = time_system_.waitFor(lock_, connection_event_, 5ms);
     // The default behavior of waitForDisconnect is to assume the test cleanly
     // calls waitForData, waitForNewStream, etc. to handle all events on the
     // connection. If the caller explicitly notes that other events should be
@@ -280,7 +280,7 @@ AssertionResult FakeConnectionBase::waitForHalfClose(bool ignore_spurious_events
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for half close.";
     }
-    Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
+    Thread::CondVar::WaitStatus status = time_system_.waitFor(lock_, connection_event_, 5ms);
     // The default behavior of waitForHalfClose is to assume the test cleanly
     // calls waitForData, waitForNewStream, etc. to handle all events on the
     // connection. If the caller explicitly notes that other events should be
@@ -306,7 +306,7 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for new stream.";
     }
-    Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
+    Thread::CondVar::WaitStatus status = time_system_.waitFor(lock_, connection_event_, 5ms);
     // As with waitForDisconnect, by default, waitForNewStream returns after the next event.
     // If the caller explicitly notes other events should be ignored, it will instead actually
     // wait for the next new stream, ignoring other events such as onData()
@@ -420,7 +420,7 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
       if (time_system.monotonicTime() >= end_time) {
         return AssertionFailure() << "Timed out waiting for new connection.";
       }
-      new_connection_event_.waitFor(lock_, 5ms);
+      time_system_.waitFor(lock_, new_connection_event_, 5ms);
       if (new_connections_.empty()) {
         // Run the client dispatcher since we may need to process window updates, etc.
         client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
@@ -442,14 +442,17 @@ AssertionResult
 FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                     std::vector<std::unique_ptr<FakeUpstream>>& upstreams,
                                     FakeHttpConnectionPtr& connection, milliseconds timeout) {
-  Event::TimeSystem& time_system = client_dispatcher.timeSystem();
+  if (upstreams.empty()) {
+    return AssertionFailure() << "No upstreams confgured.";
+  }
+  Event::TestTimeSystem& time_system = upstreams[0]->timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   while (time_system.monotonicTime() < end_time) {
     for (auto it = upstreams.begin(); it != upstreams.end(); ++it) {
       FakeUpstream& upstream = **it;
       Thread::ReleasableLockGuard lock(upstream.lock_);
       if (upstream.new_connections_.empty()) {
-        upstream.new_connection_event_.waitFor(upstream.lock_, 5ms);
+        time_system.waitFor(upstream.lock_, upstream.new_connection_event_, 5ms);
       }
 
       if (upstream.new_connections_.empty()) {
@@ -475,7 +478,8 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
     Thread::LockGuard lock(lock_);
     if (new_connections_.empty()) {
       ENVOY_LOG(debug, "waiting for raw connection");
-      new_connection_event_.waitFor(lock_, timeout); // Safe since CondVar::waitFor won't throw.
+      time_system_.waitFor(lock_, new_connection_event_,
+                           timeout); // Safe since CondVar::waitFor won't throw.
     }
 
     if (new_connections_.empty()) {
@@ -506,7 +510,7 @@ AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* 
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for data.";
     }
-    connection_event_.waitFor(lock_, 5ms); // Safe since CondVar::waitFor won't throw.
+    time_system_.waitFor(lock_, connection_event_, 5ms); // Safe since CondVar::waitFor won't throw.
   }
   if (data != nullptr) {
     *data = data_;
@@ -524,7 +528,7 @@ FakeRawConnection::waitForData(const std::function<bool(const std::string&)>& da
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for data.";
     }
-    connection_event_.waitFor(lock_, 5ms); // Safe since CondVar::waitFor won't throw.
+    time_system_.waitFor(lock_, connection_event_, 5ms); // Safe since CondVar::waitFor won't throw.
   }
   if (data != nullptr) {
     *data = data_;

@@ -48,16 +48,6 @@
   ((message).has_##field_name() ? DurationUtil::durationToSeconds((message).field_name())          \
                                 : throw MissingFieldException(#field_name, (message)))
 
-// Set the value of a FractionalPercent field with the value from a protobuf message if present.
-// Otherwise, convert the default field value into FractionalPercent and set it.
-#define PROTOBUF_SET_FRACTIONAL_PERCENT_OR_DEFAULT(field, message, field_name, default_field_name) \
-  if ((message).has_##field_name()) {                                                              \
-    field = (message).field_name();                                                                \
-  } else {                                                                                         \
-    field.set_numerator((message).default_field_name());                                           \
-    field.set_denominator(envoy::type::FractionalPercent::HUNDRED);                                \
-  }
-
 namespace Envoy {
 namespace ProtobufPercentHelper {
 
@@ -68,10 +58,11 @@ uint64_t convertPercent(double percent, uint64_t max_value);
 
 /**
  * Convert a fractional percent denominator enum into an integer.
- * @param percent supplies percent to convert.
+ * @param denominator supplies denominator to convert.
  * @return the converted denominator.
  */
-uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent& percent);
+uint64_t fractionalPercentDenominatorToInt(
+    const envoy::type::FractionalPercent::DenominatorType& denominator);
 
 } // namespace ProtobufPercentHelper
 } // namespace Envoy

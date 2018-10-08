@@ -121,7 +121,7 @@ envoy_cc_fuzz_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:test_time_lib",
+        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )

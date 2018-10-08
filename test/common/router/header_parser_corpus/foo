@@ -5,7 +5,7 @@ headers_to_add {
   }
 }
 headers_to_remove: "7"
-request_info {
+stream_info {
   upstream_metadata {
     filter_metadata {
       key: ""

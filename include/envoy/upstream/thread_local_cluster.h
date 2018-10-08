@@ -20,8 +20,7 @@ public:
 
   /**
    * @return ClusterInfoConstSharedPtr the info for this cluster. The info is safe to store beyond
-   * the
-   *         lifetime of the ThreadLocalCluster instance itself.
+   * the lifetime of the ThreadLocalCluster instance itself.
    */
   virtual ClusterInfoConstSharedPtr info() PURE;
 
