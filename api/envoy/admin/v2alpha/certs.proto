@@ -15,10 +15,10 @@ message Certificates {
 message Certificate {
 
   // Details of CA certificate.
-  CertificateDetails ca_cert = 1;
+  repeated CertificateDetails ca_cert = 1;
 
   // Details of Certificate Chain
-  CertificateDetails cert_chain = 2;
+  repeated CertificateDetails cert_chain = 2;
 }
 
 message CertificateDetails {

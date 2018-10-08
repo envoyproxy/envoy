@@ -849,7 +849,10 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
 
   const std::string expected_empty_json = R"EOF({
  "certificates": [
-  {}
+  {
+   "ca_cert": [],
+   "cert_chain": []
+  }
  ]
 }
 )EOF";

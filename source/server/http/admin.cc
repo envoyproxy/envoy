@@ -762,11 +762,11 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap& response_
   server_.sslContextManager().iterateContexts([&](const Ssl::Context& context) -> void {
     envoy::admin::v2alpha::Certificate& certificate = *certificates.add_certificates();
     if (context.getCaCertInformation() != nullptr) {
-      envoy::admin::v2alpha::CertificateDetails* ca_certificate = certificate.mutable_ca_cert();
+      envoy::admin::v2alpha::CertificateDetails* ca_certificate = certificate.add_ca_cert();
       *ca_certificate = *context.getCaCertInformation();
     }
     if (context.getCertChainInformation() != nullptr) {
-      envoy::admin::v2alpha::CertificateDetails* cert_chain = certificate.mutable_cert_chain();
+      envoy::admin::v2alpha::CertificateDetails* cert_chain = certificate.add_cert_chain();
       *cert_chain = *context.getCertChainInformation();
     }
   });

@@ -18,6 +18,7 @@
 #include "gtest/gtest.h"
 #include "openssl/x509v3.h"
 
+using Envoy::Protobuf::util::MessageDifferencer;
 using testing::NiceMock;
 using testing::ReturnRef;
 
@@ -161,18 +162,24 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
  "path": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
  "serial_number": "eaf3b0ea1d0e579a",
  "subject_alt_names": [],
+ }
 )EOF";
 
   std::string cert_chain_json = R"EOF({
  "path": "{{ test_tmpdir }}/unittestcert.pem",
+ }
 )EOF";
 
   std::string ca_cert_partial_output(TestEnvironment::substitute(ca_cert_json));
   std::string cert_chain_partial_output(TestEnvironment::substitute(cert_chain_json));
-  EXPECT_TRUE(MessageUtil::getJsonStringFromMessage(*context->getCaCertInformation(), true, true)
-                  .find(ca_cert_partial_output) != std::string::npos);
-  EXPECT_TRUE(MessageUtil::getJsonStringFromMessage(*context->getCertChainInformation(), true, true)
-                  .find(cert_chain_partial_output) != std::string::npos);
+  envoy::admin::v2alpha::CertificateDetails certificate_details, cert_chain_details;
+  MessageUtil::loadFromJson(ca_cert_partial_output, certificate_details);
+  MessageUtil::loadFromJson(cert_chain_partial_output, cert_chain_details);
+
+  MessageDifferencer message_differencer;
+  message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
+  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()));
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
@@ -198,11 +205,13 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   {
    "dns": "server1.example.com"
   }
- ],
+ ]
+ }
 )EOF";
 
   std::string cert_chain_json = R"EOF({
  "path": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem",
+ }
 )EOF";
 
   // This is similar to the hack above, but right now we generate the ca_cert and it expires in 15
@@ -213,10 +222,14 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   // every build. For cert_chain output, we check only for the certificate path.
   std::string ca_cert_partial_output(TestEnvironment::substitute(ca_cert_json));
   std::string cert_chain_partial_output(TestEnvironment::substitute(cert_chain_json));
-  EXPECT_TRUE(MessageUtil::getJsonStringFromMessage(*context->getCaCertInformation(), true, true)
-                  .find(ca_cert_partial_output) != std::string::npos);
-  EXPECT_TRUE(MessageUtil::getJsonStringFromMessage(*context->getCertChainInformation(), true, true)
-                  .find(cert_chain_partial_output) != std::string::npos);
+  envoy::admin::v2alpha::CertificateDetails certificate_details, cert_chain_details;
+  MessageUtil::loadFromJson(ca_cert_partial_output, certificate_details);
+  MessageUtil::loadFromJson(cert_chain_partial_output, cert_chain_details);
+
+  MessageDifferencer message_differencer;
+  message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
+  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()));
 }
 
 TEST_F(SslContextImplTest, TestNoCert) {
