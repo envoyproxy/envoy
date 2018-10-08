@@ -6,6 +6,8 @@ Version history
 * fault: removed integer percentage support.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
+* router: when :ref:`max_grpc_timeout <envoy_api_field_route.RouteAction.max_grpc_timeout>`
+  is set, Envoy will now add or update the grpc-timeout header to reflect Envoy's expected timeout.
 
 1.8.0 (Oct 4, 2018)
 ===================
