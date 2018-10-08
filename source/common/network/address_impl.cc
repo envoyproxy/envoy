@@ -74,10 +74,10 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
 #define s6_addr32 __u6_addr.__u6_addr32
 #endif
 #endif
-      struct sockaddr_in sin = {.sin_family = AF_INET,
-                                .sin_port = sin6->sin6_port,
-                                .sin_addr = {.s_addr = sin6->sin6_addr.s6_addr32[3]},
-                                .sin_zero = {}};
+      struct sockaddr_in sin = {AF_INET,
+                                sin6->sin6_port,
+                                {sin6->sin6_addr.s6_addr32[3]},
+                                {}};
       return std::make_shared<Address::Ipv4Instance>(&sin);
     } else {
       return std::make_shared<Address::Ipv6Instance>(*sin6, v6only);
