@@ -13,8 +13,6 @@ namespace DubboProxy {
 Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy& proto_config,
     Server::Configuration::FactoryContext&) {
-  ASSERT(!proto_config.stat_prefix().empty());
-
   const std::string stat_prefix = fmt::format("dubbo.{}.", proto_config.stat_prefix());
 
   return [](Network::FilterManager&) -> void {};

@@ -9,7 +9,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
-namespace {
 
 inline void addInt16(Buffer::Instance& buffer, int16_t value) {
   value = htobe16(value);
@@ -40,9 +39,6 @@ inline void addSeq(Buffer::Instance& buffer, const std::initializer_list<uint8_t
   }
 }
 
-inline void addString(Buffer::Instance& buffer, const std::string& s) { buffer.add(s); }
-
-} // namespace
 } // namespace DubboProxy
 } // namespace NetworkFilters
 } // namespace Extensions
