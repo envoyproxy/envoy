@@ -152,6 +152,7 @@ public:
     const std::string DeadlineExceeded{"deadline-exceeded"};
     const std::string ResourceExhausted{"resource-exhausted"};
     const std::string Unavailable{"unavailable"};
+    const std::string Internal{"internal"};
   } EnvoyRetryOnGrpcValues;
 
   struct {
