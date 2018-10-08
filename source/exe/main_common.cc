@@ -40,7 +40,16 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
   return Server::InstanceUtil::createRuntime(server, config);
 }
 
-MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
+MainCommonBase::MainCommonBase(OptionsImpl& options)
+    : MainCommonBase(options, nullptr, nullptr, nullptr,
+                     std::unique_ptr<Runtime::RandomGenerator>()) {}
+
+MainCommonBase::MainCommonBase(OptionsImpl& options,
+                               Event::TimeSystem* time_system,
+                               TestHooks* test_hooks,
+                               Server::ComponentFactory* component_factory,
+                               std::unique_ptr<Runtime::RandomGenerator>&& random_generator)
+    : options_(options) {
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
@@ -56,6 +65,22 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
     if (restarter_.get() == nullptr) {
       restarter_.reset(new Server::HotRestartNopImpl());
     }
+    if (!time_system) {
+      default_time_system_ = absl::make_unique<Event::RealTimeSystem>();
+      time_system = default_time_system_.get();
+    }
+    if (!test_hooks) {
+      default_test_hooks_ = absl::make_unique<DefaultTestHooks>();
+      test_hooks = default_test_hooks_.get();
+    }
+    if (!component_factory) {
+      default_component_factory_ = absl::make_unique<ProdComponentFactory>();
+      component_factory = default_component_factory_.get();
+    }
+    component_factory_ = component_factory;
+    if (!random_generator) {
+      random_generator = absl::make_unique<Runtime::RandomGeneratorImpl>();
+    }
 
     tls_.reset(new ThreadLocal::InstanceImpl);
     Thread::BasicLockable& log_lock = restarter_->logLock();
@@ -70,9 +95,8 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
                                                                  restarter_->statsAllocator());
 
     server_ = std::make_unique<Server::InstanceImpl>(
-        options_, time_system_, local_address, default_test_hooks_, *restarter_, *stats_store_,
-        access_log_lock, component_factory_, std::make_unique<Runtime::RandomGeneratorImpl>(),
-        *tls_);
+        options_, *time_system, local_address, *test_hooks, *restarter_, *stats_store_,
+        access_log_lock, *component_factory, std::move(random_generator), *tls_);
     break;
   }
   case Server::Mode::Validate:
@@ -100,7 +124,7 @@ bool MainCommonBase::run() {
     return true;
   case Server::Mode::Validate: {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    return Server::validateConfig(options_, local_address, component_factory_);
+    return Server::validateConfig(options_, local_address, *component_factory_);
   }
   case Server::Mode::InitOnly:
     PERF_DUMP();
