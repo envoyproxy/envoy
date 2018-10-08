@@ -13,6 +13,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/type/percent.pb.validate.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
@@ -70,6 +71,8 @@ public:
   bool featureEnabled(const std::string& key, uint64_t default_value) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value,
                       uint64_t random_value) const override;
+  bool featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value) const;
+  bool featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value, uint64_t random_value) const;
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string& key, uint64_t default_value) const override;
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
@@ -80,6 +83,42 @@ private:
   const std::vector<OverrideLayerConstPtr> layers_;
   std::unordered_map<std::string, const Snapshot::Entry> values_;
   RandomGenerator& generator_;
+};
+
+/**
+ *
+ */
+class EntryImpl : public Snapshot::Entry {
+public:
+  EntryImpl(const std::string& raw_string_value) :
+    raw_string_value_(raw_string_value) {}
+  std::string getRawStringValue() const {
+    return raw_string_value_;
+  }
+  absl::optional<uint64_t> getUintValue() const {
+    return uint_value_;
+  }
+  absl::optional<envoy::type::FractionalPercent> getFractionalPercentValue() const {
+    return fractional_percent_value_;
+  }
+  EntryType getEntryType() const {
+    return entry_type_;
+  }
+  void attemptParse() const {
+    if (parseUintValue()) {
+      return;
+    }
+    parseFractionalPercentValue();
+  }
+
+private:
+  bool parseUintValue();
+  bool parseFractionalPercentValue();
+
+  EntryType entry_type_;
+  std::string raw_string_value_;
+  absl::optional<uint64_t> uint_value_;
+  absl::optional<envoy::type::FractionalPercent> fractional_percent_value_;
 };
 
 /**

@@ -10,11 +10,13 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/type/percent.pb.validate.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "openssl/rand.h"
 
@@ -172,16 +174,24 @@ const std::string& SnapshotImpl::get(const std::string& key) const {
   if (entry == values_.end()) {
     return EMPTY_STRING;
   } else {
-    return entry->second.string_value_;
+    return entry->second.getRawStringValue();
   }
+}
+
+bool SnapshotImpl::featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value) const {
+
+}
+
+bool SnapshotImpl::featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value, uint64_t random_value) const {
+
 }
 
 uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value) const {
   auto entry = values_.find(key);
-  if (entry == values_.end() || !entry->second.uint_value_) {
+  if (entry == values_.end() || !entry->second.getUintValue()) {
     return default_value;
   } else {
-    return entry->second.uint_value_.value();
+    return entry->second.getUintValue().value();
   }
 }
 
@@ -202,14 +212,43 @@ SnapshotImpl::SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
 }
 
 Snapshot::Entry SnapshotImpl::createEntry(const std::string& value) {
-  Entry entry{value, absl::nullopt};
-  // As a perf optimization, attempt to convert the entry's string into an integer. If we don't
-  // succeed that's fine.
-  uint64_t converted;
-  if (StringUtil::atoul(entry.string_value_.c_str(), converted)) {
-    entry.uint_value_ = converted;
-  }
+  Entry entry(value);
+
+  // As a perf optimization, attempt to parse the entry's string and store it inside the struct. If
+  // we don't succeed that's fine.
+  entry.attemptParse();
+
+
   return entry;
+}
+
+bool SnapshotImpl::EntryImpl::parseUintValue() {
+  // TODO (tonya11en): Use C++17 if-statements with initializers to limit scope of variables.
+  uint64_t converted_uint64;
+  if (StringUtil::atoul(entry.getRawStringValue().c_str(), converted_uint64)) {
+    entry_type_ = Entry::EntryType::UINT_VALUE;
+    uint_value_ = converted_uint64;
+    return true;
+  }
+  return false;
+}
+
+bool SnapshotImpl::EntryImpl::parseFractionalPercentValue() {
+  envoy::type::FractionalPercent converted_fractional_percent;
+  try {
+    MessageUtil::loadFromYamlAndValidate(raw_string_value_, converted_fractional_percent);
+  } catch (const ProtoValidationException& ex) {
+    ENVOY_LOG(error, "unable to validate proto: {}", ex.what());
+    return false;
+  } catch (const EnvoyException& ex) {
+    // An EnvoyException is thrown when we try to parse a bogus string as a protobuf. This is fine,
+    // since there was no expectation that the raw string was a valid proto.
+    return false;
+  }
+
+  fractional_percent_value_ = converted_fractional_percent;
+  entry_type_ = Entry::EntryType::FRACTIONAL_PERCENT_VALUE;
+  return true;
 }
 
 void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>& values) {
