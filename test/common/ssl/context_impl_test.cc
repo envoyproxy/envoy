@@ -16,6 +16,7 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "openssl/x509v3.h"
 
 using testing::NiceMock;
 using testing::ReturnRef;
@@ -44,7 +45,7 @@ TEST_F(SslContextImplTest, TestGetSubjectAlternateNamesWithDNS) {
   EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
   EXPECT_NE(cert, nullptr);
-  const std::vector<std::string>& subject_alt_names = Utility::getDnsSubjectAltNames(*cert);
+  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
   EXPECT_EQ(1, subject_alt_names.size());
   X509_free(cert);
   fclose(fp);
@@ -57,7 +58,7 @@ TEST_F(SslContextImplTest, TestMultipleGetSubjectAlternateNamesWithDNS) {
   EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
   EXPECT_NE(cert, nullptr);
-  const std::vector<std::string>& subject_alt_names = Utility::getDnsSubjectAltNames(*cert);
+  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
   EXPECT_EQ(2, subject_alt_names.size());
   X509_free(cert);
   fclose(fp);
@@ -69,7 +70,7 @@ TEST_F(SslContextImplTest, TestGetSubjectAlternateNamesWithUri) {
   EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
   EXPECT_NE(cert, nullptr);
-  const std::vector<std::string>& subject_alt_names = Utility::getUriSubjectAltNames(*cert);
+  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_URI);
   EXPECT_EQ(1, subject_alt_names.size());
   X509_free(cert);
   fclose(fp);
@@ -81,9 +82,11 @@ TEST_F(SslContextImplTest, TestGetSubjectAlternateNamesWithNoSAN) {
   EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
   EXPECT_NE(cert, nullptr);
-  const std::vector<std::string>& dns_subject_alt_names = Utility::getDnsSubjectAltNames(*cert);
+  const std::vector<std::string>& dns_subject_alt_names =
+      Utility::getSubjectAltNames(*cert, GEN_DNS);
   EXPECT_EQ(0, dns_subject_alt_names.size());
-  const std::vector<std::string>& uri_subject_alt_names = Utility::getUriSubjectAltNames(*cert);
+  const std::vector<std::string>& uri_subject_alt_names =
+      Utility::getSubjectAltNames(*cert, GEN_URI);
   EXPECT_EQ(0, uri_subject_alt_names.size());
   X509_free(cert);
   fclose(fp);

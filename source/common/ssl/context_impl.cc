@@ -479,12 +479,12 @@ CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::str
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
   certificate_details->set_days_until_expiration(getDaysUntilExpiration(cert));
 
-  for (auto& dns_san : Utility::getDnsSubjectAltNames(*cert)) {
+  for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
     envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
         *certificate_details->add_subject_alt_names();
     subject_alt_name.set_dns(dns_san);
   }
-  for (auto& uri_san : Utility::getUriSubjectAltNames(*cert)) {
+  for (auto& uri_san : Utility::getSubjectAltNames(*cert, GEN_URI)) {
     envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
         *certificate_details->add_subject_alt_names();
     subject_alt_name.set_uri(uri_san);

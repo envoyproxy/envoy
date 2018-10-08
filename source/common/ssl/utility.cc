@@ -21,7 +21,7 @@ std::string Utility::getSerialNumberFromCertificate(X509& cert) {
   return "";
 }
 
-std::vector<std::string> Utility::getDnsSubjectAltNames(X509& cert) {
+std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type) {
   std::vector<std::string> subject_alt_names;
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(&cert, NID_subject_alt_name, nullptr, nullptr)));
@@ -29,27 +29,10 @@ std::vector<std::string> Utility::getDnsSubjectAltNames(X509& cert) {
     return subject_alt_names;
   }
   for (const GENERAL_NAME* san : san_names.get()) {
-    if (san->type == GEN_DNS) {
+    if (san->type == type) {
       ASN1_STRING* str = san->d.dNSName;
       const char* dns_name = reinterpret_cast<const char*>(ASN1_STRING_data(str));
       subject_alt_names.push_back(std::string(dns_name));
-    }
-  }
-  return subject_alt_names;
-}
-
-std::vector<std::string> Utility::getUriSubjectAltNames(X509& cert) {
-  std::vector<std::string> subject_alt_names;
-  bssl::UniquePtr<GENERAL_NAMES> san_names(
-      static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(&cert, NID_subject_alt_name, nullptr, nullptr)));
-  if (san_names == nullptr) {
-    return subject_alt_names;
-  }
-  for (const GENERAL_NAME* san : san_names.get()) {
-    if (san->type == GEN_URI) {
-      ASN1_STRING* str = san->d.uniformResourceIdentifier;
-      const char* uri = reinterpret_cast<const char*>(ASN1_STRING_data(str));
-      subject_alt_names.push_back(std::string(uri));
     }
   }
   return subject_alt_names;
