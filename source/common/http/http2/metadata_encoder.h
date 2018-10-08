@@ -18,7 +18,7 @@ namespace Http2 {
 class MetadataEncoder : Logger::Loggable<Logger::Id::http2> {
 public:
   MetadataEncoder(uint64_t stream_id) : stream_id_(stream_id) {
-    ENVOY_LOG(debug, "Created MetadataEncoder for stream id: {}", stream_id);
+    ENVOY_LOG(debug, "Created MetadataEncoder for stream id: {}", stream_id_);
   }
 
   /**
