@@ -119,6 +119,7 @@ public:
    * NOTE: Cached clusterInfo and route will be updated the same time.
    */
   virtual Upstream::ClusterInfoConstSharedPtr clusterInfo() PURE;
+
   /**
    * Clears the route cache for the current request. This must be called when a filter has modified
    * the headers in a way that would affect routing.
