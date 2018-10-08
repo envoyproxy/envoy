@@ -13,7 +13,7 @@ namespace Router {
 // TODO(htuch): figure out how to generate via a genrule from config_impl_test the full corpus.
 DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
   try {
-    NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
     NiceMock<Server::Configuration::MockFactoryContext> factory_context;
     MessageUtil::validate(input.config());
     ConfigImpl config(input.config(), factory_context, true);
@@ -31,7 +31,7 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
     }
     auto route = config.route(headers, input.random_value());
     if (route != nullptr && route->routeEntry() != nullptr) {
-      route->routeEntry()->finalizeRequestHeaders(headers, request_info, true);
+      route->routeEntry()->finalizeRequestHeaders(headers, stream_info, true);
     }
     ENVOY_LOG_MISC(trace, "Success");
   } catch (const EnvoyException& e) {

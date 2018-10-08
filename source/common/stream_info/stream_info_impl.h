@@ -4,20 +4,20 @@
 #include <cstdint>
 
 #include "envoy/common/time.h"
-#include "envoy/request_info/request_info.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
-#include "common/request_info/filter_state_impl.h"
+#include "common/stream_info/filter_state_impl.h"
 
 namespace Envoy {
-namespace RequestInfo {
+namespace StreamInfo {
 
-struct RequestInfoImpl : public RequestInfo {
-  explicit RequestInfoImpl(TimeSource& time_source)
+struct StreamInfoImpl : public StreamInfo {
+  explicit StreamInfoImpl(TimeSource& time_source)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()) {}
 
-  RequestInfoImpl(Http::Protocol protocol, TimeSource& time_source) : RequestInfoImpl(time_source) {
+  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source) : StreamInfoImpl(time_source) {
     protocol_ = protocol;
   }
 
@@ -222,5 +222,5 @@ private:
   std::string requested_server_name_;
 };
 
-} // namespace RequestInfo
+} // namespace StreamInfo
 } // namespace Envoy

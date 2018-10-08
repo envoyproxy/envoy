@@ -1,4 +1,4 @@
-#include "test/mocks/request_info/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 
 #include "common/network/address_impl.h"
 
@@ -12,9 +12,9 @@ using testing::ReturnPointee;
 using testing::ReturnRef;
 
 namespace Envoy {
-namespace RequestInfo {
+namespace StreamInfo {
 
-MockRequestInfo::MockRequestInfo()
+MockStreamInfo::MockStreamInfo()
     : downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
       downstream_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")) {
   ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));
@@ -72,7 +72,7 @@ MockRequestInfo::MockRequestInfo()
   ON_CALL(*this, requestedServerName()).WillByDefault(ReturnRef(requested_server_name_));
 }
 
-MockRequestInfo::~MockRequestInfo() {}
+MockStreamInfo::~MockStreamInfo() {}
 
-} // namespace RequestInfo
+} // namespace StreamInfo
 } // namespace Envoy

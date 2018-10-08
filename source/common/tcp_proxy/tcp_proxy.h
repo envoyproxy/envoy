@@ -11,12 +11,12 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/request_info/filter_state.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -25,7 +25,7 @@
 #include "common/network/cidr_range.h"
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
-#include "common/request_info/request_info_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
@@ -158,7 +158,7 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
 /**
  * Per-connection TCP Proxy Cluster configuration.
  */
-class PerConnectionCluster : public RequestInfo::FilterState::Object {
+class PerConnectionCluster : public StreamInfo::FilterState::Object {
 public:
   PerConnectionCluster(absl::string_view cluster) : cluster_(cluster) {}
   const std::string& value() const { return cluster_; }
@@ -264,7 +264,7 @@ protected:
 
   virtual void onConnectionSuccess() {}
 
-  virtual RequestInfo::RequestInfo& getRequestInfo() { return request_info_; }
+  virtual StreamInfo::StreamInfo& getStreamInfo() { return stream_info_; }
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
   Network::FilterStatus initializeUpstreamConnection();
@@ -285,7 +285,7 @@ protected:
   Event::TimerPtr idle_timer_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
-  RequestInfo::RequestInfoImpl request_info_;
+  StreamInfo::StreamInfoImpl stream_info_;
   uint32_t connect_attempts_{};
   bool connecting_{};
 };

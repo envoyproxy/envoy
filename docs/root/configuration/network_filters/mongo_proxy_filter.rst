@@ -150,7 +150,7 @@ mongo.mongo.drain_close_enabled
 mongo.fault.fixed_delay.percent
   Probability of an eligible MongoDB operation to be affected by
   the injected fault when there is no active fault.
-  Defaults to the *percent* specified in the config.
+  Defaults to the *percentage* specified in the config.
 
 mongo.fault.fixed_delay.duration_ms
   The delay duration in milliseconds. Defaults to the *duration_ms* specified in the config.

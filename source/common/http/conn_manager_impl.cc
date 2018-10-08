@@ -372,7 +372,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       stream_id_(connection_manager.random_generator_.random()),
       request_timer_(new Stats::Timespan(connection_manager_.stats_.named_.downstream_rq_time_,
                                          connection_manager_.timeSystem())),
-      request_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSystem()) {
+      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSystem()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
   if (connection_manager_.codec_->protocol() == Protocol::Http2) {
@@ -380,13 +380,13 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   } else {
     connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   }
-  request_info_.setDownstreamLocalAddress(
+  stream_info_.setDownstreamLocalAddress(
       connection_manager_.read_callbacks_->connection().localAddress());
   // Initially, the downstream remote address is the source address of the
   // downstream connection. That can change later in the request's lifecycle,
   // based on XFF processing, but setting the downstream remote address here
   // prevents surprises for logging code in edge cases.
-  request_info_.setDownstreamRemoteAddress(
+  stream_info_.setDownstreamRemoteAddress(
       connection_manager_.read_callbacks_->connection().remoteAddress());
 
   if (connection_manager_.config_.streamIdleTimeout().count()) {
@@ -395,29 +395,29 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
         [this]() -> void { onIdleTimeout(); });
     resetIdleTimer();
   }
-  request_info_.setRequestedServerName(
+  stream_info_.setRequestedServerName(
       connection_manager_.read_callbacks_->connection().requestedServerName());
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
-  request_info_.onRequestComplete();
+  stream_info_.onRequestComplete();
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
     access_log->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
-                    request_info_);
+                    stream_info_);
   }
   for (const auto& log_handler : access_log_handlers_) {
     log_handler->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
-                     request_info_);
+                     stream_info_);
   }
 
-  if (request_info_.healthCheck()) {
+  if (stream_info_.healthCheck()) {
     connection_manager_.config_.tracingStats().health_check_.inc();
   }
 
   if (active_span_) {
-    Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_headers_.get(), request_info_,
+    Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_headers_.get(), stream_info_,
                                              *this);
   }
 
@@ -468,9 +468,9 @@ void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) {
   uint64_t response_code = Utility::getResponseStatus(headers);
-  request_info_.response_code_ = response_code;
+  stream_info_.response_code_ = response_code;
 
-  if (request_info_.hc_request_) {
+  if (stream_info_.hc_request_) {
     return;
   }
 
@@ -541,7 +541,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     // HTTP/1.1.
     //
     // The protocol may have shifted in the HTTP/1.0 case so reset it.
-    request_info_.protocol(protocol);
+    stream_info_.protocol(protocol);
     if (!connection_manager_.config_.http1Settings().accept_http_10_) {
       // Send "Upgrade Required" if HTTP/1.0 support is not explicitly configured on.
       sendLocalReply(false, Code::UpgradeRequired, "", nullptr, is_head_request_);
@@ -606,11 +606,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   // Modify the downstream remote address depending on configuration and headers.
-  request_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
+  stream_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
       *request_headers_, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
       connection_manager_.runtime_, connection_manager_.local_info_));
-  ASSERT(request_info_.downstreamRemoteAddress() != nullptr);
+  ASSERT(stream_info_.downstreamRemoteAddress() != nullptr);
 
   ASSERT(!cached_route_);
   refreshCachedRoute();
@@ -628,7 +628,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
 
       connection_manager_.ws_connection_ = route_entry->createWebSocketProxy(
-          *request_headers_, request_info_, *this, connection_manager_.cluster_manager_,
+          *request_headers_, stream_info_, *this, connection_manager_.cluster_manager_,
           connection_manager_.read_callbacks_);
       ASSERT(connection_manager_.ws_connection_ != nullptr);
       connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
@@ -677,11 +677,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
 void ConnectionManagerImpl::ActiveStream::traceRequest() {
   Tracing::Decision tracing_decision =
-      Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
+      Tracing::HttpTracerUtility::isTracing(stream_info_, *request_headers_);
   ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
                                             connection_manager_.config_.tracingStats());
 
-  active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_,
+  active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, stream_info_,
                                                        tracing_decision);
 
   if (!active_span_) {
@@ -774,7 +774,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
 
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
   maybeEndDecode(end_stream);
-  request_info_.addBytesReceived(data.length());
+  stream_info_.addBytesReceived(data.length());
 
   // If the initial websocket upgrade request had an HTTP body
   // let's send this up
@@ -916,7 +916,7 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
   ASSERT(!state_.remote_complete_);
   state_.remote_complete_ = end_stream;
   if (end_stream) {
-    request_info_.onLastDownstreamRxByteReceived();
+    stream_info_.onLastDownstreamRxByteReceived();
     ENVOY_STREAM_LOG(debug, "request end stream", *this);
   }
 }
@@ -949,7 +949,7 @@ void ConnectionManagerImpl::startDrainSequence() {
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   Router::RouteConstSharedPtr route = snapped_route_config_->route(*request_headers_, stream_id_);
-  request_info_.route_entry_ = route ? route->routeEntry() : nullptr;
+  stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
   cached_route_ = std::move(route);
 }
 
@@ -1121,7 +1121,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
                    end_stream && continue_data_entry == encoder_filters_.end(), headers);
 
   // Now actually encode via the codec.
-  request_info_.onFirstDownstreamTxByteSent();
+  stream_info_.onFirstDownstreamTxByteSent();
   response_encoder_->encodeHeaders(headers,
                                    end_stream && continue_data_entry == encoder_filters_.end());
 
@@ -1207,7 +1207,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
   ENVOY_STREAM_LOG(trace, "encoding data via codec (size={} end_stream={})", *this, data.length(),
                    end_stream);
 
-  request_info_.addBytesSent(data.length());
+  stream_info_.addBytesSent(data.length());
 
   // If trailers were adding during encodeData we need to trigger decodeTrailers in order
   // to allow filters to process the trailers.
@@ -1244,7 +1244,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
 
 void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
   if (end_stream) {
-    request_info_.onLastDownstreamTxByteSent();
+    stream_info_.onLastDownstreamTxByteSent();
     request_timer_->complete();
     connection_manager_.doEndStream(*this);
   }
@@ -1463,8 +1463,8 @@ Event::Dispatcher& ConnectionManagerImpl::ActiveStreamFilterBase::dispatcher() {
   return parent_.connection_manager_.read_callbacks_->connection().dispatcher();
 }
 
-RequestInfo::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestInfo() {
-  return parent_.request_info_;
+StreamInfo::StreamInfo& ConnectionManagerImpl::ActiveStreamFilterBase::streamInfo() {
+  return parent_.stream_info_;
 }
 
 Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {

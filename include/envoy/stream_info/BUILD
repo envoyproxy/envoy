@@ -9,8 +9,8 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "request_info_interface",
-    hdrs = ["request_info.h"],
+    name = "stream_info_interface",
+    hdrs = ["stream_info.h"],
     external_deps = ["abseil_optional"],
     deps = [
         ":filter_state_interface",

@@ -412,3 +412,13 @@ bazel build --explain=file.txt --verbose_explanations //source/...
 
 Sometimes it's useful to see real system paths in bazel error message output (vs. symbolic links).
 `tools/path_fix.sh` is provided to help with this. See the comments in that file.
+
+# Compilation database
+
+Run `tools/gen_compilation_database.py` to generate
+a [JSON Compilation Database](https://clang.llvm.org/docs/JSONCompilationDatabase.html). This could be used
+with any tools (e.g. clang-tidy) compatible with the format.
+
+The compilation database could also be used to setup editors with cross reference, code completion.
+For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or 
+[cquery](https://github.com/cquery-project/cquery) with supported editors.

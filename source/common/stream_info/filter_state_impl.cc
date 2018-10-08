@@ -1,9 +1,9 @@
-#include "common/request_info/filter_state_impl.h"
+#include "common/stream_info/filter_state_impl.h"
 
 #include "envoy/common/exception.h"
 
 namespace Envoy {
-namespace RequestInfo {
+namespace StreamInfo {
 
 void FilterStateImpl::setData(absl::string_view data_name, std::unique_ptr<Object>&& data) {
   // TODO(Google): Remove string conversion when fixed internally.
@@ -31,5 +31,5 @@ const FilterState::Object* FilterStateImpl::getDataGeneric(absl::string_view dat
   return it->second.get();
 }
 
-} // namespace RequestInfo
+} // namespace StreamInfo
 } // namespace Envoy
