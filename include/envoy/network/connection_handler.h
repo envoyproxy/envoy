@@ -59,13 +59,13 @@ public:
 
   /**
    * Disable all listeners. This will not close any connections and is used to temporarily
-   * stop accepting connections on this listener.
+   * stop accepting connections on all listeners.
    */
   virtual void disableListeners() PURE;
 
   /**
-   * Enable all listeners. This is used to re-enable accepting connections on this listener
-   * after it has been temporarily disabled.
+   * Enable all listeners. This is used to re-enable accepting connections on all listeners
+   * after they have been temporarily disabled.
    */
   virtual void enableListeners() PURE;
 };
