@@ -3,6 +3,8 @@ Version history
 
 1.9.0 (pending)
 ===============
+* router: added ability to set attempt count in upstream requests, see :ref:`virtual host's include request
+  attempt count flag <envoy_api_field_route.VirtualHost.include_request_attempt_count>`.
 * stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
 * fault: removed integer percentage support.
 * router: when :ref:`max_grpc_timeout <envoy_api_field_route.RouteAction.max_grpc_timeout>`

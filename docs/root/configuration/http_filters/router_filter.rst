@@ -226,6 +226,16 @@ ingress/response path. They are documented in this section.
 .. contents::
   :local:
 
+.. _config_http_filters_router_x-envoy-attempt-count:
+
+x-envoy-attempt-count
+^^^^^^^^^^^^^^^^^^^^^
+
+Sent to the upstream to indicate which attempt the current request is in a series of retries. The value
+will be "1" on the initial request, incremeting by one for each retry. Only set if the
+:ref:`include_attempt_count_header <envoy_api_field_route.VirtualHost.include_request_attempt_count>`
+flag is set to true.
+
 .. _config_http_filters_router_x-envoy-expected-rq-timeout-ms:
 
 x-envoy-expected-rq-timeout-ms
