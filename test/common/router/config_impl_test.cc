@@ -2199,6 +2199,26 @@ TEST(RouteMatcherTest, ClusterNotFoundNotCheckingViaConfig) {
   TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true);
 }
 
+TEST(RouteMatcherTest, AttemptCountHeader) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    include_request_attempt_count: true
+    routes:
+      - match: { prefix: "/"}
+        route:
+          cluster: "whatever"
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+
+  EXPECT_TRUE(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->includeAttemptCount());
+}
+
 TEST(RouteMatchTest, ClusterNotFoundResponseCode) {
   std::string yaml = R"EOF(
 virtual_hosts:
