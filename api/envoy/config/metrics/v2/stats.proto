@@ -85,7 +85,8 @@ message StatsMatcher {
   //
   //
   // A StringMatcher can be used to match against an exact string, a suffix / prefix, or a regex.
-  // For performance reasons, it is recommended to use a prefix or suffix rather than a regex.
+  // **NB:** For performance reasons, it is highly recommended to use a prefix- or suffix-based
+  // matcher rather than a regex-based matcher.
   //
   // Example 1. Excluding all stats.
   //

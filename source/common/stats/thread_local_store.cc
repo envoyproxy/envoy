@@ -235,6 +235,8 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // Determine the final name based on the prefix and the passed name.
   std::string final_name = prefix_ + name;
 
+  // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the hot path) could
+  // become prohibitively expensive. Revisit this usage in the future.
   if (parent_.stats_matcher_->rejects(final_name)) {
     return null_counter_;
   }
@@ -278,6 +280,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
 
+  // See warning/comments in counter().
   if (parent_.stats_matcher_->rejects(final_name)) {
     return null_gauge_;
   }
@@ -301,6 +304,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
 
+  // See warning/comments in counter().
   if (parent_.stats_matcher_->rejects(final_name)) {
     return null_histogram_;
   }
