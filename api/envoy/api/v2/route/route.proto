@@ -116,7 +116,8 @@ message VirtualHost {
   // value, so in the case of two Envoys on the request path with this option enabled, the upstream
   // will see the attempt count as perceived by the second Envoy. Defaults to false.
   // This header is unaffected by the
-  // :ref:`envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers` flag.
+  // :ref:`suppress_envoy_headers
+  // <envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers>` flag.
   bool include_request_attempt_count = 14;
 }
 
