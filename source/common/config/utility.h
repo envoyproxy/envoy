@@ -10,6 +10,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/stats_options.h"
 #include "envoy/stats/tag_producer.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -301,6 +302,12 @@ public:
    */
   static Stats::TagProducerPtr
   createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
+
+  /**
+   * Create StatsMatcher instance.
+   */
+  static Stats::StatsMatcherPtr
+  createStatsMatcher(const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
 
   /**
    * Check user supplied name in RDS/CDS/LDS for sanity.

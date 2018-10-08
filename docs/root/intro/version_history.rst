@@ -3,6 +3,7 @@ Version history
 
 1.9.0 (pending)
 ===============
+* stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
 * fault: removed integer percentage support.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
