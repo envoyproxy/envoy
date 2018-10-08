@@ -38,6 +38,7 @@ public:
   void waitForHeaders();
   void waitForBodyData(uint64_t size);
   void waitForEndStream();
+  bool waitForEndStreamWithTimeout(const std::chrono::milliseconds& timeout);
   void waitForReset();
 
   // Http::StreamDecoder

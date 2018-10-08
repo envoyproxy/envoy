@@ -31,6 +31,11 @@ protected:
               - name: "envoy.resource_monitors.injected_resource"
                 threshold:
                   value: 0.8
+          - name: "envoy.overload_actions.stop_accepting_connections"
+            triggers:
+              - name: "envoy.resource_monitors.injected_resource"
+                threshold:
+                  value: 0.95
       )EOF",
                                                       injected_resource_filename_);
       *bootstrap.mutable_overload_manager() =
@@ -116,6 +121,36 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_EQ(nullptr, response->headers().Connection());
+}
+
+TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  // Put envoy in overloaded state and check that it doesn't accept the new client connection.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
+                               1);
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto response = codec_client_->makeRequestWithBody(request_headers, 10);
+  EXPECT_FALSE(response->waitForEndStreamWithTimeout(std::chrono::milliseconds(2000)));
+
+  // Reduce load to deactivate the "stop accepting connections" action. Check that new connections
+  // are accepted.
+  updateResource(0.7);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
+                               0);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(10U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ(0U, response->body().size());
 }
 
 } // namespace Envoy

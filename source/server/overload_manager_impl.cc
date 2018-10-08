@@ -128,10 +128,6 @@ OverloadManagerImpl::OverloadManagerImpl(
       resource_to_actions_.insert(std::make_pair(resource, name));
     }
   }
-
-  tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalOverloadState>();
-  });
 }
 
 void OverloadManagerImpl::start() {
@@ -140,6 +136,11 @@ void OverloadManagerImpl::start() {
   if (resources_.empty()) {
     return;
   }
+
+  tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalOverloadState>();
+  });
+
   timer_ = dispatcher_.createTimer([this]() -> void {
     for (auto& resource : resources_) {
       resource.second.update();
