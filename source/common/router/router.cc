@@ -111,6 +111,15 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
     request_headers.insertEnvoyExpectedRequestTimeoutMs().value(expected_timeout);
   }
 
+  // If we've configured max_grpc_timeout, override the grpc-timeout header with
+  // the expected timeout. This ensures that the optional per try timeout is reflected
+  // in grpc-timeout, ensuring that the upstream gRPC server is aware of the actual timeout.
+  // If the expected timeout is 0 set no timeout, as Envoy treats 0 as infinite timeout.
+  if (grpc_request && route.maxGrpcTimeout() && expected_timeout != 0) {
+    Grpc::Common::toGrpcTimeout(std::chrono::milliseconds(expected_timeout),
+                                request_headers.insertGrpcTimeout().value());
+  }
+
   return timeout;
 }
 
