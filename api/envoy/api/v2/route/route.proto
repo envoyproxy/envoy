@@ -112,7 +112,9 @@ message VirtualHost {
 
   // Decides whether the :ref:`x-envoy-attempt-count
   // <config_http_filters_router_x-envoy-attempt-count>` header should be included
-  // in the upstream request. Defaults to false.
+  // in the upstream request. Setting this option will cause it to override any existing header
+  // value, so in the case of two Envoys on the request path with this option enabled, the upstream
+  // will see the attempt count as percieved by the second Envoy. Defaults to false.
   bool include_request_attempt_count = 14;
 }
 
