@@ -68,3 +68,18 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "utility_test",
+    srcs = [
+        "utility_test.cc",
+    ],
+    data = [
+        "gen_unittest_certs.sh",
+        "//test/common/ssl/test_data:certs",
+    ],
+    deps = [
+        "//source/common/ssl:utility_lib",
+        "//test/test_common:environment_lib",
+    ],
+)

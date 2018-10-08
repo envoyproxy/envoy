@@ -39,59 +39,6 @@ TEST_F(SslContextImplTest, TestdNSNameMatching) {
   EXPECT_FALSE(ContextImpl::dNSNameMatch("lyft.com", ""));
 }
 
-TEST_F(SslContextImplTest, TestGetSubjectAlternateNamesWithDNS) {
-  FILE* fp = fopen(
-      TestEnvironment::runfilesPath("test/common/ssl/test_data/san_dns_cert.pem").c_str(), "r");
-  EXPECT_NE(fp, nullptr);
-  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
-  EXPECT_NE(cert, nullptr);
-  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
-  EXPECT_EQ(1, subject_alt_names.size());
-  X509_free(cert);
-  fclose(fp);
-}
-
-TEST_F(SslContextImplTest, TestMultipleGetSubjectAlternateNamesWithDNS) {
-  FILE* fp = fopen(
-      TestEnvironment::runfilesPath("test/common/ssl/test_data/san_multiple_dns_cert.pem").c_str(),
-      "r");
-  EXPECT_NE(fp, nullptr);
-  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
-  EXPECT_NE(cert, nullptr);
-  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
-  EXPECT_EQ(2, subject_alt_names.size());
-  X509_free(cert);
-  fclose(fp);
-}
-
-TEST_F(SslContextImplTest, TestGetSubjectAlternateNamesWithUri) {
-  FILE* fp = fopen(
-      TestEnvironment::runfilesPath("test/common/ssl/test_data/san_uri_cert.pem").c_str(), "r");
-  EXPECT_NE(fp, nullptr);
-  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
-  EXPECT_NE(cert, nullptr);
-  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_URI);
-  EXPECT_EQ(1, subject_alt_names.size());
-  X509_free(cert);
-  fclose(fp);
-}
-
-TEST_F(SslContextImplTest, TestGetSubjectAlternateNamesWithNoSAN) {
-  FILE* fp = fopen(
-      TestEnvironment::runfilesPath("test/common/ssl/test_data/no_san_cert.pem").c_str(), "r");
-  EXPECT_NE(fp, nullptr);
-  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
-  EXPECT_NE(cert, nullptr);
-  const std::vector<std::string>& dns_subject_alt_names =
-      Utility::getSubjectAltNames(*cert, GEN_DNS);
-  EXPECT_EQ(0, dns_subject_alt_names.size());
-  const std::vector<std::string>& uri_subject_alt_names =
-      Utility::getSubjectAltNames(*cert, GEN_URI);
-  EXPECT_EQ(0, uri_subject_alt_names.size());
-  X509_free(cert);
-  fclose(fp);
-}
-
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
   FILE* fp = fopen(
       TestEnvironment::runfilesPath("test/common/ssl/test_data/san_dns_cert.pem").c_str(), "r");
