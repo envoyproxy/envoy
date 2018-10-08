@@ -188,6 +188,10 @@ public:
    */
   virtual uint32_t hostSelectionMaxAttempts() const PURE;
 
+  /**
+   * List of status codes that should trigger a retry when the retriable-status-codes retry
+   * policy is enabled.
+   */
   virtual const std::vector<uint32_t>& retriableStatusCodes() const PURE;
 };
 

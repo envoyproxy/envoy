@@ -35,7 +35,7 @@ public:
   static uint32_t parseRetryGrpcOn(absl::string_view retry_grpc_on_header);
 
   // Router::RetryState
-  bool enabled() override { return retry_on_ != 0 || !retriable_status_codes_.empty(); }
+  bool enabled() override { return retry_on_ != 0; }
   RetryStatus shouldRetry(const Http::HeaderMap* response_headers,
                           const absl::optional<Http::StreamResetReason>& reset_reason,
                           DoRetryCallback callback) override;
