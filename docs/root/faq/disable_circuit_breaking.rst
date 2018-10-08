@@ -6,8 +6,8 @@ for each kind of circuit breaking. Currently, there isn't a switch to turn
 circuit breaking off completely; however, you could achieve a similar behavior
 by setting these thresholds very high, for example, to `std::numeric_limits<uint32_t>::max()`.
 
-Following is a sample configuration that tries to effectively disable circuit
-breaking by setting the thresholds to a value of `1000000000`.
+Following is a sample configuration that tries to effectively disable all kinds
+of circuit breaking by setting the thresholds to a value of `1000000000`.
 
 .. code-block:: yaml
 
