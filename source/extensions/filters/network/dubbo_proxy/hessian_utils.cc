@@ -17,7 +17,8 @@ namespace {
 template <typename T>
 typename std::enable_if<std::is_signed<T>::value, T>::type leftShift(T left, uint16_t bit_number) {
   if (left < 0) {
-    left = -left return -1 * (left << bit_number);
+    left = -left;
+    return -1 * (left << bit_number);
   }
 
   return left << bit_number;
@@ -25,9 +26,13 @@ typename std::enable_if<std::is_signed<T>::value, T>::type leftShift(T left, uin
 
 } // namespace
 
+/*
+ * Reference:
+ * https://cs.chromium.org/chromium/src/base/strings/string_util.h?q=WriteInto&sq=package:chromium&dr=CSs&l=426
+ */
 char* allocStringBuffer(std::string* str, size_t length) {
   str->reserve(length);
-  str->resize(length);
+  str->resize(length - 1);
   return &((*str)[0]);
 }
 
@@ -73,7 +78,7 @@ std::string HessianUtils::peekString(Buffer::Instance& buffer, size_t* size, uin
     if (delta_length + 1 + offset > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
-    buffer.copyOut(offset + 1, delta_length, allocStringBuffer(&result, delta_length));
+    buffer.copyOut(offset + 1, delta_length, allocStringBuffer(&result, delta_length + 1));
     *size = delta_length + 1;
     return result;
 
@@ -90,7 +95,7 @@ std::string HessianUtils::peekString(Buffer::Instance& buffer, size_t* size, uin
       throw EnvoyException("buffer underflow");
     }
 
-    buffer.copyOut(offset + 2, delta_length, allocStringBuffer(&result, delta_length));
+    buffer.copyOut(offset + 2, delta_length, allocStringBuffer(&result, delta_length + 1));
     *size = delta_length + 2;
     return result;
 
@@ -105,7 +110,7 @@ std::string HessianUtils::peekString(Buffer::Instance& buffer, size_t* size, uin
       throw EnvoyException("buffer underflow");
     }
 
-    buffer.copyOut(offset + 3, delta_length, allocStringBuffer(&result, delta_length));
+    buffer.copyOut(offset + 3, delta_length, allocStringBuffer(&result, delta_length + 1));
     *size = delta_length + 3;
     return result;
 
@@ -115,7 +120,7 @@ std::string HessianUtils::peekString(Buffer::Instance& buffer, size_t* size, uin
     }
 
     delta_length = buffer.peekBEInt<uint16_t>(offset + 1);
-    buffer.copyOut(offset + 3, delta_length, allocStringBuffer(&result, delta_length));
+    buffer.copyOut(offset + 3, delta_length, allocStringBuffer(&result, delta_length + 1));
     size_t next_size = 0;
     result.append(peekString(buffer, &next_size, delta_length + 3 + offset));
     *size = next_size + delta_length + 3;
@@ -470,7 +475,7 @@ std::string HessianUtils::peekByte(Buffer::Instance& buffer, size_t* size, uint6
       throw EnvoyException("buffer underflow");
     }
 
-    buffer.copyOut(offset + 1, delta_length, allocStringBuffer(&result, delta_length));
+    buffer.copyOut(offset + 1, delta_length, allocStringBuffer(&result, delta_length + 1));
     *size = delta_length + 1;
     return result;
 
@@ -482,7 +487,7 @@ std::string HessianUtils::peekByte(Buffer::Instance& buffer, size_t* size, uint6
     if (delta_length + 2 + offset > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
-    buffer.copyOut(offset + 2, delta_length, allocStringBuffer(&result, delta_length));
+    buffer.copyOut(offset + 2, delta_length, allocStringBuffer(&result, delta_length + 1));
     *size = delta_length + 2;
     return result;
 
@@ -496,7 +501,7 @@ std::string HessianUtils::peekByte(Buffer::Instance& buffer, size_t* size, uint6
       throw EnvoyException("buffer underflow");
     }
 
-    buffer.copyOut(offset + 3, delta_length, allocStringBuffer(&result, delta_length));
+    buffer.copyOut(offset + 3, delta_length, allocStringBuffer(&result, delta_length + 1));
     *size = delta_length + 3;
     return result;
 
@@ -506,7 +511,7 @@ std::string HessianUtils::peekByte(Buffer::Instance& buffer, size_t* size, uint6
     }
 
     delta_length = buffer.peekBEInt<uint16_t>(offset + 1);
-    buffer.copyOut(offset + 3, delta_length, allocStringBuffer(&result, delta_length));
+    buffer.copyOut(offset + 3, delta_length, allocStringBuffer(&result, delta_length + 1));
     size_t next_size;
     result.append(peekByte(buffer, &next_size, delta_length + 3 + offset));
     *size = delta_length + 3 + next_size;
