@@ -46,6 +46,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "stats_matcher_test",
+    srcs = ["stats_matcher_test.cc"],
+    deps = [
+        "//source/common/stats:stats_matcher_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "tag_producer_test",
     srcs = ["tag_producer_test.cc"],
     deps = [
@@ -69,6 +78,7 @@ envoy_cc_test(
     name = "thread_local_store_test",
     srcs = ["thread_local_store_test.cc"],
     deps = [
+        "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:thread_local_store_lib",
         "//test/mocks/event:event_mocks",
@@ -77,5 +87,6 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/metrics/v2:stats_cc",
     ],
 )
