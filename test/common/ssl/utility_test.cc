@@ -12,40 +12,42 @@
 namespace Envoy {
 namespace Ssl {
 
-class UtilityTest : public testing::Test {
+// TODO(ramaraochavali): move this to separate file and use it for all tests in context_impl_test.
+namespace TestUtils {
+bssl::UniquePtr<X509> readCertFromFile(const std::string& path) {
+  FILE* fp = fopen(TestEnvironment::runfilesPath(path).c_str(), "r");
+  EXPECT_NE(fp, nullptr);
+  bssl::UniquePtr<X509> cert(PEM_read_X509(fp, nullptr, nullptr, nullptr));
+  EXPECT_NE(cert, nullptr);
+  fclose(fp);
+  return cert;
+}
+} // namespace TestUtils
 
-public:
-  bssl::UniquePtr<X509> readCertFromFile(const std::string& path) {
-    FILE* fp = fopen(TestEnvironment::runfilesPath(path).c_str(), "r");
-    EXPECT_NE(fp, nullptr);
-    bssl::UniquePtr<X509> cert(PEM_read_X509(fp, nullptr, nullptr, nullptr));
-    EXPECT_NE(cert, nullptr);
-    fclose(fp);
-    return cert;
-  }
-};
-
-TEST_F(UtilityTest, TestGetSubjectAlternateNamesWithDNS) {
-  bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
+TEST(UtilityTest, TestGetSubjectAlternateNamesWithDNS) {
+  bssl::UniquePtr<X509> cert =
+      TestUtils::readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
   const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
   EXPECT_EQ(1, subject_alt_names.size());
 }
 
-TEST_F(UtilityTest, TestMultipleGetSubjectAlternateNamesWithDNS) {
+TEST(UtilityTest, TestMultipleGetSubjectAlternateNamesWithDNS) {
   bssl::UniquePtr<X509> cert =
-      readCertFromFile("test/common/ssl/test_data/san_multiple_dns_cert.pem");
+      TestUtils::readCertFromFile("test/common/ssl/test_data/san_multiple_dns_cert.pem");
   const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
   EXPECT_EQ(2, subject_alt_names.size());
 }
 
-TEST_F(UtilityTest, TestGetSubjectAlternateNamesWithUri) {
-  bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_uri_cert.pem");
+TEST(UtilityTest, TestGetSubjectAlternateNamesWithUri) {
+  bssl::UniquePtr<X509> cert =
+      TestUtils::readCertFromFile("test/common/ssl/test_data/san_uri_cert.pem");
   const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_URI);
   EXPECT_EQ(1, subject_alt_names.size());
 }
 
-TEST_F(UtilityTest, TestGetSubjectAlternateNamesWithNoSAN) {
-  bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/no_san_cert.pem");
+TEST(UtilityTest, TestGetSubjectAlternateNamesWithNoSAN) {
+  bssl::UniquePtr<X509> cert =
+      TestUtils::readCertFromFile("test/common/ssl/test_data/no_san_cert.pem");
   const std::vector<std::string>& uri_subject_alt_names =
       Utility::getSubjectAltNames(*cert, GEN_URI);
   EXPECT_EQ(0, uri_subject_alt_names.size());
