@@ -1017,7 +1017,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
     const LoadBalancerFactorySharedPtr& lb_factory)
     : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
-      http_async_client_(*cluster, parent.parent_.stats_, parent.thread_local_dispatcher_,
+      http_async_client_(cluster, parent.parent_.stats_, parent.thread_local_dispatcher_,
                          parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
                          parent.parent_.random_,
                          Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)}) {
