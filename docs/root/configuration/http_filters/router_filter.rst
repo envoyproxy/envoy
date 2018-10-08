@@ -146,7 +146,7 @@ By default, Envoy will *not* perform retries unless you've configured them per a
 x-envoy-retriable-status-codes
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Setting this header informs Envoy about what status codes should be considered retriable when used in
-conjunction with the :ref:`retriable-status-code <config_http_filter_router_x-envoy-retry-on>` retry policy.
+conjunction with the :ref:`retriable-status-code <config_http_filters_router_x-envoy-retry-on>` retry policy.
 When the corresponding retry policy is set, the list of retriable status codes will be considered retriable
 in addition to the status codes enabled for retry through other retry policies. 
 
