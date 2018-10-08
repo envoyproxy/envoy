@@ -5,6 +5,7 @@ Version history
 ===============
 * stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
 * fault: removed integer percentage support.
+* router: added ability to configure arbitrary :ref:`retriable status codes. <envoy_api_field_route.RouteAction.RetryPolicy.retriable_status_codes>`
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
 
@@ -92,7 +93,6 @@ Version history
 * rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.
 * route checker: Added v2 config support and removed support for v1 configs.
 * router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
-* router: added ability to configure arbitrary :ref:`retriable status codes. <envoy_api_field_route.RouteAction.RetryPolicy.retriable_status_codes>`
 * stats: added :ref:`option to configure the DogStatsD metric name prefix<envoy_api_field_config.metrics.v2.DogStatsdSink.prefix>` to DogStatsdSink.
 * tcp_proxy: added support for :ref:`weighted clusters <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.weighted_clusters>`.
 * thrift_proxy: introduced thrift routing, moved configuration to correct location
