@@ -47,6 +47,8 @@ public:
    */
   class Entry {
   public:
+    virtual ~Entry() {}
+
     enum class EntryType {
       UINT_VALUE,
       FRACTIONAL_PERCENT_VALUE,
