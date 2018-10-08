@@ -66,22 +66,6 @@ void IntegrationStreamDecoder::waitForEndStream() {
   }
 }
 
-bool IntegrationStreamDecoder::waitForEndStreamWithTimeout(
-    const std::chrono::milliseconds& timeout) {
-  if (!saw_end_stream_) {
-    waiting_for_end_stream_ = true;
-    Event::TimerPtr timer = dispatcher_.createTimer([this] {
-      if (!saw_end_stream_) {
-        dispatcher_.exit();
-        waiting_for_end_stream_ = false;
-      }
-    });
-    timer->enableTimer(timeout);
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
-  }
-  return saw_end_stream_;
-}
-
 void IntegrationStreamDecoder::waitForReset() {
   if (!saw_reset_) {
     waiting_for_reset_ = true;

@@ -61,23 +61,13 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Put envoy in overloaded state and check that it drops new requests.
-  // Test with both header-only requests and header+body requests.
   updateResource(0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
 
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeRequestWithBody(request_headers, 10);
-  response->waitForEndStream();
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
-  EXPECT_EQ("envoy overloaded", response->body());
-  codec_client_->close();
-
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  response = codec_client_->makeHeaderOnlyRequest(request_headers);
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
@@ -145,7 +135,8 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   Http::TestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   auto response = codec_client_->makeRequestWithBody(request_headers, 10);
-  EXPECT_FALSE(response->waitForEndStreamWithTimeout(std::chrono::milliseconds(2000)));
+  EXPECT_FALSE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
+                                                         std::chrono::milliseconds(1000)));
 
   // Reduce load to deactivate the "stop accepting connections" action. Check that new connections
   // are accepted.
