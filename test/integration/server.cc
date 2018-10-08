@@ -118,7 +118,7 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic) {
-  Server::TestOptionsImpl options(config_path_, version);
+  std::unique_ptr<OptionsImpl> options(Server::createTestOptionsImpl(config_path_, "", version));
   Server::HotRestartNopImpl restarter;
   Thread::MutexBasicLockable lock;
 
@@ -134,7 +134,7 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
     random_generator = std::make_unique<Runtime::RandomGeneratorImpl>();
   }
   server_.reset(new Server::InstanceImpl(
-      options, time_system_, Network::Utility::getLocalAddress(version), *this, restarter,
+      *options, time_system_, Network::Utility::getLocalAddress(version), *this, restarter,
       stats_store, lock, *this, std::move(random_generator), tls));
   pending_listeners_ = server_->listenerManager().listeners().size();
   ENVOY_LOG(info, "waiting for {} test server listeners", pending_listeners_);
@@ -146,10 +146,6 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   server_->run();
   server_.reset();
   stat_store_ = nullptr;
-}
-
-Server::TestOptionsImpl Server::TestOptionsImpl::asConfigYaml() {
-  return TestOptionsImpl("", Filesystem::fileReadToEnd(config_path_), local_address_ip_version_);
 }
 
 } // namespace Envoy
