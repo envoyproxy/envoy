@@ -133,6 +133,8 @@ const char AdminHtmlEnd[] = R"(
 </body>
 )";
 
+const std::regex PromRegex("[^a-zA-Z0-9_]");
+
 void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_map) {
   header_map.insertStatus().value(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
@@ -594,10 +596,15 @@ Http::Code AdminImpl::handlerPrometheusStats(absl::string_view, Http::HeaderMap&
 }
 
 std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
-  std::string stats_name = name;
-  std::replace(stats_name.begin(), stats_name.end(), '.', '_');
-  std::replace(stats_name.begin(), stats_name.end(), '-', '_');
-  return stats_name;
+  // The name must match the regex [a-zA-Z_:][a-zA-Z0-9_:]* as required by
+  // prometheus. Of which the colon is reserved and should not be exported.
+  // Refer to https://prometheus.io/docs/concepts/data_model/.
+  std::string stats_name = std::regex_replace(name, PromRegex, "_");
+  if (stats_name[0] >= '0' && stats_name[0] <= '9') {
+    return fmt::format("_{}", stats_name);
+  } else {
+    return stats_name;
+  }
 }
 
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
