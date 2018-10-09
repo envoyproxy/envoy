@@ -137,6 +137,13 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   EXPECT_FALSE(loader->snapshot().featureEnabled("file8", fractional_percent)); // valid data
 
   EXPECT_CALL(generator, random()).WillOnce(Return(4));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(6));
+  EXPECT_FALSE(
+      loader->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(4));
   EXPECT_TRUE(loader->snapshot().featureEnabled("file1", fractional_percent)); // invalid data
 
   EXPECT_CALL(generator, random()).WillOnce(Return(6));

@@ -179,12 +179,12 @@ const std::string& SnapshotImpl::get(const std::string& key) const {
 }
 
 bool SnapshotImpl::featureEnabled(const std::string& key,
-                                  envoy::type::FractionalPercent default_value) const {
+                                  const envoy::type::FractionalPercent& default_value) const {
   return featureEnabled(key, default_value, generator_.random());
 }
 
 bool SnapshotImpl::featureEnabled(const std::string& key,
-                                  envoy::type::FractionalPercent default_value,
+                                  const envoy::type::FractionalPercent& default_value,
                                   uint64_t random_value) const {
   const auto& entry = values_.find(key);
   uint64_t numerator, denominator;

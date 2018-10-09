@@ -75,8 +75,8 @@ public:
   bool featureEnabled(const std::string& key, uint64_t default_value,
                       uint64_t random_value) const override;
   bool featureEnabled(const std::string& key,
-                      envoy::type::FractionalPercent default_value) const override;
-  bool featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value,
+                      const envoy::type::FractionalPercent& default_value) const override;
+  bool featureEnabled(const std::string& key, const envoy::type::FractionalPercent& default_value,
                       uint64_t random_value) const override;
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string& key, uint64_t default_value) const override;

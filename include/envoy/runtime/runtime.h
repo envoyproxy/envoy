@@ -135,7 +135,7 @@ public:
    * @return true if the feature is enabled.
    */
   virtual bool featureEnabled(const std::string& key,
-                              envoy::type::FractionalPercent default_value) const PURE;
+                              const envoy::type::FractionalPercent& default_value) const PURE;
 
   /**
    * Test if a feature is enabled using a supplied stable random value. This variant is used if
@@ -147,7 +147,8 @@ public:
    *        is enabled.
    * @return true if the feature is enabled.
    */
-  virtual bool featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value,
+  virtual bool featureEnabled(const std::string& key,
+                              const envoy::type::FractionalPercent& default_value,
                               uint64_t random_value) const PURE;
 
   /**
