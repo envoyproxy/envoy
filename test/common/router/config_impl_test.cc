@@ -2036,13 +2036,15 @@ virtual_hosts:
 
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
 
-  EXPECT_CALL(snapshot, featureEnabled("bogus_key", Matcher<const envoy::type::FractionalPercent&>(_), 41))
+  EXPECT_CALL(snapshot,
+              featureEnabled("bogus_key", Matcher<const envoy::type::FractionalPercent&>(_), 41))
       .WillRepeatedly(Return(true));
   EXPECT_EQ(
       "something_else",
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 41)->routeEntry()->clusterName());
 
-  EXPECT_CALL(snapshot, featureEnabled("bogus_key", Matcher<const envoy::type::FractionalPercent&>(_), 43))
+  EXPECT_CALL(snapshot,
+              featureEnabled("bogus_key", Matcher<const envoy::type::FractionalPercent&>(_), 43))
       .WillRepeatedly(Return(false));
   EXPECT_EQ(
       "www2",
