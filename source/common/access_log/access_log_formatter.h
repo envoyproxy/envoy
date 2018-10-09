@@ -128,7 +128,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                           const RequestInfo::RequestInfo&) const override;
+                     const RequestInfo::RequestInfo&) const override;
 
 private:
   std::string str_;
@@ -157,7 +157,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
-                           const Http::HeaderMap&, const RequestInfo::RequestInfo&) const override;
+                     const Http::HeaderMap&, const RequestInfo::RequestInfo&) const override;
 };
 
 /**
@@ -170,7 +170,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap& response_headers,
-                           const Http::HeaderMap&, const RequestInfo::RequestInfo&) const override;
+                     const Http::HeaderMap&, const RequestInfo::RequestInfo&) const override;
 };
 
 /**
@@ -183,8 +183,8 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
-                           const Http::HeaderMap& response_trailers,
-                           const RequestInfo::RequestInfo&) const override;
+                     const Http::HeaderMap& response_trailers,
+                     const RequestInfo::RequestInfo&) const override;
 };
 
 /**
@@ -196,8 +196,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                           const RequestInfo::RequestInfo& request_info) const override;
-
+                     const RequestInfo::RequestInfo& request_info) const override;
 
 private:
   std::function<std::string(const RequestInfo::RequestInfo&)> field_extractor_;
@@ -229,7 +228,7 @@ public:
 
   // FormatterProvider::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                           const RequestInfo::RequestInfo& request_info) const override;
+                     const RequestInfo::RequestInfo& request_info) const override;
 };
 
 /**
@@ -239,7 +238,7 @@ class StartTimeFormatter : public FormatterProvider {
 public:
   StartTimeFormatter(const std::string& format);
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                           const RequestInfo::RequestInfo&) const override;
+                     const RequestInfo::RequestInfo&) const override;
 
 private:
   const Envoy::DateFormatter date_formatter_;
