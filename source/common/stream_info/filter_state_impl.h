@@ -13,10 +13,11 @@ class FilterStateImpl : public FilterState {
 public:
   // FilterState
   void setData(absl::string_view data_name, std::unique_ptr<Object>&& data) override;
-  bool hasDataWithName(absl::string_view) const override;
+  bool hasData(absl::string_view) const override;
   const Object* getDataGeneric(absl::string_view data_name) const override;
-  void addToListGeneric(absl::string_view data_name, std::unique_ptr<Object>&& data) override;
-  const std::vector<std::unique_ptr<Object>>* getList(absl::string_view data_name) const override;
+  void addToListGeneric(absl::string_view list_name, std::unique_ptr<Object>&& item) override;
+  const std::vector<std::unique_ptr<Object>>* getList(absl::string_view list_name) const override;
+  bool hasList(absl::string_view) const override;
 
 private:
   // The explicit non-type-specific comparator is necessary to allow use of find() method

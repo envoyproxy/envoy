@@ -16,7 +16,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::unique_ptr<Objec
   data_storage_[name] = std::move(data);
 }
 
-bool FilterStateImpl::hasDataWithName(absl::string_view data_name) const {
+bool FilterStateImpl::hasData(absl::string_view data_name) const {
   // TODO(Google): Remove string conversion when fixed internally.
   return data_storage_.count(std::string(data_name)) > 0;
 }
@@ -31,26 +31,31 @@ const FilterState::Object* FilterStateImpl::getDataGeneric(absl::string_view dat
   return it->second.get();
 }
 
-void FilterStateImpl::addToListGeneric(absl::string_view data_name,
-                                       std::unique_ptr<Object>&& data) {
+void FilterStateImpl::addToListGeneric(absl::string_view list_name,
+                                       std::unique_ptr<Object>&& item) {
   // TODO(Google): Remove string conversion when fixed internally.
-  const std::string name(data_name);
+  const std::string name(list_name);
   if (list_storage_.find(name) == list_storage_.end()) {
     list_storage_[name] = std::vector<std::unique_ptr<FilterState::Object>>();
   }
 
-  list_storage_[name].push_back(std::move(data));
+  list_storage_[name].push_back(std::move(item));
 }
 
 const std::vector<std::unique_ptr<FilterState::Object>>*
-FilterStateImpl::getList(absl::string_view data_name) const {
+FilterStateImpl::getList(absl::string_view list_name) const {
   // TODO(Google): Remove string conversion when fixed internally.
-  const auto& it = list_storage_.find(std::string(data_name));
+  const auto& it = list_storage_.find(std::string(list_name));
 
   if (it == list_storage_.end()) {
     return nullptr;
   }
   return &it->second;
+}
+
+bool FilterStateImpl::hasList(absl::string_view list_name) const {
+  // TODO(Google): Remove string conversion when fixed internally.
+  return list_storage_.count(std::string(list_name)) > 0;
 }
 
 } // namespace StreamInfo
