@@ -7,12 +7,12 @@ namespace StreamInfo {
 
 void FilterStateImpl::setData(absl::string_view data_name, std::unique_ptr<Object>&& data) {
   // TODO(Google): Remove string conversion when fixed internally.
+  // absl::string_view will not convert to std::string without an explicit cast; see
+  // https://github.com/abseil/abseil-cpp/blob/master/absl/strings/string_view.h#L328
   const std::string name(data_name);
   if (data_storage_.find(name) != data_storage_.end()) {
     throw EnvoyException("FilterState::setData<T> called twice with same name.");
   }
-  // absl::string_view will not convert to std::string without an explicit case; see
-  // https://github.com/abseil/abseil-cpp/blob/master/absl/strings/string_view.h#L328
   data_storage_[name] = std::move(data);
 }
 
@@ -39,8 +39,6 @@ void FilterStateImpl::addToListGeneric(absl::string_view data_name,
     list_storage_[name] = std::vector<std::unique_ptr<FilterState::Object>>();
   }
 
-  // absl::string_view will not convert to std::string without an explicit case; see
-  // https://github.com/abseil/abseil-cpp/blob/master/absl/strings/string_view.h#L328
   list_storage_[name].push_back(std::move(data));
 }
 

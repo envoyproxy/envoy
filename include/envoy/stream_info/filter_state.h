@@ -60,11 +60,11 @@ public:
    * The addToList, hasListWithName, forEachListItem are variants of the above
    * functions, that operate on list data. Multiple elements could be added
    * the list under the same data_name.
-   * @param data_name the name of the data being added to the end of a list.
-   * @param data an owning pointer to the data to be stored.
-   * Note that data_names for list elements have no relation to the data_names
-   * for singleton data objects added through setData. All items added to the list
-   * must be of the same type.
+   * @param data_name the name of the list data being set.
+   * @param data an owning pointer to the data to be appended to the list.
+   * Note that data_names for list elements do not share the same namespace as 
+   * the data_names for singleton data objects added through setData. All items 
+   * added to the list must be of the same type.
    */
   template <typename T>
   void addToList(absl::string_view data_name, std::unique_ptr<Object>&& data) {
@@ -96,7 +96,7 @@ public:
    * @param operation a lambda function that operates on each element in the list,
    * if it exists. The iteration will stop if the lambda function returns false or
    * reaches the end of the list. The iteration order will be the same as the order
-   * in which the elements were added to the list. Note that if an element in the
+   * in which the elements were added to the list. Note that if the elements in the
    * list cannot be dynamically type-cast into the requested type, an exception
    * will be thrown.
    */
