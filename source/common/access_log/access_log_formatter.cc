@@ -13,6 +13,8 @@
 
 #include "absl/strings/str_split.h"
 #include "fmt/format.h"
+#include "rapidjson/prettywriter.h"
+#include "rapidjson/stringbuffer.h"
 
 using Envoy::Config::Metadata;
 
@@ -54,22 +56,70 @@ AccessLogFormatUtils::protocolToString(const absl::optional<Http::Protocol>& pro
 }
 
 FormatterImpl::FormatterImpl(const std::string& format) {
-  formatters_ = AccessLogFormatParser::parse(format);
+  providers_ = AccessLogFormatParser::parse(format);
 }
 
 std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
                                   const Http::HeaderMap& response_headers,
-                                  const Http::HeaderMap& response_trailers,
+                                  const Http::HeaderMap& response_trailers, 
                                   const RequestInfo::RequestInfo& request_info) const {
   std::string log_line;
   log_line.reserve(256);
 
-  for (const FormatterPtr& formatter : formatters_) {
+  for (const FormatterProviderPtr& provider : providers_) {
     log_line +=
-        formatter->format(request_headers, response_headers, response_trailers, request_info);
+        provider->format(request_headers, response_headers, response_trailers, request_info);
   }
 
   return log_line;
+}
+
+JsonFormatterImpl::JsonFormatterImpl(const std::map<const std::string, const std::string>& format_mapping) {
+  for (const auto& format_pair : format_mapping) {
+    auto providers = AccessLogFormatParser::parse(format_pair.second);
+
+    // Enforce that each key only has one format specifier in it
+    if (providers.size() > 1) {
+      throw EnvoyException(fmt::format("More than one format specifier was provided in the JSON log format: {}", format_pair.second));
+    }
+
+    if (providers.size() < 1) {
+      throw EnvoyException(fmt::format("No format specifier was provided in the JSON log format: {}", format_pair.second));
+    }
+
+    json_output_format_.emplace(format_pair.first, std::move(providers[0]));
+  }
+}
+
+std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
+                                      const Http::HeaderMap& response_headers,
+                                      const Http::HeaderMap& response_trailers,
+                                      const RequestInfo::RequestInfo& request_info) const {
+  rapidjson::StringBuffer strbuf;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
+
+  writer.StartObject();
+  auto output_map = this->to_map(request_headers, response_headers, response_trailers, request_info);
+  for (auto it = output_map->begin(); it != output_map->end(); ++it) {
+    writer.Key(it->first.c_str());
+    writer.String(it->second.c_str());
+  }
+  writer.EndObject();
+  return fmt::format("{}\n", strbuf.GetString());
+}
+
+std::unique_ptr<std::map<std::string, std::string>>
+JsonFormatterImpl::to_map(const Http::HeaderMap& request_headers,
+                          const Http::HeaderMap& response_headers,
+                          const Http::HeaderMap& response_trailers,
+                          const RequestInfo::RequestInfo& request_info) const {
+  std::map<std::string, std::string> output;
+  for (const auto& pair : json_output_format_) {
+    output.emplace(
+      pair.first,
+      pair.second->format(request_headers, response_headers, response_trailers, request_info));
+  }
+  return std::make_unique<std::map<std::string, std::string>>(output);
 }
 
 void AccessLogFormatParser::parseCommandHeader(const std::string& token, const size_t start,
@@ -131,16 +181,17 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
 }
 
 // TODO(derekargueta): #2967 - Rewrite AccessLogformatter with parser library & formal grammar
-std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format) {
+std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string& format) {
   std::string current_token;
-  std::vector<FormatterPtr> formatters;
+  std::vector<FormatterProviderPtr> formatters;
   const std::string DYNAMIC_META_TOKEN = "DYNAMIC_METADATA(";
   const std::regex command_w_args_regex(R"EOF(%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
   for (size_t pos = 0; pos < format.length(); ++pos) {
     if (format[pos] == '%') {
       if (!current_token.empty()) {
-        formatters.emplace_back(new PlainStringFormatter(current_token));
+        formatters.emplace_back(
+          FormatterProviderPtr{new PlainStringFormatter(current_token)});
         current_token = "";
       }
 
@@ -164,7 +215,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         parseCommandHeader(token, ReqParamStart, main_header, alternative_header, max_length);
 
         formatters.emplace_back(
-            new RequestHeaderFormatter(main_header, alternative_header, max_length));
+            FormatterProviderPtr{new RequestHeaderFormatter(main_header, alternative_header, max_length)});
       } else if (token.find("RESP(") == 0) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
@@ -172,7 +223,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         parseCommandHeader(token, RespParamStart, main_header, alternative_header, max_length);
 
         formatters.emplace_back(
-            new ResponseHeaderFormatter(main_header, alternative_header, max_length));
+            FormatterProviderPtr{new ResponseHeaderFormatter(main_header, alternative_header, max_length)});
       } else if (token.find("TRAILER(") == 0) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
@@ -180,7 +231,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         parseCommandHeader(token, TrailParamStart, main_header, alternative_header, max_length);
 
         formatters.emplace_back(
-            new ResponseTrailerFormatter(main_header, alternative_header, max_length));
+            FormatterProviderPtr{new ResponseTrailerFormatter(main_header, alternative_header, max_length)});
       } else if (token.find(DYNAMIC_META_TOKEN) == 0) {
         std::string filter_namespace;
         absl::optional<size_t> max_length;
@@ -188,7 +239,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         const size_t start = DYNAMIC_META_TOKEN.size();
 
         parseCommand(token, start, ":", filter_namespace, path, max_length);
-        formatters.emplace_back(new DynamicMetadataFormatter(filter_namespace, path, max_length));
+        formatters.emplace_back(FormatterProviderPtr{new DynamicMetadataFormatter(filter_namespace, path, max_length)});
       } else if (token.find("START_TIME") == 0) {
         const size_t parameters_length = pos + StartTimeParamStart + 1;
         const size_t parameters_end = command_end_position - parameters_length;
@@ -196,9 +247,9 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         const std::string args = token[StartTimeParamStart - 1] == '('
                                      ? token.substr(StartTimeParamStart, parameters_end)
                                      : "";
-        formatters.emplace_back(new StartTimeFormatter(args));
+        formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(args)});
       } else {
-        formatters.emplace_back(new RequestInfoFormatter(token));
+        formatters.emplace_back(FormatterProviderPtr{new RequestInfoFormatter(token)});
       }
       pos = command_end_position;
     } else {
@@ -207,14 +258,13 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
   }
 
   if (!current_token.empty()) {
-    formatters.emplace_back(new PlainStringFormatter(current_token));
+    formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
   }
 
   return formatters;
 }
 
 RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
-
   if (field_name == "REQUEST_DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return AccessLogFormatUtils::durationToString(request_info.lastDownstreamRxByteReceived());

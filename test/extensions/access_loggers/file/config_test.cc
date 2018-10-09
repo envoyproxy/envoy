@@ -73,6 +73,85 @@ TEST(FileAccessLogConfigTest, FileAccessLogTest) {
   EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(instance.get()));
 }
 
+TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
+  envoy::config::filter::accesslog::v2::AccessLog config;
+  
+  envoy::config::accesslog::v2::FileAccessLog fal_config;
+  fal_config.set_path("/dev/null");
+  
+  // auto json_format2 = new envoy::config::accesslog::v2::FileAccessLogJsonFormat;
+  auto json_format = new google::protobuf::Struct;
+  google::protobuf::Value string_value;
+  string_value.set_string_value("%PROTOCOL%");
+  (*json_format->mutable_fields())[std::string{"protocol"}] = string_value;
+  fal_config.set_allocated_json_format(json_format);
+
+  EXPECT_EQ(fal_config.access_log_format_case(), envoy::config::accesslog::v2::FileAccessLog::kJsonFormat);
+  MessageUtil::jsonConvert(fal_config, *config.mutable_config());
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
+                            "Provided name for static registration lookup was empty.");
+
+  config.set_name(AccessLogNames::get().File);
+
+  AccessLog::InstanceSharedPtr log = AccessLog::AccessLogFactory::fromProto(config, context);
+
+  EXPECT_NE(nullptr, log);
+  EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
+
+  config.set_name("INVALID");
+
+  EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
+                            "Didn't find a registered implementation for name: 'INVALID'");
+}
+
+TEST(FileAccessLogConfigTest, FileAccessLogJsonConversionTest) {
+  {
+    envoy::config::filter::accesslog::v2::AccessLog config;
+    config.set_name(AccessLogNames::get().File);
+    envoy::config::accesslog::v2::FileAccessLog fal_config;
+    fal_config.set_path("/dev/null");
+  
+    auto json_format = new google::protobuf::Struct;
+    google::protobuf::Value string_value;
+    string_value.set_bool_value(false);
+    (*json_format->mutable_fields())[std::string{"protocol"}] = string_value;
+    fal_config.set_allocated_json_format(json_format);
+    
+    MessageUtil::jsonConvert(fal_config, *config.mutable_config());
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+
+    EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
+                              "Only string values are supported in the JSON access log format.");
+  }
+
+  {
+    envoy::config::filter::accesslog::v2::AccessLog config;
+    config.set_name(AccessLogNames::get().File);
+    envoy::config::accesslog::v2::FileAccessLog fal_config;
+    fal_config.set_path("/dev/null");
+  
+    auto json_format = new google::protobuf::Struct;
+    auto nested_struct = new google::protobuf::Struct;
+    google::protobuf::Value string_value;
+    string_value.set_string_value(std::string{"some_nested_value"});
+    (*nested_struct->mutable_fields())[std::string{"some_nested_key"}] = string_value;
+
+    google::protobuf::Value struct_value;
+    struct_value.set_allocated_struct_value(nested_struct);
+    (*json_format->mutable_fields())[std::string{"top_level_key"}] = struct_value;
+    fal_config.set_allocated_json_format(json_format);
+    
+    MessageUtil::jsonConvert(fal_config, *config.mutable_config());
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+
+    EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
+                              "Only string values are supported in the JSON access log format.");
+  }
+}
+
+
 } // namespace File
 } // namespace AccessLoggers
 } // namespace Extensions
