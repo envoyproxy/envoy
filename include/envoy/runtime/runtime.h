@@ -134,7 +134,8 @@ public:
    *        does not exist or it is not a fractional percent.
    * @return true if the feature is enabled.
    */
-  virtual bool featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value) const PURE;
+  virtual bool featureEnabled(const std::string& key,
+                              envoy::type::FractionalPercent default_value) const PURE;
 
   /**
    * Test if a feature is enabled using a supplied stable random value. This variant is used if

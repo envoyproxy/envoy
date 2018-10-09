@@ -178,19 +178,25 @@ const std::string& SnapshotImpl::get(const std::string& key) const {
   }
 }
 
-bool SnapshotImpl::featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value) const {
+bool SnapshotImpl::featureEnabled(const std::string& key,
+                                  envoy::type::FractionalPercent default_value) const {
   return featureEnabled(key, default_value, generator_.random());
 }
 
-bool SnapshotImpl::featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value, uint64_t random_value) const {
+bool SnapshotImpl::featureEnabled(const std::string& key,
+                                  envoy::type::FractionalPercent default_value,
+                                  uint64_t random_value) const {
   const auto& entry = values_.find(key);
   uint64_t numerator, denominator;
-  if (entry == values_.end() || entry->second.entry_type_ != Entry::EntryType::FRACTIONAL_PERCENT_VALUE) {
+  if (entry == values_.end() ||
+      entry->second.entry_type_ != Entry::EntryType::FRACTIONAL_PERCENT_VALUE) {
     numerator = default_value.numerator();
-    denominator = ProtobufPercentHelper::fractionalPercentDenominatorToInt(default_value.denominator());
+    denominator =
+        ProtobufPercentHelper::fractionalPercentDenominatorToInt(default_value.denominator());
   } else {
     numerator = entry->second.fractional_percent_value_->numerator();
-    denominator = ProtobufPercentHelper::fractionalPercentDenominatorToInt(entry->second.fractional_percent_value_->denominator());
+    denominator = ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+        entry->second.fractional_percent_value_->denominator());
   }
 
   return random_value % denominator < numerator;

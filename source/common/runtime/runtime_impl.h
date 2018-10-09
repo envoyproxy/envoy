@@ -61,7 +61,9 @@ struct RuntimeStats {
 /**
  * Implementation of Snapshot whose source is the vector of layers passed to the constructor.
  */
-class SnapshotImpl : public Snapshot, public ThreadLocal::ThreadLocalObject, Logger::Loggable<Logger::Id::runtime> {
+class SnapshotImpl : public Snapshot,
+                     public ThreadLocal::ThreadLocalObject,
+                     Logger::Loggable<Logger::Id::runtime> {
 public:
   SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
                std::vector<OverrideLayerConstPtr>&& layers);
@@ -72,8 +74,10 @@ public:
   bool featureEnabled(const std::string& key, uint64_t default_value) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value,
                       uint64_t random_value) const override;
-  bool featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value) const override;
-  bool featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value, uint64_t random_value) const override;
+  bool featureEnabled(const std::string& key,
+                      envoy::type::FractionalPercent default_value) const override;
+  bool featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value,
+                      uint64_t random_value) const override;
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string& key, uint64_t default_value) const override;
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
@@ -102,9 +106,7 @@ private:
 class OverrideLayerImpl : public Snapshot::OverrideLayer {
 public:
   explicit OverrideLayerImpl(const std::string& name) : name_{name} {}
-  const Snapshot::EntryMap& values() const override {
-    return values_;
-  }
+  const Snapshot::EntryMap& values() const override { return values_; }
   const std::string& name() const override { return name_; }
 
 protected:

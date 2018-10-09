@@ -13,6 +13,6 @@ envoy_cc_library(
     hdrs = ["runtime.h"],
     external_deps = ["abseil_optional"],
     deps = [
-      "@envoy_api//envoy/type:percent_cc",
+        "@envoy_api//envoy/type:percent_cc",
     ],
 )
