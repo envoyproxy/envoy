@@ -231,6 +231,7 @@ void InstanceImpl::initialize(Options& options,
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
+  stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
 
   server_stats_.reset(
       new ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});

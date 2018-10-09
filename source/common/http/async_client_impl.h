@@ -19,6 +19,7 @@
 #include "envoy/router/shadow_writer.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/linked_object.h"
@@ -35,7 +36,7 @@ class AsyncRequestImpl;
 
 class AsyncClientImpl final : public AsyncClient {
 public:
-  AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,
+  AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster, Stats::Store& stats_store,
                   Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info,
                   Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                   Runtime::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer);
@@ -52,7 +53,7 @@ public:
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
 private:
-  const Upstream::ClusterInfo& cluster_;
+  Upstream::ClusterInfoConstSharedPtr cluster_;
   Router::FilterConfig config_;
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
@@ -161,6 +162,7 @@ private:
     const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
       return nullptr;
     }
+    bool includeAttemptCount() const override { return false; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullConfig route_configuration_;
@@ -229,6 +231,8 @@ private:
       return nullptr;
     }
 
+    bool includeAttemptCount() const override { return false; }
+
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
     static const NullShadowPolicy shadow_policy_;
@@ -267,6 +271,7 @@ private:
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
   Router::RouteConstSharedPtr route() override { return route_; }
+  Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() override { return stream_id_; }
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }

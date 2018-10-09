@@ -111,6 +111,15 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
     request_headers.insertEnvoyExpectedRequestTimeoutMs().value(expected_timeout);
   }
 
+  // If we've configured max_grpc_timeout, override the grpc-timeout header with
+  // the expected timeout. This ensures that the optional per try timeout is reflected
+  // in grpc-timeout, ensuring that the upstream gRPC server is aware of the actual timeout.
+  // If the expected timeout is 0 set no timeout, as Envoy treats 0 as infinite timeout.
+  if (grpc_request && route.maxGrpcTimeout() && expected_timeout != 0) {
+    Grpc::Common::toGrpcTimeout(std::chrono::milliseconds(expected_timeout),
+                                request_headers.insertGrpcTimeout().value());
+  }
+
   return timeout;
 }
 
@@ -285,6 +294,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (headers.EnvoyUpstreamRequestTimeoutAltResponse()) {
     timeout_response_code_ = Http::Code::NoContent;
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
+  }
+
+  include_attempt_count_ = route_entry_->includeAttemptCount();
+  if (include_attempt_count_) {
+    headers.insertEnvoyAttemptCount().value(attempt_count_);
   }
 
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
@@ -753,11 +767,16 @@ bool Filter::setupRetry(bool end_stream) {
 
 void Filter::doRetry() {
   is_retry_ = true;
+  attempt_count_++;
   Http::ConnectionPool::Instance* conn_pool = getConnPool();
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();
     cleanup();
     return;
+  }
+
+  if (include_attempt_count_) {
+    downstream_headers_->insertEnvoyAttemptCount().value(attempt_count_);
   }
 
   ASSERT(response_timeout_ || timeout_.global_timeout_.count() == 0);

@@ -36,6 +36,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
@@ -1507,7 +1508,7 @@ TEST_F(HttpConnectionManagerImplTest, AllowNonWebSocketOnWebSocketRoute) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketNoThreadLocalCluster) {
   setup(false, "");
 
-  EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cluster_manager_, get(_)).Times(2).WillRepeatedly(Return(nullptr));
   expectOnUpstreamInitFailure();
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
@@ -2639,9 +2640,19 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
   }));
 
   setupFilterChain(3, 2);
+  const std::string fake_cluster1_name = "fake_cluster1";
+  const std::string fake_cluster2_name = "fake_cluster2";
 
-  Router::RouteConstSharedPtr route1 = std::make_shared<NiceMock<Router::MockRoute>>();
-  Router::RouteConstSharedPtr route2 = std::make_shared<NiceMock<Router::MockRoute>>();
+  std::shared_ptr<Upstream::MockThreadLocalCluster> fake_cluster1 =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, get(_))
+      .WillOnce(Return(fake_cluster1.get()))
+      .WillOnce(Return(nullptr));
+
+  std::shared_ptr<Router::MockRoute> route1 = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(route1->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster1_name));
+  std::shared_ptr<Router::MockRoute> route2 = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(route2->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster2_name));
 
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _))
       .WillOnce(Return(route1))
@@ -2652,6 +2663,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
         EXPECT_EQ(route1->routeEntry(), decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
         decoder_filters_[0]->callbacks_->clearRouteCache();
         return FilterHeadersStatus::Continue;
       }));
@@ -2659,11 +2671,14 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->route());
         EXPECT_EQ(route2->routeEntry(), decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+        // RDS & CDS consistency problem: route2 points to fake_cluster2, which doesn't exist.
+        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->clusterInfo());
         decoder_filters_[1]->callbacks_->clearRouteCache();
         return FilterHeadersStatus::Continue;
       }));
   EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->clusterInfo());
         EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->route());
         EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->streamInfo().routeEntry());
         return FilterHeadersStatus::StopIteration;
