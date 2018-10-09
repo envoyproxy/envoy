@@ -17,7 +17,7 @@ namespace Http2 {
 // map of string key value pairs.
 class MetadataDecoder : Logger::Loggable<Logger::Id::http2> {
 public:
-  MetadataDecoder(uint64_t stream_id);
+  MetadataDecoder(uint64_t stream_id, MetadataCallback cb);
 
   /**
    * Calls this function when METADATA frame payload is received. The payload doesn't need to be
@@ -71,10 +71,6 @@ private:
   // Metadata event callback function.
   MetadataCallback callback_;
 
-  // Saved metadata in case callback function is not registered yet.
-  // TODO(soya3129): consider removing this vector if it is not necessary in Envoy.
-  std::vector<MetadataMap> metadata_map_list_;
-
   // Metadata that is currently under decoding.
   MetadataMap metadata_map_;
 
@@ -84,16 +80,13 @@ private:
   // The stream id the decoder is associated with.
   const uint64_t stream_id_;
 
-  // TODO(soya3129): consider sharing the inflater with all streams in a connection. Caveat:
-  // inflater failure on one stream can impact other streams.
-  nghttp2_hd_inflater* inflater_;
-
   // Payload size limit. If the payload received exceeds the limit, fails the connection.
   const uint64_t max_payload_size_bound_ = 1024 * 1024;
 
-  // Unique pointer to delete inflater.
-  typedef CSmartPtr<nghttp2_hd_inflater, nghttp2_hd_inflate_del> InflaterDeleter;
-  InflaterDeleter inflater_deleter_;
+  // TODO(soya3129): consider sharing the inflater with all streams in a connection. Caveat:
+  // inflater failure on one stream can impact other streams.
+  typedef CSmartPtr<nghttp2_hd_inflater, nghttp2_hd_inflate_del> Inflater;
+  Inflater inflater_;
 };
 
 } // namespace Http2

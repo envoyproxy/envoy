@@ -7,6 +7,8 @@
 #include "common/common/logger.h"
 #include "common/http/http2/metadata_interface.h"
 
+#include "nghttp2/nghttp2.h"
+
 namespace Envoy {
 namespace Http {
 namespace Http2 {
@@ -17,9 +19,7 @@ namespace Http2 {
  */
 class MetadataEncoder : Logger::Loggable<Logger::Id::http2> {
 public:
-  MetadataEncoder(uint64_t stream_id) : stream_id_(stream_id) {
-    ENVOY_LOG(debug, "Created MetadataEncoder for stream id: {}", stream_id_);
-  }
+  MetadataEncoder(uint64_t stream_id);
 
   /**
    * Creates wire format HTTP/2 header block from metadata_map. Only after previous payload is
@@ -82,6 +82,11 @@ private:
 
   // Default HPACK table size.
   const size_t header_table_size_ = 4096;
+
+  // TODO(soya3129): share deflater among all encoders in the same connection. The benefit is less
+  // memory, and the caveat is encoding error on one stream can impact other streams.
+  typedef CSmartPtr<nghttp2_hd_deflater, nghttp2_hd_deflate_del> Deflater;
+  Deflater deflater_;
 };
 
 } // namespace Http2

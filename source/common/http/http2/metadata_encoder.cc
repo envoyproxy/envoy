@@ -8,8 +8,13 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-namespace {
-typedef CSmartPtr<nghttp2_hd_deflater, nghttp2_hd_deflate_del> DeflaterDeleter;
+MetadataEncoder::MetadataEncoder(uint64_t stream_id) : stream_id_(stream_id) {
+  ENVOY_LOG(debug, "Created MetadataEncoder for stream id: {}", stream_id_);
+
+  nghttp2_hd_deflater* deflater;
+  int rv = nghttp2_hd_deflate_new(&deflater, header_table_size_);
+  ASSERT(rv == 0);
+  deflater_ = Deflater(deflater);
 }
 
 bool MetadataEncoder::createPayload(MetadataMap& metadata_map) {
@@ -40,18 +45,8 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(MetadataMap& metadata_map) {
                 header.first.size(), header.second.size(), NGHTTP2_NV_FLAG_NO_INDEX};
   }
 
-  // Create deflater (encoder).
-  // TODO(soya3129): share deflater among all encoders in the same connection. The benefit is less
-  // memory, and the caveat is encoding error on one stream can impact other streams.
-  int rv;
-  nghttp2_hd_deflater* deflater;
-  rv = nghttp2_hd_deflate_new(&deflater, header_table_size_);
-  // Ensure deflater will be automatically deleted.
-  DeflaterDeleter deflater_deleter(deflater);
-  ASSERT(rv == 0);
-
   // Estimates the upper bound of output payload.
-  size_t buflen = nghttp2_hd_deflate_bound(deflater, nva, nvlen);
+  size_t buflen = nghttp2_hd_deflate_bound(deflater_.get(), nva, nvlen);
   if (buflen > max_payload_size_bound_) {
     ENVOY_LOG(error, "Payload size {} exceeds the max bound.", buflen);
     return false;
@@ -62,7 +57,7 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(MetadataMap& metadata_map) {
 
   // Creates payload using nghttp2.
   uint8_t* buf = reinterpret_cast<uint8_t*>(iovec.mem_);
-  ssize_t result = nghttp2_hd_deflate_hd(deflater, buf, buflen, nva, nvlen);
+  ssize_t result = nghttp2_hd_deflate_hd(deflater_.get(), buf, buflen, nva, nvlen);
   ASSERT(result > 0);
   iovec.len_ = result;
 

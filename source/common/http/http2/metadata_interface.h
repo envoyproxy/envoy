@@ -16,7 +16,8 @@ namespace Http2 {
  * 0x4d. The value is large enough that it is not likely to be used by any official extensions in
  * the near future. METADATA frame be used to communicate metadata between Envoy and any other peers
  * where METADATA frame type is supported. A proxy or peer may choose to consume METADATA frames,
- * pass them along unmodified, or modify the payloads.
+ * pass them along unmodified, or modify the payloads. METADATA frames can be sent at any location
+ * of a stream.
  */
 const uint8_t METADATA_FRAME_TYPE = 0x4d;
 const uint8_t END_METADATA_FLAG = 0x4;
