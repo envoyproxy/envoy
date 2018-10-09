@@ -72,8 +72,9 @@ UpstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
 
   HandshakerFactory factory =
       [handshaker_service](Event::Dispatcher& dispatcher,
-                           const Network::Address::InstanceConstSharedPtr&,
+                           const Network::Address::InstanceConstSharedPtr& local_address,
                            const Network::Address::InstanceConstSharedPtr&) -> TsiHandshakerPtr {
+    ASSERT(local_address != nullptr);
     GrpcAltsCredentialsOptionsPtr options{grpc_alts_credentials_client_options_create()};
 
     tsi_handshaker* handshaker = nullptr;

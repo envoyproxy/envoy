@@ -23,19 +23,101 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 
-class AltsIntegrationTest : public HttpIntegrationTest,
-                            public testing::TestWithParam<Network::Address::IpVersion> {
+class AltsIntegrationTestBase : public HttpIntegrationTest,
+                                public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AltsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+  AltsIntegrationTestBase(const std::string& server_peer_identity,
+                          const std::string& client_peer_identity)
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()),
+        server_peer_identity_(server_peer_identity), client_peer_identity_(client_peer_identity) {}
 
-  void initialize() override;
-  void SetUp() override;
-  void TearDown() override;
+  void initialize() override {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      auto transport_socket = bootstrap.mutable_static_resources()
+                                  ->mutable_listeners(0)
+                                  ->mutable_filter_chains(0)
+                                  ->mutable_transport_socket();
+      std::string yaml = R"EOF(
+    name: envoy.transport_sockets.alts
+    config:
+      peer_service_accounts: []
+      handshaker_service: ")EOF" +
+                         fakeHandshakerServerAddress() + "\"";
+      if (!server_peer_identity_.empty()) {
+        yaml.replace(yaml.find("[]"), std::string::size_type(2), server_peer_identity_);
+      }
 
-  Network::ClientConnectionPtr makeAltsConnection();
-  std::string fakeHandshakerServerAddress();
+      MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *transport_socket);
+    });
+    HttpIntegrationTest::initialize();
+    registerTestServerPorts({"http"});
+  }
 
+  void SetUp() override {
+    fake_handshaker_server_thread_ = std::make_unique<Thread::Thread>([this]() {
+      std::unique_ptr<grpc::Service> service = grpc::gcp::CreateFakeHandshakerService();
+
+      std::string server_address = Network::Test::getLoopbackAddressUrlString(version_) + ":0";
+      grpc::ServerBuilder builder;
+      builder.AddListeningPort(server_address, grpc::InsecureServerCredentials(),
+                               &fake_handshaker_server_port_);
+      builder.RegisterService(service.get());
+
+      fake_handshaker_server_ = builder.BuildAndStart();
+      fake_handshaker_server_ci_.setReady();
+      fake_handshaker_server_->Wait();
+    });
+
+    fake_handshaker_server_ci_.waitReady();
+
+    std::string client_yaml = R"EOF(
+      peer_service_accounts: []
+      handshaker_service: ")EOF" +
+                              fakeHandshakerServerAddress() + "\"";
+    if (!client_peer_identity_.empty()) {
+      client_yaml.replace(client_yaml.find("[]"), std::string::size_type(2), client_peer_identity_);
+    }
+
+    NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+    UpstreamAltsTransportSocketConfigFactory factory;
+
+    ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+    MessageUtil::loadFromYaml(TestEnvironment::substitute(client_yaml), *config);
+
+    ENVOY_LOG_MISC(info, "{}", config->DebugString());
+
+    client_alts_ = factory.createTransportSocketFactory(*config, mock_factory_ctx);
+  }
+
+  void TearDown() override {
+    HttpIntegrationTest::cleanupUpstreamAndDownstream();
+    dispatcher_->clearDeferredDeleteList();
+    if (fake_handshaker_server_ != nullptr) {
+      fake_handshaker_server_->Shutdown();
+    }
+    fake_handshaker_server_thread_->join();
+  }
+
+  Network::ClientConnectionPtr makeAltsConnection() {
+    Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
+    return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                               client_alts_->createTransportSocket(), nullptr);
+  }
+
+  std::string fakeHandshakerServerAddress() {
+    return absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
+                        std::to_string(fake_handshaker_server_port_));
+  }
+
+  Network::Address::InstanceConstSharedPtr getAddress(const Network::Address::IpVersion& version,
+                                                      int port) {
+    std::string url =
+        "tcp://" + Network::Test::getLoopbackAddressUrlString(version) + ":" + std::to_string(port);
+    return Network::Utility::resolveUrl(url);
+  }
+
+  const std::string server_peer_identity_;
+  const std::string client_peer_identity_;
   Thread::ThreadPtr fake_handshaker_server_thread_;
   std::unique_ptr<grpc::Server> fake_handshaker_server_;
   ConditionalInitializer fake_handshaker_server_ci_;
@@ -43,91 +125,52 @@ public:
   Network::TransportSocketFactoryPtr client_alts_;
 };
 
-std::string AltsIntegrationTest::fakeHandshakerServerAddress() {
-  return absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
-                      std::to_string(fake_handshaker_server_port_));
-}
+class AltsIntegrationTestValidPeer : public AltsIntegrationTestBase {
+public:
+  AltsIntegrationTestValidPeer() : AltsIntegrationTestBase("[peer_identity]", "") {}
+};
 
-void AltsIntegrationTest::initialize() {
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-    auto transport_socket = bootstrap.mutable_static_resources()
-                                ->mutable_listeners(0)
-                                ->mutable_filter_chains(0)
-                                ->mutable_transport_socket();
-    const std::string yaml = R"EOF(
-  name: envoy.transport_sockets.alts
-  config:
-    peer_service_accounts: [peer_identity]
-    handshaker_service: ")EOF" +
-                             fakeHandshakerServerAddress() + "\"";
-
-    MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *transport_socket);
-  });
-  HttpIntegrationTest::initialize();
-  registerTestServerPorts({"http"});
-}
-
-void AltsIntegrationTest::SetUp() {
-  fake_handshaker_server_thread_ = std::make_unique<Thread::Thread>([this]() {
-    std::unique_ptr<grpc::Service> service = grpc::gcp::CreateFakeHandshakerService();
-
-    std::string server_address = Network::Test::getLoopbackAddressUrlString(version_) + ":0";
-    grpc::ServerBuilder builder;
-    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials(),
-                             &fake_handshaker_server_port_);
-    builder.RegisterService(service.get());
-
-    fake_handshaker_server_ = builder.BuildAndStart();
-    fake_handshaker_server_ci_.setReady();
-    fake_handshaker_server_->Wait();
-  });
-
-  fake_handshaker_server_ci_.waitReady();
-
-  const std::string yaml =
-      absl::StrCat("handshaker_service: \"", fakeHandshakerServerAddress(), "\"");
-
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
-  UpstreamAltsTransportSocketConfigFactory factory;
-
-  ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *config);
-
-  ENVOY_LOG_MISC(info, "{}", config->DebugString());
-
-  client_alts_ = factory.createTransportSocketFactory(*config, mock_factory_ctx);
-}
-void AltsIntegrationTest::TearDown() {
-  HttpIntegrationTest::cleanupUpstreamAndDownstream();
-  dispatcher_->clearDeferredDeleteList();
-  if (fake_handshaker_server_ != nullptr) {
-    fake_handshaker_server_->Shutdown();
-  }
-  fake_handshaker_server_thread_->join();
-}
-
-Network::Address::InstanceConstSharedPtr getAddress(const Network::Address::IpVersion& version,
-                                                    int port) {
-  std::string url =
-      "tcp://" + Network::Test::getLoopbackAddressUrlString(version) + ":" + std::to_string(port);
-  return Network::Utility::resolveUrl(url);
-}
-
-Network::ClientConnectionPtr AltsIntegrationTest::makeAltsConnection() {
-  Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
-  return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                             client_alts_->createTransportSocket(), nullptr);
-}
-
-INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTest,
+INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestValidPeer,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
-TEST_P(AltsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
+TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = [this]() -> Network::ClientConnectionPtr {
     return makeAltsConnection();
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+}
+
+class AltsIntegrationTestEmptyPeer : public AltsIntegrationTestBase {
+public:
+  AltsIntegrationTestEmptyPeer() : AltsIntegrationTestBase("", "") {}
+};
+
+INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestEmptyPeer,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
+TEST_P(AltsIntegrationTestEmptyPeer, RouterRequestAndResponseWithBodyNoBuffer) {
+  ConnectionCreationFunction creator = [this]() -> Network::ClientConnectionPtr {
+    return makeAltsConnection();
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+}
+
+class AltsIntegrationTestInvalidPeer : public AltsIntegrationTestBase {
+public:
+  AltsIntegrationTestInvalidPeer()
+      : AltsIntegrationTestBase("invalid_server_identity", "invalid_client_identity") {}
+};
+
+INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestInvalidPeer,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
+TEST_P(AltsIntegrationTestInvalidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
+  initialize();
+  codec_client_ = makeRawHttpConnection(makeAltsConnection());
+  EXPECT_FALSE(codec_client_->connected());
 }
 
 } // namespace Alts
