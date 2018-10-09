@@ -90,7 +90,7 @@ std::string HessianUtils::peekString(Buffer::Instance& buffer, size_t* size, uin
       throw EnvoyException("buffer underflow");
     }
 
-    delta_length = (code - 0x30) * 256 + buffer.peekInt<int8_t>(offset + 1);
+    delta_length = (code - 0x30) * 256 + buffer.peekInt<uint8_t>(offset + 1);
     if (delta_length + 2 + offset > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
