@@ -42,40 +42,19 @@ class Snapshot {
 public:
   virtual ~Snapshot() {}
 
-  /**
-   * The raw data from a single snapshot key.
-   */
-  class Entry {
-  public:
-    virtual ~Entry() {}
-
+  struct Entry {
     enum class EntryType {
+      STRING_VALUE,
       UINT_VALUE,
       FRACTIONAL_PERCENT_VALUE,
-      UNSET_VALUE,
     };
-
-    /**
-     * The raw runtime data.
-     */
-    virtual std::string getRawStringValue() const PURE;
-
-    /**
-     * The possibly parsed integer value from the runtime data.
-     */
-    virtual absl::optional<uint64_t> getUintValue() const PURE;
-
-    /**
-     * The possibly parsed fractional percent value from the runtime data.
-     */
-    virtual absl::optional<envoy::type::FractionalPercent> getFractionalPercentValue() const PURE;
-
-    /**
-     * Attempts to parse the raw string value into one of the supported entry types and sets the
-     * entry type as appropriate.
-     */
-    virtual void attemptParse() const PURE;
+    EntryType entry_type_;
+    std::string raw_string_value_;
+    absl::optional<uint64_t> uint_value_;
+    absl::optional<envoy::type::FractionalPercent> fractional_percent_value_;
   };
+
+  typedef std::unordered_map<std::string, Entry> EntryMap;
 
   /**
    * A provider of runtime values. One or more of these compose the snapshot's source of values,
@@ -84,10 +63,12 @@ public:
   class OverrideLayer {
   public:
     virtual ~OverrideLayer() {}
+
     /**
      * @return const std::unordered_map<std::string, Entry>& the values in this layer.
      */
-    virtual const std::unordered_map<std::string, Entry>& values() const PURE;
+    virtual const std::unordered_map<std::string, Snapshot::Entry>& values() const PURE;
+
     /**
      * @return const std::string& a user-friendly alias for this layer, e.g. "admin" or "disk".
      */

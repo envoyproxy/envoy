@@ -32,6 +32,8 @@ public:
                      bool(const std::string& key, uint64_t default_value, uint64_t random_value));
   MOCK_CONST_METHOD4(featureEnabled, bool(const std::string& key, uint64_t default_value,
                                           uint64_t random_value, uint64_t num_buckets));
+  MOCK_CONST_METHOD2(featureEnabled, bool(const std::string& key, envoy::type::FractionalPercent default_value));
+  MOCK_CONST_METHOD3(featureEnabled, bool(const std::string& key, envoy::type::FractionalPercent default_value, uint64_t random_value));
   MOCK_CONST_METHOD1(get, const std::string&(const std::string& key));
   MOCK_CONST_METHOD2(getInteger, uint64_t(const std::string& key, uint64_t default_value));
   MOCK_CONST_METHOD0(getLayers, const std::vector<OverrideLayerConstPtr>&());
@@ -54,7 +56,6 @@ public:
   ~MockOverrideLayer();
 
   MOCK_CONST_METHOD0(name, const std::string&());
-  MOCK_CONST_METHOD0(values, const std::unordered_map<std::string, Snapshot::Entry>&());
 };
 
 } // namespace Runtime

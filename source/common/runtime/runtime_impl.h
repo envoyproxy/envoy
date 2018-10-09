@@ -15,6 +15,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/type/percent.pb.validate.h"
 
+#include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
@@ -60,7 +61,7 @@ struct RuntimeStats {
 /**
  * Implementation of Snapshot whose source is the vector of layers passed to the constructor.
  */
-class SnapshotImpl : public Snapshot, public ThreadLocal::ThreadLocalObject {
+class SnapshotImpl : public Snapshot, public ThreadLocal::ThreadLocalObject, Logger::Loggable<Logger::Id::runtime> {
 public:
   SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
                std::vector<OverrideLayerConstPtr>&& layers);
@@ -71,8 +72,8 @@ public:
   bool featureEnabled(const std::string& key, uint64_t default_value) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value,
                       uint64_t random_value) const override;
-  bool featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value) const;
-  bool featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value, uint64_t random_value) const;
+  bool featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value) const override;
+  bool featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value, uint64_t random_value) const override;
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string& key, uint64_t default_value) const override;
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
@@ -80,45 +81,19 @@ public:
   static Entry createEntry(const std::string& value);
 
 private:
-  const std::vector<OverrideLayerConstPtr> layers_;
-  std::unordered_map<std::string, const Snapshot::Entry> values_;
-  RandomGenerator& generator_;
-};
-
-/**
- *
- */
-class EntryImpl : public Snapshot::Entry {
-public:
-  EntryImpl(const std::string& raw_string_value) :
-    raw_string_value_(raw_string_value) {}
-  std::string getRawStringValue() const {
-    return raw_string_value_;
-  }
-  absl::optional<uint64_t> getUintValue() const {
-    return uint_value_;
-  }
-  absl::optional<envoy::type::FractionalPercent> getFractionalPercentValue() const {
-    return fractional_percent_value_;
-  }
-  EntryType getEntryType() const {
-    return entry_type_;
-  }
-  void attemptParse() const {
-    if (parseUintValue()) {
+  static void resolveEntryType(Entry& entry) {
+    if (parseEntryUintValue(entry)) {
       return;
     }
-    parseFractionalPercentValue();
+    parseEntryFractionalPercentValue(entry);
   }
 
-private:
-  bool parseUintValue();
-  bool parseFractionalPercentValue();
+  static bool parseEntryUintValue(Entry& entry);
+  static bool parseEntryFractionalPercentValue(Entry& entry);
 
-  EntryType entry_type_;
-  std::string raw_string_value_;
-  absl::optional<uint64_t> uint_value_;
-  absl::optional<envoy::type::FractionalPercent> fractional_percent_value_;
+  const std::vector<OverrideLayerConstPtr> layers_;
+  EntryMap values_;
+  RandomGenerator& generator_;
 };
 
 /**
@@ -127,13 +102,13 @@ private:
 class OverrideLayerImpl : public Snapshot::OverrideLayer {
 public:
   explicit OverrideLayerImpl(const std::string& name) : name_{name} {}
-  const std::unordered_map<std::string, Snapshot::Entry>& values() const override {
+  const Snapshot::EntryMap& values() const override {
     return values_;
   }
   const std::string& name() const override { return name_; }
 
 protected:
-  std::unordered_map<std::string, Snapshot::Entry> values_;
+  Snapshot::EntryMap values_;
   const std::string name_;
 };
 

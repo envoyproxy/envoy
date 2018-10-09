@@ -174,24 +174,34 @@ const std::string& SnapshotImpl::get(const std::string& key) const {
   if (entry == values_.end()) {
     return EMPTY_STRING;
   } else {
-    return entry->second.getRawStringValue();
+    return entry->second.raw_string_value_;
   }
 }
 
 bool SnapshotImpl::featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value) const {
-
+  return featureEnabled(key, default_value, generator_.random());
 }
 
 bool SnapshotImpl::featureEnabled(const std::string& key, envoy::type::FractionalPercent default_value, uint64_t random_value) const {
+  const auto& entry = values_.find(key);
+  uint64_t numerator, denominator;
+  if (entry == values_.end() || entry->second.entry_type_ != Entry::EntryType::FRACTIONAL_PERCENT_VALUE) {
+    numerator = default_value.numerator();
+    denominator = ProtobufPercentHelper::fractionalPercentDenominatorToInt(default_value.denominator());
+  } else {
+    numerator = entry->second.fractional_percent_value_->numerator();
+    denominator = ProtobufPercentHelper::fractionalPercentDenominatorToInt(entry->second.fractional_percent_value_->denominator());
+  }
 
+  return random_value % denominator < numerator;
 }
 
 uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value) const {
   auto entry = values_.find(key);
-  if (entry == values_.end() || !entry->second.getUintValue()) {
+  if (entry == values_.end() || !entry->second.uint_value_) {
     return default_value;
   } else {
-    return entry->second.getUintValue().value();
+    return entry->second.uint_value_.value();
   }
 }
 
@@ -211,32 +221,33 @@ SnapshotImpl::SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
   stats.num_keys_.set(values_.size());
 }
 
-Snapshot::Entry SnapshotImpl::createEntry(const std::string& value) {
-  Entry entry(value);
+SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
+  Entry entry;
+  entry.entry_type_ = Entry::EntryType::STRING_VALUE;
+  entry.raw_string_value_ = value;
 
   // As a perf optimization, attempt to parse the entry's string and store it inside the struct. If
   // we don't succeed that's fine.
-  entry.attemptParse();
-
+  resolveEntryType(entry);
 
   return entry;
 }
 
-bool SnapshotImpl::EntryImpl::parseUintValue() {
+bool SnapshotImpl::parseEntryUintValue(Entry& entry) {
   // TODO (tonya11en): Use C++17 if-statements with initializers to limit scope of variables.
   uint64_t converted_uint64;
-  if (StringUtil::atoul(entry.getRawStringValue().c_str(), converted_uint64)) {
-    entry_type_ = Entry::EntryType::UINT_VALUE;
-    uint_value_ = converted_uint64;
+  if (StringUtil::atoul(entry.raw_string_value_.c_str(), converted_uint64)) {
+    entry.entry_type_ = Entry::EntryType::UINT_VALUE;
+    entry.uint_value_ = converted_uint64;
     return true;
   }
   return false;
 }
 
-bool SnapshotImpl::EntryImpl::parseFractionalPercentValue() {
+bool SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
   envoy::type::FractionalPercent converted_fractional_percent;
   try {
-    MessageUtil::loadFromYamlAndValidate(raw_string_value_, converted_fractional_percent);
+    MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent);
   } catch (const ProtoValidationException& ex) {
     ENVOY_LOG(error, "unable to validate proto: {}", ex.what());
     return false;
@@ -246,8 +257,8 @@ bool SnapshotImpl::EntryImpl::parseFractionalPercentValue() {
     return false;
   }
 
-  fractional_percent_value_ = converted_fractional_percent;
-  entry_type_ = Entry::EntryType::FRACTIONAL_PERCENT_VALUE;
+  entry.fractional_percent_value_ = converted_fractional_percent;
+  entry.entry_type_ = Entry::EntryType::FRACTIONAL_PERCENT_VALUE;
   return true;
 }
 

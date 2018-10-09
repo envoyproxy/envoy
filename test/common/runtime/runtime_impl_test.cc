@@ -142,8 +142,8 @@ TEST_F(DiskBackedLoaderImplTest, GetLayers) {
   run("test/common/runtime/test_data/current", "envoy_override");
   const auto& layers = loader->snapshot().getLayers();
   EXPECT_EQ(3, layers.size());
-  EXPECT_EQ("hello", layers[0]->values().find("file1")->second.string_value_);
-  EXPECT_EQ("hello override", layers[1]->values().find("file1")->second.string_value_);
+  EXPECT_EQ("hello", layers[0]->values().find("file1")->second.raw_string_value_);
+  EXPECT_EQ("hello override", layers[1]->values().find("file1")->second.raw_string_value_);
   // Admin should be last
   EXPECT_NE(nullptr, dynamic_cast<const AdminLayer*>(layers.back().get()));
   EXPECT_TRUE(layers[2]->values().empty());
@@ -151,7 +151,7 @@ TEST_F(DiskBackedLoaderImplTest, GetLayers) {
   loader->mergeValues({{"foo", "bar"}});
   // The old snapshot and its layers should have been invalidated. Refetch.
   const auto& new_layers = loader->snapshot().getLayers();
-  EXPECT_EQ("bar", new_layers[2]->values().find("foo")->second.string_value_);
+  EXPECT_EQ("bar", new_layers[2]->values().find("foo")->second.raw_string_value_);
 }
 
 TEST_F(DiskBackedLoaderImplTest, BadDirectory) {
