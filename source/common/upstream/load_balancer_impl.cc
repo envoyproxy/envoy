@@ -62,13 +62,16 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
 }
 
 // The following cases are handled by
-// recalculatePerPriorityState and recalculatePerPriorityPanic methods;
-// - Total health is = 100. It means there are enough healthy hosts to handle the load.
+// recalculatePerPriorityState and recalculatePerPriorityPanic methods (normalized total health is
+// sum of all priorities' health values and capped at 100).
+// - normalized total health is = 100%. It means there are enough healthy hosts to handle the load.
 //   Do not enter panic mode, even if a specific priority has low number of healthy hosts.
-// - Total health is < 100. There are not enough healthy hosts to handle the load. Continue
+// - normalized total health is < 100%. There are not enough healthy hosts to handle the load.
+// Continue
 //   distibuting the load among priority sets, but turn on panic mode for a given priority
 //   if # of healthy hosts in priority set is low.
-// - Total health is 0. All hosts are down. Redirect 100% of traffic to P=0 and enable panic mode.
+// - normalized total health is 0%. All hosts are down. Redirect 100% of traffic to P=0 and enable
+// panic mode.
 
 void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    const PrioritySet& priority_set,
@@ -83,6 +86,11 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   HostSet& host_set = *priority_set.hostSetsPerPriority()[priority];
   per_priority_health[priority] = 0;
   if (host_set.hosts().size() > 0) {
+    // Each priority level's health is ratio of healthy hosts to total number of hosts in a priority
+    // multiplied by overprovisioning factor of 1.4 and capped at 100%. It means that if all
+    // hosts are healthy that priority's health is 100%*1.4=140% and is capped at 100% which results
+    // in 100%. If 80% of hosts are healty, that priority's health is still 100% (80%*1.4=112% and
+    // capped at 100%).
     per_priority_health[priority] =
         std::min<uint32_t>(100, (host_set.overprovisioning_factor() *
                                  host_set.healthyHosts().size() / host_set.hosts().size()));
@@ -97,8 +105,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   // adds up to 100.
   // Sum of priority levels' health values may exceed 100, so it is capped at 100 and referred as
   // normalized total health.
-  const uint32_t normalized_total_health = std::min<uint32_t>(
-      std::accumulate(per_priority_health.begin(), per_priority_health.end(), 0), 100);
+  const uint32_t normalized_total_health = calcNormalizedTotalHealth(per_priority_health);
   if (normalized_total_health == 0) {
     // Everything is terrible. Send all load to P=0.
     // In this one case sumEntries(per_priority_load) != 100 since we sinkhole all traffic in P=0.
@@ -131,8 +138,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
 void LoadBalancerBase::recalculatePerPriorityPanic() {
   per_priority_panic_.resize(priority_set_.hostSetsPerPriority().size());
 
-  const uint32_t normalized_total_health = std::min<uint32_t>(
-      std::accumulate(per_priority_health_.begin(), per_priority_health_.end(), 0), 100);
+  const uint32_t normalized_total_health = calcNormalizedTotalHealth(per_priority_health_);
 
   if (normalized_total_health == 0) {
     // Everything is terrible. All load should be to P=0. Turn on panic mode.
@@ -142,8 +148,9 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
   }
 
   for (size_t i = 0; i < per_priority_health_.size(); ++i) {
-    // For each level check if it should run in panic mode. Never set panic mode if the total health
-    // is 100%, even when individual priority level has very low # of healthy hosts.
+    // For each level check if it should run in panic mode. Never set panic mode if
+    // normalized total health is 100%, even when individual priority level has very low # of
+    // healthy hosts.
     const HostSet& priority_host_set = *priority_set_.hostSetsPerPriority()[i];
     per_priority_panic_[i] =
         (normalized_total_health == 100 ? false : isGlobalPanic(priority_host_set));

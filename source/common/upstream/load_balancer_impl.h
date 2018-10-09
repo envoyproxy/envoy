@@ -81,6 +81,16 @@ public:
   void recalculatePerPriorityPanic();
 
 protected:
+  // Method calculates normalized total health. Each priority level's health is ratio of
+  // healthy hosts to total number of hosts in a priority multiplied by overprovisioning factor
+  // of 1.4 and capped at 100%. Effectively each priority's health is a value between 0-100%.
+  // Calculating normalized total health starts with summarizing all priorities' health values.
+  // It can exceed 100%. For example if there are three priorities and each is 100% healthy, the
+  // total of all priorities is 300%. Normalized total health is then capped at 100%.
+  static uint32_t calcNormalizedTotalHealth(std::vector<uint32_t>& per_priority_health) {
+    return std::min<uint32_t>(
+        std::accumulate(per_priority_health.begin(), per_priority_health.end(), 0), 100);
+  }
   // The percentage load (0-100) for each priority level
   std::vector<uint32_t> per_priority_load_;
   // The health (0-100) for each priority level.
