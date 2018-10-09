@@ -404,7 +404,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     JsonFormatterImpl formatter(key_mapping);
     
     auto actual_json_map = formatter.to_map(request_header, response_header, response_trailer, request_info);
-    EXPECT_THAT(*actual_json_map, ::testing::ContainerEq(expected_json_map));
+    EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
     
     auto actual_string = formatter.format(request_header, response_header, response_trailer, request_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
@@ -431,7 +431,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     JsonFormatterImpl formatter(key_mapping);
     
     auto actual_json_map = formatter.to_map(request_header, response_header, response_trailer, request_info);
-    EXPECT_THAT(*actual_json_map, ::testing::ContainerEq(expected_json_map));
+    EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
     
     auto actual_string = formatter.format(request_header, response_header, response_trailer, request_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
@@ -462,7 +462,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
 
     auto actual_json_map = formatter.to_map(request_header, response_header, response_trailer, request_info);
-    EXPECT_THAT(*actual_json_map, ::testing::ContainerEq(expected_json_map));
+    EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
     auto actual_string = formatter.format(request_header, response_header, response_trailer, request_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
@@ -493,7 +493,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
 
     auto actual_json_map = formatter.to_map(request_header, response_header, response_trailer, request_info);
-    EXPECT_THAT(*actual_json_map, ::testing::ContainerEq(expected_json_map));
+    EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
     auto actual_string = formatter.format(request_header, response_header, response_trailer, request_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
@@ -524,7 +524,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     JsonFormatterImpl formatter(key_mapping);
 
     auto actual_json_map = formatter.to_map(request_header, response_header, response_trailer, request_info);
-    EXPECT_THAT(*actual_json_map, ::testing::ContainerEq(expected_json_map));
+    EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
     
     auto actual_string = formatter.format(request_header, response_header, response_trailer, request_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
@@ -563,7 +563,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     JsonFormatterImpl formatter(key_mapping);
 
     auto actual_json_map = formatter.to_map(request_header, response_header, response_trailer, request_info);
-    EXPECT_THAT(*actual_json_map, ::testing::ContainerEq(expected_json_map));
+    EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
     
     auto actual_string = formatter.format(request_header, response_header, response_trailer, request_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));

@@ -75,19 +75,19 @@ std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
 }
 
 JsonFormatterImpl::JsonFormatterImpl(const std::map<const std::string, const std::string>& format_mapping) {
-  for (const auto& format_pair : format_mapping) {
-    auto providers = AccessLogFormatParser::parse(format_pair.second);
+  for (const auto& pair : format_mapping) {
+    auto providers = AccessLogFormatParser::parse(pair.second);
 
     // Enforce that each key only has one format specifier in it
     if (providers.size() > 1) {
-      throw EnvoyException(fmt::format("More than one format specifier was provided in the JSON log format: {}", format_pair.second));
+      throw EnvoyException(fmt::format("More than one format specifier was provided in the JSON log format: {}", pair.second));
     }
 
     if (providers.size() < 1) {
-      throw EnvoyException(fmt::format("No format specifier was provided in the JSON log format: {}", format_pair.second));
+      throw EnvoyException(fmt::format("No format specifier was provided in the JSON log format: {}", pair.second));
     }
 
-    json_output_format_.emplace(format_pair.first, std::move(providers[0]));
+    json_output_format_.emplace(pair.first, std::move(providers[0]));
   }
 }
 
@@ -98,28 +98,27 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
   rapidjson::StringBuffer strbuf;
   rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
 
-  writer.StartObject();
   auto output_map = this->to_map(request_headers, response_headers, response_trailers, request_info);
-  for (auto it = output_map->begin(); it != output_map->end(); ++it) {
-    writer.Key(it->first.c_str());
-    writer.String(it->second.c_str());
+  writer.StartObject();
+  for (const auto& pair : output_map) {
+    writer.Key(pair.first.c_str());
+    writer.String(pair.second.c_str());
   }
   writer.EndObject();
   return fmt::format("{}\n", strbuf.GetString());
 }
 
-std::unique_ptr<std::map<std::string, std::string>>
-JsonFormatterImpl::to_map(const Http::HeaderMap& request_headers,
-                          const Http::HeaderMap& response_headers,
-                          const Http::HeaderMap& response_trailers,
-                          const RequestInfo::RequestInfo& request_info) const {
+std::map<std::string, std::string> JsonFormatterImpl::to_map(const Http::HeaderMap& request_headers,
+                                          const Http::HeaderMap& response_headers,
+                                          const Http::HeaderMap& response_trailers,
+                                          const RequestInfo::RequestInfo& request_info) const {
   std::map<std::string, std::string> output;
   for (const auto& pair : json_output_format_) {
     output.emplace(
       pair.first,
       pair.second->format(request_headers, response_headers, response_trailers, request_info));
   }
-  return std::make_unique<std::map<std::string, std::string>>(output);
+  return output;
 }
 
 void AccessLogFormatParser::parseCommandHeader(const std::string& token, const size_t start,

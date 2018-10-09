@@ -108,11 +108,10 @@ public:
                      const Http::HeaderMap& response_trailers,
                      const RequestInfo::RequestInfo& request_info) const override;
 
-  std::unique_ptr<std::map<std::string, std::string>> to_map(
-    const Http::HeaderMap& request_headers,
-    const Http::HeaderMap& response_headers,
-    const Http::HeaderMap& response_trailers,
-    const RequestInfo::RequestInfo& request_info) const;
+  std::map<std::string, std::string> to_map(const Http::HeaderMap& request_headers,
+                                            const Http::HeaderMap& response_headers,
+                                            const Http::HeaderMap& response_trailers,
+                                            const RequestInfo::RequestInfo& request_info) const;
 
 private:
   std::vector<FormatterProviderPtr> providers_;
