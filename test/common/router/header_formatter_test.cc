@@ -211,7 +211,9 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
   Envoy::StreamInfo::FilterStateImpl per_request_state;
   per_request_state.setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1));
-  EXPECT_EQ(1, per_request_state.getData<StreamInfo::TestIntAccessor>("testing").access());
+  EXPECT_THROW_WITH_MESSAGE(per_request_state.getData<StreamInfo::TestIntAccessor>("testing"),
+                            EnvoyException,
+                            "Data stored under testing cannot be coerced to specified type");
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
