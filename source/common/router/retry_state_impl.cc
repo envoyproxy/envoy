@@ -37,7 +37,7 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
 
   // We short circuit here and do not both with an allocation if there is no chance we will retry.
   if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() ||
-      route_policy.retryOn() || !route_policy.retriableStatusCodes().empty()) {
+      route_policy.retryOn()) {
     ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, runtime, random,
                                  dispatcher, priority));
   }
@@ -73,7 +73,10 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
   if (request_headers.EnvoyRetriableStatusCodes()) {
     for (const auto code : StringUtil::splitToken(
              request_headers.EnvoyRetriableStatusCodes()->value().getStringView(), ",")) {
-      retriable_status_codes_.emplace_back(std::stoi(std::string(code)));
+      uint64_t out;
+      if (StringUtil::atoul(std::string(code).c_str(), out)) {
+        retriable_status_codes_.emplace_back(out);
+      }
     }
   }
 
