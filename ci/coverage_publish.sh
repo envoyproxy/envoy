@@ -25,6 +25,7 @@ then
   COVERAGE_DIR="$(dirname "${COVERAGE_FILE}")"
   S3_LOCATION="lyft-envoy/coverage/report-${BRANCH_NAME}"
 
+  pip install --upgrade pip
   pip install awscli --upgrade
   aws s3 cp "${COVERAGE_DIR}" "s3://${S3_LOCATION}" --recursive --acl public-read --quiet --sse
   echo "Coverage report for branch '${BRANCH_NAME}': https://s3.amazonaws.com/${S3_LOCATION}/coverage.html"
