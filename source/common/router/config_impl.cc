@@ -46,13 +46,14 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
     return;
   }
 
-  per_try_timeout_ = std::chrono::milliseconds(
-      PROTOBUF_GET_MS_OR_DEFAULT(config.retry_policy(), per_try_timeout, 0));
-  num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_policy(), num_retries, 1);
-  retry_on_ = RetryStateImpl::parseRetryOn(config.retry_policy().retry_on());
-  retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
+  const auto& retry_policy = config.retry_policy();
+  per_try_timeout_ =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
+  num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
+  retry_on_ = RetryStateImpl::parseRetryOn(retry_policy.retry_on());
+  retry_on_ |= RetryStateImpl::parseRetryGrpcOn(retry_policy.retry_on());
 
-  for (const auto& host_predicate : config.retry_policy().retry_host_predicate()) {
+  for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
     auto& factory =
         ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
             host_predicate.name());
@@ -61,7 +62,7 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
     factory.createHostPredicate(*this, *config, num_retries_);
   }
 
-  const auto retry_priority = config.retry_policy().retry_priority();
+  const auto retry_priority = retry_policy.retry_priority();
   if (!retry_priority.name().empty()) {
     auto& factory = ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
         retry_priority.name());
@@ -70,9 +71,13 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
     factory.createRetryPriority(*this, *config, num_retries_);
   }
 
-  auto host_selection_attempts = config.retry_policy().host_selection_retry_max_attempts();
+  auto host_selection_attempts = retry_policy.host_selection_retry_max_attempts();
   if (host_selection_attempts) {
     host_selection_attempts_ = host_selection_attempts;
+  }
+
+  for (auto code : retry_policy.retriable_status_codes()) {
+    retriable_status_codes_.emplace_back(code);
   }
 }
 
