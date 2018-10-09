@@ -40,7 +40,7 @@ parseAccessLogFromJson(const std::string& json_string) {
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::FilterJson::translateAccessLog(*json_object_ptr, access_log);
   return access_log;
-} 
+}
 
 envoy::config::filter::accesslog::v2::AccessLog parseAccessLogFromV2Yaml(const std::string& yaml) {
   envoy::config::filter::accesslog::v2::AccessLog access_log;
