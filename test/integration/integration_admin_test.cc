@@ -1,9 +1,11 @@
 #include "test/integration/integration_admin_test.h"
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/fmt.h"
+#include "common/stats/stats_matcher_impl.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/utility.h"
@@ -440,6 +442,80 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
     EXPECT_TRUE(response->complete());
     EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   }
+}
+
+// Testing the behavior of StatsMatcher, which allows/denies the  instantiation of stats based on
+// restrictions on their names.
+class StatsMatcherIntegrationTest : public HttpIntegrationTest, public testing::Test {
+public:
+  StatsMatcherIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4,
+                            simTime()) {}
+
+  void initialize() override {
+    config_helper_.addConfigModifier(
+        [this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+          *bootstrap.mutable_stats_config()->mutable_stats_matcher() = stats_matcher_;
+        });
+    HttpIntegrationTest::initialize();
+  }
+  void makeRequest() {
+    response_ = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
+                                                   downstreamProtocol(), version_);
+    ASSERT_TRUE(response_->complete());
+    EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  }
+
+  BufferingStreamDecoderPtr response_;
+  envoy::config::metrics::v2::StatsMatcher stats_matcher_;
+};
+
+// Verify that StatsMatcher prevents the printing of uninstantiated stats.
+TEST_F(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
+  stats_matcher_.mutable_exclusion_list()->add_patterns()->set_prefix("server.");
+  initialize();
+  makeRequest();
+  EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.")));
+}
+
+TEST_F(StatsMatcherIntegrationTest, ExcludeRequests) {
+  stats_matcher_.mutable_exclusion_list()->add_patterns()->set_regex(".*requests.*");
+  initialize();
+  makeRequest();
+  EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("requests")));
+}
+
+TEST_F(StatsMatcherIntegrationTest, ExcludeExact) {
+  stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
+  initialize();
+  makeRequest();
+  EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.concurrency")));
+}
+
+TEST_F(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
+  stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
+  stats_matcher_.mutable_exclusion_list()->add_patterns()->set_regex(".*live");
+  initialize();
+  makeRequest();
+  EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.concurrency")));
+  EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.live")));
+}
+
+// TODO(ambuc): Find a cleaner way to test this. This test has two unfortunate compromises:
+//
+// - a) `listener_manager.listener_create_success` must be instantiated, because BaseIntegrationTest
+//      blocks on its creation (see waitForCounterGe and the suite of waitFor* functions), and
+// - b) `stats.overflow` isn't blocked from instantiation, because it occurs at ThreadLocalStore
+//      construction time, before setStatsMatcher() is called.
+//
+// If either of these invariants is changed, this test must be rewritten.
+TEST_F(StatsMatcherIntegrationTest, IncludeExact) {
+  stats_matcher_.mutable_inclusion_list()->add_patterns()->set_exact(
+      "listener_manager.listener_create_success");
+  initialize();
+  makeRequest();
+  EXPECT_THAT(response_->body(),
+              testing::Eq("listener_manager.listener_create_success: 1\nstats.overflow: 0\n"));
 }
 
 } // namespace Envoy
