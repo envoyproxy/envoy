@@ -8,10 +8,6 @@
 #include "gtest/gtest.h"
 #include "nghttp2/nghttp2.h"
 
-// A global variable in nghttp2 to disable preface and initial settings for
-// tests.
-extern int nghttp2_enable_strict_preface;
-
 namespace Envoy {
 namespace Http {
 namespace Http2 {
@@ -102,12 +98,16 @@ static ssize_t send_callback(nghttp2_session* session, const uint8_t* buf, size_
 
 class MetadataEncoderDecoderTest : public ::testing::Test {
 public:
-  MetadataEncoderDecoderTest() : encoder_(STREAM_ID), decoder_(STREAM_ID) {}
+  MetadataEncoderDecoderTest() : encoder_(STREAM_ID) {}
 
-  void initialize() {
+  void initialize(MetadataCallback cb) {
+    decoder_ = std::make_unique<MetadataDecoder>(STREAM_ID, cb);
+
     // Enables extension frame.
     nghttp2_option_new(&option_);
     nghttp2_option_set_user_recv_extension_type(option_, METADATA_FRAME_TYPE);
+    // Skip HTTP/2 connection preface.
+    nghttp2_option_set_no_recv_client_magic(option_, 1);
 
     // Sets callback functions.
     nghttp2_session_callbacks_new(&callbacks_);
@@ -119,13 +119,8 @@ public:
 
     // Sets application data to pass to nghttp2 session.
     user_data_.encoder = &encoder_;
-    user_data_.decoder = &decoder_;
+    user_data_.decoder = decoder_.get();
     user_data_.output_buffer = &output_buffer_;
-
-    // Creates new nghttp2 session.
-    nghttp2_enable_strict_preface = 0;
-    nghttp2_session_client_new2(&session_, callbacks_, &user_data_, option_);
-    nghttp2_enable_strict_preface = 1;
   }
 
   void cleanUp() {
@@ -144,7 +139,7 @@ public:
   nghttp2_session* session_ = nullptr;
   nghttp2_session_callbacks* callbacks_;
   MetadataEncoder encoder_;
-  MetadataDecoder decoder_;
+  std::unique_ptr<MetadataDecoder> decoder_;
   nghttp2_option* option_;
 
   // Stores data received by peer.
@@ -158,8 +153,6 @@ public:
 
 // Tests encoding and decoding small METADATAs, which can fit in one HTTP2 frame.
 TEST_F(MetadataEncoderDecoderTest, EncodeDecodeSmallHeaderBlock) {
-  initialize();
-
   MetadataMap metadata_map = {
       {"header_key1", "header_value1"},
       {"header_key2", "header_value2"},
@@ -170,7 +163,7 @@ TEST_F(MetadataEncoderDecoderTest, EncodeDecodeSmallHeaderBlock) {
   // Verifies the encoding/decoding result in decoder's callback functions.
   MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
                                   std::placeholders::_1);
-  decoder_.registerMetadataCallback(cb);
+  initialize(cb);
 
   // Creates metadata payload.
   encoder_.createPayload(metadata_map);
@@ -193,8 +186,6 @@ TEST_F(MetadataEncoderDecoderTest, EncodeDecodeSmallHeaderBlock) {
 
 // Tests encoding/decoding large METADATAs, which can cross multiple HTTP2 frames.
 TEST_F(MetadataEncoderDecoderTest, EncodeLargeHeaderBlock) {
-  initialize();
-
   MetadataMap metadata_map = {
       {"header_key1", std::string(50000, 'a')},
       {"header_key2", std::string(50000, 'b')},
@@ -203,7 +194,7 @@ TEST_F(MetadataEncoderDecoderTest, EncodeLargeHeaderBlock) {
   // Verifies the encoding/decoding result in decoder's callback functions.
   MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
                                   std::placeholders::_1);
-  decoder_.registerMetadataCallback(cb);
+  initialize(cb);
 
   // Creates metadata payload.
   encoder_.createPayload(metadata_map);
@@ -231,8 +222,6 @@ TEST_F(MetadataEncoderDecoderTest, EncodeLargeHeaderBlock) {
 
 // Tests encoder and decoder can perform on multiple MetadataMaps.
 TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
-  initialize();
-
   MetadataMap metadata_map = {
       {"header_key1", "header_value1"},
       {"header_key2", "header_value2"},
@@ -243,7 +232,8 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
   // Encode and decode the first MetadataMap.
   MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
                                   std::placeholders::_1);
-  decoder_.registerMetadataCallback(cb);
+  initialize(cb);
+
   encoder_.createPayload(metadata_map);
   nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID, nullptr);
   nghttp2_session_send(session_);
@@ -261,10 +251,10 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
   };
 
   // Encode and decode the second MetadataMap.
-  decoder_.unregisterMetadataCallback();
+  decoder_->unregisterMetadataCallback();
   MetadataCallback cb2 = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this,
                                    &metadata_map_2, std::placeholders::_1);
-  decoder_.registerMetadataCallback(cb2);
+  decoder_->registerMetadataCallback(cb2);
   encoder_.createPayload(metadata_map_2);
   nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID, nullptr);
   nghttp2_session_send(session_);
@@ -274,7 +264,14 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
 }
 
 TEST_F(MetadataEncoderDecoderTest, TestUnqualifiedInput) {
-  initialize();
+  MetadataMap metadata_map = {
+      {"header_key1", "header_value1"},
+  };
+
+  // Verifies the encoding/decoding result in decoder's callback functions.
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
+                                  std::placeholders::_1);
+  initialize(cb);
 
   MetadataMap metadata_map1 = {
       {"header_key1", "header_value1"},
@@ -292,51 +289,34 @@ TEST_F(MetadataEncoderDecoderTest, TestUnqualifiedInput) {
 }
 
 TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
-  initialize();
-
   MetadataMap metadata_map = {
-      {"header_key", std::string(1024 * 1024 + 1, 'a')},
+      {"header_key1", std::string(1024 * 1024 + 1, 'a')},
   };
+
+  // Verifies the encoding/decoding result in decoder's callback functions.
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
+                                  std::placeholders::_1);
+  initialize(cb);
+
   // metadata_map exceeds size limit.
   EXPECT_FALSE(encoder_.createPayload(metadata_map));
 
   std::string payload = std::string(1024 * 1024 + 1, 'a');
   EXPECT_FALSE(
-      decoder_.receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()), payload.size()));
-
-  cleanUp();
-}
-
-TEST_F(MetadataEncoderDecoderTest, TestDecodeCallbackSetAfterReceiveMetadata) {
-  initialize();
-
-  MetadataMap metadata_map = {
-      {"header_key1", "header_value1"},
-      {"header_key2", "header_value2"},
-      {"header_key3", "header_value3"},
-      {"header_key4", "header_value4"},
-  };
-
-  // Receives payload first.
-  encoder_.createPayload(metadata_map);
-  nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID, nullptr);
-  nghttp2_session_send(session_);
-  nghttp2_session_mem_recv(session_, output_buffer_.buf, output_buffer_.length);
-
-  // Sets up callback function.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
-                                  std::placeholders::_1);
-  decoder_.registerMetadataCallback(cb);
+      decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()), payload.size()));
 
   cleanUp();
 }
 
 TEST_F(MetadataEncoderDecoderTest, TestDecodeBadData) {
-  initialize();
-
   MetadataMap metadata_map = {
-      {"header_key", "header_value"},
+      {"header_key1", "header_value1"},
   };
+
+  // Verifies the encoding/decoding result in decoder's callback functions.
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
+                                  std::placeholders::_1);
+  initialize(cb);
 
   // Generates payload.
   encoder_.createPayload(metadata_map);
@@ -345,8 +325,8 @@ TEST_F(MetadataEncoderDecoderTest, TestDecodeBadData) {
 
   // Messes up with the encoded payload, and passes it to the decoder.
   output_buffer_.buf[10] |= 0xff;
-  decoder_.receiveMetadata(output_buffer_.buf, output_buffer_.length);
-  EXPECT_FALSE(decoder_.onMetadataFrameComplete(true));
+  decoder_->receiveMetadata(output_buffer_.buf, output_buffer_.length);
+  EXPECT_FALSE(decoder_->onMetadataFrameComplete(true));
 
   cleanUp();
 }

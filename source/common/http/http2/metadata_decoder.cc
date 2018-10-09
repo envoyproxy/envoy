@@ -6,10 +6,14 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-MetadataDecoder::MetadataDecoder(uint64_t stream_id) : stream_id_(stream_id) {
-  int rv = nghttp2_hd_inflate_new(&inflater_);
+MetadataDecoder::MetadataDecoder(uint64_t stream_id, MetadataCallback cb) : stream_id_(stream_id) {
+  nghttp2_hd_inflater* inflater;
+  int rv = nghttp2_hd_inflate_new(&inflater);
   ASSERT(rv == 0);
-  inflater_deleter_ = InflaterDeleter(inflater_);
+  inflater_ = Inflater(inflater);
+
+  ASSERT(cb != nullptr);
+  callback_ = std::move(cb);
 }
 
 bool MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len) {
@@ -26,13 +30,8 @@ bool MetadataDecoder::onMetadataFrameComplete(bool end_metadata) {
   }
 
   if (end_metadata) {
-    if (callback_ != nullptr) {
-      callback_(metadata_map_);
-      metadata_map_.clear();
-    } else {
-      metadata_map_list_.emplace_back(std::move(metadata_map_));
-      ASSERT(metadata_map_.empty());
-    }
+    callback_(metadata_map_);
+    metadata_map_.clear();
   }
   return true;
 }
@@ -57,7 +56,7 @@ bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
     // Feeds data to nghttp2 to decode.
     while (slice.len_ > 0) {
       ssize_t result =
-          nghttp2_hd_inflate_hd2(inflater_, &nv, &inflate_flags,
+          nghttp2_hd_inflate_hd2(inflater_.get(), &nv, &inflate_flags,
                                  reinterpret_cast<uint8_t*>(slice.mem_), slice.len_, is_end);
       if (result < 0 || (result == 0 && slice.len_ > 0)) {
         // If decoding fails, or there is data left in slice, but no data can be consumed by
@@ -80,7 +79,7 @@ bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
     if (slice.len_ == 0 && is_end) {
       // After one header block is decoded, reset inflater.
       ASSERT(end_metadata);
-      nghttp2_hd_inflate_end_headers(inflater_);
+      nghttp2_hd_inflate_end_headers(inflater_.get());
     }
   }
 
@@ -91,10 +90,6 @@ bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
 void MetadataDecoder::registerMetadataCallback(MetadataCallback callback) {
   ASSERT(callback != nullptr);
   callback_ = std::move(callback);
-  for (const auto& metadata_map : metadata_map_list_) {
-    callback_(metadata_map);
-  }
-  metadata_map_list_.clear();
 }
 
 void MetadataDecoder::unregisterMetadataCallback() { callback_ = nullptr; }
