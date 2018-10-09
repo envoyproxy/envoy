@@ -56,6 +56,18 @@ public:
    * Stop all listeners. This will not close any connections and is used for draining.
    */
   virtual void stopListeners() PURE;
+
+  /**
+   * Disable all listeners. This will not close any connections and is used to temporarily
+   * stop accepting connections on all listeners.
+   */
+  virtual void disableListeners() PURE;
+
+  /**
+   * Enable all listeners. This is used to re-enable accepting connections on all listeners
+   * after they have been temporarily disabled.
+   */
+  virtual void enableListeners() PURE;
 };
 
 typedef std::unique_ptr<ConnectionHandler> ConnectionHandlerPtr;
