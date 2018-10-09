@@ -33,6 +33,7 @@ public:
   const LowerCaseString ContentType{"content-type"};
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
+  const LowerCaseString EnvoyAttemptCount{"x-envoy-attempt-count"};
   const LowerCaseString EnvoyDownstreamServiceCluster{"x-envoy-downstream-service-cluster"};
   const LowerCaseString EnvoyDownstreamServiceNode{"x-envoy-downstream-service-node"};
   const LowerCaseString EnvoyExternalAddress{"x-envoy-external-address"};
@@ -46,6 +47,7 @@ public:
   const LowerCaseString EnvoyOverloaded{"x-envoy-overloaded"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
   const LowerCaseString EnvoyRetryGrpcOn{"x-envoy-retry-grpc-on"};
+  const LowerCaseString EnvoyRetriableStatusCodes{"x-envoy-retriable-status-codes"};
   const LowerCaseString EnvoyUpstreamAltStatName{"x-envoy-upstream-alt-stat-name"};
   const LowerCaseString EnvoyUpstreamCanary{"x-envoy-upstream-canary"};
   const LowerCaseString EnvoyUpstreamRequestTimeoutAltResponse{
@@ -145,6 +147,7 @@ public:
     const std::string ConnectFailure{"connect-failure"};
     const std::string RefusedStream{"refused-stream"};
     const std::string Retriable4xx{"retriable-4xx"};
+    const std::string RetriableStatusCodes{"retriable-status-codes"};
   } EnvoyRetryOnValues;
 
   struct {

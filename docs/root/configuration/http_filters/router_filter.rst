@@ -95,6 +95,11 @@ refused-stream
   Envoy will attempt a retry if the upstream server resets the stream with a REFUSED_STREAM error
   code. This reset type indicates that a request is safe to retry. (Included in *5xx*)
 
+retriable-status-codes
+  Envoy will attempt a retry if the upstream server responds with any response code matching one defined
+  in either :ref:`the retry policy <envoy_api_field_route.RouteAction.RetryPolicy.retriable_status_codes>`
+  or in the :ref:`config_http_filters_router_x-envoy-retriable-status-codes` header.
+
 The number of retries can be controlled via the
 :ref:`config_http_filters_router_x-envoy-max-retries` header or via the :ref:`route
 configuration <envoy_api_field_route.RouteAction.retry_policy>`.
@@ -138,6 +143,20 @@ Note that retry policies can also be applied at the :ref:`route level
 <envoy_api_field_route.RouteAction.retry_policy>`.
 
 By default, Envoy will *not* perform retries unless you've configured them per above.
+
+.. _config_http_filters_router_x-envoy-retriable-status-codes:
+
+x-envoy-retriable-status-codes
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Setting this header informs Envoy about what status codes should be considered retriable when used in
+conjunction with the :ref:`retriable-status-code <config_http_filters_router_x-envoy-retry-on>` retry policy.
+When the corresponding retry policy is set, the list of retriable status codes will be considered retriable
+in addition to the status codes enabled for retry through other retry policies. 
+
+The list is a comma delimited list of integers: "409" would cause 409 to be considered retriable, while "504,409"
+would consider both 504 and 409 retriable.
+
+This header will only be honored for requests from internal clients.
 
 .. _config_http_filters_router_x-envoy-upstream-alt-stat-name:
 
@@ -228,6 +247,16 @@ ingress/response path. They are documented in this section.
 
 .. contents::
   :local:
+
+.. _config_http_filters_router_x-envoy-attempt-count:
+
+x-envoy-attempt-count
+^^^^^^^^^^^^^^^^^^^^^
+
+Sent to the upstream to indicate which attempt the current request is in a series of retries. The value
+will be "1" on the initial request, incrementing by one for each retry. Only set if the
+:ref:`include_attempt_count_header <envoy_api_field_route.VirtualHost.include_request_attempt_count>`
+flag is set to true.
 
 .. _config_http_filters_router_x-envoy-expected-rq-timeout-ms:
 

@@ -244,7 +244,7 @@ public:
   ~MockWorkerFactory();
 
   // Server::WorkerFactory
-  WorkerPtr createWorker() override { return WorkerPtr{createWorker_()}; }
+  WorkerPtr createWorker(OverloadManager&) override { return WorkerPtr{createWorker_()}; }
 
   MOCK_METHOD0(createWorker_, Worker*());
 };

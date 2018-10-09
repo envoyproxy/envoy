@@ -12,6 +12,7 @@
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace Http {
@@ -110,6 +111,14 @@ public:
    * NOTE: In the future we may want to allow the filter to override the route entry.
    */
   virtual Router::RouteConstSharedPtr route() PURE;
+
+  /**
+   * Returns the clusterInfo for the cached route.
+   * This method is to avoid multiple look ups in the filter chain, it also provides a consistent
+   * view of clusterInfo after a route is picked/repicked.
+   * NOTE: Cached clusterInfo and route will be updated the same time.
+   */
+  virtual Upstream::ClusterInfoConstSharedPtr clusterInfo() PURE;
 
   /**
    * Clears the route cache for the current request. This must be called when a filter has modified

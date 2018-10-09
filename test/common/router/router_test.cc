@@ -2001,6 +2001,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_EQ("15", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2011,6 +2012,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_EQ("10", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2023,6 +2025,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
     EXPECT_EQ("15", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2035,6 +2038,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
     EXPECT_EQ("5", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2047,6 +2051,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
     EXPECT_EQ("7", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2060,6 +2065,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
     EXPECT_EQ("5", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2069,6 +2075,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
+    EXPECT_FALSE(headers.has("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2078,6 +2085,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
     EXPECT_EQ(std::chrono::milliseconds(10), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
+    EXPECT_FALSE(headers.has("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2088,6 +2096,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
     EXPECT_EQ(std::chrono::milliseconds(1000), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
+    EXPECT_EQ("1000m", headers.get_("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2098,6 +2107,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
     EXPECT_EQ(std::chrono::milliseconds(999), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
+    EXPECT_EQ("999m", headers.get_("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2107,6 +2117,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
     EXPECT_EQ(std::chrono::milliseconds(999), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
+    EXPECT_EQ("999m", headers.get_("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2120,6 +2131,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_EQ("15", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_EQ("15m", headers.get_("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2133,6 +2145,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_EQ("1000", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_EQ("1000m", headers.get_("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2148,6 +2161,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
     EXPECT_EQ("15", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_EQ("15m", headers.get_("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2163,6 +2177,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
     EXPECT_EQ("5", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_EQ("5m", headers.get_("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2178,6 +2193,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
     EXPECT_EQ("7", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_EQ("7m", headers.get_("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;
@@ -2194,6 +2210,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
     EXPECT_EQ("5", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_EQ("5m", headers.get_("grpc-timeout"));
   }
 }
 
