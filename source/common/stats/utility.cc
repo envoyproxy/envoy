@@ -2,15 +2,15 @@
 
 #include <algorithm>
 #include <string>
+#include <regex>
 
 namespace Envoy {
 namespace Stats {
 
+const std::regex re("[^a-zA-Z0-9_]");
+
 std::string Utility::sanitizeStatsName(const std::string& name) {
-  std::string stats_name = name;
-  std::replace(stats_name.begin(), stats_name.end(), ':', '_');
-  std::replace(stats_name.begin(), stats_name.end(), '\0', '_');
-  return stats_name;
+  return std::regex_replace(name, re, "_");
 }
 
 } // namespace Stats
