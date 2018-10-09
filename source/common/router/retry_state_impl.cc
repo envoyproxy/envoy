@@ -21,6 +21,7 @@ const uint32_t RetryPolicy::RETRY_ON_5XX;
 const uint32_t RetryPolicy::RETRY_ON_GATEWAY_ERROR;
 const uint32_t RetryPolicy::RETRY_ON_CONNECT_FAILURE;
 const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
+const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_CANCELLED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
@@ -53,7 +54,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
                                Upstream::ResourcePriority priority)
     : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
       priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
-      retry_priority_(route_policy.retryPriority()) {
+      retry_priority_(route_policy.retryPriority()),
+      retriable_status_codes_(route_policy.retriableStatusCodes()) {
 
   if (request_headers.EnvoyRetryOn()) {
     retry_on_ = parseRetryOn(request_headers.EnvoyRetryOn()->value().c_str());
@@ -66,6 +68,15 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
     uint64_t temp;
     if (StringUtil::atoul(max_retries, temp)) {
       retries_remaining_ = temp;
+    }
+  }
+  if (request_headers.EnvoyRetriableStatusCodes()) {
+    for (const auto code : StringUtil::splitToken(
+             request_headers.EnvoyRetriableStatusCodes()->value().getStringView(), ",")) {
+      uint64_t out;
+      if (StringUtil::atoul(std::string(code).c_str(), out)) {
+        retriable_status_codes_.emplace_back(out);
+      }
     }
   }
 
@@ -102,6 +113,8 @@ uint32_t RetryStateImpl::parseRetryOn(absl::string_view config) {
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_4XX;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RefusedStream) {
       ret |= RetryPolicy::RETRY_ON_REFUSED_STREAM;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RetriableStatusCodes) {
+      ret |= RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
     }
   }
 
@@ -213,6 +226,14 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
     Http::Code code = static_cast<Http::Code>(Http::Utility::getResponseStatus(*response_headers));
     if (code == Http::Code::Conflict) {
       return true;
+    }
+  }
+
+  if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES)) {
+    for (auto code : retriable_status_codes_) {
+      if (Http::Utility::getResponseStatus(*response_headers) == code) {
+        return true;
+      }
     }
   }
 
