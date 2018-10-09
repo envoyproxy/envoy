@@ -74,7 +74,7 @@ public:
   void getParentStats(HotRestart::GetParentStatsInfo&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   HotRestart& hotRestart() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Init::Manager& initManager() override { return init_manager_; }
-  ListenerManager& listenerManager() override { return listener_manager_; }
+  ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
   RateLimit::ClientPtr
@@ -85,7 +85,7 @@ public:
   void shutdown() override;
   void shutdownAdmin() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
-  OverloadManager& overloadManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  OverloadManager& overloadManager() override { return *overload_manager_; }
   bool healthCheckFailed() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -128,7 +128,7 @@ public:
   uint64_t nextListenerTag() override { return 0; }
 
   // Server::WorkerFactory
-  WorkerPtr createWorker() override {
+  WorkerPtr createWorker(OverloadManager&) override {
     // Returned workers are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
@@ -154,8 +154,9 @@ private:
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   InitManagerImpl init_manager_;
-  ListenerManagerImpl listener_manager_;
+  std::unique_ptr<ListenerManagerImpl> listener_manager_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
+  std::unique_ptr<OverloadManager> overload_manager_;
 };
 
 } // namespace Server

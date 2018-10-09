@@ -3,12 +3,13 @@ Version history
 
 1.9.0 (pending)
 ===============
+* fault: removed integer percentage support.
+* router: added ability to configure arbitrary :ref:`retriable status codes. <envoy_api_field_route.RouteAction.RetryPolicy.retriable_status_codes>`
 * router: added ability to set attempt count in upstream requests, see :ref:`virtual host's include request
   attempt count flag <envoy_api_field_route.VirtualHost.include_request_attempt_count>`.
-* stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
-* fault: removed integer percentage support.
 * router: when :ref:`max_grpc_timeout <envoy_api_field_route.RouteAction.max_grpc_timeout>`
   is set, Envoy will now add or update the grpc-timeout header to reflect Envoy's expected timeout.
+* stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
 

@@ -258,6 +258,7 @@ private:
   HEADER_FUNC(EnvoyOverloaded)                                                                     \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
+  HEADER_FUNC(EnvoyRetriableStatusCodes)                                                           \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
   HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
   HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
