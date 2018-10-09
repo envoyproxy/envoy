@@ -290,6 +290,29 @@ TEST(PolicyMatcher, PolicyMatcher) {
   checkMatcher(matcher, false, conn);
 }
 
+TEST(RequestedServerNameMatcher, ValidRequestedServerName) {
+  Envoy::Network::MockConnection conn;
+  EXPECT_CALL(conn, requestedServerName())
+      .Times(8)
+      .WillRepeatedly(Return(absl::string_view("www.cncf.io")));
+
+  checkMatcher(RequestedServerNameMatcher("www.cncf.io"), true, conn);
+  checkMatcher(RequestedServerNameMatcher("*.cncf.io"), true, conn);
+  checkMatcher(RequestedServerNameMatcher("*.cncf.*"), true, conn);
+  checkMatcher(RequestedServerNameMatcher("www.*"), true, conn);
+  checkMatcher(RequestedServerNameMatcher("*.io"), true, conn);
+  checkMatcher(RequestedServerNameMatcher("*"), true, conn);
+  checkMatcher(RequestedServerNameMatcher("xyz.cncf.io"), false, conn);
+  checkMatcher(RequestedServerNameMatcher("example.com"), false, conn);
+}
+
+TEST(RequestedServerNameMatcher, EmptyRequestedServerName) {
+  Envoy::Network::MockConnection conn;
+  EXPECT_CALL(conn, requestedServerName()).Times(1).WillRepeatedly(Return(absl::string_view("")));
+
+  checkMatcher(RequestedServerNameMatcher("example.com"), false, conn);
+}
+
 } // namespace
 } // namespace RBAC
 } // namespace Common

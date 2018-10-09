@@ -11,6 +11,8 @@
 #include "common/http/header_utility.h"
 #include "common/network/cidr_range.h"
 
+#include "absl/strings/str_replace.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -200,6 +202,30 @@ public:
 
 private:
   const Envoy::Matchers::MetadataMatcher matcher_;
+};
+
+/**
+ * Perform a match against the requested SNI server name.
+ */
+class RequestedServerNameMatcher : public Matcher {
+public:
+  /**
+   * The constructor creates a simple regex from the input server name to be
+   * used further while matching. The regex substitutions are described below.
+   *
+   * 1. . with \. to treat the dot as a simple dot, and not a regex dot
+   * 2. * with .+? to enforce a one or more characters match
+   */
+  RequestedServerNameMatcher(const std::string& sni_server_name)
+      : server_name_regex_(RegexUtil::parseRegex(
+            absl::StrReplaceAll(sni_server_name, {{".", "\\."}, {"*", ".+?"}}),
+            std::regex::optimize)) {}
+
+  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+               const envoy::api::v2::core::Metadata&) const override;
+
+private:
+  const std::regex server_name_regex_;
 };
 
 } // namespace RBAC

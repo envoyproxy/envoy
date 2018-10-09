@@ -126,6 +126,9 @@ message Permission {
     // match, this permission would not match. Conversely, if the value of `not_rule` would not
     // match, this permission would match.
     Permission not_rule = 8;
+
+    // The name of the destination server that the client is attempting to connect to.
+    string requested_server_name = 9;
   }
 }
 

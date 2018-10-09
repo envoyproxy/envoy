@@ -12,6 +12,7 @@ Version history
 * router: added ability to set attempt count in upstream requests, see :ref:`virtual host's include request
   attempt count flag <envoy_api_field_route.VirtualHost.include_request_attempt_count>`.
 * router: added internal :ref:`grpc-retry-on <config_http_filters_router_x-envoy-retry-grpc-on>` policy.
+* rbac: added support for :ref:`SNI based <envoy_api_field_config.rbac.v2alpha.Permission.requested_server_name>` permissions.
 * router: when :ref:`max_grpc_timeout <envoy_api_field_route.RouteAction.max_grpc_timeout>`
   is set, Envoy will now add or update the grpc-timeout header to reflect Envoy's expected timeout.
 * stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
