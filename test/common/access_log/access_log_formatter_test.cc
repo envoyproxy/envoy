@@ -383,30 +383,29 @@ TEST(AccessLogFormatterTest, startTimeFormatter) {
 }
 
 TEST(AccessLogFormatterTest, JsonFormatterTest) {
-   {
+  {
     RequestInfo::MockRequestInfo request_info;
     Http::TestHeaderMapImpl request_header{};
     Http::TestHeaderMapImpl response_header{};
     Http::TestHeaderMapImpl response_trailer{};
-    
+
     envoy::api::v2::core::Metadata metadata;
     populateMetadataTestData(metadata);
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
-        
-    std::map<std::string, std::string> expected_json_map = {
-      {"plain_string", "plain_string_value"}
-    };
+
+    std::map<std::string, std::string> expected_json_map = {{"plain_string", "plain_string_value"}};
 
     const std::map<const std::string, const std::string> key_mapping = {
-      {"plain_string", "plain_string_value"}
-    };
+        {"plain_string", "plain_string_value"}};
     JsonFormatterImpl formatter(key_mapping);
-    
-    auto actual_json_map = formatter.to_map(request_header, response_header, response_trailer, request_info);
+
+    auto actual_json_map =
+        formatter.to_map(request_header, response_header, response_trailer, request_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
-    
-    auto actual_string = formatter.format(request_header, response_header, response_trailer, request_info);
+
+    auto actual_string =
+        formatter.format(request_header, response_header, response_trailer, request_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
   }
 
@@ -415,25 +414,23 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     Http::TestHeaderMapImpl request_header{};
     Http::TestHeaderMapImpl response_header{};
     Http::TestHeaderMapImpl response_trailer{};
-    
+
     envoy::api::v2::core::Metadata metadata;
     populateMetadataTestData(metadata);
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
-        
-    std::map<std::string, std::string> expected_json_map = {
-      {"protocol", "HTTP/1.1"}
-    };
 
-    const std::map<const std::string, const std::string> key_mapping = {
-      {"protocol", "%PROTOCOL%"}
-    };
+    std::map<std::string, std::string> expected_json_map = {{"protocol", "HTTP/1.1"}};
+
+    const std::map<const std::string, const std::string> key_mapping = {{"protocol", "%PROTOCOL%"}};
     JsonFormatterImpl formatter(key_mapping);
-    
-    auto actual_json_map = formatter.to_map(request_header, response_header, response_trailer, request_info);
+
+    auto actual_json_map =
+        formatter.to_map(request_header, response_header, response_trailer, request_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
-    
-    auto actual_string = formatter.format(request_header, response_header, response_trailer, request_info);
+
+    auto actual_string =
+        formatter.format(request_header, response_header, response_trailer, request_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
   }
 
@@ -444,27 +441,27 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     Http::TestHeaderMapImpl response_trailer{};
 
     std::map<std::string, std::string> expected_json_map = {
-      {"protocol", "HTTP/1.1"},
-      {"some_request_header", "SOME_REQUEST_HEADER"},
-      {"nonexistent_response_header", "-"},
-      {"some_response_header", "SOME_RESPONSE_HEADER"}
-    };
+        {"protocol", "HTTP/1.1"},
+        {"some_request_header", "SOME_REQUEST_HEADER"},
+        {"nonexistent_response_header", "-"},
+        {"some_response_header", "SOME_RESPONSE_HEADER"}};
 
     const std::map<const std::string, const std::string> key_mapping = {
-      {"protocol", "%PROTOCOL%"},
-      {"some_request_header", "%REQ(some_request_header)%"},
-      {"nonexistent_response_header", "%RESP(nonexistent_response_header)%"},
-      {"some_response_header", "%RESP(some_response_header)%"}
-    };
+        {"protocol", "%PROTOCOL%"},
+        {"some_request_header", "%REQ(some_request_header)%"},
+        {"nonexistent_response_header", "%RESP(nonexistent_response_header)%"},
+        {"some_response_header", "%RESP(some_response_header)%"}};
     JsonFormatterImpl formatter(key_mapping);
 
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
 
-    auto actual_json_map = formatter.to_map(request_header, response_header, response_trailer, request_info);
+    auto actual_json_map =
+        formatter.to_map(request_header, response_header, response_trailer, request_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
-    auto actual_string = formatter.format(request_header, response_header, response_trailer, request_info);
+    auto actual_string =
+        formatter.format(request_header, response_header, response_trailer, request_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
   }
 
@@ -475,27 +472,31 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     Http::TestHeaderMapImpl response_trailer{};
 
     std::map<std::string, std::string> expected_json_map = {
-      {"request_present_header_or_request_absent_header", "REQUEST_PRESENT_HEADER"},
-      {"request_absent_header_or_request_present_header", "REQUEST_PRESENT_HEADER"},
-      {"response_absent_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"},
-      {"response_present_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"}
-    };
+        {"request_present_header_or_request_absent_header", "REQUEST_PRESENT_HEADER"},
+        {"request_absent_header_or_request_present_header", "REQUEST_PRESENT_HEADER"},
+        {"response_absent_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"},
+        {"response_present_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"}};
 
     const std::map<const std::string, const std::string> key_mapping = {
-      {"request_present_header_or_request_absent_header", "%REQ(request_present_header?request_absent_header)%"},
-      {"request_absent_header_or_request_present_header", "%REQ(request_absent_header?request_present_header)%"},
-      {"response_absent_header_or_response_absent_header", "%RESP(response_absent_header?response_present_header)%"},
-      {"response_present_header_or_response_absent_header", "%RESP(response_present_header?response_absent_header)%"}
-    };
+        {"request_present_header_or_request_absent_header",
+         "%REQ(request_present_header?request_absent_header)%"},
+        {"request_absent_header_or_request_present_header",
+         "%REQ(request_absent_header?request_present_header)%"},
+        {"response_absent_header_or_response_absent_header",
+         "%RESP(response_absent_header?response_present_header)%"},
+        {"response_present_header_or_response_absent_header",
+         "%RESP(response_present_header?response_absent_header)%"}};
     JsonFormatterImpl formatter(key_mapping);
 
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
 
-    auto actual_json_map = formatter.to_map(request_header, response_header, response_trailer, request_info);
+    auto actual_json_map =
+        formatter.to_map(request_header, response_header, response_trailer, request_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
-    auto actual_string = formatter.format(request_header, response_header, response_trailer, request_info);
+    auto actual_string =
+        formatter.format(request_header, response_header, response_trailer, request_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
   }
 
@@ -504,29 +505,29 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
     Http::TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
     Http::TestHeaderMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
-    
+
     envoy::api::v2::core::Metadata metadata;
     populateMetadataTestData(metadata);
     EXPECT_CALL(request_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
     std::map<std::string, std::string> expected_json_map = {
-      {"test_key", "\"test_value\""},
-      {"test_obj", "{\"inner_key\":\"inner_value\"}"},
-      {"test_obj.inner_key", "\"inner_value\""}
-    };
+        {"test_key", "\"test_value\""},
+        {"test_obj", "{\"inner_key\":\"inner_value\"}"},
+        {"test_obj.inner_key", "\"inner_value\""}};
 
     const std::map<const std::string, const std::string> key_mapping = {
-      {"test_key", "%DYNAMIC_METADATA(com.test:test_key)%"},
-      {"test_obj", "%DYNAMIC_METADATA(com.test:test_obj)%"},
-      {"test_obj.inner_key", "%DYNAMIC_METADATA(com.test:test_obj:inner_key)%"}
-    };
+        {"test_key", "%DYNAMIC_METADATA(com.test:test_key)%"},
+        {"test_obj", "%DYNAMIC_METADATA(com.test:test_obj)%"},
+        {"test_obj.inner_key", "%DYNAMIC_METADATA(com.test:test_obj:inner_key)%"}};
 
     JsonFormatterImpl formatter(key_mapping);
 
-    auto actual_json_map = formatter.to_map(request_header, response_header, response_trailer, request_info);
+    auto actual_json_map =
+        formatter.to_map(request_header, response_header, response_trailer, request_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
-    
-    auto actual_string = formatter.format(request_header, response_header, response_trailer, request_info);
+
+    auto actual_string =
+        formatter.format(request_header, response_header, response_trailer, request_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
   }
 
@@ -545,27 +546,27 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     gmtime_r(&test_epoch, &time_val);
     time_t expected_time_t = mktime(&time_val);
 
-   std::map<std::string, std::string> expected_json_map = {
-      {"simple_date", "2018/03/28"},
-      {"test_time", fmt::format("{}", expected_time_t)},
-      {"bad_format", "bad_format"},
-      {"default", "2018-03-28T23:35:58.000Z"},
-      {"all_zeroes", "000000000.0.00.000"}
-    };
+    std::map<std::string, std::string> expected_json_map = {
+        {"simple_date", "2018/03/28"},
+        {"test_time", fmt::format("{}", expected_time_t)},
+        {"bad_format", "bad_format"},
+        {"default", "2018-03-28T23:35:58.000Z"},
+        {"all_zeroes", "000000000.0.00.000"}};
 
     const std::map<const std::string, const std::string> key_mapping = {
-      {"simple_date", "%START_TIME(%Y/%m/%d)%"},
-      {"test_time", "%START_TIME(%s)%"},
-      {"bad_format", "%START_TIME(bad_format)%"},
-      {"default", "%START_TIME%"},
-      {"all_zeroes", "%START_TIME(%f.%1f.%2f.%3f)%"}
-    };
+        {"simple_date", "%START_TIME(%Y/%m/%d)%"},
+        {"test_time", "%START_TIME(%s)%"},
+        {"bad_format", "%START_TIME(bad_format)%"},
+        {"default", "%START_TIME%"},
+        {"all_zeroes", "%START_TIME(%f.%1f.%2f.%3f)%"}};
     JsonFormatterImpl formatter(key_mapping);
 
-    auto actual_json_map = formatter.to_map(request_header, response_header, response_trailer, request_info);
+    auto actual_json_map =
+        formatter.to_map(request_header, response_header, response_trailer, request_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
-    
-    auto actual_string = formatter.format(request_header, response_header, response_trailer, request_info);
+
+    auto actual_string =
+        formatter.format(request_header, response_header, response_trailer, request_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
   }
 }
