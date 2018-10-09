@@ -125,6 +125,23 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   EXPECT_CALL(generator, random()).WillOnce(Return(2));
   EXPECT_FALSE(loader->snapshot().featureEnabled("file3", 1));
 
+  // Fractional percent feature enablement
+  envoy::type::FractionalPercent fractional_percent;
+  fractional_percent.set_numerator(5);
+  fractional_percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(50));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file8", fractional_percent)); // valid data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(60));
+  EXPECT_FALSE(loader->snapshot().featureEnabled("file8", fractional_percent)); // valid data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(4));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file1", fractional_percent)); // invalid data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(6));
+  EXPECT_FALSE(loader->snapshot().featureEnabled("file1", fractional_percent)); // invalid data
+
   // Check stable value
   EXPECT_TRUE(loader->snapshot().featureEnabled("file3", 1, 1));
   EXPECT_FALSE(loader->snapshot().featureEnabled("file3", 1, 3));

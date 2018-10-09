@@ -32,6 +32,7 @@
 using testing::_;
 using testing::ContainerEq;
 using testing::ElementsAreArray;
+using testing::Matcher;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
@@ -1994,29 +1995,16 @@ TEST(RouteMatcherTest, Runtime) {
   Runtime::MockSnapshot snapshot;
 
   ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
-  EXPECT_CALL(snapshot, getInteger("some_key", 50))
-      .Times(testing::AtLeast(1))
-      .WillRepeatedly(Return(42));
 
   TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
+  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 41)).WillRepeatedly(Return(true));;
   EXPECT_EQ("something_else",
             config.route(genHeaders("www.lyft.com", "/", "GET"), 41)->routeEntry()->clusterName());
 
+  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 43)).WillRepeatedly(Return(false));;
   EXPECT_EQ("www2",
             config.route(genHeaders("www.lyft.com", "/", "GET"), 43)->routeEntry()->clusterName());
-
-  // Simulate a change in the runtime value.
-  ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
-  EXPECT_CALL(snapshot, getInteger("some_key", 50))
-      .Times(testing::AtLeast(1))
-      .WillRepeatedly(Return(52));
-
-  EXPECT_EQ("something_else",
-            config.route(genHeaders("www.lyft.com", "/", "GET"), 51)->routeEntry()->clusterName());
-
-  EXPECT_EQ("www2",
-            config.route(genHeaders("www.lyft.com", "/", "GET"), 53)->routeEntry()->clusterName());
 }
 
 TEST(RouteMatcherTest, FractionalRuntime) {
@@ -2044,83 +2032,17 @@ virtual_hosts:
   Runtime::MockSnapshot snapshot;
   ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
 
-  std::string runtime_fraction = R"EOF(
-    numerator: 42
-    denominator: HUNDRED
-  )EOF";
-  EXPECT_CALL(snapshot, get("bogus_key"))
-      .Times(testing::AtLeast(1))
-      .WillRepeatedly(ReturnRef(runtime_fraction));
-
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
 
+  EXPECT_CALL(snapshot, featureEnabled("bogus_key", Matcher<envoy::type::FractionalPercent>(_), 41)).WillRepeatedly(Return(true));
   EXPECT_EQ(
       "something_else",
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 41)->routeEntry()->clusterName());
 
+  EXPECT_CALL(snapshot, featureEnabled("bogus_key", Matcher<envoy::type::FractionalPercent>(_), 43)).WillRepeatedly(Return(false));
   EXPECT_EQ(
       "www2",
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 43)->routeEntry()->clusterName());
-
-  // Simulate a change in the runtime value.
-  runtime_fraction = R"EOF(
-    numerator: 52
-    denominator: HUNDRED
-  )EOF";
-  EXPECT_CALL(snapshot, get("bogus_key"))
-      .Times(testing::AtLeast(1))
-      .WillRepeatedly(ReturnRef(runtime_fraction));
-
-  EXPECT_EQ(
-      "something_else",
-      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 51)->routeEntry()->clusterName());
-
-  EXPECT_EQ(
-      "www2",
-      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 53)->routeEntry()->clusterName());
-}
-
-TEST(RouteMatcherTest, FractionalRuntimeDefault) {
-  std::string yaml = R"EOF(
-virtual_hosts:
-  - name: "www2"
-    domains: ["www.lyft.com"]
-    routes:
-      - match:
-          prefix: "/"
-          runtime_fraction:
-            default_value:
-              numerator: 50
-              denominator: MILLION
-            runtime_key: "bogus_key"
-        route:
-          cluster: "something_else"
-      - match:
-          prefix: "/"
-        route:
-          cluster: "www2"
-  )EOF";
-
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Runtime::MockSnapshot snapshot;
-  ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
-
-  const std::string runtime_fraction = R"EOF(
-    this string is nonsense and should fail parsing
-  )EOF";
-  EXPECT_CALL(snapshot, get("bogus_key"))
-      .Times(testing::AtLeast(1))
-      .WillRepeatedly(ReturnRef(runtime_fraction));
-
-  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
-
-  EXPECT_EQ(
-      "something_else",
-      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 49)->routeEntry()->clusterName());
-
-  EXPECT_EQ(
-      "www2",
-      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 51)->routeEntry()->clusterName());
 }
 
 TEST(RouteMatcherTest, ShadowClusterNotFound) {
