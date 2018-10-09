@@ -1,8 +1,10 @@
 Envoy fault injection example
 =============================
 
-In this example, we show [Envoy's fault injection
-feature](https://www.envoyproxy.io/docs/envoy/latest/configuration/http_filters/fault_filter) in a sandbox.
+This simple example demonstrates [Envoy's fault injection
+capability](https://www.envoyproxy.io/docs/envoy/latest/configuration/http_filters/fault_filter) using [Envoy's runtime
+support](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime) to control the feature.
+
 
 ## Usage
 ```
@@ -14,11 +16,11 @@ docker-compose exec envoy bash
 bash send_request.sh
 ```
 
-This constantly sends HTTP GET requests to running Envoy process. The process proxies the requests to the backend server
-which is running python process in the "backend" container. We see HTTP 200 responses here.
+The script above (`send_request.sh`) sends a continuous stream of HTTP requests to Envoy, which in turn forwards the
+requests to the backend container. Fault injection is configured in Envoy but turned off (i.e. affects 0% of requests).
+Consequently, you should see a continuous sequence of HTTP 200 response code.
 
-Then let's inject a fault using [Envoy's runtime
-feature](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime).
+Tun on fault injection via the runtime using the commands below.
 
 ```
 # in terminal 3
@@ -26,8 +28,8 @@ docker-compose exec envoy bash
 bash enable_fault_injection.sh
 ```
 
-This changes Envoy's fault injection filter config via runtime setting. Then `send_request.sh` script shows HTTP 503
-responses.
+The script above enables HTTP aborts for 100% of requests. So, you should now see a continuous sequence of HTTP 503
+responses for all requests.
 
 To disable the fault injection:
 
