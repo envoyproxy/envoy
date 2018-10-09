@@ -62,8 +62,8 @@ public:
    * the list under the same data_name.
    * @param data_name the name of the list data being set.
    * @param data an owning pointer to the data to be appended to the list.
-   * Note that data_names for list elements do not share the same namespace as 
-   * the data_names for singleton data objects added through setData. All items 
+   * Note that data_names for list elements do not share the same namespace as
+   * the data_names for singleton data objects added through setData. All items
    * added to the list must be of the same type.
    */
   template <typename T>
