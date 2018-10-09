@@ -1998,11 +1998,13 @@ TEST(RouteMatcherTest, Runtime) {
 
   TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
-  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 41)).WillRepeatedly(Return(true));;
+  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 41)).WillRepeatedly(Return(true));
+  ;
   EXPECT_EQ("something_else",
             config.route(genHeaders("www.lyft.com", "/", "GET"), 41)->routeEntry()->clusterName());
 
-  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 43)).WillRepeatedly(Return(false));;
+  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 43)).WillRepeatedly(Return(false));
+  ;
   EXPECT_EQ("www2",
             config.route(genHeaders("www.lyft.com", "/", "GET"), 43)->routeEntry()->clusterName());
 }
@@ -2034,12 +2036,14 @@ virtual_hosts:
 
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
 
-  EXPECT_CALL(snapshot, featureEnabled("bogus_key", Matcher<envoy::type::FractionalPercent>(_), 41)).WillRepeatedly(Return(true));
+  EXPECT_CALL(snapshot, featureEnabled("bogus_key", Matcher<envoy::type::FractionalPercent>(_), 41))
+      .WillRepeatedly(Return(true));
   EXPECT_EQ(
       "something_else",
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 41)->routeEntry()->clusterName());
 
-  EXPECT_CALL(snapshot, featureEnabled("bogus_key", Matcher<envoy::type::FractionalPercent>(_), 43)).WillRepeatedly(Return(false));
+  EXPECT_CALL(snapshot, featureEnabled("bogus_key", Matcher<envoy::type::FractionalPercent>(_), 43))
+      .WillRepeatedly(Return(false));
   EXPECT_EQ(
       "www2",
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 43)->routeEntry()->clusterName());

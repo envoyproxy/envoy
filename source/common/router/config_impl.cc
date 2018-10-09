@@ -358,10 +358,12 @@ bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const
 
   if (runtime_->legacy_runtime_data_) {
     // Use the deprecated 'runtime' field from the route.
-    return loader_.snapshot().featureEnabled(runtime_->runtime_key_, runtime_->runtime_default_, random_value);
+    return loader_.snapshot().featureEnabled(runtime_->runtime_key_, runtime_->runtime_default_,
+                                             random_value);
   }
 
-  return loader_.snapshot().featureEnabled(runtime_->fractional_runtime_key_, runtime_->fractional_runtime_default_, random_value);
+  return loader_.snapshot().featureEnabled(runtime_->fractional_runtime_key_,
+                                           runtime_->fractional_runtime_default_, random_value);
 }
 
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
