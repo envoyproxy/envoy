@@ -43,7 +43,7 @@ public:
 private:
   std::function<std::string(const Envoy::RequestInfo::RequestInfo&)> field_extractor_;
   const bool append_;
-  std::unordered_map<std::string, std::vector<AccessLog::FormatterPtr>> start_time_formatters_;
+  std::unordered_map<std::string, std::vector<Envoy::AccessLog::FormatterProviderPtr>> start_time_formatters_;
 };
 
 /**

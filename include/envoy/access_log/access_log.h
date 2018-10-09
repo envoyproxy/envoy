@@ -84,5 +84,20 @@ public:
 
 typedef std::unique_ptr<Formatter> FormatterPtr;
 
+/**
+ * Interface for access log provider
+ */
+class FormatterProvider {
+public:
+  virtual ~FormatterProvider() {}
+
+  virtual std::string format(const Http::HeaderMap& request_headers,
+                                   const Http::HeaderMap& response_headers,
+                                   const Http::HeaderMap& response_trailers,
+                                   const RequestInfo::RequestInfo& request_info) const PURE;
+};
+
+typedef std::unique_ptr<FormatterProvider> FormatterProviderPtr;
+
 } // namespace AccessLog
 } // namespace Envoy
