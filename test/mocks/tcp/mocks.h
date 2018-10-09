@@ -21,7 +21,7 @@ public:
   ~MockCancellable();
 
   // Tcp::ConnectionPool::Cancellable
-  MOCK_METHOD0(cancel, void());
+  MOCK_METHOD1(cancel, void(bool close));
 };
 
 class MockUpstreamCallbacks : public UpstreamCallbacks {

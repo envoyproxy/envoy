@@ -383,7 +383,7 @@ FilterStatus Router::UpstreamRequest::start() {
 
 void Router::UpstreamRequest::resetStream() {
   if (conn_pool_handle_) {
-    conn_pool_handle_->cancel();
+    conn_pool_handle_->cancel(false);
   }
 
   if (conn_data_ != nullptr) {

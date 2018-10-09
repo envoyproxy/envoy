@@ -124,7 +124,7 @@ protected:
     ~PendingRequest();
 
     // ConnectionPool::Cancellable
-    void cancel() override { parent_.onPendingRequestCancel(*this); }
+    void cancel(bool close) override { parent_.onPendingRequestCancel(*this, close); }
 
     ConnPoolImpl& parent_;
     ConnectionPool::Callbacks& callbacks_;
@@ -135,11 +135,11 @@ protected:
   void assignConnection(ActiveConn& conn, ConnectionPool::Callbacks& callbacks);
   void createNewConnection();
   void onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent event);
-  void onPendingRequestCancel(PendingRequest& request);
+  void onPendingRequestCancel(PendingRequest& request, bool close);
   virtual void onConnReleased(ActiveConn& conn);
   virtual void onConnDestroyed(ActiveConn& conn);
   void onUpstreamReady();
-  void processIdleConnection(ActiveConn& conn, bool delay);
+  void processIdleConnection(ActiveConn& conn, bool new_connection, bool delay);
   void checkForDrained();
 
   Event::Dispatcher& dispatcher_;
@@ -147,8 +147,9 @@ protected:
   Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
 
-  std::list<ActiveConnPtr> ready_conns_;
-  std::list<ActiveConnPtr> busy_conns_;
+  std::list<ActiveConnPtr> pending_conns_; // conns awaiting connected event
+  std::list<ActiveConnPtr> ready_conns_;   // conns ready for assignment
+  std::list<ActiveConnPtr> busy_conns_;    // conns assigned
   std::list<PendingRequestPtr> pending_requests_;
   std::list<DrainedCb> drained_callbacks_;
   Stats::TimespanPtr conn_connect_ms_;

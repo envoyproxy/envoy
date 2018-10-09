@@ -21,8 +21,12 @@ public:
 
   /**
    * Cancel the pending request.
+   * @param close if true the connection pool will close a pending connection as part of
+   *              cancellation (unless the number of pending requests exceeds the number of pending
+   *              connections). If false, the pending request is allowed to complete and becomes
+   *              available for a future connection request.
    */
-  virtual void cancel() PURE;
+  virtual void cancel(bool close = false) PURE;
 };
 
 /**
