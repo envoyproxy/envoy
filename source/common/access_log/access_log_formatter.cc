@@ -74,17 +74,20 @@ std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
   return log_line;
 }
 
-JsonFormatterImpl::JsonFormatterImpl(const std::map<const std::string, const std::string>& format_mapping) {
+JsonFormatterImpl::JsonFormatterImpl(
+    const std::map<const std::string, const std::string>& format_mapping) {
   for (const auto& pair : format_mapping) {
     auto providers = AccessLogFormatParser::parse(pair.second);
 
     // Enforce that each key only has one format specifier in it
     if (providers.size() > 1) {
-      throw EnvoyException(fmt::format("More than one format specifier was provided in the JSON log format: {}", pair.second));
+      throw EnvoyException(fmt::format(
+          "More than one format specifier was provided in the JSON log format: {}", pair.second));
     }
 
     if (providers.size() < 1) {
-      throw EnvoyException(fmt::format("No format specifier was provided in the JSON log format: {}", pair.second));
+      throw EnvoyException(
+          fmt::format("No format specifier was provided in the JSON log format: {}", pair.second));
     }
 
     json_output_format_.emplace(pair.first, std::move(providers[0]));
@@ -98,7 +101,8 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
   rapidjson::StringBuffer strbuf;
   rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
 
-  auto output_map = this->to_map(request_headers, response_headers, response_trailers, request_info);
+  auto output_map =
+      this->to_map(request_headers, response_headers, response_trailers, request_info);
   writer.StartObject();
   for (const auto& pair : output_map) {
     writer.Key(pair.first.c_str());
@@ -108,15 +112,13 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
   return fmt::format("{}\n", strbuf.GetString());
 }
 
-std::map<std::string, std::string> JsonFormatterImpl::to_map(const Http::HeaderMap& request_headers,
-                                          const Http::HeaderMap& response_headers,
-                                          const Http::HeaderMap& response_trailers,
-                                          const RequestInfo::RequestInfo& request_info) const {
+std::map<std::string, std::string> JsonFormatterImpl::to_map(
+    const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
+    const Http::HeaderMap& response_trailers, const RequestInfo::RequestInfo& request_info) const {
   std::map<std::string, std::string> output;
   for (const auto& pair : json_output_format_) {
-    output.emplace(
-      pair.first,
-      pair.second->format(request_headers, response_headers, response_trailers, request_info));
+    output.emplace(pair.first, pair.second->format(request_headers, response_headers,
+                                                   response_trailers, request_info));
   }
   return output;
 }
@@ -189,8 +191,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
   for (size_t pos = 0; pos < format.length(); ++pos) {
     if (format[pos] == '%') {
       if (!current_token.empty()) {
-        formatters.emplace_back(
-          FormatterProviderPtr{new PlainStringFormatter(current_token)});
+        formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
         current_token = "";
       }
 
@@ -213,24 +214,24 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
 
         parseCommandHeader(token, ReqParamStart, main_header, alternative_header, max_length);
 
-        formatters.emplace_back(
-            FormatterProviderPtr{new RequestHeaderFormatter(main_header, alternative_header, max_length)});
+        formatters.emplace_back(FormatterProviderPtr{
+            new RequestHeaderFormatter(main_header, alternative_header, max_length)});
       } else if (token.find("RESP(") == 0) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
         parseCommandHeader(token, RespParamStart, main_header, alternative_header, max_length);
 
-        formatters.emplace_back(
-            FormatterProviderPtr{new ResponseHeaderFormatter(main_header, alternative_header, max_length)});
+        formatters.emplace_back(FormatterProviderPtr{
+            new ResponseHeaderFormatter(main_header, alternative_header, max_length)});
       } else if (token.find("TRAILER(") == 0) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
         parseCommandHeader(token, TrailParamStart, main_header, alternative_header, max_length);
 
-        formatters.emplace_back(
-            FormatterProviderPtr{new ResponseTrailerFormatter(main_header, alternative_header, max_length)});
+        formatters.emplace_back(FormatterProviderPtr{
+            new ResponseTrailerFormatter(main_header, alternative_header, max_length)});
       } else if (token.find(DYNAMIC_META_TOKEN) == 0) {
         std::string filter_namespace;
         absl::optional<size_t> max_length;
@@ -238,7 +239,8 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
         const size_t start = DYNAMIC_META_TOKEN.size();
 
         parseCommand(token, start, ":", filter_namespace, path, max_length);
-        formatters.emplace_back(FormatterProviderPtr{new DynamicMetadataFormatter(filter_namespace, path, max_length)});
+        formatters.emplace_back(
+            FormatterProviderPtr{new DynamicMetadataFormatter(filter_namespace, path, max_length)});
       } else if (token.find("START_TIME") == 0) {
         const size_t parameters_length = pos + StartTimeParamStart + 1;
         const size_t parameters_end = command_end_position - parameters_length;
