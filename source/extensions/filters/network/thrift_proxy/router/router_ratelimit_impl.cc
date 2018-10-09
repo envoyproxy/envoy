@@ -89,7 +89,7 @@ bool HeaderValueMatchAction::populateDescriptor(const RouteEntry&,
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const envoy::api::v2::route::RateLimit& config)
     : disable_key_(config.disable_key()),
-      stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))) {
+      stage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0)) {
   for (const auto& action : config.actions()) {
     switch (action.action_specifier_case()) {
     case envoy::api::v2::route::RateLimit::Action::kSourceCluster:
@@ -142,7 +142,7 @@ RateLimitPolicyImpl::RateLimitPolicyImpl(
   for (const auto& rate_limit : rate_limits) {
     std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
         new RateLimitPolicyEntryImpl(rate_limit));
-    uint64_t stage = rate_limit_policy_entry->stage();
+    uint32_t stage = rate_limit_policy_entry->stage();
     ASSERT(stage < rate_limit_entries_reference_.size());
     rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);
     rate_limit_entries_.emplace_back(std::move(rate_limit_policy_entry));
@@ -150,7 +150,7 @@ RateLimitPolicyImpl::RateLimitPolicyImpl(
 }
 
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>&
-RateLimitPolicyImpl::getApplicableRateLimit(uint64_t stage) const {
+RateLimitPolicyImpl::getApplicableRateLimit(uint32_t stage) const {
   ASSERT(stage < rate_limit_entries_reference_.size());
   return rate_limit_entries_reference_[stage];
 }

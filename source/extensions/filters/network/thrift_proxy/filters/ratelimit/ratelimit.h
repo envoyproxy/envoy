@@ -29,7 +29,7 @@ public:
       : domain_(config.domain()), stage_(config.stage()), local_info_(local_info), scope_(scope),
         runtime_(runtime), cm_(cm), failure_mode_deny_(config.failure_mode_deny()) {}
 
-  const std::string& domain() { return domain_; }
+  const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint32_t stage() const { return stage_; }
   Stats::Scope& scope() { return scope_; }
@@ -39,8 +39,8 @@ public:
   bool failureModeAllow() const { return !failure_mode_deny_; };
 
 private:
-  std::string domain_;
-  const uint64_t stage_;
+  const std::string domain_;
+  const uint32_t stage_;
   const LocalInfo::LocalInfo& local_info_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
@@ -151,7 +151,7 @@ private:
   ThriftProxy::ThriftFilters::DecoderFilterCallbacks* callbacks_{};
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  bool initiating_call_{};
+  bool initiating_call_{false};
 };
 
 } // namespace RateLimitFilter

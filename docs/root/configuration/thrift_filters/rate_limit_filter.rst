@@ -31,9 +31,9 @@ The filter outputs statistics in the *cluster.<route target cluster>.ratelimit.*
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  ok, Counter, Total under limit responses from the rate limit service
-  error, Counter, Total errors contacting the rate limit service
-  over_limit, Counter, total over limit responses from the rate limit service
+  ok, Counter, Total under limit responses from the rate limit service.
+  error, Counter, Total errors contacting the rate limit service.
+  over_limit, Counter, Total over limit responses from the rate limit service.
   failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
   of :ref:`failure_mode_deny
   <envoy_api_field_config.filter.thrift.rate_limit.v2alpha1.RateLimit.failure_mode_deny>` set to

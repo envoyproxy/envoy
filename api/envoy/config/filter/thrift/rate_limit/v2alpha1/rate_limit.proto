@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.config.filter.thrift.rate_limit.v2alpha1;
 option go_package = "v2alpha1";
 
-import "envoy/api/v2/ratelimit/ratelimit.proto";
 import "google/protobuf/duration.proto";
 
 import "validate/validate.proto";
@@ -17,8 +16,11 @@ message RateLimit {
   // The rate limit domain to use in the rate limit service request.
   string domain = 1 [(validate.rules).string.min_bytes = 1];
 
-  // Specifies the rate limit configurations to be applied with the same stage number. If not set,
-  // the default stage number is 0.
+  // Specifies the rate limit configuration stage. Each configured rate limit filter performs a
+  // rate limit check using descriptors configured in the
+  // :ref:`envoy_api_msg_config.filter.network.thrift_proxy_v2alpha1.RouteAction` for the request.
+  // Only those entries with a matching stage number are used for a given filter. If not set, the
+  // default stage number is 0.
   //
   // .. note::
   //

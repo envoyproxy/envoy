@@ -51,7 +51,7 @@ public:
   /**
    * @return the stage value that the configuration is applicable to.
    */
-  virtual uint64_t stage() const PURE;
+  virtual uint32_t stage() const PURE;
 
   /**
    * @return runtime key to be set to disable the configuration.
@@ -90,7 +90,7 @@ public:
    * @return set of RateLimitPolicyEntry that are applicable for a stage.
    */
   virtual const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
-  getApplicableRateLimit(uint64_t stage) const PURE;
+  getApplicableRateLimit(uint32_t stage) const PURE;
 };
 
 } // namespace Router

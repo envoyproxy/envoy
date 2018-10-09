@@ -273,7 +273,7 @@ public:
   MockRateLimitPolicyEntry();
   ~MockRateLimitPolicyEntry();
 
-  MOCK_CONST_METHOD0(stage, uint64_t());
+  MOCK_CONST_METHOD0(stage, uint32_t());
   MOCK_CONST_METHOD0(disableKey, const std::string&());
   MOCK_CONST_METHOD5(populateDescriptors,
                      void(const RouteEntry&, std::vector<RateLimit::Descriptor>&,
@@ -291,7 +291,7 @@ public:
   MOCK_CONST_METHOD0(empty, bool());
   MOCK_CONST_METHOD1(
       getApplicableRateLimit,
-      const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&(uint64_t));
+      const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&(uint32_t));
 
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limit_policy_entry_;
 };

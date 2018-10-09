@@ -71,33 +71,30 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
     break;
   case RateLimit::LimitStatus::Error:
     cluster_->statsScope().counter("ratelimit.error").inc();
-    break;
-  case RateLimit::LimitStatus::OverLimit:
-    cluster_->statsScope().counter("ratelimit.over_limit").inc();
-    break;
-  }
-
-  if (status == RateLimit::LimitStatus::OverLimit &&
-      config_->runtime().snapshot().featureEnabled("ratelimit.thrift_filter_enforcing", 100)) {
-    state_ = State::Responded;
-    callbacks_->sendLocalReply(
-        ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "over limit"),
-        false);
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
-  } else if (status == RateLimit::LimitStatus::Error) {
-    if (config_->failureModeAllow()) {
-      cluster_->statsScope().counter("ratelimit.failure_mode_allowed").inc();
-      if (!initiating_call_) {
-        callbacks_->continueDecoding();
-      }
-    } else {
+    if (!config_->failureModeAllow()) {
       state_ = State::Responded;
       callbacks_->sendLocalReply(
           ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "limiter error"),
           false);
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
+      return;
     }
-  } else if (!initiating_call_) {
+    cluster_->statsScope().counter("ratelimit.failure_mode_allowed").inc();
+    break;
+  case RateLimit::LimitStatus::OverLimit:
+    cluster_->statsScope().counter("ratelimit.over_limit").inc();
+    if (config_->runtime().snapshot().featureEnabled("ratelimit.thrift_filter_enforcing", 100)) {
+      state_ = State::Responded;
+      callbacks_->sendLocalReply(
+          ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "over limit"),
+          false);
+      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
+      return;
+    }
+    break;
+  }
+
+  if (!initiating_call_) {
     callbacks_->continueDecoding();
   }
 }

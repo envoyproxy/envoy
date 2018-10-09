@@ -115,7 +115,7 @@ public:
   RateLimitPolicyEntryImpl(const envoy::api::v2::route::RateLimit& config);
 
   // Router::RateLimitPolicyEntry
-  uint64_t stage() const override { return stage_; }
+  uint32_t stage() const override { return stage_; }
   const std::string& disableKey() const override { return disable_key_; }
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<Envoy::RateLimit::Descriptor>& descriptors,
@@ -125,7 +125,7 @@ public:
 
 private:
   const std::string disable_key_;
-  uint64_t stage_;
+  uint32_t stage_;
   std::vector<RateLimitActionPtr> actions_;
 };
 
@@ -139,10 +139,10 @@ public:
 
   // Router::RateLimitPolicy
   const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
-  getApplicableRateLimit(uint64_t stage = 0) const override;
+  getApplicableRateLimit(uint32_t stage = 0) const override;
   bool empty() const override { return rate_limit_entries_.empty(); }
 
-  static constexpr uint64_t MAX_STAGE_NUMBER = 10;
+  static constexpr uint32_t MAX_STAGE_NUMBER = 10;
 
 private:
   std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_entries_;
