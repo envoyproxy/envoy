@@ -149,7 +149,6 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
   EXPECT_EQ("envoy overloaded", response->body());
   codec_client_->close();
-
 }
 
 } // namespace Envoy
