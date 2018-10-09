@@ -25,7 +25,7 @@ option (gogoproto.equal_all) = true;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#comment:next free field: 14]
+// [#comment:next free field: 15]
 message VirtualHost {
   // The logical name of the virtual host. This is used when emitting certain
   // statistics but is not relevant for routing.
@@ -109,6 +109,16 @@ message VirtualHost {
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
   // for if and how it is utilized.
   map<string, google.protobuf.Struct> per_filter_config = 12;
+
+  // Decides whether the :ref:`x-envoy-attempt-count
+  // <config_http_filters_router_x-envoy-attempt-count>` header should be included
+  // in the upstream request. Setting this option will cause it to override any existing header
+  // value, so in the case of two Envoys on the request path with this option enabled, the upstream
+  // will see the attempt count as perceived by the second Envoy. Defaults to false.
+  // This header is unaffected by the
+  // :ref:`suppress_envoy_headers
+  // <envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers>` flag.
+  bool include_request_attempt_count = 14;
 }
 
 // A route is both a specification of how to match a request as well as an indication of what to do
@@ -291,16 +301,33 @@ message RouteMatch {
   // is true.
   google.protobuf.BoolValue case_sensitive = 4;
 
-  // Indicates that the route should additionally match on a runtime key. An
-  // integer between 0-100. Every time the route is considered for a match, a
-  // random number between 0-99 is selected. If the number is <= the value found
-  // in the key (checked first) or, if the key is not present, the default
-  // value, the route is a match (assuming everything also about the route
-  // matches). A runtime route configuration can be used to roll out route changes in a
-  // gradual manner without full code/config deploys. Refer to the
-  // :ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting_shift>` docs
-  // for additional documentation.
-  core.RuntimeUInt32 runtime = 5;
+  oneof runtime_specifier {
+    // Indicates that the route should additionally match on a runtime key. An integer between
+    // 0-100. Every time the route is considered for a match, a random number between 0-99 is
+    // selected. If the number is <= the value found in the key (checked first) or, if the key is
+    // not present, the default value, the route is a match (assuming everything also about the
+    // route matches). A runtime route configuration can be used to roll out route changes in a
+    // gradual manner without full code/config deploys. Refer to the :ref:`traffic shifting
+    // <config_http_conn_man_route_table_traffic_splitting_shift>` docs for additional
+    // documentation.
+    //
+    // .. attention::
+    //
+    //   **This field is deprecated**. Set the
+    //   :ref:`runtime_fraction<envoy_api_field_route.RouteMatch.runtime_fraction>` field instead.
+    core.RuntimeUInt32 runtime = 5 [deprecated = true];
+
+    // Indicates that the route should additionally match on a runtime key. Every time the route
+    // is considered for a match, it must also fall under the percentage of matches indicated by
+    // this field. For some fraction N/D, a random number in the range [0,D) is selected. If the
+    // number is <= the value of the numberator N, or if the key is not present, the default
+    // value, the router continues to evaluate the remaining match criteria. A runtime_fraction
+    // route configuration can be used to roll out route changes in a gradual manner (with more
+    // granularity than the deprecated runtime field) without full code/config deploys. Refer to
+    // the :ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting_shift>` docs
+    // for additional documentation.
+    core.RuntimeFractionalPercent runtime_fraction = 9;
+  }
 
   // Specifies a set of headers that the route should match on. The router will
   // check the request’s headers against all the specified headers in the route
@@ -488,7 +515,6 @@ message RouteAction {
       google.protobuf.Struct config = 2;
     }
 
-    // [#not-implemented-hide:]
     // Specifies an implementation of a RetryPriority which is used to determine the
     // distribution of load across priorities used for retries.
     RetryPriority retry_priority = 4;
@@ -498,12 +524,10 @@ message RouteAction {
       google.protobuf.Struct config = 2;
     }
 
-    // [#not-implemented-hide:]
     // Specifies a collection of RetryHostPredicates that will be consulted when selecting a host
     // for retries. If any of the predicates reject the host, host selection will be reattempted.
     repeated RetryHostPredicate retry_host_predicate = 5;
 
-    // [#not-implemented-hide:]
     // The maximum number of times host selection will be reattempted before giving up, at which
     // point the host that was last selected will be routed to. If unspecified, this will default to
     // retrying once.

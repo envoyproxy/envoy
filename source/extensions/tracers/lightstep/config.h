@@ -17,8 +17,12 @@ namespace Lightstep {
 class LightstepTracerFactory : public Server::Configuration::TracerFactory {
 public:
   // TracerFactory
-  Tracing::HttpTracerPtr createHttpTracer(const Json::Object& json_config,
+  Tracing::HttpTracerPtr createHttpTracer(const envoy::config::trace::v2::Tracing& configuration,
                                           Server::Instance& server) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::trace::v2::LightstepConfig>();
+  }
 
   std::string name() override;
 };

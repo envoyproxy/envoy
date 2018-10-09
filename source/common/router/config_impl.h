@@ -68,7 +68,7 @@ typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedP
 class SslRedirector : public DirectResponseEntry {
 public:
   // Router::DirectResponseEntry
-  void finalizeResponseHeaders(Http::HeaderMap&, const RequestInfo::RequestInfo&) const override {}
+  void finalizeResponseHeaders(Http::HeaderMap&, const StreamInfo::StreamInfo&) const override {}
   std::string newPath(const Http::HeaderMap& headers) const override;
   void rewritePathHeader(Http::HeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
@@ -140,6 +140,7 @@ public:
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
+  bool includeAttemptCount() const override { return include_attempt_count_; }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -176,6 +177,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   PerFilterConfigs per_filter_configs_;
+  const bool include_attempt_count_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
@@ -291,7 +293,8 @@ class RouteEntryImplBase : public RouteEntry,
                            public DirectResponseEntry,
                            public Route,
                            public PathMatchCriterion,
-                           public std::enable_shared_from_this<RouteEntryImplBase> {
+                           public std::enable_shared_from_this<RouteEntryImplBase>,
+                           Logger::Loggable<Logger::Id::router> {
 public:
   /**
    * @throw EnvoyException with reason if the route configuration contains any errors
@@ -317,11 +320,10 @@ public:
     return cluster_not_found_response_code_;
   }
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
-  void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const RequestInfo::RequestInfo& request_info,
+  void finalizeRequestHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
   void finalizeResponseHeaders(Http::HeaderMap& headers,
-                               const RequestInfo::RequestInfo& request_info) const override;
+                               const StreamInfo::StreamInfo& stream_info) const override;
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
 
   const MetadataMatchCriteria* metadataMatchCriteria() const override {
@@ -343,7 +345,7 @@ public:
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
   bool useOldStyleWebSocket() const override { return websocket_config_ != nullptr; }
   Http::WebSocketProxyPtr
-  createWebSocketProxy(Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+  createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
                        Http::WebSocketProxyCallbacks& callbacks,
                        Upstream::ClusterManager& cluster_manager,
                        Network::ReadFilterCallbacks* read_callbacks) const override;
@@ -353,6 +355,7 @@ public:
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
   const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
+  bool includeAttemptCount() const override { return vhost_.includeAttemptCount(); }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -386,8 +389,8 @@ protected:
 
 private:
   struct RuntimeData {
-    std::string key_{};
-    uint64_t default_{};
+    uint64_t numerator_val_{};
+    uint64_t denominator_val_{};
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {
@@ -401,14 +404,13 @@ private:
       return parent_->clusterNotFoundResponseCode();
     }
 
-    void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                const RequestInfo::RequestInfo& request_info,
+    void finalizeRequestHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
-      return parent_->finalizeRequestHeaders(headers, request_info, insert_envoy_original_path);
+      return parent_->finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
     }
     void finalizeResponseHeaders(Http::HeaderMap& headers,
-                                 const RequestInfo::RequestInfo& request_info) const override {
-      return parent_->finalizeResponseHeaders(headers, request_info);
+                                 const StreamInfo::StreamInfo& stream_info) const override {
+      return parent_->finalizeResponseHeaders(headers, stream_info);
     }
 
     const CorsPolicy* corsPolicy() const override { return parent_->corsPolicy(); }
@@ -440,12 +442,12 @@ private:
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
     bool useOldStyleWebSocket() const override { return parent_->useOldStyleWebSocket(); }
     Http::WebSocketProxyPtr
-    createWebSocketProxy(Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+    createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
                          Http::WebSocketProxyCallbacks& callbacks,
                          Upstream::ClusterManager& cluster_manager,
                          Network::ReadFilterCallbacks* read_callbacks) const override {
-      return parent_->createWebSocketProxy(request_headers, request_info, callbacks,
-                                           cluster_manager, read_callbacks);
+      return parent_->createWebSocketProxy(request_headers, stream_info, callbacks, cluster_manager,
+                                           read_callbacks);
     }
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
@@ -454,6 +456,8 @@ private:
     const PathMatchCriterion& pathMatchCriterion() const override {
       return parent_->pathMatchCriterion();
     }
+
+    bool includeAttemptCount() const override { return parent_->includeAttemptCount(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -492,16 +496,15 @@ private:
       return DynamicRouteEntry::metadataMatchCriteria();
     }
 
-    void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                const RequestInfo::RequestInfo& request_info,
+    void finalizeRequestHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
-      request_headers_parser_->evaluateHeaders(headers, request_info);
-      DynamicRouteEntry::finalizeRequestHeaders(headers, request_info, insert_envoy_original_path);
+      request_headers_parser_->evaluateHeaders(headers, stream_info);
+      DynamicRouteEntry::finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
     }
     void finalizeResponseHeaders(Http::HeaderMap& headers,
-                                 const RequestInfo::RequestInfo& request_info) const override {
-      response_headers_parser_->evaluateHeaders(headers, request_info);
-      DynamicRouteEntry::finalizeResponseHeaders(headers, request_info);
+                                 const StreamInfo::StreamInfo& stream_info) const override {
+      response_headers_parser_->evaluateHeaders(headers, stream_info);
+      DynamicRouteEntry::finalizeResponseHeaders(headers, stream_info);
     }
 
     const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
@@ -518,8 +521,7 @@ private:
 
   typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
 
-  static absl::optional<RuntimeData>
-  loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
+  absl::optional<RuntimeData> loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
 
   static std::multimap<std::string, std::string>
   parseOpaqueConfig(const envoy::api::v2::route::Route& route);
@@ -540,8 +542,8 @@ private:
   const std::chrono::milliseconds timeout_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
-  const absl::optional<RuntimeData> runtime_;
   Runtime::Loader& loader_;
+  const absl::optional<RuntimeData> runtime_;
   const std::string host_redirect_;
   const std::string path_redirect_;
   const bool https_redirect_;

@@ -14,12 +14,14 @@
 #include "common/common/logger.h"
 #include "common/event/libevent.h"
 #include "common/network/filter_manager_impl.h"
-#include "common/request_info/filter_state_impl.h"
 #include "common/ssl/ssl_socket.h"
+#include "common/stream_info/filter_state_impl.h"
 
 #include "absl/types/optional.h"
 
 namespace Envoy {
+class TestPauseFilter;
+
 namespace Network {
 
 /**
@@ -90,8 +92,8 @@ public:
     return socket_->options();
   }
   absl::string_view requestedServerName() const override { return socket_->requestedServerName(); }
-  RequestInfo::FilterState& perConnectionState() override { return per_connection_state_; }
-  const RequestInfo::FilterState& perConnectionState() const override {
+  StreamInfo::FilterState& perConnectionState() override { return per_connection_state_; }
+  const StreamInfo::FilterState& perConnectionState() const override {
     return per_connection_state_;
   }
 
@@ -133,7 +135,7 @@ protected:
   TransportSocketPtr transport_socket_;
   FilterManagerImpl filter_manager_;
   ConnectionSocketPtr socket_;
-  RequestInfo::FilterStateImpl per_connection_state_;
+  StreamInfo::FilterStateImpl per_connection_state_;
 
   Buffer::OwnedImpl read_buffer_;
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
@@ -149,6 +151,8 @@ protected:
   Event::FileEventPtr file_event_;
 
 private:
+  friend class ::Envoy::TestPauseFilter;
+
   void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);
   void onReadReady();

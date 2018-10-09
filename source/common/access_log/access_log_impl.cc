@@ -19,8 +19,8 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/request_info/utility.h"
 #include "common/runtime/uuid_util.h"
+#include "common/stream_info/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "absl/types/optional.h"
@@ -79,14 +79,14 @@ FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFi
   }
 }
 
-bool TraceableRequestFilter::evaluate(const RequestInfo::RequestInfo& info,
+bool TraceableRequestFilter::evaluate(const StreamInfo::StreamInfo& info,
                                       const Http::HeaderMap& request_headers) {
   Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);
 
   return decision.traced && decision.reason == Tracing::Reason::ServiceForced;
 }
 
-bool StatusCodeFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
+bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&) {
   if (!info.responseCode()) {
     return compareAgainstValue(0ULL);
   }
@@ -94,7 +94,7 @@ bool StatusCodeFilter::evaluate(const RequestInfo::RequestInfo& info, const Http
   return compareAgainstValue(info.responseCode().value());
 }
 
-bool DurationFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
+bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&) {
   absl::optional<std::chrono::nanoseconds> final = info.requestComplete();
   ASSERT(final);
 
@@ -108,19 +108,19 @@ RuntimeFilter::RuntimeFilter(const envoy::config::filter::accesslog::v2::Runtime
       percent_(config.percent_sampled()),
       use_independent_randomness_(config.use_independent_randomness()) {}
 
-bool RuntimeFilter::evaluate(const RequestInfo::RequestInfo&,
-                             const Http::HeaderMap& request_header) {
+bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_header) {
   const Http::HeaderEntry* uuid = request_header.RequestId();
   uint64_t random_value;
   if (use_independent_randomness_ || uuid == nullptr ||
-      !UuidUtils::uuidModBy(uuid->value().c_str(), random_value,
-                            ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_))) {
+      !UuidUtils::uuidModBy(
+          uuid->value().c_str(), random_value,
+          ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator()))) {
     random_value = random_.random();
   }
 
   return runtime_.snapshot().featureEnabled(
       runtime_key_, percent_.numerator(), random_value,
-      ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_));
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator()));
 }
 
 OperatorFilter::OperatorFilter(const Protobuf::RepeatedPtrField<
@@ -139,7 +139,7 @@ AndFilter::AndFilter(const envoy::config::filter::accesslog::v2::AndFilter& conf
                      Runtime::Loader& runtime, Runtime::RandomGenerator& random)
     : OperatorFilter(config.filters(), runtime, random) {}
 
-bool OrFilter::evaluate(const RequestInfo::RequestInfo& info,
+bool OrFilter::evaluate(const StreamInfo::StreamInfo& info,
                         const Http::HeaderMap& request_headers) {
   bool result = false;
   for (auto& filter : filters_) {
@@ -153,7 +153,7 @@ bool OrFilter::evaluate(const RequestInfo::RequestInfo& info,
   return result;
 }
 
-bool AndFilter::evaluate(const RequestInfo::RequestInfo& info,
+bool AndFilter::evaluate(const StreamInfo::StreamInfo& info,
                          const Http::HeaderMap& request_headers) {
   bool result = true;
   for (auto& filter : filters_) {
@@ -167,7 +167,7 @@ bool AndFilter::evaluate(const RequestInfo::RequestInfo& info,
   return result;
 }
 
-bool NotHealthCheckFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
+bool NotHealthCheckFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&) {
   return !info.healthCheck();
 }
 
@@ -175,23 +175,22 @@ HeaderFilter::HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFil
   header_data_.push_back(Http::HeaderUtility::HeaderData(config.header()));
 }
 
-bool HeaderFilter::evaluate(const RequestInfo::RequestInfo&,
-                            const Http::HeaderMap& request_headers) {
+bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_headers) {
   return Http::HeaderUtility::matchHeaders(request_headers, header_data_);
 }
 
 ResponseFlagFilter::ResponseFlagFilter(
     const envoy::config::filter::accesslog::v2::ResponseFlagFilter& config) {
   for (int i = 0; i < config.flags_size(); i++) {
-    absl::optional<RequestInfo::ResponseFlag> response_flag =
-        RequestInfo::ResponseFlagUtils::toResponseFlag(config.flags(i));
+    absl::optional<StreamInfo::ResponseFlag> response_flag =
+        StreamInfo::ResponseFlagUtils::toResponseFlag(config.flags(i));
     // The config has been validated. Therefore, every flag in the config will have a mapping.
     ASSERT(response_flag.has_value());
     configured_flags_ |= response_flag.value();
   }
 }
 
-bool ResponseFlagFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
+bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&) {
   if (configured_flags_ != 0) {
     return info.intersectResponseFlags(configured_flags_);
   }

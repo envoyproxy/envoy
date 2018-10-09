@@ -18,7 +18,7 @@ class HeaderFormatter {
 public:
   virtual ~HeaderFormatter() {}
 
-  virtual const std::string format(const Envoy::RequestInfo::RequestInfo& request_info) const PURE;
+  virtual const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
    * @return bool indicating whether the formatted header should be appended to the existing
@@ -30,18 +30,18 @@ public:
 typedef std::unique_ptr<HeaderFormatter> HeaderFormatterPtr;
 
 /**
- * A formatter that expands the request header variable to a value based on info in RequestInfo.
+ * A formatter that expands the request header variable to a value based on info in StreamInfo.
  */
-class RequestInfoHeaderFormatter : public HeaderFormatter {
+class StreamInfoHeaderFormatter : public HeaderFormatter {
 public:
-  RequestInfoHeaderFormatter(absl::string_view field_name, bool append);
+  StreamInfoHeaderFormatter(absl::string_view field_name, bool append);
 
   // HeaderFormatter::format
-  const std::string format(const Envoy::RequestInfo::RequestInfo& request_info) const override;
+  const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const override;
   bool append() const override { return append_; }
 
 private:
-  std::function<std::string(const Envoy::RequestInfo::RequestInfo&)> field_extractor_;
+  std::function<std::string(const Envoy::StreamInfo::StreamInfo&)> field_extractor_;
   const bool append_;
   std::unordered_map<std::string, std::vector<AccessLog::FormatterPtr>> start_time_formatters_;
 };
@@ -55,7 +55,7 @@ public:
       : static_value_(static_header_value), append_(append) {}
 
   // HeaderFormatter::format
-  const std::string format(const Envoy::RequestInfo::RequestInfo&) const override {
+  const std::string format(const Envoy::StreamInfo::StreamInfo&) const override {
     return static_value_;
   };
   bool append() const override { return append_; }
@@ -74,10 +74,10 @@ public:
       : formatters_(std::move(formatters)), append_(append) {}
 
   // HeaderFormatter::format
-  const std::string format(const Envoy::RequestInfo::RequestInfo& request_info) const override {
+  const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const override {
     std::string buf;
     for (const auto& formatter : formatters_) {
-      buf += formatter->format(request_info);
+      buf += formatter->format(stream_info);
     }
     return buf;
   };

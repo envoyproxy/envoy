@@ -1,4 +1,4 @@
 format: "%START_TIME(%s.%3f)%|%START_TIME(%s.%4f)%|%START_TIME(%s.%5f)%|%START_TIME(%s.%6f)%"
-request_info {
+stream_info {
   start_time: 1522796769123456
 }

@@ -70,11 +70,15 @@ protected:
   // The priority-ordered set of hosts to use for load balancing.
   const PrioritySet& priority_set_;
 
+public:
   // Called when a host set at the given priority level is updated. This updates
-  // per_priority_health_ for that priority level, and may update per_priority_load_ for all
+  // per_priority_health for that priority level, and may update per_priority_load for all
   // priority levels.
-  void recalculatePerPriorityState(uint32_t priority);
+  void static recalculatePerPriorityState(uint32_t priority, const PrioritySet& priority_set,
+                                          PriorityLoad& priority_load,
+                                          std::vector<uint32_t>& per_priority_health);
 
+protected:
   // The percentage load (0-100) for each priority level
   std::vector<uint32_t> per_priority_load_;
   // The health (0-100) for each priority level.

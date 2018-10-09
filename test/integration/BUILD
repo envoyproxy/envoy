@@ -172,9 +172,11 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//include/envoy/http:header_map_interface",
+        "//source/common/stats:stats_matcher_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
+        "@envoy_api//envoy/config/metrics/v2:stats_cc",
     ],
 )
 
@@ -190,22 +192,6 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "add_trailers_filter_config_lib",
-    srcs = [
-        "add_trailers_filter.cc",
-        "add_trailers_filter.h",
-        "add_trailers_filter_config.cc",
-        "add_trailers_filter_config.h",
-    ],
-    deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
-    ],
-)
-
-envoy_cc_test_library(
     name = "http_integration_lib",
     srcs = [
         "http_integration.cc",
@@ -214,13 +200,15 @@ envoy_cc_test_library(
         "http_integration.h",
     ],
     deps = [
-        ":add_trailers_filter_config_lib",
         ":integration_lib",
         ":test_host_predicate_lib",
         "//include/envoy/event:timer_interface",
+        "//source/common/common:thread_annotations",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/upstream:utility_lib",
+        "//test/integration/filters:add_trailers_filter_config_lib",
+        "//test/integration/filters:pause_filter_lib",
         "//test/test_common:registry_lib",
     ],
 )
