@@ -21,7 +21,8 @@ public:
   std::string name() const override;
 
 private:
-  std::map<const std::string, const std::string> convert_json_format_to_map(google::protobuf::Struct config);
+  std::map<const std::string, const std::string>
+  convert_json_format_to_map(google::protobuf::Struct config);
 };
 
 } // namespace File
