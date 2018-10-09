@@ -307,7 +307,7 @@ public:
   /**
    * Object on which filters can share data on a per-request basis.
    * For singleton data objects, only one filter can produce a named data object.
-   * List data objects can be updated by multiple filters (append only). Both object 
+   * List data objects can be updated by multiple filters (append only). Both object
    * types can be consumed by multiple filters.
    * @return the per-request state associated with this request.
    */
