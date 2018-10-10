@@ -3,6 +3,7 @@ Version history
 
 1.9.0 (pending)
 ===============
+* admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * fault: removed integer percentage support.
 * router: added ability to configure arbitrary :ref:`retriable status codes. <envoy_api_field_route.RouteAction.RetryPolicy.retriable_status_codes>`
 * router: added ability to set attempt count in upstream requests, see :ref:`virtual host's include request
