@@ -13,6 +13,8 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+class MetadataEncoderDecoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
+
 // A class that decodes METADATA payload in the format of HTTP/2 header block into MetadataMap, a
 // map of string key value pairs.
 class MetadataDecoder : Logger::Loggable<Logger::Id::http2> {
@@ -38,19 +40,6 @@ public:
   bool onMetadataFrameComplete(bool end_metadata);
 
   /**
-   * TODO(soya3129): Remove this function and metadata_map_list_ if callback is available before
-   * construction.
-   * Registers a callback to receive metadata events on the wire.
-   * @param callback is the callback function.
-   */
-  void registerMetadataCallback(MetadataCallback callback);
-
-  /**
-   * Indicates that the caller is no longer interested in metadata events.
-   */
-  void unregisterMetadataCallback();
-
-  /**
    * @return payload_.
    */
   Buffer::OwnedImpl& payload() { return payload_; }
@@ -61,6 +50,7 @@ public:
   uint64_t getStreamId() const { return stream_id_; }
 
 private:
+  friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
   /**
    * Decodes METADATA payload using nghttp2.
    * @param end_metadata indicates is END_METADATA is true.
