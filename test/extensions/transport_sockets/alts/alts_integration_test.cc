@@ -165,8 +165,7 @@ TEST_P(AltsIntegrationTestEmptyPeer, RouterRequestAndResponseWithBodyNoBuffer) {
 
 class AltsIntegrationTestClientInvalidPeer : public AltsIntegrationTestBase {
 public:
-  AltsIntegrationTestClientInvalidPeer()
-      : AltsIntegrationTestBase("", "invalid_client_identity") {}
+  AltsIntegrationTestClientInvalidPeer() : AltsIntegrationTestBase("", "invalid_client_identity") {}
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestClientInvalidPeer,
@@ -183,8 +182,7 @@ TEST_P(AltsIntegrationTestClientInvalidPeer, clientValidationFail) {
 
 class AltsIntegrationTestServerInvalidPeer : public AltsIntegrationTestBase {
 public:
-  AltsIntegrationTestServerInvalidPeer()
-      : AltsIntegrationTestBase("invalid_server_identity", "") {}
+  AltsIntegrationTestServerInvalidPeer() : AltsIntegrationTestBase("invalid_server_identity", "") {}
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestServerInvalidPeer,
@@ -199,13 +197,11 @@ TEST_P(AltsIntegrationTestServerInvalidPeer, ServerValidationFail) {
   testing::NiceMock<Network::MockConnectionCallbacks> client_callbacks;
   Network::ClientConnectionPtr client_conn = makeAltsConnection();
   client_conn->addConnectionCallbacks(client_callbacks);
-  EXPECT_CALL(client_callbacks,
-            onEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::Connected));
   client_conn->connect();
 
   EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke(
-          [&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
