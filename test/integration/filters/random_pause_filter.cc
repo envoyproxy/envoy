@@ -50,14 +50,17 @@ public:
 
   Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
     return [&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      // GUARDED_BY insists the lock be held when the guarded variable is passed by reference.
       absl::WriterMutexLock m(&rand_lock_);
-      callbacks.addStreamFilter(std::make_shared<::Envoy::RandomPauseFilter>(rand_lock_, rng_));
+      if (rng_.get() == nullptr) {
+        // Lazily create to ensure the test seed is set.
+        rng_ = std::make_unique<TestRandomGenerator>();
+      }
+      callbacks.addStreamFilter(std::make_shared<::Envoy::RandomPauseFilter>(rand_lock_, *rng_));
     };
   }
 
   absl::Mutex rand_lock_;
-  TestRandomGenerator rng_ GUARDED_BY(rand_lock_);
+  std::unique_ptr<TestRandomGenerator> rng_ GUARDED_BY(rand_lock_);
 };
 
 // perform static registration
