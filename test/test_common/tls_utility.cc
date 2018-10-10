@@ -2,7 +2,6 @@
 
 #include "common/common/assert.h"
 
-#include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -38,14 +37,6 @@ std::vector<uint8_t> generateClientHello(const std::string& sni_name, const std:
   ASSERT(data_len > 0);
   std::vector<uint8_t> buf(data, data + data_len);
   return buf;
-}
-
-bssl::UniquePtr<X509> readCertFromFile(const std::string& path) {
-  const std::string& file_content = TestEnvironment::readFileToStringForTest(path);
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file_content.c_str(), file_content.size()));
-  bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
-  EXPECT_NE(cert, nullptr);
-  return cert;
 }
 
 } // namespace Test

@@ -51,6 +51,7 @@ envoy_cc_test(
     srcs = [
         "context_impl_test.cc",
         "ssl_certs_test.h",
+        "test_utility.h",
     ],
     data = [
         "gen_unittest_certs.sh",
@@ -73,6 +74,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = [
+        "test_utility.h",
         "utility_test.cc",
     ],
     data = [

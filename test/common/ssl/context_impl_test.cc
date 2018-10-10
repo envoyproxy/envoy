@@ -9,6 +9,7 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/common/ssl/ssl_certs_test.h"
+#include "test/common/ssl/test_utility.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -42,24 +43,21 @@ TEST_F(SslContextImplTest, TestdNSNameMatching) {
 }
 
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
-  bssl::UniquePtr<X509> cert =
-      Envoy::Tls::Test::readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
+  bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
   std::vector<std::string> verify_subject_alt_name_list = {"server1.example.com",
                                                            "server2.example.com"};
   EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
 }
 
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
-  bssl::UniquePtr<X509> cert =
-      Envoy::Tls::Test::readCertFromFile("test/common/ssl/test_data/san_uri_cert.pem");
+  bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_uri_cert.pem");
   std::vector<std::string> verify_subject_alt_name_list = {"spiffe://lyft.com/fake-team",
                                                            "spiffe://lyft.com/test-team"};
   EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
 }
 
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
-  bssl::UniquePtr<X509> cert =
-      Envoy::Tls::Test::readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
+  bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
   std::vector<std::string> verify_subject_alt_name_list = {"foo", "bar"};
   EXPECT_FALSE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
 }
