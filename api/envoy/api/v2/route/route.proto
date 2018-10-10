@@ -532,6 +532,9 @@ message RouteAction {
     // point the host that was last selected will be routed to. If unspecified, this will default to
     // retrying once.
     int64 host_selection_retry_max_attempts = 6;
+
+    // HTTP status codes that should trigger a retry in addition to those specified by retry_on.
+    repeated uint32 retriable_status_codes = 7;
   }
 
   // Specifies the idle timeout for the route. If not specified, there is no per-route idle timeout,
