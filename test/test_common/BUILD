@@ -153,12 +153,13 @@ envoy_cc_test(
     deps = [":simulated_time_system_lib"],
 )
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "tls_utility_lib",
     srcs = ["tls_utility.cc"],
     hdrs = ["tls_utility.h"],
     external_deps = ["ssl"],
     deps = [
+        ":environment_lib",
         "//source/common/common:assert_lib",
     ],
 )
