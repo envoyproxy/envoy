@@ -29,7 +29,7 @@ Version history
   health check/weight/metadata updates within the given duration.
 * config: regex validation added to limit to a maximum of 1024 characters.
 * config: v1 disabled by default. v1 support remains available until October via flipping --v2-config-only=false.
-* config: v1 disabled by default. v1 support remains available until October via setting :option:`--allow-deprecated-v1-api`.
+* config: v1 disabled by default. v1 support remains available until October via deprecated flag --allow-deprecated-v1-api.
 * config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`  
   stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented 
   in case of schema/validation error.
