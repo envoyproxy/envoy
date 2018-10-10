@@ -19,11 +19,9 @@ MetadataEncoder::MetadataEncoder(uint64_t stream_id) : stream_id_(stream_id) {
 
 bool MetadataEncoder::createPayload(MetadataMap& metadata_map) {
   ASSERT(!metadata_map.empty());
-  if (payload_.length() > 0) {
-    // |payload_| is not empty.
-    ENVOY_LOG(error, "payload_ is not empty.");
-    return false;
-  }
+  // TODO(soya3129): If we need to send more than one METADATA header blocks on one stream, save the
+  // metadata_map if the previous payload hasn't been consumed by nghttp2.
+  ASSERT(payload_.length() == 0);
 
   bool success = createHeaderBlockUsingNghttp2(metadata_map);
   if (!success) {
