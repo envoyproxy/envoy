@@ -62,12 +62,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
       "", "config-yaml", "Inline YAML configuration, merges with the contents of --config-path",
       false, "", "string", cmd);
 
-  // Deprecated and unused.
-  TCLAP::SwitchArg v2_config_only("", "v2-config-only", "deprecated", cmd, true);
-
-  TCLAP::SwitchArg allow_v1_config("", "allow-deprecated-v1-api", "allow use of legacy v1 config",
-                                   cmd, false);
-
   TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
                                         "allow unknown fields in the configuration", cmd, false);
 
@@ -194,7 +188,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   concurrency_ = std::max(1U, concurrency.getValue());
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
-  v2_config_only_ = !allow_v1_config.getValue();
+  v2_config_only_ = true;
   if (allow_unknown_fields.getValue()) {
     MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Allow;
   }
