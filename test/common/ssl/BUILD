@@ -67,7 +67,6 @@ envoy_cc_test(
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
-        "//test/test_common:tls_utility_lib",
     ],
 )
 
@@ -84,6 +83,5 @@ envoy_cc_test(
     deps = [
         "//source/common/ssl:utility_lib",
         "//test/test_common:environment_lib",
-        "//test/test_common:tls_utility_lib",
     ],
 )
