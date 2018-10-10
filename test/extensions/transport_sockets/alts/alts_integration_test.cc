@@ -73,6 +73,8 @@ public:
 
     fake_handshaker_server_ci_.waitReady();
 
+    ENVOY_LOG_MISC(info, "handshaker listen port {}", fake_handshaker_server_port_);
+
     std::string client_yaml = R"EOF(
       peer_service_accounts: []
       handshaker_service: ")EOF" +
@@ -116,7 +118,7 @@ public:
   }
 
   std::string wrongHandshakerServerAddress() {
-    return absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
+    return absl::StrCat(Network::Test::getLoopbackAddressUrlString2(version_), ":",
                         std::to_string(fake_handshaker_server_port_ + 1));
   }
 

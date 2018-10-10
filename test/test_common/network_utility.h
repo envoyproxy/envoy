@@ -43,6 +43,13 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port
 const std::string getLoopbackAddressUrlString(const Address::IpVersion version);
 
 /**
+ * Get a URL ready IP loopback address as a string.
+ * @param version IP address version of loopback address.
+ * @return std::string URL ready loopback address as a string.
+ */
+const std::string getLoopbackAddressUrlString2(const Address::IpVersion version);
+
+/**
  * Get a IP loopback address as a string. There are no square brackets around IPv6 addresses, this
  * is what inet_ntop() gives.
  * @param version IP address version of loopback address.
