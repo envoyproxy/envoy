@@ -2,8 +2,8 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
-#include "envoy/network/listen_socket.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/network/listen_socket.h"
 
 namespace Envoy {
 namespace Network {
