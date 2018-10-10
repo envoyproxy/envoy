@@ -188,8 +188,7 @@ bool SnapshotImpl::featureEnabled(const std::string& key,
                                   uint64_t random_value) const {
   const auto& entry = values_.find(key);
   uint64_t numerator, denominator;
-  if (entry == values_.end() ||
-      entry->second.entry_type_ != Entry::EntryType::FRACTIONAL_PERCENT_VALUE) {
+  if (entry == values_.end() || !entry->second.fractional_percent_value_.has_value()) {
     numerator = default_value.numerator();
     denominator =
         ProtobufPercentHelper::fractionalPercentDenominatorToInt(default_value.denominator());
@@ -229,7 +228,6 @@ SnapshotImpl::SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
 
 SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
   Entry entry;
-  entry.entry_type_ = Entry::EntryType::STRING_VALUE;
   entry.raw_string_value_ = value;
 
   // As a perf optimization, attempt to parse the entry's string and store it inside the struct. If
@@ -240,32 +238,28 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
 }
 
 bool SnapshotImpl::parseEntryUintValue(Entry& entry) {
-  // TODO (tonya11en): Use C++17 if-statements with initializers to limit scope of variables.
   uint64_t converted_uint64;
   if (StringUtil::atoul(entry.raw_string_value_.c_str(), converted_uint64)) {
-    entry.entry_type_ = Entry::EntryType::UINT_VALUE;
     entry.uint_value_ = converted_uint64;
     return true;
   }
   return false;
 }
 
-bool SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
+void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
   envoy::type::FractionalPercent converted_fractional_percent;
   try {
     MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent);
   } catch (const ProtoValidationException& ex) {
-    ENVOY_LOG(error, "unable to validate proto: {}", ex.what());
-    return false;
+    ENVOY_LOG(error, "unable to validate fraction percent runtime proto: {}", ex.what());
+    return;
   } catch (const EnvoyException& ex) {
     // An EnvoyException is thrown when we try to parse a bogus string as a protobuf. This is fine,
     // since there was no expectation that the raw string was a valid proto.
-    return false;
+    return;
   }
 
   entry.fractional_percent_value_ = converted_fractional_percent;
-  entry.entry_type_ = Entry::EntryType::FRACTIONAL_PERCENT_VALUE;
-  return true;
 }
 
 void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>& values) {

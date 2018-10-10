@@ -93,7 +93,7 @@ private:
   }
 
   static bool parseEntryUintValue(Entry& entry);
-  static bool parseEntryFractionalPercentValue(Entry& entry);
+  static void parseEntryFractionalPercentValue(Entry& entry);
 
   const std::vector<OverrideLayerConstPtr> layers_;
   EntryMap values_;

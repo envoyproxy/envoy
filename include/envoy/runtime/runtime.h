@@ -51,7 +51,6 @@ public:
     std::string raw_string_value_;
     absl::optional<uint64_t> uint_value_;
     absl::optional<envoy::type::FractionalPercent> fractional_percent_value_;
-    EntryType entry_type_;
   };
 
   typedef std::unordered_map<std::string, Entry> EntryMap;
