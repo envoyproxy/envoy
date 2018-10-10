@@ -8,8 +8,8 @@
 #include "common/ssl/utility.h"
 #include "common/stats/isolated_store_impl.h"
 
-#include "test/common/ssl/ssl_test_utility.h"
 #include "test/common/ssl/ssl_certs_test.h"
+#include "test/common/ssl/ssl_test_utility.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
