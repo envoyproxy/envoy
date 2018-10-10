@@ -127,6 +127,8 @@ public:
 
 class AltsIntegrationTestValidPeer : public AltsIntegrationTestBase {
 public:
+  // FakeHandshake server sends peer_identity as peer service account. Set this
+  // information into config to pass validation.
   AltsIntegrationTestValidPeer() : AltsIntegrationTestBase("[peer_identity]", "") {}
 };
 
@@ -134,6 +136,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestValidPeer,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
+// Verifies that when received peer service account passes validation, the alts
+// handshake succeeds.
 TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = [this]() -> Network::ClientConnectionPtr {
     return makeAltsConnection();
@@ -150,6 +154,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestEmptyPeer,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
+// Verifies that when peer service account is not set into config, the alts
+// handshake succeeds.
 TEST_P(AltsIntegrationTestEmptyPeer, RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = [this]() -> Network::ClientConnectionPtr {
     return makeAltsConnection();
@@ -157,20 +163,50 @@ TEST_P(AltsIntegrationTestEmptyPeer, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
 }
 
-class AltsIntegrationTestInvalidPeer : public AltsIntegrationTestBase {
+class AltsIntegrationTestClientInvalidPeer : public AltsIntegrationTestBase {
 public:
-  AltsIntegrationTestInvalidPeer()
-      : AltsIntegrationTestBase("invalid_server_identity", "invalid_client_identity") {}
+  AltsIntegrationTestClientInvalidPeer()
+      : AltsIntegrationTestBase("", "invalid_client_identity") {}
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestInvalidPeer,
+INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestClientInvalidPeer,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
-TEST_P(AltsIntegrationTestInvalidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
+// Verifies that when client receives peer service account which does not match
+// any accounts in config, the handshake will fail and client closes connection.
+TEST_P(AltsIntegrationTestClientInvalidPeer, clientValidationFail) {
   initialize();
   codec_client_ = makeRawHttpConnection(makeAltsConnection());
   EXPECT_FALSE(codec_client_->connected());
+}
+
+class AltsIntegrationTestServerInvalidPeer : public AltsIntegrationTestBase {
+public:
+  AltsIntegrationTestServerInvalidPeer()
+      : AltsIntegrationTestBase("invalid_server_identity", "") {}
+};
+
+INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestServerInvalidPeer,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
+// Verifies that when Envoy receives peer service account which does not match
+// any accounts in config, the handshake will fail and Envoy closes connection.
+TEST_P(AltsIntegrationTestServerInvalidPeer, ServerValidationFail) {
+  initialize();
+
+  testing::NiceMock<Network::MockConnectionCallbacks> client_callbacks;
+  Network::ClientConnectionPtr client_conn = makeAltsConnection();
+  client_conn->addConnectionCallbacks(client_callbacks);
+  EXPECT_CALL(client_callbacks,
+            onEvent(Network::ConnectionEvent::Connected));
+  client_conn->connect();
+
+  EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke(
+          [&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 } // namespace Alts

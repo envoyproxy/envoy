@@ -58,9 +58,9 @@ REPOSITORY_LOCATIONS = dict(
     ),
     com_github_grpc_grpc = dict(
         # TODO(lizan): Use release once new version released.
-        sha256 = "c3954b27d7cd44265b9f5eff423c115f7ccd00f871c0f5162957fc6c77d23b23",
-        strip_prefix = "grpc-4b1aa50e37c8e5bc1e4319b16827c8ff4507abc1",
-        urls = ["https://github.com/grpc/grpc/archive/4b1aa50e37c8e5bc1e4319b16827c8ff4507abc1.tar.gz"],
+        sha256 = "dcd972e32e39e41f6248c7f8252676de2993d93289da842b72e271d0a89ed150",
+        strip_prefix = "grpc-1.16.0-pre1",
+        urls = ["https://github.com/grpc/grpc/archive/v1.16.0-pre1.tar.gz"],
     ),
     com_github_nanopb_nanopb = dict(
         # From: https://github.com/grpc/grpc/blob/v1.14.0/bazel/grpc_deps.bzl#L123

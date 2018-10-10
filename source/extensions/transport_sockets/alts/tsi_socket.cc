@@ -37,7 +37,6 @@ std::string TsiSocket::protocol() const {
 Network::PostIoAction TsiSocket::doHandshake() {
   ASSERT(!handshake_complete_);
   ENVOY_CONN_LOG(debug, "TSI: doHandshake", callbacks_->connection());
-
   if (!handshaker_next_calling_ && raw_read_buffer_.length() > 0) {
     doHandshakeNext();
   }
@@ -163,6 +162,10 @@ Network::IoResult TsiSocket::doRead(Buffer::Instance& buffer) {
                    result.end_stream_read_);
     if (result.action_ == Network::PostIoAction::Close && result.bytes_processed_ == 0) {
       return result;
+    }
+
+    if (!handshake_complete_ && result.end_stream_read_ && result.bytes_processed_ == 0) {
+      return {Network::PostIoAction::Close, result.bytes_processed_, result.end_stream_read_};
     }
 
     end_stream_read_ = result.end_stream_read_;
