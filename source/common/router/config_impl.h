@@ -393,8 +393,15 @@ protected:
 
 private:
   struct RuntimeData {
-    uint64_t numerator_val_{};
-    uint64_t denominator_val_{};
+    std::string fractional_runtime_key_{};
+    envoy::type::FractionalPercent fractional_runtime_default_{};
+
+    // Relating to the deprecated 'runtime' field.
+    std::string runtime_key_{};
+    uint64_t runtime_default_{};
+
+    // Indicates whether to use the deprecated 'runtime' field or 'fractional_percent'.
+    bool legacy_runtime_data_{};
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {
@@ -531,6 +538,8 @@ private:
   parseOpaqueConfig(const envoy::api::v2::route::Route& route);
 
   static DecoratorConstPtr parseDecorator(const envoy::api::v2::route::Route& route);
+
+  bool evaluateRuntimeMatch(const uint64_t random_value) const;
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;

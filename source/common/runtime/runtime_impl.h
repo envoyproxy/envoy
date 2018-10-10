@@ -13,7 +13,9 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/type/percent.pb.validate.h"
 
+#include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
@@ -59,7 +61,9 @@ struct RuntimeStats {
 /**
  * Implementation of Snapshot whose source is the vector of layers passed to the constructor.
  */
-class SnapshotImpl : public Snapshot, public ThreadLocal::ThreadLocalObject {
+class SnapshotImpl : public Snapshot,
+                     public ThreadLocal::ThreadLocalObject,
+                     Logger::Loggable<Logger::Id::runtime> {
 public:
   SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
                std::vector<OverrideLayerConstPtr>&& layers);
@@ -70,6 +74,10 @@ public:
   bool featureEnabled(const std::string& key, uint64_t default_value) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value,
                       uint64_t random_value) const override;
+  bool featureEnabled(const std::string& key,
+                      const envoy::type::FractionalPercent& default_value) const override;
+  bool featureEnabled(const std::string& key, const envoy::type::FractionalPercent& default_value,
+                      uint64_t random_value) const override;
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string& key, uint64_t default_value) const override;
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
@@ -77,8 +85,18 @@ public:
   static Entry createEntry(const std::string& value);
 
 private:
+  static void resolveEntryType(Entry& entry) {
+    if (parseEntryUintValue(entry)) {
+      return;
+    }
+    parseEntryFractionalPercentValue(entry);
+  }
+
+  static bool parseEntryUintValue(Entry& entry);
+  static void parseEntryFractionalPercentValue(Entry& entry);
+
   const std::vector<OverrideLayerConstPtr> layers_;
-  std::unordered_map<std::string, const Snapshot::Entry> values_;
+  EntryMap values_;
   RandomGenerator& generator_;
 };
 
@@ -88,13 +106,11 @@ private:
 class OverrideLayerImpl : public Snapshot::OverrideLayer {
 public:
   explicit OverrideLayerImpl(const std::string& name) : name_{name} {}
-  const std::unordered_map<std::string, Snapshot::Entry>& values() const override {
-    return values_;
-  }
+  const Snapshot::EntryMap& values() const override { return values_; }
   const std::string& name() const override { return name_; }
 
 protected:
-  std::unordered_map<std::string, Snapshot::Entry> values_;
+  Snapshot::EntryMap values_;
   const std::string name_;
 };
 
