@@ -40,10 +40,15 @@ static_resources:
     connect_timeout: 1s
     type: strict_dns
     lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: backend
-        port_value: 80
+    load_assignment:
+      cluster_name: local_service
+      endpoints:
+      - lb_endpoints:
+          endpoint:
+            address:
+              socket_address:
+                address: backend
+                port_value: 80
 admin:
   access_log_path: /dev/stdout
   address:
