@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Ssl {
 
-bssl::UniquePtr<X509> readCertFromFile(const std::string& path) {
+inline bssl::UniquePtr<X509> readCertFromFile(const std::string& path) {
   const std::string& file_content = TestEnvironment::readFileToStringForTest(path);
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file_content.c_str(), file_content.size()));
   bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
