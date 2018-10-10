@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -57,6 +58,7 @@ envoy_cc_test(
         "//test/common/ssl/test_data:certs",
     ],
     deps = [
+        ":ssl_test_utils",
         "//source/common/json:json_loader_lib",
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",
@@ -77,6 +79,19 @@ envoy_cc_test(
     data = [
         "gen_unittest_certs.sh",
         "//test/common/ssl/test_data:certs",
+    ],
+    external_deps = ["ssl"],
+    deps = [
+        ":ssl_test_utils",
+        "//source/common/ssl:utility_lib",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "ssl_test_utils",
+    srcs = [
+        "ssl_test_utility.h",
     ],
     deps = [
         "//source/common/ssl:utility_lib",
