@@ -328,7 +328,8 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
                             const std::string& cluster, bool validate_clusters,
                             envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
                             envoy::api::v2::route::VirtualHost::TlsRequirementType type,
-                            envoy::api::v2::route::RouteAction::RetryPolicy retry_policy) {
+                            envoy::api::v2::route::RouteAction::RetryPolicy retry_policy,
+                            bool include_attempt_count_header) {
   RELEASE_ASSERT(!finalized_, "");
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
@@ -337,6 +338,7 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
   route_config->mutable_validate_clusters()->set_value(validate_clusters);
   auto* virtual_host = route_config->add_virtual_hosts();
   virtual_host->set_name(domains);
+  virtual_host->set_include_request_attempt_count(include_attempt_count_header);
   virtual_host->add_domains(domains);
   virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
   virtual_host->mutable_routes(0)->mutable_route()->set_cluster(cluster);

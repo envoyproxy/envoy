@@ -131,6 +131,11 @@ private:
     uint32_t hostSelectionMaxAttempts() const override { return 1; }
     uint32_t numRetries() const override { return 0; }
     uint32_t retryOn() const override { return 0; }
+    const std::vector<uint32_t>& retriableStatusCodes() const override {
+      return retriable_status_codes_;
+    }
+
+    const std::vector<uint32_t> retriable_status_codes_;
   };
 
   struct NullShadowPolicy : public Router::ShadowPolicy {
@@ -162,6 +167,7 @@ private:
     const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
       return nullptr;
     }
+    bool includeAttemptCount() const override { return false; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullConfig route_configuration_;
@@ -229,6 +235,8 @@ private:
     const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
       return nullptr;
     }
+
+    bool includeAttemptCount() const override { return false; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
