@@ -12,6 +12,9 @@ Version history
 * stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
+* http: added support for a :ref:`request timeout
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_timeout>`.
+  The timeout is disabled by default.
 
 1.8.0 (Oct 4, 2018)
 ===================
