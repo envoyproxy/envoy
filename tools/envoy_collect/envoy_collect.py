@@ -121,7 +121,7 @@ def run_envoy(envoy_shcmd_args, envoy_log_path, admin_address_path,
   print(envoy_shcmd)
 
   # Some process setup stuff to ensure the child process gets cleaned up properly if the
-  # collector dies and doesn't get its signals implicity.
+  # collector dies and doesn't get its signals implicitly.
   def envoy_preexec_fn():
     os.setpgrp()
     libc = ctypes.CDLL(ctypes.util.find_library('c'), use_errno=True)
@@ -247,7 +247,7 @@ if __name__ == '__main__':
   parser.add_argument(
       '--log-level',
       '-l',
-      help='Envoy log level. This will be overriden when invoking Envoy.')
+      help='Envoy log level. This will be overridden when invoking Envoy.')
   # envoy_collect specific args.
   parser.add_argument(
       '--performance',

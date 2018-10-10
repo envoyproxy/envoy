@@ -70,6 +70,7 @@ EXTENSIONS = {
     "envoy.filters.network.redis_proxy":                "//source/extensions/filters/network/redis_proxy:config",
     "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",
     "envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
+    "envoy.filters.network.sni_cluster":                "//source/extensions/filters/network/sni_cluster:config",
 
     #
     # Resource monitors
@@ -111,6 +112,9 @@ EXTENSIONS = {
 
     # Retry host predicates
     "envoy.retry_host_predicates.other_hosts":          "//source/extensions/retry/host/other_hosts:config",
+
+    # Retry priorities
+    "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/other_priority:config",
 }
 
 WINDOWS_EXTENSIONS = {
@@ -181,6 +185,7 @@ WINDOWS_EXTENSIONS = {
     #"envoy.filters.network.ratelimit":                  "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",
     #"envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
+    #"envoy.filters.network.sni_cluster":                "//source/extensions/filters/network/sni_cluster:config",
 
     #
     # Stat sinks

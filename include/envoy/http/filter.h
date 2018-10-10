@@ -123,10 +123,10 @@ public:
   virtual uint64_t streamId() PURE;
 
   /**
-   * @return requestInfo for logging purposes. Individual filter may add specific information to be
+   * @return streamInfo for logging purposes. Individual filter may add specific information to be
    * put into the access log.
    */
-  virtual RequestInfo::RequestInfo& requestInfo() PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   /**
    * @return span context used for tracing purposes. Individual filters may add or modify
@@ -480,7 +480,7 @@ public:
 
   /**
    * Called with trailers to be encoded, implicitly ending the stream.
-   * @param trailers supplies the trailes to be encoded.
+   * @param trailers supplies the trailers to be encoded.
    */
   virtual FilterTrailersStatus encodeTrailers(HeaderMap& trailers) PURE;
 

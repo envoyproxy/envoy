@@ -134,7 +134,8 @@ public:
   void createUpstreams() override {
     HttpProtocolIntegrationTest::createUpstreams();
     // for Jwks upstream.
-    fake_upstreams_.emplace_back(new FakeUpstream(0, GetParam().upstream_protocol, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, GetParam().upstream_protocol, version_, timeSystem()));
   }
 
   void initializeFilter() {

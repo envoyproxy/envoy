@@ -13,11 +13,15 @@ namespace Host {
 class OtherHostsRetryPredicateFactory : public Upstream::RetryHostPredicateFactory {
 public:
   void createHostPredicate(Upstream::RetryHostPredicateFactoryCallbacks& callbacks,
-                           const Protobuf::Message&) override {
-    callbacks.addHostPredicate(std::make_shared<OtherHostsRetryPredicate>());
+                           const Protobuf::Message&, uint32_t retry_count) override {
+    callbacks.addHostPredicate(std::make_shared<OtherHostsRetryPredicate>(retry_count));
   }
 
   std::string name() override { return RetryHostPredicateValues::get().PreviousHostsPredicate; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  }
 };
 
 } // namespace Host

@@ -8,6 +8,6 @@ namespace Envoy {
 class IntegrationTest : public HttpIntegrationTest,
                         public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  IntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  IntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 };
 } // namespace Envoy

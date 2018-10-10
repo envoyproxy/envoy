@@ -36,7 +36,7 @@ Http::FilterHeadersStatus HealthCheckFilter::decodeHeaders(Http::HeaderMap& head
                                                            bool end_stream) {
   if (Http::HeaderUtility::matchHeaders(headers, *header_match_data_)) {
     health_check_request_ = true;
-    callbacks_->requestInfo().healthCheck(true);
+    callbacks_->streamInfo().healthCheck(true);
 
     // Set the 'sampled' status for the span to false. This overrides
     // any previous sampling decision associated with the trace instance,
@@ -97,7 +97,7 @@ void HealthCheckFilter::onComplete() {
   ASSERT(handling_);
   Http::Code final_status = Http::Code::OK;
   if (context_.healthCheckFailed()) {
-    callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::FailedLocalHealthCheck);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck);
     final_status = Http::Code::ServiceUnavailable;
   } else {
     if (cache_manager_) {
@@ -118,7 +118,7 @@ void HealthCheckFilter::onComplete() {
         const auto& stats = cluster->info()->stats();
         const uint64_t membership_total = stats.membership_total_.value();
         if (membership_total == 0) {
-          // If the cluster exists but is empty, consider the service unhealty unless
+          // If the cluster exists but is empty, consider the service unhealthy unless
           // the specified minimum percent healthy for the cluster happens to be zero.
           if (min_healthy_percentage == 0.0) {
             continue;
@@ -139,7 +139,7 @@ void HealthCheckFilter::onComplete() {
     }
 
     if (!Http::CodeUtility::is2xx(enumToInt(final_status))) {
-      callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::FailedLocalHealthCheck);
+      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck);
     }
   }
 

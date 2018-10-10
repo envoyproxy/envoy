@@ -6,7 +6,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/time.h"
-#include "envoy/request_info/request_info.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "common/common/utility.h"
 
@@ -36,7 +36,7 @@ private:
   /**
    * General parse command utility. Will parse token from start position. Token is expected to end
    * with ')'. An optional ":max_length" may be specified after the closing ')' char. Token may
-   * contain multiple values separated by "seperator" string. First value will be populated in
+   * contain multiple values separated by "separator" string. First value will be populated in
    * "main" and any additional sub values will be set in the vector "subitems". For example token
    * of: "com.test.my_filter:test_object:inner_key):100" with separator of ":" will set the
    * following:
@@ -46,7 +46,7 @@ private:
    *
    * @param token the token to parse
    * @param start the index to start parsing from
-   * @param seperator seperator between values
+   * @param separator separator between values
    * @param main the first value
    * @param sub_items any additional values
    * @param max_length optional max_length will be populated if specified
@@ -92,14 +92,14 @@ public:
   std::string format(const Http::HeaderMap& request_headers,
                      const Http::HeaderMap& response_headers,
                      const Http::HeaderMap& response_trailers,
-                     const RequestInfo::RequestInfo& request_info) const override;
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   std::vector<FormatterPtr> formatters_;
 };
 
 /**
- * Formatter for string literal. It ignores headers and request info and returns string by which it
+ * Formatter for string literal. It ignores headers and stream info and returns string by which it
  * was initialized.
  */
 class PlainStringFormatter : public Formatter {
@@ -108,7 +108,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const RequestInfo::RequestInfo&) const override;
+                     const StreamInfo::StreamInfo&) const override;
 
 private:
   std::string str_;
@@ -137,7 +137,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
-                     const Http::HeaderMap&, const RequestInfo::RequestInfo&) const override;
+                     const Http::HeaderMap&, const StreamInfo::StreamInfo&) const override;
 };
 
 /**
@@ -150,7 +150,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap& response_headers,
-                     const Http::HeaderMap&, const RequestInfo::RequestInfo&) const override;
+                     const Http::HeaderMap&, const StreamInfo::StreamInfo&) const override;
 };
 
 /**
@@ -164,22 +164,22 @@ public:
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
                      const Http::HeaderMap& response_trailers,
-                     const RequestInfo::RequestInfo&) const override;
+                     const StreamInfo::StreamInfo&) const override;
 };
 
 /**
- * Formatter based on the RequestInfo field.
+ * Formatter based on the StreamInfo field.
  */
-class RequestInfoFormatter : public Formatter {
+class StreamInfoFormatter : public Formatter {
 public:
-  RequestInfoFormatter(const std::string& field_name);
+  StreamInfoFormatter(const std::string& field_name);
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const RequestInfo::RequestInfo& request_info) const override;
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
-  std::function<std::string(const RequestInfo::RequestInfo&)> field_extractor_;
+  std::function<std::string(const StreamInfo::StreamInfo&)> field_extractor_;
 };
 
 /**
@@ -199,7 +199,7 @@ private:
 };
 
 /**
- * Formatter based on the DynamicMetadata from RequestInfo.
+ * Formatter based on the DynamicMetadata from StreamInfo.
  */
 class DynamicMetadataFormatter : public Formatter, MetadataFormatter {
 public:
@@ -208,7 +208,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const RequestInfo::RequestInfo& request_info) const override;
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 /**
@@ -218,7 +218,7 @@ class StartTimeFormatter : public Formatter {
 public:
   StartTimeFormatter(const std::string& format);
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const RequestInfo::RequestInfo&) const override;
+                     const StreamInfo::StreamInfo&) const override;
 
 private:
   const Envoy::DateFormatter date_formatter_;

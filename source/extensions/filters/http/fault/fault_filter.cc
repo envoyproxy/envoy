@@ -34,15 +34,14 @@ const std::string FaultFilter::ABORT_HTTP_STATUS_KEY = "fault.http.abort.http_st
 FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
 
   if (fault.has_abort()) {
-    PROTOBUF_SET_FRACTIONAL_PERCENT_OR_DEFAULT(abort_percentage_, fault.abort(), percentage,
-                                               percent);
-    http_status_ = fault.abort().http_status();
+    const auto& abort = fault.abort();
+    abort_percentage_ = abort.percentage();
+    http_status_ = abort.http_status();
   }
 
   if (fault.has_delay()) {
-    PROTOBUF_SET_FRACTIONAL_PERCENT_OR_DEFAULT(fixed_delay_percentage_, fault.delay(), percentage,
-                                               percent);
     const auto& delay = fault.delay();
+    fixed_delay_percentage_ = delay.percentage();
     fixed_duration_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(delay, fixed_delay, 0);
   }
 
@@ -118,7 +117,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
     delay_timer_ = callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
     delay_timer_->enableTimer(std::chrono::milliseconds(duration_ms.value()));
     recordDelaysInjectedStats();
-    callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::DelayInjected);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DelayInjected);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -134,13 +133,14 @@ bool FaultFilter::isDelayEnabled() {
   bool enabled = config_->runtime().snapshot().featureEnabled(
       DELAY_PERCENT_KEY, fault_settings_->delayPercentage().numerator(),
       config_->randomGenerator().random(),
-      ProtobufPercentHelper::fractionalPercentDenominatorToInt(fault_settings_->delayPercentage()));
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+          fault_settings_->delayPercentage().denominator()));
   if (!downstream_cluster_delay_percent_key_.empty()) {
     enabled |= config_->runtime().snapshot().featureEnabled(
         downstream_cluster_delay_percent_key_, fault_settings_->delayPercentage().numerator(),
         config_->randomGenerator().random(),
         ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-            fault_settings_->delayPercentage()));
+            fault_settings_->delayPercentage().denominator()));
   }
   return enabled;
 }
@@ -149,13 +149,14 @@ bool FaultFilter::isAbortEnabled() {
   bool enabled = config_->runtime().snapshot().featureEnabled(
       ABORT_PERCENT_KEY, fault_settings_->abortPercentage().numerator(),
       config_->randomGenerator().random(),
-      ProtobufPercentHelper::fractionalPercentDenominatorToInt(fault_settings_->abortPercentage()));
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+          fault_settings_->abortPercentage().denominator()));
   if (!downstream_cluster_abort_percent_key_.empty()) {
     enabled |= config_->runtime().snapshot().featureEnabled(
         downstream_cluster_abort_percent_key_, fault_settings_->abortPercentage().numerator(),
         config_->randomGenerator().random(),
         ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-            fault_settings_->abortPercentage()));
+            fault_settings_->abortPercentage().denominator()));
   }
   return enabled;
 }
@@ -254,7 +255,7 @@ void FaultFilter::postDelayInjection() {
 }
 
 void FaultFilter::abortWithHTTPStatus() {
-  callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::FaultInjected);
+  callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
   callbacks_->sendLocalReply(static_cast<Http::Code>(abortHttpStatus()), "fault filter abort",
                              nullptr);
   recordAbortsInjectedStats();

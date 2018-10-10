@@ -17,6 +17,9 @@ load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
 
+# go version for rules_go
+GO_VERSION = "1.10.4"
+
 def _repository_impl(name, **kwargs):
     # `existing_rule_keys` contains the names of repositories that have already
     # been defined in the Bazel workspace. By skipping repos with existing keys,
@@ -28,7 +31,8 @@ def _repository_impl(name, **kwargs):
         # wants to override the version. Do nothing.
         return
 
-    location = REPOSITORY_LOCATIONS[name]
+    loc_key = kwargs.pop("repository_key", name)
+    location = REPOSITORY_LOCATIONS[loc_key]
 
     # Git tags are mutable. We want to depend on commit IDs instead. Give the
     # user a useful error if they accidentally specify a tag.
@@ -195,7 +199,7 @@ def _python_deps():
         build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
     )
 
-# Bazel native C++ dependencies. For the depedencies that doesn't provide autoconf/automake builds.
+# Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
     _repository_impl("grpc_httpjson_transcoding")
     native.bind(
@@ -211,7 +215,21 @@ def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
     # it to exclude the Go rules.
     if "io_bazel_rules_go" not in skip_targets:
+        _repository_impl(
+            name = "com_github_golang_protobuf",
+            # These patches are to add BUILD files to golang/protobuf.
+            # TODO(sesmith177): Remove this dependency when both:
+            #   1. There's a release of golang/protobuf that includes
+            #      https://github.com/golang/protobuf/commit/31e0d063dd98c052257e5b69eeb006818133f45c
+            #   2. That release is included in rules_go
+            patches = [
+                "@io_bazel_rules_go//third_party:com_github_golang_protobuf-gazelle.patch",
+                "@io_bazel_rules_go//third_party:com_github_golang_protobuf-extras.patch",
+            ],
+            patch_args = ["-p1"],
+        )
         _repository_impl("io_bazel_rules_go")
+        _repository_impl("bazel_gazelle")
 
 def _envoy_api_deps():
     # Treat the data plane API as an external repo, this simplifies exporting the API to
@@ -448,6 +466,10 @@ def _com_google_googletest():
 def _com_google_absl():
     _repository_impl("com_google_absl")
     native.bind(
+        name = "abseil_any",
+        actual = "@com_google_absl//absl/types:any",
+    )
+    native.bind(
         name = "abseil_base",
         actual = "@com_google_absl//absl/base:base",
     )
@@ -485,8 +507,10 @@ def _com_google_protobuf():
     # Needed for cc_proto_library, Bazel doesn't support aliases today for repos,
     # see https://groups.google.com/forum/#!topic/bazel-discuss/859ybHQZnuI and
     # https://github.com/bazelbuild/bazel/issues/3219.
-    location = REPOSITORY_LOCATIONS["com_google_protobuf"]
-    git_repository(name = "com_google_protobuf_cc", **location)
+    _repository_impl(
+        "com_google_protobuf_cc",
+        repository_key = "com_google_protobuf",
+    )
     native.bind(
         name = "protobuf",
         actual = "@com_google_protobuf//:protobuf",

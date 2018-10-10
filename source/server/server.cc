@@ -253,19 +253,25 @@ void InstanceImpl::initialize(Options& options,
                                    options.serviceClusterName(), options.serviceNodeName()));
 
   Configuration::InitialImpl initial_config(bootstrap_);
-  ENVOY_LOG(debug, "admin address: {}", initial_config.admin().address()->asString());
 
   HotRestart::ShutdownParentAdminInfo info;
   info.original_start_time_ = original_start_time_;
   restarter_.shutdownParentAdmin(info);
   original_start_time_ = info.original_start_time_;
   admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
-                             initial_config.admin().profilePath(), options.adminAddressPath(),
-                             initial_config.admin().address(), *this,
-                             stats_store_.createScope("listener.admin.")));
+                             initial_config.admin().profilePath(), *this));
+  if (initial_config.admin().address()) {
+    ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
+    admin_->startHttpListener(options.adminAddressPath(), initial_config.admin().address(),
+                              stats_store_.createScope("listener.admin."));
+  } else {
+    ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
+  }
   config_tracker_entry_ =
       admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
-  handler_->addListener(admin_->listener());
+  if (initial_config.admin().address()) {
+    admin_->addListenerToHandler(handler_.get());
+  }
 
   loadServerFlags(initial_config.flagsPath());
 
@@ -501,7 +507,7 @@ void InstanceImpl::shutdownAdmin() {
   //                     somehow keep flushing histograms from the old process.
   stat_flush_timer_.reset();
   handler_->stopListeners();
-  admin_->mutable_socket().close();
+  admin_->closeSocket();
 
   ENVOY_LOG(warn, "terminating parent process");
   restarter_.terminateParent();

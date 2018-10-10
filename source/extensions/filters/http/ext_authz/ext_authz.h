@@ -145,7 +145,7 @@ private:
   // the filter chain should stop. Otherwise the filter chain can continue to the next filter.
   enum class FilterReturn { ContinueDecoding, StopDecoding };
   void initiateCall(const Http::HeaderMap& headers);
-  Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& reponse);
+  Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};

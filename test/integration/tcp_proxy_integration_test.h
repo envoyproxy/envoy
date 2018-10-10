@@ -14,7 +14,8 @@ namespace {
 class TcpProxyIntegrationTest : public BaseIntegrationTest,
                                 public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  TcpProxyIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::TCP_PROXY_CONFIG) {
+  TcpProxyIntegrationTest()
+      : BaseIntegrationTest(GetParam(), realTime(), ConfigHelper::TCP_PROXY_CONFIG) {
     enable_half_close_ = true;
   }
 

@@ -167,6 +167,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
@@ -195,6 +196,7 @@ envoy_cc_test(
         ":cluster_health_check_bootstrap.yaml",
         ":empty_bootstrap.yaml",
         ":node_bootstrap.yaml",
+        ":node_bootstrap_no_admin_port.yaml",
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",
     ],
