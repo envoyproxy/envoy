@@ -8,6 +8,9 @@
 #include "gtest/gtest.h"
 #include "nghttp2/nghttp2.h"
 
+// A global variable in nghttp2 to disable preface and initial settings for tests.
+extern int nghttp2_enable_strict_preface;
+
 namespace Envoy {
 namespace Http {
 namespace Http2 {
@@ -106,8 +109,6 @@ public:
     // Enables extension frame.
     nghttp2_option_new(&option_);
     nghttp2_option_set_user_recv_extension_type(option_, METADATA_FRAME_TYPE);
-    // Skip HTTP/2 connection preface.
-    nghttp2_option_set_no_recv_client_magic(option_, 1);
 
     // Sets callback functions.
     nghttp2_session_callbacks_new(&callbacks_);
@@ -123,7 +124,9 @@ public:
     user_data_.output_buffer = &output_buffer_;
 
     // Creates new nghttp2 session.
+    nghttp2_enable_strict_preface = 0;
     nghttp2_session_client_new2(&session_, callbacks_, &user_data_, option_);
+    nghttp2_enable_strict_preface = 1;
   }
 
   void cleanUp() {
@@ -254,10 +257,9 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
   };
 
   // Encode and decode the second MetadataMap.
-  decoder_->unregisterMetadataCallback();
   MetadataCallback cb2 = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this,
                                    &metadata_map_2, std::placeholders::_1);
-  decoder_->registerMetadataCallback(cb2);
+  decoder_->callback_ = cb2;
   encoder_.createPayload(metadata_map_2);
   nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID, nullptr);
   nghttp2_session_send(session_);

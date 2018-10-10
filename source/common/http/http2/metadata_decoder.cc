@@ -87,13 +87,6 @@ bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
   return true;
 }
 
-void MetadataDecoder::registerMetadataCallback(MetadataCallback callback) {
-  ASSERT(callback != nullptr);
-  callback_ = std::move(callback);
-}
-
-void MetadataDecoder::unregisterMetadataCallback() { callback_ = nullptr; }
-
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy
