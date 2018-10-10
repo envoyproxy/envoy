@@ -46,6 +46,8 @@ def fixCompilationDatabase(args):
     db = json.load(db_file)
 
   db = [modifyCompileCommand(target) for target in db if isCompileTarget(target, args)]
+
+  # Remove to avoid writing into symlink
   os.remove("compile_commands.json")
   with open("compile_commands.json", "w") as db_file:
     json.dump(db, db_file, indent=2)
