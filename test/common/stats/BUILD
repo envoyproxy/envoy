@@ -46,8 +46,8 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "stats_matcher_test",
-    srcs = ["stats_matcher_test.cc"],
+    name = "stats_matcher_impl_test",
+    srcs = ["stats_matcher_impl_test.cc"],
     deps = [
         "//source/common/stats:stats_matcher_lib",
         "//test/test_common:utility_lib",
@@ -64,8 +64,8 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "symbol_table_test",
-    srcs = ["symbol_table_test.cc"],
+    name = "symbol_table_impl_test",
+    srcs = ["symbol_table_impl_test.cc"],
     deps = [
         "//source/common/stats:symbol_table_lib",
         "//test/mocks/stats:stats_mocks",
