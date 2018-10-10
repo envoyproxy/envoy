@@ -266,31 +266,6 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
   cleanUp();
 }
 
-TEST_F(MetadataEncoderDecoderTest, TestUnqualifiedInput) {
-  MetadataMap metadata_map = {
-      {"header_key1", "header_value1"},
-  };
-
-  // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
-                                  std::placeholders::_1);
-  initialize(cb);
-
-  MetadataMap metadata_map1 = {
-      {"header_key1", "header_value1"},
-      {"header_key2", "header_value2"},
-  };
-  MetadataMap metadata_map2 = {
-      {"header_key3", "header_value3"},
-      {"header_key4", "header_value4"},
-  };
-  EXPECT_TRUE(encoder_.createPayload(metadata_map1));
-  // Multiple metadata_map will be rejected.
-  EXPECT_FALSE(encoder_.createPayload(metadata_map2));
-
-  cleanUp();
-}
-
 TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
   MetadataMap metadata_map = {
       {"header_key1", std::string(1024 * 1024 + 1, 'a')},
