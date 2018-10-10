@@ -13,23 +13,15 @@ load(
 
 envoy_package()
 
-envoy_cc_test_library(
-    name = "utility_lib",
-    hdrs = ["utility.h"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:byte_order_lib",
-        "//test/test_common:printers_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
 envoy_extension_cc_test(
     name = "hessian_utils_test",
     srcs = ["hessian_utils_test.cc"],
     extension_name = "envoy.filters.network.dubbo_proxy",
     deps = [
-        ":utility_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:byte_order_lib",
         "//source/extensions/filters/network/dubbo_proxy:hessian_utils_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:utility_lib",
     ],
 )
