@@ -22,6 +22,7 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& buf, bool end_stream) override {
     absl::WriterMutexLock m(&rand_lock_);
     uint64_t random = rng_.random();
+    // Roughly every 5th encode (5 being arbitrary) swap the watermark state.
     if (random % 5 == 0) {
       if (connection()->aboveHighWatermark()) {
         connection()->onLowWatermark();
