@@ -92,9 +92,9 @@ public:
   virtual ~FormatterProvider() {}
 
   virtual std::string format(const Http::HeaderMap& request_headers,
-                                   const Http::HeaderMap& response_headers,
-                                   const Http::HeaderMap& response_trailers,
-                                   const RequestInfo::RequestInfo& request_info) const PURE;
+                             const Http::HeaderMap& response_headers,
+                             const Http::HeaderMap& response_trailers,
+                             const RequestInfo::RequestInfo& request_info) const PURE;
 };
 
 typedef std::unique_ptr<FormatterProvider> FormatterProviderPtr;
