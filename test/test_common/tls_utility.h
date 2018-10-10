@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "test/test_common/environment.h"
+
 #include "openssl/x509v3.h"
 
 namespace Envoy {

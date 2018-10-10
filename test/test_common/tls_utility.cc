@@ -2,9 +2,8 @@
 
 #include "common/common/assert.h"
 
-#include "openssl/ssl.h"
-
 #include "gtest/gtest.h"
+#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Tls {
