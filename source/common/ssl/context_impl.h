@@ -147,7 +147,6 @@ public:
 private:
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
-  const bool forward_original_sni_;
 };
 
 class ServerContextImpl : public ContextImpl, public ServerContext {

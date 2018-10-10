@@ -86,11 +86,6 @@ public:
    * @return true if server-initiated TLS renegotiation will be allowed.
    */
   virtual bool allowRenegotiation() const PURE;
-
-  /**
-   * @return true if forwarding the original SNI is allowed.
-   */
-  virtual bool forwardOriginalSni() const PURE;
 };
 
 typedef std::unique_ptr<ClientContextConfig> ClientContextConfigPtr;
