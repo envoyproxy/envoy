@@ -312,7 +312,7 @@ public:
   /**
    * This routine disarms the request timer owned by the connection manager, if it exists.
    */
-  virtual void endRequestTimeout() PURE;
+  virtual void upstreamRequestComplete() PURE;
 };
 
 /**

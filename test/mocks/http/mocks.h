@@ -204,7 +204,7 @@ public:
   MOCK_METHOD1(removeDownstreamWatermarkCallbacks, void(DownstreamWatermarkCallbacks&));
   MOCK_METHOD1(setDecoderBufferLimit, void(uint32_t));
   MOCK_METHOD0(decoderBufferLimit, uint32_t());
-  MOCK_METHOD0(endRequestTimeout, void());
+  MOCK_METHOD0(upstreamRequestComplete, void());
 
   // Http::StreamDecoderFilterCallbacks
   void sendLocalReply(Code code, const std::string& body,

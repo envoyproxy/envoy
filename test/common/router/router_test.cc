@@ -278,7 +278,7 @@ TEST_F(RouterTest, DisarmRequestTimeoutOnCompleteHeaders) {
         return nullptr;
       }));
 
-  EXPECT_CALL(callbacks_, endRequestTimeout()).Times(1);
+  EXPECT_CALL(callbacks_, upstreamRequestComplete()).Times(1);
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
@@ -301,7 +301,7 @@ TEST_F(RouterTest, DisarmRequestTimeoutOnCompleteData) {
         return nullptr;
       }));
 
-  EXPECT_CALL(callbacks_, endRequestTimeout()).Times(1);
+  EXPECT_CALL(callbacks_, upstreamRequestComplete()).Times(1);
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
@@ -328,7 +328,7 @@ TEST_F(RouterTest, DisarmRequestTimeoutOnCompleteTrailers) {
         return nullptr;
       }));
 
-  EXPECT_CALL(callbacks_, endRequestTimeout()).Times(1);
+  EXPECT_CALL(callbacks_, upstreamRequestComplete()).Times(1);
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);

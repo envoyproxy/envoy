@@ -1564,7 +1564,7 @@ TEST_F(HttpConnectionManagerImplTest, DisarmRequestTimeoutFilterCallback) {
   sendReqestHeadersAndData();
 
   EXPECT_CALL(*request_timer, disableTimer()).Times(1);
-  decoder_filters_[0]->callbacks_->endRequestTimeout();
+  decoder_filters_[0]->callbacks_->upstreamRequestComplete();
 }
 
 TEST_F(HttpConnectionManagerImplTest, DisarmRequestTimeoutOnCompleteHeaders) {
@@ -1578,7 +1578,7 @@ TEST_F(HttpConnectionManagerImplTest, DisarmRequestTimeoutOnCompleteHeaders) {
       }));
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](HeaderMap&, bool) -> FilterHeadersStatus {
-        filter->callbacks_->endRequestTimeout();
+        filter->callbacks_->upstreamRequestComplete();
         return FilterHeadersStatus::StopIteration;
       }));
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
@@ -1613,7 +1613,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteData) {
       }));
   EXPECT_CALL(*filter, decodeData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance&, bool) -> FilterDataStatus {
-        filter->callbacks_->endRequestTimeout();
+        filter->callbacks_->upstreamRequestComplete();
         return FilterDataStatus::StopIterationNoBuffer;
       }));
 
@@ -1648,7 +1648,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteTrailers) {
       }));
   EXPECT_CALL(*filter, decodeTrailers(_))
       .WillRepeatedly(Invoke([&](HeaderMap&) -> FilterTrailersStatus {
-        filter->callbacks_->endRequestTimeout();
+        filter->callbacks_->upstreamRequestComplete();
         return FilterTrailersStatus::Continue;
       }));
 
