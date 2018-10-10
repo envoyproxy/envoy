@@ -27,12 +27,12 @@ class AltsIntegrationTestBase : public HttpIntegrationTest,
                                 public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   AltsIntegrationTestBase(const std::string& server_peer_identity,
-                          const std::string& client_peer_identity,
-                          bool server_connect_handshaker,
+                          const std::string& client_peer_identity, bool server_connect_handshaker,
                           bool client_connect_handshaker)
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()),
         server_peer_identity_(server_peer_identity), client_peer_identity_(client_peer_identity),
-        server_connect_handshaker_(server_connect_handshaker), client_connect_handshaker_(client_connect_handshaker) {}
+        server_connect_handshaker_(server_connect_handshaker),
+        client_connect_handshaker_(client_connect_handshaker) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -117,7 +117,7 @@ public:
 
   std::string wrongHandshakerServerAddress() {
     return absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
-                    std::to_string(fake_handshaker_server_port_ + 1));
+                        std::to_string(fake_handshaker_server_port_ + 1));
   }
 
   Network::Address::InstanceConstSharedPtr getAddress(const Network::Address::IpVersion& version,
@@ -142,8 +142,10 @@ class AltsIntegrationTestValidPeer : public AltsIntegrationTestBase {
 public:
   // FakeHandshake server sends "peer_identity" as peer service account. Set this
   // information into config to pass validation.
-  AltsIntegrationTestValidPeer() : AltsIntegrationTestBase("[peer_identity]", "",
-  /* server_connect_handshaker */ true, /* client_connect_handshaker */ true) {}
+  AltsIntegrationTestValidPeer()
+      : AltsIntegrationTestBase("[peer_identity]", "",
+                                /* server_connect_handshaker */ true,
+                                /* client_connect_handshaker */ true) {}
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestValidPeer,
@@ -161,8 +163,10 @@ TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
 
 class AltsIntegrationTestEmptyPeer : public AltsIntegrationTestBase {
 public:
-  AltsIntegrationTestEmptyPeer() : AltsIntegrationTestBase("", "",
-  /* server_connect_handshaker */ true, /* client_connect_handshaker */ true) {}
+  AltsIntegrationTestEmptyPeer()
+      : AltsIntegrationTestBase("", "",
+                                /* server_connect_handshaker */ true,
+                                /* client_connect_handshaker */ true) {}
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestEmptyPeer,
@@ -180,8 +184,10 @@ TEST_P(AltsIntegrationTestEmptyPeer, RouterRequestAndResponseWithBodyNoBuffer) {
 
 class AltsIntegrationTestClientInvalidPeer : public AltsIntegrationTestBase {
 public:
-  AltsIntegrationTestClientInvalidPeer() : AltsIntegrationTestBase("", "invalid_client_identity",
-  /* server_connect_handshaker */ true, /* client_connect_handshaker */ true) {}
+  AltsIntegrationTestClientInvalidPeer()
+      : AltsIntegrationTestBase("", "invalid_client_identity",
+                                /* server_connect_handshaker */ true,
+                                /* client_connect_handshaker */ true) {}
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestClientInvalidPeer,
@@ -198,8 +204,10 @@ TEST_P(AltsIntegrationTestClientInvalidPeer, clientValidationFail) {
 
 class AltsIntegrationTestServerInvalidPeer : public AltsIntegrationTestBase {
 public:
-  AltsIntegrationTestServerInvalidPeer() : AltsIntegrationTestBase("invalid_server_identity", "",
-  /* server_connect_handshaker */ true, /* client_connect_handshaker */ true) {}
+  AltsIntegrationTestServerInvalidPeer()
+      : AltsIntegrationTestBase("invalid_server_identity", "",
+                                /* server_connect_handshaker */ true,
+                                /* client_connect_handshaker */ true) {}
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestServerInvalidPeer,
@@ -224,8 +232,10 @@ TEST_P(AltsIntegrationTestServerInvalidPeer, ServerValidationFail) {
 
 class AltsIntegrationTestClientWrongHandshaker : public AltsIntegrationTestBase {
 public:
-  AltsIntegrationTestClientWrongHandshaker() : AltsIntegrationTestBase("", "",
-  /* server_connect_handshaker */ true, /* client_connect_handshaker */ false) {}
+  AltsIntegrationTestClientWrongHandshaker()
+      : AltsIntegrationTestBase("", "",
+                                /* server_connect_handshaker */ true,
+                                /* client_connect_handshaker */ false) {}
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestClientWrongHandshaker,
@@ -242,8 +252,10 @@ TEST_P(AltsIntegrationTestClientWrongHandshaker, ConnectToWrongHandshakerAddress
 
 class AltsIntegrationTestServerWrongHandshaker : public AltsIntegrationTestBase {
 public:
-  AltsIntegrationTestServerWrongHandshaker() : AltsIntegrationTestBase("", "",
-  /* server_connect_handshaker */ false, /* client_connect_handshaker */ true) {}
+  AltsIntegrationTestServerWrongHandshaker()
+      : AltsIntegrationTestBase("", "",
+                                /* server_connect_handshaker */ false,
+                                /* client_connect_handshaker */ true) {}
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestServerWrongHandshaker,
