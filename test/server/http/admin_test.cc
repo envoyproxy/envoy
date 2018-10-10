@@ -12,6 +12,7 @@
 #include "common/profiler/profiler.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/ssl/context_config_impl.h"
 #include "common/stats/thread_local_store.h"
 
 #include "server/http/admin.h"
@@ -832,6 +833,35 @@ TEST_P(AdminInstanceTest, Memory) {
   MessageUtil::loadFromJson(output_json, output_proto);
   EXPECT_THAT(output_proto, AllOf(Property(&envoy::admin::v2alpha::Memory::allocated, Ge(0)),
                                   Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0))));
+}
+
+TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  // Setup a context that returns null cert details.
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
+  Ssl::ClientContextConfigImpl cfg(*loader, factory_context);
+  Stats::IsolatedStoreImpl store;
+  Ssl::ClientContextSharedPtr client_ctx(
+      server_.sslContextManager().createSslClientContext(store, cfg));
+
+  const std::string expected_empty_json = R"EOF({
+ "certificates": [
+  {
+   "ca_cert": [],
+   "cert_chain": []
+  }
+ ]
+}
+)EOF";
+
+  // Validate that cert details are null and /certs handles it correctly.
+  EXPECT_EQ(nullptr, client_ctx->getCaCertInformation());
+  EXPECT_EQ(nullptr, client_ctx->getCertChainInformation());
+  EXPECT_EQ(Http::Code::OK, getCallback("/certs", header_map, response));
+  EXPECT_EQ(expected_empty_json, response.toString());
 }
 
 TEST_P(AdminInstanceTest, Runtime) {

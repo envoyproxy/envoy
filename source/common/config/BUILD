@@ -334,6 +334,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/stats:stats_lib",
+        "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:tag_producer_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",

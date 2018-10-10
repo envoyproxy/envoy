@@ -3,6 +3,7 @@
 #include <functional>
 
 #include "envoy/server/guarddog.h"
+#include "envoy/server/overload_manager.h"
 
 namespace Envoy {
 namespace Server {
@@ -84,7 +85,7 @@ public:
   /**
    * @return WorkerPtr a new worker.
    */
-  virtual WorkerPtr createWorker() PURE;
+  virtual WorkerPtr createWorker(OverloadManager& overload_manager) PURE;
 };
 
 } // namespace Server

@@ -82,5 +82,17 @@ void ListenerImpl::errorCallback(evconnlistener*, void*) {
   PANIC(fmt::format("listener accept failure: {}", strerror(errno)));
 }
 
+void ListenerImpl::enable() {
+  if (listener_.get()) {
+    evconnlistener_enable(listener_.get());
+  }
+}
+
+void ListenerImpl::disable() {
+  if (listener_.get()) {
+    evconnlistener_disable(listener_.get());
+  }
+}
+
 } // namespace Network
 } // namespace Envoy
