@@ -121,6 +121,9 @@ public:
     user_data_.encoder = &encoder_;
     user_data_.decoder = decoder_.get();
     user_data_.output_buffer = &output_buffer_;
+
+    // Creates new nghttp2 session.
+    nghttp2_session_client_new2(&session_, callbacks_, &user_data_, option_);
   }
 
   void cleanUp() {
