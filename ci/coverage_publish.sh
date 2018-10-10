@@ -8,11 +8,11 @@ if [ "${CIRCLECI}" != "true" ]; then
   exit 0
 fi
 
-# available for master builds and PRs from originating repository (not forks)
-if [ -z "$CIRCLE_PULL_REQUEST" ]
+# available for master builds
+if [ -z "$CIRCLE_PR_NUMBER" ]
 then
   echo "Uploading coverage report..."
-  
+
   [[ -z "${ENVOY_BUILD_DIR}" ]] && ENVOY_BUILD_DIR=/build
   COVERAGE_FILE="${ENVOY_BUILD_DIR}/envoy/generated/coverage/coverage.html"
 

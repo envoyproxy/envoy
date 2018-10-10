@@ -46,6 +46,18 @@ void ConnectionHandlerImpl::stopListeners() {
   }
 }
 
+void ConnectionHandlerImpl::disableListeners() {
+  for (auto& listener : listeners_) {
+    listener.second->listener_->disable();
+  }
+}
+
+void ConnectionHandlerImpl::enableListeners() {
+  for (auto& listener : listeners_) {
+    listener.second->listener_->enable();
+  }
+}
+
 void ConnectionHandlerImpl::ActiveListener::removeConnection(ActiveConnection& connection) {
   ENVOY_CONN_LOG_TO_LOGGER(parent_.logger_, debug, "adding to cleanup list",
                            *connection.connection_);

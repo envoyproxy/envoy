@@ -140,6 +140,7 @@ public:
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
+  bool includeAttemptCount() const override { return include_attempt_count_; }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -176,6 +177,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   PerFilterConfigs per_filter_configs_;
+  const bool include_attempt_count_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
@@ -198,6 +200,9 @@ public:
   }
   Upstream::RetryPrioritySharedPtr retryPriority() const override { return retry_priority_; }
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_attempts_; }
+  const std::vector<uint32_t>& retriableStatusCodes() const override {
+    return retriable_status_codes_;
+  }
 
   // Upstream::RetryHostPredicateFactoryCallbacks
   void addHostPredicate(Upstream::RetryHostPredicateSharedPtr predicate) override {
@@ -217,6 +222,7 @@ private:
   std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
   uint32_t host_selection_attempts_{1};
+  std::vector<uint32_t> retriable_status_codes_;
 };
 
 /**
@@ -353,6 +359,7 @@ public:
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
   const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
+  bool includeAttemptCount() const override { return vhost_.includeAttemptCount(); }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -453,6 +460,8 @@ private:
     const PathMatchCriterion& pathMatchCriterion() const override {
       return parent_->pathMatchCriterion();
     }
+
+    bool includeAttemptCount() const override { return parent_->includeAttemptCount(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
