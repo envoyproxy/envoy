@@ -370,8 +370,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     : connection_manager_(connection_manager),
       snapped_route_config_(connection_manager.config_.routeConfigProvider().config()),
       stream_id_(connection_manager.random_generator_.random()),
-      request_response_timespan_(new Stats::Timespan(connection_manager_.stats_.named_.downstream_rq_time_,
-           connection_manager_.timeSystem())),
+      request_response_timespan_(new Stats::Timespan(
+          connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSystem())),
       stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSystem()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
