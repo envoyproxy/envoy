@@ -2199,6 +2199,26 @@ TEST(RouteMatcherTest, ClusterNotFoundNotCheckingViaConfig) {
   TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true);
 }
 
+TEST(RouteMatcherTest, AttemptCountHeader) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    include_request_attempt_count: true
+    routes:
+      - match: { prefix: "/"}
+        route:
+          cluster: "whatever"
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+
+  EXPECT_TRUE(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->includeAttemptCount());
+}
+
 TEST(RouteMatchTest, ClusterNotFoundResponseCode) {
   std::string yaml = R"EOF(
 virtual_hosts:
@@ -4756,6 +4776,29 @@ virtual_hosts:
   Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
   EXPECT_EQ(7 * 1000, route_entry->idleTimeout().value().count());
+}
+
+TEST(RouteConfigurationV2, RetriableStatusCodes) {
+  const std::string ExplicitIdleTimeot = R"EOF(
+name: RetriableStatusCodes
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          retry_policy:
+            retriable_status_codes: [100, 200]
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(ExplicitIdleTimeot), factory_context,
+                        true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
+  const std::vector<uint32_t> expected_codes{100, 200};
+  EXPECT_EQ(expected_codes, retry_policy.retriableStatusCodes());
 }
 
 class PerFilterConfigsTest : public testing::Test {
