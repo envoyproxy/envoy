@@ -127,6 +127,9 @@ cancelled
 deadline-exceeded
   Envoy will attempt a retry if the gRPC status code in the response headers is "deadline-exceeded" (4)
 
+internal
+  Envoy will attempt to retry if the gRPC status code in the response headers is "internal" (13)
+
 resource-exhausted
   Envoy will attempt a retry if the gRPC status code in the response headers is "resource-exhausted" (8)
 
