@@ -11,12 +11,15 @@ namespace {
 class LuaIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  LuaIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
   }
 
   void initializeFilter(const std::string& filter_config) {
@@ -45,7 +48,7 @@ public:
           new_route->mutable_match()->set_prefix("/alt/route");
           new_route->mutable_route()->set_cluster("alt_cluster");
 
-          const std::string key = Extensions::HttpFilters::HttpFilterNames::get().LUA;
+          const std::string key = Extensions::HttpFilters::HttpFilterNames::get().Lua;
           const std::string yaml =
               R"EOF(
             foo.bar:
@@ -72,12 +75,16 @@ public:
   void cleanup() {
     codec_client_->close();
     if (fake_lua_connection_ != nullptr) {
-      fake_lua_connection_->close();
-      fake_lua_connection_->waitForDisconnect();
+      AssertionResult result = fake_lua_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_lua_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
     if (fake_upstream_connection_ != nullptr) {
-      fake_upstream_connection_->close();
-      fake_upstream_connection_->waitForDisconnect();
+      AssertionResult result = fake_upstream_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_upstream_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
   }
 
@@ -106,6 +113,10 @@ config:
 
       local metadata = request_handle:metadata():get("foo.bar")
       local body_length = request_handle:body():length()
+
+      request_handle:streamInfo():dynamicMetadata():set("envoy.lb", "foo", "bar")
+      local dynamic_metadata_value = request_handle:streamInfo():dynamicMetadata():get("envoy.lb")["foo"]
+
       request_handle:headers():add("request_body_size", body_length)
       request_handle:headers():add("request_metadata_foo", metadata["foo"])
       request_handle:headers():add("request_metadata_baz", metadata["baz"])
@@ -114,7 +125,8 @@ config:
       else
         request_handle:headers():add("request_secure", "true")
       end
-      request_handle:headers():add("request_protocol", request_handle:requestInfo():protocol())
+      request_handle:headers():add("request_protocol", request_handle:streamInfo():protocol())
+      request_handle:headers():add("request_dynamic_metadata_value", dynamic_metadata_value)
     end
 
     function envoy_on_response(response_handle)
@@ -123,7 +135,7 @@ config:
       response_handle:headers():add("response_metadata_foo", metadata["foo"])
       response_handle:headers():add("response_metadata_baz", metadata["baz"])
       response_handle:headers():add("response_body_size", body_length)
-      response_handle:headers():add("request_protocol", response_handle:requestInfo():protocol())
+      response_handle:headers():add("request_protocol", response_handle:streamInfo():protocol())
       response_handle:headers():remove("foo")
     end
 )EOF";
@@ -166,6 +178,11 @@ config:
   EXPECT_STREQ(
       "HTTP/1.1",
       upstream_request_->headers().get(Http::LowerCaseString("request_protocol"))->value().c_str());
+
+  EXPECT_STREQ("bar", upstream_request_->headers()
+                          .get(Http::LowerCaseString("request_dynamic_metadata_value"))
+                          ->value()
+                          .c_str());
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   upstream_request_->encodeHeaders(response_headers, false);
@@ -224,9 +241,9 @@ config:
                                           {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  fake_lua_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-  lua_request_ = fake_lua_connection_->waitForNewStream(*dispatcher_);
-  lua_request_->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_lua_connection_));
+  ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
+  ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl response_data1("good");
@@ -282,9 +299,9 @@ config:
                                           {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  fake_lua_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-  lua_request_ = fake_lua_connection_->waitForNewStream(*dispatcher_);
-  lua_request_->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_lua_connection_));
+  ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
+  ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, true);
 
@@ -326,6 +343,42 @@ config:
 
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+}
+
+// Should survive from 30 calls when calling streamInfo():dynamicMetadata(). This is a regression
+// test for #4305.
+TEST_P(LuaIntegrationTest, SurviveMultipleCalls) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: envoy.lua
+config:
+  inline_code: |
+    function envoy_on_request(request_handle)
+      request_handle:streamInfo():dynamicMetadata()
+    end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"x-forwarded-for", "10.0.0.1"}};
+
+  for (uint32_t i = 0; i < 30; ++i) {
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    response->waitForEndStream();
+
+    EXPECT_TRUE(response->complete());
+    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  }
+
+  cleanup();
 }
 
 } // namespace

@@ -6,19 +6,38 @@ As of release 1.3.0, Envoy will follow a
 The following features have been DEPRECATED and will be removed in the specified release cycle.
 A logged warning is expected for each deprecated item that is in deprecation window.
 
-## Version 1.8.0 (pending)
+## Version 1.9.0 (pending)
 
-* Use of the v1 API is deprecated. See envoy-announce
-  [email](https://groups.google.com/forum/#!topic/envoy-announce/oPnYMZw8H4U).
-* Use of the legacy 
+## Version 1.8.0 (Oct 4, 2018)
+
+* Use of the v1 API (including `*.deprecated_v1` fields in the v2 API) is deprecated.
+  See envoy-announce [email](https://groups.google.com/forum/#!topic/envoy-announce/oPnYMZw8H4U).
+* Use of the legacy
   [ratelimit.proto](https://github.com/envoyproxy/envoy/blob/b0a518d064c8255e0e20557a8f909b6ff457558f/source/common/ratelimit/ratelimit.proto)
   is deprecated, in favor of the proto defined in
   [date-plane-api](https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/ratelimit/v2/rls.proto)
   Prior to 1.8.0, Envoy can use either proto to send client requests to a ratelimit server with the use of the
   `use_data_plane_proto` boolean flag in the [ratelimit configuration](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/ratelimit/v2/rls.proto).
   However, when using the deprecated client a warning is logged.
+* Use of the --v2-config-only flag.
+* Use of both `use_websocket` and `websocket_config` in
+  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto)
+  is deprecated. Please use the new `upgrade_configs` in the
+  [HttpConnectionManager](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto)
+  instead.
+* Use of the integer `percent` field in [FaultDelay](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/fault/v2/fault.proto)
+  and in [FaultAbort](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/http/fault/v2/fault.proto) is deprecated in favor
+  of the new `FractionalPercent` based `percentage` field.
+* Setting hosts via `hosts` field in `Cluster` is deprecated. Use `load_assignment` instead.
+* Use of `response_headers_to_*` and `request_headers_to_add` are deprecated at the `RouteAction`
+  level. Please use the configuration options at the `Route` level.
+* Use of `runtime` in `RouteMatch`, found in
+  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto).
+  Set the `runtime_fraction` field instead.
+* Use of the string `user` field in `Authenticated` in [rbac.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/rbac/v2alpha/rbac.proto)
+  is deprecated in favor of the new `StringMatcher` based `principal_name` field.
 
-## Version 1.7.0
+## Version 1.7.0 (Jun 21, 2018)
 
 * Admin mutations should be sent as POSTs rather than GETs. HTTP GETs will result in an error
   status code and will not have their intended effect. Prior to 1.7, GETs can be used for

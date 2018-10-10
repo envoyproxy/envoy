@@ -5,8 +5,9 @@
 #include "envoy/config/subscription.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/stats/scope.h"
+#include "envoy/upstream/locality.h"
 
-#include "common/upstream/locality.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
@@ -19,10 +20,8 @@ class EdsClusterImpl : public BaseDynamicClusterImpl,
                        Config::SubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> {
 public:
   EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                 Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                 const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
-                 Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                 bool added_via_api);
+                 Server::Configuration::TransportSocketFactoryContext& factory_context,
+                 Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Secondary; }
@@ -37,9 +36,11 @@ public:
 private:
   using LocalityWeightsMap =
       std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
-  bool updateHostsPerLocality(HostSet& host_set, const HostVector& new_hosts,
-                              LocalityWeightsMap& locality_weights_map,
-                              LocalityWeightsMap& new_locality_weights_map);
+  bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
+                              const HostVector& new_hosts, LocalityWeightsMap& locality_weights_map,
+                              LocalityWeightsMap& new_locality_weights_map,
+                              PriorityStateManager& priority_state_manager,
+                              std::unordered_map<std::string, HostSharedPtr>& updated_hosts);
 
   // ClusterImplBase
   void startPreInit() override;

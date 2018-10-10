@@ -20,9 +20,13 @@ Below is a list of additional documentation to aid the development process:
 
 - [Guide to contributing to Envoy](https://github.com/envoyproxy/envoy/blob/master/CONTRIBUTING.md)
 
+- [Overview of Envoy's testing frameworks](https://github.com/envoyproxy/envoy/blob/master/test/README.md)
+
 - [Overview of how to write integration tests for new code](https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md)
 
 - [Envoy filter example project (how to consume and extend Envoy as a submodule)](https://github.com/envoyproxy/envoy-filter-example)
+
+- [Performance testing Envoy with `tcmalloc`/`pprof`](https://github.com/envoyproxy/envoy/tree/bazel/PPROF.md)
 
 And some documents on components of Envoy architecture:
 

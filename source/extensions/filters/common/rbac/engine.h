@@ -25,9 +25,19 @@ public:
    * @param headers    the headers of the incoming request used to identify the action/principal. An
    *                   empty map should be used if there are no headers available.
    * @param metadata   the metadata with additional information about the action/principal.
+   * @param effective_policy_id  it will be filled by the matching policy's ID,
+   *                   which is used to identity the source of the allow/deny.
    */
   virtual bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
-                       const envoy::api::v2::core::Metadata& metadata) const PURE;
+                       const envoy::api::v2::core::Metadata& metadata,
+                       std::string* effective_policy_id) const PURE;
+
+  /**
+   * Returns whether or not the current action is permitted.
+   *
+   * @param connection the downstream connection used to identify the action/principal.
+   */
+  virtual bool allowed(const Network::Connection& connection) const PURE;
 };
 
 } // namespace RBAC

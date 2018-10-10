@@ -6,6 +6,9 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/server/options.h"
+#include "envoy/stats/stats_options.h"
+
+#include "common/stats/stats_options_impl.h"
 
 #include "spdlog/spdlog.h"
 
@@ -60,9 +63,7 @@ public:
   void setServiceNodeName(const std::string& service_node) { service_node_ = service_node; }
   void setServiceZone(const std::string& service_zone) { service_zone_ = service_zone; }
   void setMaxStats(uint64_t max_stats) { max_stats_ = max_stats; }
-  void setMaxObjNameLength(uint64_t max_obj_name_length) {
-    max_obj_name_length_ = max_obj_name_length;
-  }
+  void setStatsOptions(Stats::StatsOptionsImpl stats_options) { stats_options_ = stats_options; }
   void setHotRestartDisabled(bool hot_restart_disabled) {
     hot_restart_disabled_ = hot_restart_disabled;
   }
@@ -79,6 +80,10 @@ public:
   }
   std::chrono::seconds drainTime() const override { return drain_time_; }
   spdlog::level::level_enum logLevel() const override { return log_level_; }
+  const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
+  componentLogLevels() const override {
+    return component_log_levels_;
+  }
   const std::string& logFormat() const override { return log_format_; }
   const std::string& logPath() const override { return log_path_; }
   std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
@@ -91,10 +96,13 @@ public:
   const std::string& serviceNodeName() const override { return service_node_; }
   const std::string& serviceZone() const override { return service_zone_; }
   uint64_t maxStats() const override { return max_stats_; }
-  uint64_t maxObjNameLength() const override { return max_obj_name_length_; }
+  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
 
 private:
+  void parseComponentLogLevels(const std::string& component_log_levels);
+  void logError(const std::string& error) const;
+
   uint64_t base_id_;
   uint32_t concurrency_;
   std::string config_path_;
@@ -103,6 +111,7 @@ private:
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;
+  std::vector<std::pair<std::string, spdlog::level::level_enum>> component_log_levels_;
   std::string log_format_;
   std::string log_path_;
   uint64_t restart_epoch_;
@@ -114,8 +123,10 @@ private:
   std::chrono::seconds parent_shutdown_time_;
   Server::Mode mode_;
   uint64_t max_stats_;
-  uint64_t max_obj_name_length_;
+  Stats::StatsOptionsImpl stats_options_;
   bool hot_restart_disabled_;
+
+  friend class OptionsImplTest;
 };
 
 /**

@@ -19,7 +19,8 @@ namespace Ssl {
 class SslIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  SslIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  SslIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 
   void initialize() override;
 
@@ -32,7 +33,6 @@ public:
 private:
   std::unique_ptr<Runtime::Loader> runtime_;
   std::unique_ptr<ContextManager> context_manager_;
-  Secret::MockSecretManager secret_manager_;
 
   Network::TransportSocketFactoryPtr client_ssl_ctx_plain_;
   Network::TransportSocketFactoryPtr client_ssl_ctx_alpn_;

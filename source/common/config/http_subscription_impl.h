@@ -30,13 +30,15 @@ class HttpSubscriptionImpl : public Http::RestApiFetcher,
                              public Config::Subscription<ResourceType>,
                              Logger::Loggable<Logger::Id::config> {
 public:
-  HttpSubscriptionImpl(const envoy::api::v2::core::Node& node, Upstream::ClusterManager& cm,
+  HttpSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Upstream::ClusterManager& cm,
                        const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
+                       std::chrono::milliseconds request_timeout,
                        const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
-      : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval),
+      : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval,
+                             request_timeout),
         stats_(stats) {
-    request_.mutable_node()->CopyFrom(node);
+    request_.mutable_node()->CopyFrom(local_info.node());
     ASSERT(service_method.options().HasExtension(google::api::http));
     const auto& http_rule = service_method.options().GetExtension(google::api::http);
     path_ = http_rule.post();
@@ -67,6 +69,9 @@ public:
     request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
     request.headers().insertPath().value(path_);
     request.body().reset(new Buffer::OwnedImpl(MessageUtil::getJsonStringFromMessage(request_)));
+    request.headers().insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.Json);
+    request.headers().insertContentLength().value(request.body()->length());
   }
 
   void parseResponse(const Http::Message& response) override {

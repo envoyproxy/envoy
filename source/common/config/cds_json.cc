@@ -53,9 +53,11 @@ void CdsJson::translateHealthCheck(const Json::Object& json_health_check,
     }
   } else {
     ASSERT(hc_type == "redis");
-    auto* redis_health_check = health_check.mutable_redis_health_check();
+    auto* redis_health_check = health_check.mutable_custom_health_check();
+    redis_health_check->set_name("envoy.health_checkers.redis");
     if (json_health_check.hasObject("redis_key")) {
-      redis_health_check->set_key(json_health_check.getString("redis_key"));
+      redis_health_check->mutable_config()->MergeFrom(
+          MessageUtil::keyValueStruct("key", json_health_check.getString("redis_key")));
     }
   }
 }
@@ -99,11 +101,12 @@ void CdsJson::translateOutlierDetection(
 
 void CdsJson::translateCluster(const Json::Object& json_cluster,
                                const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
-                               envoy::api::v2::Cluster& cluster) {
+                               envoy::api::v2::Cluster& cluster,
+                               const Stats::StatsOptions& stats_options) {
   json_cluster.validateSchema(Json::Schema::CLUSTER_SCHEMA);
 
   const std::string name = json_cluster.getString("name");
-  Utility::checkObjNameLength("Invalid cluster name", name);
+  Utility::checkObjNameLength("Invalid cluster name", name, stats_options);
   cluster.set_name(name);
 
   const std::string string_type = json_cluster.getString("type");

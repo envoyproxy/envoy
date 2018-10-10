@@ -44,7 +44,7 @@ bool ZeroCopyInputStreamImpl::Next(const void** data, int* size) {
   return false;
 }
 
-bool ZeroCopyInputStreamImpl::Skip(int) { NOT_IMPLEMENTED; }
+bool ZeroCopyInputStreamImpl::Skip(int) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 void ZeroCopyInputStreamImpl::BackUp(int count) {
   ASSERT(count >= 0);

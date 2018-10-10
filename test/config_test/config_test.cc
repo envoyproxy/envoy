@@ -18,11 +18,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace ConfigTest {
@@ -84,7 +84,7 @@ public:
   NiceMock<Server::MockListenerComponentFactory> component_factory_;
   NiceMock<Server::MockWorkerFactory> worker_factory_;
   Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_,
-                                                ProdSystemTimeSource::instance_};
+                                                server_.timeSystem()};
   Runtime::RandomGeneratorImpl random_;
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};

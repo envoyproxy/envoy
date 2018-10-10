@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package test.common.http;
+
+import "google/protobuf/empty.proto";
+
+// Structured input for header_map_impl_fuzz_test.
+
+message AddReference {
+  string key = 1;
+  string value = 2;
+}
+
+message AddReferenceKey {
+  string key = 1;
+  oneof value_selector {
+    string string_value = 2;
+    uint64 uint64_value = 3;
+  }
+}
+
+message AddCopy {
+  string key = 1;
+  oneof value_selector {
+    string string_value = 2;
+    uint64 uint64_value = 3;
+  }
+}
+
+message SetReference {
+  string key = 1;
+  string value = 2;
+}
+
+message SetReferenceKey {
+  string key = 1;
+  string value = 2;
+}
+
+message GetAndMutate {
+  string key = 1;
+  oneof mutate_selector {
+    string append = 2;
+    google.protobuf.Empty clear = 3;
+    string find = 4;
+    string set_copy = 5;
+    uint64 set_integer = 6;
+    string set_reference = 7;
+  }
+}
+
+message Action {
+  oneof action_selector {
+    AddReference add_reference = 1;
+    AddReferenceKey add_reference_key = 2;
+    AddCopy add_copy = 3;
+    SetReference set_reference = 4;
+    SetReferenceKey set_reference_key = 5;
+    GetAndMutate get_and_mutate = 6;
+    google.protobuf.Empty copy = 7;
+    string lookup = 8;
+    string remove = 9;
+    string remove_prefix = 10;
+  }
+}
+
+message HeaderMapImplFuzzTestCase {
+  repeated Action actions = 1;
+}

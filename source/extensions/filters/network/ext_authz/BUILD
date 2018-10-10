@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # External authorization L4 network filter
 # Public docs: TODO(saumoh): Docs needed in docs/root/configuration/network_filters
 

@@ -1,3 +1,5 @@
+#include "envoy/stats/scope.h"
+
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/http/async_client_impl.h"
@@ -11,18 +13,19 @@
 #include "test/integration/fake_upstream.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/secret/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_time.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Grpc {
@@ -82,7 +85,9 @@ public:
     grpc_stream_->sendMessage(request_msg, end_stream);
 
     helloworld::HelloRequest received_msg;
-    fake_stream_->waitForGrpcMessage(dispatcher_helper_.dispatcher_, received_msg);
+    AssertionResult result =
+        fake_stream_->waitForGrpcMessage(dispatcher_helper_.dispatcher_, received_msg);
+    RELEASE_ASSERT(result, result.message());
     EXPECT_THAT(request_msg, ProtoEq(received_msg));
   }
 
@@ -116,7 +121,7 @@ public:
       reply_headers->addReference(value.first, value.second);
     }
     expectInitialMetadata(metadata);
-    fake_stream_->encodeHeaders(*reply_headers, false);
+    fake_stream_->encodeHeaders(Http::HeaderMapImpl(*reply_headers), false);
   }
 
   void sendReply() {
@@ -162,7 +167,8 @@ public:
 
   void closeStream() {
     grpc_stream_->closeStream();
-    fake_stream_->waitForEndStream(dispatcher_helper_.dispatcher_);
+    AssertionResult result = fake_stream_->waitForEndStream(dispatcher_helper_.dispatcher_);
+    RELEASE_ASSERT(result, result.message());
   }
 
   DispatcherHelper& dispatcher_helper_;
@@ -197,12 +203,13 @@ public:
 class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
-      : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {}
+      : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
+        dispatcher_(test_time_.timeSystem()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
-      fake_upstream_ =
-          std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP2, ipVersion());
+      fake_upstream_ = std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP2,
+                                                      ipVersion(), test_time_.timeSystem());
     }
     switch (clientType()) {
     case ClientType::EnvoyGrpc:
@@ -224,8 +231,10 @@ public:
 
   void TearDown() override {
     if (fake_connection_) {
-      fake_connection_->close();
-      fake_connection_->waitForDisconnect();
+      AssertionResult result = fake_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
       fake_connection_.reset();
     }
   }
@@ -267,7 +276,7 @@ public:
     envoy::api::v2::core::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
     fillServiceWideInitialMetadata(config);
-    return std::make_unique<AsyncClientImpl>(cm_, config);
+    return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_.timeSystem());
   }
 
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() {
@@ -286,12 +295,13 @@ public:
     return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stub_factory,
                                                    stats_scope_, createGoogleGrpcConfig());
 #else
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
 #endif
   }
 
   void expectInitialHeaders(FakeStream& fake_stream, const TestMetadata& initial_metadata) {
-    fake_stream.waitForHeadersComplete();
+    AssertionResult result = fake_stream.waitForHeadersComplete();
+    RELEASE_ASSERT(result, result.message());
     Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
     EXPECT_EQ("POST", stream_headers.get_(":method"));
     EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers.get_(":path"));
@@ -333,9 +343,12 @@ public:
     EXPECT_NE(request->grpc_request_, nullptr);
 
     if (!fake_connection_) {
-      fake_connection_ = fake_upstream_->waitForHttpConnection(dispatcher_);
+      AssertionResult result = fake_upstream_->waitForHttpConnection(dispatcher_, fake_connection_);
+      RELEASE_ASSERT(result, result.message());
     }
-    fake_streams_.push_back(fake_connection_->waitForNewStream(dispatcher_));
+    fake_streams_.emplace_back();
+    AssertionResult result = fake_connection_->waitForNewStream(dispatcher_, fake_streams_.back());
+    RELEASE_ASSERT(result, result.message());
     auto& fake_stream = *fake_streams_.back();
     request->fake_stream_ = &fake_stream;
 
@@ -343,7 +356,8 @@ public:
     expectExtraHeaders(fake_stream);
 
     helloworld::HelloRequest received_msg;
-    fake_stream.waitForGrpcMessage(dispatcher_, received_msg);
+    result = fake_stream.waitForGrpcMessage(dispatcher_, received_msg);
+    RELEASE_ASSERT(result, result.message());
     EXPECT_THAT(request_msg, ProtoEq(received_msg));
 
     return request;
@@ -362,9 +376,12 @@ public:
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
     if (!fake_connection_) {
-      fake_connection_ = fake_upstream_->waitForHttpConnection(dispatcher_);
+      AssertionResult result = fake_upstream_->waitForHttpConnection(dispatcher_, fake_connection_);
+      RELEASE_ASSERT(result, result.message());
     }
-    fake_streams_.push_back(fake_connection_->waitForNewStream(dispatcher_));
+    fake_streams_.emplace_back();
+    AssertionResult result = fake_connection_->waitForNewStream(dispatcher_, fake_streams_.back());
+    RELEASE_ASSERT(result, result.message());
     auto& fake_stream = *fake_streams_.back();
     stream->fake_stream_ = &fake_stream;
 
@@ -378,6 +395,7 @@ public:
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   DispatcherHelper dispatcher_helper_{dispatcher_};
   Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
@@ -399,6 +417,7 @@ public:
   Upstream::MockThreadLocalCluster thread_local_cluster_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Runtime::MockLoader runtime_;
+  Ssl::ContextManagerImpl context_manager_{runtime_};
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
@@ -421,6 +440,7 @@ public:
     // doesn't like dangling contexts at destruction.
     GrpcClientIntegrationTest::TearDown();
     fake_upstream_.reset();
+    async_client_transport_socket_.reset();
     client_connection_.reset();
     mock_cluster_info_->transport_socket_factory_.reset();
   }
@@ -444,16 +464,17 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     }
-    Ssl::ClientContextConfigImpl cfg(tls_context, secret_manager_);
+    auto cfg = std::make_unique<Ssl::ClientContextConfigImpl>(tls_context, factory_context_);
 
-    mock_cluster_info_->transport_socket_factory_ =
-        std::make_unique<Ssl::ClientSslSocketFactory>(cfg, context_manager_, *stats_store_);
+    mock_cluster_info_->transport_socket_factory_ = std::make_unique<Ssl::ClientSslSocketFactory>(
+        std::move(cfg), context_manager_, *stats_store_);
     ON_CALL(*mock_cluster_info_, transportSocketFactory())
         .WillByDefault(ReturnRef(*mock_cluster_info_->transport_socket_factory_));
     async_client_transport_socket_ =
         mock_cluster_info_->transport_socket_factory_->createTransportSocket();
     fake_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
-                                                    FakeHttpConnection::Type::HTTP2, ipVersion());
+                                                    FakeHttpConnection::Type::HTTP2, ipVersion(),
+                                                    test_time_.timeSystem());
 
     GrpcClientIntegrationTest::initialize();
   }
@@ -474,16 +495,15 @@ public:
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     }
 
-    Ssl::ServerContextConfigImpl cfg(tls_context, secret_manager_);
+    auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, factory_context_);
 
     static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return std::make_unique<Ssl::ServerSslSocketFactory>(
-        cfg, context_manager_, *upstream_stats_store, std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   }
 
   bool use_client_cert_{};
-  Secret::MockSecretManager secret_manager_;
-  Ssl::ContextManagerImpl context_manager_{runtime_};
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 
 } // namespace

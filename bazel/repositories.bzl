@@ -7,6 +7,18 @@ load(":genrule_repository.bzl", "genrule_repository")
 load(":patched_http_archive.bzl", "patched_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
 load(":target_recipes.bzl", "TARGET_RECIPES")
+load(
+    "@bazel_tools//tools/cpp:windows_cc_configure.bzl",
+    "find_vc_path",
+    "setup_vc_env_vars",
+)
+load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
+
+# dict of {build recipe name: longform extension name,}
+PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
+
+# go version for rules_go
+GO_VERSION = "1.10.4"
 
 def _repository_impl(name, **kwargs):
     # `existing_rule_keys` contains the names of repositories that have already
@@ -19,14 +31,16 @@ def _repository_impl(name, **kwargs):
         # wants to override the version. Do nothing.
         return
 
-    location = REPOSITORY_LOCATIONS[name]
+    loc_key = kwargs.pop("repository_key", name)
+    location = REPOSITORY_LOCATIONS[loc_key]
 
     # Git tags are mutable. We want to depend on commit IDs instead. Give the
     # user a useful error if they accidentally specify a tag.
     if "tag" in location:
         fail(
-            "Refusing to depend on Git tag %r for external dependency %r: use 'commit' instead."
-            % (location["tag"], name))
+            "Refusing to depend on Git tag %r for external dependency %r: use 'commit' instead." %
+            (location["tag"], name),
+        )
 
     if "commit" in location:
         # Git repository at given commit ID. Add a BUILD file if requested.
@@ -35,13 +49,15 @@ def _repository_impl(name, **kwargs):
                 name = name,
                 remote = location["remote"],
                 commit = location["commit"],
-                **kwargs)
+                **kwargs
+            )
         else:
             git_repository(
                 name = name,
                 remote = location["remote"],
                 commit = location["commit"],
-                **kwargs)
+                **kwargs
+            )
     else:  # HTTP
         # HTTP tarball at a given URL. Add a BUILD file if requested.
         if "build_file" in kwargs:
@@ -50,33 +66,57 @@ def _repository_impl(name, **kwargs):
                 urls = location["urls"],
                 sha256 = location["sha256"],
                 strip_prefix = location["strip_prefix"],
-                **kwargs)
+                **kwargs
+            )
         else:
             native.http_archive(
                 name = name,
                 urls = location["urls"],
                 sha256 = location["sha256"],
                 strip_prefix = location["strip_prefix"],
-                **kwargs)
+                **kwargs
+            )
 
 def _build_recipe_repository_impl(ctxt):
+    # modify the recipes list based on the build context
+    recipes = _apply_dep_blacklist(ctxt, ctxt.attr.recipes)
+
     # Setup the build directory with links to the relevant files.
     ctxt.symlink(Label("//bazel:repositories.sh"), "repositories.sh")
-    ctxt.symlink(Label("//ci/build_container:build_and_install_deps.sh"),
-                 "build_and_install_deps.sh")
+    ctxt.symlink(Label("//bazel:repositories.bat"), "repositories.bat")
+    ctxt.symlink(
+        Label("//ci/build_container:build_and_install_deps.sh"),
+        "build_and_install_deps.sh",
+    )
     ctxt.symlink(Label("//ci/build_container:recipe_wrapper.sh"), "recipe_wrapper.sh")
     ctxt.symlink(Label("//ci/build_container:Makefile"), "Makefile")
-    for r in ctxt.attr.recipes:
-        ctxt.symlink(Label("//ci/build_container/build_recipes:" + r + ".sh"),
-                     "build_recipes/" + r + ".sh")
+    for r in recipes:
+        ctxt.symlink(
+            Label("//ci/build_container/build_recipes:" + r + ".sh"),
+            "build_recipes/" + r + ".sh",
+        )
     ctxt.symlink(Label("//ci/prebuilt:BUILD"), "BUILD")
 
     # Run the build script.
-    environment = {}
+    command = []
+    env = {}
+    if ctxt.os.name.upper().startswith("WINDOWS"):
+        vc_path = find_vc_path(ctxt)
+        current_path = get_env_var(ctxt, "PATH", None, False)
+        env = setup_vc_env_vars(ctxt, vc_path)
+        env["PATH"] += (";%s" % current_path)
+        env["CC"] = "cl"
+        env["CXX"] = "cl"
+        env["CXXFLAGS"] = "-DNDEBUG"
+        env["CFLAGS"] = "-DNDEBUG"
+        command = ["./repositories.bat"] + recipes
+    else:
+        command = ["./repositories.sh"] + recipes
+
     print("Fetching external dependencies...")
     result = ctxt.execute(
-        ["./repositories.sh"] + ctxt.attr.recipes,
-        environment = environment,
+        command,
+        environment = env,
         quiet = False,
     )
     print(result.stdout)
@@ -86,6 +126,7 @@ def _build_recipe_repository_impl(ctxt):
         print("\033[31;1m\033[48;5;226m External dependency build failed, check above log " +
               "for errors and ensure all prerequisites at " +
               "https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers are met.")
+
         # This error message doesn't appear to the user :( https://github.com/bazelbuild/bazel/issues/3683
         fail("External dep build failed")
 
@@ -97,7 +138,7 @@ def _default_envoy_build_config_impl(ctx):
 _default_envoy_build_config = repository_rule(
     implementation = _default_envoy_build_config_impl,
     attrs = {
-        "config": attr.label(default="@envoy//source/extensions:extensions_build_config.bzl"),
+        "config": attr.label(default = "@envoy//source/extensions:extensions_build_config.bzl"),
     },
 )
 
@@ -113,12 +154,12 @@ def _default_envoy_api_impl(ctx):
         "tools",
     ]
     for d in api_dirs:
-      ctx.symlink(ctx.path(ctx.attr.api).dirname.get_child(d), d)
+        ctx.symlink(ctx.path(ctx.attr.api).dirname.get_child(d), d)
 
 _default_envoy_api = repository_rule(
     implementation = _default_envoy_api_impl,
     attrs = {
-        "api": attr.label(default="@envoy//api:BUILD"),
+        "api": attr.label(default = "@envoy//api:BUILD"),
     },
 )
 
@@ -158,7 +199,7 @@ def _python_deps():
         build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
     )
 
-# Bazel native C++ dependencies. For the depedencies that doesn't provide autoconf/automake builds.
+# Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
     _repository_impl("grpc_httpjson_transcoding")
     native.bind(
@@ -174,14 +215,32 @@ def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
     # it to exclude the Go rules.
     if "io_bazel_rules_go" not in skip_targets:
+        _repository_impl(
+            name = "com_github_golang_protobuf",
+            # These patches are to add BUILD files to golang/protobuf.
+            # TODO(sesmith177): Remove this dependency when both:
+            #   1. There's a release of golang/protobuf that includes
+            #      https://github.com/golang/protobuf/commit/31e0d063dd98c052257e5b69eeb006818133f45c
+            #   2. That release is included in rules_go
+            patches = [
+                "@io_bazel_rules_go//third_party:com_github_golang_protobuf-gazelle.patch",
+                "@io_bazel_rules_go//third_party:com_github_golang_protobuf-extras.patch",
+            ],
+            patch_args = ["-p1"],
+        )
         _repository_impl("io_bazel_rules_go")
+        _repository_impl("bazel_gazelle")
 
 def _envoy_api_deps():
     # Treat the data plane API as an external repo, this simplifies exporting the API to
     # https://github.com/envoyproxy/data-plane-api.
     if "envoy_api" not in native.existing_rules().keys():
-        _default_envoy_api(name="envoy_api")
+        _default_envoy_api(name = "envoy_api")
 
+    native.bind(
+        name = "api_httpbody_protos",
+        actual = "@googleapis//:api_httpbody_protos",
+    )
     native.bind(
         name = "http_api_protos",
         actual = "@googleapis//:http_api_protos",
@@ -203,7 +262,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
             "CXX",
             "CFLAGS",
             "CXXFLAGS",
-            "LD_LIBRARY_PATH"
+            "LD_LIBRARY_PATH",
         ],
         # Don't pretend we're in the sandbox, we do some evil stuff with envoy_dep_cache.
         local = True,
@@ -224,6 +283,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
         name = "envoy_deps",
         recipes = recipes.to_list(),
     )
+
     for t in TARGET_RECIPES:
         if t not in skip_targets:
             native.bind(
@@ -253,6 +313,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_lightstep_tracer_cpp()
     _com_github_grpc_grpc()
     _com_github_google_jwt_verify()
+    _com_github_nanopb_nanopb()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
     _com_google_googletest()
@@ -405,6 +466,10 @@ def _com_google_googletest():
 def _com_google_absl():
     _repository_impl("com_google_absl")
     native.bind(
+        name = "abseil_any",
+        actual = "@com_google_absl//absl/types:any",
+    )
+    native.bind(
         name = "abseil_base",
         actual = "@com_google_absl//absl/base:base",
     )
@@ -429,14 +494,23 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/debugging:symbolize",
     )
 
+    # Require abseil_time as an indirect dependency as it is needed by the
+    # direct dependency jwt_verify_lib.
+    native.bind(
+        name = "abseil_time",
+        actual = "@com_google_absl//absl/time:time",
+    )
+
 def _com_google_protobuf():
     _repository_impl("com_google_protobuf")
 
     # Needed for cc_proto_library, Bazel doesn't support aliases today for repos,
     # see https://groups.google.com/forum/#!topic/bazel-discuss/859ybHQZnuI and
     # https://github.com/bazelbuild/bazel/issues/3219.
-    location = REPOSITORY_LOCATIONS["com_google_protobuf"]
-    git_repository(name = "com_google_protobuf_cc", **location)
+    _repository_impl(
+        "com_google_protobuf_cc",
+        repository_key = "com_google_protobuf",
+    )
     native.bind(
         name = "protobuf",
         actual = "@com_google_protobuf//:protobuf",
@@ -451,32 +525,59 @@ def _com_github_grpc_grpc():
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
     native.bind(
-      name = "protobuf_headers",
-      actual = "@com_google_protobuf//:protobuf_headers",
+        name = "protobuf_headers",
+        actual = "@com_google_protobuf//:protobuf_headers",
     )
     native.bind(
-      name = "libssl",
-      actual = "//external:ssl",
+        name = "libssl",
+        actual = "//external:ssl",
     )
     native.bind(
-      name = "cares",
-      actual = "//external:ares",
-    )
-
-    native.bind(
-      name = "grpc",
-      actual = "@com_github_grpc_grpc//:grpc++"
+        name = "cares",
+        actual = "//external:ares",
     )
 
     native.bind(
-      name = "grpc_health_proto",
-      actual = "@envoy//bazel:grpc_health_proto",
+        name = "grpc",
+        actual = "@com_github_grpc_grpc//:grpc++",
+    )
+
+    native.bind(
+        name = "grpc_health_proto",
+        actual = "@envoy//bazel:grpc_health_proto",
+    )
+
+def _com_github_nanopb_nanopb():
+    _repository_impl(
+        name = "com_github_nanopb_nanopb",
+        build_file = "@com_github_grpc_grpc//third_party:nanopb.BUILD",
+    )
+
+    native.bind(
+        name = "nanopb",
+        actual = "@com_github_nanopb_nanopb//:nanopb",
     )
 
 def _com_github_google_jwt_verify():
     _repository_impl("com_github_google_jwt_verify")
 
     native.bind(
-      name = "jwt_verify_lib",
-      actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
+        name = "jwt_verify_lib",
+        actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
     )
+
+def _apply_dep_blacklist(ctxt, recipes):
+    newlist = []
+    skip_list = dict()
+    if _is_linux_ppc(ctxt):
+        skip_list = PPC_SKIP_TARGETS
+    for t in recipes:
+        if t not in skip_list.keys():
+            newlist.append(t)
+    return newlist
+
+def _is_linux_ppc(ctxt):
+    if ctxt.os.name != "linux":
+        return False
+    res = ctxt.execute(["uname", "-m"])
+    return "ppc" in res.stdout

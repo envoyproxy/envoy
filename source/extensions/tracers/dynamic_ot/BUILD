@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Trace driver for dynamically loadable C++ OpenTracing drivers (http://opentracing.io/).
 
 load(

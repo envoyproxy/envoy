@@ -44,13 +44,14 @@ INSTANTIATE_TEST_CASE_P(CorpusExamples, FuzzerCorpusTest, testing::ValuesIn(test
 
 int main(int argc, char** argv) {
   // Expected usage: <test path> <corpus path> [other gtest flags]
-  RELEASE_ASSERT(argc-- >= 2);
+  RELEASE_ASSERT(argc-- >= 2, "");
   const std::string corpus_path = Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +
                                   Envoy::TestEnvironment::getCheckedEnvVar("TEST_WORKSPACE") + "/" +
                                   *++argv;
-  RELEASE_ASSERT(Envoy::Filesystem::directoryExists(corpus_path));
+  RELEASE_ASSERT(Envoy::Filesystem::directoryExists(corpus_path), "");
   Envoy::test_corpus_ = Envoy::TestUtility::listFiles(corpus_path, true);
   testing::InitGoogleTest(&argc, argv);
-  Envoy::Fuzz::Runner::setupEnvironment(argc, argv);
+  Envoy::Fuzz::Runner::setupEnvironment(argc, argv, spdlog::level::info);
+
   return RUN_ALL_TESTS();
 }

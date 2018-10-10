@@ -4,6 +4,7 @@
 
 #include "envoy/api/v2/lds.pb.validate.h"
 #include "envoy/api/v2/listener/listener.pb.validate.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/cleanup.h"
 #include "common/config/resources.h"
@@ -24,11 +25,11 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm) {
   subscription_ =
       Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Listener>(
-          lds_config, local_info.node(), dispatcher, cm, random, *scope_,
-          [this, &lds_config, &cm, &dispatcher, &random,
-           &local_info]() -> Config::Subscription<envoy::api::v2::Listener>* {
+          lds_config, local_info, dispatcher, cm, random, *scope_,
+          [this, &lds_config, &cm, &dispatcher, &random, &local_info,
+           &scope]() -> Config::Subscription<envoy::api::v2::Listener>* {
             return new LdsSubscription(Config::Utility::generateStats(*scope_), lds_config, cm,
-                                       dispatcher, random, local_info);
+                                       dispatcher, random, local_info, scope.statsOptions());
           },
           "envoy.api.v2.ListenerDiscoveryService.FetchListeners",
           "envoy.api.v2.ListenerDiscoveryService.StreamListeners");
@@ -44,6 +45,12 @@ void LdsApiImpl::initialize(std::function<void()> callback) {
 void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
   cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
   Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
+  std::unordered_set<std::string> listener_names;
+  for (const auto& listener : resources) {
+    if (!listener_names.insert(listener.name()).second) {
+      throw EnvoyException(fmt::format("duplicate listener {} found", listener.name()));
+    }
+  }
   for (const auto& listener : resources) {
     MessageUtil::validate(listener);
   }

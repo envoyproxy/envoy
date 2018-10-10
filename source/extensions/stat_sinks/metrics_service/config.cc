@@ -27,9 +27,9 @@ Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Messag
       std::make_shared<GrpcMetricsStreamerImpl>(
           server.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
               grpc_service, server.stats(), false),
-          server.threadLocal(), server.localInfo());
+          server.localInfo());
 
-  return std::make_unique<MetricsServiceSink>(grpc_metrics_streamer);
+  return std::make_unique<MetricsServiceSink>(grpc_metrics_streamer, server.timeSystem());
 }
 
 ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {
@@ -37,7 +37,7 @@ ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {
       std::make_unique<envoy::config::metrics::v2::MetricsServiceConfig>());
 }
 
-std::string MetricsServiceSinkFactory::name() { return StatsSinkNames::get().METRICS_SERVICE; }
+std::string MetricsServiceSinkFactory::name() { return StatsSinkNames::get().MetricsService; }
 
 /**
  * Static registration for the this sink factory. @see RegisterFactory.

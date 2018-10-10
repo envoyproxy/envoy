@@ -14,8 +14,11 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/load_balancer_type.h"
+#include "envoy/upstream/locality.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -41,6 +44,15 @@ public:
     FAILED_OUTLIER_CHECK = 0x02,
     // The host is currently marked as unhealthy by EDS.
     FAILED_EDS_HEALTH = 0x04,
+  };
+
+  enum class ActiveHealthFailureType {
+    // The failure type is unknown, all hosts' failure types are initialized as UNKNOWN
+    UNKNOWN,
+    // The host is actively responding it's unhealthy
+    UNHEALTHY,
+    // The host is timing out
+    TIMEOUT,
   };
 
   /**
@@ -97,6 +109,17 @@ public:
   virtual bool healthy() const PURE;
 
   /**
+   * Returns the host's ActiveHealthFailureType. Types are specified in ActiveHealthFailureType.
+   */
+  virtual ActiveHealthFailureType getActiveHealthFailureType() const PURE;
+
+  /**
+   * Set the most recent health failure type for a host. Types are specified in
+   * ActiveHealthFailureType.
+   */
+  virtual void setActiveHealthFailureType(ActiveHealthFailureType flag) PURE;
+
+  /**
    * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
    * a new monitor must be installed before the host is used across threads. Thus,
    * this routine should only be called on the main thread before the host is used across threads.
@@ -137,6 +160,11 @@ typedef std::shared_ptr<const Host> HostConstSharedPtr;
 typedef std::vector<HostSharedPtr> HostVector;
 typedef std::shared_ptr<HostVector> HostVectorSharedPtr;
 typedef std::shared_ptr<const HostVector> HostVectorConstSharedPtr;
+
+typedef std::unique_ptr<HostVector> HostListPtr;
+typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
+    LocalityWeightsMap;
+typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
 
 /**
  * Bucket hosts by locality.
@@ -235,17 +263,24 @@ public:
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
+   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
    */
   virtual void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
                            HostsPerLocalityConstSharedPtr hosts_per_locality,
                            HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                            LocalityWeightsConstSharedPtr locality_weights,
-                           const HostVector& hosts_added, const HostVector& hosts_removed) PURE;
+                           const HostVector& hosts_added, const HostVector& hosts_removed,
+                           absl::optional<uint32_t> overprovisioning_factor) PURE;
 
   /**
    * @return uint32_t the priority of this host set.
    */
   virtual uint32_t priority() const PURE;
+
+  /**
+   * @return uint32_t the overprovisioning factor of this host set.
+   */
+  virtual uint32_t overprovisioning_factor() const PURE;
 };
 
 typedef std::unique_ptr<HostSet> HostSetPtr;
@@ -332,6 +367,7 @@ public:
   COUNTER  (upstream_cx_none_healthy)                                                              \
   COUNTER  (upstream_rq_total)                                                                     \
   GAUGE    (upstream_rq_active)                                                                    \
+  COUNTER  (upstream_rq_completed)                                                                 \
   COUNTER  (upstream_rq_pending_total)                                                             \
   COUNTER  (upstream_rq_pending_overflow)                                                          \
   COUNTER  (upstream_rq_pending_failure_eject)                                                     \
@@ -388,6 +424,17 @@ struct ClusterLoadReportStats {
 };
 
 /**
+ * All extension protocol specific options returned by the method at
+ *   NamedNetworkFilterConfigFactory::createProtocolOptions
+ * must be derived from this class.
+ */
+class ProtocolOptionsConfig {
+public:
+  virtual ~ProtocolOptionsConfig() {}
+};
+typedef std::shared_ptr<const ProtocolOptionsConfig> ProtocolOptionsConfigConstSharedPtr;
+
+/**
  * Information about a given upstream cluster.
  */
 class ClusterInfo {
@@ -437,6 +484,18 @@ public:
   virtual const Http::Http2Settings& http2Settings() const PURE;
 
   /**
+   * @param name std::string containing the well-known name of the extension for which protocol
+   *        options are desired
+   * @return std::shared_ptr<const Derived> where Derived is a subclass of ProtocolOptionsConfig
+   *         and contains extension-specific protocol options for upstream connections.
+   */
+  template <class Derived>
+  const std::shared_ptr<const Derived>
+  extensionProtocolOptionsTyped(const std::string& name) const {
+    return std::dynamic_pointer_cast<const Derived>(extensionProtocolOptions(name));
+  }
+
+  /**
    * @return const envoy::api::v2::Cluster::CommonLbConfig& the common configuration for all
    *         load balancers for this cluster.
    */
@@ -457,6 +516,14 @@ public:
    */
   virtual const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&
   lbRingHashConfig() const PURE;
+
+  /**
+   * @return const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>& the configuration
+   *         for the Original Destination load balancing policy, only used if type is set to
+   *         ORIGINAL_DST_LB.
+   */
+  virtual const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>&
+  lbOriginalDstConfig() const PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.
@@ -535,6 +602,17 @@ public:
    *         after a host is removed from service discovery.
    */
   virtual bool drainConnectionsOnHostRemoval() const PURE;
+
+protected:
+  /**
+   * Invoked by extensionProtocolOptionsTyped.
+   * @param name std::string containing the well-known name of the extension for which protocol
+   *        options are desired
+   * @return ProtocolOptionsConfigConstSharedPtr with extension-specific protocol options for
+   *         upstream connections.
+   */
+  virtual ProtocolOptionsConfigConstSharedPtr
+  extensionProtocolOptions(const std::string& name) const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;

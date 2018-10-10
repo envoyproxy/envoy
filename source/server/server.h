@@ -7,12 +7,12 @@
 #include <memory>
 #include <string>
 
+#include "envoy/event/timer.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
-#include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/tracing/http_tracer.h"
 
@@ -27,6 +27,7 @@
 #include "server/http/admin.h"
 #include "server/init_manager_impl.h"
 #include "server/listener_manager_impl.h"
+#include "server/overload_manager_impl.h"
 #include "server/test_hooks.h"
 #include "server/worker_impl.h"
 
@@ -41,6 +42,7 @@ namespace Server {
 // clang-format off
 #define ALL_SERVER_STATS(GAUGE)                                                                    \
   GAUGE(uptime)                                                                                    \
+  GAUGE(concurrency)                                                                               \
   GAUGE(memory_allocated)                                                                          \
   GAUGE(memory_heap_size)                                                                          \
   GAUGE(live)                                                                                      \
@@ -113,7 +115,11 @@ class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
   RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, HotRestart& hot_restart,
             AccessLog::AccessLogManager& access_log_manager, InitManagerImpl& init_manager,
-            std::function<void()> workers_start_cb);
+            OverloadManager& overload_manager, std::function<void()> workers_start_cb);
+
+  // Helper function to inititate a shutdown. This can be triggered either by catching SIGTERM
+  // or be called from ServerImpl::shutdown().
+  void shutdown(Event::Dispatcher& dispatcher, HotRestart& hot_restart);
 
 private:
   Event::SignalEventPtr sigterm_;
@@ -130,8 +136,9 @@ public:
   /**
    * @throw EnvoyException if initialization fails.
    */
-  InstanceImpl(Options& options, Network::Address::InstanceConstSharedPtr local_address,
-               TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
+  InstanceImpl(Options& options, Event::TimeSystem& time_system,
+               Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
+               HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls);
 
@@ -155,6 +162,7 @@ public:
   Init::Manager& initManager() override { return init_manager_; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
+  OverloadManager& overloadManager() override { return *overload_manager_; }
   Runtime::RandomGenerator& random() override { return *random_generator_; }
   RateLimit::ClientPtr
   rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
@@ -172,6 +180,7 @@ public:
   Tracing::HttpTracer& httpTracer() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
+  Event::TimeSystem& timeSystem() override { return time_system_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_->statsFlushInterval();
@@ -188,6 +197,7 @@ private:
   void terminate();
 
   Options& options_;
+  Event::TimeSystem& time_system_;
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;
@@ -201,11 +211,11 @@ private:
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorPtr random_generator_;
   Runtime::LoaderPtr runtime_loader_;
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
   std::unique_ptr<Configuration::Main> config_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
@@ -221,7 +231,10 @@ private:
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
+  Upstream::ProdClusterInfoFactory info_factory_;
   Upstream::HdsDelegatePtr hds_delegate_;
+  std::unique_ptr<OverloadManagerImpl> overload_manager_;
+  std::unique_ptr<RunHelper> run_helper_;
 };
 
 } // namespace Server

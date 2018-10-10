@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <list>
 #include <stdexcept>
@@ -21,9 +22,11 @@
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/stats/stats_options_impl.h"
 
 #include "test/test_common/printers.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
@@ -31,16 +34,49 @@ using testing::GTEST_FLAG(random_seed);
 
 namespace Envoy {
 
-static const int32_t SEED = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                std::chrono::system_clock::now().time_since_epoch())
-                                .count();
+// The purpose of using the static seed here is to use --test_arg=--gtest_random_seed=[seed]
+// to specify the seed of the problem to replay.
+int32_t getSeed() {
+  static const int32_t seed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                  std::chrono::system_clock::now().time_since_epoch())
+                                  .count();
+  return seed;
+}
 
 TestRandomGenerator::TestRandomGenerator()
-    : seed_(GTEST_FLAG(random_seed) == 0 ? SEED : GTEST_FLAG(random_seed)), generator_(seed_) {
+    : seed_(GTEST_FLAG(random_seed) == 0 ? getSeed() : GTEST_FLAG(random_seed)), generator_(seed_) {
   std::cerr << "TestRandomGenerator running with seed " << seed_ << "\n";
 }
 
 uint64_t TestRandomGenerator::random() { return generator_(); }
+
+bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
+                                            const Http::HeaderMap& rhs) {
+  if (lhs.size() != rhs.size()) {
+    return false;
+  }
+
+  struct State {
+    const Http::HeaderMap& lhs;
+    bool equal;
+  };
+
+  State state{lhs, true};
+  rhs.iterate(
+      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+        State* state = static_cast<State*>(context);
+        const Http::HeaderEntry* entry =
+            state->lhs.get(Http::LowerCaseString(std::string(header.key().c_str())));
+        if (entry == nullptr || (entry->value() != header.value().c_str())) {
+          state->equal = false;
+          return Http::HeaderMap::Iterate::Break;
+        }
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      &state);
+
+  return state.equal;
+}
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
   if (lhs.length() != rhs.length()) {
@@ -83,21 +119,11 @@ void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint6
 }
 
 Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, const std::string& name) {
-  for (auto counter : store.counters()) {
-    if (counter->name() == name) {
-      return counter;
-    }
-  }
-  return nullptr;
+  return findByName(store.counters(), name);
 }
 
 Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::string& name) {
-  for (auto gauge : store.gauges()) {
-    if (gauge->name() == name) {
-      return gauge;
-    }
-  }
-  return nullptr;
+  return findByName(store.gauges(), name);
 }
 
 std::list<Network::Address::InstanceConstSharedPtr>
@@ -143,7 +169,8 @@ envoy::config::bootstrap::v2::Bootstrap
 TestUtility::parseBootstrapFromJson(const std::string& json_string) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::BootstrapJson::translateBootstrap(*json_object_ptr, bootstrap);
+  Stats::StatsOptionsImpl stats_options;
+  Config::BootstrapJson::translateBootstrap(*json_object_ptr, bootstrap, stats_options);
   return bootstrap;
 }
 
@@ -182,6 +209,31 @@ void ConditionalInitializer::waitReady() {
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
 ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
 
+AtomicFileUpdater::AtomicFileUpdater(const std::string& filename)
+    : link_(filename), new_link_(absl::StrCat(filename, ".new")),
+      target1_(absl::StrCat(filename, ".target1")), target2_(absl::StrCat(filename, ".target2")),
+      use_target1_(true) {
+  unlink(link_.c_str());
+  unlink(new_link_.c_str());
+  unlink(target1_.c_str());
+  unlink(target2_.c_str());
+}
+
+void AtomicFileUpdater::update(const std::string& contents) {
+  const std::string target = use_target1_ ? target1_ : target2_;
+  use_target1_ = !use_target1_;
+  {
+    std::ofstream file(target);
+    file << contents;
+  }
+  int rc = symlink(target.c_str(), new_link_.c_str());
+  ASSERT_EQ(0, rc) << strerror(errno);
+  rc = rename(new_link_.c_str(), link_.c_str());
+  ASSERT_EQ(0, rc) << strerror(errno);
+}
+
+constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
+
 namespace Http {
 
 // Satisfy linker
@@ -202,6 +254,20 @@ TestHeaderMapImpl::TestHeaderMapImpl(
 }
 
 TestHeaderMapImpl::TestHeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl(rhs) {}
+
+TestHeaderMapImpl::TestHeaderMapImpl(const TestHeaderMapImpl& rhs)
+    : TestHeaderMapImpl(static_cast<const HeaderMap&>(rhs)) {}
+
+TestHeaderMapImpl& TestHeaderMapImpl::operator=(const TestHeaderMapImpl& rhs) {
+  if (&rhs == this) {
+    return *this;
+  }
+
+  clear();
+  copyFrom(rhs);
+
+  return *this;
+}
 
 void TestHeaderMapImpl::addCopy(const std::string& key, const std::string& value) {
   addCopy(LowerCaseString(key), value);
@@ -225,4 +291,24 @@ bool TestHeaderMapImpl::has(const std::string& key) { return get(LowerCaseString
 bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nullptr; }
 
 } // namespace Http
+
+namespace Stats {
+
+MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options)
+    : alloc_(stats_options) {
+  ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
+    return alloc_.alloc(name);
+  }));
+
+  ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
+    return alloc_.free(data);
+  }));
+
+  EXPECT_CALL(*this, alloc(absl::string_view("stats.overflow")));
+}
+
+MockedTestAllocator::~MockedTestAllocator() {}
+
+} // namespace Stats
+
 } // namespace Envoy

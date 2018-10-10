@@ -6,6 +6,7 @@
 #include <string>
 
 #include "common/common/assert.h"
+#include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -33,9 +34,21 @@ std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%
 // is either literal text (with % escaped as %%) or part of a %VAR% or %VAR(["args"])% expression.
 // The statement machine does minimal validation of the arguments (if any) and does not know the
 // names of valid variables. Interpretation of the variable name and arguments is delegated to
-// RequestInfoHeaderFormatter.
+// StreamInfoHeaderFormatter.
 HeaderFormatterPtr
 parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option) {
+  const std::string& key = header_value_option.header().key();
+  // PGV constraints provide this guarantee.
+  ASSERT(!key.empty());
+  // We reject :path/:authority rewriting, there is already a well defined mechanism to
+  // perform this in the RouteAction, and doing this via request_headers_to_add
+  // will cause us to have to worry about interaction with other aspects of the
+  // RouteAction, e.g. prefix rewriting. We also reject other :-prefixed
+  // headers, since it seems dangerous and there doesn't appear a use case.
+  if (key[0] == ':') {
+    throw EnvoyException(":-prefixed headers may not be modified");
+  }
+
   const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
 
   absl::string_view format(header_value_option.header().value());
@@ -84,7 +97,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
       if (ch == '%') {
         // Found complete variable name, add formatter.
         formatters.emplace_back(
-            new RequestInfoHeaderFormatter(format.substr(start, pos - start), append));
+            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -165,7 +178,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
       // Search for closing % of a %VAR(...)% expression
       if (ch == '%') {
         formatters.emplace_back(
-            new RequestInfoHeaderFormatter(format.substr(start, pos - start), append));
+            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -179,7 +192,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
       break;
 
     default:
-      NOT_REACHED;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   } while (++pos < format.size());
 
@@ -227,6 +240,12 @@ HeaderParserPtr HeaderParser::configure(
   HeaderParserPtr header_parser = configure(headers_to_add);
 
   for (const auto& header : headers_to_remove) {
+    // We reject :-prefix (e.g. :path) removal here. This is dangerous, since other aspects of
+    // request finalization assume their existence and they are needed for well-formedness in most
+    // cases.
+    if (header[0] == ':') {
+      throw EnvoyException(":-prefixed headers may not be removed");
+    }
     header_parser->headers_to_remove_.emplace_back(header);
   }
 
@@ -234,9 +253,9 @@ HeaderParserPtr HeaderParser::configure(
 }
 
 void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const RequestInfo::RequestInfo& request_info) const {
+                                   const StreamInfo::StreamInfo& stream_info) const {
   for (const auto& formatter : headers_to_add_) {
-    const std::string value = formatter.second->format(request_info);
+    const std::string value = formatter.second->format(stream_info);
     if (!value.empty()) {
       if (formatter.second->append()) {
         headers.addReferenceKey(formatter.first, value);

@@ -34,7 +34,7 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
         server.clusterManager(), server.stats(), statsd_sink.prefix());
   default:
     // Verified by schema.
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -43,7 +43,7 @@ ProtobufTypes::MessagePtr StatsdSinkFactory::createEmptyConfigProto() {
       new envoy::config::metrics::v2::StatsdSink());
 }
 
-std::string StatsdSinkFactory::name() { return StatsSinkNames::get().STATSD; }
+std::string StatsdSinkFactory::name() { return StatsSinkNames::get().Statsd; }
 
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.

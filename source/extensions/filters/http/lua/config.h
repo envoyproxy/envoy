@@ -15,7 +15,7 @@ namespace Lua {
  */
 class LuaFilterConfig : public Common::FactoryBase<envoy::config::filter::http::lua::v2::Lua> {
 public:
-  LuaFilterConfig() : FactoryBase(HttpFilterNames::get().LUA) {}
+  LuaFilterConfig() : FactoryBase(HttpFilterNames::get().Lua) {}
 
   Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string& stats_prefix,

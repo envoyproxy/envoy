@@ -18,6 +18,8 @@
 #include "common/common/lock_guard.h"
 #include "common/common/utility.h"
 #include "common/network/utility.h"
+#include "common/stats/raw_stat_data.h"
+#include "common/stats/stats_options_impl.h"
 
 #include "absl/strings/string_view.h"
 
@@ -40,7 +42,7 @@ static BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
 SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
 
-  const uint64_t entry_size = Stats::RawStatData::size();
+  const uint64_t entry_size = Stats::RawStatData::structSizeWithOptions(options.statsOptions());
   const uint64_t total_size = sizeof(SharedMemory) + stats_set_size;
 
   int flags = O_RDWR;
@@ -53,20 +55,23 @@ SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options
     os_sys_calls.shmUnlink(shmem_name.c_str());
   }
 
-  int shmem_fd = os_sys_calls.shmOpen(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
-  if (shmem_fd == -1) {
-    PANIC(fmt::format("cannot open shared memory region {} check user permissions", shmem_name));
+  const Api::SysCallIntResult result =
+      os_sys_calls.shmOpen(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
+  if (result.rc_ == -1) {
+    PANIC(fmt::format("cannot open shared memory region {} check user permissions. Error: {}",
+                      shmem_name, strerror(result.errno_)));
   }
 
   if (options.restartEpoch() == 0) {
-    int rc = os_sys_calls.ftruncate(shmem_fd, total_size);
-    RELEASE_ASSERT(rc != -1);
+    const Api::SysCallIntResult truncateRes = os_sys_calls.ftruncate(result.rc_, total_size);
+    RELEASE_ASSERT(truncateRes.rc_ != -1, "");
   }
 
-  SharedMemory* shmem = reinterpret_cast<SharedMemory*>(
-      os_sys_calls.mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_SHARED, shmem_fd, 0));
-  RELEASE_ASSERT(shmem != MAP_FAILED);
-  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem) % alignof(decltype(shmem))) == 0);
+  const Api::SysCallPtrResult mmapRes =
+      os_sys_calls.mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_SHARED, result.rc_, 0);
+  SharedMemory* shmem = reinterpret_cast<SharedMemory*>(mmapRes.rc_);
+  RELEASE_ASSERT(shmem != MAP_FAILED, "");
+  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem) % alignof(decltype(shmem))) == 0, "");
 
   if (options.restartEpoch() == 0) {
     shmem->size_ = total_size;
@@ -78,15 +83,15 @@ SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options
     shmem->initializeMutex(shmem->stat_lock_);
     shmem->initializeMutex(shmem->init_lock_);
   } else {
-    RELEASE_ASSERT(shmem->size_ == total_size);
-    RELEASE_ASSERT(shmem->version_ == VERSION);
-    RELEASE_ASSERT(shmem->max_stats_ == options.maxStats());
-    RELEASE_ASSERT(shmem->entry_size_ == entry_size);
+    RELEASE_ASSERT(shmem->size_ == total_size, "");
+    RELEASE_ASSERT(shmem->version_ == VERSION, "");
+    RELEASE_ASSERT(shmem->max_stats_ == options.maxStats(), "");
+    RELEASE_ASSERT(shmem->entry_size_ == entry_size, "");
   }
 
   // Stats::RawStatData must be naturally aligned for atomics to work properly.
-  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem->stats_set_data_) % alignof(RawStatDataSet)) ==
-                 0);
+  RELEASE_ASSERT(
+      (reinterpret_cast<uintptr_t>(shmem->stats_set_data_) % alignof(RawStatDataSet)) == 0, "");
 
   // Here we catch the case where a new Envoy starts up when the current Envoy has not yet fully
   // initialized. The startup logic is quite complicated, and it's not worth trying to handle this
@@ -109,14 +114,16 @@ void SharedMemory::initializeMutex(pthread_mutex_t& mutex) {
   pthread_mutex_init(&mutex, &attribute);
 }
 
-std::string SharedMemory::version(uint64_t max_num_stats, uint64_t max_stat_name_len) {
+std::string SharedMemory::version(uint64_t max_num_stats,
+                                  const Stats::StatsOptions& stats_options) {
   return fmt::format("{}.{}.{}.{}", VERSION, sizeof(SharedMemory), max_num_stats,
-                     max_stat_name_len);
+                     stats_options.maxNameLength());
 }
 
 HotRestartImpl::HotRestartImpl(Options& options)
     : options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
-      shmem_(SharedMemory::initialize(RawStatDataSet::numBytes(stats_set_options_), options)),
+      shmem_(SharedMemory::initialize(
+          RawStatDataSet::numBytes(stats_set_options_, options_.statsOptions()), options_)),
       log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
       stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
   {
@@ -124,7 +131,7 @@ HotRestartImpl::HotRestartImpl(Options& options)
     // because it might be actively written to while we sanityCheck it.
     Thread::LockGuard lock(stat_lock_);
     stats_set_.reset(new RawStatDataSet(stats_set_options_, options.restartEpoch() == 0,
-                                        shmem_.stats_set_data_));
+                                        shmem_.stats_set_data_, options_.statsOptions()));
   }
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
@@ -136,17 +143,17 @@ HotRestartImpl::HotRestartImpl(Options& options)
   // If our parent ever goes away just terminate us so that we don't have to rely on ops/launching
   // logic killing the entire process tree. We should never exist without our parent.
   int rc = prctl(PR_SET_PDEATHSIG, SIGTERM);
-  RELEASE_ASSERT(rc != -1);
+  RELEASE_ASSERT(rc != -1, "");
 }
 
-Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
+Stats::RawStatData* HotRestartImpl::alloc(absl::string_view name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
   Thread::LockGuard lock(stat_lock_);
-  absl::string_view key = name;
-  if (key.size() > Stats::RawStatData::maxNameLength()) {
-    key.remove_suffix(key.size() - Stats::RawStatData::maxNameLength());
-  }
-  auto value_created = stats_set_->insert(key);
+  // In production, the name is truncated in ThreadLocalStore before this
+  // is called. This is just a sanity check to make sure that actually happens;
+  // it is coded as an if/return-null to facilitate testing.
+  ASSERT(name.length() <= options_.statsOptions().maxNameLength());
+  auto value_created = stats_set_->insert(name);
   Stats::RawStatData* data = value_created.first;
   if (data == nullptr) {
     return nullptr;
@@ -169,7 +176,8 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   }
   bool key_removed = stats_set_->remove(data.key());
   ASSERT(key_removed);
-  memset(static_cast<void*>(&data), 0, Stats::RawStatData::size());
+  memset(static_cast<void*>(&data), 0,
+         Stats::RawStatData::structSizeWithOptions(options_.statsOptions()));
 }
 
 int HotRestartImpl::bindDomainSocket(uint64_t id) {
@@ -178,8 +186,9 @@ int HotRestartImpl::bindDomainSocket(uint64_t id) {
   // easily read single messages.
   int fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
   sockaddr_un address = createDomainSocketAddress(id);
-  int rc = os_sys_calls.bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
-  if (rc != 0) {
+  Api::SysCallIntResult result =
+      os_sys_calls.bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
+  if (result.rc_ != 0) {
     throw EnvoyException(
         fmt::format("unable to bind domain socket with id={} (see --base-id option)", id));
   }
@@ -280,7 +289,7 @@ HotRestartImpl::RpcBase* HotRestartImpl::receiveRpc(bool block) {
   // By default the domain socket is non blocking. If we need to block, make it blocking first.
   if (block) {
     int rc = fcntl(my_domain_socket_, F_SETFL, 0);
-    RELEASE_ASSERT(rc != -1);
+    RELEASE_ASSERT(rc != -1, "");
   }
 
   iovec iov[1];
@@ -303,17 +312,17 @@ HotRestartImpl::RpcBase* HotRestartImpl::receiveRpc(bool block) {
     return nullptr;
   }
 
-  RELEASE_ASSERT(rc != -1);
-  RELEASE_ASSERT(message.msg_flags == 0);
+  RELEASE_ASSERT(rc != -1, "");
+  RELEASE_ASSERT(message.msg_flags == 0, "");
 
   // Turn non-blocking back on if we made it blocking.
   if (block) {
     int rc = fcntl(my_domain_socket_, F_SETFL, O_NONBLOCK);
-    RELEASE_ASSERT(rc != -1);
+    RELEASE_ASSERT(rc != -1, "");
   }
 
   RpcBase* rpc = reinterpret_cast<RpcBase*>(&rpc_buffer_[0]);
-  RELEASE_ASSERT(static_cast<uint64_t>(rc) == rpc->length_);
+  RELEASE_ASSERT(static_cast<uint64_t>(rc) == rpc->length_, "");
 
   // We should only get control data in a GetListenSocketReply. If that's the case, pull the
   // cloned fd out of the control data and stick it into the RPC so that higher level code does
@@ -327,7 +336,7 @@ HotRestartImpl::RpcBase* HotRestartImpl::receiveRpc(bool block) {
       reinterpret_cast<RpcGetListenSocketReply*>(rpc)->fd_ =
           *reinterpret_cast<int*>(CMSG_DATA(cmsg));
     } else {
-      RELEASE_ASSERT(false);
+      RELEASE_ASSERT(false, "");
     }
   }
 
@@ -346,7 +355,7 @@ void HotRestartImpl::sendMessage(sockaddr_un& address, RpcBase& rpc) {
   message.msg_iov = iov;
   message.msg_iovlen = 1;
   int rc = sendmsg(my_domain_socket_, &message, 0);
-  RELEASE_ASSERT(rc != -1);
+  RELEASE_ASSERT(rc != -1, "");
 }
 
 void HotRestartImpl::onGetListenSocket(RpcGetListenSocketRequest& rpc) {
@@ -389,7 +398,7 @@ void HotRestartImpl::onGetListenSocket(RpcGetListenSocketRequest& rpc) {
     *reinterpret_cast<int*>(CMSG_DATA(control_message)) = reply.fd_;
 
     int rc = sendmsg(my_domain_socket_, &message, 0);
-    RELEASE_ASSERT(rc != -1);
+    RELEASE_ASSERT(rc != -1, "");
   }
 }
 
@@ -474,23 +483,30 @@ void HotRestartImpl::shutdown() { socket_event_.reset(); }
 
 std::string HotRestartImpl::version() {
   Thread::LockGuard lock(stat_lock_);
-  return versionHelper(shmem_.maxStats(), Stats::RawStatData::maxNameLength(), *stats_set_);
+  return versionHelper(shmem_.maxStats(), options_.statsOptions(), *stats_set_);
 }
 
 // Called from envoy --hot-restart-version -- needs to instantiate a RawStatDataSet so it
 // can generate the version string.
 std::string HotRestartImpl::hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len) {
-  const BlockMemoryHashSetOptions options = blockMemHashOptions(max_num_stats);
-  const uint64_t bytes = RawStatDataSet::numBytes(options);
-  std::unique_ptr<uint8_t[]> mem_buffer_for_dry_run_(new uint8_t[bytes]);
-  RawStatDataSet stats_set(options, true /* init */, mem_buffer_for_dry_run_.get());
+  Stats::StatsOptionsImpl stats_options;
+  stats_options.max_obj_name_length_ = max_stat_name_len - stats_options.maxStatSuffixLength();
 
-  return versionHelper(max_num_stats, max_stat_name_len, stats_set);
+  const BlockMemoryHashSetOptions hash_set_options = blockMemHashOptions(max_num_stats);
+  const uint64_t bytes = RawStatDataSet::numBytes(hash_set_options, stats_options);
+  std::unique_ptr<uint8_t[]> mem_buffer_for_dry_run_(new uint8_t[bytes]);
+
+  RawStatDataSet stats_set(hash_set_options, true /* init */, mem_buffer_for_dry_run_.get(),
+                           stats_options);
+
+  return versionHelper(max_num_stats, stats_options, stats_set);
 }
 
-std::string HotRestartImpl::versionHelper(uint64_t max_num_stats, uint64_t max_stat_name_len,
+std::string HotRestartImpl::versionHelper(uint64_t max_num_stats,
+                                          const Stats::StatsOptions& stats_options,
                                           RawStatDataSet& stats_set) {
-  return SharedMemory::version(max_num_stats, max_stat_name_len) + "." + stats_set.version();
+  return SharedMemory::version(max_num_stats, stats_options) + "." +
+         stats_set.version(stats_options);
 }
 
 } // namespace Server

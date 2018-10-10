@@ -110,7 +110,7 @@ TEST(HeaderStringTest, All) {
     HeaderString string(static_string);
     EXPECT_EQ(HeaderString::Type::Reference, string.type());
     string.append("a", 1);
-    EXPECT_STREQ("a", string.c_str());
+    EXPECT_STREQ("HELLOa", string.c_str());
   }
 
   // Copy inline
@@ -425,11 +425,37 @@ TEST(HeaderMapImplTest, SetRemovesAllValues) {
 }
 
 TEST(HeaderMapImplTest, DoubleInlineAdd) {
-  HeaderMapImpl headers;
-  headers.addReferenceKey(Headers::get().ContentLength, 5);
-  EXPECT_DEBUG_DEATH(headers.addReferenceKey(Headers::get().ContentLength, 6), "");
-  EXPECT_STREQ("5", headers.ContentLength()->value().c_str());
-  EXPECT_EQ(1UL, headers.size());
+  {
+    HeaderMapImpl headers;
+    const std::string foo("foo");
+    const std::string bar("bar");
+    headers.addReference(Headers::get().ContentLength, foo);
+    headers.addReference(Headers::get().ContentLength, bar);
+    EXPECT_STREQ("foo,bar", headers.ContentLength()->value().c_str());
+    EXPECT_EQ(1UL, headers.size());
+  }
+  {
+    HeaderMapImpl headers;
+    headers.addReferenceKey(Headers::get().ContentLength, "foo");
+    headers.addReferenceKey(Headers::get().ContentLength, "bar");
+    EXPECT_STREQ("foo,bar", headers.ContentLength()->value().c_str());
+    EXPECT_EQ(1UL, headers.size());
+  }
+  {
+    HeaderMapImpl headers;
+    headers.addReferenceKey(Headers::get().ContentLength, 5);
+    headers.addReferenceKey(Headers::get().ContentLength, 6);
+    EXPECT_STREQ("5,6", headers.ContentLength()->value().c_str());
+    EXPECT_EQ(1UL, headers.size());
+  }
+  {
+    HeaderMapImpl headers;
+    const std::string foo("foo");
+    headers.addReference(Headers::get().ContentLength, foo);
+    headers.addReferenceKey(Headers::get().ContentLength, 6);
+    EXPECT_STREQ("foo,6", headers.ContentLength()->value().c_str());
+    EXPECT_EQ(1UL, headers.size());
+  }
 }
 
 TEST(HeaderMapImplTest, DoubleInlineSet) {
@@ -666,6 +692,29 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
     HeaderMapImpl::appendToHeader(value3, "");
     EXPECT_EQ(value3, "empty");
   }
+  // Regression test for appending to an empty string with a short string, then
+  // setting integer.
+  {
+    const std::string empty;
+    HeaderString value4(empty);
+    HeaderMapImpl::appendToHeader(value4, " ");
+    value4.setInteger(0);
+    EXPECT_STREQ("0", value4.c_str());
+    EXPECT_EQ(1U, value4.size());
+  }
+}
+
+TEST(HeaderMapImplTest, TestHeaderLengthChecks) {
+  HeaderString value;
+  value.setCopy("some;", 5);
+  EXPECT_DEATH_LOG_TO_STDERR(value.append(nullptr, std::numeric_limits<uint32_t>::max()),
+                             "Trying to allocate overly large headers.");
+
+  std::string source("hello");
+  HeaderString reference;
+  reference.setReference(source);
+  EXPECT_DEATH_LOG_TO_STDERR(reference.append(nullptr, std::numeric_limits<uint32_t>::max()),
+                             "Trying to allocate overly large headers.");
 }
 
 TEST(HeaderMapImplTest, PseudoHeaderOrder) {
@@ -851,6 +900,22 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
         },
         &cb);
   }
+}
+
+// Validate that TestHeaderMapImpl copy construction and assignment works. This is a
+// regression for where we were missing a valid copy constructor and had the
+// default (dangerous) move semantics takeover.
+TEST(HeaderMapImplTest, TestHeaderMapImplyCopy) {
+  TestHeaderMapImpl foo;
+  foo.addCopy(LowerCaseString("foo"), "bar");
+  auto headers = std::make_unique<TestHeaderMapImpl>(foo);
+  EXPECT_STREQ("bar", headers->get(LowerCaseString("foo"))->value().c_str());
+  TestHeaderMapImpl baz{{"foo", "baz"}};
+  baz = *headers;
+  EXPECT_STREQ("bar", baz.get(LowerCaseString("foo"))->value().c_str());
+  const TestHeaderMapImpl& baz2 = baz;
+  baz = baz2;
+  EXPECT_STREQ("bar", baz.get(LowerCaseString("foo"))->value().c_str());
 }
 
 } // namespace Http

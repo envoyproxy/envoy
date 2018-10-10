@@ -1,5 +1,7 @@
 #include "common/config/lds_json.h"
 
+#include "envoy/stats/stats_options.h"
+
 #include "common/common/assert.h"
 #include "common/config/address_json.h"
 #include "common/config/json_utility.h"
@@ -14,11 +16,12 @@ namespace Envoy {
 namespace Config {
 
 void LdsJson::translateListener(const Json::Object& json_listener,
-                                envoy::api::v2::Listener& listener) {
+                                envoy::api::v2::Listener& listener,
+                                const Stats::StatsOptions& stats_options) {
   json_listener.validateSchema(Json::Schema::LISTENER_SCHEMA);
 
   const std::string name = json_listener.getString("name", "");
-  Utility::checkObjNameLength("Invalid listener name", name);
+  Utility::checkObjNameLength("Invalid listener name", name, stats_options);
   listener.set_name(name);
 
   AddressJson::translateAddress(json_listener.getString("address"), true, true,
@@ -38,8 +41,9 @@ void LdsJson::translateListener(const Json::Object& json_listener,
         json_filter->getString("name")));
     JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
-    const std::string json_config = "{\"deprecated_v1\": true, \"value\": " +
-                                    json_filter->getObject("config")->asJsonString() + "}";
+    const std::string json_config =
+        "{\"deprecated_v1\": true, \"value\": " + json_filter->getObject("config")->asJsonString() +
+        "}";
 
     const auto status = Protobuf::util::JsonStringToMessage(json_config, filter->mutable_config());
     // JSON schema has already validated that this is a valid JSON object.

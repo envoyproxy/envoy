@@ -1,5 +1,7 @@
 #include "common/grpc/google_async_client_impl.h"
 
+#include "envoy/stats/scope.h"
+
 #include "common/common/empty_string.h"
 #include "common/common/lock_guard.h"
 #include "common/config/datasource.h"
@@ -203,7 +205,8 @@ void GoogleAsyncStreamImpl::resetStream() {
 }
 
 void GoogleAsyncStreamImpl::writeQueued() {
-  if (!call_initialized_ || finish_pending_ || write_pending_ || write_pending_queue_.empty()) {
+  if (!call_initialized_ || finish_pending_ || write_pending_ || write_pending_queue_.empty() ||
+      draining_cq_) {
     return;
   }
   write_pending_ = true;
@@ -332,7 +335,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     break;
   }
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -385,7 +388,7 @@ GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
       callbacks_(callbacks) {
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
                                          "async " + parent.stat_prefix_ + " egress",
-                                         ProdSystemTimeSource::instance_.currentTime());
+                                         parent.timeSource().systemTime());
   current_span_->setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, parent.stat_prefix_);
   current_span_->setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY);
 }

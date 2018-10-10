@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "common/common/fmt.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "extensions/filters/network/redis_proxy/supported_commands.h"
@@ -16,6 +16,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::ByRef;
 using testing::DoAll;
 using testing::Eq;
@@ -23,7 +24,6 @@ using testing::InSequence;
 using testing::Ref;
 using testing::Return;
 using testing::WithArg;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {

@@ -10,10 +10,11 @@
 
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/options.h"
+#include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
 #include "common/common/block_memory_hash_set.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/raw_stat_data.h"
 
 namespace Envoy {
 namespace Server {
@@ -27,7 +28,7 @@ typedef BlockMemoryHashSet<Stats::RawStatData> RawStatDataSet;
 class SharedMemory {
 public:
   static void configure(uint64_t max_num_stats, uint64_t max_stat_name_len);
-  static std::string version(uint64_t max_num_stats, uint64_t max_stat_name_len);
+  static std::string version(uint64_t max_num_stats, const Stats::StatsOptions& stats_options);
 
   // Made public for testing.
   static const uint64_t VERSION;
@@ -40,7 +41,7 @@ private:
   };
 
   // Due to the flexible-array-length of stats_set_data_, c-style allocation
-  // and initialization are neccessary.
+  // and initialization are necessary.
   SharedMemory() = delete;
   ~SharedMemory() = delete;
 
@@ -139,7 +140,7 @@ public:
   static std::string hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len);
 
   // RawStatDataAllocator
-  Stats::RawStatData* alloc(const std::string& name) override;
+  Stats::RawStatData* alloc(absl::string_view name) override;
   void free(Stats::RawStatData& data) override;
 
 private:
@@ -191,8 +192,8 @@ private:
 
   template <class rpc_class, RpcMessageType rpc_type> rpc_class* receiveTypedRpc() {
     RpcBase* base_message = receiveRpc(true);
-    RELEASE_ASSERT(base_message->length_ == sizeof(rpc_class));
-    RELEASE_ASSERT(base_message->type_ == rpc_type);
+    RELEASE_ASSERT(base_message->length_ == sizeof(rpc_class), "");
+    RELEASE_ASSERT(base_message->type_ == rpc_type, "");
     return reinterpret_cast<rpc_class*>(base_message);
   }
 
@@ -203,7 +204,7 @@ private:
   void onSocketEvent();
   RpcBase* receiveRpc(bool block);
   void sendMessage(sockaddr_un& address, RpcBase& rpc);
-  static std::string versionHelper(uint64_t max_num_stats, uint64_t max_stat_name_len,
+  static std::string versionHelper(uint64_t max_num_stats, const Stats::StatsOptions& stats_options,
                                    RawStatDataSet& stats_set);
 
   Options& options_;

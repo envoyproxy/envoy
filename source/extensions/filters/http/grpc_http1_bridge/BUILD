@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # L7 HTTP filter that bridges HTTP/1.1 unary "gRPC" to compliant HTTP/2 gRPC.
 # Public docs: docs/root/configuration/http_filters/grpc_http1_bridge_filter.rst
 

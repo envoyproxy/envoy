@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Stats sink for the DataDog (https://www.datadoghq.com/) variant of the statsd protocol
 # (https://docs.datadoghq.com/developers/dogstatsd/).
 

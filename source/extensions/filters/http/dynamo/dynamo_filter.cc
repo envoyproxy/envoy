@@ -23,7 +23,7 @@ namespace Dynamo {
 
 Http::FilterHeadersStatus DynamoFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   if (enabled_) {
-    start_decode_ = std::chrono::steady_clock::now();
+    start_decode_ = time_system_.monotonicTime();
     operation_ = RequestParser::parseOperation(headers);
     return Http::FilterHeadersStatus::StopIteration;
   } else {
@@ -172,7 +172,7 @@ void DynamoFilter::chargeBasicStats(uint64_t status) {
 void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::string& entity_type,
                                         uint64_t status) {
   std::chrono::milliseconds latency = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::steady_clock::now() - start_decode_);
+      time_system_.monotonicTime() - start_decode_);
 
   std::string group_string =
       Http::CodeUtility::groupStringForResponseCode(static_cast<Http::Code>(status));
@@ -236,8 +236,9 @@ void DynamoFilter::chargeTablePartitionIdStats(const Json::Object& json_body) {
   std::vector<RequestParser::PartitionDescriptor> partitions =
       RequestParser::parsePartitions(json_body);
   for (const RequestParser::PartitionDescriptor& partition : partitions) {
-    std::string scope_string = Utility::buildPartitionStatString(
-        stat_prefix_, table_descriptor_.table_name, operation_, partition.partition_id_);
+    std::string scope_string =
+        Utility::buildPartitionStatString(stat_prefix_, table_descriptor_.table_name, operation_,
+                                          partition.partition_id_, scope_.statsOptions());
     scope_.counter(scope_string).add(partition.capacity_);
   }
 }

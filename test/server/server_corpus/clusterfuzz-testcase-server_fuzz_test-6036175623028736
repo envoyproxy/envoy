@@ -1,0 +1,26 @@
+dynamic_resources {
+  ads_config {
+    api_type: GRPC
+    grpc_services {
+      google_grpc {
+        target_uri: "\177\177"
+        stat_prefix: "\177\001D\177"
+      }
+      timeout {
+        seconds: 2048
+      }
+      initial_metadata {
+        value: "\177\177\177\177"
+      }
+    }
+  }
+}
+flags_path: "\'"
+admin {
+  access_log_path: "@"
+  address {
+    pipe {
+      path: "^"
+    }
+  }
+}

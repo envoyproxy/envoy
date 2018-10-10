@@ -20,6 +20,11 @@ public:
    *                  allocated.
    */
   static uint64_t totalCurrentlyReserved();
+
+  /**
+   * @return uint64_t the number of bytes in free, unmapped pages in the page heap.
+   */
+  static uint64_t totalPageHeapUnmapped();
 };
 
 } // namespace Memory

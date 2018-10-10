@@ -3,7 +3,7 @@
 Service discovery
 =================
 
-When an upstream cluster is defined in the :ref:`configuration <config_cluster_manager_cluster>`,
+When an upstream cluster is defined in the :ref:`configuration <envoy_api_msg_Cluster>`,
 Envoy needs to know how to resolve the members of the cluster. This is known as *service discovery*.
 
 .. _arch_overview_service_discovery_types:
@@ -61,25 +61,22 @@ via an iptables REDIRECT or TPROXY target or with Proxy Protocol. In these cases
 to an original destination cluster are forwarded to upstream hosts as addressed by the redirection
 metadata, without any explicit host configuration or upstream host discovery. 
 Connections to upstream hosts are pooled and unused hosts are flushed out when they have been idle longer than
-:ref:`cleanup_interval_ms <config_cluster_manager_cluster_cleanup_interval_ms>`, which defaults to
+:ref:`cleanup_interval <envoy_api_field_Cluster.cleanup_interval>`, which defaults to
 5000ms. If the original destination address is is not available, no upstream connection is opened.
 Envoy can also pickup the original destination from a :ref:`HTTP header 
 <arch_overview_load_balancing_types_original_destination_request_header>`.
 Original destination service discovery must be used with the original destination :ref:`load
 balancer <arch_overview_load_balancing_types_original_destination>`. 
 
-.. _arch_overview_service_discovery_types_sds:
+.. _arch_overview_service_discovery_types_eds:
 
-Service discovery service (SDS)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Endpoint discovery service (EDS)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The *service discovery service* is a generic :ref:`REST based API <config_cluster_manager_sds_api>`
-used by Envoy to fetch cluster members. Lyft provides a reference implementation via the Python
-`discovery service <https://github.com/lyft/discovery>`_. That implementation uses AWS DynamoDB as
-the backing store, however the API is simple enough that it could easily be implemented on top of a
-variety of different backing stores. For each SDS cluster, Envoy will periodically fetch the cluster
-members from the discovery service. SDS is the preferred service discovery mechanism for a few
-reasons:
+The *endpoint discovery service* is a :ref:`xDS management server based on gRPC or REST-JSON API server
+<config_overview_v2_management_server>` used by Envoy to fetch cluster members. The cluster members are called
+"endpoint" in Envoy terminology. For each cluster, Envoy fetch the endpoints from the discovery service. EDS is the
+preferred service discovery mechanism for a few reasons:
 
 * Envoy has explicit knowledge of each upstream host (vs. routing through a DNS resolved load
   balancer) and can make more intelligent load balancing decisions.
@@ -90,6 +87,25 @@ reasons:
 Generally active health checking is used in conjunction with the eventually consistent service
 discovery service data to making load balancing and routing decisions. This is discussed further in
 the following section.
+
+.. _arch_overview_service_discovery_types_sds:
+
+Service discovery service (v1 SDS)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+*(deprecated)* This discovery service was replaced to endpoint discovery service in :ref:`v2 xDS
+API<config_overview_v2>`.
+
+The *service discovery service* is a generic :ref:`REST based API <config_cluster_manager_sds_api>`
+used by Envoy to fetch cluster members. Lyft provides a reference implementation via the Python
+`discovery service <https://github.com/lyft/discovery>`_. That implementation uses AWS DynamoDB as
+the backing store, however the API is simple enough that it could easily be implemented on top of a
+variety of different backing stores.
+
+.. attention::
+
+  In the current xDS API, the word "SDS" is used as an acronym for :ref:`Secret Discovery Service
+  <config_secret_discovery_service>`.
 
 .. _arch_overview_service_discovery_eventually_consistent:
 

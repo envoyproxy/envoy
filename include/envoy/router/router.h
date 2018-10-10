@@ -16,6 +16,7 @@
 #include "envoy/http/websocket.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
+#include "envoy/upstream/retry.h"
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -42,10 +43,10 @@ public:
    * example, adding or removing headers. This should only be called ONCE immediately after
    * obtaining the initial response headers.
    * @param headers supplies the response headers, which may be modified during this call.
-   * @param request_info holds additional information about the request.
+   * @param stream_info holds additional information about the request.
    */
   virtual void finalizeResponseHeaders(Http::HeaderMap& headers,
-                                       const RequestInfo::RequestInfo& request_info) const PURE;
+                                       const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 /**
@@ -98,6 +99,11 @@ public:
    * @return std::list<std::string>& access-control-allow-origin values.
    */
   virtual const std::list<std::string>& allowOrigins() const PURE;
+
+  /*
+   * @return std::list<std::regex>& regexes that match allowed origins.
+   */
+  virtual const std::list<std::regex>& allowOriginRegexes() const PURE;
 
   /**
    * @return std::string access-control-allow-methods value.
@@ -163,6 +169,23 @@ public:
    * @return uint32_t a local OR of RETRY_ON values above.
    */
   virtual uint32_t retryOn() const PURE;
+
+  /**
+   * Initializes the RetryHostPredicates to be used with this retry attempt.
+   * @return list of RetryHostPredicates to use
+   */
+  virtual std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const PURE;
+
+  /**
+   * @return the RetryPriority to use when determining priority load for retries.
+   */
+  virtual Upstream::RetryPrioritySharedPtr retryPriority() const PURE;
+
+  /**
+   * Number of times host selection should be reattempted when selecting a host
+   * for a retry attempt.
+   */
+  virtual uint32_t hostSelectionMaxAttempts() const PURE;
 };
 
 /**
@@ -198,6 +221,35 @@ public:
   virtual RetryStatus shouldRetry(const Http::HeaderMap* response_headers,
                                   const absl::optional<Http::StreamResetReason>& reset_reason,
                                   DoRetryCallback callback) PURE;
+
+  /**
+   * Called when a host was attempted but the request failed and is eligible for another retry.
+   * Should be used to update whatever internal state depends on previously attempted hosts.
+   * @param host the previously attempted host.
+   */
+  virtual void onHostAttempted(Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * Determine whether host selection should be reattempted. Applies to host selection during
+   * retries, and is used to provide configurable host selection for retries.
+   * @param host the host under consideration
+   * @return whether host selection should be reattempted
+   */
+  virtual bool shouldSelectAnotherHost(const Upstream::Host& host) PURE;
+
+  /**
+   * Returns a reference to the PriorityLoad that should be used for the next retry.
+   * @param priority_set current priority set.
+   * @param priority_load original priority load.
+   * @return PriorityLoad that should be used to select a priority for the next retry.
+   */
+  virtual const Upstream::PriorityLoad&
+  priorityLoadForRetry(const Upstream::PrioritySet& priority_set,
+                       const Upstream::PriorityLoad& priority_load) PURE;
+  /**
+   * return how many times host selection should be reattempted during host selection.
+   */
+  virtual uint32_t hostSelectionMaxAttempts() const PURE;
 };
 
 typedef std::unique_ptr<RetryState> RetryStatePtr;
@@ -253,7 +305,7 @@ public:
 typedef std::shared_ptr<const RouteSpecificFilterConfig> RouteSpecificFilterConfigConstSharedPtr;
 
 /**
- * Virtual host defintion.
+ * Virtual host definition.
  */
 class VirtualHost {
 public:
@@ -428,11 +480,11 @@ public:
    * example URL prefix rewriting, adding headers, etc. This should only be called ONCE
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
    * @param headers supplies the request headers, which may be modified during this call.
-   * @param request_info holds additional information about the request.
+   * @param stream_info holds additional information about the request.
    * @param insert_envoy_original_path insert x-envoy-original-path header if path rewritten?
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                      const RequestInfo::RequestInfo& request_info,
+                                      const StreamInfo::StreamInfo& stream_info,
                                       bool insert_envoy_original_path) const PURE;
 
   /**
@@ -466,6 +518,12 @@ public:
    * @return std::chrono::milliseconds the route's timeout.
    */
   virtual std::chrono::milliseconds timeout() const PURE;
+
+  /**
+   * @return optional<std::chrono::milliseconds> the route's idle timeout. Zero indicates a
+   *         disabled idle timeout, while nullopt indicates deference to the global timeout.
+   */
+  virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
    * @return absl::optional<std::chrono::milliseconds> the maximum allowed timeout value derived
@@ -508,7 +566,7 @@ public:
    *         in this route.
    */
   virtual Http::WebSocketProxyPtr
-  createWebSocketProxy(Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+  createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
                        Http::WebSocketProxyCallbacks& callbacks,
                        Upstream::ClusterManager& cluster_manager,
                        Network::ReadFilterCallbacks* read_callbacks) const PURE;

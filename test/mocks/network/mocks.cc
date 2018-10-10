@@ -13,12 +13,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
+using testing::Const;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Network {
@@ -92,6 +93,11 @@ template <class T> static void initializeMockConnection(T& connection) {
   ON_CALL(connection, write(_, _)).WillByDefault(Invoke([](Buffer::Instance& buffer, bool) -> void {
     buffer.drain(buffer.length());
   }));
+
+  ON_CALL(connection, perConnectionState())
+      .WillByDefault(ReturnRef(connection.per_connection_state_));
+  ON_CALL(Const(connection), perConnectionState())
+      .WillByDefault(ReturnRef(connection.per_connection_state_));
 }
 
 MockConnection::MockConnection() {
@@ -203,11 +209,24 @@ MockListener::~MockListener() { onDestroy(); }
 MockConnectionHandler::MockConnectionHandler() {}
 MockConnectionHandler::~MockConnectionHandler() {}
 
-MockTransportSocket::MockTransportSocket() {}
+MockIp::MockIp() {}
+MockIp::~MockIp() {}
+
+MockResolvedAddress::~MockResolvedAddress() {}
+
+MockTransportSocket::MockTransportSocket() {
+  ON_CALL(*this, setTransportSocketCallbacks(_))
+      .WillByDefault(Invoke([&](TransportSocketCallbacks& callbacks) { callbacks_ = &callbacks; }));
+}
 MockTransportSocket::~MockTransportSocket() {}
 
 MockTransportSocketFactory::MockTransportSocketFactory() {}
 MockTransportSocketFactory::~MockTransportSocketFactory() {}
+
+MockTransportSocketCallbacks::MockTransportSocketCallbacks() {
+  ON_CALL(*this, connection()).WillByDefault(ReturnRef(connection_));
+}
+MockTransportSocketCallbacks::~MockTransportSocketCallbacks() {}
 
 } // namespace Network
 } // namespace Envoy

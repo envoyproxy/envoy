@@ -6,7 +6,7 @@ Load balancing
 When a filter needs to acquire a connection to a host in an upstream cluster, the cluster manager
 uses a load balancing policy to determine which host is selected. The load balancing policies are
 pluggable and are specified on a per upstream cluster basis in the :ref:`configuration
-<config_cluster_manager_cluster>`. Note that if no active health checking policy is :ref:`configured
+<envoy_api_msg_Cluster>`. Note that if no active health checking policy is :ref:`configured
 <config_cluster_manager_cluster_hc>` for a cluster, all upstream cluster members are considered
 healthy.
 
@@ -118,18 +118,30 @@ cluster <arch_overview_service_discovery_types_original_destination>`. Upstream 
 based on the downstream connection metadata, i.e., connections are opened to the same address as the
 destination address of the incoming connection was before the connection was redirected to
 Envoy. New destinations are added to the cluster by the load balancer on-demand, and the cluster
-:ref:`periodically <config_cluster_manager_cluster_cleanup_interval_ms>` cleans out unused hosts
-from the cluster. No other :ref:`load balancing type <config_cluster_manager_cluster_lb_type>` can
+:ref:`periodically <envoy_api_field_Cluster.cleanup_interval>` cleans out unused hosts
+from the cluster. No other :ref:`load balancing policy <envoy_api_field_Cluster.lb_policy>` can
 be used with original destination clusters.
 
 .. _arch_overview_load_balancing_types_original_destination_request_header:
 
 Original destination host request header
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Envoy can also pick up the original destination from a HTTP header called ``x-envoy-original-destination-host``. 
+Envoy can also pick up the original destination from a HTTP header called
+:ref:`x-envoy-orignal-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>`.
 Please note that fully resolved IP address should be passed in this header. For example if a request has to be
 routed to a host with IP address 10.195.16.237 at port 8888, the request header value should be set as
 ``10.195.16.237:8888``.
+
+.. _arch_overview_load_balancing_overprovisioning_factor:
+
+Overprovisioning Factor
+-----------------------
+Priority levels and localities are considered overprovisioned with
+:ref:`this percentage <envoy_api_field_ClusterLoadAssignment.Policy.overprovisioning_factor>`.
+Envoy doesn't consider a priority level or locality unhealthy until the
+percentage of healthy hosts multiplied by the overprovisioning factor drops
+below 100. The default value is 1.4, so a priority level or locality will not be
+considered unhealthy until the percentage of healthy endpoints goes below 72%.
 
 .. _arch_overview_load_balancing_panic_threshold:
 
@@ -162,9 +174,10 @@ priority may also be specified. When endpoints at the highest priority level (P=
 traffic will land on endpoints in that priority level. As endpoints for the highest priority level
 become unhealthy, traffic will begin to trickle to lower priority levels.
 
-Currently, it is assumed that each priority level is over-provisioned by a (hard-coded) factor of
-1.4. So if 80% of the endpoints are healthy, the priority level is still considered healthy because
-80*1.4 > 100. As the number of healthy endpoints dips below 72%, the health of the priority level
+Currently, it is assumed that each priority level is over-provisioned by the
+:ref:`overprovisioning factor <arch_overview_load_balancing_overprovisioning_factor>`.
+With default factor value 1.4, if 80% of the endpoints are healthy, the priority level is still considered
+healthy because 80*1.4 > 100. As the number of healthy endpoints dips below 72%, the health of the priority level
 goes below 100. At that point the percent of traffic equivalent to the health of P=0 will go to P=0
 and remaining traffic will flow to P=1.
 
@@ -302,12 +315,14 @@ When all endpoints are healthy, the locality is picked using a weighted
 round-robin schedule, where the locality weight is used for weighting. When some
 endpoints in a locality are unhealthy, we adjust the locality weight to reflect
 this. As with :ref:`priority levels
-<arch_overview_load_balancing_priority_levels>`, we assume an over-provision
-factor (currently hardcoded at 1.4), which means we do not perform any weight
+<arch_overview_load_balancing_priority_levels>`, we assume an
+:ref:`over-provision factor <arch_overview_load_balancing_overprovisioning_factor>`
+(default value 1.4), which means we do not perform any weight
 adjustment when only a small number of endpoints in a locality are unhealthy.
 
 Assume a simple set-up with 2 localities X and Y, where X has a locality weight
-of 1 and Y has a locality weight of 2, L=Y 100% healthy.
+of 1 and Y has a locality weight of 2, L=Y 100% healthy,
+with default overprovisioning factor 1.4.
 
 +----------------------------+---------------------------+----------------------------+
 | L=X healthy endpoints      | Percent of traffic to L=X |  Percent of traffic to L=Y |

@@ -4,51 +4,18 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/registry/registry.h"
 
+#include "common/common/assert.h"
+#include "common/config/utility.h"
 #include "common/singleton/const_singleton.h"
 
-#include "absl/types/optional.h"
+#include "extensions/filters/network/thrift_proxy/metadata.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
-
-/**
- * Names of available Transport implementations.
- */
-class TransportNameValues {
-public:
-  // Framed transport
-  const std::string FRAMED = "framed";
-
-  // Unframed transport
-  const std::string UNFRAMED = "unframed";
-
-  // Auto-detection transport
-  const std::string AUTO = "auto";
-};
-
-typedef ConstSingleton<TransportNameValues> TransportNames;
-
-/**
- * TransportCallbacks are Thrift transport-level callbacks.
- */
-class TransportCallbacks {
-public:
-  virtual ~TransportCallbacks() {}
-
-  /**
-   * Indicates the start of a Thrift transport frame was detected.
-   * @param size the size of the message, if available to the transport
-   */
-  virtual void transportFrameStart(absl::optional<uint32_t> size) PURE;
-
-  /**
-   * Indicates the end of a Thrift transport frame was detected.
-   */
-  virtual void transportFrameComplete() PURE;
-};
 
 /**
  * Transport represents a Thrift transport. The Thrift transport is nominally a generic,
@@ -66,20 +33,29 @@ public:
    */
   virtual const std::string& name() const PURE;
 
+  /**
+   * @return TransportType the transport type
+   */
+  virtual TransportType type() const PURE;
+
   /*
-   * decodeFrameStart decodes the start of a transport message, potentially invoking callbacks.
-   * If successful, the start of the frame is removed from the buffer.
+   * Decodes the start of a transport message. If successful, the start of the frame is removed
+   * from the buffer. Transports should not modify the buffer, headers, protocol type, or size if
+   * more data is required to decode the frame's start. If the full frame start can be decoded, the
+   * Transport must drain the frame start data from the buffer. The request metadata should be
+   * modified with any data available to the transport.
    *
    * @param buffer the currently buffered thrift data.
+   * @param metadata MessageMetadata to be modified if transport supports additional information
    * @return bool true if a complete frame header was successfully consumed, false if more data
    *                 is required.
    * @throws EnvoyException if the data is not valid for this transport.
    */
-  virtual bool decodeFrameStart(Buffer::Instance& buffer) PURE;
+  virtual bool decodeFrameStart(Buffer::Instance& buffer, MessageMetadata& metadata) PURE;
 
   /*
-   * decodeFrameEnd decodes the end of a transport message, potentially invoking callbacks.
-   * If successful, the end of the frame is removed from the buffer.
+   * Decodes the end of a transport message. If successful, the end of the frame is removed from
+   * the buffer.
    *
    * @param buffer the currently buffered thrift data.
    * @return bool true if a complete frame trailer was successfully consumed, false if more data
@@ -87,9 +63,66 @@ public:
    * @throws EnvoyException if the data is not valid for this transport.
    */
   virtual bool decodeFrameEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Wraps the given message buffer with the transport's header and trailer (if any). After
+   * encoding, message will be empty.
+   * @param buffer is the output buffer
+   * @param metadata MessageMetadata for the message
+   * @param message a protocol-encoded message
+   * @throws EnvoyException if the message is too large for the transport
+   */
+  virtual void encodeFrame(Buffer::Instance& buffer, const MessageMetadata& metadata,
+                           Buffer::Instance& message) PURE;
 };
 
 typedef std::unique_ptr<Transport> TransportPtr;
+
+/**
+ * Implemented by each Thrift transport and registered via Registry::registerFactory or the
+ * convenience class RegisterFactory.
+ */
+class NamedTransportConfigFactory {
+public:
+  virtual ~NamedTransportConfigFactory() {}
+
+  /**
+   * Create a particular Thrift transport.
+   * @return TransportPtr the transport
+   */
+  virtual TransportPtr createTransport() PURE;
+
+  /**
+   * @return std::string the identifying name for a particular implementation of thrift transport
+   * produced by the factory.
+   */
+  virtual std::string name() PURE;
+
+  /**
+   * Convenience method to lookup a factory by type.
+   * @param TransportType the transport type
+   * @return NamedTransportConfigFactory& for the TransportType
+   */
+  static NamedTransportConfigFactory& getFactory(TransportType type) {
+    const std::string& name = TransportNames::get().fromType(type);
+    return Envoy::Config::Utility::getAndCheckFactory<NamedTransportConfigFactory>(name);
+  }
+};
+
+/**
+ * TransportFactoryBase provides a template for a trivial NamedTransportConfigFactory.
+ */
+template <class TransportImpl> class TransportFactoryBase : public NamedTransportConfigFactory {
+  TransportPtr createTransport() override { return std::move(std::make_unique<TransportImpl>()); }
+
+  std::string name() override { return name_; }
+
+protected:
+  TransportFactoryBase(const std::string& name) : name_(name) {}
+
+private:
+  const std::string name_;
+};
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

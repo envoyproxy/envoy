@@ -20,6 +20,16 @@ void WatermarkBuffer::add(const Instance& data) {
   checkHighWatermark();
 }
 
+void WatermarkBuffer::prepend(absl::string_view data) {
+  OwnedImpl::prepend(data);
+  checkHighWatermark();
+}
+
+void WatermarkBuffer::prepend(Instance& data) {
+  OwnedImpl::prepend(data);
+  checkHighWatermark();
+}
+
 void WatermarkBuffer::commit(RawSlice* iovecs, uint64_t num_iovecs) {
   OwnedImpl::commit(iovecs, num_iovecs);
   checkHighWatermark();
@@ -40,10 +50,10 @@ void WatermarkBuffer::move(Instance& rhs, uint64_t length) {
   checkHighWatermark();
 }
 
-int WatermarkBuffer::read(int fd, uint64_t max_length) {
-  int bytes_read = OwnedImpl::read(fd, max_length);
+Api::SysCallIntResult WatermarkBuffer::read(int fd, uint64_t max_length) {
+  Api::SysCallIntResult result = OwnedImpl::read(fd, max_length);
   checkHighWatermark();
-  return bytes_read;
+  return result;
 }
 
 uint64_t WatermarkBuffer::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
@@ -52,10 +62,10 @@ uint64_t WatermarkBuffer::reserve(uint64_t length, RawSlice* iovecs, uint64_t nu
   return bytes_reserved;
 }
 
-int WatermarkBuffer::write(int fd) {
-  int bytes_written = OwnedImpl::write(fd);
+Api::SysCallIntResult WatermarkBuffer::write(int fd) {
+  Api::SysCallIntResult result = OwnedImpl::write(fd);
   checkLowWatermark();
-  return bytes_written;
+  return result;
 }
 
 void WatermarkBuffer::setWatermarks(uint32_t low_watermark, uint32_t high_watermark) {

@@ -24,7 +24,7 @@ public:
    * @return std::string the URI in the SAN feld of the local certificate. Returns "" if there is no
    *         local certificate, or no SAN field, or no URI.
    **/
-  virtual std::string uriSanLocalCertificate() PURE;
+  virtual std::string uriSanLocalCertificate() const PURE;
 
   /**
    * @return std::string the subject field of the local certificate in RFC 2253 format. Returns ""
@@ -37,6 +37,12 @@ public:
    *         certificate which can happen in TLS (non mTLS) connections.
    */
   virtual const std::string& sha256PeerCertificateDigest() const PURE;
+
+  /**
+   * @return std::string the serial number field of the peer certificate. Returns "" if
+   *         there is no peer certificate, or no serial number.
+   **/
+  virtual std::string serialNumberPeerCertificate() const PURE;
 
   /**
    * @return std::string the subject field of the peer certificate in RFC 2253 format. Returns "" if
@@ -60,13 +66,13 @@ public:
    * @return std::vector<std::string> the DNS entries in the SAN field of the peer certificate.
    *         Returns {} if there is no peer certificate, or no SAN field, or no DNS.
    **/
-  virtual std::vector<std::string> dnsSansPeerCertificate() PURE;
+  virtual std::vector<std::string> dnsSansPeerCertificate() const PURE;
 
   /**
    * @return std::vector<std::string> the DNS entries in the SAN field of the local certificate.
    *         Returns {} if there is no local certificate, or no SAN field, or no DNS.
    **/
-  virtual std::vector<std::string> dnsSansLocalCertificate() PURE;
+  virtual std::vector<std::string> dnsSansLocalCertificate() const PURE;
 };
 
 } // namespace Ssl

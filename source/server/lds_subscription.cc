@@ -16,19 +16,12 @@ LdsSubscription::LdsSubscription(Config::SubscriptionStats stats,
                                  const envoy::api::v2::core::ConfigSource& lds_config,
                                  Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random,
-                                 const LocalInfo::LocalInfo& local_info)
-    : RestApiFetcher(cm, lds_config.api_config_source().cluster_names()[0], dispatcher, random,
-                     Config::Utility::apiConfigSourceRefreshDelay(lds_config.api_config_source())),
-      local_info_(local_info), stats_(stats) {
-  const auto& api_config_source = lds_config.api_config_source();
-  UNREFERENCED_PARAMETER(lds_config);
-  // If we are building an LdsSubscription, the ConfigSource should be REST_LEGACY.
-  ASSERT(api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
-  // TODO(htuch): Add support for multiple clusters, #1170.
-  ASSERT(api_config_source.cluster_names().size() == 1);
-  ASSERT(api_config_source.has_refresh_delay());
-  Envoy::Config::Utility::checkClusterAndLocalInfo("lds", api_config_source.cluster_names()[0], cm,
-                                                   local_info);
+                                 const LocalInfo::LocalInfo& local_info,
+                                 const Stats::StatsOptions& stats_options)
+    : RestApiFetcher(cm, lds_config.api_config_source(), dispatcher, random),
+      local_info_(local_info), stats_(stats), stats_options_(stats_options) {
+  Envoy::Config::Utility::checkClusterAndLocalInfo(
+      "lds", lds_config.api_config_source().cluster_names()[0], cm, local_info);
 }
 
 void LdsSubscription::createRequest(Http::Message& request) {
@@ -37,6 +30,9 @@ void LdsSubscription::createRequest(Http::Message& request) {
   request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   request.headers().insertPath().value(
       fmt::format("/v1/listeners/{}/{}", local_info_.clusterName(), local_info_.nodeName()));
+  request.headers().insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
+  request.headers().insertContentLength().value(size_t(0));
 }
 
 void LdsSubscription::parseResponse(const Http::Message& response) {
@@ -48,7 +44,7 @@ void LdsSubscription::parseResponse(const Http::Message& response) {
 
   Protobuf::RepeatedPtrField<envoy::api::v2::Listener> resources;
   for (const Json::ObjectSharedPtr& json_listener : json_listeners) {
-    Config::LdsJson::translateListener(*json_listener, *resources.Add());
+    Config::LdsJson::translateListener(*json_listener, *resources.Add(), stats_options_);
   }
 
   std::pair<std::string, uint64_t> hash =
@@ -62,10 +58,11 @@ void LdsSubscription::onFetchComplete() {}
 
 void LdsSubscription::onFetchFailure(const EnvoyException* e) {
   callbacks_->onConfigUpdateFailed(e);
-  stats_.update_failure_.inc();
   if (e) {
+    stats_.update_rejected_.inc();
     ENVOY_LOG(warn, "lds: fetch failure: {}", e->what());
   } else {
+    stats_.update_failure_.inc();
     ENVOY_LOG(info, "lds: fetch failure: network error");
   }
 }

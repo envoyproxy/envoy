@@ -3,7 +3,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
@@ -58,7 +58,7 @@ void BufferFilter::initConfig() {
     return;
   }
 
-  const std::string& name = HttpFilterNames::get().BUFFER;
+  const std::string& name = HttpFilterNames::get().Buffer;
   const auto* entry = callbacks_->route()->routeEntry();
 
   const BufferFilterSettings* route_local =

@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Echo L4 network filter. This is primarily a simplistic example.
 # Public docs: docs/root/configuration/network_filters/echo_filter.rst
 

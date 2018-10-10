@@ -2,13 +2,14 @@
 #include "common/thread_local/thread_local_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Ref;
 using testing::ReturnPointee;
-using testing::_;
 
 namespace Envoy {
 namespace ThreadLocal {
@@ -113,8 +114,10 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 // Validate ThreadLocal::InstanceImpl's dispatcher() behavior.
 TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
-  Event::DispatcherImpl main_dispatcher;
-  Event::DispatcherImpl thread_dispatcher;
+
+  DangerousDeprecatedTestTime test_time;
+  Event::DispatcherImpl main_dispatcher(test_time.timeSystem());
+  Event::DispatcherImpl thread_dispatcher(test_time.timeSystem());
 
   tls.registerThread(main_dispatcher, true);
   tls.registerThread(thread_dispatcher, false);

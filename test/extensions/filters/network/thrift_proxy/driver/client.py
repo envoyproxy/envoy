@@ -79,6 +79,19 @@ def main(cfg, reqhandle, resphandle):
             transport,
             client_type=THeaderTransport.CLIENT_TYPE.HEADER,
         )
+
+        if cfg.headers is not None:
+            pairs = cfg.headers.split(",")
+            for p in pairs:
+                key,value=p.split("=")
+                transport.set_header(key,value)
+
+        if cfg.protocol == "binary":
+            transport.set_protocol_id(THeaderTransport.T_BINARY_PROTOCOL)
+        elif cfg.protocol == "compact":
+            transport.set_protocol_id(THeaderTransport.T_COMPACT_PROTOCOL)
+        else:
+            sys.exit("header transport cannot be used with protocol {0}".format(cfg.protocol))
     else:
         sys.exit("unknown transport {0}".format(cfg.transport))
 
@@ -153,7 +166,6 @@ def main(cfg, reqhandle, resphandle):
 
     transport.close()
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Thrift client tool.",
@@ -219,6 +231,13 @@ if __name__ == "__main__":
         dest="unix",
         action="store_true",
     )
+    parser.add_argument(
+        "--headers",
+        dest="headers",
+        metavar="KEY=VALUE[,KEY=VALUE]",
+        help="list of comma-delimited, key value pairs to include as tranport headers.",
+    )
+
     cfg = parser.parse_args()
 
     reqhandle = io.BytesIO()

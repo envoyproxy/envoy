@@ -1,7 +1,7 @@
 #include <memory>
 
 #include "common/access_log/access_log_manager_impl.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -11,8 +11,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Return;
 using testing::_;
+using testing::Return;
 
 namespace Envoy {
 namespace AccessLog {

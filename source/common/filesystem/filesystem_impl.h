@@ -10,6 +10,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stats/store.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/thread.h"
@@ -119,7 +120,7 @@ private:
                                           // not get interleaved by multiple processes writing to
                                           // the same file during hot-restart.
   Thread::MutexBasicLockable flush_lock_; // This lock is used to prevent simulataneous flushes from
-                                          // the flush thread and a syncronous flush. This protects
+                                          // the flush thread and a synchronous flush. This protects
                                           // concurrent access to the about_to_write_buffer_, fd_,
                                           // and all other data used during flushing and file
                                           // re-opening.
@@ -131,10 +132,10 @@ private:
   Thread::CondVar flush_event_;
   std::atomic<bool> flush_thread_exit_{};
   std::atomic<bool> reopen_file_{};
-  Buffer::OwnedImpl flush_buffer_
-      GUARDED_BY(write_lock_); // This buffer is used by multiple threads. It gets filled and
-                               // then flushed either when max size is reached or when a timer
-                               // fires.
+  Buffer::OwnedImpl
+      flush_buffer_ GUARDED_BY(write_lock_); // This buffer is used by multiple threads. It gets
+                                             // filled and then flushed either when max size is
+                                             // reached or when a timer fires.
   // TODO(jmarantz): this should be GUARDED_BY(flush_lock_) but the analysis cannot poke through
   // the std::make_unique assignment. I do not believe it's possible to annotate this properly now
   // due to limitations in the clang thread annotation analysis.
@@ -152,4 +153,4 @@ private:
 };
 
 } // namespace Filesystem
-} // Envoy
+} // namespace Envoy

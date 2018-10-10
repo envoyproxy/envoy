@@ -19,7 +19,8 @@ namespace {
 class GrpcFileBasedMetadataClientIntegrationTest : public GrpcSslClientIntegrationTest {
 public:
   void expectExtraHeaders(FakeStream& fake_stream) override {
-    fake_stream.waitForHeadersComplete();
+    AssertionResult result = fake_stream.waitForHeadersComplete();
+    RELEASE_ASSERT(result, result.message());
     Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
     if (!header_value_1_.empty()) {
       EXPECT_EQ(header_prefix_1_ + header_value_1_, stream_headers.get_(header_key_1_));
@@ -86,7 +87,7 @@ TEST_P(GrpcFileBasedMetadataClientIntegrationTest, FileBasedMetadataGrpcAuthRequ
   header_prefix_1_ = "prefix1";
   header_value_1_ = "secretvalue";
   credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().FILE_BASED_METADATA;
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().FileBasedMetadata;
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -101,7 +102,7 @@ TEST_P(GrpcFileBasedMetadataClientIntegrationTest, DoubleFileBasedMetadataGrpcAu
   header_value_1_ = "secretvalue";
   header_value_2_ = "secret2";
   credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().FILE_BASED_METADATA;
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().FileBasedMetadata;
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -112,7 +113,7 @@ TEST_P(GrpcFileBasedMetadataClientIntegrationTest, DoubleFileBasedMetadataGrpcAu
 TEST_P(GrpcFileBasedMetadataClientIntegrationTest, EmptyFileBasedMetadataGrpcAuthRequest) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().FILE_BASED_METADATA;
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().FileBasedMetadata;
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -127,7 +128,7 @@ TEST_P(GrpcFileBasedMetadataClientIntegrationTest, ExtraConfigFileBasedMetadataG
   header_prefix_1_ = "prefix1";
   header_value_1_ = "secretvalue";
   credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().FILE_BASED_METADATA;
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().FileBasedMetadata;
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();

@@ -2,10 +2,10 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 
+#include "extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "extensions/filters/network/thrift_proxy/protocol.h"
 #include "extensions/filters/network/thrift_proxy/transport.h"
 
@@ -15,6 +15,7 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 #define ALL_PROTOCOL_STATES(FUNCTION)                                                              \
+  FUNCTION(StopIteration)                                                                          \
   FUNCTION(WaitForData)                                                                            \
   FUNCTION(MessageBegin)                                                                           \
   FUNCTION(MessageEnd)                                                                             \
@@ -59,9 +60,12 @@ private:
  * DecoderStateMachine is the Thrift message state machine as described in
  * source/extensions/filters/network/thrift_proxy/docs.
  */
-class DecoderStateMachine {
+class DecoderStateMachine : public Logger::Loggable<Logger::Id::thrift> {
 public:
-  DecoderStateMachine(Protocol& proto) : proto_(proto), state_(ProtocolState::MessageBegin) {}
+  DecoderStateMachine(Protocol& proto, MessageMetadataSharedPtr& metadata,
+                      DecoderEventHandler& handler)
+      : proto_(proto), metadata_(metadata), handler_(handler), state_(ProtocolState::MessageBegin) {
+  }
 
   /**
    * Consumes as much data from the configured Buffer as possible and executes the decoding state
@@ -114,72 +118,109 @@ private:
     uint32_t remaining_;
   };
 
+  struct DecoderStatus {
+    DecoderStatus(ProtocolState next_state) : next_state_(next_state), filter_status_{} {};
+    DecoderStatus(ProtocolState next_state, FilterStatus filter_status)
+        : next_state_(next_state), filter_status_(filter_status){};
+
+    ProtocolState next_state_;
+    absl::optional<FilterStatus> filter_status_;
+  };
+
   // These functions map directly to the matching ProtocolState values. Each returns the next state
   // or ProtocolState::WaitForData if more data is required.
-  ProtocolState messageBegin(Buffer::Instance& buffer);
-  ProtocolState messageEnd(Buffer::Instance& buffer);
-  ProtocolState structBegin(Buffer::Instance& buffer);
-  ProtocolState structEnd(Buffer::Instance& buffer);
-  ProtocolState fieldBegin(Buffer::Instance& buffer);
-  ProtocolState fieldValue(Buffer::Instance& buffer);
-  ProtocolState fieldEnd(Buffer::Instance& buffer);
-  ProtocolState listBegin(Buffer::Instance& buffer);
-  ProtocolState listValue(Buffer::Instance& buffer);
-  ProtocolState listEnd(Buffer::Instance& buffer);
-  ProtocolState mapBegin(Buffer::Instance& buffer);
-  ProtocolState mapKey(Buffer::Instance& buffer);
-  ProtocolState mapValue(Buffer::Instance& buffer);
-  ProtocolState mapEnd(Buffer::Instance& buffer);
-  ProtocolState setBegin(Buffer::Instance& buffer);
-  ProtocolState setValue(Buffer::Instance& buffer);
-  ProtocolState setEnd(Buffer::Instance& buffer);
+  DecoderStatus messageBegin(Buffer::Instance& buffer);
+  DecoderStatus messageEnd(Buffer::Instance& buffer);
+  DecoderStatus structBegin(Buffer::Instance& buffer);
+  DecoderStatus structEnd(Buffer::Instance& buffer);
+  DecoderStatus fieldBegin(Buffer::Instance& buffer);
+  DecoderStatus fieldValue(Buffer::Instance& buffer);
+  DecoderStatus fieldEnd(Buffer::Instance& buffer);
+  DecoderStatus listBegin(Buffer::Instance& buffer);
+  DecoderStatus listValue(Buffer::Instance& buffer);
+  DecoderStatus listEnd(Buffer::Instance& buffer);
+  DecoderStatus mapBegin(Buffer::Instance& buffer);
+  DecoderStatus mapKey(Buffer::Instance& buffer);
+  DecoderStatus mapValue(Buffer::Instance& buffer);
+  DecoderStatus mapEnd(Buffer::Instance& buffer);
+  DecoderStatus setBegin(Buffer::Instance& buffer);
+  DecoderStatus setValue(Buffer::Instance& buffer);
+  DecoderStatus setEnd(Buffer::Instance& buffer);
 
   // handleValue represents the generic Value state from the state machine documentation. It
   // returns either ProtocolState::WaitForData if more data is required or the next state. For
   // structs, lists, maps, or sets the return_state is pushed onto the stack and the next state is
   // based on elem_type. For primitive value types, return_state is returned as the next state
   // (unless WaitForData is returned).
-  ProtocolState handleValue(Buffer::Instance& buffer, FieldType elem_type,
+  DecoderStatus handleValue(Buffer::Instance& buffer, FieldType elem_type,
                             ProtocolState return_state);
 
   // handleState delegates to the appropriate method based on state_.
-  ProtocolState handleState(Buffer::Instance& buffer);
+  DecoderStatus handleState(Buffer::Instance& buffer);
 
   // Helper method to retrieve the current frame's return state and remove the frame from the
   // stack.
   ProtocolState popReturnState();
 
   Protocol& proto_;
+  MessageMetadataSharedPtr metadata_;
+  DecoderEventHandler& handler_;
   ProtocolState state_;
   std::vector<Frame> stack_;
 };
 
 typedef std::unique_ptr<DecoderStateMachine> DecoderStateMachinePtr;
 
+class DecoderCallbacks {
+public:
+  virtual ~DecoderCallbacks() {}
+
+  /**
+   * @return DecoderEventHandler& a new DecoderEventHandler for a message.
+   */
+  virtual DecoderEventHandler& newDecoderEventHandler() PURE;
+};
+
 /**
- * Decoder encapsulates a configured TransportPtr and ProtocolPtr.
+ * Decoder encapsulates a configured Transport and Protocol and provides the ability to decode
+ * Thrift messages.
  */
 class Decoder : public Logger::Loggable<Logger::Id::thrift> {
 public:
-  Decoder(TransportPtr&& transport, ProtocolPtr&& protocol);
+  Decoder(Transport& transport, Protocol& protocol, DecoderCallbacks& callbacks);
 
   /**
-   * Drains data from the given buffer while executing a DecoderStateMachine over the data. A new
-   * DecoderStateMachine is instantiated for each message.
+   * Drains data from the given buffer while executing a state machine over the data.
    *
    * @param data a Buffer containing Thrift protocol data
+   * @param buffer_underflow bool set to true if more data is required to continue decoding
+   * @return FilterStatus::StopIteration when waiting for filter continuation,
+   *             Continue otherwise.
    * @throw EnvoyException on Thrift protocol errors
    */
-  void onData(Buffer::Instance& data);
+  FilterStatus onData(Buffer::Instance& data, bool& buffer_underflow);
 
-  const Transport& transport() { return *transport_; }
-  const Protocol& protocol() { return *protocol_; }
+  TransportType transportType() { return transport_.type(); }
+  ProtocolType protocolType() { return protocol_.type(); }
 
 private:
-  TransportPtr transport_;
-  ProtocolPtr protocol_;
+  struct ActiveRequest {
+    ActiveRequest(DecoderEventHandler& handler) : handler_(handler) {}
+
+    DecoderEventHandler& handler_;
+  };
+  typedef std::unique_ptr<ActiveRequest> ActiveRequestPtr;
+
+  void complete();
+
+  Transport& transport_;
+  Protocol& protocol_;
+  DecoderCallbacks& callbacks_;
+  ActiveRequestPtr request_;
+  MessageMetadataSharedPtr metadata_;
   DecoderStateMachinePtr state_machine_;
-  bool frame_started_;
+  bool frame_started_{false};
+  bool frame_ended_{false};
 };
 
 typedef std::unique_ptr<Decoder> DecoderPtr;

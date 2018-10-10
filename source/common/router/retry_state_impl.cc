@@ -52,7 +52,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
                                Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                Upstream::ResourcePriority priority)
     : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
-      priority_(priority) {
+      priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
+      retry_priority_(route_policy.retryPriority()) {
 
   if (request_headers.EnvoyRetryOn()) {
     retry_on_ = parseRetryOn(request_headers.EnvoyRetryOn()->value().c_str());
@@ -71,23 +72,21 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
   // Merge in the route policy.
   retry_on_ |= route_policy.retryOn();
   retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
+  const uint32_t base = runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25);
+  // Cap the max interval to 10 times the base interval to ensure reasonable backoff intervals.
+  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(base, base * 10, random_);
+  host_selection_max_attempts_ = route_policy.hostSelectionMaxAttempts();
 }
 
 RetryStateImpl::~RetryStateImpl() { resetRetry(); }
 
 void RetryStateImpl::enableBackoffTimer() {
-  // TODO(ramaraochavali): Implement JitteredExponentialBackOff and refactor this.
-  // We use a fully jittered exponential backoff algorithm.
-  current_retry_++;
-  uint32_t multiplier = (1 << current_retry_) - 1;
-  uint64_t base = runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25);
-  uint64_t timeout = random_.random() % (base * multiplier);
-
   if (!retry_timer_) {
     retry_timer_ = dispatcher_.createTimer([this]() -> void { callback_(); });
   }
 
-  retry_timer_->enableTimer(std::chrono::milliseconds(timeout));
+  // We use a fully jittered exponential backoff algorithm.
+  retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
 }
 
 uint32_t RetryStateImpl::parseRetryOn(absl::string_view config) {

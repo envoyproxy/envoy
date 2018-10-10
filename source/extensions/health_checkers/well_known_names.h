@@ -13,7 +13,7 @@ namespace HealthCheckers {
 class HealthCheckerNameValues {
 public:
   // Redis health checker.
-  const std::string REDIS_HEALTH_CHECKER = "envoy.health_checkers.redis";
+  const std::string RedisHealthChecker = "envoy.health_checkers.redis";
 };
 
 typedef ConstSingleton<HealthCheckerNameValues> HealthCheckerNames;

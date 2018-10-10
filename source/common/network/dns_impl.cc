@@ -56,7 +56,7 @@ DnsResolverImpl::DnsResolverImpl(
     }
     const std::string resolvers_csv = StringUtil::join(resolver_addrs, ",");
     int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
-    RELEASE_ASSERT(result == ARES_SUCCESS);
+    RELEASE_ASSERT(result == ARES_SUCCESS, "");
   }
 }
 
@@ -120,7 +120,18 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
 
   if (completed_) {
     if (!cancelled_) {
-      callback_(std::move(address_list));
+      try {
+        callback_(std::move(address_list));
+      } catch (const EnvoyException& e) {
+        ENVOY_LOG(critical, "EnvoyException in c-ares callback");
+        dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
+      } catch (const std::exception& e) {
+        ENVOY_LOG(critical, "std::exception in c-ares callback");
+        dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
+      } catch (...) {
+        ENVOY_LOG(critical, "Unknown exception in c-ares callback");
+        dispatcher_.post([] { throw EnvoyException("unknown"); });
+      }
     }
     if (owned_) {
       delete this;
@@ -182,10 +193,10 @@ void DnsResolverImpl::onAresSocketStateChange(int fd, int read, int write) {
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
                                          DnsLookupFamily dns_lookup_family, ResolveCb callback) {
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
-  // failed intial call to getHostbyName followed by a synchronous IPv4
+  // failed initial call to getHostbyName followed by a synchronous IPv4
   // resolution.
   std::unique_ptr<PendingResolution> pending_resolution(
-      new PendingResolution(callback, channel_, dns_name));
+      new PendingResolution(callback, dispatcher_, channel_, dns_name));
   if (dns_lookup_family == DnsLookupFamily::Auto) {
     pending_resolution->fallback_if_failed_ = true;
   }

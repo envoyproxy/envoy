@@ -6,10 +6,12 @@
 #include <string>
 
 #include "common/common/fmt.h"
+#include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/common/version.h"
-#include "common/stats/stats_impl.h"
+#include "common/protobuf/utility.h"
 
+#include "absl/strings/str_split.h"
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 
@@ -40,6 +42,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   log_levels_string +=
       fmt::format("\nDefault is [{}]", spdlog::level::level_names[default_log_level]);
 
+  const std::string component_log_level_string =
+      "Comma separated list of component log levels. For example upstream:debug,config:trace";
   const std::string log_format_string =
       fmt::format("Log message format in spdlog syntax "
                   "(see https://github.com/gabime/spdlog/wiki/3.-Custom-formatting)"
@@ -57,7 +61,16 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<std::string> config_yaml(
       "", "config-yaml", "Inline YAML configuration, merges with the contents of --config-path",
       false, "", "string", cmd);
-  TCLAP::SwitchArg v2_config_only("", "v2-config-only", "parse config as v2 only", cmd, true);
+
+  // Deprecated and unused.
+  TCLAP::SwitchArg v2_config_only("", "v2-config-only", "deprecated", cmd, true);
+
+  TCLAP::SwitchArg allow_v1_config("", "allow-deprecated-v1-api", "allow use of legacy v1 config",
+                                   cmd, false);
+
+  TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
+                                        "allow unknown fields in the configuration", cmd, false);
+
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
                                                   false, "", "string", cmd);
   TCLAP::ValueArg<std::string> local_address_ip_version("", "local-address-ip-version",
@@ -67,6 +80,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<std::string> log_level("l", "log-level", log_levels_string, false,
                                          spdlog::level::level_names[default_log_level], "string",
                                          cmd);
+  TCLAP::ValueArg<std::string> component_log_level(
+      "", "component-log-level", component_log_level_string, false, "", "string", cmd);
   TCLAP::ValueArg<std::string> log_format("", "log-format", log_format_string, false,
                                           Logger::Logger::DEFAULT_LOG_FORMAT, "string", cmd);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
@@ -74,7 +89,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
                                           "uint32_t", cmd);
   TCLAP::SwitchArg hot_restart_version_option("", "hot-restart-version",
-                                              "hot restart compatability version", cmd);
+                                              "hot restart compatibility version", cmd);
   TCLAP::ValueArg<std::string> service_cluster("", "service-cluster", "Cluster name", false, "",
                                                "string", cmd);
   TCLAP::ValueArg<std::string> service_node("", "service-node", "Node name", false, "", "string",
@@ -149,6 +164,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
   log_format_ = log_format.getValue();
 
+  parseComponentLogLevels(component_log_level.getValue());
+
   if (mode.getValue() == "serve") {
     mode_ = Server::Mode::Serve;
   } else if (mode.getValue() == "validate") {
@@ -174,10 +191,13 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
   // For base ID, scale what the user inputs by 10 so that we have spread for domain sockets.
   base_id_ = base_id.getValue() * 10;
-  concurrency_ = concurrency.getValue();
+  concurrency_ = std::max(1U, concurrency.getValue());
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
-  v2_config_only_ = v2_config_only.getValue();
+  v2_config_only_ = !allow_v1_config.getValue();
+  if (allow_unknown_fields.getValue()) {
+    MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Allow;
+  }
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
   restart_epoch_ = restart_epoch.getValue();
@@ -188,15 +208,49 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   max_stats_ = max_stats.getValue();
-  max_obj_name_length_ = max_obj_name_len.getValue();
+  stats_options_.max_obj_name_length_ = max_obj_name_len.getValue();
 
   if (hot_restart_version_option.getValue()) {
-    Stats::RawStatData::configure(*this);
-    std::cerr << hot_restart_version_cb(max_stats.getValue(),
-                                        max_obj_name_len.getValue() +
-                                            Stats::RawStatData::maxStatSuffixLength(),
+    std::cerr << hot_restart_version_cb(max_stats.getValue(), stats_options_.maxNameLength(),
                                         !hot_restart_disabled_);
     throw NoServingException();
   }
 }
+
+void OptionsImpl::parseComponentLogLevels(const std::string& component_log_levels) {
+  if (component_log_levels.empty()) {
+    return;
+  }
+  std::vector<std::string> log_levels = absl::StrSplit(component_log_levels, ',');
+  for (auto& level : log_levels) {
+    std::vector<std::string> log_name_level = absl::StrSplit(level, ':');
+    if (log_name_level.size() != 2) {
+      logError(fmt::format("error: component log level not correctly specified '{}'", level));
+    }
+    std::string log_name = log_name_level[0];
+    std::string log_level = log_name_level[1];
+    size_t level_to_use = std::numeric_limits<size_t>::max();
+    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
+      if (log_level == spdlog::level::level_names[i]) {
+        level_to_use = i;
+        break;
+      }
+    }
+    if (level_to_use == std::numeric_limits<size_t>::max()) {
+      logError(fmt::format("error: invalid log level specified '{}'", log_level));
+    }
+    Logger::Logger* logger_to_change = Logger::Registry::logger(log_name);
+    if (!logger_to_change) {
+      logError(fmt::format("error: invalid component specified '{}'", log_name));
+    }
+    component_log_levels_.push_back(
+        std::make_pair(log_name, static_cast<spdlog::level::level_enum>(level_to_use)));
+  }
+}
+
+void OptionsImpl::logError(const std::string& error) const {
+  std::cerr << error << std::endl;
+  throw MalformedArgvException(error);
+}
+
 } // namespace Envoy

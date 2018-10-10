@@ -15,7 +15,7 @@ namespace Gzip {
  */
 class GzipFilterFactory : public Common::FactoryBase<envoy::config::filter::http::gzip::v2::Gzip> {
 public:
-  GzipFilterFactory() : FactoryBase(HttpFilterNames::get().ENVOY_GZIP) {}
+  GzipFilterFactory() : FactoryBase(HttpFilterNames::get().EnvoyGzip) {}
 
 private:
   Http::FilterFactoryCb

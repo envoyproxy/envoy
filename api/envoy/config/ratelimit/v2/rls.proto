@@ -29,9 +29,9 @@ message RateLimitServiceConfig {
   }
 
   // Specifies if Envoy should use the data-plane-api client
-  // :repo:`api/envoy/service/ratelimit/v2/rls.proto` or the legacy 
+  // :repo:`api/envoy/service/ratelimit/v2/rls.proto` or the legacy
   // client :repo:`source/common/ratelimit/ratelimit.proto` when
-  // making requests to the rate limit service. 
+  // making requests to the rate limit service.
   //
   // .. note::
   //

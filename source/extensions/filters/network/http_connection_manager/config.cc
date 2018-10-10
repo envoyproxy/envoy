@@ -9,7 +9,6 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
-#include "envoy/stats/stats.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/common/fmt.h"
@@ -41,6 +40,16 @@ FilterFactoryMap::const_iterator findUpgradeCaseInsensitive(const FilterFactoryM
     }
   }
   return upgrade_map.end();
+}
+
+std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
+    const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+        config) {
+  if (config.has_internal_address_config()) {
+    return std::make_unique<InternalAddressConfig>(config.internal_address_config());
+  }
+
+  return std::make_unique<Http::DefaultInternalAddressConfig>();
 }
 
 } // namespace
@@ -77,14 +86,16 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
           date_provider](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.random(), context.httpTracer(),
-        context.runtime(), context.localInfo(), context.clusterManager())});
+        context.runtime(), context.localInfo(), context.clusterManager(),
+        &context.overloadManager(), context.dispatcher().timeSystem())});
   };
 }
 
 Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
     const Json::Object& json_config, Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager proto_config;
-  Config::FilterJson::translateHttpConnectionManager(json_config, proto_config);
+  Config::FilterJson::translateHttpConnectionManager(json_config, proto_config,
+                                                     context.scope().statsOptions());
   return createFilterFactoryFromProtoTyped(proto_config, context);
 }
 
@@ -113,6 +124,11 @@ HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& c
   return "";
 }
 
+InternalAddressConfig::InternalAddressConfig(
+    const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+        InternalAddressConfig& config)
+    : unix_sockets_(config.unix_sockets()) {}
+
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         config,
@@ -123,17 +139,22 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
+      internal_address_config_(createInternalAddressConfig(config)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
       route_config_provider_manager_(route_config_provider_manager),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
+      idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout)),
+      stream_idle_timeout_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       date_provider_(date_provider),
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
-      proxy_100_continue_(config.proxy_100_continue()) {
+      proxy_100_continue_(config.proxy_100_continue()),
+      delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(config, context_, stats_prefix_,
                                                                    route_config_provider_manager_);
@@ -159,7 +180,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     forward_client_cert_ = Http::ForwardClientCertType::AlwaysForwardOnly;
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const auto& set_current_client_cert_details = config.set_current_client_cert_details();
@@ -196,7 +217,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       tracing_operation_name = Tracing::OperationName::Egress;
       break;
     default:
-      NOT_REACHED;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
     for (const std::string& header : tracing_config.request_headers_for_tags()) {
@@ -213,10 +234,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     tracing_config_.reset(new Http::TracingConnectionManagerConfig(
         {tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
          overall_sampling}));
-  }
-
-  if (config.has_idle_timeout()) {
-    idle_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, idle_timeout));
   }
 
   for (const auto& access_log : config.access_log()) {
@@ -242,7 +259,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     codec_type_ = CodecType::HTTP2;
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const auto& filters = config.http_filters();
@@ -320,7 +337,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     }
   }
 
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {

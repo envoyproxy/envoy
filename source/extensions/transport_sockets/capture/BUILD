@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Capture wrapper around raw_buffer sockets.
 
 load(
@@ -14,6 +15,7 @@ envoy_cc_library(
     srcs = ["capture.cc"],
     hdrs = ["capture.h"],
     deps = [
+        "//include/envoy/event:timer_interface",
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",

@@ -46,7 +46,7 @@ void SignalAction::installSigHandlers() {
   stack.ss_size = altstack_size_;        // ... guard page at the other
   stack.ss_flags = 0;
 
-  RELEASE_ASSERT(sigaltstack(&stack, &previous_altstack_) == 0);
+  RELEASE_ASSERT(sigaltstack(&stack, &previous_altstack_) == 0, "");
 
   int hidx = 0;
   for (const auto& sig : FATAL_SIGS) {
@@ -56,7 +56,7 @@ void SignalAction::installSigHandlers() {
     saction.sa_flags = (SA_SIGINFO | SA_ONSTACK | SA_RESETHAND | SA_NODEFER);
     saction.sa_sigaction = sigHandler;
     auto* handler = &previous_handlers_[hidx++];
-    RELEASE_ASSERT(sigaction(sig, &saction, handler) == 0);
+    RELEASE_ASSERT(sigaction(sig, &saction, handler) == 0, "");
   }
 }
 
@@ -67,12 +67,12 @@ void SignalAction::removeSigHandlers() {
     previous_altstack_.ss_size = MINSIGSTKSZ;
   }
 #endif
-  RELEASE_ASSERT(sigaltstack(&previous_altstack_, nullptr) == 0);
+  RELEASE_ASSERT(sigaltstack(&previous_altstack_, nullptr) == 0, "");
 
   int hidx = 0;
   for (const auto& sig : FATAL_SIGS) {
     auto* handler = &previous_handlers_[hidx++];
-    RELEASE_ASSERT(sigaction(sig, handler, nullptr) == 0);
+    RELEASE_ASSERT(sigaction(sig, handler, nullptr) == 0, "");
   }
 }
 
@@ -85,9 +85,10 @@ void SignalAction::mapAndProtectStackMemory() {
   // library hint that might be used in the future.
   altstack_ = static_cast<char*>(mmap(nullptr, mapSizeWithGuards(), PROT_READ | PROT_WRITE,
                                       MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0));
-  RELEASE_ASSERT(altstack_);
-  RELEASE_ASSERT(mprotect(altstack_, guard_size_, PROT_NONE) == 0);
-  RELEASE_ASSERT(mprotect(altstack_ + guard_size_ + altstack_size_, guard_size_, PROT_NONE) == 0);
+  RELEASE_ASSERT(altstack_, "");
+  RELEASE_ASSERT(mprotect(altstack_, guard_size_, PROT_NONE) == 0, "");
+  RELEASE_ASSERT(mprotect(altstack_ + guard_size_ + altstack_size_, guard_size_, PROT_NONE) == 0,
+                 "");
 }
 
 void SignalAction::unmapStackMemory() { munmap(altstack_, mapSizeWithGuards()); }

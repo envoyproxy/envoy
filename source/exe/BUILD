@@ -9,7 +9,9 @@ load(
 load(
     "//source/extensions:all_extensions.bzl",
     "envoy_all_extensions",
+    "envoy_windows_extensions",
 )
+load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS")
 
 envoy_package()
 
@@ -37,7 +39,11 @@ envoy_cc_library(
         "//source/server:options_lib",
         "//source/server:server_lib",
         "//source/server:test_hooks_lib",
-    ] + envoy_all_extensions(),
+    ] + select({
+        "//bazel:windows_x86_64": envoy_windows_extensions(),
+        "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//conditions:default": envoy_all_extensions(),
+    }),
 )
 
 envoy_cc_library(

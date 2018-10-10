@@ -2,6 +2,8 @@
 
 #include "common/http/utility.h"
 
+#include "extensions/filters/common/lua/wrappers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -102,8 +104,70 @@ void HeaderMapWrapper::checkModifiable(lua_State* state) {
   }
 }
 
-int RequestInfoWrapper::luaProtocol(lua_State* state) {
-  lua_pushstring(state, Http::Utility::getProtocolString(request_info_.protocol().value()).c_str());
+int StreamInfoWrapper::luaProtocol(lua_State* state) {
+  lua_pushstring(state, Http::Utility::getProtocolString(stream_info_.protocol().value()).c_str());
+  return 1;
+}
+
+int StreamInfoWrapper::luaDynamicMetadata(lua_State* state) {
+  if (dynamic_metadata_wrapper_.get() != nullptr) {
+    dynamic_metadata_wrapper_.pushStack();
+  } else {
+    dynamic_metadata_wrapper_.reset(DynamicMetadataMapWrapper::create(state, *this), true);
+  }
+  return 1;
+}
+
+DynamicMetadataMapIterator::DynamicMetadataMapIterator(DynamicMetadataMapWrapper& parent)
+    : parent_{parent}, current_{parent_.streamInfo().dynamicMetadata().filter_metadata().begin()} {}
+
+StreamInfo::StreamInfo& DynamicMetadataMapWrapper::streamInfo() { return parent_.stream_info_; }
+
+int DynamicMetadataMapIterator::luaPairsIterator(lua_State* state) {
+  if (current_ == parent_.streamInfo().dynamicMetadata().filter_metadata().end()) {
+    parent_.iterator_.reset();
+    return 0;
+  }
+
+  lua_pushstring(state, current_->first.c_str());
+  Filters::Common::Lua::MetadataMapHelper::createTable(state, current_->second.fields());
+
+  current_++;
+  return 2;
+}
+
+int DynamicMetadataMapWrapper::luaGet(lua_State* state) {
+  const char* filter_name = luaL_checkstring(state, 2);
+  const auto& metadata = streamInfo().dynamicMetadata().filter_metadata();
+  const auto filter_it = metadata.find(filter_name);
+  if (filter_it == metadata.end()) {
+    return 0;
+  }
+
+  Filters::Common::Lua::MetadataMapHelper::createTable(state, filter_it->second.fields());
+  return 1;
+}
+
+int DynamicMetadataMapWrapper::luaSet(lua_State* state) {
+  if (iterator_.get() != nullptr) {
+    luaL_error(state, "dynamic metadata map cannot be modified while iterating");
+  }
+
+  // TODO(dio): Allow to set dynamic metadata using a table.
+  const char* filter_name = luaL_checkstring(state, 2);
+  const char* key = luaL_checkstring(state, 3);
+  const char* value = luaL_checkstring(state, 4);
+  streamInfo().setDynamicMetadata(filter_name, MessageUtil::keyValueStruct(key, value));
+  return 0;
+}
+
+int DynamicMetadataMapWrapper::luaPairs(lua_State* state) {
+  if (iterator_.get() != nullptr) {
+    luaL_error(state, "cannot create a second iterator before completing the first");
+  }
+
+  iterator_.reset(DynamicMetadataMapIterator::create(state, *this), true);
+  lua_pushcclosure(state, DynamicMetadataMapIterator::static_luaPairsIterator, 1);
   return 1;
 }
 

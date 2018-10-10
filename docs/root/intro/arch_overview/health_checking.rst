@@ -22,7 +22,36 @@ unhealthy, successes required before marking a host healthy, etc.):
   failure. Optionally, Envoy can perform EXISTS on a user-specified key. If the key does not exist
   it is considered a passing healthcheck. This allows the user to mark a Redis instance for
   maintenance by setting the specified key to any value and waiting for traffic to drain. See
-  :ref:`redis_key <config_cluster_manager_cluster_hc_redis_key>`.
+  :ref:`redis_key <envoy_api_msg_config.health_checker.redis.v2.Redis>`.
+
+.. _arch_overview_per_cluster_health_check_config:
+
+Per cluster member health check config
+--------------------------------------
+
+If active health checking is configured for an upstream cluster, a specific additional configuration
+for each registered member can be specified by setting the
+:ref:`HealthCheckConfig<envoy_api_msg_endpoint.Endpoint.HealthCheckConfig>`
+in the :ref:`Endpoint<envoy_api_msg_endpoint.Endpoint>` of an :ref:`LbEndpoint<envoy_api_msg_endpoint.LbEndpoint>`
+of each defined :ref:`LocalityLbEndpoints<envoy_api_msg_endpoint.LocalityLbEndpoints>` in a
+:ref:`ClusterLoadAssignment<envoy_api_msg_ClusterLoadAssignment>`.
+
+An example of setting up :ref:`health check config<envoy_api_msg_endpoint.Endpoint.HealthCheckConfig>`
+to set a :ref:`cluster member<envoy_api_msg_endpoint.Endpoint>`'s alternative health check
+:ref:`port<envoy_api_field_endpoint.Endpoint.HealthCheckConfig.port_value>` is:
+
+.. code-block:: yaml
+
+  load_assignment:
+    endpoints:
+    - lb_endpoints:
+      - endpoint:
+          health_check_config:
+            port_value: 8080
+          address:
+            socket_address:
+              address: localhost
+              port_value: 80
 
 .. _arch_overview_health_check_logging:
 
@@ -108,7 +137,7 @@ is having a different HTTP health checking URL for every service type. The downs
 is that overall configuration becomes more complicated as every health check URL is fully custom.
 
 The Envoy HTTP health checker supports the :ref:`service_name
-<config_cluster_manager_cluster_hc_service_name>` option. If this option is set, the health checker
+<envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name>` option. If this option is set, the health checker
 additionally compares the value of the *x-envoy-upstream-healthchecked-cluster* response header to
 *service_name*. If the values do not match, the health check does not pass. The upstream health
 check filter appends *x-envoy-upstream-healthchecked-cluster* to the response headers. The appended

@@ -21,6 +21,12 @@ uint64_t Stats::totalCurrentlyReserved() {
   return value;
 }
 
+uint64_t Stats::totalPageHeapUnmapped() {
+  size_t value = 0;
+  MallocExtension::instance()->GetNumericProperty("tcmalloc.pageheap_unmapped_bytes", &value);
+  return value;
+}
+
 } // namespace Memory
 } // namespace Envoy
 
@@ -31,6 +37,7 @@ namespace Memory {
 
 uint64_t Stats::totalCurrentlyAllocated() { return 0; }
 uint64_t Stats::totalCurrentlyReserved() { return 0; }
+uint64_t Stats::totalPageHeapUnmapped() { return 0; }
 
 } // namespace Memory
 } // namespace Envoy

@@ -11,8 +11,10 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/resolver.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/stats/scope.h"
 
-#include "common/stats/stats_impl.h"
+#include "common/stats/isolated_store_impl.h"
+#include "common/stream_info/filter_state_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/printers.h"
@@ -49,6 +51,7 @@ public:
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
   bool read_enabled_{true};
+  StreamInfo::FilterStateImpl per_connection_state_;
   Connection::State state_{Connection::State::Open};
 };
 
@@ -76,7 +79,6 @@ public:
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_CONST_METHOD0(state, State());
@@ -86,6 +88,10 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
+  MOCK_METHOD0(perConnectionState, StreamInfo::FilterState&());
+  MOCK_CONST_METHOD0(perConnectionState, const StreamInfo::FilterState&());
+  MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
+  MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
 };
 
 /**
@@ -116,7 +122,6 @@ public:
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_CONST_METHOD0(state, State());
@@ -126,6 +131,10 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
+  MOCK_METHOD0(perConnectionState, StreamInfo::FilterState&());
+  MOCK_CONST_METHOD0(perConnectionState, const StreamInfo::FilterState&());
+  MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
+  MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());
@@ -391,6 +400,9 @@ public:
 
 class MockIp : public Address::Ip {
 public:
+  MockIp();
+  ~MockIp();
+
   MOCK_CONST_METHOD0(addressAsString, const std::string&());
   MOCK_CONST_METHOD0(isAnyAddress, bool());
   MOCK_CONST_METHOD0(isUnicastAddress, bool());
@@ -404,13 +416,14 @@ class MockResolvedAddress : public Address::Instance {
 public:
   MockResolvedAddress(const std::string& logical, const std::string& physical)
       : logical_(logical), physical_(physical) {}
+  ~MockResolvedAddress();
 
   bool operator==(const Address::Instance& other) const override {
     return asString() == other.asString();
   }
 
-  MOCK_CONST_METHOD1(bind, int(int));
-  MOCK_CONST_METHOD1(connect, int(int));
+  MOCK_CONST_METHOD1(bind, Api::SysCallIntResult(int));
+  MOCK_CONST_METHOD1(connect, Api::SysCallIntResult(int));
   MOCK_CONST_METHOD0(ip, Address::Ip*());
   MOCK_CONST_METHOD1(socket, int(Address::SocketType));
   MOCK_CONST_METHOD0(type, Address::Type());
@@ -434,8 +447,9 @@ public:
   MOCK_METHOD1(doRead, IoResult(Buffer::Instance& buffer));
   MOCK_METHOD2(doWrite, IoResult(Buffer::Instance& buffer, bool end_stream));
   MOCK_METHOD0(onConnected, void());
-  MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
+
+  TransportSocketCallbacks* callbacks_{};
 };
 
 class MockTransportSocketFactory : public TransportSocketFactory {
@@ -445,6 +459,20 @@ public:
 
   MOCK_CONST_METHOD0(implementsSecureTransport, bool());
   MOCK_CONST_METHOD0(createTransportSocket, TransportSocketPtr());
+};
+
+class MockTransportSocketCallbacks : public TransportSocketCallbacks {
+public:
+  MockTransportSocketCallbacks();
+  ~MockTransportSocketCallbacks();
+
+  MOCK_CONST_METHOD0(fd, int());
+  MOCK_METHOD0(connection, Connection&());
+  MOCK_METHOD0(shouldDrainReadBuffer, bool());
+  MOCK_METHOD0(setReadBufferReady, void());
+  MOCK_METHOD1(raiseEvent, void(ConnectionEvent));
+
+  testing::NiceMock<MockConnection> connection_;
 };
 
 } // namespace Network

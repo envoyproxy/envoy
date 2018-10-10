@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Redis proxy L4 network filter. Implements consistent hashing and observability for large redis
 # clusters.
 # Public docs: docs/root/configuration/network_filters/redis_proxy_filter.rst
@@ -72,6 +73,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/upstream:load_balancer_lib",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
     ],
 )

@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/stats/scope.h"
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
@@ -47,7 +49,7 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
                                                config_->stats_.downstream_cx_rx_bytes_buffered_,
                                                config_->stats_.downstream_cx_tx_bytes_total_,
                                                config_->stats_.downstream_cx_tx_bytes_buffered_,
-                                               nullptr});
+                                               nullptr, nullptr});
 }
 
 void ProxyFilter::onRespValue(RespValuePtr&& value) {

@@ -27,7 +27,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Permis
   case envoy::config::rbac::v2alpha::Permission::RuleCase::kNotRule:
     return std::make_shared<const NotMatcher>(permission.not_rule());
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -50,7 +50,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Princi
   case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kNotId:
     return std::make_shared<const NotMatcher>(principal.not_id());
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -135,14 +135,14 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
   const auto* ssl = connection.ssl();
   if (!ssl) { // connection was not authenticated
     return false;
-  } else if (name_.empty()) { // matcher allows any subject
+  } else if (!matcher_.has_value()) { // matcher allows any subject
     return true;
   }
 
   std::string principal = ssl->uriSanPeerCertificate();
   principal = principal.empty() ? ssl->subjectPeerCertificate() : principal;
 
-  return principal == name_;
+  return matcher_.value().match(principal);
 }
 
 bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap&,

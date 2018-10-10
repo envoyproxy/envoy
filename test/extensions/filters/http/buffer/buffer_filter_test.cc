@@ -5,7 +5,6 @@
 #include "envoy/event/dispatcher.h"
 
 #include "common/http/header_map_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "extensions/filters/http/buffer/buffer_filter.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -17,12 +16,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::DoAll;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -46,10 +45,10 @@ public:
 
   void routeLocalConfig(const Router::RouteSpecificFilterConfig* route_settings,
                         const Router::RouteSpecificFilterConfig* vhost_settings) {
-    ON_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().BUFFER))
+    ON_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Buffer))
         .WillByDefault(Return(route_settings));
     ON_CALL(callbacks_.route_->route_entry_.virtual_host_,
-            perFilterConfig(HttpFilterNames::get().BUFFER))
+            perFilterConfig(HttpFilterNames::get().Buffer))
         .WillByDefault(Return(vhost_settings));
   }
 

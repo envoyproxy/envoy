@@ -1,6 +1,7 @@
 #include "common/upstream/ring_hash_lb.h"
 
 #include <cstdint>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -103,8 +104,8 @@ RingHashLoadBalancer::Ring::Ring(
     // new address that is larger, or runs on a platform where UDS is larger. I don't think it's
     // worth the defensive coding to deal with the heap allocation case (e.g. via
     // absl::InlinedVector) at the current time.
-    RELEASE_ASSERT(address_string.size() + 1 + StringUtil::MIN_ITOA_OUT_LEN <=
-                   sizeof(hash_key_buffer));
+    RELEASE_ASSERT(
+        address_string.size() + 1 + StringUtil::MIN_ITOA_OUT_LEN <= sizeof(hash_key_buffer), "");
     memcpy(hash_key_buffer, address_string.c_str(), offset_start);
     hash_key_buffer[offset_start++] = '_';
     for (uint64_t i = 0; i < hashes_per_host; i++) {
@@ -125,9 +126,8 @@ RingHashLoadBalancer::Ring::Ring(
   std::sort(ring_.begin(), ring_.end(), [](const RingEntry& lhs, const RingEntry& rhs) -> bool {
     return lhs.hash_ < rhs.hash_;
   });
-
   if (ENVOY_LOG_CHECK_LEVEL(trace)) {
-    for (auto entry : ring_) {
+    for (const auto& entry : ring_) {
       ENVOY_LOG(trace, "ring hash: host={} hash={}", entry.host_->address()->asString(),
                 entry.hash_);
     }

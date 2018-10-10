@@ -276,7 +276,7 @@ metadata()
 
 Returns the current route entry metadata. Note that the metadata should be specified
 under the filter name i.e. *envoy.lua*. Below is an example of a *metadata* in a
-:ref:`route entry <config_http_conn_man_route_table_route>`.
+:ref:`route entry <envoy_api_msg_route.Route>`.
 
 .. code-block:: yaml
 
@@ -290,16 +290,16 @@ under the filter name i.e. *envoy.lua*. Below is an example of a *metadata* in a
 
 Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
 
-requestInfo()
+streamInfo()
 ^^^^^^^^^^^^^
 
 .. code-block:: lua
 
-  requestInfo = handle:requestInfo()
+  streamInfo = handle:streamInfo()
 
-Returns :repo:`information <include/request_info/request_info.h>` related to the current request.
+Returns :repo:`information <include/stream_info/stream_info.h>` related to the current request.
 
-Returns a :ref:`request info object <config_http_filters_lua_request_info_wrapper>`.
+Returns a :ref:`stream info object <config_http_filters_lua_stream_info_wrapper>`.
 
 connection()
 ^^^^^^^^^^^^
@@ -426,9 +426,9 @@ __pairs()
 Iterates through every *metadata* entry. *key* is a string that supplies a *metadata*
 key. *value* is *metadata* entry value.
 
-.. _config_http_filters_lua_request_info_wrapper:
+.. _config_http_filters_lua_stream_info_wrapper:
 
-Request info object API
+Stream info object API
 -----------------------
 
 protocol()
@@ -436,10 +436,58 @@ protocol()
 
 .. code-block:: lua
 
-  requestInfo:protocol()
+  streamInfo:protocol()
 
 Returns the string representation of :repo:`HTTP protocol <include/envoy/http/protocol.h>`
 used by the current request. The possible values are: *HTTP/1.0*, *HTTP/1.1*, and *HTTP/2*.
+
+dynamicMetadata()
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:dynamicMetadata()
+
+Returns a :ref:`dynamic metadata object <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>`.
+
+.. _config_http_filters_lua_stream_info_dynamic_metadata_wrapper:
+
+Dynamic metadata object API
+---------------------------
+
+get()
+^^^^^
+
+.. code-block:: lua
+
+  dynamicMetadata:get(filterName)
+
+  -- to get a value from a returned table.
+  dynamicMetadata:get(filterName)[key]
+
+Gets an entry in dynamic metadata struct. *filterName* is a string that supplies the filter name, e.g. *envoy.lb*.
+Returns the corresponding *table* of a given *filterName*.
+
+set()
+^^^^^
+
+.. code-block:: lua
+
+  dynamicMetadata:set(filterName, key, value)
+
+Sets key-value pair of a *filterName*'s metadata. *filterName* is a key specifying the target filter name,
+e.g. *envoy.lb*. The type of *key* and *value* is *string*.
+
+__pairs()
+^^^^^^^^^
+
+.. code-block:: lua
+
+  for key, value in pairs(dynamicMetadata) do
+  end
+
+Iterates through every *dynamicMetadata* entry. *key* is a string that supplies a *dynamicMetadata*
+key. *value* is *dynamicMetadata* entry value.
 
 .. _config_http_filters_lua_connection_wrapper:
 

@@ -7,8 +7,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::_;
+using testing::Invoke;
 
 namespace Envoy {
 namespace Extensions {
@@ -50,7 +50,7 @@ bool operator==(const RespValue& lhs, const RespValue& rhs) {
   }
   }
 
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 MockEncoder::MockEncoder() {

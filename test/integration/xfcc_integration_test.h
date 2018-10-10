@@ -6,7 +6,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
+#include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -31,7 +31,8 @@ public:
   const std::string client_uri_san_ = "URI=spiffe://lyft.com/frontend-team";
   const std::string client_dns_san_ = "DNS=lyft.com;DNS=www.lyft.com";
 
-  XfccIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  XfccIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 
   void initialize() override;
   void createUpstreams() override;
@@ -56,7 +57,7 @@ private:
   Network::TransportSocketFactoryPtr client_tls_ssl_ctx_;
   Network::TransportSocketFactoryPtr client_mtls_ssl_ctx_;
   Network::TransportSocketFactoryPtr upstream_ssl_ctx_;
-  Secret::MockSecretManager secret_manager_;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 } // namespace Xfcc
 } // namespace Envoy

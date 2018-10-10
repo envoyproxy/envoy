@@ -22,7 +22,7 @@ Stats::SinkPtr DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& co
       Network::Address::resolveProtoAddress(sink_config.address());
   ENVOY_LOG(debug, "dog_statsd UDP ip address: {}", address->asString());
   return std::make_unique<Common::Statsd::UdpStatsdSink>(server.threadLocal(), std::move(address),
-                                                         true);
+                                                         true, sink_config.prefix());
 }
 
 ProtobufTypes::MessagePtr DogStatsdSinkFactory::createEmptyConfigProto() {
@@ -30,7 +30,7 @@ ProtobufTypes::MessagePtr DogStatsdSinkFactory::createEmptyConfigProto() {
       new envoy::config::metrics::v2::DogStatsdSink());
 }
 
-std::string DogStatsdSinkFactory::name() { return StatsSinkNames::get().DOG_STATSD; }
+std::string DogStatsdSinkFactory::name() { return StatsSinkNames::get().DogStatsd; }
 
 /**
  * Static registration for the this sink factory. @see RegisterFactory.

@@ -16,7 +16,7 @@ namespace RateLimitFilter {
 class RateLimitFilterConfig
     : public Common::FactoryBase<envoy::config::filter::http::rate_limit::v2::RateLimit> {
 public:
-  RateLimitFilterConfig() : FactoryBase(HttpFilterNames::get().RATE_LIMIT) {}
+  RateLimitFilterConfig() : FactoryBase(HttpFilterNames::get().RateLimit) {}
 
   Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string&,

@@ -2,23 +2,27 @@
 #include <memory>
 #include <sstream>
 
-#include "common/stats/stats_impl.h"
-
 #include "extensions/stat_sinks/hystrix/hystrix.h"
 
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
 #include "absl/strings/str_split.h"
+#include "circllhist.h"
+#include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
+using testing::ReturnPointee;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -92,6 +96,24 @@ public:
   NiceMock<Stats::MockCounter> retry_5xx_counter_;
   NiceMock<Stats::MockCounter> error_4xx_counter_;
   NiceMock<Stats::MockCounter> retry_4xx_counter_;
+};
+
+class HistogramWrapper {
+public:
+  HistogramWrapper() : histogram_(hist_alloc()) {}
+
+  ~HistogramWrapper() { hist_free(histogram_); }
+
+  const histogram_t* getHistogram() { return histogram_; }
+
+  void setHistogramValues(const std::vector<uint64_t>& values) {
+    for (uint64_t value : values) {
+      hist_insert_intscale(histogram_, value, 0, 1);
+    }
+  }
+
+private:
+  histogram_t* histogram_;
 };
 
 class HystrixSinkTest : public testing::Test {
@@ -430,6 +452,97 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   // Check that old values of test_cluster2 were deleted.
   validateResults(cluster_message_map[cluster2_name_], 0, 0, 0, 0, 0, window_size_);
 }
+
+TEST_F(HystrixSinkTest, HistogramTest) {
+  InSequence s;
+  std::vector<Stats::ParentHistogramSharedPtr> stored_histograms;
+
+  // Create histogram for the Hystrix sink to read.
+  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram->name_ = "cluster." + cluster1_name_ + ".upstream_rq_time";
+  const std::string tag_extracted_name = "cluster.upstream_rq_time";
+  ON_CALL(*histogram, tagExtractedName())
+      .WillByDefault(testing::ReturnRefOfCopy(tag_extracted_name));
+  std::vector<Stats::Tag> tags;
+  Stats::Tag tag = {
+      Config::TagNames::get().CLUSTER_NAME, // name_
+      cluster1_name_                        // value_
+  };
+  tags.emplace_back(tag);
+  ON_CALL(*histogram, tags()).WillByDefault(testing::ReturnRef(tags));
+
+  histogram->used_ = true;
+
+  // Init with data such that the quantile value is equal to the quantile.
+  std::vector<uint64_t> h1_interval_values;
+  for (size_t i = 0; i < 100; ++i) {
+    h1_interval_values.push_back(i);
+  }
+
+  HistogramWrapper hist1_interval;
+  hist1_interval.setHistogramValues(h1_interval_values);
+
+  Stats::HistogramStatisticsImpl h1_interval_statistics(hist1_interval.getHistogram());
+  ON_CALL(*histogram, intervalStatistics())
+      .WillByDefault(testing::ReturnRef(h1_interval_statistics));
+  stored_histograms.push_back(histogram);
+
+  ON_CALL(source_, cachedHistograms()).WillByDefault(ReturnPointee(&stored_histograms));
+
+  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+  // Register callback to sink.
+  sink_->registerConnection(&callbacks_);
+  sink_->flush(source_);
+
+  std::unordered_map<std::string, std::string> cluster_message_map =
+      buildClusterMap(buffer.toString());
+
+  Json::ObjectSharedPtr latency = Json::Factory::loadFromString(cluster_message_map[cluster1_name_])
+                                      ->getObject("latencyExecute");
+
+  // Data was added such that the value equals the quantile:
+  // "latencyExecute": {"99.5": 99.500000, "95": 95.000000, "90": 90.000000, "100": 100.000000, "0":
+  // 0.000000, "25": 25.000000, "99": 99.000000, "50": 50.000000, "75": 75.000000}.
+  for (const double quantile : hystrix_quantiles) {
+    EXPECT_EQ(quantile * 100, latency->getDouble(fmt::sprintf("%g", quantile * 100)));
+  }
+}
+
+TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
+  InSequence s;
+  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+  // Register callback to sink.
+  sink_->registerConnection(&callbacks_);
+
+  // This value doesn't matter in handlerHystrixEventStream
+  absl::string_view path_and_query;
+
+  Http::HeaderMapImpl response_headers;
+
+  NiceMock<Server::Configuration::MockAdminStream> admin_stream_mock;
+  NiceMock<Network::MockConnection> connection_mock;
+
+  auto addr_instance_ = Envoy::Network::Utility::parseInternetAddress("2.3.4.5", 123, false);
+
+  ON_CALL(admin_stream_mock, getDecoderFilterCallbacks()).WillByDefault(ReturnRef(callbacks_));
+  ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_mock));
+  ON_CALL(connection_mock, remoteAddress()).WillByDefault(ReturnRef(addr_instance_));
+
+  ASSERT_EQ(
+      sink_->handlerHystrixEventStream(path_and_query, response_headers, buffer, admin_stream_mock),
+      Http::Code::OK);
+
+  // Check that response_headers has been set correctly
+  EXPECT_EQ(response_headers.ContentType()->value(), "text/event-stream");
+  EXPECT_EQ(response_headers.CacheControl()->value(), "no-cache");
+  EXPECT_EQ(response_headers.Connection()->value(), "close");
+  EXPECT_EQ(response_headers.AccessControlAllowOrigin()->value(), "*");
+
+  std::string access_control_allow_headers =
+      std::string(response_headers.AccessControlAllowHeaders()->value().getStringView());
+  EXPECT_THAT(access_control_allow_headers, HasSubstr("Accept"));
+}
+
 } // namespace Hystrix
 } // namespace StatSinks
 } // namespace Extensions

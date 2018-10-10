@@ -40,7 +40,9 @@ envoy_cc_library(
             "inotify/watcher_impl.h",
         ],
     }),
-    external_deps = ["event"],
+    external_deps = [
+        "event",
+    ],
     strip_include_prefix = select({
         "@bazel_tools//tools/osx:darwin": "kqueue",
         "//conditions:default": "inotify",

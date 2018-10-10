@@ -6,7 +6,6 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/header_map.h"
-#include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/utility.h"
@@ -83,6 +82,8 @@ void ConnPoolImpl::createNewConnection() {
 
 ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_decoder,
                                                      ConnectionPool::Callbacks& callbacks) {
+  host_->cluster().stats().upstream_rq_total_.inc();
+  host_->stats().rq_total_.inc();
   if (!ready_clients_.empty()) {
     ready_clients_.front()->moveBetweenLists(ready_clients_, busy_clients_);
     ENVOY_CONN_LOG(debug, "using existing connection", *busy_clients_.front()->codec_client_);
@@ -145,6 +146,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       // The only time this happens is if we actually saw a connect failure.
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
+
       removed = client.removeFromList(busy_clients_);
 
       // Raw connect failures should never happen under normal circumstances. If we have an upstream
@@ -265,9 +267,7 @@ ConnPoolImpl::StreamWrapper::StreamWrapper(StreamDecoder& response_decoder, Acti
       StreamDecoderWrapper(response_decoder), parent_(parent) {
 
   StreamEncoderWrapper::inner_.getStream().addCallbacks(*this);
-  parent_.parent_.host_->cluster().stats().upstream_rq_total_.inc();
   parent_.parent_.host_->cluster().stats().upstream_rq_active_.inc();
-  parent_.parent_.host_->stats().rq_total_.inc();
   parent_.parent_.host_->stats().rq_active_.inc();
 }
 
@@ -312,8 +312,8 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
       remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()) {
 
-  parent_.conn_connect_ms_.reset(
-      new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_connect_ms_));
+  parent_.conn_connect_ms_.reset(new Stats::Timespan(
+      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem()));
   Upstream::Host::CreateConnectionData data =
       parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_);
   real_host_description_ = data.host_description_;
@@ -325,7 +325,8 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.host_->cluster().stats().upstream_cx_http1_total_.inc();
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();
-  conn_length_.reset(new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_length_ms_));
+  conn_length_.reset(new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_length_ms_,
+                                         parent_.dispatcher_.timeSystem()));
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
 
@@ -334,7 +335,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
        parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
        parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
        parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_,
-       &parent_.host_->cluster().stats().bind_errors_});
+       &parent_.host_->cluster().stats().bind_errors_, nullptr});
 }
 
 ConnPoolImpl::ActiveClient::~ActiveClient() {

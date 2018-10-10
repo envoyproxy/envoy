@@ -13,9 +13,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Router {
@@ -25,6 +25,11 @@ public:
   RouterRetryStateImplTest() : callback_([this]() -> void { callback_ready_.ready(); }) {
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.use_retry", 100))
         .WillByDefault(Return(true));
+  }
+
+  void setup() {
+    Http::TestHeaderMapImpl headers;
+    setup(headers);
   }
 
   void setup(Http::HeaderMap& request_headers) {
@@ -37,7 +42,7 @@ public:
     EXPECT_CALL(*retry_timer_, enableTimer(_));
   }
 
-  TestRetryPolicy policy_;
+  NiceMock<TestRetryPolicy> policy_;
   NiceMock<Upstream::MockClusterInfo> cluster_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
@@ -391,6 +396,15 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
 
   EXPECT_EQ(3UL, cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_success_.value());
+}
+
+TEST_F(RouterRetryStateImplTest, HostSelectionAttempts) {
+  policy_.host_selection_max_attempts_ = 2;
+  policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+
+  setup();
+
+  EXPECT_EQ(2, state_->hostSelectionMaxAttempts());
 }
 
 TEST_F(RouterRetryStateImplTest, Cancel) {

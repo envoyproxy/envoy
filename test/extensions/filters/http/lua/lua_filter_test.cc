@@ -1,5 +1,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/http/message_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "extensions/filters/http/lua/lua_filter.h"
 
@@ -13,6 +14,7 @@
 
 #include "gmock/gmock.h"
 
+using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
@@ -20,7 +22,6 @@ using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::StrEq;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -65,6 +66,10 @@ public:
 
   void setup(const std::string& lua_code) {
     config_.reset(new FilterConfig(lua_code, tls_, cluster_manager_));
+    setupFilter();
+  }
+
+  void setupFilter() {
     filter_.reset(new TestFilter(config_));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -90,7 +95,7 @@ public:
   envoy::api::v2::core::Metadata metadata_;
   NiceMock<Envoy::Ssl::MockConnection> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info_;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -1223,6 +1228,8 @@ TEST_F(LuaHttpFilterTest, HttpCallInvalidHeaders) {
 }
 
 // Respond right away.
+// This is also a regression test for https://github.com/envoyproxy/envoy/issues/3570 which runs
+// the request flow 2000 times and does a GC at the end to make sure we don't leak memory.
 TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -1239,12 +1246,31 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   InSequence s;
   setup(SCRIPT);
 
-  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
-  Http::TestHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
-  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers, false));
+  // Perform a GC and snap bytes currently used by the runtime.
+  config_->runtimeGC();
+  const uint64_t mem_use_at_start = config_->runtimeBytesUsed();
+
+  for (uint64_t i = 0; i < 2000; i++) {
+    Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+    Http::TestHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
+    EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers, false));
+    filter_->onDestroy();
+    setupFilter();
+  }
+
+  // Perform GC and compare bytes currently used by the runtime to the original value.
+  // NOTE: This value is not the same as the original value for reasons that I do not fully
+  //       understand. Depending on the number of requests tested, it increases incrementally, but
+  //       then goes down again at a certain point. There must be some type of interpreter caching
+  //       going on because I'm pretty certain this is not another leak. Because of this, we need
+  //       to do a soft comparison here. In my own testing, without a fix for #3570, the memory
+  //       usage after is at least 20x higher after 2000 iterations so we just check to see if it's
+  //       within 2x.
+  config_->runtimeGC();
+  EXPECT_TRUE(config_->runtimeBytesUsed() < mem_use_at_start * 2);
 }
 
 // Respond with bad status.
@@ -1476,19 +1502,47 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoLuaMetadata) {
 TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      request_handle:logTrace(request_handle:requestInfo():protocol())
+      request_handle:logTrace(request_handle:streamInfo():protocol())
     end
   )EOF"};
 
   InSequence s;
   setup(SCRIPT);
 
-  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillOnce(ReturnRef(request_info_));
-  EXPECT_CALL(request_info_, protocol()).WillOnce(Return(Http::Protocol::Http11));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, protocol()).WillOnce(Return(Http::Protocol::Http11));
 
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("HTTP/1.1")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Set and get stream info dynamic metadata.
+TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:streamInfo():dynamicMetadata():set("envoy.lb", "foo", "bar")
+      request_handle:logTrace(request_handle:streamInfo():dynamicMetadata():get("envoy.lb")["foo"])
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  DangerousDeprecatedTestTime test_time;
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time.timeSystem());
+  EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(1, stream_info.dynamicMetadata().filter_metadata_size());
+  EXPECT_EQ("bar", stream_info.dynamicMetadata()
+                       .filter_metadata()
+                       .at("envoy.lb")
+                       .fields()
+                       .at("foo")
+                       .string_value());
 }
 
 // Check the connection.

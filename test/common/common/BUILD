@@ -15,6 +15,15 @@ envoy_cc_test(
     srcs = ["backoff_strategy_test.cc"],
     deps = [
         "//source/common/common:backoff_lib",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "assert_test",
+    srcs = ["assert_test.cc"],
+    deps = [
+        "//source/common/common:assert_lib",
     ],
 )
 
@@ -31,6 +40,8 @@ envoy_cc_fuzz_test(
     name = "base64_fuzz_test",
     srcs = ["base64_fuzz_test.cc"],
     corpus = "base64_corpus",
+    # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
+    tags = ["no_fuzz"],
     deps = ["//source/common/common:base64_lib"],
 )
 
@@ -38,6 +49,8 @@ envoy_cc_fuzz_test(
     name = "utility_fuzz_test",
     srcs = ["utility_fuzz_test.cc"],
     corpus = "utility_corpus",
+    # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
+    tags = ["no_fuzz"],
     deps = ["//source/common/common:utility_lib"],
 )
 
@@ -101,6 +114,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/common:utility_lib",
+        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -132,7 +146,7 @@ envoy_cc_test(
     srcs = ["token_bucket_impl_test.cc"],
     deps = [
         "//source/common/common:token_bucket_impl_lib",
-        "//test/mocks:common_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -147,8 +161,10 @@ envoy_cc_test(
     name = "block_memory_hash_set_test",
     srcs = ["block_memory_hash_set_test.cc"],
     deps = [
+        "//include/envoy/stats:stats_interface",
         "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:hash_lib",
+        "//source/common/stats:stats_lib",
     ],
 )
 

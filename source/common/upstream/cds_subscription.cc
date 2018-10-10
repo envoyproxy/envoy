@@ -16,18 +16,10 @@ CdsSubscription::CdsSubscription(
     Config::SubscriptionStats stats, const envoy::api::v2::core::ConfigSource& cds_config,
     const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm,
     Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-    const LocalInfo::LocalInfo& local_info)
-    : RestApiFetcher(cm, cds_config.api_config_source().cluster_names()[0], dispatcher, random,
-                     Config::Utility::apiConfigSourceRefreshDelay(cds_config.api_config_source())),
-      local_info_(local_info), stats_(stats), eds_config_(eds_config) {
-  const auto& api_config_source = cds_config.api_config_source();
-  UNREFERENCED_PARAMETER(api_config_source);
-  // If we are building an CdsSubscription, the ConfigSource should be REST_LEGACY.
-  ASSERT(api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
-  // TODO(htuch): Add support for multiple clusters, #1170.
-  ASSERT(api_config_source.cluster_names().size() == 1);
-  ASSERT(api_config_source.has_refresh_delay());
-}
+    const LocalInfo::LocalInfo& local_info, const Stats::StatsOptions& stats_options)
+    : RestApiFetcher(cm, cds_config.api_config_source(), dispatcher, random),
+      local_info_(local_info), stats_(stats), eds_config_(eds_config),
+      stats_options_(stats_options) {}
 
 void CdsSubscription::createRequest(Http::Message& request) {
   ENVOY_LOG(debug, "cds: starting request");
@@ -35,6 +27,9 @@ void CdsSubscription::createRequest(Http::Message& request) {
   request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   request.headers().insertPath().value(
       fmt::format("/v1/clusters/{}/{}", local_info_.clusterName(), local_info_.nodeName()));
+  request.headers().insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
+  request.headers().insertContentLength().value(size_t(0));
 }
 
 void CdsSubscription::parseResponse(const Http::Message& response) {
@@ -46,7 +41,7 @@ void CdsSubscription::parseResponse(const Http::Message& response) {
 
   Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> resources;
   for (const Json::ObjectSharedPtr& cluster : clusters) {
-    Config::CdsJson::translateCluster(*cluster, eds_config_, *resources.Add());
+    Config::CdsJson::translateCluster(*cluster, eds_config_, *resources.Add(), stats_options_);
   }
 
   std::pair<std::string, uint64_t> hash =
@@ -60,10 +55,11 @@ void CdsSubscription::onFetchComplete() {}
 
 void CdsSubscription::onFetchFailure(const EnvoyException* e) {
   callbacks_->onConfigUpdateFailed(e);
-  stats_.update_failure_.inc();
   if (e) {
+    stats_.update_rejected_.inc();
     ENVOY_LOG(warn, "cds: fetch failure: {}", e->what());
   } else {
+    stats_.update_failure_.inc();
     ENVOY_LOG(debug, "cds: fetch failure: network error");
   }
 }

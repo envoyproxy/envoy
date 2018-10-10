@@ -4,6 +4,8 @@
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 
+#include "source/common/ratelimit/ratelimit.pb.h"
+
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 
@@ -22,24 +24,36 @@ public:
   ~RatelimitGrpcClientIntegrationParamTest() {}
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
-  bool useDataPlaneProto() const { return std::get<2>(GetParam()); }
+  bool useDataPlaneProto() const {
+    // Force link time dependency on deprecated message type.
+    pb::lyft::ratelimit::RateLimit _ignore;
+    return std::get<2>(GetParam());
+  }
 };
 
 class RatelimitIntegrationTest : public HttpIntegrationTest,
                                  public RatelimitGrpcClientIntegrationParamTest {
 public:
-  RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  RatelimitIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
 
   void SetUp() override { initialize(); }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
   void initialize() override {
-    config_helper_.addFilter(
-        "{ name: envoy.rate_limit, config: { domain: some_domain, timeout: 0.5s } }");
+    if (failure_mode_deny_) {
+      config_helper_.addFilter("{ name: envoy.rate_limit, config: { domain: some_domain, "
+                               "failure_mode_deny: true, timeout: 0.5s } }");
+
+    } else {
+      config_helper_.addFilter(
+          "{ name: envoy.rate_limit, config: { domain: some_domain, timeout: 0.5s } }");
+    }
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -74,11 +88,16 @@ public:
   }
 
   void waitForRatelimitRequest() {
-    fake_ratelimit_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-    ratelimit_request_ = fake_ratelimit_connection_->waitForNewStream(*dispatcher_);
+    AssertionResult result =
+        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_ratelimit_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_ratelimit_connection_->waitForNewStream(*dispatcher_, ratelimit_request_);
+    RELEASE_ASSERT(result, result.message());
     envoy::service::ratelimit::v2::RateLimitRequest request_msg;
-    ratelimit_request_->waitForGrpcMessage(*dispatcher_, request_msg);
-    ratelimit_request_->waitForEndStream(*dispatcher_);
+    result = ratelimit_request_->waitForGrpcMessage(*dispatcher_, request_msg);
+    RELEASE_ASSERT(result, result.message());
+    result = ratelimit_request_->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
     EXPECT_STREQ("POST", ratelimit_request_->headers().Method()->value().c_str());
     if (useDataPlaneProto()) {
       EXPECT_STREQ("/envoy.service.ratelimit.v2.RateLimitService/ShouldRateLimit",
@@ -98,9 +117,13 @@ public:
   }
 
   void waitForSuccessfulUpstreamResponse() {
-    fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-    upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
-    upstream_request_->waitForEndStream(*dispatcher_);
+    AssertionResult result =
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+    RELEASE_ASSERT(result, result.message());
+    result = upstream_request_->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
 
     upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
     upstream_request_->encodeData(response_size_, true);
@@ -121,24 +144,38 @@ public:
                  response_->headers().Status()->value().c_str());
   }
 
-  void sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code code) {
+  void sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code code,
+                             const Http::HeaderMapImpl& headers) {
     ratelimit_request_->startGrpcStream();
     envoy::service::ratelimit::v2::RateLimitResponse response_msg;
     response_msg.set_overall_code(code);
+
+    headers.iterate(
+        [](const Http::HeaderEntry& h, void* context) -> Http::HeaderMap::Iterate {
+          auto header = static_cast<envoy::service::ratelimit::v2::RateLimitResponse*>(context)
+                            ->mutable_headers()
+                            ->Add();
+          header->set_key(h.key().c_str());
+          header->set_value(h.value().c_str());
+          return Http::HeaderMap::Iterate::Continue;
+        },
+        &response_msg);
+
     ratelimit_request_->sendGrpcMessage(response_msg);
     ratelimit_request_->finishGrpcStream(Grpc::Status::Ok);
   }
 
   void cleanup() {
-    codec_client_->close();
     if (fake_ratelimit_connection_ != nullptr) {
-      fake_ratelimit_connection_->close();
-      fake_ratelimit_connection_->waitForDisconnect();
+      if (clientType() != Grpc::ClientType::GoogleGrpc) {
+        // TODO(htuch) we should document the underlying cause of this difference and/or fix it.
+        AssertionResult result = fake_ratelimit_connection_->close();
+        RELEASE_ASSERT(result, result.message());
+      }
+      AssertionResult result = fake_ratelimit_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
-    if (fake_upstream_connection_ != nullptr) {
-      fake_upstream_connection_->close();
-      fake_upstream_connection_->waitForDisconnect();
-    }
+    cleanupUpstreamAndDownstream();
   }
 
   FakeHttpConnectionPtr fake_ratelimit_connection_;
@@ -147,16 +184,51 @@ public:
 
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;
+  bool failure_mode_deny_ = false;
+};
+
+// Test that verifies failure mode cases.
+class RatelimitFailureModeIntegrationTest : public RatelimitIntegrationTest {
+public:
+  RatelimitFailureModeIntegrationTest() { failure_mode_deny_ = true; }
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, RatelimitIntegrationTest,
+                        RATELIMIT_GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_CASE_P(IpVersionsClientType, RatelimitFailureModeIntegrationTest,
                         RATELIMIT_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(RatelimitIntegrationTest, Ok) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK);
+  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK,
+                        Http::HeaderMapImpl{});
   waitForSuccessfulUpstreamResponse();
+  cleanup();
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+}
+
+TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
+  initiateClientConnection();
+  waitForRatelimitRequest();
+  Http::TestHeaderMapImpl ratelimit_headers{{"x-ratelimit-limit", "1000"},
+                                            {"x-ratelimit-remaining", "500"}};
+  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK,
+                        ratelimit_headers);
+  waitForSuccessfulUpstreamResponse();
+
+  ratelimit_headers.iterate(
+      [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
+        IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
+        Http::LowerCaseString lower_key{entry.key().c_str()};
+        EXPECT_STREQ(entry.value().c_str(), response->headers().get(lower_key)->value().c_str());
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      response_.get());
+
   cleanup();
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
@@ -167,8 +239,34 @@ TEST_P(RatelimitIntegrationTest, Ok) {
 TEST_P(RatelimitIntegrationTest, OverLimit) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT);
+  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT,
+                        Http::HeaderMapImpl{});
   waitForFailedUpstreamResponse(429);
+  cleanup();
+
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.over_limit")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+}
+
+TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
+  initiateClientConnection();
+  waitForRatelimitRequest();
+  Http::TestHeaderMapImpl ratelimit_headers{
+      {"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "0"}, {"retry-after", "33"}};
+  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT,
+                        ratelimit_headers);
+  waitForFailedUpstreamResponse(429);
+
+  ratelimit_headers.iterate(
+      [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
+        IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
+        Http::LowerCaseString lower_key{entry.key().c_str()};
+        EXPECT_STREQ(entry.value().c_str(), response->headers().get(lower_key)->value().c_str());
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      response_.get());
+
   cleanup();
 
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
@@ -187,6 +285,7 @@ TEST_P(RatelimitIntegrationTest, Error) {
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.error")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.failure_mode_allowed")->value());
 }
 
 TEST_P(RatelimitIntegrationTest, Timeout) {
@@ -205,7 +304,7 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
     EXPECT_EQ(1, test_server_->counter("grpc.ratelimit.streams_closed_4")->value());
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();
@@ -214,9 +313,9 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
 
 TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {
   initiateClientConnection();
-  fake_ratelimit_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-  fake_ratelimit_connection_->close();
-  fake_ratelimit_connection_->waitForDisconnect(true);
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_ratelimit_connection_));
+  ASSERT_TRUE(fake_ratelimit_connection_->close());
+  ASSERT_TRUE(fake_ratelimit_connection_->waitForDisconnect(true));
   fake_ratelimit_connection_ = nullptr;
   // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();
@@ -224,11 +323,29 @@ TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {
 }
 
 TEST_P(RatelimitIntegrationTest, FailedConnect) {
-  fake_upstreams_[1].reset();
+  // Do not reset the fake upstream for the ratelimiter, but have it stop listening.
+  // If we reset, the Envoy will continue to send H2 to the original rate limiter port, which may
+  // be used by another test, and data sent to that port "unexpectedly" will cause problems for
+  // that test.
+  fake_upstreams_[1]->cleanUp();
   initiateClientConnection();
   // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();
   cleanup();
+}
+
+TEST_P(RatelimitFailureModeIntegrationTest, ErrorWithFailureModeOff) {
+  initiateClientConnection();
+  waitForRatelimitRequest();
+  ratelimit_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
+  // Rate limiter fail closed
+  waitForFailedUpstreamResponse(500);
+  cleanup();
+
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.error")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.failure_mode_allowed"));
 }
 
 } // namespace

@@ -5,7 +5,6 @@ TARGET_RECIPES = {
     "ares": "cares",
     "benchmark": "benchmark",
     "event": "libevent",
-    "event_pthreads": "libevent",
     "tcmalloc_and_profiler": "gperftools",
     "luajit": "luajit",
     "nghttp2": "nghttp2",

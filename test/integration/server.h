@@ -7,17 +7,19 @@
 #include <string>
 
 #include "envoy/server/options.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 
 #include "server/server.h"
 #include "server/test_hooks.h"
 
 #include "test/integration/server_stats.h"
+#include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -49,8 +51,12 @@ public:
     return local_address_ip_version_;
   }
   std::chrono::seconds drainTime() const override { return std::chrono::seconds(1); }
-  spdlog::level::level_enum logLevel() const override { NOT_IMPLEMENTED; }
-  const std::string& logFormat() const override { NOT_IMPLEMENTED; }
+  spdlog::level::level_enum logLevel() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
+  componentLogLevels() const override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  const std::string& logFormat() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   std::chrono::seconds parentShutdownTime() const override { return std::chrono::seconds(2); }
   const std::string& logPath() const override { return log_path_; }
   uint64_t restartEpoch() const override { return 0; }
@@ -62,7 +68,7 @@ public:
   const std::string& serviceNodeName() const override { return service_node_name_; }
   const std::string& serviceZone() const override { return service_zone_; }
   uint64_t maxStats() const override { return 16384; }
-  uint64_t maxObjNameLength() const override { return 60; }
+  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
   bool hotRestartDisabled() const override { return false; }
 
   // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
@@ -76,6 +82,7 @@ private:
   const std::string service_cluster_name_;
   const std::string service_node_name_;
   const std::string service_zone_;
+  Stats::StatsOptionsImpl stats_options_;
   const std::string log_path_;
 };
 
@@ -138,9 +145,12 @@ public:
     return wrapped_scope_->histogram(name);
   }
 
+  const StatsOptions& statsOptions() const override { return stats_options_; }
+
 private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
+  StatsOptionsImpl stats_options_;
 };
 
 /**
@@ -168,6 +178,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
   }
+  const StatsOptions& statsOptions() const override { return stats_options_; }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override {
@@ -196,6 +207,7 @@ private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
   SourceImpl source_;
+  StatsOptionsImpl stats_options_;
 };
 
 } // namespace Stats
@@ -214,12 +226,12 @@ public:
   static IntegrationTestServerPtr create(const std::string& config_path,
                                          const Network::Address::IpVersion version,
                                          std::function<void()> pre_worker_start_test_steps,
-                                         bool deterministic);
+                                         bool deterministic, Event::TestTimeSystem& time_system);
   ~IntegrationTestServer();
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
   Server::InstanceImpl& server() {
-    RELEASE_ASSERT(server_ != nullptr);
+    RELEASE_ASSERT(server_ != nullptr, "");
     return *server_;
   }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
@@ -230,23 +242,22 @@ public:
   }
   void start(const Network::Address::IpVersion version,
              std::function<void()> pre_worker_start_test_steps, bool deterministic);
-  void start();
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
     while (counter(name) == nullptr || counter(name)->value() < value) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      time_system_.sleep(std::chrono::milliseconds(10));
     }
   }
 
   void waitForGaugeGe(const std::string& name, uint64_t value) override {
     while (gauge(name) == nullptr || gauge(name)->value() < value) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      time_system_.sleep(std::chrono::milliseconds(10));
     }
   }
 
   void waitForGaugeEq(const std::string& name, uint64_t value) override {
     while (gauge(name) == nullptr || gauge(name)->value() != value) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      time_system_.sleep(std::chrono::milliseconds(10));
     }
   }
 
@@ -281,7 +292,8 @@ public:
   }
 
 protected:
-  IntegrationTestServer(const std::string& config_path) : config_path_(config_path) {}
+  IntegrationTestServer(Event::TestTimeSystem& time_system, const std::string& config_path)
+      : time_system_(time_system), config_path_(config_path) {}
 
 private:
   /**
@@ -289,6 +301,7 @@ private:
    */
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic);
 
+  Event::TestTimeSystem& time_system_;
   const std::string config_path_;
   Thread::ThreadPtr thread_;
   Thread::CondVar listeners_cv_;
@@ -300,6 +313,7 @@ private:
   Stats::Store* stat_store_{};
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
+  Network::Address::InstanceConstSharedPtr admin_address_;
 };
 
 } // namespace Envoy

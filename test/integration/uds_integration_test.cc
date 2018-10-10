@@ -54,7 +54,7 @@ void UdsListenerIntegrationTest::initialize() {
     admin_addr->mutable_pipe()->set_path(getAdminSocketName());
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
-    RELEASE_ASSERT(listeners->size() > 0);
+    RELEASE_ASSERT(listeners->size() > 0, "");
     auto filter_chains = listeners->Get(0).filter_chains();
     listeners->Clear();
     auto* listener = listeners->Add();

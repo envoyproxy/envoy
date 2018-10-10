@@ -17,6 +17,9 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/admin.h"
+#include "envoy/ssl/context_manager.h"
+#include "envoy/stats/store.h"
+#include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
@@ -119,6 +122,18 @@ public:
                                                                  ResourcePriority priority,
                                                                  Http::Protocol protocol,
                                                                  LoadBalancerContext* context) PURE;
+
+  /**
+   * Allocate a load balanced TCP connection pool for a cluster. This is *per-thread* so that
+   * callers do not need to worry about per thread synchronization. The load balancing policy that
+   * is used is the one defined on the cluster when it was created.
+   *
+   * Can return nullptr if there is no host available in the cluster or if the cluster does not
+   * exist.
+   */
+  virtual Tcp::ConnectionPool::Instance* tcpConnPoolForCluster(const std::string& cluster,
+                                                               ResourcePriority priority,
+                                                               LoadBalancerContext* context) PURE;
 
   /**
    * Allocate a load balanced TCP connection for a cluster. The created connection is already
@@ -250,6 +265,15 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
 
   /**
+   * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and
+   * 'options->hashKey()', if any.
+   */
+  virtual Tcp::ConnectionPool::InstancePtr
+  allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                      ResourcePriority priority,
+                      const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
+
+  /**
    * Allocate a cluster from configuration proto.
    */
   virtual ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster,
@@ -269,6 +293,33 @@ public:
    * Returns the secret manager.
    */
   virtual Secret::SecretManager& secretManager() PURE;
+};
+
+/**
+ * Factory for creating ClusterInfo
+ */
+class ClusterInfoFactory {
+public:
+  virtual ~ClusterInfoFactory() {}
+
+  /**
+   * This method returns a Upstream::ClusterInfoConstSharedPtr
+   *
+   * @param runtime supplies the runtime loader.
+   * @param cluster supplies the owning cluster.
+   * @param bind_config supplies information on binding newly established connections.
+   * @param stats supplies a store for all known counters, gauges, and timers.
+   * @param ssl_context_manager supplies a manager for all SSL contexts.
+   * @param secret_manager supplies a manager for static secrets.
+   * @param added_via_api denotes whether this was added via API.
+   * @return Upstream::ClusterInfoConstSharedPtr
+   */
+  virtual Upstream::ClusterInfoConstSharedPtr
+  createClusterInfo(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
+                    const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
+                    Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+                    ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
+                    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random) PURE;
 };
 
 } // namespace Upstream

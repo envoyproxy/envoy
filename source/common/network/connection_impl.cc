@@ -52,7 +52,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       dispatcher_(dispatcher), id_(next_global_id_++) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
-  RELEASE_ASSERT(fd() != -1);
+  RELEASE_ASSERT(fd() != -1, "");
 
   if (!connected) {
     connecting_ = true;
@@ -68,7 +68,8 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 }
 
 ConnectionImpl::~ConnectionImpl() {
-  ASSERT(fd() == -1);
+  ASSERT(fd() == -1 && delayed_close_timer_ == nullptr,
+         "ConnectionImpl was unexpectedly torn down without being closed.");
 
   // In general we assume that owning code has called close() previously to the destructor being
   // run. This generally must be done so that callbacks run in the correct context (vs. deferred
@@ -106,10 +107,51 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
     closeSocket(ConnectionEvent::LocalClose);
   } else {
-    // TODO(mattklein123): We need a flush timer here. We might never get open socket window.
-    ASSERT(type == ConnectionCloseType::FlushWrite);
-    close_with_flush_ = true;
+    ASSERT(type == ConnectionCloseType::FlushWrite ||
+           type == ConnectionCloseType::FlushWriteAndDelay);
+
+    // No need to continue if a FlushWrite/FlushWriteAndDelay has already been issued and there is a
+    // pending delayed close.
+    //
+    // An example of this condition manifests when a downstream connection is closed early by Envoy,
+    // such as when a route can't be matched:
+    //   In ConnectionManagerImpl::onData()
+    //     1) Via codec_->dispatch(), a local reply with a 404 is sent to the client
+    //       a) ConnectionManagerImpl::doEndStream() issues the first connection close() via
+    //          ConnectionManagerImpl::checkForDeferredClose()
+    //     2) A second close is issued by a subsequent call to
+    //        ConnectionManagerImpl::checkForDeferredClose() prior to returning from onData()
+    if (delayed_close_) {
+      return;
+    }
+
+    delayed_close_ = true;
+    const bool delayed_close_timeout_set = delayedCloseTimeout().count() > 0;
+
+    // NOTE: the delayed close timeout (if set) affects both FlushWrite and FlushWriteAndDelay
+    // closes:
+    //   1. For FlushWrite, the timeout sets an upper bound on how long to wait for the flush to
+    //   complete before the connection is locally closed.
+    //   2. For FlushWriteAndDelay, the timeout specifies an upper bound on how long to wait for the
+    //   flush to complete and the peer to close the connection before it is locally closed.
+
+    // All close types that follow do not actually close() the socket immediately so that buffered
+    // data can be written. However, we do want to stop reading to apply TCP backpressure.
     read_enabled_ = false;
+
+    // Force a closeSocket() after the write buffer is flushed if the close_type calls for it or if
+    // no delayed close timeout is set.
+    close_after_flush_ = !delayed_close_timeout_set || type == ConnectionCloseType::FlushWrite;
+
+    // Create and activate a timer which will immediately close the connection if triggered.
+    // A config value of 0 disables the timeout.
+    if (delayed_close_timeout_set) {
+      delayed_close_timer_ = dispatcher_.createTimer([this]() -> void { onDelayedCloseTimeout(); });
+      ENVOY_CONN_LOG(debug, "setting delayed close timer with timeout {} ms", *this,
+                     delayedCloseTimeout().count());
+      delayed_close_timer_->enableTimer(delayedCloseTimeout());
+    }
+
     file_event_->setEnabled(Event::FileReadyType::Write |
                             (enable_half_close_ ? 0 : Event::FileReadyType::Closed));
   }
@@ -118,7 +160,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 Connection::State ConnectionImpl::state() const {
   if (fd() == -1) {
     return State::Closed;
-  } else if (close_with_flush_) {
+  } else if (delayed_close_) {
     return State::Closing;
   } else {
     return State::Open;
@@ -128,6 +170,12 @@ Connection::State ConnectionImpl::state() const {
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   if (fd() == -1) {
     return;
+  }
+
+  // No need for a delayed close (if pending) now that the socket is being closed.
+  if (delayed_close_timer_) {
+    delayed_close_timer_->disableTimer();
+    delayed_close_timer_ = nullptr;
   }
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
@@ -162,7 +210,7 @@ void ConnectionImpl::noDelay(bool enable) {
   sockaddr addr;
   socklen_t len = sizeof(addr);
   int rc = getsockname(fd(), &addr, &len);
-  RELEASE_ASSERT(rc == 0);
+  RELEASE_ASSERT(rc == 0, "");
 
   if (addr.sa_family == AF_UNIX) {
     return;
@@ -179,7 +227,7 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 #endif
 
-  RELEASE_ASSERT(0 == rc);
+  RELEASE_ASSERT(0 == rc, "");
 }
 
 uint64_t ConnectionImpl::id() const { return id_; }
@@ -234,7 +282,7 @@ void ConnectionImpl::readDisable(bool disable) {
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
   // back pressure at the kernel layer, but still get timely notification of a FIN. Note that
-  // we are not gaurenteed to get notified, so even if the remote has closed, we may not know
+  // we are not guaranteed to get notified, so even if the remote has closed, we may not know
   // until we try to write. Further note that currently we optionally don't correctly handle half
   // closed TCP connections in the sense that we assume that a remote FIN means the remote intends a
   // full close.
@@ -247,7 +295,7 @@ void ConnectionImpl::readDisable(bool disable) {
     read_enabled_ = false;
 
     // If half-close semantics are enabled, we never want early close notifications; we
-    // always want to read all avaiable data, even if the other side has closed.
+    // always want to read all available data, even if the other side has closed.
     if (detect_early_close_ && !enable_half_close_) {
       file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
     } else {
@@ -488,7 +536,7 @@ void ConnectionImpl::onWriteReady() {
     // write callback. This can happen if we manage to complete the SSL handshake in the write
     // callback, raise a connected event, and close the connection.
     closeSocket(ConnectionEvent::RemoteClose);
-  } else if ((close_with_flush_ && new_buffer_size == 0) || bothSidesHalfClosed()) {
+  } else if ((close_after_flush_ && new_buffer_size == 0) || bothSidesHalfClosed()) {
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     closeSocket(ConnectionEvent::LocalClose);
   } else if (result.action_ == PostIoAction::KeepOpen && result.bytes_processed_ > 0) {
@@ -504,7 +552,9 @@ void ConnectionImpl::onWriteReady() {
 }
 
 void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
-  ASSERT(!connection_stats_);
+  ASSERT(!connection_stats_,
+         "Two network filters are attempting to set connection stats. This indicates an issue "
+         "with the configured filter chain.");
   connection_stats_.reset(new ConnectionStats(stats));
 }
 
@@ -533,6 +583,14 @@ bool ConnectionImpl::bothSidesHalfClosed() {
   return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
 }
 
+void ConnectionImpl::onDelayedCloseTimeout() {
+  ENVOY_CONN_LOG(debug, "triggered delayed close", *this);
+  if (connection_stats_ != nullptr && connection_stats_->delayed_close_timeouts_ != nullptr) {
+    connection_stats_->delayed_close_timeouts_->inc();
+  }
+  closeSocket(ConnectionEvent::LocalClose);
+}
+
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,
@@ -540,47 +598,51 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
                      std::move(transport_socket), false) {
-  if (!Network::Socket::applyOptions(options, *socket_,
-                                     envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
-    // Set a special error state to ensure asynchronous close to give the owner of the
-    // ConnectionImpl a chance to add callbacks and detect the "disconnect".
-    immediate_error_event_ = ConnectionEvent::LocalClose;
-    // Trigger a write event to close this connection out-of-band.
-    file_event_->activate(Event::FileReadyType::Write);
-    return;
-  }
-
-  if (source_address != nullptr) {
-    const int rc = source_address->bind(fd());
-    if (rc < 0) {
-      ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
-                     strerror(errno));
-      bind_error_ = true;
+  // There are no meaningful socket options or source address semantics for
+  // non-IP sockets, so skip.
+  if (remote_address->ip() != nullptr) {
+    if (!Network::Socket::applyOptions(options, *socket_,
+                                       envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect".
       immediate_error_event_ = ConnectionEvent::LocalClose;
-
       // Trigger a write event to close this connection out-of-band.
       file_event_->activate(Event::FileReadyType::Write);
+      return;
+    }
+
+    if (source_address != nullptr) {
+      const Api::SysCallIntResult result = source_address->bind(fd());
+      if (result.rc_ < 0) {
+        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
+                       strerror(result.errno_));
+        bind_error_ = true;
+        // Set a special error state to ensure asynchronous close to give the owner of the
+        // ConnectionImpl a chance to add callbacks and detect the "disconnect".
+        immediate_error_event_ = ConnectionEvent::LocalClose;
+
+        // Trigger a write event to close this connection out-of-band.
+        file_event_->activate(Event::FileReadyType::Write);
+      }
     }
   }
 }
 
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
-  const int rc = socket_->remoteAddress()->connect(fd());
-  if (rc == 0) {
+  const Api::SysCallIntResult result = socket_->remoteAddress()->connect(fd());
+  if (result.rc_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
   } else {
-    ASSERT(rc == -1);
-    if (errno == EINPROGRESS) {
+    ASSERT(result.rc_ == -1);
+    if (result.errno_ == EINPROGRESS) {
       ASSERT(connecting_);
       ENVOY_CONN_LOG(debug, "connection in progress", *this);
     } else {
       immediate_error_event_ = ConnectionEvent::RemoteClose;
       connecting_ = false;
-      ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
+      ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, result.errno_);
 
       // Trigger a write event. This is needed on OSX and seems harmless on Linux.
       file_event_->activate(Event::FileReadyType::Write);

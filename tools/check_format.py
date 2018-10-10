@@ -13,15 +13,35 @@ import traceback
 
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/",
                      "./bazel-", "./bazel/external", "./.cache",
+                     "./source/extensions/extensions_build_config.bzl",
                      "./tools/testdata/check_format/")
-SUFFIXES = (".cc", ".h", "BUILD", ".md", ".rst", ".proto")
+SUFFIXES = (".cc", ".h", "BUILD", ".bzl", ".md", ".rst", ".proto")
 DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
 
 # Files in these paths can make reference to protobuf stuff directly
-GOOGLE_PROTOBUF_WHITELIST = ('ci/prebuilt', 'source/common/protobuf', 'api/test')
+GOOGLE_PROTOBUF_WHITELIST = ("ci/prebuilt", "source/common/protobuf", "api/test")
+REPOSITORIES_BZL = "bazel/repositories.bzl"
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-5.0")
+# Files matching these exact names can reference real-world time. These include the class
+# definitions for real-world time, the construction of them in main(), and perf annotation.
+# For now it includes the validation server but that really should be injected too.
+REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
+                       './source/common/event/real_time_system.cc',
+                       './source/common/event/real_time_system.h',
+                       './source/exe/main_common.cc',
+                       './source/exe/main_common.h',
+                       './source/server/config_validation/server.cc',
+                       './source/common/common/perf_annotation.h',
+                       './test/test_common/simulated_time_system.cc',
+                       './test/test_common/simulated_time_system.h',
+                       './test/test_common/test_time.cc',
+                       './test/test_common/test_time.h',
+                       './test/test_common/utility.cc',
+                       './test/test_common/utility.h',
+                       './test/integration/integration.h')
+
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-7")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
@@ -60,8 +80,14 @@ def checkNamespace(file_path):
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
 def whitelistedForProtobufDeps(file_path):
-  return (file_path.endswith(PROTO_SUFFIX) or
+  return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL) or \
           any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_WHITELIST))
+
+# Real-world time sources should not be instantiated in the source, except for a few
+# specific cases. They should be passed down from where they are instantied to where
+# they need to be used, e.g. through the ServerInstance, Dispatcher, or ClusterManager.
+def whitelistedForRealTime(file_path):
+  return file_path in REAL_TIME_WHITELIST
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
@@ -82,6 +108,9 @@ def isBuildFile(file_path):
   if basename in {"BUILD", "BUILD.bazel"} or basename.endswith(".BUILD"):
     return True
   return False
+
+def isSkylarkFile(file_path):
+  return file_path.endswith(".bzl")
 
 def hasInvalidAngleBracketDirectory(line):
   if not line.startswith(INCLUDE_ANGLE):
@@ -117,6 +146,21 @@ def fixSourceLine(line):
 
   return line
 
+# We want to look for a call to condvar.waitFor, but there's no strong pattern
+# to the variable name of the condvar. If we just look for ".waitFor" we'll also
+# pick up time_system_.waitFor(...), and we don't want to return true for that
+# pattern. But in that case there is a strong pattern of using time_system in
+# various spellings as the variable name.
+def hasCondVarWaitFor(line):
+  wait_for = line.find('.waitFor(')
+  if wait_for == -1:
+    return False
+  preceding = line[0:wait_for]
+  if preceding.endswith('time_system') or preceding.endswith('timeSystem()') or \
+     preceding.endswith('time_system_'):
+    return False
+  return True
+
 def checkSourceLine(line, file_path, reportError):
   # Check fixable errors. These may have been fixed already.
   if line.find(".  ") != -1:
@@ -140,41 +184,53 @@ def checkSourceLine(line, file_path, reportError):
     # comments, for example this one.
     reportError("Don't use <mutex> or <condition_variable*>, switch to "
                 "Thread::MutexBasicLockable in source/common/common/thread.h")
+  if line.startswith('#include <shared_mutex>'):
+    # We don't check here for std::shared_timed_mutex because that may
+    # legitimately show up in comments, for example this one.
+    reportError("Don't use <shared_mutex>, use absl::Mutex for reader/writer locks.")
+  if not whitelistedForRealTime(file_path) and not 'NO_CHECK_FORMAT(real_time)' in line:
+    if 'RealTimeSource' in line or 'RealTimeSystem' in line or \
+       'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line or \
+       'std::this_thread::sleep_for' in line or hasCondVarWaitFor(line):
+      reportError("Don't reference real-world time sources from production code; use injection")
+  if 'std::atomic_' in line:
+    # The std::atomic_* free functions are functionally equivalent to calling
+    # operations on std::atomic<T> objects, so prefer to use that instead.
+    reportError("Don't use free std::atomic_* functions, use std::atomic<T> members instead.")
 
 def checkBuildLine(line, file_path, reportError):
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
-  if envoy_build_rule_check and '@envoy//' in line:
+  if envoy_build_rule_check and not isSkylarkFile(file_path) and '@envoy//' in line:
     reportError("Superfluous '@envoy//' prefix")
 
-def fixBuildLine(line):
-  if envoy_build_rule_check:
+def fixBuildLine(line, file_path):
+  if envoy_build_rule_check and not isSkylarkFile(file_path):
     line = line.replace('@envoy//', '//')
   return line
 
 def fixBuildPath(file_path):
   for line in fileinput.input(file_path, inplace=True):
-    sys.stdout.write(fixBuildLine(line))
+    sys.stdout.write(fixBuildLine(line, file_path))
 
   error_messages = []
   # TODO(htuch): Add API specific BUILD fixer script.
-  if not isApiFile(file_path):
-    if os.system(
-        "%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
+  if not isApiFile(file_path) and not isSkylarkFile(file_path):
+    if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
-    if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
-      error_messages += ["buildifier rewrite failed for file: %s" % file_path]
+
+  if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
+    error_messages += ["buildifier rewrite failed for file: %s" % file_path]
   return error_messages
 
 def checkBuildPath(file_path):
   error_messages = []
-  if not isApiFile(file_path):
+  if not isApiFile(file_path) and not isSkylarkFile(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
-    error_messages += executeCommand(
-        command, "envoy_build_fixer check failed", file_path)
+    error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
 
-  command = "cat %s | %s -mode=fix | diff %s -" % (file_path, BUILDIFIER_PATH, file_path)
+  command = "%s -mode=diff %s" % (BUILDIFIER_PATH, file_path)
   error_messages += executeCommand(command, "buildifier check failed", file_path)
   error_messages += checkFileContents(file_path, checkBuildLine)
   return error_messages
@@ -184,18 +240,20 @@ def fixSourcePath(file_path):
     sys.stdout.write(fixSourceLine(line))
 
   error_messages = []
-  if not file_path.endswith(DOCS_SUFFIX) and not file_path.endswith(PROTO_SUFFIX):
-    error_messages += fixHeaderOrder(file_path)
+  if not file_path.endswith(DOCS_SUFFIX):
+    if not file_path.endswith(PROTO_SUFFIX):
+      error_messages += fixHeaderOrder(file_path)
     error_messages += clangFormat(file_path)
   return error_messages
 
 def checkSourcePath(file_path):
   error_messages = checkFileContents(file_path, checkSourceLine)
 
-  if not file_path.endswith(DOCS_SUFFIX) and not file_path.endswith(PROTO_SUFFIX):
-    error_messages += checkNamespace(file_path)
-    command = ("%s %s | diff %s -" % (HEADER_ORDER_PATH, file_path, file_path))
-    error_messages += executeCommand(command, "header_order.py check failed", file_path)
+  if not file_path.endswith(DOCS_SUFFIX):
+    if not file_path.endswith(PROTO_SUFFIX):
+      error_messages += checkNamespace(file_path)
+      command = ("%s %s | diff %s -" % (HEADER_ORDER_PATH, file_path, file_path))
+      error_messages += executeCommand(command, "header_order.py check failed", file_path)
     command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
     error_messages += executeCommand(command, "clang-format check failed", file_path)
 
@@ -245,7 +303,7 @@ def checkFormat(file_path):
   # Apply fixes first, if asked, and then run checks. If we wind up attempting to fix
   # an issue, but there's still an error, that's a problem.
   try_to_fix = operation_type == "fix"
-  if isBuildFile(file_path):
+  if isBuildFile(file_path) or isSkylarkFile(file_path):
     if try_to_fix:
       error_messages += fixBuildPath(file_path)
     error_messages += checkBuildPath(file_path)

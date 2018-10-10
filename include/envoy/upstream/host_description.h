@@ -53,9 +53,19 @@ public:
   virtual bool canary() const PURE;
 
   /**
+   * Update the canary status of the host.
+   */
+  virtual void canary(bool is_canary) PURE;
+
+  /**
    * @return the metadata associated with this host
    */
-  virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
+  virtual const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const PURE;
+
+  /**
+   * Set the current metadata.
+   */
+  virtual void metadata(const envoy::api::v2::core::Metadata& new_metadata) PURE;
 
   /**
    * @return the cluster the host is a member of.
@@ -98,9 +108,24 @@ public:
    * @return the address used to health check the host.
    */
   virtual Network::Address::InstanceConstSharedPtr healthCheckAddress() const PURE;
+
+  /**
+   * Set the address used to health check the host.
+   */
+  virtual void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr) PURE;
+
+  /**
+   * @return the priority of the host.
+   */
+  virtual uint32_t priority() const PURE;
+
+  /**
+   * Set the current priority.
+   */
+  virtual void priority(uint32_t) PURE;
 };
 
 typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
 
-} // Upstream
+} // namespace Upstream
 } // namespace Envoy

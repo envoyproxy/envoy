@@ -3,7 +3,7 @@ FROM envoyproxy/envoy:latest
 RUN apt-get update
 RUN apt-get -q install -y python-dev \
     python-pip
-RUN pip install -q grpcio requests
+RUN pip install -q grpcio protobuf requests
 ADD ./client /client
 RUN chmod a+x /client/client.py
 RUN mkdir /var/log/envoy/

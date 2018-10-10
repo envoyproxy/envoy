@@ -43,8 +43,15 @@ public:
    * @param json_config supplies the general json configuration for the HttpTracer
    * @param server supplies the server instance
    */
-  virtual Tracing::HttpTracerPtr createHttpTracer(const Json::Object& json_config,
-                                                  Instance& server) PURE;
+  virtual Tracing::HttpTracerPtr
+  createHttpTracer(const envoy::config::trace::v2::Tracing& configuration, Instance& server) PURE;
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The tracing
+   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
+   *         JSON and then parsed into this empty proto.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * Returns the identifying name for a particular implementation of tracer produced by the

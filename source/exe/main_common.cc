@@ -7,7 +7,7 @@
 #include "common/common/perf_annotation.h"
 #include "common/event/libevent.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/thread_local_store.h"
 
 #include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"
@@ -16,6 +16,8 @@
 #include "server/proto_descriptors.h"
 #include "server/server.h"
 #include "server/test_hooks.h"
+
+#include "absl/strings/str_split.h"
 
 #ifdef ENVOY_HOT_RESTART
 #include "server/hot_restart_impl.h"
@@ -41,9 +43,8 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
-  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
+  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
 
-  Stats::RawStatData::configure(options_);
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
   case Server::Mode::Serve: {
@@ -60,22 +61,37 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    Logger::Registry::initialize(options_.logLevel(), options_.logFormat(), log_lock);
+    logging_context_ =
+        std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(), log_lock);
 
-    stats_store_.reset(new Stats::ThreadLocalStoreImpl(restarter_->statsAllocator()));
-    server_.reset(new Server::InstanceImpl(
-        options_, local_address, default_test_hooks_, *restarter_, *stats_store_, access_log_lock,
-        component_factory_, std::make_unique<Runtime::RandomGeneratorImpl>(), *tls_));
+    configureComponentLogLevels();
+
+    stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
+                                                                 restarter_->statsAllocator());
+
+    server_ = std::make_unique<Server::InstanceImpl>(
+        options_, time_system_, local_address, default_test_hooks_, *restarter_, *stats_store_,
+        access_log_lock, component_factory_, std::make_unique<Runtime::RandomGeneratorImpl>(),
+        *tls_);
     break;
   }
   case Server::Mode::Validate:
     restarter_.reset(new Server::HotRestartNopImpl());
-    Logger::Registry::initialize(options_.logLevel(), options_.logFormat(), restarter_->logLock());
+    logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
+                                                         restarter_->logLock());
     break;
   }
 }
 
 MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
+
+void MainCommonBase::configureComponentLogLevels() {
+  for (auto& component_log_level : options_.componentLogLevels()) {
+    Logger::Logger* logger_to_change = Logger::Registry::logger(component_log_level.first);
+    ASSERT(logger_to_change);
+    logger_to_change->setLevel(component_log_level.second);
+  }
+}
 
 bool MainCommonBase::run() {
   switch (options_.mode()) {
@@ -90,7 +106,19 @@ bool MainCommonBase::run() {
     PERF_DUMP();
     return true;
   }
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string_view method,
+                                  const AdminRequestFn& handler) {
+  std::string path_and_query_buf = std::string(path_and_query);
+  std::string method_buf = std::string(method);
+  server_->dispatcher().post([this, path_and_query_buf, method_buf, handler]() {
+    Http::HeaderMapImpl response_headers;
+    std::string body;
+    server_->admin().request(path_and_query_buf, method_buf, response_headers, body);
+    handler(response_headers, body);
+  });
 }
 
 MainCommon::MainCommon(int argc, const char* const* argv)

@@ -15,10 +15,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -26,7 +26,7 @@ namespace StatSinks {
 namespace Hystrix {
 
 TEST(StatsConfigTest, ValidHystrixSink) {
-  const std::string name = StatsSinkNames::get().HYSTRIX;
+  const std::string name = StatsSinkNames::get().Hystrix;
 
   envoy::config::metrics::v2::HystrixSink sink_config;
 

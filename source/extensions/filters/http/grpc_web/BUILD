@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # L7 HTTP filter that implements the grpc-web protocol (https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-WEB.md)
 # Public docs: docs/root/configuration/http_filters/grpc_web_filter.rst
 

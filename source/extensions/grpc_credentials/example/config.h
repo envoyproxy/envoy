@@ -30,7 +30,7 @@ public:
   virtual std::shared_ptr<grpc::ChannelCredentials>
   getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config) override;
 
-  std::string name() const override { return GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE; }
+  std::string name() const override { return GrpcCredentialsNames::get().AccessTokenExample; }
 };
 
 /*

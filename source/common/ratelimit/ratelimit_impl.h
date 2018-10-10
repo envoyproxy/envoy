@@ -10,6 +10,7 @@
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/service/ratelimit/v2/rls.pb.h"
+#include "envoy/stats/scope.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -86,7 +87,7 @@ public:
   void cancel() override {}
   void limit(RequestCallbacks& callbacks, const std::string&, const std::vector<Descriptor>&,
              Tracing::Span&) override {
-    callbacks.complete(LimitStatus::OK);
+    callbacks.complete(LimitStatus::OK, nullptr);
   }
 };
 

@@ -30,7 +30,8 @@ public:
                                    should_weight ? weight : 1));
     }
     HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
-    host_set.updateHosts(updated_hosts, updated_hosts, nullptr, nullptr, {}, hosts, {});
+    host_set.updateHosts(updated_hosts, updated_hosts, nullptr, nullptr, {}, hosts, {},
+                         absl::nullopt);
   }
 
   PrioritySetImpl priority_set_;
@@ -97,13 +98,10 @@ BENCHMARK(BM_MaglevLoadBalancerBuildTable)
     ->Arg(500)
     ->Unit(benchmark::kMillisecond);
 
-class TestLoadBalancerContext : public LoadBalancerContext {
+class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
-  const Network::Connection* downstreamConnection() const override { return nullptr; }
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
   absl::optional<uint64_t> hash_key_;
 };
@@ -351,8 +349,8 @@ int main(int argc, char** argv) {
   // TODO(mattklein123): Provide a common bazel benchmark wrapper much like we do for normal tests,
   // fuzz, etc.
   Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Registry::initialize(spdlog::level::warn,
-                                      Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock);
+  Envoy::Logger::Context logging_context(spdlog::level::warn,
+                                         Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock);
 
   benchmark::Initialize(&argc, argv);
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {

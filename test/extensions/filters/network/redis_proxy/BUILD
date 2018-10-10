@@ -31,6 +31,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.redis_proxy",
     deps = [
         ":redis_mocks",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
         "//test/mocks:common_lib",

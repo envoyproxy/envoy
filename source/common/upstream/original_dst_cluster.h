@@ -6,6 +6,8 @@
 #include <unordered_map>
 
 #include "envoy/secret/secret_manager.h"
+#include "envoy/server/transport_socket_config.h"
+#include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/empty_string.h"
@@ -24,8 +26,8 @@ namespace Upstream {
 class OriginalDstCluster : public ClusterImplBase {
 public:
   OriginalDstCluster(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
-                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                     ClusterManager& cm, Event::Dispatcher& dispatcher, bool added_via_api);
+                     Server::Configuration::TransportSocketFactoryContext& factory_context,
+                     Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -43,7 +45,8 @@ public:
    */
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
-    LoadBalancer(PrioritySet& priority_set, ClusterSharedPtr& parent);
+    LoadBalancer(PrioritySet& priority_set, ClusterSharedPtr& parent,
+                 const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>& config);
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -97,6 +100,7 @@ public:
     PrioritySet& priority_set_;                // Thread local priority set.
     std::weak_ptr<OriginalDstCluster> parent_; // Primary cluster managed by the main thread.
     ClusterInfoConstSharedPtr info_;
+    const bool use_http_header_;
     HostMap host_map_;
   };
 

@@ -42,6 +42,13 @@ private:
 
 class MetadataMapWrapper;
 
+struct MetadataMapHelper {
+  static void setValue(lua_State* state, const ProtobufWkt::Value& value);
+  static void
+  createTable(lua_State* state,
+              const Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Value>& fields);
+};
+
 /**
  * Iterator over a metadata map.
  */
@@ -88,10 +95,6 @@ private:
     // Iterators do not survive yields.
     iterator_.reset();
   }
-
-  void setValue(lua_State* state, const ProtobufWkt::Value& value);
-  void createTable(lua_State* state,
-                   const Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Value>& fields);
 
   const ProtobufWkt::Struct metadata_;
   LuaDeathRef<MetadataMapIterator> iterator_;

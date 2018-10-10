@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Stats sink for the basic version of the hystrix protocol (https://github.com/b/hystrix_spec).
 
 load(
@@ -34,6 +35,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
+        "//source/common/config:well_known_names",
         "//source/common/http:headers_lib",
     ],
 )

@@ -13,11 +13,11 @@ namespace Tracers {
 class TracerNameValues {
 public:
   // Lightstep tracer
-  const std::string LIGHTSTEP = "envoy.lightstep";
+  const std::string Lightstep = "envoy.lightstep";
   // Zipkin tracer
-  const std::string ZIPKIN = "envoy.zipkin";
+  const std::string Zipkin = "envoy.zipkin";
   // Dynamic tracer
-  const std::string DYNAMIC_OT = "envoy.dynamic.ot";
+  const std::string DynamicOt = "envoy.dynamic.ot";
 };
 
 typedef ConstSingleton<TracerNameValues> TracerNames;

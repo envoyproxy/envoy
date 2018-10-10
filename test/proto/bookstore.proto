@@ -3,6 +3,7 @@ syntax = "proto3";
 package bookstore;
 
 import "google/api/annotations.proto";
+import "google/api/httpbody.proto";
 import "google/protobuf/empty.proto";
 
 // A simple Bookstore API.
@@ -82,6 +83,11 @@ service Bookstore {
   rpc GetAuthor(GetAuthorRequest) returns (Author) {
     option (google.api.http) = {
       get: "/authors/{author}"
+    };
+  }
+  rpc GetIndex(google.protobuf.Empty) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/index"
     };
   }
 }

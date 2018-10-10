@@ -9,7 +9,8 @@ void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeader
   if (!header_value.empty()) {
     uint64_t parsed_value;
     RELEASE_ASSERT(StringUtil::atoul(header_value.c_str(), parsed_value, 10) &&
-                   parsed_value < std::numeric_limits<int32_t>::max());
+                       parsed_value < std::numeric_limits<int32_t>::max(),
+                   "");
     return_int = parsed_value;
   }
 }
@@ -20,9 +21,13 @@ const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response_size_bytes";
 const char AutonomousStream::EXPECT_REQUEST_SIZE_BYTES[] = "expect_request_size_bytes";
 const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
 
+AutonomousStream::AutonomousStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
+                                   AutonomousUpstream& upstream)
+    : FakeStream(parent, encoder, upstream.timeSystem()), upstream_(upstream) {}
+
 // For now, assert all streams which are started are completed.
 // Support for incomplete streams can be added when needed.
-AutonomousStream::~AutonomousStream() { RELEASE_ASSERT(complete()); }
+AutonomousStream::~AutonomousStream() { RELEASE_ASSERT(complete(), ""); }
 
 // By default, automatically send a response when the request is complete.
 void AutonomousStream::setEndStream(bool end_stream) {
@@ -55,6 +60,12 @@ void AutonomousStream::sendResponse() {
   encodeData(response_body_length, true);
 }
 
+AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shared_connection,
+                                                   Stats::Store& store, Type type,
+                                                   AutonomousUpstream& upstream)
+    : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem()),
+      upstream_(upstream) {}
+
 Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder) {
   auto stream = new AutonomousStream(*this, response_encoder, upstream_);
   streams_.push_back(FakeStreamPtr{stream});
@@ -72,7 +83,8 @@ bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connectio
   shared_connections_.emplace_back(new SharedConnectionWrapper(connection, true));
   AutonomousHttpConnectionPtr http_connection(
       new AutonomousHttpConnection(*shared_connections_.back(), stats_store_, http_type_, *this));
-  http_connection->initialize();
+  testing::AssertionResult result = http_connection->initialize();
+  RELEASE_ASSERT(result, result.message());
   http_connections_.push_back(std::move(http_connection));
   return true;
 }

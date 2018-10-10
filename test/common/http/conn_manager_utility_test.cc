@@ -18,14 +18,19 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Http {
+
+class MockInternalAddressConfig : public Http::InternalAddressConfig {
+public:
+  MOCK_CONST_METHOD1(isInternalAddress, bool(const Network::Address::Instance&));
+};
 
 class MockConnectionManagerConfig : public ConnectionManagerConfig {
 public:
@@ -44,12 +49,18 @@ public:
   MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
   MOCK_METHOD0(generateRequestId, bool());
-  MOCK_METHOD0(idleTimeout, const absl::optional<std::chrono::milliseconds>&());
+  MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
+  MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider&());
   MOCK_METHOD0(serverName, const std::string&());
   MOCK_METHOD0(stats, ConnectionManagerStats&());
   MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
   MOCK_METHOD0(useRemoteAddress, bool());
+  const Http::InternalAddressConfig& internalAddressConfig() const override {
+    return *internal_address_config_;
+  }
+  MOCK_METHOD0(unixSocketInternal, bool());
   MOCK_CONST_METHOD0(xffNumTrustedHops, uint32_t());
   MOCK_CONST_METHOD0(skipXffAppend, bool());
   MOCK_CONST_METHOD0(via, const std::string&());
@@ -62,6 +73,9 @@ public:
   MOCK_METHOD0(listenerStats, ConnectionManagerListenerStats&());
   MOCK_CONST_METHOD0(proxy100Continue, bool());
   MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
+
+  std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
+      std::make_unique<DefaultInternalAddressConfig>();
 };
 
 class ConnectionManagerUtilityTest : public testing::Test {
@@ -87,11 +101,11 @@ public:
   // This is a convenience method used to call mutateRequestHeaders(). It is done in this
   // convoluted way to force tests to check both the final downstream address as well as whether
   // the request is internal/external, given the importance of these two pieces of data.
-  MutateRequestRet callMutateRequestHeaders(HeaderMap& headers, Protocol protocol) {
+  MutateRequestRet callMutateRequestHeaders(HeaderMap& headers, Protocol) {
     MutateRequestRet ret;
     ret.downstream_address_ =
-        ConnectionManagerUtility::mutateRequestHeaders(
-            headers, protocol, connection_, config_, route_config_, random_, runtime_, local_info_)
+        ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                       random_, runtime_, local_info_)
             ->asString();
     ret.internal_ = headers.EnvoyInternalRequest() != nullptr;
     return ret;
@@ -149,6 +163,25 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
   EXPECT_STREQ("198.51.100.1", headers.ForwardedFor()->value().c_str());
 }
 
+// Verify internal request and XFF is set when we are using remote address and the address is
+// internal according to user configuration.
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenUserConfiguredRemoteAddress) {
+  auto config = std::make_unique<NiceMock<MockInternalAddressConfig>>();
+  ON_CALL(*config, isInternalAddress).WillByDefault(Return(true));
+  config_.internal_address_config_ = std::move(config);
+
+  Network::Address::Ipv4Instance local_address("10.3.2.1");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
+
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+
+  TestHeaderMapImpl headers;
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", true}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("12.12.12.12", headers.get_(Headers::get().ForwardedFor));
+}
+
 // Verify internal request and XFF is set when we are using remote address the address is internal.
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenLocalHostRemoteAddress) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
@@ -195,7 +228,7 @@ TEST_F(ConnectionManagerUtilityTest, ViaEmpty) {
   EXPECT_FALSE(request_headers.has(Headers::get().Via));
 
   TestHeaderMapImpl response_headers;
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, via_);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, via_);
   EXPECT_FALSE(response_headers.has(Headers::get().Via));
 }
 
@@ -212,9 +245,9 @@ TEST_F(ConnectionManagerUtilityTest, ViaAppend) {
 
   TestHeaderMapImpl response_headers;
   // Pretend we're doing a 100-continue transform here.
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
   // The actual response header processing.
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, via_);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, via_);
   EXPECT_EQ("foo", response_headers.get_(Headers::get().Via));
 }
 
@@ -535,23 +568,13 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketReque
   EXPECT_FALSE(headers.has("upgrade"));
 }
 
-// Make sure we remove connections headers for a WS request over h2.
-TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForHttp2Requests) {
-  TestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
-
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
-            callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_FALSE(headers.has("connection"));
-  EXPECT_FALSE(headers.has("upgrade"));
-}
-
 // Test cleaning response headers.
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
   TestHeaderMapImpl response_headers{
       {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "custom_value"}};
   TestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
 
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
 
   EXPECT_EQ(1UL, response_headers.size());
   EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
@@ -566,7 +589,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketRes
       {"connection", "upgrade"}, {"transfer-encoding", "foo"}, {"upgrade", "bar"}};
   EXPECT_TRUE(Utility::isUpgrade(request_headers));
   EXPECT_TRUE(Utility::isUpgrade(response_headers));
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
 
   EXPECT_EQ(2UL, response_headers.size()) << response_headers;
   EXPECT_EQ("upgrade", response_headers.get_("connection"));
@@ -581,7 +604,7 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
         {"connection", "foo"}, {"transfer-encoding", "bar"}, {"custom_header", "custom_value"}};
     EXPECT_FALSE(Utility::isUpgrade(request_headers));
     EXPECT_FALSE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
 
     EXPECT_EQ(1UL, response_headers.size()) << response_headers;
     EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
@@ -596,7 +619,7 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
                                        {"custom_header", "custom_value"}};
     EXPECT_FALSE(Utility::isUpgrade(request_headers));
     EXPECT_TRUE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
 
     EXPECT_EQ(2UL, response_headers.size()) << response_headers;
     EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
@@ -609,7 +632,7 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
     TestHeaderMapImpl response_headers{{"transfer-encoding", "foo"}, {"upgrade", "bar"}};
     EXPECT_TRUE(Utility::isUpgrade(request_headers));
     EXPECT_FALSE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
 
     EXPECT_EQ(1UL, response_headers.size()) << response_headers;
     EXPECT_EQ("bar", response_headers.get_("upgrade"));
@@ -622,7 +645,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
   TestHeaderMapImpl request_headers{{"x-request-id", "request-id"},
                                     {"x-envoy-force-trace", "true"}};
 
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
   EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
 }
 
@@ -1008,7 +1031,7 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
   Http::TestHeaderMapImpl request_headers{{}};
   Http::TestHeaderMapImpl response_headers{{"keep-alive", "timeout=60"},
                                            {"proxy-connection", "proxy-header"}};
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
 
   EXPECT_EQ(UuidTraceStatus::NoTrace,
             UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));

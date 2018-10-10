@@ -18,7 +18,7 @@ public:
   Http::FilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
                                             Server::Configuration::FactoryContext&) override {
     // Only used in v1 filters.
-    NOT_IMPLEMENTED;
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   Http::FilterFactoryCb

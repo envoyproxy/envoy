@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
+#include "envoy/stats/stats_options.h"
 
 #include "spdlog/spdlog.h"
 
@@ -97,6 +98,13 @@ public:
   virtual spdlog::level::level_enum logLevel() const PURE;
 
   /**
+   * @return const std::vector<std::pair<std::string, spdlog::level::level_enum>>& pair of
+   * component,log level for all configured components.
+   */
+  virtual const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
+  componentLogLevels() const PURE;
+
+  /**
    * @return const std::string& the log format string.
    */
   virtual const std::string& logFormat() const PURE;
@@ -149,10 +157,10 @@ public:
   virtual uint64_t maxStats() const PURE;
 
   /**
-   * @return uint64_t the maximum name length of the name field in
+   * @return StatsOptions& the max stat name / suffix lengths for stats.
    * router/cluster/listener.
    */
-  virtual uint64_t maxObjNameLength() const PURE;
+  virtual const Stats::StatsOptions& statsOptions() const PURE;
 
   /**
    * @return bool indicating whether the hot restart functionality has been disabled via cli flags.

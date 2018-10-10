@@ -24,7 +24,7 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
                                                 },
                                                 Event::FileTriggerType::Edge,
                                                 Event::FileReadyType::Read)) {
-  RELEASE_ASSERT(inotify_fd_ >= 0);
+  RELEASE_ASSERT(inotify_fd_ >= 0, "");
 }
 
 WatcherImpl::~WatcherImpl() { close(inotify_fd_); }
@@ -57,7 +57,7 @@ void WatcherImpl::onInotifyEvent() {
     if (rc == -1 && errno == EAGAIN) {
       return;
     }
-    RELEASE_ASSERT(rc >= 0);
+    RELEASE_ASSERT(rc >= 0, "");
 
     const size_t event_count = rc;
     size_t index = 0;

@@ -8,7 +8,7 @@ External Authorization
 The external authorization HTTP filter calls an external gRPC or HTTP service to check if the incoming
 HTTP request is authorized or not.
 If the request is deemed unauthorized then the request will be denied normally with 403 (Forbidden) response.
-Note that sending additional custom metadata from the authorization service to the upstream, or to the downstream is 
+Note that sending additional custom metadata from the authorization service to the upstream, to the downstream or to the authorization service is 
 also possible. This is explained in more details at :ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2alpha.ExtAuthz>`.
 
 .. tip::
@@ -82,5 +82,5 @@ The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_au
   ok, Counter, Total responses from the filter.
   error, Counter, Total errors contacting the external service.
   denied, Counter, Total responses from the authorizations service that were to deny the traffic.
-  failure_mode_allow, Counter, "Total requests that were error(s) but were allowed through because
+  failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
   of failure_mode_allow set to true."

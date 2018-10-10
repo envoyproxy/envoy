@@ -4,11 +4,15 @@
 #include "common/common/version.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
+#include "common/stats/histogram_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+
+using testing::AssertionResult;
 
 namespace Envoy {
 namespace {
@@ -17,11 +21,12 @@ class MetricsServiceIntegrationTest : public HttpIntegrationTest,
                                       public Grpc::GrpcClientIntegrationParamTest {
 public:
   MetricsServiceIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
     fake_upstreams_.back()->set_allow_unexpected_disconnects(true);
   }
 
@@ -47,15 +52,20 @@ public:
     HttpIntegrationTest::initialize();
   }
 
-  void waitForMetricsServiceConnection() {
-    fake_metrics_service_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+  ABSL_MUST_USE_RESULT
+  AssertionResult waitForMetricsServiceConnection() {
+    return fake_upstreams_[1]->waitForHttpConnection(*dispatcher_,
+                                                     fake_metrics_service_connection_);
   }
 
-  void waitForMetricsStream() {
-    metrics_service_request_ = fake_metrics_service_connection_->waitForNewStream(*dispatcher_);
+  ABSL_MUST_USE_RESULT
+  AssertionResult waitForMetricsStream() {
+    return fake_metrics_service_connection_->waitForNewStream(*dispatcher_,
+                                                              metrics_service_request_);
   }
 
-  void waitForMetricsRequest() {
+  ABSL_MUST_USE_RESULT
+  AssertionResult waitForMetricsRequest() {
     bool known_histogram_exists = false;
     bool known_counter_exists = false;
     bool known_gauge_exists = false;
@@ -65,7 +75,7 @@ public:
     // flushed.
     while (!(known_counter_exists && known_gauge_exists && known_histogram_exists)) {
       envoy::service::metrics::v2::StreamMetricsMessage request_msg;
-      metrics_service_request_->waitForGrpcMessage(*dispatcher_, request_msg);
+      VERIFY_ASSERTION(metrics_service_request_->waitForGrpcMessage(*dispatcher_, request_msg));
       EXPECT_STREQ("POST", metrics_service_request_->headers().Method()->value().c_str());
       EXPECT_STREQ("/envoy.service.metrics.v2.MetricsService/StreamMetrics",
                    metrics_service_request_->headers().Path()->value().c_str());
@@ -102,12 +112,16 @@ public:
     EXPECT_TRUE(known_counter_exists);
     EXPECT_TRUE(known_gauge_exists);
     EXPECT_TRUE(known_histogram_exists);
+
+    return AssertionSuccess();
   }
 
   void cleanup() {
     if (fake_metrics_service_connection_ != nullptr) {
-      fake_metrics_service_connection_->close();
-      fake_metrics_service_connection_->waitForDisconnect();
+      AssertionResult result = fake_metrics_service_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_metrics_service_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
   }
 
@@ -130,9 +144,9 @@ TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
                                           {"x-lyft-user-id", "123"}};
   sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 
-  waitForMetricsServiceConnection();
-  waitForMetricsStream();
-  waitForMetricsRequest();
+  ASSERT_TRUE(waitForMetricsServiceConnection());
+  ASSERT_TRUE(waitForMetricsStream());
+  ASSERT_TRUE(waitForMetricsRequest());
 
   // Send an empty response and end the stream. This should never happen but make sure nothing
   // breaks and we make a new stream on a follow up request.
@@ -149,7 +163,7 @@ TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
     test_server_->waitForCounterGe("grpc.metrics_service.streams_closed_0", 1);
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   cleanup();
 }

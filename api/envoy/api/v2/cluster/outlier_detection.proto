@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package envoy.api.v2.cluster;
+option csharp_namespace = "Envoy.Api.V2.ClusterNS";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";

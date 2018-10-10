@@ -12,6 +12,8 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/callback_impl.h"
+#include "common/upstream/health_discovery_service.h"
+#include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/config/mocks.h"
@@ -20,6 +22,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 
 #include "gmock/gmock.h"
@@ -32,7 +35,9 @@ namespace Upstream {
 
 class MockHostSet : public HostSet {
 public:
-  MockHostSet(uint32_t priority = 0);
+  MockHostSet(uint32_t priority = 0,
+              uint32_t overprovisioning_factor = kDefaultOverProvisioningFactor);
+  ~MockHostSet();
 
   void runCallbacks(const HostVector added, const HostVector removed) {
     member_update_cb_helper_.runCallbacks(priority(), added, removed);
@@ -49,13 +54,18 @@ public:
   MOCK_CONST_METHOD0(healthyHostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(localityWeights, LocalityWeightsConstSharedPtr());
   MOCK_METHOD0(chooseLocality, absl::optional<uint32_t>());
-  MOCK_METHOD7(updateHosts, void(std::shared_ptr<const HostVector> hosts,
+  MOCK_METHOD8(updateHosts, void(std::shared_ptr<const HostVector> hosts,
                                  std::shared_ptr<const HostVector> healthy_hosts,
                                  HostsPerLocalityConstSharedPtr hosts_per_locality,
                                  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                                  LocalityWeightsConstSharedPtr locality_weights,
-                                 const HostVector& hosts_added, const HostVector& hosts_removed));
+                                 const HostVector& hosts_added, const HostVector& hosts_removed,
+                                 absl::optional<uint32_t> overprovisioning_factor));
   MOCK_CONST_METHOD0(priority, uint32_t());
+  uint32_t overprovisioning_factor() const override { return overprovisioning_factor_; }
+  void set_overprovisioning_factor(const uint32_t overprovisioning_factor) {
+    overprovisioning_factor_ = overprovisioning_factor;
+  }
 
   HostVector hosts_;
   HostVector healthy_hosts_;
@@ -64,12 +74,13 @@ public:
   LocalityWeightsConstSharedPtr locality_weights_{{}};
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
   uint32_t priority_{};
+  uint32_t overprovisioning_factor_{};
 };
 
 class MockPrioritySet : public PrioritySet {
 public:
   MockPrioritySet();
-  ~MockPrioritySet() {}
+  ~MockPrioritySet();
 
   HostSet& getHostSet(uint32_t priority);
   void runUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
@@ -86,6 +97,39 @@ public:
 
   std::vector<HostSetPtr> host_sets_;
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
+};
+
+class MockRetryPriority : public RetryPriority {
+public:
+  MockRetryPriority(const PriorityLoad& priority_load) : priority_load_(priority_load) {}
+  ~MockRetryPriority();
+
+  const PriorityLoad& determinePriorityLoad(const PrioritySet&, const PriorityLoad&) {
+    return priority_load_;
+  }
+
+  MOCK_METHOD1(onHostAttempted, void(HostDescriptionConstSharedPtr));
+
+private:
+  const PriorityLoad& priority_load_;
+};
+
+class MockRetryPriorityFactory : public RetryPriorityFactory {
+public:
+  MockRetryPriorityFactory(RetryPrioritySharedPtr retry_priority)
+      : retry_priority_(retry_priority) {}
+  void createRetryPriority(RetryPriorityFactoryCallbacks& callbacks, const Protobuf::Message&,
+                           uint32_t) override {
+    callbacks.addRetryPriority(retry_priority_);
+  }
+
+  std::string name() const override { return "envoy.mock_retry_priority"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  }
+
+private:
+  RetryPrioritySharedPtr retry_priority_;
 };
 
 class MockCluster : public Cluster {
@@ -108,6 +152,20 @@ public:
   std::function<void()> initialize_callback_;
   Network::Address::InstanceConstSharedPtr source_address_;
   NiceMock<MockPrioritySet> priority_set_;
+};
+
+class MockLoadBalancerContext : public LoadBalancerContext {
+public:
+  MockLoadBalancerContext();
+  ~MockLoadBalancerContext();
+
+  MOCK_METHOD0(computeHashKey, absl::optional<uint64_t>());
+  MOCK_METHOD0(metadataMatchCriteria, Router::MetadataMatchCriteria*());
+  MOCK_CONST_METHOD0(downstreamConnection, const Network::Connection*());
+  MOCK_CONST_METHOD0(downstreamHeaders, const Http::HeaderMap*());
+  MOCK_METHOD2(determinePriorityLoad, const PriorityLoad&(const PrioritySet&, const PriorityLoad&));
+  MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host&));
+  MOCK_CONST_METHOD0(hostSelectionRetryCount, uint32_t());
 };
 
 class MockLoadBalancer : public LoadBalancer {
@@ -154,6 +212,12 @@ public:
                                      ResourcePriority priority, Http::Protocol protocol,
                                      const Network::ConnectionSocket::OptionsSharedPtr& options));
 
+  MOCK_METHOD4(
+      allocateTcpConnPool,
+      Tcp::ConnectionPool::InstancePtr(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                                       ResourcePriority priority,
+                                       const Network::ConnectionSocket::OptionsSharedPtr& options));
+
   MOCK_METHOD5(clusterFromProto,
                ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                 Outlier::EventLoggerSharedPtr outlier_event_logger,
@@ -165,11 +229,12 @@ public:
                          ClusterManager& cm));
 
 private:
-  Secret::MockSecretManager secret_manager_;
+  NiceMock<Secret::MockSecretManager> secret_manager_;
 };
 
 class MockClusterManager : public ClusterManager {
 public:
+  explicit MockClusterManager(TimeSource& time_source);
   MockClusterManager();
   ~MockClusterManager();
 
@@ -191,6 +256,9 @@ public:
                Http::ConnectionPool::Instance*(const std::string& cluster,
                                                ResourcePriority priority, Http::Protocol protocol,
                                                LoadBalancerContext* context));
+  MOCK_METHOD3(tcpConnPoolForCluster,
+               Tcp::ConnectionPool::Instance*(const std::string& cluster, ResourcePriority priority,
+                                              LoadBalancerContext* context));
   MOCK_METHOD2(tcpConnForCluster_,
                MockHost::MockCreateConnectionData(const std::string& cluster,
                                                   LoadBalancerContext* context));
@@ -207,6 +275,7 @@ public:
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
+  NiceMock<Tcp::ConnectionPool::MockInstance> tcp_conn_pool_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   envoy::api::v2::core::BindConfig bind_config_;
   NiceMock<Config::MockGrpcMux> ads_mux_;
@@ -260,6 +329,29 @@ public:
 
   MOCK_METHOD1(onClusterAddOrUpdate, void(ThreadLocalCluster& cluster));
   MOCK_METHOD1(onClusterRemoval, void(const std::string& cluster_name));
+};
+
+class MockClusterInfoFactory : public ClusterInfoFactory, Logger::Loggable<Logger::Id::upstream> {
+public:
+  MockClusterInfoFactory();
+  ~MockClusterInfoFactory();
+
+  MOCK_METHOD10(createClusterInfo,
+                ClusterInfoConstSharedPtr(
+                    Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
+                    const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
+                    Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+                    ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
+                    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random));
+};
+
+class MockRetryHostPredicate : public RetryHostPredicate {
+public:
+  MockRetryHostPredicate();
+  ~MockRetryHostPredicate();
+
+  MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host& candidate_host));
+  MOCK_METHOD1(onHostAttempted, void(HostDescriptionConstSharedPtr));
 };
 
 } // namespace Upstream

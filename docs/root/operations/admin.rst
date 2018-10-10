@@ -32,8 +32,8 @@ modify different aspects of the server:
   In the future additional security options will be added to the administration interface. This
   work is tracked in `this <https://github.com/envoyproxy/envoy/issues/2763>`_ issue.
 
-  All mutations should be sent as HTTP POST operations. For a limited time, they will continue
-  to work with HTTP GET, with a warning logged.
+  All mutations must be sent as HTTP POST operations. When a mutation is requested via GET,
+  the request has no effect, and an HTTP 400 (Invalid Request) response is returned.
 
 .. http:get:: /
 
@@ -69,7 +69,7 @@ modify different aspects of the server:
       :ref:`success rate average<arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_average>`,
       and :ref:`ejection threshold<arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_ejection_threshold>`
       are presented. Both of these values could be ``-1`` if there was not enough data to calculate them in the last
-      :ref:`interval<config_cluster_manager_cluster_outlier_detection_interval_ms>`.
+      :ref:`interval<envoy_api_field_cluster.OutlierDetection.interval>`.
 
     - ``added_via_api`` flag -- ``false`` if the cluster was added via static configuration, ``true``
       if it was added via the :ref:`CDS<config_cluster_manager_cds>` api.
@@ -92,8 +92,8 @@ modify different aspects of the server:
       zone, String, Service zone
       canary, Boolean, Whether the host is a canary
       success_rate, Double, "Request success rate (0-100). -1 if there was not enough
-      :ref:`request volume<config_cluster_manager_cluster_outlier_detection_success_rate_request_volume>`
-      in the :ref:`interval<config_cluster_manager_cluster_outlier_detection_interval_ms>`
+      :ref:`request volume<envoy_api_field_cluster.OutlierDetection.success_rate_request_volume>`
+      in the :ref:`interval<envoy_api_field_cluster.OutlierDetection.interval>`
       to calculate it"
 
   Host health status
@@ -158,6 +158,10 @@ modify different aspects of the server:
   Enable/disable different logging levels on different subcomponents. Generally only used during
   development.
 
+.. http:post:: /memory
+
+  Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all `/stats` and filtering to get the memory-related statistics.
+
 .. http:post:: /quitquitquit
 
   Cleanly exit the server.
@@ -202,6 +206,10 @@ The fields are:
   Outputs statistics that Envoy has updated (counters incremented at least once, gauges changed at
   least once, and histograms added to at least once).
 
+  .. http:get:: /stats?filter=regex
+
+  Filters the returned stats to those with names matching the regular expression `regex`. Compatible with `usedonly`. Performs partial matching by default, so `/stats?filter=server` will return all stats containing the word `server`. Full-string matching can be specified with begin- and end-line anchors. (i.e. `/stats?filter=^server.concurrency$`)
+
 .. http:get:: /stats?format=json
 
   Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
@@ -209,7 +217,7 @@ The fields are:
   that contains "supported_quantiles" which lists the quantiles supported and an array of computed_quantiles
   that has the computed quantile for each histogram.
 
-  If a histogram is not updated during an interval, the ouput will have null for all the quantiles.
+  If a histogram is not updated during an interval, the output will have null for all the quantiles.
   
   Example histogram output:
 
@@ -330,7 +338,7 @@ The fields are:
   `text/event-stream <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_ 
   format, as expected by the Hystrix dashboard. 
   
-  If invoked from a browser or a terminal, the response will be shown as a continous stream, 
+  If invoked from a browser or a terminal, the response will be shown as a continuous stream, 
   sent in intervals defined by the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` 
   :ref:`stats_flush_interval <envoy_api_field_config.bootstrap.v2.Bootstrap.stats_flush_interval>`
 
@@ -352,6 +360,7 @@ The fields are:
     In Envoy, service unavailable response will cause **outlier detection** - removing a node off the 
     load balancer pool, but requests are not rejected as a result. Therefore, this counter is always 
     set to '0'.
-  * Latency information is currently unavailable.
+  * Latency information represents data since last flush. 
+    Mean latency is currently not available.
   
   

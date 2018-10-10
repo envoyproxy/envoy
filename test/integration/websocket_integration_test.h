@@ -1,29 +1,63 @@
 #pragma once
 
-#include "test/integration/http_integration.h"
+#include "test/integration/http_protocol_integration.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 
+struct WebsocketProtocolTestParams {
+  Network::Address::IpVersion version;
+  Http::CodecClient::Type downstream_protocol;
+  FakeHttpConnection::Type upstream_protocol;
+  bool old_style;
+};
+
 class WebsocketIntegrationTest : public HttpIntegrationTest,
-                                 public testing::TestWithParam<Network::Address::IpVersion> {
+                                 public testing::TestWithParam<WebsocketProtocolTestParams> {
 public:
+  WebsocketIntegrationTest()
+      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, realTime()) {}
   void initialize() override;
-  WebsocketIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  void SetUp() override {
+    setDownstreamProtocol(GetParam().downstream_protocol);
+    setUpstreamProtocol(GetParam().upstream_protocol);
+  }
 
 protected:
-  void validateInitialUpstreamData(const std::string& received_data);
-  void validateInitialDownstreamData(const std::string& received_data);
-  void validateFinalDownstreamData(const std::string& received_data,
-                                   const std::string& expected_data);
-  void validateFinalUpstreamData(const std::string& received_data,
-                                 const std::string& expected_data);
+  void performUpgrade(const Http::TestHeaderMapImpl& upgrade_request_headers,
+                      const Http::TestHeaderMapImpl& upgrade_response_headers);
+  void sendBidirectionalData();
 
-  const std::string upgrade_req_str_ = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
-                                       "keep-alive, Upgrade\r\nUpgrade: websocket\r\n\r\n";
-  const std::string upgrade_resp_str_ =
-      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
+  void validateUpgradeRequestHeaders(const Http::HeaderMap& proxied_request_headers,
+                                     const Http::HeaderMap& original_request_headers);
+  void validateUpgradeResponseHeaders(const Http::HeaderMap& proxied_response_headers,
+                                      const Http::HeaderMap& original_response_headers);
+  void commonValidate(Http::HeaderMap& proxied_headers, const Http::HeaderMap& original_headers);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult waitForUpstreamDisconnectOrReset() {
+    if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
+      return upstream_request_->waitForReset();
+    } else {
+      return fake_upstream_connection_->waitForDisconnect();
+    }
+  }
+
+  void waitForClientDisconnectOrReset() {
+    if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+      response_->waitForReset();
+    } else {
+      codec_client_->waitForDisconnect();
+    }
+  }
+
+  IntegrationStreamDecoderPtr response_;
+  // True if the test uses "old style" TCP proxy websockets. False to use the
+  // new style "HTTP filter chain" websockets.
+  // See
+  // https://github.com/envoyproxy/envoy/blob/master/docs/root/intro/arch_overview/websocket.rst
+  bool old_style_websockets_{GetParam().old_style};
 };
 
 } // namespace Envoy

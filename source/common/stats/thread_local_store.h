@@ -10,7 +10,12 @@
 
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/stats/stats_impl.h"
+#include "common/stats/heap_stat_data.h"
+#include "common/stats/histogram_impl.h"
+#include "common/stats/source_impl.h"
+#include "common/stats/utility.h"
+
+#include "circllhist.h"
 
 namespace Envoy {
 namespace Stats {
@@ -42,12 +47,16 @@ public:
   void recordValue(uint64_t value) override;
   bool used() const override { return flags_ & Flags::Used; }
 
+  // Stats::Metric
+  const std::string name() const override { return name_; }
+
 private:
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
   uint64_t current_active_;
   histogram_t* histograms_[2];
   std::atomic<uint16_t> flags_;
   std::thread::id created_thread_id_;
+  const std::string name_;
 };
 
 typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
@@ -81,6 +90,9 @@ public:
   }
   const std::string summary() const override;
 
+  // Stats::Metric
+  const std::string name() const override { return name_; }
+
 private:
   bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
 
@@ -93,6 +105,7 @@ private:
   mutable Thread::MutexBasicLockable merge_lock_;
   std::list<TlsHistogramSharedPtr> tls_histograms_ GUARDED_BY(merge_lock_);
   bool merged_;
+  const std::string name_;
 };
 
 typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;
@@ -132,7 +145,7 @@ public:
  * - When a scope is destroyed, a cache flush operation is run on all threads to flush any cached
  *   data owned by the destroyed scope.
  * - Scopes use a unique incrementing ID for the cache key. This ensures that if a new scope is
- *   created at the same address as a recently deleted scope, cache references will not accidently
+ *   created at the same address as a recently deleted scope, cache references will not accidentally
  *   reference the old scope which may be about to be cache flushed.
  * - Since it's possible to have overlapping scopes, we de-dup stats when counters() or gauges() is
  *   called since these are very uncommon operations.
@@ -149,7 +162,7 @@ public:
  * If there is one it will write to it, otherwise creates new one and writes to it.
  * During the flush process the following sequence is followed.
  *  - The main thread starts the flush process by posting a message to every worker which tells the
- *    worker to swap its "active" histogram with its "backup" histogram. This is acheived via a call
+ *    worker to swap its "active" histogram with its "backup" histogram. This is achieved via a call
  *    to "beginMerge" method.
  *  - Each TLS histogram has 2 histograms it makes use of, swapping back and forth. It manages a
  *    current_active index via which it writes to the correct histogram.
@@ -163,7 +176,7 @@ public:
  */
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
-  ThreadLocalStoreImpl(StatDataAllocator& alloc);
+  ThreadLocalStoreImpl(const Stats::StatsOptions& stats_options, StatDataAllocator& alloc);
   ~ThreadLocalStoreImpl();
 
   // Stats::Scope
@@ -195,6 +208,8 @@ public:
 
   Source& source() override { return source_; }
 
+  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
+
 private:
   struct TlsCacheEntry {
     std::unordered_map<std::string, CounterSharedPtr> counters_;
@@ -224,10 +239,11 @@ private:
     Gauge& gauge(const std::string& name) override;
     Histogram& histogram(const std::string& name) override;
     Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
+    const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
 
     template <class StatType>
     using MakeStatFn =
-        std::function<std::shared_ptr<StatType>(StatDataAllocator&, const std::string& name,
+        std::function<std::shared_ptr<StatType>(StatDataAllocator&, absl::string_view name,
                                                 std::string&& tag_extracted_name,
                                                 std::vector<Tag>&& tags)>;
 
@@ -271,7 +287,9 @@ private:
   void clearScopeFromCaches(uint64_t scope_id);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
+  absl::string_view truncateStatNameIfNeeded(absl::string_view name);
 
+  const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
@@ -283,7 +301,7 @@ private:
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
-  HeapRawStatDataAllocator heap_allocator_;
+  HeapStatDataAllocator heap_allocator_;
   SourceImpl source_;
 };
 

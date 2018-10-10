@@ -123,10 +123,10 @@ public:
   virtual uint64_t streamId() PURE;
 
   /**
-   * @return requestInfo for logging purposes. Individual filter may add specific information to be
+   * @return streamInfo for logging purposes. Individual filter may add specific information to be
    * put into the access log.
    */
-  virtual RequestInfo::RequestInfo& requestInfo() PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   /**
    * @return span context used for tracing purposes. Individual filters may add or modify
@@ -189,6 +189,17 @@ public:
    * @param streaming_filter boolean supplies if this filter streams data or buffers the full body.
    */
   virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
+
+  /**
+   * Adds decoded trailers. May only be called in decodeData when end_stream is set to true.
+   * If called in any other context, an assertion will be triggered.
+   *
+   * When called in decodeData, the trailers map will be initialized to an empty map and returned by
+   * reference. Calling this function more than once is invalid.
+   *
+   * @return a reference to the newly created trailers map.
+   */
+  virtual HeaderMap& addDecodedTrailers() PURE;
 
   /**
    * Create a locally generated response using the provided response_code and body_text parameters.
@@ -396,6 +407,17 @@ public:
   virtual void addEncodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
+   * Adds encoded trailers. May only be called in encodeData when end_stream is set to true.
+   * If called in any other context, an assertion will be triggered.
+   *
+   * When called in encodeData, the trailers map will be initialized to an empty map and returned by
+   * reference. Calling this function more than once is invalid.
+   *
+   * @return a reference to the newly created trailers map.
+   */
+  virtual HeaderMap& addEncodedTrailers() PURE;
+
+  /**
    * Called when an encoder filter goes over its high watermark.
    */
   virtual void onEncoderFilterAboveWriteBufferHighWatermark() PURE;
@@ -458,7 +480,7 @@ public:
 
   /**
    * Called with trailers to be encoded, implicitly ending the stream.
-   * @param trailers supplies the trailes to be encoded.
+   * @param trailers supplies the trailers to be encoded.
    */
   virtual FilterTrailersStatus encodeTrailers(HeaderMap& trailers) PURE;
 

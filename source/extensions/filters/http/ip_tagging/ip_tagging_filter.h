@@ -9,6 +9,7 @@
 #include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
@@ -86,7 +87,7 @@ private:
     case envoy::config::filter::http::ip_tagging::v2::IPTagging_RequestType_EXTERNAL:
       return FilterRequestType::EXTERNAL;
     default:
-      NOT_REACHED;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 

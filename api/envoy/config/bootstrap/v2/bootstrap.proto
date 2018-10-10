@@ -16,6 +16,7 @@ import "envoy/api/v2/cds.proto";
 import "envoy/api/v2/lds.proto";
 import "envoy/config/trace/v2/trace.proto";
 import "envoy/config/metrics/v2/stats.proto";
+import "envoy/config/overload/v2alpha/overload.proto";
 import "envoy/config/ratelimit/v2/rls.proto";
 
 import "google/protobuf/duration.proto";
@@ -42,7 +43,8 @@ message Bootstrap {
     // IP or DNS-based).
     repeated envoy.api.v2.Cluster clusters = 2 [(gogoproto.nullable) = false];
 
-    // [#not-implemented-hide:]
+    // These static secrets can be used by :ref:`SdsSecretConfig
+    // <envoy_api_msg_auth.SdsSecretConfig>`
     repeated envoy.api.v2.auth.Secret secrets = 3 [(gogoproto.nullable) = false];
   }
   // Statically specified resources.
@@ -123,6 +125,9 @@ message Bootstrap {
 
   // Configuration for the local administration HTTP server.
   Admin admin = 12 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+
+  // Optional overload manager configuration.
+  envoy.config.overload.v2alpha.OverloadManager overload_manager = 15;
 }
 
 // Administration interface :ref:`operations documentation
@@ -137,8 +142,8 @@ message Admin {
   string profile_path = 2;
 
   // The TCP address that the administration server will listen on.
-  envoy.api.v2.core.Address address = 3
-      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  // If not specified, Envoy will not start an administration server.
+  envoy.api.v2.core.Address address = 3;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
@@ -147,7 +152,7 @@ message ClusterManager {
   // this configuration). In order to enable :ref:`zone aware routing
   // <arch_overview_load_balancing_zone_aware_routing>` this option must be set.
   // If *local_cluster_name* is defined then :ref:`clusters
-  // <config_cluster_manager_clusters>` must be defined in the :ref:`Bootstrap
+  // <envoy_api_msg_Cluster>` must be defined in the :ref:`Bootstrap
   // static cluster resources
   // <envoy_api_field_config.bootstrap.v2.Bootstrap.StaticResources.clusters>`. This is unrelated to
   // the :option:`--service-cluster` option which does not `affect zone aware

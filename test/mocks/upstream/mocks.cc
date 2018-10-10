@@ -8,17 +8,18 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Upstream {
 
-MockHostSet::MockHostSet(uint32_t priority) : priority_(priority) {
+MockHostSet::MockHostSet(uint32_t priority, uint32_t overprovisioning_factor)
+    : priority_(priority), overprovisioning_factor_(overprovisioning_factor) {
   ON_CALL(*this, priority()).WillByDefault(Return(priority_));
   ON_CALL(*this, hosts()).WillByDefault(ReturnRef(hosts_));
   ON_CALL(*this, healthyHosts()).WillByDefault(ReturnRef(healthy_hosts_));
@@ -33,6 +34,8 @@ MockHostSet::MockHostSet(uint32_t priority) : priority_(priority) {
   }));
 }
 
+MockHostSet::~MockHostSet() {}
+
 MockPrioritySet::MockPrioritySet() {
   getHostSet(0);
   ON_CALL(*this, hostSetsPerPriority()).WillByDefault(ReturnRef(host_sets_));
@@ -42,6 +45,8 @@ MockPrioritySet::MockPrioritySet() {
         return member_update_cb_helper_.add(cb);
       }));
 }
+
+MockPrioritySet::~MockPrioritySet() {}
 
 HostSet& MockPrioritySet::getHostSet(uint32_t priority) {
   if (host_sets_.size() < priority + 1) {
@@ -61,6 +66,8 @@ void MockPrioritySet::runUpdateCallbacks(uint32_t priority, const HostVector& ho
   member_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
 }
 
+MockRetryPriority::~MockRetryPriority() {}
+
 MockCluster::MockCluster() {
   ON_CALL(*this, prioritySet()).WillByDefault(ReturnRef(priority_set_));
   ON_CALL(testing::Const(*this), prioritySet()).WillByDefault(ReturnRef(priority_set_));
@@ -74,6 +81,10 @@ MockCluster::MockCluster() {
 
 MockCluster::~MockCluster() {}
 
+MockLoadBalancerContext::MockLoadBalancerContext() {}
+
+MockLoadBalancerContext::~MockLoadBalancerContext() {}
+
 MockLoadBalancer::MockLoadBalancer() { ON_CALL(*this, chooseHost(_)).WillByDefault(Return(host_)); }
 
 MockLoadBalancer::~MockLoadBalancer() {}
@@ -86,8 +97,11 @@ MockThreadLocalCluster::MockThreadLocalCluster() {
 
 MockThreadLocalCluster::~MockThreadLocalCluster() {}
 
+MockClusterManager::MockClusterManager(TimeSource&) : MockClusterManager() {}
+
 MockClusterManager::MockClusterManager() {
   ON_CALL(*this, httpConnPoolForCluster(_, _, _, _)).WillByDefault(Return(&conn_pool_));
+  ON_CALL(*this, tcpConnPoolForCluster(_, _, _)).WillByDefault(Return(&tcp_conn_pool_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault(ReturnRef(async_client_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault((ReturnRef(async_client_)));
   ON_CALL(*this, bindConfig()).WillByDefault(ReturnRef(bind_config_));
@@ -119,6 +133,13 @@ MockCdsApi::~MockCdsApi() {}
 MockClusterUpdateCallbacks::MockClusterUpdateCallbacks() {}
 
 MockClusterUpdateCallbacks::~MockClusterUpdateCallbacks() {}
+
+MockClusterInfoFactory::MockClusterInfoFactory() {}
+
+MockClusterInfoFactory::~MockClusterInfoFactory() {}
+
+MockRetryHostPredicate::MockRetryHostPredicate() {}
+MockRetryHostPredicate::~MockRetryHostPredicate() {}
 
 } // namespace Upstream
 } // namespace Envoy

@@ -6,6 +6,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -23,13 +24,13 @@ Writer::Writer(Network::Address::InstanceConstSharedPtr address) {
   fd_ = address->socket(Network::Address::SocketType::Datagram);
   ASSERT(fd_ != -1);
 
-  int rc = address->connect(fd_);
-  ASSERT(rc != -1);
+  const Api::SysCallIntResult result = address->connect(fd_);
+  ASSERT(result.rc_ != -1);
 }
 
 Writer::~Writer() {
   if (fd_ != -1) {
-    RELEASE_ASSERT(close(fd_) == 0);
+    RELEASE_ASSERT(close(fd_) == 0, "");
   }
 }
 
@@ -243,7 +244,7 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
                                      parent_.cluster_info_->stats().upstream_cx_rx_bytes_buffered_,
                                      parent_.cluster_info_->stats().upstream_cx_tx_bytes_total_,
                                      parent_.cluster_info_->stats().upstream_cx_tx_bytes_buffered_,
-                                     &parent_.cluster_info_->stats().bind_errors_});
+                                     &parent_.cluster_info_->stats().bind_errors_, nullptr});
     connection_->connect();
   }
 

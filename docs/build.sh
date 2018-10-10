@@ -43,7 +43,7 @@ fi
 
 source "${BUILD_DIR}"/venv/bin/activate
 
-bazel --batch build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
+bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED  --spawn_strategy=standalone
 
 # These are the protos we want to put in docs, this list will grow.
@@ -51,6 +51,7 @@ bazel --batch build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
 PROTO_RST="
   /envoy/admin/v2alpha/clusters/envoy/admin/v2alpha/clusters.proto.rst
   /envoy/admin/v2alpha/config_dump/envoy/admin/v2alpha/config_dump.proto.rst
+  /envoy/admin/v2alpha/memory/envoy/admin/v2alpha/memory.proto.rst
   /envoy/admin/v2alpha/clusters/envoy/admin/v2alpha/metrics.proto.rst
   /envoy/api/v2/core/address/envoy/api/v2/core/address.proto.rst
   /envoy/api/v2/core/base/envoy/api/v2/core/base.proto.rst
@@ -87,6 +88,7 @@ PROTO_RST="
   /envoy/config/filter/http/health_check/v2/health_check/envoy/config/filter/http/health_check/v2/health_check.proto.rst
   /envoy/config/filter/http/header_to_metadata/v2/header_to_metadata/envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.proto.rst
   /envoy/config/filter/http/ip_tagging/v2/ip_tagging/envoy/config/filter/http/ip_tagging/v2/ip_tagging.proto.rst
+  /envoy/config/filter/http/jwt_authn/v2alpha/jwt_authn/envoy/config/filter/http/jwt_authn/v2alpha/config.proto.rst
   /envoy/config/filter/http/lua/v2/lua/envoy/config/filter/http/lua/v2/lua.proto.rst
   /envoy/config/filter/http/rate_limit/v2/rate_limit/envoy/config/filter/http/rate_limit/v2/rate_limit.proto.rst
   /envoy/config/filter/http/rbac/v2/rbac/envoy/config/filter/http/rbac/v2/rbac.proto.rst
@@ -98,10 +100,17 @@ PROTO_RST="
   /envoy/config/filter/network/http_connection_manager/v2/http_connection_manager/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto.rst
   /envoy/config/filter/network/mongo_proxy/v2/mongo_proxy/envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.proto.rst
   /envoy/config/filter/network/rate_limit/v2/rate_limit/envoy/config/filter/network/rate_limit/v2/rate_limit.proto.rst
+  /envoy/config/filter/network/rbac/v2/rbac/envoy/config/filter/network/rbac/v2/rbac.proto.rst
   /envoy/config/filter/network/redis_proxy/v2/redis_proxy/envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto.rst
   /envoy/config/filter/network/tcp_proxy/v2/tcp_proxy/envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.proto.rst
+  /envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy/envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.proto.rst
+  /envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy/envoy/config/filter/network/thrift_proxy/v2alpha1/route.proto.rst
+  /envoy/config/filter/thrift/router/v2alpha1/router/envoy/config/filter/thrift/router/v2alpha1/router.proto.rst
   /envoy/config/health_checker/redis/v2/redis/envoy/config/health_checker/redis/v2/redis.proto.rst
+  /envoy/config/overload/v2alpha/overload/envoy/config/overload/v2alpha/overload.proto.rst
   /envoy/config/rbac/v2alpha/rbac/envoy/config/rbac/v2alpha/rbac.proto.rst
+  /envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap/envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.proto.rst
+  /envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource/envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.proto.rst
   /envoy/config/transport_socket/capture/v2alpha/capture/envoy/config/transport_socket/capture/v2alpha/capture.proto.rst
   /envoy/data/accesslog/v2/accesslog/envoy/data/accesslog/v2/accesslog.proto.rst
   /envoy/data/core/v2alpha/health_check_event/envoy/data/core/v2alpha/health_check_event.proto.rst
@@ -113,6 +122,7 @@ PROTO_RST="
   /envoy/type/percent/envoy/type/percent.proto.rst
   /envoy/type/range/envoy/type/range.proto.rst
   /envoy/type/matcher/metadata/envoy/type/matcher/metadata.proto.rst
+  /envoy/type/matcher/value/envoy/type/matcher/value.proto.rst
   /envoy/type/matcher/number/envoy/type/matcher/number.proto.rst
   /envoy/type/matcher/string/envoy/type/matcher/string.proto.rst
 "

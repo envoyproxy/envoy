@@ -13,6 +13,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
 #include "common/common/linked_object.h"
@@ -109,7 +110,8 @@ private:
   struct ActiveConnection : LinkedObject<ActiveConnection>,
                             public Event::DeferredDeletable,
                             public Network::ConnectionCallbacks {
-    ActiveConnection(ActiveListener& listener, Network::ConnectionPtr&& new_connection);
+    ActiveConnection(ActiveListener& listener, Network::ConnectionPtr&& new_connection,
+                     Event::TimeSystem& time_system);
     ~ActiveConnection();
 
     // Network::ConnectionCallbacks
@@ -167,5 +169,5 @@ private:
   std::atomic<uint64_t> num_connections_{};
 };
 
-} // Server
+} // namespace Server
 } // namespace Envoy

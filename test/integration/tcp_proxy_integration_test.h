@@ -14,16 +14,17 @@ namespace {
 class TcpProxyIntegrationTest : public BaseIntegrationTest,
                                 public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  TcpProxyIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::TCP_PROXY_CONFIG) {
+  TcpProxyIntegrationTest()
+      : BaseIntegrationTest(GetParam(), realTime(), ConfigHelper::TCP_PROXY_CONFIG) {
     enable_half_close_ = true;
   }
 
-  void initialize() override;
-
-  void TearDown() override {
+  ~TcpProxyIntegrationTest() {
     test_server_.reset();
     fake_upstreams_.clear();
   }
+
+  void initialize() override;
 };
 
 class TcpProxySslIntegrationTest : public TcpProxyIntegrationTest {
@@ -33,15 +34,15 @@ public:
   void sendAndReceiveTlsData(const std::string& data_to_send_upstream,
                              const std::string& data_to_send_downstream);
 
-  Network::ClientConnectionPtr ssl_client_;
-  FakeRawConnectionPtr fake_upstream_connection_;
   testing::NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<Ssl::ContextManager> context_manager_;
   Network::TransportSocketFactoryPtr context_;
   ConnectionStatusCallbacks connect_callbacks_;
   MockWatermarkBuffer* client_write_buffer_;
   std::shared_ptr<WaitForPayloadReader> payload_reader_;
-  Secret::MockSecretManager secret_manager_;
+  testing::NiceMock<Secret::MockSecretManager> secret_manager_;
+  Network::ClientConnectionPtr ssl_client_;
+  FakeRawConnectionPtr fake_upstream_connection_;
 };
 
 } // namespace

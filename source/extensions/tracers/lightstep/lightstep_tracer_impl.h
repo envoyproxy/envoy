@@ -50,8 +50,9 @@ public:
  */
 class LightStepDriver : public Common::Ot::OpenTracingDriver {
 public:
-  LightStepDriver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                  Stats::Store& stats, ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
+  LightStepDriver(const envoy::config::trace::v2::LightstepConfig& lightstep_config,
+                  Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
+                  ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                   std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
                   PropagationMode propagation_mode);
 
@@ -59,6 +60,8 @@ public:
   Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
+
+  static const size_t DefaultMinFlushSpans;
 
   // Tracer::OpenTracingDriver
   opentracing::Tracer& tracer() override;
@@ -119,7 +122,7 @@ private:
   std::unique_ptr<lightstep::LightStepTracerOptions> options_;
   const PropagationMode propagation_mode_;
 };
-}
+} // namespace Lightstep
 } // namespace Tracers
 } // namespace Extensions
 } // namespace Envoy

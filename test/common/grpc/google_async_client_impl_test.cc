@@ -1,16 +1,19 @@
+#include "envoy/stats/scope.h"
+
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/google_async_client_impl.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Return;
 using testing::_;
+using testing::Return;
 
 namespace Envoy {
 namespace Grpc {
@@ -42,7 +45,8 @@ public:
 class EnvoyGoogleAsyncClientImplTest : public testing::Test {
 public:
   EnvoyGoogleAsyncClientImplTest()
-      : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
+      : dispatcher_(test_time_.timeSystem()),
+        method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     envoy::api::v2::core::GrpcService config;
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_target_uri("fake_address");
@@ -52,6 +56,7 @@ public:
                                                            stats_store_, config);
   }
 
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
   MockStubFactory stub_factory_;

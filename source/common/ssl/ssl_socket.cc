@@ -1,9 +1,12 @@
 #include "common/ssl/ssl_socket.h"
 
+#include "envoy/stats/scope.h"
+
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"
 #include "common/http/headers.h"
+#include "common/ssl/utility.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
@@ -14,8 +17,26 @@ using Envoy::Network::PostIoAction;
 namespace Envoy {
 namespace Ssl {
 
-SslSocket::SslSocket(Context& ctx, InitialState state)
-    : ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
+namespace {
+// This SslSocket will be used when SSL secret is not fetched from SDS server.
+class NotReadySslSocket : public Network::TransportSocket {
+public:
+  // Network::TransportSocket
+  void setTransportSocketCallbacks(Network::TransportSocketCallbacks&) override {}
+  std::string protocol() const override { return EMPTY_STRING; }
+  bool canFlushClose() override { return true; }
+  void closeSocket(Network::ConnectionEvent) override {}
+  Network::IoResult doRead(Buffer::Instance&) override { return {PostIoAction::Close, 0, false}; }
+  Network::IoResult doWrite(Buffer::Instance&, bool) override {
+    return {PostIoAction::Close, 0, false};
+  }
+  void onConnected() override {}
+  const Ssl::Connection* ssl() const override { return nullptr; }
+};
+} // namespace
+
+SslSocket::SslSocket(ContextSharedPtr ctx, InitialState state)
+    : ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), ssl_(ctx_->newSsl()) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_.get());
   } else {
@@ -98,7 +119,7 @@ PostIoAction SslSocket::doHandshake() {
   if (rc == 1) {
     ENVOY_CONN_LOG(debug, "handshake complete", callbacks_->connection());
     handshake_complete_ = true;
-    ctx_.logHandshake(ssl_.get());
+    ctx_->logHandshake(ssl_.get());
     callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 
     // It's possible that we closed during the handshake callback.
@@ -125,7 +146,7 @@ void SslSocket::drainErrorQueue() {
   while (uint64_t err = ERR_get_error()) {
     if (ERR_GET_LIB(err) == ERR_LIB_SSL) {
       if (ERR_GET_REASON(err) == SSL_R_PEER_DID_NOT_RETURN_A_CERTIFICATE) {
-        ctx_.stats().fail_verify_no_cert_.inc();
+        ctx_->stats().fail_verify_no_cert_.inc();
         saw_counted_error = true;
       } else if (ERR_GET_REASON(err) == SSL_R_CERTIFICATE_VERIFY_FAILED) {
         saw_counted_error = true;
@@ -138,7 +159,7 @@ void SslSocket::drainErrorQueue() {
                    ERR_reason_error_string(err));
   }
   if (saw_error && !saw_counted_error) {
-    ctx_.stats().connection_error_.inc();
+    ctx_->stats().connection_error_.inc();
   }
 }
 
@@ -216,7 +237,7 @@ bool SslSocket::peerCertificatePresented() const {
   return cert != nullptr;
 }
 
-std::string SslSocket::uriSanLocalCertificate() {
+std::string SslSocket::uriSanLocalCertificate() const {
   // The cert object is not owned.
   X509* cert = SSL_get_certificate(ssl_.get());
   if (!cert) {
@@ -225,7 +246,7 @@ std::string SslSocket::uriSanLocalCertificate() {
   return getUriSanFromCertificate(cert);
 }
 
-std::vector<std::string> SslSocket::dnsSansLocalCertificate() {
+std::vector<std::string> SslSocket::dnsSansLocalCertificate() const {
   X509* cert = SSL_get_certificate(ssl_.get());
   if (!cert) {
     return {};
@@ -246,7 +267,7 @@ const std::string& SslSocket::sha256PeerCertificateDigest() const {
   std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
   unsigned int n;
   X509_digest(cert.get(), EVP_sha256(), computed_hash.data(), &n);
-  RELEASE_ASSERT(n == computed_hash.size());
+  RELEASE_ASSERT(n == computed_hash.size(), "");
   cached_sha_256_peer_certificate_digest_ = Hex::encode(computed_hash);
   return cached_sha_256_peer_certificate_digest_;
 }
@@ -262,11 +283,11 @@ const std::string& SslSocket::urlEncodedPemEncodedPeerCertificate() const {
   }
 
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-  RELEASE_ASSERT(buf != nullptr);
-  RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1);
+  RELEASE_ASSERT(buf != nullptr, "");
+  RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1, "");
   const uint8_t* output;
   size_t length;
-  RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1);
+  RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
   absl::string_view pem(reinterpret_cast<const char*>(output), length);
   cached_url_encoded_pem_encoded_peer_certificate_ = absl::StrReplaceAll(
       pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
@@ -281,7 +302,7 @@ std::string SslSocket::uriSanPeerCertificate() const {
   return getUriSanFromCertificate(cert.get());
 }
 
-std::vector<std::string> SslSocket::dnsSansPeerCertificate() {
+std::vector<std::string> SslSocket::dnsSansPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return {};
@@ -306,7 +327,7 @@ std::string SslSocket::getUriSanFromCertificate(X509* cert) const {
   return "";
 }
 
-std::vector<std::string> SslSocket::getDnsSansFromCertificate(X509* cert) {
+std::vector<std::string> SslSocket::getDnsSansFromCertificate(X509* cert) const {
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names == nullptr) {
@@ -339,9 +360,17 @@ std::string SslSocket::protocol() const {
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
 }
 
+std::string SslSocket::serialNumberPeerCertificate() const {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return "";
+  }
+  return Utility::getSerialNumberFromCertificate(*cert.get());
+}
+
 std::string SslSocket::getSubjectFromCertificate(X509* cert) const {
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-  RELEASE_ASSERT(buf != nullptr);
+  RELEASE_ASSERT(buf != nullptr, "");
 
   // flags=XN_FLAG_RFC2253 is the documented parameter for single-line output in RFC 2253 format.
   // Example from the RFC:
@@ -373,28 +402,89 @@ std::string SslSocket::subjectLocalCertificate() const {
   return getSubjectFromCertificate(cert);
 }
 
-ClientSslSocketFactory::ClientSslSocketFactory(const ClientContextConfig& config,
+namespace {
+SslSocketFactoryStats generateStats(const std::string& prefix, Stats::Scope& store) {
+  return {
+      ALL_SSL_SOCKET_FACTORY_STATS(POOL_COUNTER_PREFIX(store, prefix + "_ssl_socket_factory."))};
+}
+} // namespace
+
+ClientSslSocketFactory::ClientSslSocketFactory(ClientContextConfigPtr config,
                                                Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope)
-    : ssl_ctx_(manager.createSslClientContext(stats_scope, config)) {}
+    : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("client", stats_scope)),
+      config_(std::move(config)),
+      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {
+  config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
+}
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() const {
-  return std::make_unique<Ssl::SslSocket>(*ssl_ctx_, Ssl::InitialState::Client);
+  // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
+  // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
+  // use the same ssl_ctx to create SslSocket.
+  ClientContextSharedPtr ssl_ctx;
+  {
+    absl::ReaderMutexLock l(&ssl_ctx_mu_);
+    ssl_ctx = ssl_ctx_;
+  }
+  if (ssl_ctx) {
+    return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Client);
+  } else {
+    ENVOY_LOG(debug, "Create NotReadySslSocket");
+    stats_.upstream_context_secrets_not_ready_.inc();
+    return std::make_unique<NotReadySslSocket>();
+  }
 }
 
 bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
-ServerSslSocketFactory::ServerSslSocketFactory(const ServerContextConfig& config,
+void ClientSslSocketFactory::onAddOrUpdateSecret() {
+  ENVOY_LOG(debug, "Secret is updated.");
+  {
+    absl::WriterMutexLock l(&ssl_ctx_mu_);
+    ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
+  }
+  stats_.ssl_context_update_by_sds_.inc();
+}
+
+ServerSslSocketFactory::ServerSslSocketFactory(ServerContextConfigPtr config,
                                                Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope,
                                                const std::vector<std::string>& server_names)
-    : ssl_ctx_(manager.createSslServerContext(stats_scope, config, server_names)) {}
+    : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("server", stats_scope)),
+      config_(std::move(config)), server_names_(server_names),
+      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_)) {
+  config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
+}
 
 Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() const {
-  return std::make_unique<Ssl::SslSocket>(*ssl_ctx_, Ssl::InitialState::Server);
+  // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
+  // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
+  // use the same ssl_ctx to create SslSocket.
+  ServerContextSharedPtr ssl_ctx;
+  {
+    absl::ReaderMutexLock l(&ssl_ctx_mu_);
+    ssl_ctx = ssl_ctx_;
+  }
+  if (ssl_ctx) {
+    return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Server);
+  } else {
+    ENVOY_LOG(debug, "Create NotReadySslSocket");
+    stats_.downstream_context_secrets_not_ready_.inc();
+    return std::make_unique<NotReadySslSocket>();
+  }
 }
 
 bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
+
+void ServerSslSocketFactory::onAddOrUpdateSecret() {
+  ENVOY_LOG(debug, "Secret is updated.");
+  {
+    absl::WriterMutexLock l(&ssl_ctx_mu_);
+    ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
+  }
+  stats_.ssl_context_update_by_sds_.inc();
+}
 
 } // namespace Ssl
 } // namespace Envoy

@@ -4,7 +4,6 @@
 
 #include "common/common/fmt.h"
 #include "common/http/codec_client.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"
@@ -20,13 +19,13 @@ class UdsUpstreamIntegrationTest
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
 public:
   UdsUpstreamIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam()), realTime()),
         abstract_namespace_(std::get<1>(GetParam())) {}
 
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(
         TestEnvironment::unixDomainSocketPath("udstest.1.sock", abstract_namespace_),
-        FakeHttpConnection::Type::HTTP1));
+        FakeHttpConnection::Type::HTTP1, timeSystem()));
 
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
@@ -51,7 +50,7 @@ class UdsListenerIntegrationTest
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
 public:
   UdsListenerIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam()), realTime()),
         abstract_namespace_(std::get<1>(GetParam())) {}
 
   void initialize() override;

@@ -7,6 +7,7 @@
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v2/ads.pb.h"
+#include "envoy/stats/scope.h"
 
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
@@ -20,7 +21,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
@@ -59,22 +60,52 @@ admin:
       port_value: 0
 )EOF";
 
-class AdsIntegrationTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
+class AdsIntegrationBaseTest : public HttpIntegrationTest {
 public:
-  AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
+  AdsIntegrationBaseTest(Http::CodecClient::Type downstream_protocol,
+                         Network::Address::IpVersion version,
+                         const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+      : HttpIntegrationTest(downstream_protocol, version, realTime(), config) {}
+
+  void createAdsConnection(FakeUpstream& upstream) {
+    ads_upstream_ = &upstream;
+    AssertionResult result = ads_upstream_->waitForHttpConnection(*dispatcher_, ads_connection_);
+    RELEASE_ASSERT(result, result.message());
+  }
+
+  void cleanUpAdsConnection() {
+    ASSERT(ads_upstream_ != nullptr);
+
+    // Don't ASSERT fail if an ADS reconnect ends up unparented.
+    ads_upstream_->set_allow_unexpected_disconnects(true);
+    AssertionResult result = ads_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = ads_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    ads_connection_.reset();
+  }
+
+protected:
+  FakeHttpConnectionPtr ads_connection_;
+  FakeUpstream* ads_upstream_{};
+};
+
+class AdsIntegrationTest : public AdsIntegrationBaseTest,
+                           public Grpc::GrpcClientIntegrationParamTest {
+public:
+  AdsIntegrationTest()
+      : AdsIntegrationBaseTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
 
   void TearDown() override {
-    ads_connection_->close();
-    ads_connection_->waitForDisconnect();
-    ads_connection_.reset();
+    cleanUpAdsConnection();
     test_server_.reset();
     fake_upstreams_.clear();
   }
 
   void createUpstreams() override {
-    HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP2, version_));
+    AdsIntegrationBaseTest::createUpstreams();
+    fake_upstreams_.emplace_back(new FakeUpstream(
+        createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {
@@ -86,11 +117,11 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
     tls_cert->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
-    Ssl::ServerContextConfigImpl cfg(tls_context, secret_manager_);
+    auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, factory_context_);
 
     static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return std::make_unique<Ssl::ServerSslSocketFactory>(
-        cfg, context_manager_, *upstream_stats_store, std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   }
 
   AssertionResult
@@ -99,7 +130,11 @@ public:
                           const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
                           const std::string& expected_error_message = "") {
     envoy::api::v2::DiscoveryRequest discovery_request;
-    ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+    VERIFY_ASSERTION(ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+
+    EXPECT_TRUE(discovery_request.has_node());
+    EXPECT_FALSE(discovery_request.node().id().empty());
+    EXPECT_FALSE(discovery_request.node().cluster().empty());
 
     // TODO(PiotrSikora): Remove this hack once fixed internally.
     if (!(expected_type_url == discovery_request.type_url())) {
@@ -171,9 +206,10 @@ public:
                     fake_upstreams_[0]->localAddress()->ip()->port()));
   }
 
-  envoy::api::v2::Listener buildListener(const std::string& name, const std::string& route_config) {
-    return TestUtility::parseYaml<envoy::api::v2::Listener>(
-        fmt::format(R"EOF(
+  envoy::api::v2::Listener buildListener(const std::string& name, const std::string& route_config,
+                                         const std::string& stat_prefix = "ads_test") {
+    return TestUtility::parseYaml<envoy::api::v2::Listener>(fmt::format(
+        R"EOF(
       name: {}
       address:
         socket_address:
@@ -183,14 +219,14 @@ public:
         filters:
         - name: envoy.http_connection_manager
           config:
-            stat_prefix: ads_test
+            stat_prefix: {}
             codec_type: HTTP2
             rds:
               route_config_name: {}
               config_source: {{ ads: {{}} }}
             http_filters: [{{ name: envoy.router }}]
     )EOF",
-                    name, Network::Test::getLoopbackAddressString(ipVersion()), route_config));
+        name, Network::Test::getLoopbackAddressString(ipVersion()), stat_prefix, route_config));
   }
 
   envoy::api::v2::RouteConfiguration buildRouteConfig(const std::string& name,
@@ -236,10 +272,11 @@ public:
       }
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    HttpIntegrationTest::initialize();
+    AdsIntegrationBaseTest::initialize();
     if (ads_stream_ == nullptr) {
-      ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-      ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+      createAdsConnection(*(fake_upstreams_[1]));
+      AssertionResult result = ads_connection_->waitForNewStream(*dispatcher_, ads_stream_);
+      RELEASE_ASSERT(result, result.message());
       ads_stream_->startGrpcStream();
     }
   }
@@ -262,10 +299,9 @@ public:
     return dynamic_cast<const envoy::admin::v2alpha::RoutesConfigDump&>(*message_ptr);
   }
 
-  Secret::MockSecretManager secret_manager_;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   Runtime::MockLoader runtime_;
   Ssl::ContextManagerImpl context_manager_{runtime_};
-  FakeHttpConnectionPtr ads_connection_;
   FakeStreamPtr ads_stream_;
 };
 
@@ -445,23 +481,178 @@ TEST_P(AdsIntegrationTest, Failure) {
   makeSingleRequest();
 }
 
-class AdsFailIntegrationTest : public HttpIntegrationTest,
+// Validate that the request with duplicate listeners is rejected.
+TEST_P(AdsIntegrationTest, DuplicateWarmingListeners) {
+  initialize();
+
+  // Send initial configuration, validate we can process a request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
+
+  // Send duplicate listeners and validate that the update is rejected.
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener,
+      {buildListener("duplicae_listener", "route_config_0"),
+       buildListener("duplicae_listener", "route_config_0")},
+      "1");
+  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+}
+
+// Regression test for the use-after-free crash when processing RDS update (#3953).
+TEST_P(AdsIntegrationTest, RdsAfterLdsWithNoRdsChanges) {
+  initialize();
+
+  // Send initial configuration.
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "1");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // Validate that we can process a request.
+  makeSingleRequest();
+
+  // Update existing LDS (change stat_prefix).
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0", "rds_crash")},
+      "2");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  // Update existing RDS (no changes).
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "2");
+
+  // Validate that we can process a request again
+  makeSingleRequest();
+}
+
+// Validate that the request with duplicate clusters in the initial request during server init is
+// rejected.
+TEST_P(AdsIntegrationTest, DuplicateInitialClusters) {
+  initialize();
+
+  // Send initial configuration, failing each xDS once (via a type mismatch), validate we can
+  // process a request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(
+      Config::TypeUrl::get().Cluster,
+      {buildCluster("duplicate_cluster"), buildCluster("duplicate_cluster")}, "1");
+
+  test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+}
+
+// Validate that the request with duplicate clusters in the subsequent requests (warming clusters)
+// is rejected.
+TEST_P(AdsIntegrationTest, DuplicateWarmingClusters) {
+  initialize();
+
+  // Send initial configuration, validate we can process a request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {"cluster_0"}));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}));
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {"route_config_0"}));
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  makeSingleRequest();
+
+  // Send duplicate warming clusters and validate that the update is rejected.
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(
+      Config::TypeUrl::get().Cluster,
+      {buildCluster("duplicate_cluster"), buildCluster("duplicate_cluster")}, "2");
+  test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+}
+
+// Regression test for the use-after-free crash when processing RDS update (#3953).
+TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
+  initialize();
+
+  // Send initial configuration.
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "1");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // Validate that we can process a request.
+  makeSingleRequest();
+
+  // Update existing LDS (change stat_prefix).
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_1")}, "2");
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_1")}, "2");
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0", "rds_crash")},
+      "2");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  // Update existing RDS (migrate traffic to cluster_1).
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_1")},
+      "2");
+
+  // Validate that we can process a request after RDS update
+  test_server_->waitForCounterGe("http.ads_test.rds.route_config_0.config_reload", 2);
+  makeSingleRequest();
+}
+
+class AdsFailIntegrationTest : public AdsIntegrationBaseTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 public:
   AdsFailIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
+      : AdsIntegrationBaseTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
 
   void TearDown() override {
-    ads_connection_->close();
-    ads_connection_->waitForDisconnect();
-    ads_connection_.reset();
+    cleanUpAdsConnection();
     test_server_.reset();
     fake_upstreams_.clear();
   }
 
   void createUpstreams() override {
-    HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+    AdsIntegrationBaseTest::createUpstreams();
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
   void initialize() override {
@@ -474,10 +665,9 @@ public:
       ads_cluster->set_name("ads_cluster");
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    HttpIntegrationTest::initialize();
+    AdsIntegrationBaseTest::initialize();
   }
 
-  FakeHttpConnectionPtr ads_connection_;
   FakeStreamPtr ads_stream_;
 };
 
@@ -487,29 +677,28 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsFailIntegrationTest,
 // Validate that we don't crash on failed ADS stream.
 TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
   initialize();
-  ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-  ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+  createAdsConnection(*fake_upstreams_[1]);
+  ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
   ads_stream_->startGrpcStream();
   ads_stream_->finishGrpcStream(Grpc::Status::Internal);
 }
 
-class AdsConfigIntegrationTest : public HttpIntegrationTest,
+class AdsConfigIntegrationTest : public AdsIntegrationBaseTest,
                                  public Grpc::GrpcClientIntegrationParamTest {
 public:
   AdsConfigIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
+      : AdsIntegrationBaseTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
 
   void TearDown() override {
-    ads_connection_->close();
-    ads_connection_->waitForDisconnect();
-    ads_connection_.reset();
+    cleanUpAdsConnection();
     test_server_.reset();
     fake_upstreams_.clear();
   }
 
   void createUpstreams() override {
-    HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+    AdsIntegrationBaseTest::createUpstreams();
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
   void initialize() override {
@@ -530,10 +719,9 @@ public:
       eds_config->mutable_ads();
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    HttpIntegrationTest::initialize();
+    AdsIntegrationBaseTest::initialize();
   }
 
-  FakeHttpConnectionPtr ads_connection_;
   FakeStreamPtr ads_stream_;
 };
 
@@ -543,8 +731,8 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsConfigIntegrationTest,
 // This is s regression validating that we don't crash on EDS static Cluster that uses ADS.
 TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {
   initialize();
-  ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-  ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+  createAdsConnection(*fake_upstreams_[1]);
+  ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
   ads_stream_->startGrpcStream();
   ads_stream_->finishGrpcStream(Grpc::Status::Ok);
 }
@@ -564,15 +752,15 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
   });
 
   pre_worker_start_test_steps_ = [this]() {
-    ads_connection_ = fake_upstreams_.back()->waitForHttpConnection(*dispatcher_);
-    ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+    createAdsConnection(*fake_upstreams_.back());
+    ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
     ads_stream_->startGrpcStream();
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
                                         {"eds_cluster2", "eds_cluster"}));
     sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
         Config::TypeUrl::get().ClusterLoadAssignment,
-        {buildClusterLoadAssignment("eds_cluster"), buildClusterLoadAssignment("eds_cluster1")},
+        {buildClusterLoadAssignment("eds_cluster"), buildClusterLoadAssignment("eds_cluster2")},
         "1");
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",

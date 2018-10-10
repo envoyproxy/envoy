@@ -4,7 +4,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/network/filter_manager_impl.h"
-#include "common/stats/stats_impl.h"
 #include "common/tcp_proxy/tcp_proxy.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -24,12 +23,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::WithArgs;
-using testing::_;
 
 namespace Envoy {
 namespace Network {
@@ -154,6 +153,8 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   InSequence s;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   NiceMock<MockConnection> connection;
+  NiceMock<MockClientConnection> upstream_connection;
+  NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool;
   FilterManagerImpl manager(connection, *this);
 
   std::string rl_json = R"EOF(
@@ -189,7 +190,8 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   tcp_proxy.set_cluster("fake_cluster");
   TcpProxy::ConfigSharedPtr tcp_proxy_config(new TcpProxy::Config(tcp_proxy, factory_context));
   manager.addReadFilter(
-      std::make_shared<TcpProxy::Filter>(tcp_proxy_config, factory_context.cluster_manager_));
+      std::make_shared<TcpProxy::Filter>(tcp_proxy_config, factory_context.cluster_manager_,
+                                         factory_context.dispatcher().timeSystem()));
 
   RateLimit::RequestCallbacks* request_callbacks{};
   EXPECT_CALL(*rl_client, limit(_, "foo",
@@ -202,23 +204,19 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
 
   EXPECT_EQ(manager.initializeReadFilters(), true);
 
-  NiceMock<Network::MockClientConnection>* upstream_connection =
-      new NiceMock<Network::MockClientConnection>();
-  Upstream::MockHost::MockCreateConnectionData conn_info;
-  conn_info.connection_ = upstream_connection;
-  conn_info.host_description_ = Upstream::makeTestHost(
-      factory_context.cluster_manager_.thread_local_cluster_.cluster_.info_, "tcp://127.0.0.1:80");
-  EXPECT_CALL(factory_context.cluster_manager_, tcpConnForCluster_("fake_cluster", _))
-      .WillOnce(Return(conn_info));
+  EXPECT_CALL(factory_context.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      .WillOnce(Return(&conn_pool));
 
-  request_callbacks->complete(RateLimit::LimitStatus::OK);
+  request_callbacks->complete(RateLimit::LimitStatus::OK, nullptr);
 
-  upstream_connection->raiseEvent(Network::ConnectionEvent::Connected);
+  conn_pool.poolReady(upstream_connection);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*upstream_connection, write(BufferEqual(&buffer), _));
+  EXPECT_CALL(upstream_connection, write(BufferEqual(&buffer), _));
   read_buffer_.add("hello");
   manager.onRead();
+
+  connection.raiseEvent(ConnectionEvent::RemoteClose);
 }
 
 } // namespace Network

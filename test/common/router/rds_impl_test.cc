@@ -3,6 +3,7 @@
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.validate.h"
+#include "envoy/stats/scope.h"
 
 #include "common/config/filter_json.h"
 #include "common/config/utility.h"
@@ -23,24 +24,24 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Router {
 namespace {
 
 envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
-parseHttpConnectionManagerFromJson(const std::string& json_string) {
+parseHttpConnectionManagerFromJson(const std::string& json_string, const Stats::Scope& scope) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
       http_connection_manager;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Envoy::Config::FilterJson::translateHttpConnectionManager(*json_object_ptr,
-                                                            http_connection_manager);
+  Envoy::Config::FilterJson::translateHttpConnectionManager(
+      *json_object_ptr, http_connection_manager, scope.statsOptions());
   return http_connection_manager;
 }
 
@@ -64,11 +65,12 @@ public:
             }));
   }
 
+  Event::SimulatedTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Http::MockAsyncClientRequest request_;
   Http::AsyncClient::Callbacks* callbacks_{};
   Event::MockTimer* interval_timer_{};
-  NiceMock<MockSystemTimeSource> system_time_source_;
 };
 
 class RdsImplTest : public RdsTestBase {
@@ -107,15 +109,16 @@ public:
     interval_timer_ = new Event::MockTimer(&factory_context_.dispatcher_);
     EXPECT_CALL(factory_context_.init_manager_, registerTarget(_));
     rds_ =
-        RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+        RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json, scope_),
                                         factory_context_, "foo.", *route_config_provider_manager_);
     expectRequest();
     factory_context_.init_manager_.initialize();
   }
 
+  NiceMock<Stats::MockStore> scope_;
   NiceMock<Server::MockInstance> server_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  RouteConfigProviderSharedPtr rds_;
+  RouteConfigProviderPtr rds_;
 };
 
 TEST_F(RdsImplTest, RdsAndStatic) {
@@ -131,10 +134,10 @@ TEST_F(RdsImplTest, RdsAndStatic) {
     }
     )EOF";
 
-  EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
-                                               factory_context_, "foo.",
-                                               *route_config_provider_manager_),
-               EnvoyException);
+  EXPECT_THROW(
+      RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json, scope_),
+                                      factory_context_, "foo.", *route_config_provider_manager_),
+      EnvoyException);
 }
 
 TEST_F(RdsImplTest, LocalInfoNotDefined) {
@@ -154,10 +157,10 @@ TEST_F(RdsImplTest, LocalInfoNotDefined) {
 
   factory_context_.local_info_.node_.set_cluster("");
   factory_context_.local_info_.node_.set_id("");
-  EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
-                                               factory_context_, "foo.",
-                                               *route_config_provider_manager_),
-               EnvoyException);
+  EXPECT_THROW(
+      RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json, scope_),
+                                      factory_context_, "foo.", *route_config_provider_manager_),
+      EnvoyException);
 }
 
 TEST_F(RdsImplTest, UnknownCluster) {
@@ -178,7 +181,7 @@ TEST_F(RdsImplTest, UnknownCluster) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
-      RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+      RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json, scope_),
                                       factory_context_, "foo.", *route_config_provider_manager_),
       EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS "
@@ -323,8 +326,11 @@ TEST_F(RdsImplTest, Failure) {
 
   EXPECT_EQ(2UL,
             factory_context_.scope_.counter("foo.rds.foo_route_config.update_attempt").value());
-  EXPECT_EQ(2UL,
+  EXPECT_EQ(1UL,
             factory_context_.scope_.counter("foo.rds.foo_route_config.update_failure").value());
+  // Validate that the schema error increments update_rejected stat.
+  EXPECT_EQ(1UL,
+            factory_context_.scope_.counter("foo.rds.foo_route_config.update_rejected").value());
 }
 
 TEST_F(RdsImplTest, FailureArray) {
@@ -347,7 +353,7 @@ TEST_F(RdsImplTest, FailureArray) {
   EXPECT_EQ(1UL,
             factory_context_.scope_.counter("foo.rds.foo_route_config.update_attempt").value());
   EXPECT_EQ(1UL,
-            factory_context_.scope_.counter("foo.rds.foo_route_config.update_failure").value());
+            factory_context_.scope_.counter("foo.rds.foo_route_config.update_rejected").value());
 }
 
 class RouteConfigProviderManagerImplTest : public RdsTestBase {
@@ -362,20 +368,19 @@ public:
       )EOF";
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-    Envoy::Config::Utility::translateRdsConfig(*config, rds_);
+    Envoy::Config::Utility::translateRdsConfig(*config, rds_, stats_options_);
 
     // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
     Upstream::MockCluster cluster;
     cluster_map.emplace("foo_cluster", cluster);
-    ON_CALL(factory_context_, systemTimeSource()).WillByDefault(ReturnRef(system_time_source_));
     EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&factory_context_.dispatcher_);
-    provider_ = route_config_provider_manager_->getRdsRouteConfigProvider(rds_, factory_context_,
-                                                                          "foo_prefix.");
+    provider_ = route_config_provider_manager_->createRdsRouteConfigProvider(rds_, factory_context_,
+                                                                             "foo_prefix.");
   }
 
   RouteConfigProviderManagerImplTest() {
@@ -386,9 +391,10 @@ public:
 
   ~RouteConfigProviderManagerImplTest() { factory_context_.thread_local_.shutdownThread(); }
 
+  Stats::StatsOptionsImpl stats_options_;
   envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  RouteConfigProviderSharedPtr provider_;
+  RouteConfigProviderPtr provider_;
 };
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
@@ -422,13 +428,11 @@ virtual_hosts:
         route: { cluster: baz }
 )EOF";
 
-  EXPECT_CALL(system_time_source_, currentTime())
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
-  EXPECT_CALL(factory_context_, systemTimeSource()).WillRepeatedly(ReturnRef(system_time_source_));
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
 
   // Only static route.
-  RouteConfigProviderSharedPtr static_config =
-      route_config_provider_manager_->getStaticRouteConfigProvider(
+  RouteConfigProviderPtr static_config =
+      route_config_provider_manager_->createStaticRouteConfigProvider(
           parseRouteConfigurationFromV2Yaml(config_yaml), factory_context_);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump2 =
@@ -506,14 +510,34 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
   setup();
 
-  // Because this get has the same cluster and route_config_name, the provider returned is just a
-  // shared_ptr to the same provider as the one above.
-  RouteConfigProviderSharedPtr provider2 =
-      route_config_provider_manager_->getRdsRouteConfigProvider(rds_, factory_context_,
-                                                                "foo_prefix");
-  // So this means that both shared_ptrs should be the same.
-  EXPECT_EQ(provider_, provider2);
-  EXPECT_EQ(2UL, provider_.use_count());
+  EXPECT_FALSE(provider_->configInfo().has_value());
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> route_configs;
+  route_configs.Add()->MergeFrom(parseRouteConfigurationFromV2Yaml(R"EOF(
+name: foo_route_config
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+)EOF"));
+
+  RdsRouteConfigSubscription& subscription =
+      dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_).subscription();
+
+  subscription.onConfigUpdate(route_configs, "1");
+
+  RouteConfigProviderPtr provider2 = route_config_provider_manager_->createRdsRouteConfigProvider(
+      rds_, factory_context_, "foo_prefix");
+
+  // provider2 should have route config immediately after create
+  EXPECT_TRUE(provider2->configInfo().has_value());
+
+  // So this means that both provider have same subscription.
+  EXPECT_EQ(&dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_).subscription(),
+            &dynamic_cast<RdsRouteConfigProviderImpl&>(*provider2).subscription());
+  EXPECT_EQ(&provider_->configInfo().value().config_, &provider2->configInfo().value().config_);
 
   std::string config_json2 = R"EOF(
     {
@@ -525,7 +549,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 
   Json::ObjectSharedPtr config2 = Json::Factory::loadFromString(config_json2);
   envoy::config::filter::network::http_connection_manager::v2::Rds rds2;
-  Envoy::Config::Utility::translateRdsConfig(*config2, rds2);
+  Envoy::Config::Utility::translateRdsConfig(*config2, rds2, stats_options_);
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
@@ -535,34 +559,32 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type());
   new Event::MockTimer(&factory_context_.dispatcher_);
-  RouteConfigProviderSharedPtr provider3 =
-      route_config_provider_manager_->getRdsRouteConfigProvider(rds2, factory_context_,
-                                                                "foo_prefix");
+  RouteConfigProviderPtr provider3 = route_config_provider_manager_->createRdsRouteConfigProvider(
+      rds2, factory_context_, "foo_prefix");
   EXPECT_NE(provider3, provider_);
-  EXPECT_EQ(2UL, provider_.use_count());
-  EXPECT_EQ(1UL, provider3.use_count());
+  dynamic_cast<RdsRouteConfigProviderImpl&>(*provider3)
+      .subscription()
+      .onConfigUpdate(route_configs, "provider3");
 
-  std::vector<RouteConfigProviderSharedPtr> configured_providers =
-      route_config_provider_manager_->getRdsRouteConfigProviders();
-  EXPECT_EQ(2UL, configured_providers.size());
-  EXPECT_EQ(3UL, provider_.use_count());
-  EXPECT_EQ(2UL, provider3.use_count());
+  EXPECT_EQ(2UL,
+            route_config_provider_manager_->dumpRouteConfigs()->dynamic_route_configs().size());
 
   provider_.reset();
   provider2.reset();
-  configured_providers.clear();
 
   // All shared_ptrs to the provider pointed at by provider1, and provider2 have been deleted, so
   // now we should only have the provider pointed at by provider3.
-  configured_providers = route_config_provider_manager_->getRdsRouteConfigProviders();
-  EXPECT_EQ(1UL, configured_providers.size());
-  EXPECT_EQ(provider3, configured_providers.front());
+  auto dynamic_route_configs =
+      route_config_provider_manager_->dumpRouteConfigs()->dynamic_route_configs();
+  EXPECT_EQ(1UL, dynamic_route_configs.size());
+
+  // Make sure the left one is provider3
+  EXPECT_EQ("provider3", dynamic_route_configs[0].version_info());
 
   provider3.reset();
-  configured_providers.clear();
 
-  configured_providers = route_config_provider_manager_->getRdsRouteConfigProviders();
-  EXPECT_EQ(0UL, configured_providers.size());
+  EXPECT_EQ(0UL,
+            route_config_provider_manager_->dumpRouteConfigs()->dynamic_route_configs().size());
 }
 
 // Negative test for protoc-gen-validate constraints.
@@ -573,7 +595,8 @@ TEST_F(RouteConfigProviderManagerImplTest, ValidateFail) {
   auto* route_config = route_configs.Add();
   route_config->set_name("foo_route_config");
   route_config->mutable_virtual_hosts()->Add();
-  EXPECT_THROW(provider_impl.onConfigUpdate(route_configs, ""), ProtoValidationException);
+  EXPECT_THROW(provider_impl.subscription().onConfigUpdate(route_configs, ""),
+               ProtoValidationException);
 }
 
 TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
@@ -581,7 +604,7 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
   factory_context_.init_manager_.initialize();
   auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_.get());
   EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
-  provider_impl.onConfigUpdate({}, "");
+  provider_impl.subscription().onConfigUpdate({}, "");
   EXPECT_EQ(
       1UL, factory_context_.scope_.counter("foo_prefix.rds.foo_route_config.update_empty").value());
 }
@@ -594,8 +617,8 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
   route_configs.Add();
   route_configs.Add();
   EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
-  EXPECT_THROW_WITH_MESSAGE(provider_impl.onConfigUpdate(route_configs, ""), EnvoyException,
-                            "Unexpected RDS resource length: 2");
+  EXPECT_THROW_WITH_MESSAGE(provider_impl.subscription().onConfigUpdate(route_configs, ""),
+                            EnvoyException, "Unexpected RDS resource length: 2");
 }
 
 } // namespace

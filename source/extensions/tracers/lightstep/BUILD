@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Trace driver for LightStep (https://lightstep.com/)
 
 load(

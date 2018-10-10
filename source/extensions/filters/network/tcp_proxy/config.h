@@ -16,7 +16,7 @@ namespace TcpProxy {
 class ConfigFactory
     : public Common::FactoryBase<envoy::config::filter::network::tcp_proxy::v2::TcpProxy> {
 public:
-  ConfigFactory() : FactoryBase(NetworkFilterNames::get().TCP_PROXY) {}
+  ConfigFactory() : FactoryBase(NetworkFilterNames::get().TcpProxy) {}
 
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb

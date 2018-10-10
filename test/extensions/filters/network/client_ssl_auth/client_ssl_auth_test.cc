@@ -21,13 +21,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::WithArg;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -141,7 +141,7 @@ TEST_F(ClientSslAuthFilterTest, NoSsl) {
   setup();
   Buffer::OwnedImpl dummy("hello");
 
-  // Check no SSL case, mulitple iterations.
+  // Check no SSL case, multiple iterations.
   EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillOnce(Return(nullptr));
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onNewConnection());
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy, false));

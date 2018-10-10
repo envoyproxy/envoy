@@ -6,7 +6,7 @@
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/filesystem/filesystem_impl.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -17,6 +17,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -24,7 +25,6 @@ using testing::Return;
 using testing::SaveArg;
 using testing::Sequence;
 using testing::Throw;
-using testing::_;
 
 namespace Envoy {
 
@@ -89,8 +89,8 @@ TEST(FileSystemImpl, fileReadToEndDoesNotExist) {
 TEST(FilesystemImpl, CanonicalPathSuccess) { EXPECT_EQ("/", Filesystem::canonicalPath("//")); }
 
 TEST(FilesystemImpl, CanonicalPathFail) {
-  EXPECT_THROW_WITH_MESSAGE(Filesystem::canonicalPath("/_some_non_existant_file"), EnvoyException,
-                            "Unable to determine canonical path for /_some_non_existant_file");
+  EXPECT_THROW_WITH_MESSAGE(Filesystem::canonicalPath("/_some_non_existent_file"), EnvoyException,
+                            "Unable to determine canonical path for /_some_non_existent_file");
 }
 
 TEST(FilesystemImpl, IllegalPath) {
@@ -101,7 +101,7 @@ TEST(FilesystemImpl, IllegalPath) {
   EXPECT_TRUE(Filesystem::illegalPath("/proc/"));
   EXPECT_TRUE(Filesystem::illegalPath("/sys"));
   EXPECT_TRUE(Filesystem::illegalPath("/sys/"));
-  EXPECT_TRUE(Filesystem::illegalPath("/_some_non_existant_file"));
+  EXPECT_TRUE(Filesystem::illegalPath("/_some_non_existent_file"));
 }
 
 TEST(FileSystemImpl, flushToLogFilePeriodically) {

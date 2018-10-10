@@ -6,7 +6,7 @@ Overview (v2 API)
 The Envoy v2 APIs are defined as `proto3
 <https://developers.google.com/protocol-buffers/docs/proto3>`_ `Protocol Buffers
 <https://developers.google.com/protocol-buffers/>`_ in the `data plane API
-repository <https://github.com/envoyproxy/data-plane-api/tree/master/api>`_. They evolve the
+repository <https://github.com/envoyproxy/data-plane-api/tree/master/envoy/api>`_. They evolve the
 existing :ref:`v1 APIs and concepts <config_overview_v1>` to support:
 
 * Streaming delivery of `xDS <https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md>`_
@@ -37,12 +37,9 @@ flag, i.e.:
 
 .. code-block:: console
 
-  ./envoy -c <path to config>.{json,yaml,pb,pb_text} --v2-config-only
+  ./envoy -c <path to config>.{json,yaml,pb,pb_text}
 
-where the extension reflects the underlying v2 config representation. The
-:option:`--v2-config-only` flag is not strictly required as Envoy will attempt
-to autodetect the config file version, but this option provides an enhanced
-debug experience when configuration parsing fails.
+where the extension reflects the underlying v2 config representation.
 
 The :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` message is the root of the
 configuration. A key concept in the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>`
@@ -98,7 +95,15 @@ A minimal fully static bootstrap config is provided below:
       connect_timeout: 0.25s
       type: STATIC
       lb_policy: ROUND_ROBIN
-      hosts: [{ socket_address: { address: 127.0.0.2, port_value: 1234 }}]
+      load_assignment:
+        cluster_name: some_service
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 1234
 
 Mostly static with dynamic EDS
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -145,13 +150,23 @@ on 127.0.0.3:5678 is provided below:
         eds_config:
           api_config_source:
             api_type: GRPC
-            cluster_names: [xds_cluster]
+            grpc_services:
+              envoy_grpc:
+                cluster_name: xds_cluster
     - name: xds_cluster
       connect_timeout: 0.25s
       type: STATIC
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {}
-      hosts: [{ socket_address: { address: 127.0.0.3, port_value: 5678 }}]
+      load_assignment:
+        cluster_name: xds_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 5678
 
 Notice above that *xds_cluster* is defined to point Envoy at the management server. Even in
 an otherwise completely dynamic configurations, some static resources need to
@@ -198,11 +213,15 @@ below:
     lds_config:
       api_config_source:
         api_type: GRPC
-        cluster_names: [xds_cluster]
+        grpc_services:
+          envoy_grpc:
+            cluster_name: xds_cluster
     cds_config:
       api_config_source:
         api_type: GRPC
-        cluster_names: [xds_cluster]
+        grpc_services:
+          envoy_grpc:
+            cluster_name: xds_cluster
 
   static_resources:
     clusters:
@@ -211,7 +230,15 @@ below:
       type: STATIC
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {}
-      hosts: [{ socket_address: { address: 127.0.0.3, port_value: 5678 }}]
+      load_assignment:
+        cluster_name: xds_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 5678
 
 The management server could respond to LDS requests with:
 
@@ -236,7 +263,9 @@ The management server could respond to LDS requests with:
             config_source:
               api_config_source:
                 api_type: GRPC
-                cluster_names: [xds_cluster]
+                grpc_services:
+                  envoy_grpc:
+                    cluster_name: xds_cluster
           http_filters:
           - name: envoy.router
 
@@ -270,7 +299,9 @@ The management server could respond to CDS requests with:
       eds_config:
         api_config_source:
           api_type: GRPC
-          cluster_names: [xds_cluster]
+          grpc_services:
+            envoy_grpc:
+              cluster_name: xds_cluster
 
 The management server could respond to EDS requests with:
 
@@ -299,6 +330,8 @@ you can run:
 
   bazel run //tools:v1_to_bootstrap <path to v1 JSON/YAML configuration file>
 
+.. _config_overview_v2_management_server:
+
 Management server
 -----------------
 
@@ -324,7 +357,9 @@ for the service definition. This is used by Envoy as a client when
     cds_config:
       api_config_source:
         api_type: GRPC
-        cluster_names: [some_xds_cluster]
+        grpc_services:
+          envoy_grpc:
+            cluster_name: some_xds_cluster
 
 is set in the :ref:`dynamic_resources
 <envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
@@ -341,7 +376,9 @@ for the service definition. This is used by Envoy as a client when
     eds_config:
       api_config_source:
         api_type: GRPC
-        cluster_names: [some_xds_cluster]
+        grpc_services:
+          envoy_grpc:
+            cluster_name: some_xds_cluster
 
 is set in the :ref:`eds_cluster_config
 <envoy_api_field_Cluster.eds_cluster_config>` field of the :ref:`Cluster
@@ -358,7 +395,9 @@ for the service definition. This is used by Envoy as a client when
     lds_config:
       api_config_source:
         api_type: GRPC
-        cluster_names: [some_xds_cluster]
+        grpc_services:
+          envoy_grpc:
+            cluster_name: some_xds_cluster
 
 is set in the :ref:`dynamic_resources
 <envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
@@ -376,7 +415,9 @@ for the service definition. This is used by Envoy as a client when
     config_source:
       api_config_source:
         api_type: GRPC
-        cluster_names: [some_xds_cluster]
+        grpc_services:
+          envoy_grpc:
+            cluster_name: some_xds_cluster
 
 is set in the :ref:`rds
 <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.rds>` field of the :ref:`HttpConnectionManager
@@ -496,7 +537,9 @@ for the service definition. This is used by Envoy as a client when
 
     ads_config:
       api_type: GRPC
-      cluster_names: [some_ads_cluster]
+      grpc_services:
+        envoy_grpc:
+          cluster_name: some_ads_cluster
 
 is set in the :ref:`dynamic_resources
 <envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
@@ -526,15 +569,27 @@ the shared ADS channel.
 Management Server Unreachability
 --------------------------------
 
-When Envoy instance looses connectivity with the management server, Envoy will latch on to
-the previous configuration while actively retrying in the background to reestablish the 
-connection with the management server. 
+When an Envoy instance loses connectivity with the management server, Envoy will latch on to
+the previous configuration while actively retrying in the background to reestablish the
+connection with the management server.
 
-Envoy debug logs the fact that it is not able to establish a connection with the management server 
+Envoy debug logs the fact that it is not able to establish a connection with the management server
 every time it attempts a connection.
 
-:ref:`upstream_cx_connect_fail <config_cluster_manager_cluster_stats>` a cluster level statistic
-of the cluster pointing to management server provides a signal for monitoring this behavior.
+:ref:`connected_state <management_server_stats>` statistic provides a signal for monitoring this behavior.
+
+.. _management_server_stats:
+
+Statistics
+----------
+
+Management Server has a statistics tree rooted at *control_plane.* with the following statistics:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   connected_state, Gauge, A boolan (1 for connected and 0 for disconnected) that indicates the current connection state with management server
 
 .. _config_overview_v2_status:
 

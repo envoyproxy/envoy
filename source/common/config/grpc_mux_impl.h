@@ -24,9 +24,9 @@ class GrpcMuxImpl : public GrpcMux,
                     Grpc::TypedAsyncStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
                     Logger::Loggable<Logger::Id::upstream> {
 public:
-  GrpcMuxImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
+  GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              MonotonicTimeSource& time_source = ProdMonotonicTimeSource::instance_);
+              Runtime::RandomGenerator& random, Stats::Scope& scope);
   ~GrpcMuxImpl();
 
   void start() override;
@@ -45,13 +45,16 @@ public:
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_INITIAL_DELAY_MS = 500;
   const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
-  const double MULTIPLIER = 2;
 
 private:
   void setRetryTimer();
   void establishNewStream();
   void sendDiscoveryRequest(const std::string& type_url);
   void handleFailure();
+  ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
+    const std::string control_plane_prefix = "control_plane.";
+    return {ALL_CONTROL_PLANE_STATS(POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
+  }
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const std::vector<std::string>& resources, GrpcMuxCallbacks& callbacks,
@@ -95,7 +98,7 @@ private:
     TokenBucketPtr limit_log_;
   };
 
-  envoy::api::v2::core::Node node_;
+  const LocalInfo::LocalInfo& local_info_;
   Grpc::AsyncClientPtr async_client_;
   Grpc::AsyncStream* stream_{};
   const Protobuf::MethodDescriptor& service_method_;
@@ -103,8 +106,10 @@ private:
   // Envoy's dependendency ordering.
   std::list<std::string> subscriptions_;
   Event::TimerPtr retry_timer_;
-  MonotonicTimeSource& time_source_;
-  BackOffStrategyPtr backoff_strategy_ptr_;
+  Runtime::RandomGenerator& random_;
+  TimeSource& time_source_;
+  BackOffStrategyPtr backoff_strategy_;
+  ControlPlaneStats control_plane_stats_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {

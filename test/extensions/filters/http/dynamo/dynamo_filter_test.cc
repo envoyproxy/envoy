@@ -15,11 +15,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -33,7 +33,8 @@ public:
         .WillByDefault(Return(enabled));
     EXPECT_CALL(loader_.snapshot_, featureEnabled("dynamodb.filter_enabled", 100));
 
-    filter_.reset(new DynamoFilter(loader_, stat_prefix_, stats_));
+    filter_.reset(new DynamoFilter(loader_, stat_prefix_, stats_,
+                                   decoder_callbacks_.dispatcher().timeSystem()));
 
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -44,7 +45,7 @@ public:
   std::unique_ptr<DynamoFilter> filter_;
   NiceMock<Runtime::MockLoader> loader_;
   std::string stat_prefix_{"prefix."};
-  Stats::MockStore stats_;
+  NiceMock<Stats::MockStore> stats_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };

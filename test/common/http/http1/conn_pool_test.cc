@@ -17,11 +17,13 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -30,7 +32,6 @@ using testing::Property;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Http {
@@ -79,7 +80,7 @@ public:
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&mock_dispatcher_);
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-    test_client.client_dispatcher_.reset(new Event::DispatcherImpl);
+    test_client.client_dispatcher_.reset(new Event::DispatcherImpl(test_time_.timeSystem()));
     Network::ClientConnectionPtr connection{test_client.connection_};
     test_client.codec_client_ = new CodecClientForTest(
         std::move(connection), test_client.codec_,
@@ -110,6 +111,7 @@ public:
     EXPECT_FALSE(upstream_ready_enabled_);
   }
 
+  DangerousDeprecatedTestTime test_time_;
   Event::MockDispatcher& mock_dispatcher_;
   NiceMock<Event::MockTimer>* mock_upstream_ready_timer_;
   std::vector<TestCodecClient> test_clients_;
@@ -146,6 +148,7 @@ struct ActiveTestRequest {
 
   ActiveTestRequest(Http1ConnPoolImplTest& parent, size_t client_index, Type type)
       : parent_(parent), client_index_(client_index) {
+    uint64_t current_rq_total = parent_.cluster_->stats_.upstream_rq_total_.value();
     if (type == Type::CreateConnection) {
       parent.conn_pool_.expectClientCreate();
     }
@@ -153,6 +156,7 @@ struct ActiveTestRequest {
     if (type == Type::Immediate) {
       expectNewStream();
     }
+
     handle_ = parent.conn_pool_.newStream(outer_decoder_, callbacks_);
 
     if (type == Type::Immediate) {
@@ -167,6 +171,7 @@ struct ActiveTestRequest {
       parent.conn_pool_.test_clients_[client_index_].connection_->raiseEvent(
           Network::ConnectionEvent::Connected);
     }
+    EXPECT_EQ(current_rq_total + 1, parent_.cluster_->stats_.upstream_rq_total_.value());
   }
 
   void completeResponse(bool with_body) {
@@ -363,6 +368,7 @@ TEST_F(Http1ConnPoolImplTest, ConnectTimeout) {
   EXPECT_CALL(conn_pool_, onClientDestroy()).Times(2);
   dispatcher_.clearDeferredDeleteList();
 
+  EXPECT_EQ(2U, cluster_->stats_.upstream_rq_total_.value());
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_timeout_.value());
 }

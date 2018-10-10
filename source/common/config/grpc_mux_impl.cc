@@ -9,15 +9,17 @@
 namespace Envoy {
 namespace Config {
 
-GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
+GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
-                         MonotonicTimeSource& time_source)
-    : node_(node), async_client_(std::move(async_client)), service_method_(service_method),
-      time_source_(time_source) {
+                         Runtime::RandomGenerator& random, Stats::Scope& scope)
+    : local_info_(local_info), async_client_(std::move(async_client)),
+      service_method_(service_method), random_(random), time_source_(dispatcher.timeSystem()),
+      control_plane_stats_(generateControlPlaneStats(scope)) {
+  Config::Utility::checkLocalInfo("ads", local_info);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
-  backoff_strategy_ptr_ = std::make_unique<ExponentialBackOffStrategy>(
-      RETRY_INITIAL_DELAY_MS, RETRY_MAX_DELAY_MS, MULTIPLIER);
+  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
+                                                                RETRY_MAX_DELAY_MS, random_);
 }
 
 GrpcMuxImpl::~GrpcMuxImpl() {
@@ -31,7 +33,7 @@ GrpcMuxImpl::~GrpcMuxImpl() {
 void GrpcMuxImpl::start() { establishNewStream(); }
 
 void GrpcMuxImpl::setRetryTimer() {
-  retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_ptr_->nextBackOffMs()));
+  retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
 }
 
 void GrpcMuxImpl::establishNewStream() {
@@ -43,6 +45,7 @@ void GrpcMuxImpl::establishNewStream() {
     return;
   }
 
+  control_plane_stats_.connected_state_.set(1);
   for (const auto type_url : subscriptions_) {
     sendDiscoveryRequest(type_url);
   }
@@ -110,11 +113,11 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
   // TODO(gsagula): move TokenBucketImpl params to a config.
   if (!api_state_[type_url].subscribed_) {
     // Bucket contains 100 tokens maximum and refills at 5 tokens/sec.
-    api_state_[type_url].limit_request_ = std::make_unique<TokenBucketImpl>(100, 5, time_source_);
+    api_state_[type_url].limit_request_ = std::make_unique<TokenBucketImpl>(100, time_source_, 5);
     // Bucket contains 1 token maximum and refills 1 token on every ~5 seconds.
-    api_state_[type_url].limit_log_ = std::make_unique<TokenBucketImpl>(1, 0.2, time_source_);
+    api_state_[type_url].limit_log_ = std::make_unique<TokenBucketImpl>(1, time_source_, 0.2);
     api_state_[type_url].request_.set_type_url(type_url);
-    api_state_[type_url].request_.mutable_node()->MergeFrom(node_);
+    api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
     api_state_[type_url].subscribed_ = true;
     subscriptions_.emplace_back(type_url);
   }
@@ -159,7 +162,7 @@ void GrpcMuxImpl::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
 
 void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
   // Reset here so that it starts with fresh backoff interval on next disconnect.
-  backoff_strategy_ptr_->reset();
+  backoff_strategy_->reset();
 
   const std::string& type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
@@ -239,6 +242,7 @@ void GrpcMuxImpl::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
 void GrpcMuxImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
   ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
   stream_ = nullptr;
+  control_plane_stats_.connected_state_.set(0);
   setRetryTimer();
 }
 

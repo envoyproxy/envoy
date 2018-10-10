@@ -23,6 +23,7 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         "//include/envoy/common:backoff_strategy_interface",
+        "//include/envoy/runtime:runtime_interface",
     ],
 )
 
@@ -135,6 +136,7 @@ envoy_cc_library(
         "@envoy_api//envoy/type/matcher:metadata_cc",
         "@envoy_api//envoy/type/matcher:number_cc",
         "@envoy_api//envoy/type/matcher:string_cc",
+        "@envoy_api//envoy/type/matcher:value_cc",
     ],
 )
 
@@ -234,6 +236,7 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         ":logger_lib",
+        "//source/common/stats:stats_options_lib",
     ],
 )
 

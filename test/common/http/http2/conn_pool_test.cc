@@ -15,10 +15,12 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -27,7 +29,6 @@ using testing::Property;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Http {
@@ -77,7 +78,7 @@ public:
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-    test_client.client_dispatcher_.reset(new Event::DispatcherImpl);
+    test_client.client_dispatcher_.reset(new Event::DispatcherImpl(test_time_.timeSystem()));
 
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
     Network::ClientConnectionPtr connection{test_client.connection_};
@@ -101,6 +102,7 @@ public:
 
   MOCK_METHOD0(onClientDestroy, void());
 
+  DangerousDeprecatedTestTime test_time_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};
@@ -392,6 +394,7 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
+  EXPECT_EQ(2U, cluster_->stats_.upstream_rq_total_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_timeout_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_failure_eject_.value());

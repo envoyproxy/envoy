@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Mongo proxy L4 network filter (observability and fault injection).
 # Public docs: docs/root/configuration/network_filters/mongo_proxy_filter.rst
 

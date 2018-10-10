@@ -7,65 +7,72 @@
 #include "common/stats/thread_local_store.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Stats {
 
-class StatsThreadLocalStoreTest : public testing::Test, public RawStatDataAllocator {
+class StatsThreadLocalStoreTest : public testing::Test {
 public:
-  StatsThreadLocalStoreTest() {
-    ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](const std::string& name) -> RawStatData* {
-      return alloc_.alloc(name);
-    }));
+  void SetUp() override {
+    alloc_ = std::make_unique<MockedTestAllocator>(options_);
+    resetStoreWithAlloc(*alloc_);
+  }
 
-    ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
-      return alloc_.free(data);
-    }));
-
-    EXPECT_CALL(*this, alloc("stats.overflow"));
-    store_.reset(new ThreadLocalStoreImpl(*this));
+  void resetStoreWithAlloc(StatDataAllocator& alloc) {
+    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, alloc);
     store_->addSink(sink_);
   }
 
-  MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
-  MOCK_METHOD1(free, void(RawStatData& data));
-
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  TestAllocator alloc_;
+  StatsOptionsImpl options_;
+  std::unique_ptr<MockedTestAllocator> alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
 };
 
-class HistogramTest : public testing::Test, public RawStatDataAllocator {
+class HistogramWrapper {
 public:
-  typedef std::map<std::string, Stats::ParentHistogramSharedPtr> NameHistogramMap;
+  HistogramWrapper() : histogram_(hist_alloc()) {}
+
+  ~HistogramWrapper() { hist_free(histogram_); }
+
+  const histogram_t* getHistogram() { return histogram_; }
+
+  void setHistogramValues(const std::vector<uint64_t>& values) {
+    for (uint64_t value : values) {
+      hist_insert_intscale(histogram_, value, 0, 1);
+    }
+  }
+
+private:
+  histogram_t* histogram_;
+};
+
+class HistogramTest : public testing::Test {
+public:
+  typedef std::map<std::string, ParentHistogramSharedPtr> NameHistogramMap;
+
+  HistogramTest() : alloc_(options_) {}
 
   void SetUp() override {
-    ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](const std::string& name) -> RawStatData* {
-      return alloc_.alloc(name);
-    }));
-
-    ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
-      return alloc_.free(data);
-    }));
-
-    EXPECT_CALL(*this, alloc("stats.overflow"));
-    store_.reset(new ThreadLocalStoreImpl(*this));
+    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, alloc_);
     store_->addSink(sink_);
     store_->initializeThreading(main_thread_dispatcher_, tls_);
   }
@@ -74,12 +81,12 @@ public:
     store_->shutdownThreading();
     tls_.shutdownThread();
     // Includes overflow stat.
-    EXPECT_CALL(*this, free(_));
+    EXPECT_CALL(alloc_, free(_));
   }
 
   NameHistogramMap makeHistogramMap(const std::vector<ParentHistogramSharedPtr>& hist_list) {
     NameHistogramMap name_histogram_map;
-    for (const Stats::ParentHistogramSharedPtr& histogram : hist_list) {
+    for (const ParentHistogramSharedPtr& histogram : hist_list) {
       // Exclude the scope part of the name.
       const std::vector<std::string>& split_vector = absl::StrSplit(histogram->name(), '.');
       name_histogram_map.insert(std::make_pair(split_vector.back(), histogram));
@@ -99,31 +106,31 @@ public:
 
     std::vector<ParentHistogramSharedPtr> histogram_list = store_->histograms();
 
-    histogram_t* hist1_cumulative = makeHistogram(h1_cumulative_values_);
-    histogram_t* hist2_cumulative = makeHistogram(h2_cumulative_values_);
-    histogram_t* hist1_interval = makeHistogram(h1_interval_values_);
-    histogram_t* hist2_interval = makeHistogram(h2_interval_values_);
+    HistogramWrapper hist1_cumulative;
+    HistogramWrapper hist2_cumulative;
+    HistogramWrapper hist1_interval;
+    HistogramWrapper hist2_interval;
 
-    HistogramStatisticsImpl h1_cumulative_statistics(hist1_cumulative);
-    HistogramStatisticsImpl h2_cumulative_statistics(hist2_cumulative);
-    HistogramStatisticsImpl h1_interval_statistics(hist1_interval);
-    HistogramStatisticsImpl h2_interval_statistics(hist2_interval);
+    hist1_cumulative.setHistogramValues(h1_cumulative_values_);
+    hist2_cumulative.setHistogramValues(h2_cumulative_values_);
+    hist1_interval.setHistogramValues(h1_interval_values_);
+    hist2_interval.setHistogramValues(h2_interval_values_);
+
+    HistogramStatisticsImpl h1_cumulative_statistics(hist1_cumulative.getHistogram());
+    HistogramStatisticsImpl h2_cumulative_statistics(hist2_cumulative.getHistogram());
+    HistogramStatisticsImpl h1_interval_statistics(hist1_interval.getHistogram());
+    HistogramStatisticsImpl h2_interval_statistics(hist2_interval.getHistogram());
 
     NameHistogramMap name_histogram_map = makeHistogramMap(histogram_list);
-    const Stats::ParentHistogramSharedPtr& h1 = name_histogram_map["h1"];
+    const ParentHistogramSharedPtr& h1 = name_histogram_map["h1"];
     EXPECT_EQ(h1->cumulativeStatistics().summary(), h1_cumulative_statistics.summary());
     EXPECT_EQ(h1->intervalStatistics().summary(), h1_interval_statistics.summary());
 
     if (histogram_list.size() > 1) {
-      const Stats::ParentHistogramSharedPtr& h2 = name_histogram_map["h2"];
+      const ParentHistogramSharedPtr& h2 = name_histogram_map["h2"];
       EXPECT_EQ(h2->cumulativeStatistics().summary(), h2_cumulative_statistics.summary());
       EXPECT_EQ(h2->intervalStatistics().summary(), h2_interval_statistics.summary());
     }
-
-    hist_free(hist1_cumulative);
-    hist_free(hist2_cumulative);
-    hist_free(hist1_interval);
-    hist_free(hist2_interval);
 
     h1_interval_values_.clear();
     h2_interval_values_.clear();
@@ -144,20 +151,13 @@ public:
     }
   }
 
-  histogram_t* makeHistogram(const std::vector<uint64_t>& values) {
-    histogram_t* histogram = hist_alloc();
-    for (uint64_t value : values) {
-      hist_insert_intscale(histogram, value, 0, 1);
-    }
-    return histogram;
-  }
-
   MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
   MOCK_METHOD1(free, void(RawStatData& data));
 
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  TestAllocator alloc_;
+  StatsOptionsImpl options_;
+  MockedTestAllocator alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
   InSequence s;
@@ -167,7 +167,7 @@ public:
 
 TEST_F(StatsThreadLocalStoreTest, NoTls) {
   InSequence s;
-  EXPECT_CALL(*this, alloc(_)).Times(2);
+  EXPECT_CALL(*alloc_, alloc(_)).Times(2);
 
   Counter& c1 = store_->counter("c1");
   EXPECT_EQ(&c1, &store_->counter("c1"));
@@ -184,14 +184,14 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   store_->deliverHistogramToSinks(h1, 100);
 
   EXPECT_EQ(2UL, store_->counters().size());
-  EXPECT_EQ(&c1, store_->counters().front().get());
-  EXPECT_EQ(2L, store_->counters().front().use_count());
+  EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
+  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
-  EXPECT_EQ(&g1, store_->gauges().front().get());
+  EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(3);
+  EXPECT_CALL(*alloc_, free(_)).Times(3);
 
   store_->shutdownThreading();
 }
@@ -200,7 +200,7 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  EXPECT_CALL(*this, alloc(_)).Times(2);
+  EXPECT_CALL(*alloc_, alloc(_)).Times(2);
 
   Counter& c1 = store_->counter("c1");
   EXPECT_EQ(&c1, &store_->counter("c1"));
@@ -212,24 +212,24 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(&h1, &store_->histogram("h1"));
 
   EXPECT_EQ(2UL, store_->counters().size());
-  EXPECT_EQ(&c1, store_->counters().front().get());
-  EXPECT_EQ(3L, store_->counters().front().use_count());
+  EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
+  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
-  EXPECT_EQ(&g1, store_->gauges().front().get());
+  EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(3L, store_->gauges().front().use_count());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
 
   EXPECT_EQ(2UL, store_->counters().size());
-  EXPECT_EQ(&c1, store_->counters().front().get());
-  EXPECT_EQ(2L, store_->counters().front().use_count());
+  EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
+  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
-  EXPECT_EQ(&g1, store_->gauges().front().get());
+  EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(3);
+  EXPECT_CALL(*alloc_, free(_)).Times(3);
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {
@@ -237,7 +237,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   ScopePtr scope1 = store_->createScope("scope1.");
-  EXPECT_CALL(*this, alloc(_)).Times(4);
+  EXPECT_CALL(*alloc_, alloc(_)).Times(4);
   Counter& c1 = store_->counter("c1");
   Counter& c2 = scope1->counter("c2");
   EXPECT_EQ("c1", c1.name());
@@ -263,7 +263,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(5);
+  EXPECT_CALL(*alloc_, free(_)).Times(5);
 }
 
 // Validate that we sanitize away bad characters in the stats prefix.
@@ -272,7 +272,7 @@ TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   ScopePtr scope1 = store_->createScope(std::string("scope1:\0:foo.", 13));
-  EXPECT_CALL(*this, alloc(_));
+  EXPECT_CALL(*alloc_, alloc(_));
   Counter& c1 = scope1->counter("c1");
   EXPECT_EQ("scope1___foo.c1", c1.name());
 
@@ -280,7 +280,7 @@ TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(2);
+  EXPECT_CALL(*alloc_, free(_)).Times(2);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
@@ -288,12 +288,12 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   ScopePtr scope1 = store_->createScope("scope1.");
-  EXPECT_CALL(*this, alloc(_));
+  EXPECT_CALL(*alloc_, alloc(_));
   scope1->counter("c1");
   EXPECT_EQ(2UL, store_->counters().size());
-  CounterSharedPtr c1 = store_->counters().front();
+  CounterSharedPtr c1 = TestUtility::findCounter(*store_, "scope1.c1");
   EXPECT_EQ("scope1.c1", c1->name());
-  EXPECT_EQ(store_->source().cachedCounters().front(), c1);
+  EXPECT_EQ(TestUtility::findByName(store_->source().cachedCounters(), "scope1.c1"), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(tls_, runOnAllThreads(_));
@@ -303,7 +303,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   store_->source().clearCache();
   EXPECT_EQ(1UL, store_->source().cachedCounters().size());
 
-  EXPECT_CALL(*this, free(_));
+  EXPECT_CALL(*alloc_, free(_));
   EXPECT_EQ(1L, c1.use_count());
   c1.reset();
 
@@ -311,7 +311,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_));
+  EXPECT_CALL(*alloc_, free(_));
 }
 
 TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
@@ -319,12 +319,12 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   ScopePtr scope1 = store_->createScope("scope1.");
-  EXPECT_CALL(*this, alloc(_));
+  EXPECT_CALL(*alloc_, alloc(_));
   Counter& c1 = scope1->counter("foo.bar");
   EXPECT_EQ("scope1.foo.bar", c1.name());
 
   ScopePtr scope2 = scope1->createScope("foo.");
-  EXPECT_CALL(*this, alloc(_));
+  EXPECT_CALL(*alloc_, alloc(_));
   Counter& c2 = scope2->counter("bar");
   EXPECT_NE(&c1, &c2);
   EXPECT_EQ("scope1.foo.bar", c2.name());
@@ -334,7 +334,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   EXPECT_EQ(1UL, c1.value());
   EXPECT_EQ(c1.value(), c2.value());
 
-  EXPECT_CALL(*this, alloc(_));
+  EXPECT_CALL(*alloc_, alloc(_));
   Gauge& g1 = scope2->gauge("some_gauge");
   EXPECT_EQ("scope1.foo.some_gauge", g1.name());
 
@@ -342,7 +342,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(4);
+  EXPECT_CALL(*alloc_, free(_)).Times(4);
 }
 
 TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
@@ -355,7 +355,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   ScopePtr scope2 = store_->createScope("scope1.");
 
   // We will call alloc twice, but they should point to the same backing storage.
-  EXPECT_CALL(*this, alloc(_)).Times(2);
+  EXPECT_CALL(*alloc_, alloc(_)).Times(2);
   Counter& c1 = scope1->counter("c");
   Counter& c2 = scope2->counter("c");
   EXPECT_NE(&c1, &c2);
@@ -370,7 +370,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ(2UL, store_->counters().size());
 
   // Gauges should work the same way.
-  EXPECT_CALL(*this, alloc(_)).Times(2);
+  EXPECT_CALL(*alloc_, alloc(_)).Times(2);
   Gauge& g1 = scope1->gauge("g");
   Gauge& g2 = scope2->gauge("g");
   EXPECT_NE(&g1, &g2);
@@ -383,7 +383,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ(1UL, store_->gauges().size());
 
   // Deleting scope 1 will call free but will be reference counted. It still leaves scope 2 valid.
-  EXPECT_CALL(*this, free(_)).Times(2);
+  EXPECT_CALL(*alloc_, free(_)).Times(2);
   scope1.reset();
   c2.inc();
   EXPECT_EQ(3UL, c2.value());
@@ -396,14 +396,14 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(3);
+  EXPECT_CALL(*alloc_, free(_)).Times(3);
 }
 
 TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  EXPECT_CALL(*this, alloc("foo")).WillOnce(Return(nullptr));
+  EXPECT_CALL(*alloc_, alloc(absl::string_view("foo"))).WillOnce(Return(nullptr));
   Counter& c1 = store_->counter("foo");
   EXPECT_EQ(1UL, store_->counter("stats.overflow").value());
 
@@ -414,14 +414,89 @@ TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
   tls_.shutdownThread();
 
   // Includes overflow but not the failsafe stat which we allocated from the heap.
-  EXPECT_CALL(*this, free(_));
+  EXPECT_CALL(*alloc_, free(_));
+}
+
+TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  // First, with a successful RawStatData allocation:
+  const uint64_t max_name_length = options_.maxNameLength();
+  const std::string name_1(max_name_length + 1, 'A');
+
+  EXPECT_CALL(*alloc_, alloc(_));
+  EXPECT_LOG_CONTAINS("warning", "is too long with", store_->counter(name_1));
+
+  // The stats did not overflow yet.
+  EXPECT_EQ(0UL, store_->counter("stats.overflow").value());
+
+  // The name will be truncated, so we won't be able to find it with the entire name.
+  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
+
+  // But we can find it based on the expected truncation.
+  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
+
+  // The same should be true with heap allocation, which occurs when the default
+  // allocator fails.
+  const std::string name_2(max_name_length + 1, 'B');
+  EXPECT_CALL(*alloc_, alloc(_)).WillOnce(Return(nullptr));
+  store_->counter(name_2);
+
+  // Same deal: the name will be truncated, so we won't be able to find it with the entire name.
+  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
+
+  // But we can find it based on the expected truncation.
+  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
+
+  // Now the stats have overflowed.
+  EXPECT_EQ(1UL, store_->counter("stats.overflow").value());
+
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+
+  // Includes overflow, and the first raw-allocated stat, but not the failsafe stat which we
+  // allocated from the heap.
+  EXPECT_CALL(*alloc_, free(_)).Times(2);
+}
+
+class HeapStatsThreadLocalStoreTest : public StatsThreadLocalStoreTest {
+public:
+  void SetUp() override {
+    resetStoreWithAlloc(heap_alloc_);
+    // Note: we do not call StatsThreadLocalStoreTest::SetUp here as that
+    // sets up a thread_local_store with raw stat alloc.
+  }
+  void TearDown() override {
+    store_.reset(); // delete before the allocator.
+  }
+
+  HeapStatDataAllocator heap_alloc_;
+};
+
+TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  // Allocate a stat greater than the max name length.
+  const uint64_t max_name_length = options_.maxNameLength();
+  const std::string name_1(max_name_length + 1, 'A');
+
+  store_->counter(name_1);
+
+  // This works fine, and we can find it by its long name because heap-stats do not
+  // get truncsated.
+  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
+
+  store_->shutdownThreading();
+  tls_.shutdownThread();
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  EXPECT_CALL(*this, alloc(_)).Times(4);
+  EXPECT_CALL(*alloc_, alloc(_)).Times(4);
   store_->counter("c1");
   store_->gauge("g1");
   store_->shutdownThreading();
@@ -437,7 +512,7 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(5);
+  EXPECT_CALL(*alloc_, free(_)).Times(5);
 }
 
 TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
@@ -460,7 +535,7 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
 
   tls_.shutdownThread();
 
-  EXPECT_CALL(*this, free(_));
+  EXPECT_CALL(*alloc_, free(_));
 }
 
 // Histogram tests
@@ -545,9 +620,9 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
 
   const std::string h1_expected_summary =
       "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
-      "P99: 1.099, P99.9: 1.0999, P100: 1.1";
-  const std::string h2_expected_summary =
-      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, P99.9: 99.9, P100: 100";
+      "P99: 1.099, P99.5: 1.0995, P99.9: 1.0999, P100: 1.1";
+  const std::string h2_expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, "
+                                          "P99: 99, P99.5: 99.5, P99.9: 99.9, P100: 100";
 
   for (size_t i = 0; i < 100; ++i) {
     expectCallAndAccumulate(h2, i);
@@ -574,8 +649,8 @@ TEST_F(HistogramTest, BasicHistogramMergeSummary) {
   }
   EXPECT_EQ(1, validateMerge());
 
-  const std::string expected_summary =
-      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, P99.9: 99.9, P100: 100";
+  const std::string expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: "
+                                       "99, P99.5: 99.5, P99.9: 99.9, P100: 100";
 
   NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
   EXPECT_EQ(expected_summary, name_histogram_map["h1"]->cumulativeStatistics().summary());
@@ -607,7 +682,7 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   // Merge histograms again and validate that both h1 and h2 are used.
   store_->mergeHistograms([]() -> void {});
 
-  for (const Stats::ParentHistogramSharedPtr& histogram : store_->histograms()) {
+  for (const ParentHistogramSharedPtr& histogram : store_->histograms()) {
     EXPECT_TRUE(histogram->used());
   }
 }

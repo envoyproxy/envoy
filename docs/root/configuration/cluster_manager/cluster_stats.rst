@@ -19,6 +19,10 @@ statistics. Any ``:`` character in the stats name is replaced with ``_``.
   cluster_added, Counter, Total clusters added (either via static config or CDS)
   cluster_modified, Counter, Total clusters modified (via CDS)
   cluster_removed, Counter, Total clusters removed (via CDS)
+  cluster_updated, Counter, Total cluster updates
+  cluster_updated_via_merge, Counter, Total cluster updates applied as merged updates
+  update_merge_cancelled, Counter, Total merged updates that got cancelled and delivered early
+  update_out_of_merge_window, Counter, Total updates which arrived out of a merge window
   active_clusters, Gauge, Number of currently active (warmed) clusters
   warming_clusters, Gauge, Number of currently warming (not active) clusters
 
@@ -142,15 +146,19 @@ are rooted at *cluster.<name>.* and contain the following statistics:
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
+  upstream_rq_completed, Counter, "Total upstream requests completed"
   upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)"
   upstream_rq_<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
   upstream_rq_time, Histogram, Request time milliseconds
+  canary.upstream_rq_completed, Counter, "Total upstream canary requests completed"
   canary.upstream_rq_<\*xx>, Counter, Upstream canary aggregate HTTP response codes
   canary.upstream_rq_<\*>, Counter, Upstream canary specific HTTP response codes
   canary.upstream_rq_time, Histogram, Upstream canary request time milliseconds
+  internal.upstream_rq_completed, Counter, "Total internal origin requests completed"
   internal.upstream_rq_<\*xx>, Counter, Internal origin aggregate HTTP response codes
   internal.upstream_rq_<\*>, Counter, Internal origin specific HTTP response codes
   internal.upstream_rq_time, Histogram, Internal origin request time milliseconds
+  external.upstream_rq_completed, Counter, "Total external origin requests completed"
   external.upstream_rq_<\*xx>, Counter, External origin aggregate HTTP response codes
   external.upstream_rq_<\*>, Counter, External origin specific HTTP response codes
   external.upstream_rq_time, Histogram, External origin request time milliseconds

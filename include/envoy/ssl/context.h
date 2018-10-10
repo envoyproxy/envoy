@@ -32,12 +32,13 @@ public:
    */
   virtual std::string getCertChainInformation() const PURE;
 };
+typedef std::shared_ptr<Context> ContextSharedPtr;
 
 class ClientContext : public virtual Context {};
-typedef std::unique_ptr<ClientContext> ClientContextPtr;
+typedef std::shared_ptr<ClientContext> ClientContextSharedPtr;
 
 class ServerContext : public virtual Context {};
-typedef std::unique_ptr<ServerContext> ServerContextPtr;
+typedef std::shared_ptr<ServerContext> ServerContextSharedPtr;
 
 } // namespace Ssl
 } // namespace Envoy

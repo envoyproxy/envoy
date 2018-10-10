@@ -7,13 +7,23 @@
 #include <string>
 #include <unordered_set>
 
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/sink.h"
+#include "envoy/stats/stat_data_allocator.h"
+#include "envoy/stats/stats.h"
+#include "envoy/stats/stats_options.h"
+
 #include "common/common/lock_guard.h"
+#include "common/stats/tag_producer_impl.h"
+
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Stats {
 
-ThreadLocalStoreImpl::ThreadLocalStoreImpl(StatDataAllocator& alloc)
-    : alloc_(alloc), default_scope_(createScope("")),
+ThreadLocalStoreImpl::ThreadLocalStoreImpl(const StatsOptions& stats_options,
+                                           StatDataAllocator& alloc)
+    : stats_options_(stats_options), alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
       num_last_resort_stats_(default_scope_->counter("stats.overflow")), source_(*this) {}
 
@@ -63,14 +73,12 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
 }
 
 std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
-  // Handle de-dup due to overlapping scopes.
   std::vector<ParentHistogramSharedPtr> ret;
-  std::unordered_set<std::string> names;
   Thread::LockGuard lock(lock_);
   // TODO(ramaraochavali): As histograms don't share storage, there is a chance of duplicate names
   // here. We need to create global storage for histograms similar to how we have a central storage
   // in shared memory for counters/gauges. In the interim, no de-dup is done here. This may result
-  // in histograms with duplicate names, but until shared storage is implementing it's ultimately
+  // in histograms with duplicate names, but until shared storage is implemented it's ultimately
   // less confusing for users who have such configs.
   for (ScopeImpl* scope : scopes_) {
     for (const auto& name_histogram_pair : scope->central_cache_.histograms_) {
@@ -136,7 +144,7 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
     main_thread_dispatcher_->post(
-        [ this, scope_id = scope->scope_id_ ]()->void { clearScopeFromCaches(scope_id); });
+        [this, scope_id = scope->scope_id_]() -> void { clearScopeFromCaches(scope_id); });
   }
 }
 
@@ -153,6 +161,26 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
     tls_->runOnAllThreads(
         [this, scope_id]() -> void { tls_->getTyped<TlsCache>().scope_cache_.erase(scope_id); });
   }
+}
+
+absl::string_view ThreadLocalStoreImpl::truncateStatNameIfNeeded(absl::string_view name) {
+  // If the main allocator requires stat name truncation, warn and truncate, before
+  // attempting to allocate.
+  if (alloc_.requiresBoundedStatNameSize()) {
+    const uint64_t max_length = stats_options_.maxNameLength();
+
+    // Note that the heap-allocator does not truncate itself; we have to
+    // truncate here if we are using heap-allocation as a fallback due to an
+    // exhausted shared-memory block
+    if (name.size() > max_length) {
+      ENVOY_LOG_MISC(
+          warn,
+          "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
+          name, name.size(), max_length);
+      name = absl::string_view(name.data(), max_length);
+    }
+  }
+  return name;
 }
 
 std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
@@ -176,13 +204,17 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   std::shared_ptr<StatType>& central_ref = central_cache_map[name];
   if (!central_ref) {
     std::vector<Tag> tags;
+
+    // Tag extraction occurs on the original, untruncated name so the extraction
+    // can complete properly, even if the tag values are partially truncated.
     std::string tag_extracted_name = parent_.getTagsForName(name, tags);
+    absl::string_view truncated_name = parent_.truncateStatNameIfNeeded(name);
     std::shared_ptr<StatType> stat =
-        make_stat(parent_.alloc_, name, std::move(tag_extracted_name), std::move(tags));
+        make_stat(parent_.alloc_, truncated_name, std::move(tag_extracted_name), std::move(tags));
     if (stat == nullptr) {
       parent_.num_last_resort_stats_.inc();
-      stat =
-          make_stat(parent_.heap_allocator_, name, std::move(tag_extracted_name), std::move(tags));
+      stat = make_stat(parent_.heap_allocator_, truncated_name, std::move(tag_extracted_name),
+                       std::move(tags));
       ASSERT(stat != nullptr);
     }
     central_ref = stat;
@@ -212,7 +244,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
 
   return safeMakeStat<Counter>(
       final_name, central_cache_.counters_,
-      [](StatDataAllocator& allocator, const std::string& name, std::string&& tag_extracted_name,
+      [](StatDataAllocator& allocator, absl::string_view name, std::string&& tag_extracted_name,
          std::vector<Tag>&& tags) -> CounterSharedPtr {
         return allocator.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
       },
@@ -246,7 +278,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
 
   return safeMakeStat<Gauge>(
       final_name, central_cache_.gauges_,
-      [](StatDataAllocator& allocator, const std::string& name, std::string&& tag_extracted_name,
+      [](StatDataAllocator& allocator, absl::string_view name, std::string&& tag_extracted_name,
          std::vector<Tag>&& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
       },
@@ -315,8 +347,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
 ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(const std::string& name,
                                                    std::string&& tag_extracted_name,
                                                    std::vector<Tag>&& tags)
-    : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), current_active_(0),
-      flags_(0), created_thread_id_(std::this_thread::get_id()) {
+    : MetricImpl(std::move(tag_extracted_name), std::move(tags)), current_active_(0), flags_(0),
+      created_thread_id_(std::this_thread::get_id()), name_(name) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();
 }
@@ -341,10 +373,10 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
 ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
                                          TlsScope& tls_scope, std::string&& tag_extracted_name,
                                          std::vector<Tag>&& tags)
-    : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
+    : MetricImpl(std::move(tag_extracted_name), std::move(tags)), parent_(parent),
       tls_scope_(tls_scope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_),
-      merged_(false) {}
+      merged_(false), name_(name) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   hist_free(interval_histogram_);

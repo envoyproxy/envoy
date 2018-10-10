@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Stats sink for the gRPC metrics service: api/envoy/service/metrics/v2/metrics_service.proto
 
 load(
@@ -17,7 +18,6 @@ envoy_cc_library(
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/singleton:instance_interface",
-        "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",

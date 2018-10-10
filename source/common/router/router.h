@@ -13,6 +13,7 @@
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -23,8 +24,8 @@
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
 #include "common/http/utility.h"
-#include "common/request_info/request_info_impl.h"
 #include "common/router/config_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -95,11 +96,13 @@ public:
   FilterConfig(const std::string& stat_prefix, const LocalInfo::LocalInfo& local_info,
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
-               bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers)
+               bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
+               TimeSource& time_source)
       : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
-        suppress_envoy_headers_(suppress_envoy_headers), shadow_writer_(std::move(shadow_writer)) {}
+        suppress_envoy_headers_(suppress_envoy_headers), shadow_writer_(std::move(shadow_writer)),
+        time_source_(time_source) {}
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
@@ -107,13 +110,15 @@ public:
       : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
-                     config.start_child_span(), config.suppress_envoy_headers()) {
+                     config.start_child_span(), config.suppress_envoy_headers(),
+                     context.timeSource()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
   }
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
+  TimeSource& timeSource() { return time_source_; }
 
   Stats::Scope& scope_;
   const LocalInfo::LocalInfo& local_info_;
@@ -128,6 +133,7 @@ public:
 
 private:
   ShadowWriterPtr shadow_writer_;
+  TimeSource& time_source_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
@@ -137,11 +143,11 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  */
 class Filter : Logger::Loggable<Logger::Id::router>,
                public Http::StreamDecoderFilter,
-               public Upstream::LoadBalancerContext {
+               public Upstream::LoadBalancerContextBase {
 public:
   Filter(FilterConfig& config)
       : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
-        do_shadowing_(false) {}
+        do_shadowing_(false), is_retry_(false) {}
 
   ~Filter();
 
@@ -160,7 +166,7 @@ public:
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
         return hash_policy->generateHash(
-            callbacks_->requestInfo().downstreamRemoteAddress().get(), *downstream_headers_,
+            callbacks_->streamInfo().downstreamRemoteAddress().get(), *downstream_headers_,
             [this](const std::string& key, const std::string& path, std::chrono::seconds max_age) {
               return addDownstreamSetCookie(key, path, max_age);
             });
@@ -178,7 +184,7 @@ public:
       }
 
       // The request's metadata, if present, takes precedence over the route's.
-      const auto& request_metadata = callbacks_->requestInfo().dynamicMetadata().filter_metadata();
+      const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
       const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
       if (filter_it != request_metadata.end()) {
         if (route_entry_->metadataMatchCriteria() != nullptr) {
@@ -197,6 +203,36 @@ public:
     return callbacks_->connection();
   }
   const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_; }
+
+  bool shouldSelectAnotherHost(const Upstream::Host& host) override {
+    // We only care about host selection when performing a retry, at which point we consult the
+    // RetryState to see if we're configured to avoid certain hosts during retries.
+    if (!is_retry_) {
+      return false;
+    }
+
+    ASSERT(retry_state_);
+    return retry_state_->shouldSelectAnotherHost(host);
+  }
+
+  const Upstream::PriorityLoad&
+  determinePriorityLoad(const Upstream::PrioritySet& priority_set,
+                        const Upstream::PriorityLoad& original_priority_load) override {
+    // We only modify the priority load on retries.
+    if (!is_retry_) {
+      return original_priority_load;
+    }
+
+    return retry_state_->priorityLoadForRetry(priority_set, original_priority_load);
+  }
+
+  uint32_t hostSelectionRetryCount() const override {
+    if (!is_retry_) {
+      return 1;
+    }
+
+    return retry_state_->hostSelectionMaxAttempts();
+  }
 
   /**
    * Set a computed cookie to be sent with the downstream headers.
@@ -242,9 +278,9 @@ private:
     void maybeEndDecode(bool end_stream);
 
     void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
-      request_info_.onUpstreamHostSelected(host);
+      stream_info_.onUpstreamHostSelected(host);
       upstream_host_ = host;
-      parent_.callbacks_->requestInfo().onUpstreamHostSelected(host);
+      parent_.callbacks_->streamInfo().onUpstreamHostSelected(host);
     }
 
     // Http::StreamDecoder
@@ -299,7 +335,7 @@ private:
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
     DownstreamWatermarkManager downstream_watermark_manager_{*this};
     Tracing::SpanPtr span_;
-    RequestInfo::RequestInfoImpl request_info_;
+    StreamInfo::StreamInfoImpl stream_info_;
     Http::HeaderMap* upstream_headers_{};
     Http::HeaderMap* upstream_trailers_{};
 
@@ -313,7 +349,7 @@ private:
 
   enum class UpstreamResetType { Reset, GlobalTimeout, PerTryTimeout };
 
-  RequestInfo::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
+  StreamInfo::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
   static const std::string upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
   void chargeUpstreamCode(uint64_t response_status_code, const Http::HeaderMap& response_headers,
@@ -344,6 +380,7 @@ private:
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream);
+  TimeSource& timeSource() { return config_.timeSource(); }
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -370,6 +407,7 @@ private:
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool do_shadowing_ : 1;
+  bool is_retry_ : 1;
 };
 
 class ProdFilter : public Filter {

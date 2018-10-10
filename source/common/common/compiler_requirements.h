@@ -17,4 +17,4 @@ namespace Envoy {
   "ENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 in your build."
 #endif
 
-} // Envoy
+} // namespace Envoy

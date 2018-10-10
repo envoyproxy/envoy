@@ -17,7 +17,7 @@ namespace ExtAuthz {
 class ExtAuthzConfigFactory
     : public Common::FactoryBase<envoy::config::filter::network::ext_authz::v2::ExtAuthz> {
 public:
-  ExtAuthzConfigFactory() : FactoryBase(NetworkFilterNames::get().EXT_AUTHORIZATION) {}
+  ExtAuthzConfigFactory() : FactoryBase(NetworkFilterNames::get().ExtAuthorization) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

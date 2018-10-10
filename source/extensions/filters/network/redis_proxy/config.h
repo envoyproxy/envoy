@@ -19,7 +19,7 @@ namespace RedisProxy {
 class RedisProxyFilterConfigFactory
     : public Common::FactoryBase<envoy::config::filter::network::redis_proxy::v2::RedisProxy> {
 public:
-  RedisProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().REDIS_PROXY) {}
+  RedisProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().RedisProxy) {}
 
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb

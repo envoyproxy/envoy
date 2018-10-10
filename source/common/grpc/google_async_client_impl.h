@@ -3,6 +3,7 @@
 #include <queue>
 
 #include "envoy/grpc/async_client.h"
+#include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 
@@ -163,6 +164,8 @@ public:
                      const absl::optional<std::chrono::milliseconds>& timeout) override;
   AsyncStream* start(const Protobuf::MethodDescriptor& service_method,
                      AsyncStreamCallbacks& callbacks) override;
+
+  TimeSource& timeSource() { return dispatcher_.timeSystem(); }
 
 private:
   static std::shared_ptr<grpc::Channel>

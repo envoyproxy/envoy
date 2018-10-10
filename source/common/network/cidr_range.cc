@@ -194,7 +194,7 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
     return std::make_shared<Ipv6Instance>(sa6);
   }
   }
-  NOT_REACHED
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 IpList::IpList(const std::vector<std::string>& subnets) {

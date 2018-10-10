@@ -18,7 +18,9 @@
 #include "envoy/network/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/overload_manager.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
@@ -29,7 +31,7 @@
 #include "common/http/conn_manager_config.h"
 #include "common/http/user_agent.h"
 #include "common/http/utility.h"
-#include "common/request_info/request_info_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -48,7 +50,8 @@ public:
   ConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
                         Runtime::RandomGenerator& random_generator, Tracing::HttpTracer& tracer,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-                        Upstream::ClusterManager& cluster_manager);
+                        Upstream::ClusterManager& cluster_manager,
+                        Server::OverloadManager* overload_manager, Event::TimeSystem& time_system);
   ~ConnectionManagerImpl();
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -80,6 +83,8 @@ public:
   void onBelowWriteBufferLowWatermark() override {
     codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
   }
+
+  Event::TimeSystem& timeSystem() { return time_system_; }
 
 private:
   struct ActiveStream;
@@ -117,7 +122,7 @@ private:
     Router::RouteConstSharedPtr route() override;
     void clearRouteCache() override;
     uint64_t streamId() override;
-    RequestInfo::RequestInfo& requestInfo() override;
+    StreamInfo::StreamInfo& streamInfo() override;
     Tracing::Span& activeSpan() override;
     Tracing::Config& tracingConfig() override;
 
@@ -150,7 +155,7 @@ private:
     Buffer::WatermarkBufferPtr createBuffer() override;
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_request_data_; }
     bool complete() override { return parent_.state_.remote_complete_; }
-    void do100ContinueHeaders() override { NOT_REACHED; }
+    void do100ContinueHeaders() override { NOT_REACHED_GCOVR_EXCL_LINE; }
     void doHeaders(bool end_stream) override {
       parent_.decodeHeaders(this, *parent_.request_headers_, end_stream);
     }
@@ -162,13 +167,15 @@ private:
 
     // Http::StreamDecoderFilterCallbacks
     void addDecodedData(Buffer::Instance& data, bool streaming) override;
+    HeaderMap& addDecodedTrailers() override;
     void continueDecoding() override;
     const Buffer::Instance* decodingBuffer() override {
       return parent_.buffered_request_data_.get();
     }
     void sendLocalReply(Code code, const std::string& body,
                         std::function<void(HeaderMap& headers)> modify_headers) override {
-      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers);
+      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers,
+                             parent_.is_head_request_);
     }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -229,6 +236,7 @@ private:
 
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data, bool streaming) override;
+    HeaderMap& addEncodedTrailers() override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
     void setEncoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
@@ -267,13 +275,16 @@ private:
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
     const Network::Connection* connection();
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
+    HeaderMap& addDecodedTrailers();
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
+    HeaderMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, const std::string& body,
-                        std::function<void(HeaderMap& headers)> modify_headers);
+                        std::function<void(HeaderMap& headers)> modify_headers,
+                        bool is_head_request);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
@@ -287,7 +298,7 @@ private:
     void onBelowWriteBufferLowWatermark() override;
 
     // Http::StreamDecoder
-    void decode100ContinueHeaders(HeaderMapPtr&&) override { NOT_REACHED; }
+    void decode100ContinueHeaders(HeaderMapPtr&&) override { NOT_REACHED_GCOVR_EXCL_LINE; }
     void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(HeaderMapPtr&& trailers) override;
@@ -339,6 +350,9 @@ private:
       // to verify we do not encode100Continue headers more than once per
       // filter.
       static constexpr uint32_t Encode100ContinueHeaders  = 0x40;
+      // Used to indicate that we're processing the final [En|De]codeData frame,
+      // i.e. end_stream = true
+      static constexpr uint32_t LastDataFrame = 0x80;
     };
     // clang-format on
 
@@ -361,7 +375,11 @@ private:
     // Possibly increases buffer_limit_ to the value of limit.
     void setBufferLimit(uint32_t limit);
     // Set up the Encoder/Decoder filter chain.
-    void createFilterChain();
+    bool createFilterChain();
+    // Per-stream idle timeout callback.
+    void onIdleTimeout();
+    // Reset per-stream idle timer.
+    void resetIdleTimer();
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
@@ -379,8 +397,11 @@ private:
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_timer_;
+    // Per-stream idle timeout.
+    Event::TimerPtr idle_timer_;
+    std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
-    RequestInfo::RequestInfoImpl request_info_;
+    StreamInfo::StreamInfoImpl stream_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
     uint32_t buffer_limit_{0};
@@ -389,6 +410,7 @@ private:
     // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
     bool has_continue_headers_{};
+    bool is_head_request_{false};
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
@@ -438,6 +460,11 @@ private:
   WebSocketProxyPtr ws_connection_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
+  // References into the overload manager thread local state map. Using these lets us avoid a map
+  // lookup in the hot path of processing each request.
+  const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
+  const Server::OverloadActionState& overload_disable_keepalive_ref_;
+  Event::TimeSystem& time_system_;
 };
 
 } // namespace Http

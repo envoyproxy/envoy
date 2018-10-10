@@ -3,8 +3,9 @@ syntax = "proto3";
 package envoy.config.filter.http.fault.v2;
 option go_package = "v2";
 
-import "envoy/config/filter/fault/v2/fault.proto";
 import "envoy/api/v2/route/route.proto";
+import "envoy/config/filter/fault/v2/fault.proto";
+import "envoy/type/percent.proto";
 
 import "validate/validate.proto";
 
@@ -12,9 +13,7 @@ import "validate/validate.proto";
 // Fault Injection :ref:`configuration overview <config_http_filters_fault_injection>`.
 
 message FaultAbort {
-  // An integer between 0-100 indicating the percentage of requests/operations/connections
-  // that will be aborted with the error code provided.
-  uint32 percent = 1 [(validate.rules).uint32.lte = 100];
+  reserved 1;
 
   oneof error_type {
     option (validate.required) = true;
@@ -22,6 +21,10 @@ message FaultAbort {
     // HTTP status code to use to abort the HTTP request.
     uint32 http_status = 2 [(validate.rules).uint32 = {gte: 200, lt: 600}];
   }
+
+  // The percentage of requests/operations/connections that will be aborted with the error code
+  // provided.
+  envoy.type.FractionalPercent percentage = 3;
 }
 
 message HTTPFault {
@@ -41,12 +44,12 @@ message HTTPFault {
   // Specifies a set of headers that the filter should match on. The fault
   // injection filter can be applied selectively to requests that match a set of
   // headers specified in the fault filter config. The chances of actual fault
-  // injection further depend on the value of the :ref:`percent
-  // <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percent>` field. The filter will
-  // check the request's headers against all the specified headers in the filter
-  // config. A match will happen if all the headers in the config are present in
-  // the request with the same values (or based on presence if the *value* field
-  // is not in the config).
+  // injection further depend on the value of the :ref:`percentage
+  // <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percentage>` field.
+  // The filter will check the request's headers against all the specified
+  // headers in the filter config. A match will happen if all the headers in the
+  // config are present in the request with the same values (or based on
+  // presence if the *value* field is not in the config).
   repeated envoy.api.v2.route.HeaderMatcher headers = 4;
 
   // Faults are injected for the specified list of downstream hosts. If this

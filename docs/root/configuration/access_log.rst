@@ -102,6 +102,14 @@ The following command operators are supported:
   TCP
     Total duration in milliseconds of the downstream connection.
 
+%RESPONSE_DURATION%
+  HTTP
+    Total duration in milliseconds of the request from the start time to the first byte read from the
+    upstream host.
+
+  TCP
+    Not implemented ("-").
+
 .. _config_access_log_format_response_flags:
 
 %RESPONSE_FLAGS%
@@ -122,6 +130,14 @@ The following command operators are supported:
     * **DI**: The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
     * **FI**: The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
     * **RL**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
+
+%RESPONSE_TX_DURATION%
+  HTTP
+    Total duration in milliseconds of the request from the first byte read from the upstream host to the last
+    byte sent downstream.
+
+  TCP
+    Not implemented ("-").
 
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
@@ -195,7 +211,7 @@ The following command operators are supported:
     where NAMESPACE is the the filter namespace used when setting the metadata, KEY is an optional
     lookup up key in the namespace with the option of specifying nested keys separated by ':',
     and Z is an optional parameter denoting string truncation up to Z characters long. Dynamic Metadata
-    can be set by filters using the :repo:`RequestInfo <include/envoy/request_info/request_info.h>` API:
+    can be set by filters using the :repo:`StreamInfo <include/envoy/stream_info/stream_info.h>` API:
     *setDynamicMetadata*. The data will be logged as a JSON string. For example, for the following dynamic metadata:
 
     ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
@@ -210,6 +226,12 @@ The following command operators are supported:
 
   TCP
     Not implemented ("-").
+
+%REQUESTED_SERVER_NAME%
+  HTTP
+    String value set on ssl connection socket for Server Name Indication (SNI)
+  TCP
+    String value set on ssl connection socket for Server Name Indication (SNI)
 
 .. _config_access_log_default_format:
 

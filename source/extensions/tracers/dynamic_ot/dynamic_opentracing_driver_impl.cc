@@ -24,7 +24,7 @@ DynamicOpenTracingDriver::DynamicOpenTracingDriver(Stats::Store& stats, const st
     throw EnvoyException{formatErrorMessage(tracer_maybe.error(), error_message)};
   }
   tracer_ = std::move(*tracer_maybe);
-  RELEASE_ASSERT(tracer_ != nullptr);
+  RELEASE_ASSERT(tracer_ != nullptr, "");
 }
 
 std::string DynamicOpenTracingDriver::formatErrorMessage(std::error_code error_code,

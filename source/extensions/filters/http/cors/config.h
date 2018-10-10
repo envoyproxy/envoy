@@ -15,7 +15,7 @@ namespace Cors {
  */
 class CorsFilterConfig : public Common::EmptyHttpFilterConfig {
 public:
-  CorsFilterConfig() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().CORS) {}
+  CorsFilterConfig() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().Cors) {}
 
   Http::FilterFactoryCb createFilter(const std::string&,
                                      Server::Configuration::FactoryContext&) override;

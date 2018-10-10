@@ -15,22 +15,19 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Upstream {
 
-class TestLoadBalancerContext : public LoadBalancerContext {
+class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
   TestLoadBalancerContext(uint64_t hash_key) : hash_key_(hash_key) {}
 
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
-  const Network::Connection* downstreamConnection() const override { return nullptr; }
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
   absl::optional<uint64_t> hash_key_;
 };
@@ -45,7 +42,7 @@ public:
     lb_->initialize();
   }
 
-  // Run all tests aginst both priority 0 and priority 1 host sets, to ensure
+  // Run all tests against both priority 0 and priority 1 host sets, to ensure
   // all the load balancers have equivalent functonality for failover host sets.
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 

@@ -15,15 +15,13 @@
 namespace Envoy {
 namespace Upstream {
 
-// Priority levels and localities are considered overprovisioned with this factor. This means that
-// we don't consider a priority level or locality unhealthy until the percentage of healthy hosts
-// multiplied by kOverProvisioningFactor drops below 100.
-static constexpr uint32_t kOverProvisioningFactor = 140;
+// Priority levels and localities are considered overprovisioned with this factor.
+static constexpr uint32_t kDefaultOverProvisioningFactor = 140;
 
 /**
  * Base class for all LB implementations.
  */
-class LoadBalancerBase {
+class LoadBalancerBase : public LoadBalancer {
 public:
   // A utility function to chose a priority level based on a precomputed hash and
   // a priority vector in the style of per_priority_load_
@@ -31,7 +29,24 @@ public:
   // Returns the priority, a number between 0 and per_priority_load.size()-1
   static uint32_t choosePriority(uint64_t hash, const std::vector<uint32_t>& per_priority_load);
 
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+
 protected:
+  /**
+   * By implementing this method instead of chooseHost, host selection will
+   * be subject to host filters specified by LoadBalancerContext.
+   *
+   * Host selection will be retried up to the number specified by
+   * hostSelectionRetryCount on LoadBalancerContext, and if no hosts are found
+   * within the allowed attempts, the host that was selected during the last
+   * attempt will be returned.
+   *
+   * If host selection is idempotent (i.e. retrying will not change the outcome),
+   * sub classes should override chooseHost to avoid the unnecessary overhead of
+   * retrying host selection.
+   */
+  virtual HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) PURE;
+
   /**
    * For the given host_set @return if we should be in a panic mode or not. For example, if the
    * majority of hosts are unhealthy we'll be likely in a panic mode. In this case we'll route
@@ -44,7 +59,7 @@ protected:
                    const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
   // Choose host set randomly, based on the per_priority_load_;
-  HostSet& chooseHostSet();
+  HostSet& chooseHostSet(LoadBalancerContext* context);
 
   uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_[priority]; }
 
@@ -55,15 +70,39 @@ protected:
   // The priority-ordered set of hosts to use for load balancing.
   const PrioritySet& priority_set_;
 
+public:
   // Called when a host set at the given priority level is updated. This updates
-  // per_priority_health_ for that priority level, and may update per_priority_load_ for all
+  // per_priority_health for that priority level, and may update per_priority_load for all
   // priority levels.
-  void recalculatePerPriorityState(uint32_t priority);
+  void static recalculatePerPriorityState(uint32_t priority, const PrioritySet& priority_set,
+                                          PriorityLoad& priority_load,
+                                          std::vector<uint32_t>& per_priority_health);
 
+protected:
   // The percentage load (0-100) for each priority level
   std::vector<uint32_t> per_priority_load_;
   // The health (0-100) for each priority level.
   std::vector<uint32_t> per_priority_health_;
+};
+
+class LoadBalancerContextBase : public LoadBalancerContext {
+public:
+  absl::optional<uint64_t> computeHashKey() override { return {}; }
+
+  const Network::Connection* downstreamConnection() const override { return nullptr; }
+
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
+
+  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
+
+  const PriorityLoad& determinePriorityLoad(const PrioritySet&,
+                                            const PriorityLoad& original_priority_load) override {
+    return original_priority_load;
+  }
+
+  bool shouldSelectAnotherHost(const Host&) override { return false; }
+
+  uint32_t hostSelectionRetryCount() const override { return 1; }
 };
 
 /**
@@ -80,7 +119,7 @@ protected:
 
   // When deciding which hosts to use on an LB decision, we need to know how to index into the
   // priority_set. This priority_set cursor is used by ZoneAwareLoadBalancerBase subclasses, e.g.
-  // RoundRobinLoadBalancer, to index into auxillary data structures specific to the LB for
+  // RoundRobinLoadBalancer, to index into auxiliary data structures specific to the LB for
   // a given host set selection.
   struct HostsSource {
     enum class SourceType {
@@ -132,7 +171,7 @@ protected:
   /**
    * Pick the host source to use, doing zone aware routing when the hosts are sufficiently healthy.
    */
-  HostsSource hostSourceToUse();
+  HostsSource hostSourceToUse(LoadBalancerContext* context);
 
   /**
    * Index into priority_set via hosts source descriptor.
@@ -210,7 +249,7 @@ private:
  * with 1 / weight deadline, we will achieve the desired pick frequency for weighted RR in a given
  * interval. Naive implementations of weighted RR are either O(n) pick time or O(m * n) memory use,
  * where m is the weight range. We also explicitly check for the unweighted special case and use a
- * simple index to acheive O(1) scheduling in that case.
+ * simple index to achieve O(1) scheduling in that case.
  * TODO(htuch): We use EDF at Google, but the EDF scheduler may be overkill if we don't want to
  * support large ranges of weights or arbitrary precision floating weights, we could construct an
  * explicit schedule, since m will be a small constant factor in O(m * n). This
@@ -220,15 +259,15 @@ private:
  * This base class also supports unweighted selection which derived classes can use to customize
  * behavior. Derived classes can also override how host weight is determined when in weighted mode.
  */
-class EdfLoadBalancerBase : public LoadBalancer, public ZoneAwareLoadBalancerBase {
+class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase {
 public:
   EdfLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                       ClusterStats& stats, Runtime::Loader& runtime,
                       Runtime::RandomGenerator& random,
                       const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
-  // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+  // Upstream::LoadBalancerBase
+  HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
 
 protected:
   struct Scheduler {
@@ -341,7 +380,7 @@ private:
 /**
  * Random load balancer that picks a random host out of all hosts.
  */
-class RandomLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase {
+class RandomLoadBalancer : public ZoneAwareLoadBalancerBase {
 public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                      ClusterStats& stats, Runtime::Loader& runtime,
@@ -350,8 +389,8 @@ public:
       : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                   common_config) {}
 
-  // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+  // Upstream::LoadBalancerBase
+  HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
 };
 
 /**
@@ -362,7 +401,8 @@ public:
   LoadBalancerSubsetInfoImpl(const envoy::api::v2::Cluster::LbSubsetConfig& subset_config)
       : enabled_(!subset_config.subset_selectors().empty()),
         fallback_policy_(subset_config.fallback_policy()),
-        default_subset_(subset_config.default_subset()) {
+        default_subset_(subset_config.default_subset()),
+        locality_weight_aware_(subset_config.locality_weight_aware()) {
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
         subset_keys_.emplace_back(
@@ -378,12 +418,14 @@ public:
   }
   const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
   const std::vector<std::set<std::string>>& subsetKeys() const override { return subset_keys_; }
+  bool localityWeightAware() const override { return locality_weight_aware_; }
 
 private:
   const bool enabled_;
   const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
   const ProtobufWkt::Struct default_subset_;
   std::vector<std::set<std::string>> subset_keys_;
+  const bool locality_weight_aware_;
 };
 
 } // namespace Upstream

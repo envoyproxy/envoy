@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # HTTP L7 filter that performs gzip compression
 # Public docs: docs/root/configuration/http_filters/gzip_filter.rst
 

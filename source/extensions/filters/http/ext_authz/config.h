@@ -16,7 +16,7 @@ namespace ExtAuthz {
 class ExtAuthzFilterConfig
     : public Common::FactoryBase<envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz> {
 public:
-  ExtAuthzFilterConfig() : FactoryBase(HttpFilterNames::get().EXT_AUTHORIZATION) {}
+  ExtAuthzFilterConfig() : FactoryBase(HttpFilterNames::get().ExtAuthorization) {}
 
 private:
   static constexpr uint64_t DefaultTimeout = 200;

@@ -8,6 +8,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
@@ -16,7 +17,6 @@
 #include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/headers.h"
-#include "common/http/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -37,7 +37,6 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
 }
 
 ConnectionImpl::Http2Callbacks ConnectionImpl::http2_callbacks_;
-ConnectionImpl::Http2Options ConnectionImpl::http2_options_;
 
 /**
  * Helper to remove const during a cast. nghttp2 takes non-const pointers for headers even though
@@ -90,7 +89,15 @@ void ConnectionImpl::StreamImpl::encode100ContinueHeaders(const HeaderMap& heade
 
 void ConnectionImpl::StreamImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   std::vector<nghttp2_nv> final_headers;
-  buildHeaders(final_headers, headers);
+
+  Http::HeaderMapPtr modified_headers;
+  if (Http::Utility::isUpgrade(headers)) {
+    modified_headers = std::make_unique<Http::HeaderMapImpl>(headers);
+    transformUpgradeFromH1toH2(*modified_headers);
+    buildHeaders(final_headers, *modified_headers);
+  } else {
+    buildHeaders(final_headers, headers);
+  }
 
   nghttp2_data_provider provider;
   if (!end_stream) {
@@ -149,6 +156,11 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
   ASSERT(pending_receive_buffer_high_watermark_called_);
   pending_receive_buffer_high_watermark_called_ = false;
   readDisable(false);
+}
+
+void ConnectionImpl::StreamImpl::decodeHeaders() {
+  maybeTransformUpgradeFromH2ToH1();
+  decoder_->decodeHeaders(std::move(headers_), remote_end_stream_);
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {
@@ -366,13 +378,13 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
         ASSERT(!stream->remote_end_stream_);
         stream->decoder_->decode100ContinueHeaders(std::move(stream->headers_));
       } else {
-        stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
+        stream->decodeHeaders();
       }
       break;
     }
 
     case NGHTTP2_HCAT_REQUEST: {
-      stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
+      stream->decodeHeaders();
       break;
     }
 
@@ -397,11 +409,10 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
           ASSERT(!nghttp2_session_check_server_session(session_));
           stream->waiting_for_non_informational_headers_ = false;
 
-          // This can only happen in the client case in a response, when we received a 1xx to
-          // start out with. In this case, raise as headers. nghttp2 message checking guarantees
-          // proper flow here.
-          ASSERT(!stream->headers_->Status() || stream->headers_->Status()->value() != "100");
-          stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
+          // Even if we have :status 100 in the client case in a response, when
+          // we received a 1xx to start out with, nghttp2 message checking
+          // guarantees proper flow here.
+          stream->decodeHeaders();
         }
       }
 
@@ -410,7 +421,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
     default:
       // We do not currently support push.
-      NOT_IMPLEMENTED;
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 
     stream->headers_.reset();
@@ -673,7 +684,6 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
       callbacks_,
       [](nghttp2_session*, const nghttp2_frame* frame, const uint8_t* raw_name, size_t name_length,
          const uint8_t* raw_value, size_t value_length, uint8_t, void* user_data) -> int {
-
         // TODO PERF: Can reference count here to avoid copies.
         HeaderString name;
         name.setCopy(reinterpret_cast<const char*>(raw_name), name_length);
@@ -723,7 +733,7 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
 ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_del(callbacks_); }
 
-ConnectionImpl::Http2Options::Http2Options() {
+ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) {
   nghttp2_option_new(&options_);
   // Currently we do not do anything with stream priority. Setting the following option prevents
   // nghttp2 from keeping around closed streams for use during stream priority dependency graph
@@ -731,16 +741,35 @@ ConnectionImpl::Http2Options::Http2Options() {
   // of kept alive HTTP/2 connections.
   nghttp2_option_set_no_closed_streams(options_, 1);
   nghttp2_option_set_no_auto_window_update(options_, 1);
+
+  if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
+    nghttp2_option_set_max_deflate_dynamic_table_size(options_, http2_settings.hpack_table_size_);
+  }
+  if (http2_settings.allow_connect_) {
+    // TODO(alyssawilk) change to ENABLE_CONNECT_PROTOCOL when it's available.
+    nghttp2_option_set_no_http_messaging(options_, 1);
+  }
 }
 
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
+
+ConnectionImpl::ClientHttp2Options::ClientHttp2Options(const Http2Settings& http2_settings)
+    : Http2Options(http2_settings) {
+  // Temporarily disable initial max streams limit/protection, since we might want to create
+  // more than 100 streams before receiving the HTTP/2 SETTINGS frame from the server.
+  //
+  // TODO(PiotrSikora): remove this once multiple upstream connections or queuing are implemented.
+  nghttp2_option_set_peer_max_concurrent_streams(options_,
+                                                 Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
+}
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
                                            Http::ConnectionCallbacks& callbacks,
                                            Stats::Scope& stats, const Http2Settings& http2_settings)
     : ConnectionImpl(connection, stats, http2_settings), callbacks_(callbacks) {
+  ClientHttp2Options client_http2_options(http2_settings);
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
-                              http2_options_.options());
+                              client_http2_options.options());
   sendSettings(http2_settings, true);
 }
 
@@ -758,10 +787,11 @@ Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
 }
 
 int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
-  // The client code explicitly does not currently suport push promise.
-  RELEASE_ASSERT(frame->hd.type == NGHTTP2_HEADERS);
+  // The client code explicitly does not currently support push promise.
+  RELEASE_ASSERT(frame->hd.type == NGHTTP2_HEADERS, "");
   RELEASE_ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE ||
-                 frame->headers.cat == NGHTTP2_HCAT_HEADERS);
+                     frame->headers.cat == NGHTTP2_HCAT_HEADERS,
+                 "");
   if (frame->headers.cat == NGHTTP2_HCAT_HEADERS) {
     StreamImpl* stream = getStream(frame->hd.stream_id);
     ASSERT(!stream->headers_);
@@ -773,7 +803,7 @@ int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
 
 int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& name,
                                    HeaderString&& value) {
-  // The client code explicitly does not currently suport push promise.
+  // The client code explicitly does not currently support push promise.
   ASSERT(frame->hd.type == NGHTTP2_HEADERS);
   ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE || frame->headers.cat == NGHTTP2_HCAT_HEADERS);
   return saveHeader(frame, std::move(name), std::move(value));
@@ -783,8 +813,9 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            Http::ServerConnectionCallbacks& callbacks,
                                            Stats::Scope& scope, const Http2Settings& http2_settings)
     : ConnectionImpl(connection, scope, http2_settings), callbacks_(callbacks) {
+  Http2Options http2_options(http2_settings);
   nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
-                              http2_options_.options());
+                              http2_options.options());
   sendSettings(http2_settings, false);
 }
 

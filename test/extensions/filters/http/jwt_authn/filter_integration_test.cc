@@ -26,7 +26,7 @@ std::string getFilterConfig(bool use_local_jwks) {
   }
 
   HttpFilter filter;
-  filter.set_name(HttpFilterNames::get().JWT_AUTHN);
+  filter.set_name(HttpFilterNames::get().JwtAuthn);
   MessageUtil::jsonConvert(proto_config, *filter.mutable_config());
   return MessageUtil::getJsonStringFromMessage(filter);
 }
@@ -59,9 +59,7 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   EXPECT_EQ(payload_entry->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
   EXPECT_FALSE(upstream_request_->headers().Authorization());
-
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
-
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
@@ -87,13 +85,57 @@ TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
   EXPECT_STREQ("401", response->headers().Status()->value().c_str());
 }
 
+TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
+  config_helper_.addFilter(getFilterConfig(true));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+      {":method", "HEAD"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"Authorization", "Bearer " + std::string(ExpiredToken)},
+  });
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("401", response->headers().Status()->value().c_str());
+  EXPECT_STRNE("0", response->headers().ContentLength()->value().c_str());
+  EXPECT_STREQ("", response->body().c_str());
+}
+
+// This test verifies a request is passed with a path that don't match any requirements.
+TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
+  config_helper_.addFilter(getFilterConfig(true));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/foo"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+}
+
 // The test case with a fake upstream for remote Jwks server.
 class RemoteJwksIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void createUpstreams() override {
     HttpProtocolIntegrationTest::createUpstreams();
     // for Jwks upstream.
-    fake_upstreams_.emplace_back(new FakeUpstream(0, GetParam().upstream_protocol, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, GetParam().upstream_protocol, version_, timeSystem()));
   }
 
   void initializeFilter() {
@@ -109,9 +151,13 @@ public:
   }
 
   void waitForJwksResponse(const std::string& status, const std::string& jwks_body) {
-    fake_jwks_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-    jwks_request_ = fake_jwks_connection_->waitForNewStream(*dispatcher_);
-    jwks_request_->waitForEndStream(*dispatcher_);
+    AssertionResult result =
+        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_jwks_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_jwks_connection_->waitForNewStream(*dispatcher_, jwks_request_);
+    RELEASE_ASSERT(result, result.message());
+    result = jwks_request_->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
 
     Http::TestHeaderMapImpl response_headers{{":status", status}};
     jwks_request_->encodeHeaders(response_headers, false);
@@ -122,12 +168,16 @@ public:
   void cleanup() {
     codec_client_->close();
     if (fake_jwks_connection_ != nullptr) {
-      fake_jwks_connection_->close();
-      fake_jwks_connection_->waitForDisconnect();
+      AssertionResult result = fake_jwks_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_jwks_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
     if (fake_upstream_connection_ != nullptr) {
-      fake_upstream_connection_->close();
-      fake_upstream_connection_->waitForDisconnect();
+      AssertionResult result = fake_upstream_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_upstream_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
   }
 

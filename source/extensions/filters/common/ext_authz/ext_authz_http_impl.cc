@@ -2,6 +2,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/http/async_client_impl.h"
+#include "common/http/codes.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -12,20 +13,42 @@ namespace Common {
 namespace ExtAuthz {
 
 namespace {
-
-const Http::HeaderMap* getZeroContentLengthHeader() {
+const Http::HeaderMap& getZeroContentLengthHeader() {
   static const Http::HeaderMap* header_map =
       new Http::HeaderMapImpl{{Http::Headers::get().ContentLength, std::to_string(0)}};
-  return header_map;
+  return *header_map;
+}
+
+const Response& getErrorResponse() {
+  static const Response* response =
+      new Response{CheckStatus::Error, Http::HeaderVector{}, Http::HeaderVector{}, std::string{},
+                   Http::Code::Forbidden};
+  return *response;
+}
+
+const Response& getDeniedResponse() {
+  static const Response* response =
+      new Response{CheckStatus::Denied, Http::HeaderVector{}, Http::HeaderVector{}, std::string{}};
+  return *response;
+}
+
+const Response& getOkResponse() {
+  static const Response* response = new Response{
+      CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{}, std::string{}, Http::Code::OK};
+  return *response;
 }
 } // namespace
 
 RawHttpClientImpl::RawHttpClientImpl(
     const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
     const absl::optional<std::chrono::milliseconds>& timeout, const std::string& path_prefix,
-    const std::vector<Http::LowerCaseString>& response_headers_to_remove)
+    const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers,
+    const Http::LowerCaseStrUnorderedSet& allowed_request_headers,
+    const HeaderKeyValueVector& authorization_headers_to_add)
     : cluster_name_(cluster_name), path_prefix_(path_prefix),
-      response_headers_to_remove_(response_headers_to_remove), timeout_(timeout),
+      allowed_authorization_headers_(allowed_authorization_headers),
+      allowed_request_headers_(allowed_request_headers),
+      authorization_headers_to_add_(authorization_headers_to_add), timeout_(timeout),
       cm_(cluster_manager) {}
 
 RawHttpClientImpl::~RawHttpClientImpl() { ASSERT(!callbacks_); }
@@ -42,17 +65,23 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
-  Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(*getZeroContentLengthHeader());
-  for (const auto& header : request.attributes().request().http().headers()) {
-
-    const Http::LowerCaseString key{header.first};
-    if (key == Http::Headers::get().Path && !path_prefix_.empty()) {
-      std::string value;
-      absl::StrAppend(&value, path_prefix_, header.second);
-      headers->addCopy(key, value);
-    } else {
-      headers->addCopy(key, header.second);
+  Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(getZeroContentLengthHeader());
+  for (const auto& allowed_header : allowed_request_headers_) {
+    const auto& request_header =
+        request.attributes().request().http().headers().find(allowed_header.get());
+    if (request_header != request.attributes().request().http().headers().cend()) {
+      if (allowed_header == Http::Headers::get().Path && !path_prefix_.empty()) {
+        std::string value;
+        absl::StrAppend(&value, path_prefix_, request_header->second);
+        headers->addCopy(allowed_header, value);
+      } else {
+        headers->addCopy(allowed_header, request_header->second);
+      }
     }
+  }
+
+  for (const auto& kv : authorization_headers_to_add_) {
+    headers->setReference(kv.first, kv.second);
   }
 
   request_ = cm_.httpAsyncClientForCluster(cluster_name_)
@@ -60,53 +89,52 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        timeout_);
 }
 
-void RawHttpClientImpl::onSuccess(Http::MessagePtr&& response) {
-  ResponsePtr authz_response = std::make_unique<Response>(Response{});
-
-  uint64_t status_code;
-  if (StringUtil::atoul(response->headers().Status()->value().c_str(), status_code)) {
-    if (status_code == enumToInt(Http::Code::OK)) {
-      // Header that should not be sent to the upstream.
-      response->headers().removeStatus();
-      response->headers().removeMethod();
-      response->headers().removePath();
-      response->headers().removeContentLength();
-
-      // Optional/Configurable headers the should not be sent to the upstream.
-      for (const auto& header_to_remove : response_headers_to_remove_) {
-        response->headers().remove(header_to_remove);
-      }
-
-      authz_response->status = CheckStatus::OK;
-      authz_response->status_code = Http::Code::OK;
-    } else {
-      authz_response->status = CheckStatus::Denied;
-      authz_response->body = response->bodyAsString();
-      authz_response->status_code = static_cast<Http::Code>(status_code);
-    }
-  } else {
-    ENVOY_LOG(warn, "Authz_Ext failed to parse the HTTP response code.");
-    authz_response->status_code = Http::Code::Forbidden;
-    authz_response->status = CheckStatus::Denied;
+ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
+  // Set an error status if parsing status code fails. A Forbidden response is sent to the client
+  // if the filter has not been configured with failure_mode_allow.
+  uint64_t status_code{};
+  if (!StringUtil::atoul(message->headers().Status()->value().c_str(), status_code)) {
+    ENVOY_LOG(warn, "ext_authz HTTP client failed to parse the HTTP status code.");
+    return std::make_unique<Response>(getErrorResponse());
   }
 
-  response->headers().iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        static_cast<Http::HeaderVector*>(context)->emplace_back(
-            Http::LowerCaseString{header.key().c_str()}, std::string{header.value().c_str()});
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &authz_response->headers_to_add);
+  // Set an error status if the call to the authorization server returns any of the 5xx HTTP error
+  // codes. A Forbidden response is sent to the client if the filter has not been configured with
+  // failure_mode_allow.
+  if (Http::CodeUtility::is5xx(status_code)) {
+    return std::make_unique<Response>(getErrorResponse());
+  }
 
-  callbacks_->onComplete(std::move(authz_response));
+  ResponsePtr response;
+  // Set an accepted or a denied authorization response.
+  if (status_code == enumToInt(Http::Code::OK)) {
+    response = std::make_unique<Response>(getOkResponse());
+  } else {
+    response = std::make_unique<Response>(getDeniedResponse());
+    response->status_code = static_cast<Http::Code>(status_code);
+    response->body = message->bodyAsString();
+  }
+
+  // Copy all headers from the message that should be in the response.
+  for (const auto& allowed_header : allowed_authorization_headers_) {
+    const auto* entry = message->headers().get(allowed_header);
+    if (entry) {
+      response->headers_to_add.emplace_back(Http::LowerCaseString{entry->key().c_str()},
+                                            std::string{entry->value().c_str()});
+    }
+  }
+
+  return response;
+}
+
+void RawHttpClientImpl::onSuccess(Http::MessagePtr&& message) {
+  callbacks_->onComplete(messageToResponse(std::move(message)));
   callbacks_ = nullptr;
 }
 
 void RawHttpClientImpl::onFailure(Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
-  Response authz_response{};
-  authz_response.status = CheckStatus::Error;
-  callbacks_->onComplete(std::make_unique<Response>(authz_response));
+  callbacks_->onComplete(std::make_unique<Response>(getErrorResponse()));
   callbacks_ = nullptr;
 }
 

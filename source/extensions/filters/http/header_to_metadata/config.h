@@ -16,7 +16,7 @@ namespace HeaderToMetadataFilter {
 class HeaderToMetadataConfig
     : public Common::FactoryBase<envoy::config::filter::http::header_to_metadata::v2::Config> {
 public:
-  HeaderToMetadataConfig() : FactoryBase(HttpFilterNames::get().HEADER_TO_METADATA) {}
+  HeaderToMetadataConfig() : FactoryBase(HttpFilterNames::get().HeaderToMetadata) {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

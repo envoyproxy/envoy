@@ -10,6 +10,7 @@
 #include "common/config/well_known_names.h"
 #include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
+#include "common/network/address_impl.h"
 #include "common/router/router.h"
 #include "common/upstream/host_utility.h"
 
@@ -48,8 +49,8 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
                              AccessLog::AccessLogManager& log_manager) {
   HealthCheckEventLoggerPtr event_logger;
   if (!hc_config.event_log_path().empty()) {
-    event_logger =
-        std::make_unique<HealthCheckEventLoggerImpl>(log_manager, hc_config.event_log_path());
+    event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
+        log_manager, dispatcher.timeSystem(), hc_config.event_log_path());
   }
   switch (hc_config.health_checker_case()) {
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
@@ -65,16 +66,10 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
     }
     return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
                                                        random, std::move(event_logger));
-  // Deprecated redis_health_check, preserving using old config until it is removed.
-  case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kRedisHealthCheck:
-    ENVOY_LOG(warn, "redis_health_check is deprecated, use custom_health_check instead");
-    FALLTHRU;
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
-            hc_config.has_redis_health_check()
-                ? Extensions::HealthCheckers::HealthCheckerNames::get().REDIS_HEALTH_CHECKER
-                : std::string(hc_config.custom_health_check().name()));
+            std::string(hc_config.custom_health_check().name()));
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,
                                             std::move(event_logger)));
@@ -82,7 +77,7 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
   }
   default:
     // Checked by schema.
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -95,7 +90,8 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
       request_headers_parser_(
-          Router::HeaderParser::configure(config.http_health_check().request_headers_to_add())),
+          Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
+                                          config.http_health_check().request_headers_to_remove())),
       codec_client_type_(codecClientType(config.http_health_check().use_http2())) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
@@ -104,7 +100,13 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
     HttpHealthCheckerImpl& parent, const HostSharedPtr& host)
-    : ActiveHealthCheckSession(parent, host), parent_(parent) {}
+    : ActiveHealthCheckSession(parent, host), parent_(parent),
+      hostname_(parent_.host_value_.empty() ? parent_.cluster_.info()->name()
+                                            : parent_.host_value_),
+      protocol_(parent_.codec_client_type_ == Http::CodecClient::Type::HTTP1
+                    ? Http::Protocol::Http11
+                    : Http::Protocol::Http2),
+      local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
   if (client_) {
@@ -133,9 +135,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
   }
 }
 
-const RequestInfo::RequestInfoImpl
-    HttpHealthCheckerImpl::HttpActiveHealthCheckSession::REQUEST_INFO;
-
+// TODO(lilika) : Support connection pooling
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
@@ -150,13 +150,15 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
 
   Http::HeaderMapImpl request_headers{
       {Http::Headers::get().Method, "GET"},
-      {Http::Headers::get().Host,
-       parent_.host_value_.empty() ? parent_.cluster_.info()->name() : parent_.host_value_},
+      {Http::Headers::get().Host, hostname_},
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
   Router::FilterUtility::setUpstreamScheme(request_headers, *parent_.cluster_.info());
-
-  parent_.request_headers_parser_->evaluateHeaders(request_headers, REQUEST_INFO);
+  StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSystem());
+  stream_info.setDownstreamLocalAddress(local_address_);
+  stream_info.setDownstreamRemoteAddress(local_address_);
+  stream_info.onUpstreamHostSelected(host_);
+  parent_.request_headers_parser_->evaluateHeaders(request_headers, stream_info);
   request_encoder_->encodeHeaders(request_headers, true);
   request_encoder_ = nullptr;
 }
@@ -198,6 +200,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
   if (isHealthCheckSucceeded()) {
     handleSuccess();
   } else {
+    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNHEALTHY);
     handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::ACTIVE);
   }
 
@@ -213,12 +216,16 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
-  ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
-                 HostUtility::healthFlagsToString(*host_));
+  if (client_) {
+    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
+    ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
+                   HostUtility::healthFlagsToString(*host_));
 
-  // If there is an active request it will get reset, so make sure we ignore the reset.
-  expect_reset_ = true;
-  client_->close();
+    // If there is an active request it will get reset, so make sure we ignore the reset.
+    expect_reset_ = true;
+
+    client_->close();
+  }
 }
 
 Http::CodecClient::Type HttpHealthCheckerImpl::codecClientType(bool use_http2) {
@@ -294,6 +301,8 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
     if (!parent_.reuse_connection_) {
       client_->close(Network::ConnectionCloseType::NoFlush);
     }
+  } else {
+    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNHEALTHY);
   }
 }
 
@@ -327,6 +336,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
   }
 }
 
+// TODO(lilika) : Support connection pooling
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     client_ = host_->createHealthCheckConnection(parent_.dispatcher_).connection_;
@@ -349,6 +359,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
+  host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
   client_->close(Network::ConnectionCloseType::NoFlush);
 }
 
@@ -597,7 +608,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
       break;
     default:
       // Should not happen really, Protobuf should not parse undefined enums values.
-      NOT_REACHED;
+      NOT_REACHED_GCOVR_EXCL_LINE;
       break;
     }
   }

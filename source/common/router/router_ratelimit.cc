@@ -108,7 +108,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const envoy::api::v2::route::
       actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match()));
       break;
     default:
-      NOT_REACHED;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 }

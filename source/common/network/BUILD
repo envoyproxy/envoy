@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["address_impl.h"],
     deps = [
         "//include/envoy/network:address_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
     ],
@@ -58,6 +59,7 @@ envoy_cc_library(
         "//source/common/event:libevent_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/ssl:ssl_socket_lib",
+        "//source/common/stream_info:filter_state_lib",
     ],
 )
 
@@ -181,6 +183,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
+        "//include/envoy/api:os_sys_calls_interface",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
@@ -226,6 +229,7 @@ envoy_cc_library(
         ":address_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/stats:stats_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf",

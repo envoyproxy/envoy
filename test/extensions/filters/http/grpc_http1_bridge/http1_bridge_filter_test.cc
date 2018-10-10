@@ -11,11 +11,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +27,7 @@ public:
   GrpcHttp1BridgeFilterTest() : filter_(cm_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
-    ON_CALL(decoder_callbacks_.request_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
+    ON_CALL(decoder_callbacks_.stream_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
   }
 
   ~GrpcHttp1BridgeFilterTest() { filter_.onDestroy(); }

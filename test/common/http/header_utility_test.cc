@@ -43,35 +43,6 @@ name: test-header
   EXPECT_EQ(HeaderUtility::HeaderMatchType::Present, header_data.header_match_type_);
 }
 
-TEST(HeaderDataConstructorTest, ValueSet) {
-  const std::string yaml = R"EOF(
-name: test-header
-value: value
-  )EOF";
-
-  HeaderUtility::HeaderData header_data =
-      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Value, header_data.header_match_type_);
-  EXPECT_EQ("value", header_data.value_);
-}
-
-TEST(HeaderDataConstructorTest, ValueAndRegexFlagSet) {
-  const std::string yaml = R"EOF(
-name: test-header
-value: value
-regex: true
-  )EOF";
-
-  HeaderUtility::HeaderData header_data =
-      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Regex, header_data.header_match_type_);
-  EXPECT_EQ("", header_data.value_);
-}
-
 TEST(HeaderDataConstructorTest, ExactMatchSpecifier) {
   const std::string yaml = R"EOF(
 name: test-header
@@ -430,6 +401,22 @@ invert_match: true
   header_data.push_back(HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml)));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
+TEST(HeaderAddTest, HeaderAdd) {
+  TestHeaderMapImpl headers{{"myheader1", "123value"}};
+  TestHeaderMapImpl headers_to_add{{"myheader2", "456value"}};
+
+  HeaderUtility::addHeaders(headers, headers_to_add);
+
+  headers_to_add.iterate(
+      [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
+        TestHeaderMapImpl* headers = static_cast<TestHeaderMapImpl*>(context);
+        Http::LowerCaseString lower_key{entry.key().c_str()};
+        EXPECT_STREQ(entry.value().c_str(), headers->get(lower_key)->value().c_str());
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      &headers);
 }
 
 } // namespace Http

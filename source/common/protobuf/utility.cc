@@ -20,8 +20,9 @@ uint64_t convertPercent(double percent, uint64_t max_value) {
   return max_value * (percent / 100.0);
 }
 
-uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent& percent) {
-  switch (percent.denominator()) {
+uint64_t fractionalPercentDenominatorToInt(
+    const envoy::type::FractionalPercent::DenominatorType& denominator) {
+  switch (denominator) {
   case envoy::type::FractionalPercent::HUNDRED:
     return 100;
   case envoy::type::FractionalPercent::TEN_THOUSAND:
@@ -30,7 +31,7 @@ uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent&
     return 1000000;
   default:
     // Checked by schema.
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -48,9 +49,18 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
   ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
+ProtoUnknownFieldsMode MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Strict;
+
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message) {
+  MessageUtil::loadFromJsonEx(json, message, ProtoUnknownFieldsMode::Strict);
+}
+
+void MessageUtil::loadFromJsonEx(const std::string& json, Protobuf::Message& message,
+                                 ProtoUnknownFieldsMode proto_unknown_fields) {
   Protobuf::util::JsonParseOptions options;
-  options.ignore_unknown_fields = true;
+  if (proto_unknown_fields == ProtoUnknownFieldsMode::Allow) {
+    options.ignore_unknown_fields = true;
+  }
   const auto status = Protobuf::util::JsonStringToMessage(json, &message, options);
   if (!status.ok()) {
     throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
@@ -58,8 +68,14 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
 }
 
 void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
-  const std::string json = Json::Factory::loadFromYamlString(yaml)->asJsonString();
-  loadFromJson(json, message);
+  const auto loaded_object = Json::Factory::loadFromYamlString(yaml);
+  // Load the message if the loaded object has type Object or Array.
+  if (loaded_object->isObject() || loaded_object->isArray()) {
+    const std::string json = loaded_object->asJsonString();
+    loadFromJson(json, message);
+    return;
+  }
+  throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
 }
 
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message) {
@@ -68,6 +84,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   if (StringUtil::endsWith(path, ".pb")) {
     // Attempt to parse the binary format.
     if (message.ParseFromString(contents)) {
+      MessageUtil::checkUnknownFields(message);
       return;
     }
     throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
@@ -107,7 +124,7 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   ProtobufTypes::String json;
   const auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
   // This should always succeed unless something crash-worthy such as out-of-memory.
-  RELEASE_ASSERT(status.ok());
+  RELEASE_ASSERT(status.ok(), "");
   return json;
 }
 
@@ -121,7 +138,7 @@ void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message
     throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
                                      status.ToString(), source.DebugString()));
   }
-  MessageUtil::loadFromJson(json, dest);
+  MessageUtil::loadFromJsonEx(json, dest, MessageUtil::proto_unknown_fields);
 }
 
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
@@ -188,7 +205,7 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
   }
 
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

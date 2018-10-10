@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/stats/scope.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/http/header_map_impl.h"
@@ -31,6 +32,8 @@ void XfccIntegrationTest::TearDown() {
   client_tls_ssl_ctx_.reset();
   fake_upstream_connection_.reset();
   fake_upstreams_.clear();
+  HttpIntegrationTest::cleanupUpstreamAndDownstream();
+  codec_client_.reset();
   context_manager_.reset();
   runtime_.reset();
 }
@@ -58,10 +61,10 @@ Network::TransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(b
     target = json_tls;
   }
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(target);
-  Ssl::ClientContextConfigImpl cfg(*loader, secret_manager_);
+  auto cfg = std::make_unique<Ssl::ClientContextConfigImpl>(*loader, factory_context_);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::TransportSocketFactoryPtr{
-      new Ssl::ClientSslSocketFactory(cfg, *context_manager_, *client_stats_store)};
+      new Ssl::ClientSslSocketFactory(std::move(cfg), *context_manager_, *client_stats_store)};
 }
 
 Network::TransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext() {
@@ -73,10 +76,10 @@ Network::TransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext
 )EOF";
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  Ssl::ServerContextConfigImpl cfg(*loader, secret_manager_);
+  auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(*loader, factory_context_);
   static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return std::make_unique<Ssl::ServerSslSocketFactory>(
-      cfg, *context_manager_, *upstream_stats_store, std::vector<std::string>{});
+      std::move(cfg), *context_manager_, *upstream_stats_store, std::vector<std::string>{});
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeClientConnection() {
@@ -97,8 +100,8 @@ Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
 }
 
 void XfccIntegrationTest::createUpstreams() {
-  fake_upstreams_.emplace_back(
-      new FakeUpstream(createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_));
+  fake_upstreams_.emplace_back(new FakeUpstream(
+      createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
 }
 
 void XfccIntegrationTest::initialize() {
@@ -147,9 +150,9 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previ
 
   codec_client_ = makeHttpConnection(std::move(conn));
   auto response = codec_client_->makeHeaderOnlyRequest(header_map);
-  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
-  upstream_request_->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   if (expected_xfcc.empty()) {
     EXPECT_EQ(nullptr, upstream_request_->headers().ForwardedClientCert());
   } else {

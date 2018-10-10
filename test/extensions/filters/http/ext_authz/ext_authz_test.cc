@@ -28,6 +28,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -36,7 +37,6 @@ using testing::ReturnRef;
 using testing::TestWithParam;
 using testing::Values;
 using testing::WithArgs;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -117,6 +117,31 @@ envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz GetFilterConfig() {
 INSTANTIATE_TEST_CASE_P(ParameterizedFilterConfig, HttpExtAuthzFilterParamTest,
                         Values(&GetFilterConfig<true>, &GetFilterConfig<false>));
 
+// Test allowed request headers values in the HTTP client.
+TEST_F(HttpExtAuthzFilterTest, TestAllowedRequestHeaders) {
+  const std::string config = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    allowed_authorization_headers:
+      - foo_header_key
+    allowed_request_headers:
+      - bar_header_key
+  )EOF";
+
+  initialize(config);
+  EXPECT_EQ(config_->allowedRequestHeaders().size(), 4);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Path), 1);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Method), 1);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Host), 1);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::LowerCaseString{"bar_header_key"}), 1);
+  EXPECT_EQ(config_->allowedAuthorizationHeaders().size(), 1);
+  EXPECT_EQ(config_->allowedAuthorizationHeaders().count(Http::LowerCaseString{"foo_header_key"}),
+            1);
+}
+
 // Test that the request continues when the filter_callbacks has no route.
 TEST_P(HttpExtAuthzFilterParamTest, NoRoute) {
 
@@ -157,8 +182,8 @@ TEST_P(HttpExtAuthzFilterParamTest, OkResponse) {
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Envoy::RequestInfo::ResponseFlag::UnauthorizedExternalService))
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -321,8 +346,8 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponseWith401) {
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Envoy::RequestInfo::ResponseFlag::UnauthorizedExternalService));
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
@@ -356,8 +381,8 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponseWith403) {
 
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Envoy::RequestInfo::ResponseFlag::UnauthorizedExternalService));
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
@@ -415,6 +440,67 @@ TEST_P(HttpExtAuthzFilterParamTest, DestroyResponseBeforeSendLocalReply) {
         Http::TestHeaderMapImpl test_headers{*saved_headers};
         EXPECT_EQ(test_headers.get_("foo"), "bar");
         EXPECT_EQ(test_headers.get_("bar"), "foo");
+        EXPECT_EQ(data.toString(), "foo");
+      }));
+
+  request_callbacks_->onComplete(std::move(response_ptr));
+
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.denied").value());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_4xx").value());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_403").value());
+}
+
+// Verify that authz denied response headers overrides the existing encoding headers.
+TEST_P(HttpExtAuthzFilterParamTest, OverrideEncodingHeaders) {
+  InSequence s;
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Forbidden;
+  response.body = std::string{"foo"};
+  response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
+                                               {Http::LowerCaseString{"bar"}, "foo"}};
+  Filters::Common::ExtAuthz::ResponsePtr response_ptr =
+      std::make_unique<Filters::Common::ExtAuthz::Response>(response);
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Http::TestHeaderMapImpl response_headers{{":status", "403"},
+                                           {"content-length", "3"},
+                                           {"content-type", "text/plain"},
+                                           {"foo", "bar"},
+                                           {"bar", "foo"}};
+
+  Http::HeaderMap* saved_headers;
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
+      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) {
+        headers.addCopy(Http::LowerCaseString{"foo"}, std::string{"OVERRIDE_WITH_bar"});
+        headers.addCopy(Http::LowerCaseString{"foobar"}, std::string{"DO_NOT_OVERRIDE"});
+        saved_headers = &headers;
+      }));
+
+  EXPECT_CALL(filter_callbacks_, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        response_ptr.reset();
+        Http::TestHeaderMapImpl test_headers{*saved_headers};
+        EXPECT_EQ(test_headers.get_("foo"), "bar");
+        EXPECT_EQ(test_headers.get_("bar"), "foo");
+        EXPECT_EQ(test_headers.get_("foobar"), "DO_NOT_OVERRIDE");
         EXPECT_EQ(data.toString(), "foo");
       }));
 

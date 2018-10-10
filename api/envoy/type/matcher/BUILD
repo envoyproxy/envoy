@@ -7,8 +7,7 @@ api_proto_library_internal(
     srcs = ["metadata.proto"],
     visibility = ["//visibility:public"],
     deps = [
-        ":number",
-        ":string",
+        ":value",
     ],
 )
 
@@ -16,8 +15,7 @@ api_go_proto_library(
     name = "metadata",
     proto = ":metadata",
     deps = [
-        ":number_go_proto",
-        ":string_go_proto",
+        ":value_go_proto",
     ],
 )
 
@@ -47,4 +45,23 @@ api_proto_library_internal(
 api_go_proto_library(
     name = "string",
     proto = ":string",
+)
+
+api_proto_library_internal(
+    name = "value",
+    srcs = ["value.proto"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":number",
+        ":string",
+    ],
+)
+
+api_go_proto_library(
+    name = "value",
+    proto = ":value",
+    deps = [
+        ":number_go_proto",
+        ":string_go_proto",
+    ],
 )

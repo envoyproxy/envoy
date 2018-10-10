@@ -90,7 +90,7 @@ maximize the chances of your PR being merged.
 * We expect that once a PR is opened, it will be actively worked on until it is merged or closed.
   We reserve the right to close PRs that are not making progress. This is generally defined as no
   changes for 7 days. Obviously PRs that are closed due to lack of activity can be reopened later.
-  Closing stale PRs helps us keep on top of all of the work currently in flight.
+  Closing stale PRs helps us to keep on top of all of the work currently in flight.
 * If a commit deprecates a feature, the commit message must mention what has been deprecated.
   Additionally, [DEPRECATED.md](DEPRECATED.md) must be updated as part of the commit.
 * Please consider joining the [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev)
@@ -212,5 +212,19 @@ git rebase -i HEAD^^
 git push origin -f
 ```
 
-Note, that in general rewriting history in this way is a hinderance to the review process and this
+Note, that in general rewriting history in this way is a hindrance to the review process and this
 should only be done to correct a DCO mistake.
+
+## Triggering CI re-run without making changes
+
+Sometimes CI test runs fail due to obvious resource problems or other issues
+which are not related to your PR. It may be desirable to re-trigger CI without
+making any code changes. Consider adding an alias into your `.gitconfig` file:
+
+```
+[alias]
+    kick-ci = !"git commit -s --allow-empty -m 'Kick CI' && git push"
+```
+
+Once you add this alias you can issue the command `git kick-ci` and the PR
+will be sent back for a retest.

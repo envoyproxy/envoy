@@ -36,6 +36,13 @@ void LightStepLogger::operator()(lightstep::LogLevel level,
 LightStepDriver::LightStepTransporter::LightStepTransporter(LightStepDriver& driver)
     : driver_(driver) {}
 
+// If the default min_flush_spans value is too small, the larger number of reports can overwhelm
+// LightStep's satellites. Hence, we need to choose a number that's large enough; though, it's
+// somewhat arbitrary.
+//
+// See https://github.com/lightstep/lightstep-tracer-cpp/issues/106
+const size_t LightStepDriver::DefaultMinFlushSpans = 200U;
+
 LightStepDriver::LightStepTransporter::~LightStepTransporter() {
   if (active_request_ != nullptr) {
     active_request_->cancel();
@@ -122,7 +129,7 @@ void LightStepDriver::TlsLightStepTracer::enableTimer() {
   flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
 }
 
-LightStepDriver::LightStepDriver(const Json::Object& config,
+LightStepDriver::LightStepDriver(const envoy::config::trace::v2::LightstepConfig& lightstep_config,
                                  Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
                                  ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                                  std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
@@ -131,10 +138,10 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
       tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
       tls_{tls.allocateSlot()}, runtime_{runtime}, options_{std::move(options)},
       propagation_mode_{propagation_mode} {
-  Upstream::ThreadLocalCluster* cluster = cm_.get(config.getString("collector_cluster"));
+  Upstream::ThreadLocalCluster* cluster = cm_.get(lightstep_config.collector_cluster());
   if (!cluster) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
-                                     config.getString("collector_cluster")));
+                                     lightstep_config.collector_cluster()));
   }
   cluster_ = cluster->info();
 
@@ -150,8 +157,11 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
     tls_options.use_thread = false;
     tls_options.use_single_key_propagation = true;
     tls_options.logger_sink = LightStepLogger{};
-    tls_options.max_buffered_spans = std::function<size_t()>{
-        [this] { return runtime_.snapshot().getInteger("tracing.lightstep.min_flush_spans", 5U); }};
+
+    tls_options.max_buffered_spans = std::function<size_t()>{[this] {
+      return runtime_.snapshot().getInteger("tracing.lightstep.min_flush_spans",
+                                            DefaultMinFlushSpans);
+    }};
     tls_options.metrics_observer.reset(new LightStepMetricsObserver{*this});
     tls_options.transporter.reset(new LightStepTransporter{*this});
     std::shared_ptr<lightstep::LightStepTracer> tracer =

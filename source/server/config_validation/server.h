@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include "envoy/event/timer.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
@@ -13,7 +14,6 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
-#include "common/stats/stats_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "server/config_validation/admin.h"
@@ -53,7 +53,8 @@ class ValidationInstance : Logger::Loggable<Logger::Id::main>,
                            public ListenerComponentFactory,
                            public WorkerFactory {
 public:
-  ValidationInstance(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+  ValidationInstance(Options& options, Event::TimeSystem& time_system,
+                     Network::Address::InstanceConstSharedPtr local_address,
                      Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
                      ComponentFactory& component_factory);
 
@@ -66,12 +67,12 @@ public:
   Network::DnsResolverSharedPtr dnsResolver() override {
     return dispatcher().createDnsResolver({});
   }
-  void drainListeners() override { NOT_IMPLEMENTED; }
-  DrainManager& drainManager() override { NOT_IMPLEMENTED; }
+  void drainListeners() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  DrainManager& drainManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
-  void failHealthcheck(bool) override { NOT_IMPLEMENTED; }
-  void getParentStats(HotRestart::GetParentStatsInfo&) override { NOT_IMPLEMENTED; }
-  HotRestart& hotRestart() override { NOT_IMPLEMENTED; }
+  void failHealthcheck(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void getParentStats(HotRestart::GetParentStatsInfo&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  HotRestart& hotRestart() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Init::Manager& initManager() override { return init_manager_; }
   ListenerManager& listenerManager() override { return listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
@@ -82,16 +83,18 @@ public:
   }
   Runtime::Loader& runtime() override { return *runtime_loader_; }
   void shutdown() override;
-  void shutdownAdmin() override { NOT_IMPLEMENTED; }
+  void shutdownAdmin() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
-  bool healthCheckFailed() override { NOT_IMPLEMENTED; }
+  OverloadManager& overloadManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  bool healthCheckFailed() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Options& options() override { return options_; }
-  time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED; }
-  time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED; }
+  time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Stats::Store& stats() override { return stats_store_; }
   Tracing::HttpTracer& httpTracer() override { return config_->httpTracer(); }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
+  Event::TimeSystem& timeSystem() override { return time_system_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_->statsFlushInterval();
@@ -136,6 +139,7 @@ private:
                   ComponentFactory& component_factory);
 
   Options& options_;
+  Event::TimeSystem& time_system_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;

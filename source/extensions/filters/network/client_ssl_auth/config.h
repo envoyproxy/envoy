@@ -17,7 +17,7 @@ class ClientSslAuthConfigFactory
     : public Common::FactoryBase<
           envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth> {
 public:
-  ClientSslAuthConfigFactory() : FactoryBase(NetworkFilterNames::get().CLIENT_SSL_AUTH) {}
+  ClientSslAuthConfigFactory() : FactoryBase(NetworkFilterNames::get().ClientSslAuth) {}
 
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb

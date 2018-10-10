@@ -16,7 +16,7 @@ namespace IpTagging {
 class IpTaggingFilterFactory
     : public Common::FactoryBase<envoy::config::filter::http::ip_tagging::v2::IPTagging> {
 public:
-  IpTaggingFilterFactory() : FactoryBase(HttpFilterNames::get().IP_TAGGING) {}
+  IpTaggingFilterFactory() : FactoryBase(HttpFilterNames::get().IpTagging) {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

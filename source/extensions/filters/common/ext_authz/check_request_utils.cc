@@ -93,12 +93,12 @@ void CheckRequestUtils::setHttpRequest(
 
   // Set size
   // need to convert to google buffer 64t;
-  httpreq.set_size(sdfc->requestInfo().bytesReceived());
+  httpreq.set_size(sdfc->streamInfo().bytesReceived());
 
   // Set protocol
-  if (sdfc->requestInfo().protocol()) {
+  if (sdfc->streamInfo().protocol()) {
     httpreq.set_protocol(
-        Envoy::Http::Utility::getProtocolString(sdfc->requestInfo().protocol().value()));
+        Envoy::Http::Utility::getProtocolString(sdfc->streamInfo().protocol().value()));
   }
 
   // Fill in the headers

@@ -8,7 +8,6 @@
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -20,11 +19,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::AtLeast;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Config {
@@ -47,6 +46,16 @@ TEST(UtilityTest, GetTypedResources) {
   EXPECT_EQ("1", typed_resources[1].cluster_name());
 }
 
+TEST(UtilityTest, GetTypedResourcesWrongType) {
+  envoy::api::v2::DiscoveryResponse response;
+  envoy::api::v2::ClusterLoadAssignment load_assignment_0;
+  load_assignment_0.set_cluster_name("0");
+  response.add_resources()->PackFrom(load_assignment_0);
+
+  EXPECT_THROW_WITH_REGEX(Utility::getTypedResources<envoy::api::v2::Listener>(response),
+                          EnvoyException, "Unable to unpack .*");
+}
+
 TEST(UtilityTest, ComputeHashedVersion) {
   EXPECT_EQ("hash_2e1472b57af294d1", Utility::computeHashedVersion("{}").first);
   EXPECT_EQ("hash_33bf00a859c4ba3f", Utility::computeHashedVersion("foo").first);
@@ -57,6 +66,18 @@ TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
   api_config_source.mutable_refresh_delay()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
   EXPECT_EQ(1234, Utility::apiConfigSourceRefreshDelay(api_config_source).count());
+}
+
+TEST(UtilityTest, ApiConfigSourceDefaultRequestTimeout) {
+  envoy::api::v2::core::ApiConfigSource api_config_source;
+  EXPECT_EQ(1000, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
+}
+
+TEST(UtilityTest, ApiConfigSourceRequestTimeout) {
+  envoy::api::v2::core::ApiConfigSource api_config_source;
+  api_config_source.mutable_request_timeout()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
+  EXPECT_EQ(1234, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
 }
 
 TEST(UtilityTest, TranslateApiConfigSource) {
@@ -81,7 +102,8 @@ TEST(UtilityTest, TranslateApiConfigSource) {
                                     api_config_source_grpc);
   EXPECT_EQ(envoy::api::v2::core::ApiConfigSource::GRPC, api_config_source_grpc.api_type());
   EXPECT_EQ(30000, DurationUtil::durationToMilliseconds(api_config_source_grpc.refresh_delay()));
-  EXPECT_EQ("test_grpc_cluster", api_config_source_grpc.cluster_names(0));
+  EXPECT_EQ("test_grpc_cluster",
+            api_config_source_grpc.grpc_services(0).envoy_grpc().cluster_name());
 }
 
 TEST(UtilityTest, createTagProducer) {
@@ -95,15 +117,16 @@ TEST(UtilityTest, createTagProducer) {
 }
 
 TEST(UtilityTest, ObjNameLength) {
-
-  std::string name = "listenerwithareallyreallylongnamemorethanmaxcharsallowedbyschema";
+  Stats::StatsOptionsImpl stats_options;
+  std::string name = "listenerwithareallyreallyreallyreallyreallyreallyreallyreallyreallyreallyreal"
+                     "lyreallyreallyreallyreallyreallylongnamemorethanmaxcharsallowedbyschema";
   std::string err_prefix;
   std::string err_suffix = fmt::format(": Length of {} ({}) exceeds allowed maximum length ({})",
-                                       name, name.length(), Stats::RawStatData::maxObjNameLength());
+                                       name, name.length(), stats_options.maxNameLength());
   {
     err_prefix = "test";
-    EXPECT_THROW_WITH_MESSAGE(Utility::checkObjNameLength(err_prefix, name), EnvoyException,
-                              err_prefix + err_suffix);
+    EXPECT_THROW_WITH_MESSAGE(Utility::checkObjNameLength(err_prefix, name, stats_options),
+                              EnvoyException, err_prefix + err_suffix);
   }
 
   {
@@ -113,8 +136,9 @@ TEST(UtilityTest, ObjNameLength) {
     auto json_object_ptr = Json::Factory::loadFromString(json);
 
     envoy::api::v2::Listener listener;
-    EXPECT_THROW_WITH_MESSAGE(Config::LdsJson::translateListener(*json_object_ptr, listener),
-                              EnvoyException, err_prefix + err_suffix);
+    EXPECT_THROW_WITH_MESSAGE(
+        Config::LdsJson::translateListener(*json_object_ptr, listener, stats_options),
+        EnvoyException, err_prefix + err_suffix);
   }
 
   {
@@ -122,8 +146,9 @@ TEST(UtilityTest, ObjNameLength) {
     std::string json = R"EOF({ "name": ")EOF" + name + R"EOF(", "domains": [], "routes": []})EOF";
     auto json_object_ptr = Json::Factory::loadFromString(json);
     envoy::api::v2::route::VirtualHost vhost;
-    EXPECT_THROW_WITH_MESSAGE(Config::RdsJson::translateVirtualHost(*json_object_ptr, vhost),
-                              EnvoyException, err_prefix + err_suffix);
+    EXPECT_THROW_WITH_MESSAGE(
+        Config::RdsJson::translateVirtualHost(*json_object_ptr, vhost, stats_options),
+        EnvoyException, err_prefix + err_suffix);
   }
 
   {
@@ -135,8 +160,8 @@ TEST(UtilityTest, ObjNameLength) {
     envoy::api::v2::Cluster cluster;
     envoy::api::v2::core::ConfigSource eds_config;
     EXPECT_THROW_WITH_MESSAGE(
-        Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster), EnvoyException,
-        err_prefix + err_suffix);
+        Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster, stats_options),
+        EnvoyException, err_prefix + err_suffix);
   }
 
   {
@@ -144,8 +169,9 @@ TEST(UtilityTest, ObjNameLength) {
     std::string json = R"EOF({ "route_config_name": ")EOF" + name + R"EOF(", "cluster": "foo"})EOF";
     auto json_object_ptr = Json::Factory::loadFromString(json);
     envoy::config::filter::network::http_connection_manager::v2::Rds rds;
-    EXPECT_THROW_WITH_MESSAGE(Config::Utility::translateRdsConfig(*json_object_ptr, rds),
-                              EnvoyException, err_prefix + err_suffix);
+    EXPECT_THROW_WITH_MESSAGE(
+        Config::Utility::translateRdsConfig(*json_object_ptr, rds, stats_options), EnvoyException,
+        err_prefix + err_suffix);
   }
 }
 
@@ -159,9 +185,10 @@ TEST(UtilityTest, UnixClusterDns) {
   auto json_object_ptr = Json::Factory::loadFromString(json);
   envoy::api::v2::Cluster cluster;
   envoy::api::v2::core::ConfigSource eds_config;
+  Stats::StatsOptionsImpl stats_options;
   EXPECT_THROW_WITH_MESSAGE(
-      Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster), EnvoyException,
-      "unresolved URL must be TCP scheme, got: unix:///test.sock");
+      Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster, stats_options),
+      EnvoyException, "unresolved URL must be TCP scheme, got: unix:///test.sock");
 }
 
 TEST(UtilityTest, UnixClusterStatic) {
@@ -174,7 +201,8 @@ TEST(UtilityTest, UnixClusterStatic) {
   auto json_object_ptr = Json::Factory::loadFromString(json);
   envoy::api::v2::Cluster cluster;
   envoy::api::v2::core::ConfigSource eds_config;
-  Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster);
+  Stats::StatsOptionsImpl stats_options;
+  Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster, stats_options);
   EXPECT_EQ("/test.sock", cluster.hosts(0).pipe().path());
 }
 
@@ -197,7 +225,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
-        EnvoyException, "API configs must have either a gRPC service or a cluster name defined");
+        EnvoyException, "API configs must have either a gRPC service or a cluster name defined:");
   }
 
   {
@@ -208,28 +236,29 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
+        "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified:");
   }
 
   {
     envoy::api::v2::core::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
-    api_config_source.add_cluster_names();
-    // this also logs a warning for setting REST cluster names for a gRPC API config.
-    EXPECT_NO_THROW(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope));
-  }
-
-  {
-    envoy::api::v2::core::ApiConfigSource api_config_source;
-    api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
-    api_config_source.add_cluster_names();
     api_config_source.add_cluster_names();
     // this also logs a warning for setting REST cluster names for a gRPC API config.
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
+        "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified:");
+  }
+
+  {
+    envoy::api::v2::core::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+    api_config_source.add_cluster_names();
+    api_config_source.add_cluster_names();
+    EXPECT_THROW_WITH_REGEX(
+        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
+        EnvoyException,
+        "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified:");
   }
 
   {
@@ -241,7 +270,16 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
         "envoy::api::v2::core::ConfigSource, if not of type gRPC, must not have a gRPC service "
-        "specified");
+        "specified:");
+  }
+
+  {
+    envoy::api::v2::core::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
+    api_config_source.add_cluster_names("foo");
+    EXPECT_THROW_WITH_REGEX(
+        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
+        EnvoyException, "envoy::api::v2::core::ConfigSource type must be GRPC:");
   }
 
   {
@@ -272,17 +310,14 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
 
   // API of type GRPC
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
-  api_config_source->add_cluster_names("foo_cluster");
 
   // GRPC cluster without GRPC services.
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
-      EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS cluster: "
-      "'foo_cluster' does not exist, was added via api, or is an EDS cluster");
+      EnvoyException, "API configs must have either a gRPC service or a cluster name defined:");
 
   // Non-existent cluster.
-  api_config_source->add_grpc_services();
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo_cluster");
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
@@ -315,6 +350,13 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type());
   Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source);
+
+  // API with cluster_names set should be rejected.
+  api_config_source->add_cluster_names("foo_cluster");
+  EXPECT_THROW_WITH_REGEX(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
+      EnvoyException,
+      "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified:");
 }
 
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTypes) {

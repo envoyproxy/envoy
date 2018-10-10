@@ -21,12 +21,12 @@ TEST_P(IntegrationAdminTest, HealthCheck) {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/healthcheck", "", downstreamProtocol(), version_);
+      lookupPort("http"), "POST", "/healthcheck", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/healthcheck/fail", "",
-                                                downstreamProtocol(), version_);
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/healthcheck/fail",
+                                                "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
@@ -35,7 +35,7 @@ TEST_P(IntegrationAdminTest, HealthCheck) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/healthcheck/ok", "",
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/healthcheck/ok", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
@@ -60,39 +60,39 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/logging", "", downstreamProtocol(), version_);
+      lookupPort("admin"), "POST", "/logging", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 
   // Bad level
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/logging?level=blah",
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/logging?level=blah",
                                                 "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 
   // Bad logger
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/logging?blah=info",
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/logging?blah=info",
                                                 "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 
   // This is going to stomp over custom log levels that are set on the command line.
   response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/logging?level=warning", "", downstreamProtocol(), version_);
+      lookupPort("admin"), "POST", "/logging?level=warning", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   for (const Logger::Logger& logger : Logger::Registry::loggers()) {
     EXPECT_EQ("warning", logger.levelString());
   }
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/logging?assert=trace",
-                                                "", downstreamProtocol(), version_);
+  response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/logging?assert=trace", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
 
   const char* level_name = spdlog::level::level_names[default_log_level_];
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
                                                 fmt::format("/logging?level={}", level_name), "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
@@ -158,6 +158,27 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
+  // Testing a fitler with no matches
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?filter=foo", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+
+  // Testing a fitler with matches
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?filter=server",
+                                                "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
+                                                "/stats?filter=server&usedonly", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+
   response =
       IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json&usedonly",
                                          "", downstreamProtocol(), version_);
@@ -178,6 +199,39 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("application/json", ContentType(response));
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   validateStatsJson(response->body(), 1);
+
+  // Filtering stats by a regex with one match should return just that match.
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
+                                                "/stats?format=json&filter=^server\\.version$", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("application/json", ContentType(response));
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  validateStatsJson(response->body(), 0);
+  EXPECT_THAT(response->body(),
+              testing::Eq("{\"stats\":[{\"name\":\"server.version\",\"value\":0}]}"));
+
+  // Filtering stats by a non-full-string regex should also return just that match.
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
+                                                "/stats?format=json&filter=server\\.version", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("application/json", ContentType(response));
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  validateStatsJson(response->body(), 0);
+  EXPECT_THAT(response->body(),
+              testing::Eq("{\"stats\":[{\"name\":\"server.version\",\"value\":0}]}"));
+
+  // Filtering stats by a regex with no matches (".*not_intended_to_appear.*") should return a
+  // valid, empty, stats array.
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
+                                                "/stats?format=json&filter=not_intended_to_appear",
+                                                "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("application/json", ContentType(response));
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  validateStatsJson(response->body(), 0);
+  EXPECT_THAT(response->body(), testing::Eq("{\"stats\":[]}"));
 
   response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/stats?format=prometheus", "", downstreamProtocol(), version_);
@@ -224,7 +278,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_THAT(response->body(), testing::HasSubstr("added_via_api"));
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/cpuprofiler", "",
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/cpuprofiler", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("400", response->headers().Status()->value().c_str());
@@ -236,7 +290,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/reset_counters", "",
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/reset_counters", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
@@ -283,20 +337,25 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("application/json", ContentType(response));
   json = Json::Factory::loadFromString(response->body());
-  EXPECT_TRUE(json->getObject("configs")->hasObject("bootstrap"));
-  EXPECT_TRUE(json->getObject("configs")->hasObject("clusters"));
-  EXPECT_TRUE(json->getObject("configs")->hasObject("listeners"));
-  EXPECT_TRUE(json->getObject("configs")->hasObject("routes"));
+  size_t index = 0;
+  const std::string expected_types[] = {
+      "type.googleapis.com/envoy.admin.v2alpha.BootstrapConfigDump",
+      "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump",
+      "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump",
+      "type.googleapis.com/envoy.admin.v2alpha.RoutesConfigDump"};
+  for (Json::ObjectSharedPtr obj_ptr : json->getObjectArray("configs")) {
+    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
+    index++;
+  }
+
   // Validate we can parse as proto.
   envoy::admin::v2alpha::ConfigDump config_dump;
   MessageUtil::loadFromJson(response->body(), config_dump);
-  EXPECT_EQ(1, config_dump.configs().count("bootstrap"));
-  EXPECT_EQ(1, config_dump.configs().count("clusters"));
-  EXPECT_EQ(1, config_dump.configs().count("listeners"));
-  EXPECT_EQ(1, config_dump.configs().count("routes"));
+  EXPECT_EQ(4, config_dump.configs_size());
+
   // .. and that we can unpack one of the entries.
   envoy::admin::v2alpha::RoutesConfigDump route_config_dump;
-  config_dump.configs().at("routes").UnpackTo(&route_config_dump);
+  config_dump.configs(3).UnpackTo(&route_config_dump);
   EXPECT_EQ("route_config_0", route_config_dump.static_route_configs(0).route_config().name());
 }
 
@@ -341,12 +400,12 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
 
   initialize();
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/cpuprofiler?enable=y", "", downstreamProtocol(), version_);
+      lookupPort("admin"), "POST", "/cpuprofiler?enable=y", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/cpuprofiler?enable=n",
-                                                "", downstreamProtocol(), version_);
+  response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/cpuprofiler?enable=n", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
@@ -355,7 +414,8 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
 class IntegrationAdminIpv4Ipv6Test : public HttpIntegrationTest, public testing::Test {
 public:
   IntegrationAdminIpv4Ipv6Test()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4,
+                            realTime()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(
