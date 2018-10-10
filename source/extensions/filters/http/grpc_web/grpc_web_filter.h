@@ -19,7 +19,7 @@ namespace GrpcWeb {
  */
 class GrpcWebFilter : public Http::StreamFilter, NonCopyable {
 public:
-  GrpcWebFilter(Upstream::ClusterManager& cm) : cm_(cm) {}
+  GrpcWebFilter() {}
   virtual ~GrpcWebFilter(){};
 
   // Http::StreamFilterBase
@@ -56,7 +56,6 @@ private:
   static const uint8_t GRPC_WEB_TRAILER;
   const std::unordered_set<std::string>& gRpcWebContentTypes() const;
 
-  Upstream::ClusterManager& cm_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
