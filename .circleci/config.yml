@@ -84,6 +84,14 @@ jobs:
        - run: ci/coverage_publish.sh
        - store_artifacts:
            path: /build/envoy/generated/coverage
+
+   clang-tidy:
+     executor: ubuntu-build
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: ci/do_circle_ci.sh bazel.clang_tidy
+
    format:
      executor: ubuntu-build
      resource_class: small
