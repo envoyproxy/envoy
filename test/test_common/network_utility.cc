@@ -90,13 +90,6 @@ const std::string getLoopbackAddressString(const Address::IpVersion version) {
   return std::string("127.0.0.1");
 }
 
-const std::string getLoopbackAddressUrlString2(const Address::IpVersion version) {
-  if (version == Address::IpVersion::v6) {
-    return std::string("[::2]");
-  }
-  return std::string("127.0.0.2");
-}
-
 const std::string getAnyAddressUrlString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
     return std::string("[::]");
