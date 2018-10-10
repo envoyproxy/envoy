@@ -845,9 +845,7 @@ TEST_P(AdminInstanceTest, Runtime) {
   std::unordered_map<std::string, Runtime::Snapshot::Entry> entries2{
       {"string_key", {"override", {}, {}}}, {"extra_key", {"bar", {}, {}}}};
   std::unordered_map<std::string, Runtime::Snapshot::Entry> entries1{
-      {"string_key", {"foo", {}, {}}},
-      {"int_key", {"1", 1, {}}},
-      {"other_key", {"bar", {}, {}}}};
+      {"string_key", {"foo", {}, {}}}, {"int_key", {"1", 1, {}}}, {"other_key", {"bar", {}, {}}}};
 
   ON_CALL(*layer1, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer1"}));
   ON_CALL(*layer1, values()).WillByDefault(testing::ReturnRef(entries1));
