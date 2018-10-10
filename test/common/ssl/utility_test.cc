@@ -3,7 +3,7 @@
 
 #include "common/ssl/utility.h"
 
-#include "test/common/ssl/test_utility.h"
+#include "test/common/ssl/ssl_test_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
