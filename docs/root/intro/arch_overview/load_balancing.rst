@@ -171,10 +171,10 @@ describe many situations: all levels have health of 100% or 4 levels have health
 When normalized total health value is 100%, Envoy assumes that there are enough healthy hosts in all priority 
 levels to handle the load. Not all hosts need to be in one priority as Envoy distributes traffic across priority 
 levels based on each priority level's health value.
-In order for load distribution algorithm and normalized total health calculation work properly, the number of hosts
+In order for load distribution algorithm and normalized total health calculation to work properly, the number of hosts
 in each priority level should be close. Envoy assumes that for example 100% healthy priority level P=1 is able to take
-entire traffic from P=0 should all its hosts become unhealthy. If P=0 has 10 hosts and P=1 has only 2 hosts, P=1 may be unable
-to take entire load from P=0, even though P=1 health is 100%.
+the entire traffic from P=0 should all its hosts become unhealthy. If P=0 has 10 hosts and P=1 has only 2 hosts, P=1 may be unable
+to take the entire load from P=0, even though P=1 health is 100%.
 
 Assume a simple set-up with 2 priority levels, P=1 100% healthy.
 
@@ -272,7 +272,7 @@ Assume a simple set-up with 2 priority levels, P=1 100% healthy. In this scenari
 normalized total health is always 100% and P=0 never enters panic mode and Envoy is able to shift entire traffic to P=1.
 
 +-------------+------------+--------------+------------+--------------+--------------+
-| P=0 healthy | Traffic    | P=0 in panic | Ttraffic   | P=1 in panic | normalized   |
+| P=0 healthy | Traffic    | P=0 in panic | Traffic    | P=1 in panic | normalized   |
 | endpoints   |  to P=0    |              | to P=1     |              | total health |
 +=============+============+==============+============+==============+==============+
 | 100%        |  100%      | NO           |   0%       | NO           |  100%        |
