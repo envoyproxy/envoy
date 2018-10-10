@@ -8,7 +8,7 @@
 # -llvm-header-guard,-clang-diagnostic-pragma-once-outside-header:
 #   Allow `#pragma once` header guard.
 # -google-runtime-references:
-#   Allow non-const refereces as function parameter or member variable per Envoy style.
+#   Allow non-const references as function parameter or member variable per Envoy style.
 Checks:          'clang-diagnostic-*,clang-analyzer-*,*,-google-runtime-references,-llvm-header-guard,-clang-diagnostic-pragma-once-outside-header,-fuchsia-*,-android-*,-cppcoreguidelines-pro-type-vararg,-hicpp-va-arg'
 WarningsAsErrors: ''
 HeaderFilterRegex: ''
