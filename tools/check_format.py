@@ -202,7 +202,7 @@ def checkSourceLine(line, file_path, reportError):
     # can be used instead
     reportError("Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
                 "in include/envoy/common/platform.h instead")
-  if re.search("\{\s*\.\w+\s*\=\s*\w+", line):
+  if re.search("\{\s*\.\w+\s*\=", line):
     # Designated initializers are not part of the C++14 standard and are not supported
     # by MSVC
     reportError("Don't use designated initializers in struct initialization, "
