@@ -19,11 +19,10 @@ namespace GrpcWeb {
  */
 class GrpcWebFilter : public Http::StreamFilter, NonCopyable {
 public:
-  GrpcWebFilter() {}
-  virtual ~GrpcWebFilter(){};
+  virtual ~GrpcWebFilter() {}
 
   // Http::StreamFilterBase
-  void onDestroy() override{};
+  void onDestroy() override {}
 
   // Implements StreamDecoderFilter.
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
