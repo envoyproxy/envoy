@@ -72,11 +72,15 @@ public:
   MOCK_CONST_METHOD0(retryHostPredicates, std::vector<Upstream::RetryHostPredicateSharedPtr>());
   MOCK_CONST_METHOD0(retryPriority, Upstream::RetryPrioritySharedPtr());
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
+  const std::vector<uint32_t>& retriableStatusCodes() const override {
+    return retriable_status_codes_;
+  }
 
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
   uint32_t host_selection_max_attempts_;
+  std::vector<uint32_t> retriable_status_codes_;
 };
 
 class MockRetryState : public RetryState {
@@ -175,6 +179,7 @@ public:
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
   MOCK_CONST_METHOD0(routeConfig, const Config&());
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
+  MOCK_CONST_METHOD0(includeAttemptCount, bool());
   MOCK_METHOD0(retryPriority, Upstream::RetryPrioritySharedPtr());
   MOCK_METHOD0(retryHostPredicate, Upstream::RetryHostPredicateSharedPtr());
 
@@ -258,6 +263,7 @@ public:
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
   MOCK_CONST_METHOD0(pathMatchCriterion, const PathMatchCriterion&());
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
+  MOCK_CONST_METHOD0(includeAttemptCount, bool());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
