@@ -757,8 +757,9 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   EXPECT_EQ(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
             cluster_manager_->get("cluster_1")->loadBalancer().chooseHost(nullptr));
 
-  // Local reference, primary reference, thread local reference, host reference.
-  EXPECT_EQ(4U, cluster.info().use_count());
+  // Local reference, primary reference, thread local reference, host reference, async client
+  // reference.
+  EXPECT_EQ(5U, cluster.info().use_count());
 
   // Thread local reference should be gone.
   factory_.tls_.shutdownThread();

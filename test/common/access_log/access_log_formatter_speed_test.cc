@@ -9,7 +9,7 @@
 namespace {
 
 static std::unique_ptr<Envoy::AccessLog::FormatterImpl> formatter;
-static std::unique_ptr<Envoy::TestRequestInfo> request_info;
+static std::unique_ptr<Envoy::TestStreamInfo> stream_info;
 
 } // namespace
 
@@ -22,7 +22,7 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
   Http::TestHeaderMapImpl response_trailers;
   for (auto _ : state) {
     output_bytes +=
-        formatter->format(request_headers, response_headers, response_trailers, *request_info)
+        formatter->format(request_headers, response_headers, response_trailers, *stream_info)
             .length();
   }
   benchmark::DoNotOptimize(output_bytes);
@@ -40,8 +40,8 @@ int main(int argc, char** argv) {
       "s%RESPONSE_CODE% %BYTES_SENT% %DURATION% %REQ(REFERER)% \"%REQ(USER-AGENT)%\" - - -\n";
 
   formatter = std::make_unique<Envoy::AccessLog::FormatterImpl>(LogFormat);
-  request_info = std::make_unique<Envoy::TestRequestInfo>();
-  request_info->setDownstreamRemoteAddress(
+  stream_info = std::make_unique<Envoy::TestStreamInfo>();
+  stream_info->setDownstreamRemoteAddress(
       std::make_shared<Envoy::Network::Address::Ipv4Instance>("203.0.113.1"));
   benchmark::Initialize(&argc, argv);
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {

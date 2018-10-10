@@ -5,6 +5,7 @@
 #include "common/secret/sds_api.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_impl.h"
+#include "common/ssl/utility.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/common/ssl/ssl_certs_test.h"
@@ -15,7 +16,9 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "openssl/x509v3.h"
 
+using Envoy::Protobuf::util::MessageDifferencer;
 using testing::NiceMock;
 using testing::ReturnRef;
 
@@ -155,16 +158,78 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   // For the cert_chain, it is dynamically created when we run_envoy_test.sh which changes the
   // serial number with
   // every build. For cert_chain output, we check only for the certificate path.
-  std::string ca_cert_partial_output(TestEnvironment::substitute(
-      "Certificate Path: {{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem, Serial Number: "
-      "eaf3b0ea1d0e579a, "
-      "Days until Expiration: "));
-  std::string cert_chain_partial_output(
-      TestEnvironment::substitute("Certificate Path: {{ test_tmpdir }}/unittestcert.pem"));
+  std::string ca_cert_json = R"EOF({
+ "path": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+ "serial_number": "eaf3b0ea1d0e579a",
+ "subject_alt_names": [],
+ }
+)EOF";
 
-  EXPECT_TRUE(context->getCaCertInformation().find(ca_cert_partial_output) != std::string::npos);
-  EXPECT_TRUE(context->getCertChainInformation().find(cert_chain_partial_output) !=
-              std::string::npos);
+  std::string cert_chain_json = R"EOF({
+ "path": "{{ test_tmpdir }}/unittestcert.pem",
+ }
+)EOF";
+
+  std::string ca_cert_partial_output(TestEnvironment::substitute(ca_cert_json));
+  std::string cert_chain_partial_output(TestEnvironment::substitute(cert_chain_json));
+  envoy::admin::v2alpha::CertificateDetails certificate_details, cert_chain_details;
+  MessageUtil::loadFromJson(ca_cert_partial_output, certificate_details);
+  MessageUtil::loadFromJson(cert_chain_partial_output, cert_chain_details);
+
+  MessageDifferencer message_differencer;
+  message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
+  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()));
+}
+
+TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem"
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
+  ClientContextConfigImpl cfg(*loader, factory_context_);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
+  Stats::IsolatedStoreImpl store;
+
+  ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
+  std::string ca_cert_json = R"EOF({
+ "path": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem",
+ "serial_number": "b13ff63f2dbc118d",
+ "subject_alt_names": [
+  {
+   "dns": "server1.example.com"
+  }
+ ]
+ }
+)EOF";
+
+  std::string cert_chain_json = R"EOF({
+ "path": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem",
+ }
+)EOF";
+
+  // This is similar to the hack above, but right now we generate the ca_cert and it expires in 15
+  // days only in the first second that it's valid. We will partially match for up until Days until
+  // Expiration: 1.
+  // For the cert_chain, it is dynamically created when we run_envoy_test.sh which changes the
+  // serial number with
+  // every build. For cert_chain output, we check only for the certificate path.
+  std::string ca_cert_partial_output(TestEnvironment::substitute(ca_cert_json));
+  std::string cert_chain_partial_output(TestEnvironment::substitute(cert_chain_json));
+  envoy::admin::v2alpha::CertificateDetails certificate_details, cert_chain_details;
+  MessageUtil::loadFromJson(ca_cert_partial_output, certificate_details);
+  MessageUtil::loadFromJson(cert_chain_partial_output, cert_chain_details);
+
+  MessageDifferencer message_differencer;
+  message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
+  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()));
 }
 
 TEST_F(SslContextImplTest, TestNoCert) {
@@ -174,8 +239,8 @@ TEST_F(SslContextImplTest, TestNoCert) {
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
   ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
-  EXPECT_EQ("", context->getCaCertInformation());
-  EXPECT_EQ("", context->getCertChainInformation());
+  EXPECT_EQ(nullptr, context->getCaCertInformation());
+  EXPECT_EQ(nullptr, context->getCertChainInformation());
 }
 
 class SslServerContextImplTicketTest : public SslContextImplTest {

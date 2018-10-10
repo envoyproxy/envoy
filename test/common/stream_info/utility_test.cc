@@ -1,7 +1,7 @@
 #include "common/network/address_impl.h"
-#include "common/request_info/utility.h"
+#include "common/stream_info/utility.h"
 
-#include "test/mocks/request_info/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -11,7 +11,7 @@ using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
-namespace RequestInfo {
+namespace StreamInfo {
 
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   static_assert(ResponseFlag::LastFlag == 0x2000, "A flag has been added. Fix this code.");
@@ -34,27 +34,27 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   };
 
   for (const auto& test_case : expected) {
-    NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, hasResponseFlag(test_case.first)).WillByDefault(Return(true));
-    EXPECT_EQ(test_case.second, ResponseFlagUtils::toShortString(request_info));
+    NiceMock<MockStreamInfo> stream_info;
+    ON_CALL(stream_info, hasResponseFlag(test_case.first)).WillByDefault(Return(true));
+    EXPECT_EQ(test_case.second, ResponseFlagUtils::toShortString(stream_info));
   }
 
   // No flag is set.
   {
-    NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, hasResponseFlag(_)).WillByDefault(Return(false));
-    EXPECT_EQ("-", ResponseFlagUtils::toShortString(request_info));
+    NiceMock<MockStreamInfo> stream_info;
+    ON_CALL(stream_info, hasResponseFlag(_)).WillByDefault(Return(false));
+    EXPECT_EQ("-", ResponseFlagUtils::toShortString(stream_info));
   }
 
   // Test combinations.
   // These are not real use cases, but are used to cover multiple response flags case.
   {
-    NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, hasResponseFlag(ResponseFlag::DelayInjected)).WillByDefault(Return(true));
-    ON_CALL(request_info, hasResponseFlag(ResponseFlag::FaultInjected)).WillByDefault(Return(true));
-    ON_CALL(request_info, hasResponseFlag(ResponseFlag::UpstreamRequestTimeout))
+    NiceMock<MockStreamInfo> stream_info;
+    ON_CALL(stream_info, hasResponseFlag(ResponseFlag::DelayInjected)).WillByDefault(Return(true));
+    ON_CALL(stream_info, hasResponseFlag(ResponseFlag::FaultInjected)).WillByDefault(Return(true));
+    ON_CALL(stream_info, hasResponseFlag(ResponseFlag::UpstreamRequestTimeout))
         .WillByDefault(Return(true));
-    EXPECT_EQ("UT,DI,FI", ResponseFlagUtils::toShortString(request_info));
+    EXPECT_EQ("UT,DI,FI", ResponseFlagUtils::toShortString(stream_info));
   }
 }
 
@@ -94,5 +94,5 @@ TEST(UtilityTest, formatDownstreamAddressNoPort) {
             Utility::formatDownstreamAddressNoPort(Network::Address::PipeInstance("/hello")));
 }
 
-} // namespace RequestInfo
+} // namespace StreamInfo
 } // namespace Envoy

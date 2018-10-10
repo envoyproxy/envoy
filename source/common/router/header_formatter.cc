@@ -11,7 +11,7 @@
 #include "common/config/metadata.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
-#include "common/request_info/utility.h"
+#include "common/stream_info/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
@@ -42,10 +42,10 @@ std::string formatPerRequestStateParseException(absl::string_view params) {
 }
 
 // Parses the parameters for UPSTREAM_METADATA and returns a function suitable for accessing the
-// specified metadata from an RequestInfo::RequestInfo. Expects a string formatted as:
+// specified metadata from an StreamInfo::StreamInfo. Expects a string formatted as:
 //   (["a", "b", "c"])
 // There must be at least 2 array elements (a metadata namespace and at least 1 key).
-std::function<std::string(const Envoy::RequestInfo::RequestInfo&)>
+std::function<std::string(const Envoy::StreamInfo::StreamInfo&)>
 parseUpstreamMetadataField(absl::string_view params_str) {
   params_str = StringUtil::trim(params_str);
   if (params_str.empty() || params_str.front() != '(' || params_str.back() != ')') {
@@ -70,8 +70,8 @@ parseUpstreamMetadataField(absl::string_view params_str) {
     throw EnvoyException(formatUpstreamMetadataParseException(params_str));
   }
 
-  return [params](const Envoy::RequestInfo::RequestInfo& request_info) -> std::string {
-    Upstream::HostDescriptionConstSharedPtr host = request_info.upstreamHost();
+  return [params](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
+    Upstream::HostDescriptionConstSharedPtr host = stream_info.upstreamHost();
     if (!host) {
       return std::string();
     }
@@ -124,11 +124,11 @@ parseUpstreamMetadataField(absl::string_view params_str) {
 }
 
 // Parses the parameters for PER_REQUEST_STATE and returns a function suitable for accessing the
-// specified metadata from an RequestInfo::RequestInfo. Expects a string formatted as:
+// specified metadata from an StreamInfo::StreamInfo. Expects a string formatted as:
 //   (<state_name>)
 // The state name is expected to be in reverse DNS format, though this is not enforced by
 // this function.
-std::function<std::string(const Envoy::RequestInfo::RequestInfo&)>
+std::function<std::string(const Envoy::StreamInfo::StreamInfo&)>
 parsePerRequestStateField(absl::string_view param_str) {
   absl::string_view modified_param_str = StringUtil::trim(param_str);
   if (modified_param_str.empty() || modified_param_str.front() != '(' ||
@@ -141,8 +141,8 @@ parsePerRequestStateField(absl::string_view param_str) {
   }
 
   std::string param(modified_param_str);
-  return [param](const Envoy::RequestInfo::RequestInfo& request_info) -> std::string {
-    const Envoy::RequestInfo::FilterState& per_request_state = request_info.perRequestState();
+  return [param](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
+    const Envoy::StreamInfo::FilterState& per_request_state = stream_info.perRequestState();
 
     // No such value means don't output anything.
     if (!per_request_state.hasDataWithName(param)) {
@@ -164,25 +164,25 @@ parsePerRequestStateField(absl::string_view param_str) {
 
 } // namespace
 
-RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_name, bool append)
+StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_name, bool append)
     : append_(append) {
   if (field_name == "PROTOCOL") {
-    field_extractor_ = [](const Envoy::RequestInfo::RequestInfo& request_info) {
-      return Envoy::AccessLog::AccessLogFormatUtils::protocolToString(request_info.protocol());
+    field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+      return Envoy::AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol());
     };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ = [](const Envoy::RequestInfo::RequestInfo& request_info) {
-      return RequestInfo::Utility::formatDownstreamAddressNoPort(
-          *request_info.downstreamRemoteAddress());
+    field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+      return StreamInfo::Utility::formatDownstreamAddressNoPort(
+          *stream_info.downstreamRemoteAddress());
     };
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return request_info.downstreamLocalAddress()->asString();
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return stream_info.downstreamLocalAddress()->asString();
     };
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ = [](const Envoy::RequestInfo::RequestInfo& request_info) {
-      return RequestInfo::Utility::formatDownstreamAddressNoPort(
-          *request_info.downstreamLocalAddress());
+    field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+      return StreamInfo::Utility::formatDownstreamAddressNoPort(
+          *stream_info.downstreamLocalAddress());
     };
   } else if (field_name.find("START_TIME") == 0) {
     const std::string pattern = fmt::format("%{}%", field_name);
@@ -190,13 +190,13 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
       start_time_formatters_.emplace(
           std::make_pair(pattern, AccessLog::AccessLogFormatParser::parse(pattern)));
     }
-    field_extractor_ = [this, pattern](const Envoy::RequestInfo::RequestInfo& request_info) {
+    field_extractor_ = [this, pattern](const Envoy::StreamInfo::StreamInfo& stream_info) {
       const auto& formatters = start_time_formatters_.at(pattern);
       Http::HeaderMapImpl empty_map;
       std::string formatted;
       for (const auto& formatter : formatters) {
         absl::StrAppend(&formatted,
-                        formatter->format(empty_map, empty_map, empty_map, request_info));
+                        formatter->format(empty_map, empty_map, empty_map, stream_info));
       }
       return formatted;
     };
@@ -212,8 +212,8 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
 }
 
 const std::string
-RequestInfoHeaderFormatter::format(const Envoy::RequestInfo::RequestInfo& request_info) const {
-  return field_extractor_(request_info);
+StreamInfoHeaderFormatter::format(const Envoy::StreamInfo::StreamInfo& stream_info) const {
+  return field_extractor_(stream_info);
 }
 
 } // namespace Router

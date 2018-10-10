@@ -10,7 +10,7 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace RequestInfo {
+namespace StreamInfo {
 
 class FilterState {
 public:
@@ -66,5 +66,5 @@ protected:
   virtual const Object* getDataGeneric(absl::string_view data_name) const PURE;
 };
 
-} // namespace RequestInfo
+} // namespace StreamInfo
 } // namespace Envoy

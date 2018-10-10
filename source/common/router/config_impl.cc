@@ -46,13 +46,14 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
     return;
   }
 
-  per_try_timeout_ = std::chrono::milliseconds(
-      PROTOBUF_GET_MS_OR_DEFAULT(config.retry_policy(), per_try_timeout, 0));
-  num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_policy(), num_retries, 1);
-  retry_on_ = RetryStateImpl::parseRetryOn(config.retry_policy().retry_on());
-  retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
+  const auto& retry_policy = config.retry_policy();
+  per_try_timeout_ =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
+  num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
+  retry_on_ = RetryStateImpl::parseRetryOn(retry_policy.retry_on());
+  retry_on_ |= RetryStateImpl::parseRetryGrpcOn(retry_policy.retry_on());
 
-  for (const auto& host_predicate : config.retry_policy().retry_host_predicate()) {
+  for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
     auto& factory =
         ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
             host_predicate.name());
@@ -61,7 +62,7 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
     factory.createHostPredicate(*this, *config, num_retries_);
   }
 
-  const auto retry_priority = config.retry_policy().retry_priority();
+  const auto retry_priority = retry_policy.retry_priority();
   if (!retry_priority.name().empty()) {
     auto& factory = ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
         retry_priority.name());
@@ -70,9 +71,13 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
     factory.createRetryPriority(*this, *config, num_retries_);
   }
 
-  auto host_selection_attempts = config.retry_policy().host_selection_retry_max_attempts();
+  auto host_selection_attempts = retry_policy.host_selection_retry_max_attempts();
   if (host_selection_attempts) {
     host_selection_attempts_ = host_selection_attempts;
+  }
+
+  for (auto code : retry_policy.retriable_status_codes()) {
+    retriable_status_codes_.emplace_back(code);
   }
 }
 
@@ -379,24 +384,24 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
 Http::WebSocketProxyPtr RouteEntryImplBase::createWebSocketProxy(
-    Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+    Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
     Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
     Network::ReadFilterCallbacks* read_callbacks) const {
   return std::make_unique<Http::WebSocket::WsHandlerImpl>(
-      request_headers, request_info, *this, callbacks, cluster_manager, read_callbacks,
+      request_headers, stream_info, *this, callbacks, cluster_manager, read_callbacks,
       websocket_config_, time_system_);
 }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
-                                                const RequestInfo::RequestInfo& request_info,
+                                                const StreamInfo::StreamInfo& stream_info,
                                                 bool insert_envoy_original_path) const {
   // Append user-specified request headers in the following order: route-action-level headers,
   // route-level headers, virtual host level headers and finally global connection manager level
   // headers.
-  route_action_request_headers_parser_->evaluateHeaders(headers, request_info);
-  request_headers_parser_->evaluateHeaders(headers, request_info);
-  vhost_.requestHeaderParser().evaluateHeaders(headers, request_info);
-  vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, request_info);
+  route_action_request_headers_parser_->evaluateHeaders(headers, stream_info);
+  request_headers_parser_->evaluateHeaders(headers, stream_info);
+  vhost_.requestHeaderParser().evaluateHeaders(headers, stream_info);
+  vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, stream_info);
   if (!host_rewrite_.empty()) {
     headers.Host()->value(host_rewrite_);
   }
@@ -407,15 +412,15 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
   }
 }
 
-void RouteEntryImplBase::finalizeResponseHeaders(
-    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
+void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers,
+                                                 const StreamInfo::StreamInfo& stream_info) const {
   // Append user-specified response headers in the following order: route-action-level headers,
   // route-level headers, virtual host level headers and finally global connection manager level
   // headers.
-  route_action_response_headers_parser_->evaluateHeaders(headers, request_info);
-  response_headers_parser_->evaluateHeaders(headers, request_info);
-  vhost_.responseHeaderParser().evaluateHeaders(headers, request_info);
-  vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, request_info);
+  route_action_response_headers_parser_->evaluateHeaders(headers, stream_info);
+  response_headers_parser_->evaluateHeaders(headers, stream_info);
+  vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
+  vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, stream_info);
 }
 
 absl::optional<RouteEntryImplBase::RuntimeData>
@@ -737,7 +742,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
                                                       virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
-      per_filter_configs_(virtual_host.per_filter_config(), factory_context) {
+      per_filter_configs_(virtual_host.per_filter_config(), factory_context),
+      include_attempt_count_(virtual_host.include_request_attempt_count()) {
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::route::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::NONE;

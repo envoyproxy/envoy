@@ -24,8 +24,8 @@ envoy_cc_library(
         ":listen_socket_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:deferred_deletable",
-        "//include/envoy/request_info:filter_state_interface",
         "//include/envoy/ssl:connection_interface",
+        "//include/envoy/stream_info:filter_state_interface",
     ],
 )
 
