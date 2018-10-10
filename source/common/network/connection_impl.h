@@ -14,8 +14,8 @@
 #include "common/common/logger.h"
 #include "common/event/libevent.h"
 #include "common/network/filter_manager_impl.h"
-#include "common/request_info/filter_state_impl.h"
 #include "common/ssl/ssl_socket.h"
+#include "common/stream_info/filter_state_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -92,8 +92,8 @@ public:
     return socket_->options();
   }
   absl::string_view requestedServerName() const override { return socket_->requestedServerName(); }
-  RequestInfo::FilterState& perConnectionState() override { return per_connection_state_; }
-  const RequestInfo::FilterState& perConnectionState() const override {
+  StreamInfo::FilterState& perConnectionState() override { return per_connection_state_; }
+  const StreamInfo::FilterState& perConnectionState() const override {
     return per_connection_state_;
   }
 
@@ -121,6 +121,11 @@ public:
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
 
+  void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override {
+    delayed_close_timeout_ = timeout;
+  }
+  std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
+
 protected:
   void closeSocket(ConnectionEvent close_type);
 
@@ -130,13 +135,14 @@ protected:
   TransportSocketPtr transport_socket_;
   FilterManagerImpl filter_manager_;
   ConnectionSocketPtr socket_;
-  RequestInfo::FilterStateImpl per_connection_state_;
+  StreamInfo::FilterStateImpl per_connection_state_;
 
   Buffer::OwnedImpl read_buffer_;
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
   // a generic pointer.
   Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
+  std::chrono::milliseconds delayed_close_timeout_{0};
 
 protected:
   bool connecting_{false};
@@ -157,14 +163,19 @@ private:
   // Returns true iff end of stream has been both written and read.
   bool bothSidesHalfClosed();
 
+  // Callback issued when a delayed close timeout triggers.
+  void onDelayedCloseTimeout();
+
   static std::atomic<uint64_t> next_global_id_;
 
   Event::Dispatcher& dispatcher_;
   const uint64_t id_;
+  Event::TimerPtr delayed_close_timer_;
   std::list<ConnectionCallbacks*> callbacks_;
   std::list<BytesSentCb> bytes_sent_callbacks_;
   bool read_enabled_{true};
-  bool close_with_flush_{false};
+  bool close_after_flush_{false};
+  bool delayed_close_{false};
   bool above_high_watermark_{false};
   bool detect_early_close_{true};
   bool enable_half_close_{false};

@@ -52,6 +52,7 @@ public:
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(requestTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider&());
   MOCK_METHOD0(serverName, const std::string&());
   MOCK_METHOD0(stats, ConnectionManagerStats&());
@@ -470,6 +471,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   route_config_.internal_only_headers_.push_back(LowerCaseString("custom_header"));
   TestHeaderMapImpl headers{{"x-envoy-decorator-operation", "foo"},
                             {"x-envoy-downstream-service-cluster", "foo"},
+                            {"x-envoy-retriable-status-codes", "123,456"},
                             {"x-envoy-retry-on", "foo"},
                             {"x-envoy-retry-grpc-on", "foo"},
                             {"x-envoy-max-retries", "foo"},
@@ -485,6 +487,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_EQ("50.0.0.1", headers.get_("x-envoy-external-address"));
   EXPECT_FALSE(headers.has("x-envoy-decorator-operation"));
   EXPECT_FALSE(headers.has("x-envoy-downstream-service-cluster"));
+  EXPECT_FALSE(headers.has("x-envoy-retriable-status-codes"));
   EXPECT_FALSE(headers.has("x-envoy-retry-on"));
   EXPECT_FALSE(headers.has("x-envoy-retry-grpc-on"));
   EXPECT_FALSE(headers.has("x-envoy-max-retries"));

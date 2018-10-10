@@ -13,5 +13,8 @@ public:
                            const Protobuf::Message&, uint32_t) override {
     callbacks.addHostPredicate(std::make_shared<TestHostPredicate>());
   }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  }
 };
 } // namespace Envoy

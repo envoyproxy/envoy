@@ -42,14 +42,14 @@ TcpProxy::ConfigSharedPtr Config(const envoy::api::v2::route::RouteAction& route
   return std::make_shared<TcpProxy::Config>(tcp_config, factory_context);
 }
 
-WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
                              const Router::RouteEntry& route_entry,
                              WebSocketProxyCallbacks& callbacks,
                              Upstream::ClusterManager& cluster_manager,
                              Network::ReadFilterCallbacks* read_callbacks,
                              TcpProxy::ConfigSharedPtr config, Event::TimeSystem& time_system)
     : TcpProxy::Filter(config, cluster_manager, time_system), request_headers_(request_headers),
-      request_info_(request_info), route_entry_(route_entry), ws_callbacks_(callbacks) {
+      stream_info_(stream_info), route_entry_(route_entry), ws_callbacks_(callbacks) {
 
   // set_connection_stats == false because the http connection manager has already set them
   // and they will be inaccurate if we change them now.
@@ -108,7 +108,7 @@ Network::FilterStatus WsHandlerImpl::onData(Buffer::Instance& data, bool end_str
 
 void WsHandlerImpl::onConnectionSuccess() {
   // path and host rewrites
-  route_entry_.finalizeRequestHeaders(request_headers_, request_info_, true);
+  route_entry_.finalizeRequestHeaders(request_headers_, stream_info_, true);
   // for auto host rewrite
   if (route_entry_.autoHostRewrite() && !read_callbacks_->upstreamHost()->hostname().empty()) {
     request_headers_.Host()->value(read_callbacks_->upstreamHost()->hostname());
@@ -144,7 +144,7 @@ void WsHandlerImpl::onConnectionSuccess() {
   }
 }
 
-RequestInfo::RequestInfo& WsHandlerImpl::getRequestInfo() { return request_info_; }
+StreamInfo::StreamInfo& WsHandlerImpl::getStreamInfo() { return stream_info_; }
 
 } // namespace WebSocket
 } // namespace Http

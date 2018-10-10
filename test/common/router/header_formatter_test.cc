@@ -5,12 +5,12 @@
 
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
-#include "common/request_info/filter_state_impl.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/string_accessor_impl.h"
+#include "common/stream_info/filter_state_impl.h"
 
-#include "test/common/request_info/test_int_accessor.h"
+#include "test/common/stream_info/test_int_accessor.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -39,50 +39,50 @@ static envoy::api::v2::route::Route parseRouteFromV2Yaml(const std::string& yaml
   return route;
 }
 
-class RequestInfoHeaderFormatterTest : public testing::Test {
+class StreamInfoHeaderFormatterTest : public testing::Test {
 public:
-  void testFormatting(const Envoy::RequestInfo::MockRequestInfo& request_info,
+  void testFormatting(const Envoy::StreamInfo::MockStreamInfo& stream_info,
                       const std::string& variable, const std::string& expected_output) {
     {
-      auto f = RequestInfoHeaderFormatter(variable, false);
-      const std::string formatted_string = f.format(request_info);
+      auto f = StreamInfoHeaderFormatter(variable, false);
+      const std::string formatted_string = f.format(stream_info);
       EXPECT_EQ(expected_output, formatted_string);
     }
   }
 
   void testFormatting(const std::string& variable, const std::string& expected_output) {
-    NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-    testFormatting(request_info, variable, expected_output);
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    testFormatting(stream_info, variable, expected_output);
   }
 
   void testInvalidFormat(const std::string& variable) {
-    EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter(variable, false), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter(variable, false), EnvoyException,
                               fmt::format("field '{}' not supported as custom header", variable));
   }
 };
 
-TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressVariable) {
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressVariable) {
   testFormatting("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "127.0.0.1");
 }
 
-TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressVariable) {
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressVariable) {
   testFormatting("DOWNSTREAM_LOCAL_ADDRESS", "127.0.0.2:0");
 }
 
-TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressWithoutPortVariable) {
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressWithoutPortVariable) {
   testFormatting("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "127.0.0.2");
 }
 
-TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
-  ON_CALL(request_info, protocol()).WillByDefault(ReturnPointee(&protocol));
+  ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
-  testFormatting(request_info, "PROTOCOL", "HTTP/1.1");
+  testFormatting(stream_info, "PROTOCOL", "HTTP/1.1");
 }
 
-TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
 
@@ -117,55 +117,54 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   EXPECT_EQ(nested_struct.fields().at("list_key").kind_case(), ProtobufWkt::Value::kListValue);
   EXPECT_EQ(nested_struct.fields().at("struct_key").kind_case(), ProtobufWkt::Value::kStructValue);
 
-  ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
+  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
   // Top-level value.
-  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "value");
+  testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "value");
 
   // Nested string value.
-  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"str_key\"])",
+  testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"str_key\"])",
                  "str_value");
 
   // Boolean values.
-  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"bool_key1\"])",
+  testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"bool_key1\"])",
                  "true");
-  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"bool_key2\"])",
+  testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"bool_key2\"])",
                  "false");
 
   // Number values.
-  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"num_key1\"])", "1");
-  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"num_key2\"])",
+  testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"num_key1\"])", "1");
+  testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"num_key2\"])",
                  "3.14");
 
   // Deeply nested value.
-  testFormatting(request_info,
+  testFormatting(stream_info,
                  "UPSTREAM_METADATA([\"namespace\", \"nested\", \"struct_key\", \"deep_key\"])",
                  "deep_value");
 
   // Initial metadata lookup fails.
-  testFormatting(request_info, "UPSTREAM_METADATA([\"wrong_namespace\", \"key\"])", "");
-  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"not_found\"])", "");
-  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"not_found\", \"key\"])", "");
+  testFormatting(stream_info, "UPSTREAM_METADATA([\"wrong_namespace\", \"key\"])", "");
+  testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"not_found\"])", "");
+  testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"not_found\", \"key\"])", "");
 
   // Nested metadata lookup fails.
-  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"not_found\"])", "");
+  testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"not_found\"])", "");
 
   // Nested metadata lookup returns non-struct intermediate value.
-  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"key\", \"invalid\"])", "");
+  testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"key\", \"invalid\"])", "");
 
   // Struct values are not rendered.
-  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"struct_key\"])",
-                 "");
+  testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"struct_key\"])", "");
 
   // List values are not rendered.
-  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"list_key\"])", "");
+  testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"list_key\"])", "");
 }
 
 // Breaks tsan/asan builds by trying to allocate a lot of memory.
 // Works on debug builds and needs to be fixed. See
 // https://github.com/envoyproxy/envoy/issues/4268
-TEST_F(RequestInfoHeaderFormatterTest, DISABLED_UserDefinedHeadersConsideredHarmful) {
+TEST_F(StreamInfoHeaderFormatterTest, DISABLED_UserDefinedHeadersConsideredHarmful) {
   // This must be an inline header to get the append-in-place semantics.
   const char* header_name = "connection";
   Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
@@ -182,71 +181,70 @@ TEST_F(RequestInfoHeaderFormatterTest, DISABLED_UserDefinedHeadersConsideredHarm
   HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
 
   Http::TestHeaderMapImpl header_map{{":method", "POST"}};
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  EXPECT_DEATH_LOG_TO_STDERR(req_header_parser->evaluateHeaders(header_map, request_info),
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_DEATH_LOG_TO_STDERR(req_header_parser->evaluateHeaders(header_map, stream_info),
                              "Trying to allocate overly large headers.");
 }
 
-TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMissingHost) {
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMissingHost) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host;
-  ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
+  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
-  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "");
+  testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "");
 }
 
-TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
-  Envoy::RequestInfo::FilterStateImpl per_request_state;
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
+  Envoy::StreamInfo::FilterStateImpl per_request_state;
   per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
   EXPECT_EQ("test_value", per_request_state.getData<StringAccessor>("testing").asString());
 
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
-  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(stream_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(Const(stream_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
 
-  testFormatting(request_info, "PER_REQUEST_STATE(testing)", "test_value");
-  testFormatting(request_info, "PER_REQUEST_STATE(testing2)", "");
+  testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "test_value");
+  testFormatting(stream_info, "PER_REQUEST_STATE(testing2)", "");
   EXPECT_EQ("test_value", per_request_state.getData<StringAccessor>("testing").asString());
 }
 
-TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
-  Envoy::RequestInfo::FilterStateImpl per_request_state;
-  per_request_state.setData("testing", std::make_unique<RequestInfo::TestIntAccessor>(1));
-  EXPECT_EQ(1, per_request_state.getData<RequestInfo::TestIntAccessor>("testing").access());
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
+  Envoy::StreamInfo::FilterStateImpl per_request_state;
+  per_request_state.setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1));
+  EXPECT_EQ(1, per_request_state.getData<StreamInfo::TestIntAccessor>("testing").access());
 
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
-  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(stream_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(Const(stream_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
 
-  testFormatting(request_info, "PER_REQUEST_STATE(testing)", "");
+  testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "");
 }
 
-TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnPerRequestStateVariable) {
+TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnPerRequestStateVariable) {
   // No parameters
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE()", false),
-                            EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("PER_REQUEST_STATE()", false), EnvoyException,
                             "Invalid header configuration. Expected format "
                             "PER_REQUEST_STATE(<data_name>), actual format "
                             "PER_REQUEST_STATE()");
 
   // Missing single parens
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE(testing", false),
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("PER_REQUEST_STATE(testing", false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
                             "PER_REQUEST_STATE(<data_name>), actual format "
                             "PER_REQUEST_STATE(testing");
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE testing)", false),
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("PER_REQUEST_STATE testing)", false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
                             "PER_REQUEST_STATE(<data_name>), actual format "
                             "PER_REQUEST_STATE testing)");
 }
 
-TEST_F(RequestInfoHeaderFormatterTest, UnknownVariable) { testInvalidFormat("INVALID_VARIABLE"); }
+TEST_F(StreamInfoHeaderFormatterTest, UnknownVariable) { testInvalidFormat("INVALID_VARIABLE"); }
 
-TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
+TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   // Invalid JSON.
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA(abcd)", false),
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA(abcd)", false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
@@ -254,38 +252,37 @@ TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
                             "Error(offset 0, line 1): Invalid value.\n");
 
   // No parameters.
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA", false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA", false), EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA");
 
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA()", false),
-                            EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA()", false), EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA(), because JSON supplied is not valid. "
                             "Error(offset 0, line 1): The document is empty.\n");
 
   // One parameter.
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA([\"ns\"])", false),
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"ns\"])", false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA([\"ns\"])");
 
   // Missing close paren.
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA(", false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA(", false), EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA(");
 
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA([a,b,c,d]", false),
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([a,b,c,d]", false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA([a,b,c,d]");
 
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA([\"a\",\"b\"]", false),
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\",\"b\"]", false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
@@ -293,7 +290,7 @@ TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   // Non-string elements.
   EXPECT_THROW_WITH_MESSAGE(
-      RequestInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", 1])", false), EnvoyException,
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", 1])", false), EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA([\"a\", 1]), because JSON field from line 1 accessed with type 'String' "
@@ -301,8 +298,7 @@ TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   // Invalid string elements.
   EXPECT_THROW_WITH_MESSAGE(
-      RequestInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", \"\\unothex\"])", false),
-      EnvoyException,
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", \"\\unothex\"])", false), EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA([\"a\", \"\\unothex\"]), because JSON supplied is not valid. "
@@ -310,7 +306,7 @@ TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   // Non-array parameters.
   EXPECT_THROW_WITH_MESSAGE(
-      RequestInfoHeaderFormatter("UPSTREAM_METADATA({\"a\":1})", false), EnvoyException,
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA({\"a\":1})", false), EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA({\"a\":1}), because JSON field from line 1 accessed with type 'Array' "
@@ -404,13 +400,13 @@ TEST(HeaderParserTest, TestParseInternal) {
         "...]), actual format UPSTREAM_METADATA([\"ns\"])"}},
   };
 
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
-  ON_CALL(request_info, protocol()).WillByDefault(ReturnPointee(&protocol));
+  ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
-  ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
+  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
   // Upstream metadata with percent signs in the key.
   auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
@@ -424,12 +420,12 @@ TEST(HeaderParserTest, TestParseInternal) {
 
   // "2018-04-03T23:06:09.123Z".
   const SystemTime start_time(std::chrono::milliseconds(1522796769123));
-  ON_CALL(request_info, startTime()).WillByDefault(Return(start_time));
+  ON_CALL(stream_info, startTime()).WillByDefault(Return(start_time));
 
-  Envoy::RequestInfo::FilterStateImpl per_request_state;
+  Envoy::StreamInfo::FilterStateImpl per_request_state;
   per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
-  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(stream_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(Const(stream_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
 
   for (const auto& test_case : test_cases) {
     Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
@@ -447,7 +443,7 @@ TEST(HeaderParserTest, TestParseInternal) {
     HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
 
     Http::TestHeaderMapImpl header_map{{":method", "POST"}};
-    req_header_parser->evaluateHeaders(header_map, request_info);
+    req_header_parser->evaluateHeaders(header_map, stream_info);
 
     std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
 
@@ -474,8 +470,8 @@ TEST(HeaderParserTest, EvaluateHeaders) {
   HeaderParserPtr req_header_parser =
       HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add());
   Http::TestHeaderMapImpl header_map{{":method", "POST"}};
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  req_header_parser->evaluateHeaders(header_map, request_info);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("x-client-ip"));
 }
 
@@ -498,11 +494,11 @@ TEST(HeaderParserTest, EvaluateEmptyHeaders) {
   Http::TestHeaderMapImpl header_map{{":method", "POST"}};
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto metadata = std::make_shared<envoy::api::v2::core::Metadata>();
-  ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
+  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
-  req_header_parser->evaluateHeaders(header_map, request_info);
+  req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_FALSE(header_map.has("x-key"));
 }
 
@@ -523,8 +519,8 @@ TEST(HeaderParserTest, EvaluateStaticHeaders) {
   HeaderParserPtr req_header_parser =
       HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add());
   Http::TestHeaderMapImpl header_map{{":method", "POST"}};
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  req_header_parser->evaluateHeaders(header_map, request_info);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("static-header"));
   EXPECT_EQ("static-value", header_map.get_("static-header"));
 }
@@ -569,13 +565,13 @@ request_headers_to_remove: ["x-nope"]
   HeaderParserPtr req_header_parser =
       HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
   Http::TestHeaderMapImpl header_map{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
-  ON_CALL(request_info, protocol()).WillByDefault(ReturnPointee(&protocol));
+  ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
-  ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
+  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
   // Metadata with percent signs in the key.
   auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
@@ -587,12 +583,12 @@ request_headers_to_remove: ["x-nope"]
       )EOF"));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  Envoy::RequestInfo::FilterStateImpl per_request_state;
+  Envoy::StreamInfo::FilterStateImpl per_request_state;
   per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
-  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(stream_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(Const(stream_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
 
-  req_header_parser->evaluateHeaders(header_map, request_info);
+  req_header_parser->evaluateHeaders(header_map, stream_info);
 
   EXPECT_TRUE(header_map.has("x-prefix"));
   EXPECT_EQ("prefix-127.0.0.1", header_map.get_("x-prefix"));
@@ -667,11 +663,11 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
   Http::TestHeaderMapImpl header_map{
       {":method", "POST"}, {"static-header", "old-value"}, {"x-client-ip", "0.0.0.0"}};
 
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   const SystemTime start_time(std::chrono::microseconds(1522796769123456));
-  EXPECT_CALL(request_info, startTime()).Times(3).WillRepeatedly(Return(start_time));
+  EXPECT_CALL(stream_info, startTime()).Times(3).WillRepeatedly(Return(start_time));
 
-  req_header_parser->evaluateHeaders(header_map, request_info);
+  req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("static-header"));
   EXPECT_EQ("static-value", header_map.get_("static-header"));
   EXPECT_TRUE(header_map.has("x-client-ip"));
@@ -742,13 +738,13 @@ route:
   HeaderParserPtr resp_header_parser =
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
   Http::TestHeaderMapImpl header_map{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   // Initialize start_time as 2018-04-03T23:06:09.123Z in microseconds.
   const SystemTime start_time(std::chrono::microseconds(1522796769123456));
-  EXPECT_CALL(request_info, startTime()).Times(7).WillRepeatedly(Return(start_time));
+  EXPECT_CALL(stream_info, startTime()).Times(7).WillRepeatedly(Return(start_time));
 
-  resp_header_parser->evaluateHeaders(header_map, request_info);
+  resp_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("x-client-ip"));
   EXPECT_TRUE(header_map.has("x-request-start-multiple"));
   EXPECT_TRUE(header_map.has("x-safe"));
