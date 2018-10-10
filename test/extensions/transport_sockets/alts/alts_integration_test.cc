@@ -27,9 +27,12 @@ class AltsIntegrationTestBase : public HttpIntegrationTest,
                                 public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   AltsIntegrationTestBase(const std::string& server_peer_identity,
-                          const std::string& client_peer_identity)
+                          const std::string& client_peer_identity,
+                          bool server_connect_handshaker,
+                          bool client_connect_handshaker)
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()),
-        server_peer_identity_(server_peer_identity), client_peer_identity_(client_peer_identity) {}
+        server_peer_identity_(server_peer_identity), client_peer_identity_(client_peer_identity),
+        server_connect_handshaker_(server_connect_handshaker), client_connect_handshaker_(client_connect_handshaker) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -42,7 +45,7 @@ public:
     config:
       peer_service_accounts: []
       handshaker_service: ")EOF" +
-                         fakeHandshakerServerAddress() + "\"";
+                         fakeHandshakerServerAddress(server_connect_handshaker_) + "\"";
       if (!server_peer_identity_.empty()) {
         yaml.replace(yaml.find("[]"), std::string::size_type(2), server_peer_identity_);
       }
@@ -73,7 +76,7 @@ public:
     std::string client_yaml = R"EOF(
       peer_service_accounts: []
       handshaker_service: ")EOF" +
-                              fakeHandshakerServerAddress() + "\"";
+                              fakeHandshakerServerAddress(client_connect_handshaker_) + "\"";
     if (!client_peer_identity_.empty()) {
       client_yaml.replace(client_yaml.find("[]"), std::string::size_type(2), client_peer_identity_);
     }
@@ -104,9 +107,17 @@ public:
                                                client_alts_->createTransportSocket(), nullptr);
   }
 
-  std::string fakeHandshakerServerAddress() {
+  std::string fakeHandshakerServerAddress(bool connect_to_handshaker) {
+    if (connect_to_handshaker) {
+      return absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
+                          std::to_string(fake_handshaker_server_port_));
+    }
+    return wrongHandshakerServerAddress();
+  }
+
+  std::string wrongHandshakerServerAddress() {
     return absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
-                        std::to_string(fake_handshaker_server_port_));
+                    std::to_string(fake_handshaker_server_port_ + 1));
   }
 
   Network::Address::InstanceConstSharedPtr getAddress(const Network::Address::IpVersion& version,
@@ -118,6 +129,8 @@ public:
 
   const std::string server_peer_identity_;
   const std::string client_peer_identity_;
+  bool server_connect_handshaker_;
+  bool client_connect_handshaker_;
   Thread::ThreadPtr fake_handshaker_server_thread_;
   std::unique_ptr<grpc::Server> fake_handshaker_server_;
   ConditionalInitializer fake_handshaker_server_ci_;
@@ -127,9 +140,10 @@ public:
 
 class AltsIntegrationTestValidPeer : public AltsIntegrationTestBase {
 public:
-  // FakeHandshake server sends peer_identity as peer service account. Set this
+  // FakeHandshake server sends "peer_identity" as peer service account. Set this
   // information into config to pass validation.
-  AltsIntegrationTestValidPeer() : AltsIntegrationTestBase("[peer_identity]", "") {}
+  AltsIntegrationTestValidPeer() : AltsIntegrationTestBase("[peer_identity]", "",
+  /* server_connect_handshaker */ true, /* client_connect_handshaker */ true) {}
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestValidPeer,
@@ -147,7 +161,8 @@ TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
 
 class AltsIntegrationTestEmptyPeer : public AltsIntegrationTestBase {
 public:
-  AltsIntegrationTestEmptyPeer() : AltsIntegrationTestBase("", "") {}
+  AltsIntegrationTestEmptyPeer() : AltsIntegrationTestBase("", "",
+  /* server_connect_handshaker */ true, /* client_connect_handshaker */ true) {}
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestEmptyPeer,
@@ -165,7 +180,8 @@ TEST_P(AltsIntegrationTestEmptyPeer, RouterRequestAndResponseWithBodyNoBuffer) {
 
 class AltsIntegrationTestClientInvalidPeer : public AltsIntegrationTestBase {
 public:
-  AltsIntegrationTestClientInvalidPeer() : AltsIntegrationTestBase("", "invalid_client_identity") {}
+  AltsIntegrationTestClientInvalidPeer() : AltsIntegrationTestBase("", "invalid_client_identity",
+  /* server_connect_handshaker */ true, /* client_connect_handshaker */ true) {}
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestClientInvalidPeer,
@@ -173,7 +189,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestClientInvalidPeer,
                         TestUtility::ipTestParamsToString);
 
 // Verifies that when client receives peer service account which does not match
-// any accounts in config, the handshake will fail and client closes connection.
+// any account in config, the handshake will fail and client closes connection.
 TEST_P(AltsIntegrationTestClientInvalidPeer, clientValidationFail) {
   initialize();
   codec_client_ = makeRawHttpConnection(makeAltsConnection());
@@ -182,7 +198,8 @@ TEST_P(AltsIntegrationTestClientInvalidPeer, clientValidationFail) {
 
 class AltsIntegrationTestServerInvalidPeer : public AltsIntegrationTestBase {
 public:
-  AltsIntegrationTestServerInvalidPeer() : AltsIntegrationTestBase("invalid_server_identity", "") {}
+  AltsIntegrationTestServerInvalidPeer() : AltsIntegrationTestBase("invalid_server_identity", "",
+  /* server_connect_handshaker */ true, /* client_connect_handshaker */ true) {}
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestServerInvalidPeer,
@@ -190,7 +207,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestServerInvalidPeer,
                         TestUtility::ipTestParamsToString);
 
 // Verifies that when Envoy receives peer service account which does not match
-// any accounts in config, the handshake will fail and Envoy closes connection.
+// any account in config, the handshake will fail and Envoy closes connection.
 TEST_P(AltsIntegrationTestServerInvalidPeer, ServerValidationFail) {
   initialize();
 
@@ -203,6 +220,43 @@ TEST_P(AltsIntegrationTestServerInvalidPeer, ServerValidationFail) {
   EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+class AltsIntegrationTestClientWrongHandshaker : public AltsIntegrationTestBase {
+public:
+  AltsIntegrationTestClientWrongHandshaker() : AltsIntegrationTestBase("", "",
+  /* server_connect_handshaker */ true, /* client_connect_handshaker */ false) {}
+};
+
+INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestClientWrongHandshaker,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
+// Verifies that when client connects to a wrong handshakerserver, handshake fails
+// and connection closes.
+TEST_P(AltsIntegrationTestClientWrongHandshaker, ConnectToWrongHandshakerAddress) {
+  initialize();
+  codec_client_ = makeRawHttpConnection(makeAltsConnection());
+  EXPECT_FALSE(codec_client_->connected());
+}
+
+class AltsIntegrationTestServerWrongHandshaker : public AltsIntegrationTestBase {
+public:
+  AltsIntegrationTestServerWrongHandshaker() : AltsIntegrationTestBase("", "",
+  /* server_connect_handshaker */ false, /* client_connect_handshaker */ true) {}
+};
+
+INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestServerWrongHandshaker,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
+// Verifies that when server connects to a wrong handshakerserver, handshake fails
+// and connection closes.
+TEST_P(AltsIntegrationTestServerWrongHandshaker, ConnectToWrongHandshakerAddress) {
+  ConnectionCreationFunction creator = [this]() -> Network::ClientConnectionPtr {
+    return makeAltsConnection();
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
 }
 
 } // namespace Alts
