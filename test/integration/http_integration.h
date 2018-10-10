@@ -170,6 +170,7 @@ protected:
   void testDrainClose();
   void testRetry();
   void testRetryHittingBufferLimit();
+  void testRetryAttemptCountHeader();
   void testGrpcRouterNotFound();
   void testGrpcRetry();
   void testRetryPriority();
