@@ -31,15 +31,12 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
     return;
   }
 
-  const Router::RouteEntry* route_entry = route->routeEntry();
-  Upstream::ThreadLocalCluster* cluster = config_->cm().get(route_entry->clusterName());
-  if (!cluster) {
-    return;
-  }
-  cluster_ = cluster->info();
+  cluster_ = callbacks_->clusterInfo();
+  if(!cluster_) { return; }
 
   std::vector<RateLimit::Descriptor> descriptors;
 
+  const Router::RouteEntry* route_entry = route->routeEntry();
   // Get all applicable rate limit policy entries for the route.
   populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, route_entry, headers);
 
