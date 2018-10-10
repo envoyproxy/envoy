@@ -3,6 +3,7 @@
 
 #include "common/ssl/utility.h"
 
+#include "test/common/ssl/ssl_test_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -11,17 +12,6 @@
 
 namespace Envoy {
 namespace Ssl {
-
-namespace {
-bssl::UniquePtr<X509> readCertFromFile(const std::string& path) {
-  FILE* fp = fopen(TestEnvironment::runfilesPath(path).c_str(), "r");
-  EXPECT_NE(fp, nullptr);
-  bssl::UniquePtr<X509> cert(PEM_read_X509(fp, nullptr, nullptr, nullptr));
-  EXPECT_NE(cert, nullptr);
-  fclose(fp);
-  return cert;
-}
-} // namespace
 
 TEST(UtilityTest, TestGetSubjectAlternateNamesWithDNS) {
   bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
