@@ -37,7 +37,8 @@ class SslSocket : public Network::TransportSocket,
                   public Connection,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
-  SslSocket(ContextSharedPtr ctx, InitialState state);
+  SslSocket(ContextSharedPtr ctx, InitialState state,
+            std::string overrideServerNameIndication = "");
 
   // Ssl::Connection
   bool peerCertificatePresented() const override;

@@ -35,8 +35,10 @@ public:
 };
 } // namespace
 
-SslSocket::SslSocket(ContextSharedPtr ctx, InitialState state)
-    : ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), ssl_(ctx_->newSsl()) {
+SslSocket::SslSocket(ContextSharedPtr ctx, InitialState state,
+                     std::string overrideServerNameIndication)
+    : ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
+      ssl_(ctx_->newSsl(overrideServerNameIndication)) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_.get());
   } else {
