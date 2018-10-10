@@ -51,10 +51,10 @@ ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {
 std::string FileAccessLogFactory::name() const { return AccessLogNames::get().File; }
 
 std::map<const std::string, const std::string>
-FileAccessLogFactory::convert_json_format_to_map(google::protobuf::Struct json_format) {
+FileAccessLogFactory::convert_json_format_to_map(ProtobufWkt::Struct json_format) {
   std::map<const std::string, const std::string> output;
   for (const auto& pair : json_format.fields()) {
-    if (pair.second.kind_case() != google::protobuf::Value::kStringValue) {
+    if (pair.second.kind_case() != ProtobufWkt::Value::kStringValue) {
       throw EnvoyException("Only string values are supported in the JSON access log format.");
     }
     output.emplace(pair.first, pair.second.string_value());
