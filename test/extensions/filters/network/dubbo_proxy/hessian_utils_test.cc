@@ -134,8 +134,7 @@ TEST(HessianUtilsTest, peekLong) {
   // Insufficient data
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xf0};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 1));
+    buffer.add(std::string({'\xf0'}));
     size_t size;
     EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekLong(buffer, &size), EnvoyException,
                               "buffer underflow");
@@ -177,8 +176,7 @@ TEST(HessianUtilsTest, peekLong) {
   // Single octet longs
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xef};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 1));
+    buffer.add(std::string({'\xef'}));
     size_t size;
     EXPECT_EQ(15, HessianUtils::peekLong(buffer, &size));
     EXPECT_EQ(1, size);
@@ -186,8 +184,7 @@ TEST(HessianUtilsTest, peekLong) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xe0};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 1));
+    buffer.add(std::string({'\xe0'}));
     size_t size;
     EXPECT_EQ(0, HessianUtils::peekLong(buffer, &size));
     EXPECT_EQ(1, size);
@@ -195,8 +192,7 @@ TEST(HessianUtilsTest, peekLong) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xd8};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 1));
+    buffer.add(std::string({'\xd8'}));
     size_t size;
     EXPECT_EQ(-8, HessianUtils::peekLong(buffer, &size));
     EXPECT_EQ(1, size);
@@ -205,8 +201,7 @@ TEST(HessianUtilsTest, peekLong) {
   // Two octet longs
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xf8, 0x00};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 2));
+    buffer.add(std::string({'\xf8', 0x00}));
     size_t size;
     EXPECT_EQ(0, HessianUtils::peekLong(buffer, &size));
     EXPECT_EQ(2, size);
@@ -214,8 +209,7 @@ TEST(HessianUtilsTest, peekLong) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xf0, 0x00};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 2));
+    buffer.add(std::string({'\xf0', 0x00}));
     size_t size;
     EXPECT_EQ(-2048, HessianUtils::peekLong(buffer, &size));
     EXPECT_EQ(2, size);
@@ -223,8 +217,7 @@ TEST(HessianUtilsTest, peekLong) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xf7, 0x00};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 2));
+    buffer.add(std::string({'\xf7', 0x00}));
     size_t size;
     EXPECT_EQ(-256, HessianUtils::peekLong(buffer, &size));
     EXPECT_EQ(2, size);
@@ -232,8 +225,7 @@ TEST(HessianUtilsTest, peekLong) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xff, 0xff};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 2));
+    buffer.add(std::string({'\xff', '\xff'}));
     size_t size;
     EXPECT_EQ(2047, HessianUtils::peekLong(buffer, &size));
     EXPECT_EQ(2, size);
@@ -258,8 +250,7 @@ TEST(HessianUtilsTest, peekLong) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0x3f, 0xff, 0xff};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 3));
+    buffer.add(std::string({'\x3f', '\xff', '\xff'}));
     size_t size;
     EXPECT_EQ(262143, HessianUtils::peekLong(buffer, &size));
     EXPECT_EQ(3, size);
@@ -337,8 +328,7 @@ TEST(HessianUtilsTest, peekInt) {
   // Insufficient data
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xc1};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 1));
+    buffer.add(std::string({'\xc1'}));
     size_t size;
     EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekInt(buffer, &size), EnvoyException,
                               "buffer underflow");
@@ -346,8 +336,7 @@ TEST(HessianUtilsTest, peekInt) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xd0};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 1));
+    buffer.add(std::string({'\xd0'}));
     size_t size;
     EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekInt(buffer, &size), EnvoyException,
                               "buffer underflow");
@@ -373,8 +362,7 @@ TEST(HessianUtilsTest, peekInt) {
   // Single octet integers
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0x90};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 1));
+    buffer.add(std::string({'\x90'}));
     size_t size;
     EXPECT_EQ(0, HessianUtils::peekInt(buffer, &size));
     EXPECT_EQ(1, size);
@@ -382,8 +370,7 @@ TEST(HessianUtilsTest, peekInt) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0x80};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 1));
+    buffer.add(std::string({'\x80'}));
     size_t size;
     EXPECT_EQ(-16, HessianUtils::peekInt(buffer, &size));
     EXPECT_EQ(1, size);
@@ -391,8 +378,7 @@ TEST(HessianUtilsTest, peekInt) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xbf};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 1));
+    buffer.add(std::string({'\xbf'}));
     size_t size;
     EXPECT_EQ(47, HessianUtils::peekInt(buffer, &size));
     EXPECT_EQ(1, size);
@@ -401,8 +387,7 @@ TEST(HessianUtilsTest, peekInt) {
   // Two octet integers
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xc8, 0x00};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 2));
+    buffer.add(std::string({'\xc8', 0x00}));
     size_t size;
     EXPECT_EQ(0, HessianUtils::peekInt(buffer, &size));
     EXPECT_EQ(2, size);
@@ -410,8 +395,7 @@ TEST(HessianUtilsTest, peekInt) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xc0, 0x00};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 2));
+    buffer.add(std::string({'\xc0', 0x00}));
     size_t size;
     EXPECT_EQ(-2048, HessianUtils::peekInt(buffer, &size));
     EXPECT_EQ(2, size);
@@ -419,8 +403,7 @@ TEST(HessianUtilsTest, peekInt) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xc7, 0x00};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 2));
+    buffer.add(std::string({'\xc7', 0x00}));
     size_t size;
     EXPECT_EQ(-256, HessianUtils::peekInt(buffer, &size));
     EXPECT_EQ(2, size);
@@ -428,8 +411,7 @@ TEST(HessianUtilsTest, peekInt) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xcf, 0xff};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 2));
+    buffer.add(std::string({'\xcf', '\xff'}));
     size_t size;
     EXPECT_EQ(2047, HessianUtils::peekInt(buffer, &size));
     EXPECT_EQ(2, size);
@@ -438,8 +420,7 @@ TEST(HessianUtilsTest, peekInt) {
   // Three octet integers
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xd4, 0x00, 0x00};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 3));
+    buffer.add(std::string({'\xd4', 0x00, 0x00}));
     size_t size;
     EXPECT_EQ(0, HessianUtils::peekInt(buffer, &size));
     EXPECT_EQ(3, size);
@@ -447,8 +428,7 @@ TEST(HessianUtilsTest, peekInt) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xd0, 0x00, 0x00};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 3));
+    buffer.add(std::string({'\xd0', 0x00, 0x00}));
     size_t size;
     EXPECT_EQ(-262144, HessianUtils::peekInt(buffer, &size));
     EXPECT_EQ(3, size);
@@ -456,8 +436,7 @@ TEST(HessianUtilsTest, peekInt) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0xd7, 0xff, 0xff};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 3));
+    buffer.add(std::string({'\xd7', '\xff', '\xff'}));
     size_t size;
     EXPECT_EQ(262143, HessianUtils::peekInt(buffer, &size));
     EXPECT_EQ(3, size);
@@ -557,8 +536,7 @@ TEST(HessianUtilsTest, peekDouble) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0x5d, 0x80};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 2));
+    buffer.add(std::string({0x5d, '\x80'}));
     size_t size;
     EXPECT_DOUBLE_EQ(-128.0, HessianUtils::peekDouble(buffer, &size));
     EXPECT_EQ(2, size);
@@ -566,8 +544,7 @@ TEST(HessianUtilsTest, peekDouble) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0x5d, 0x7f};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 2));
+    buffer.add(std::string({0x5d, '\x7f'}));
     size_t size;
     EXPECT_DOUBLE_EQ(127.0, HessianUtils::peekDouble(buffer, &size));
     EXPECT_EQ(2, size);
@@ -583,8 +560,7 @@ TEST(HessianUtilsTest, peekDouble) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0x5e, 0x80, 0x00};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 3));
+    buffer.add(std::string({0x5e, '\x80', 0x00}));
     size_t size;
     EXPECT_DOUBLE_EQ(-32768.0, HessianUtils::peekDouble(buffer, &size));
     EXPECT_EQ(3, size);
@@ -592,8 +568,7 @@ TEST(HessianUtilsTest, peekDouble) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0x5e, 0x7f, 0xff};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 3));
+    buffer.add(std::string({0x5e, '\x7f', '\xff'}));
     size_t size;
     EXPECT_DOUBLE_EQ(32767.0, HessianUtils::peekDouble(buffer, &size));
     EXPECT_EQ(3, size);
@@ -609,9 +584,7 @@ TEST(HessianUtilsTest, peekDouble) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0x44, 0x40, 0x28, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 9));
-
+    buffer.add(std::string({0x44, 0x40, 0x28, '\x80', 0x00, 0x00, 0x00, 0x00, 0x00}));
     size_t size;
     EXPECT_DOUBLE_EQ(12.25, HessianUtils::peekDouble(buffer, &size));
     EXPECT_EQ(9, size);
@@ -680,8 +653,7 @@ TEST(HessianUtilsTest, peekDate) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0x4a, 0x00, 0x00, 0x00, 0xd0, 0x4b, 0x92, 0x84, 0xb8};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 9));
+    buffer.add(std::string({0x4a, 0x00, 0x00, 0x00, '\xd0', 0x4b, '\x92', '\x84', '\xb8'}));
     size_t size = 0;
     auto t = HessianUtils::peekDate(buffer, &size);
     EXPECT_EQ(9, size);
@@ -691,8 +663,7 @@ TEST(HessianUtilsTest, peekDate) {
 
   {
     Buffer::OwnedImpl buffer;
-    const unsigned char buf[] = {0x4a, 0x00, 0x00, 0x00, 0xd0, 0x4b, 0x92, 0x84, 0xb8};
-    buffer.add(std::string(reinterpret_cast<const char*>(&buf), 9));
+    buffer.add(std::string({0x4a, 0x00, 0x00, 0x00, '\xd0', 0x4b, '\x92', '\x84', '\xb8'}));
     auto t = HessianUtils::readDate(buffer);
     // Time zone was UTC
     EXPECT_EQ(894621091000, t.count());
