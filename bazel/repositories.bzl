@@ -520,6 +520,13 @@ def _com_google_protobuf():
         actual = "@com_google_protobuf_cc//:protoc",
     )
 
+    # Needed for `bazel fetch` to work with @com_google_protobuf
+    # https://github.com/google/protobuf/blob/v3.6.1/util/python/BUILD#L6-L9
+    native.bind(
+        name = "python_headers",
+        actual = "@com_google_protobuf//util/python:python_headers",
+    )
+
 def _com_github_grpc_grpc():
     _repository_impl("com_github_grpc_grpc")
 

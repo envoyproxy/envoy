@@ -14,6 +14,7 @@
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/ssl/utility.h"
 
 #include "openssl/hmac.h"
@@ -457,23 +458,38 @@ int32_t ContextImpl::getDaysUntilExpiration(const X509* cert) const {
   return 0;
 }
 
-std::string ContextImpl::getCaCertInformation() const {
+CertificateDetailsPtr ContextImpl::getCaCertInformation() const {
   if (ca_cert_ == nullptr) {
-    return "";
+    return nullptr;
   }
-  return fmt::format("Certificate Path: {}, Serial Number: {}, Days until Expiration: {}",
-                     getCaFileName(), Utility::getSerialNumberFromCertificate(*ca_cert_.get()),
-                     getDaysUntilExpiration(ca_cert_.get()));
+  return certificateDetails(ca_cert_.get(), getCaFileName());
 }
 
-std::string ContextImpl::getCertChainInformation() const {
+CertificateDetailsPtr ContextImpl::getCertChainInformation() const {
   if (cert_chain_ == nullptr) {
-    return "";
+    return nullptr;
   }
-  return fmt::format("Certificate Path: {}, Serial Number: {}, Days until Expiration: {}",
-                     getCertChainFileName(),
-                     Utility::getSerialNumberFromCertificate(*cert_chain_.get()),
-                     getDaysUntilExpiration(cert_chain_.get()));
+  return certificateDetails(cert_chain_.get(), getCertChainFileName());
+}
+
+CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::string& path) const {
+  CertificateDetailsPtr certificate_details =
+      std::make_unique<envoy::admin::v2alpha::CertificateDetails>();
+  certificate_details->set_path(path);
+  certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
+  certificate_details->set_days_until_expiration(getDaysUntilExpiration(cert));
+
+  for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
+    envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
+        *certificate_details->add_subject_alt_names();
+    subject_alt_name.set_dns(dns_san);
+  }
+  for (auto& uri_san : Utility::getSubjectAltNames(*cert, GEN_URI)) {
+    envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
+        *certificate_details->add_subject_alt_names();
+    subject_alt_name.set_uri(uri_san);
+  }
+  return certificate_details;
 }
 
 ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config)
