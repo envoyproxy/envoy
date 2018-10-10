@@ -2,7 +2,7 @@
 
 # Run a CI build/test target, e.g. docs, asan.
 
-set -ex
+set -e
 
 build_setup_args=""
 if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_spelling" || "$1" == "fix_spelling" ]]; then
