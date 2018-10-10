@@ -69,10 +69,7 @@ message RouteConfiguration {
 
   // Specifies a list of HTTP headers that should be removed from each response
   // that the connection manager encodes.
-  repeated string response_headers_to_remove = 5 [
-    (validate.rules).repeated .items.string.max_bytes = 16384,
-    (validate.rules).repeated .max_items = 1000
-  ];
+  repeated string response_headers_to_remove = 5;
 
   // Specifies a list of HTTP headers that should be added to each request
   // routed by the HTTP connection manager. Headers specified at this level are
