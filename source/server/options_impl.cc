@@ -191,7 +191,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   concurrency_ = std::max(1U, concurrency.getValue());
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
-  v2_config_only_ = true;
   if (allow_unknown_fields.getValue()) {
     MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Allow;
   }
