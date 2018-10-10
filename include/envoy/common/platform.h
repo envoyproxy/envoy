@@ -1,7 +1,7 @@
 #pragma once
 
 // NOLINT(namespace-envoy)
-#if !defined(WIN32)
+#if !defined(_MSC_VER)
 #define STACK_ALLOC_ARRAY(var, type, num) type var[num]
 
 #define PACKED_STRUCT(definition, name) typedef definition __attribute__((packed)) name

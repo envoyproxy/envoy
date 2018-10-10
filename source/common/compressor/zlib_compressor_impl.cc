@@ -40,7 +40,7 @@ void ZlibCompressorImpl::compress(Buffer::Instance& buffer, State state) {
   buffer.getRawSlices(slices, num_slices);
 
   for (uint64_t i = 0; i < num_slices; i++) {
-    Buffer::RawSlice& input_slice = slices[i];
+    const Buffer::RawSlice& input_slice = slices[i];
     zstream_ptr_->avail_in = input_slice.len_;
     zstream_ptr_->next_in = static_cast<Bytef*>(input_slice.mem_);
     // Z_NO_FLUSH tells the compressor to take the data in and compresses it as much as possible
