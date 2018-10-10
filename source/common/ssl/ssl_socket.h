@@ -90,8 +90,7 @@ public:
   ClientSslSocketFactory(ClientContextConfigPtr config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope);
 
-  Network::TransportSocketPtr
-  createTransportSocket(const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
+  Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 
   // Secret::SecretCallbacks
@@ -112,8 +111,7 @@ public:
   ServerSslSocketFactory(ServerContextConfigPtr config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope, const std::vector<std::string>& server_names);
 
-  Network::TransportSocketPtr
-  createTransportSocket(const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
+  Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 
   // Secret::SecretCallbacks

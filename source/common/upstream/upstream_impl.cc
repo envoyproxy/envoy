@@ -177,8 +177,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   }
 
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(),
-      cluster.transportSocketFactory().createTransportSocket(connection_options),
+      address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
       connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;
