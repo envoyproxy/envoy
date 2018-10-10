@@ -32,7 +32,9 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
   }
 
   cluster_ = callbacks_->clusterInfo();
-  if(!cluster_) { return; }
+  if (!cluster_) {
+    return;
+  }
 
   std::vector<RateLimit::Descriptor> descriptors;
 

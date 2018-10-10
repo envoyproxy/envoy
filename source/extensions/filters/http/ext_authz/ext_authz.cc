@@ -16,7 +16,9 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
     return;
   }
   cluster_ = callbacks_->clusterInfo();
-  if(!cluster_){return;}
+  if (!cluster_) {
+    return;
+  }
 
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(callbacks_, headers,
                                                                 check_request_);
