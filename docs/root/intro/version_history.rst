@@ -6,6 +6,9 @@ Version history
 * fault: removed integer percentage support.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
+* http: no longer adding whitespace when appending X-Forwarded-For headers. **Warning**: this is not
+  compatible with 1.7.0 builds prior to `9d3a4eb4ac44be9f0651fcc7f87ad98c538b01ee <https://github.com/envoyproxy/envoy/pull/3610>`_.
+  See `#3611 <https://github.com/envoyproxy/envoy/issues/3611>`_ for details.
 
 1.8.0 (Oct 4, 2018)
 ===================
@@ -51,9 +54,6 @@ Version history
 * http: added generic :ref:`Upgrade support
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`.
 * http: better handling of HEAD requests. Now sending transfer-encoding: chunked rather than content-length: 0.
-* http: no longer adding whitespace when appending X-Forwarded-For headers. **Warning**: this is not
-  compatible with 1.7.0 builds prior to `9d3a4eb4ac44be9f0651fcc7f87ad98c538b01ee <https://github.com/envoyproxy/envoy/pull/3610>`_.
-  See `#3611 <https://github.com/envoyproxy/envoy/issues/3611>`_ for details.
 * http: fixed missing support for appending to predefined inline headers, e.g.
   *authorization*, in features that interact with request and response headers,
   e.g. :ref:`request_headers_to_add
