@@ -132,6 +132,8 @@ uint32_t RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header
       ret |= RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Unavailable) {
       ret |= RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Internal) {
+      ret |= RetryPolicy::RETRY_ON_GRPC_INTERNAL;
     }
   }
 
@@ -239,8 +241,8 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
 
   if (retry_on_ &
           (RetryPolicy::RETRY_ON_GRPC_CANCELLED | RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
-           RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED |
-           RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE) &&
+           RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED | RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE |
+           RetryPolicy::RETRY_ON_GRPC_INTERNAL) &&
       response_headers) {
     absl::optional<Grpc::Status::GrpcStatus> status =
         Grpc::Common::getGrpcStatus(*response_headers);
@@ -252,7 +254,9 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
           (status.value() == Grpc::Status::ResourceExhausted &&
            (retry_on_ & RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED)) ||
           (status.value() == Grpc::Status::Unavailable &&
-           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE))) {
+           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE)) ||
+          (status.value() == Grpc::Status::Internal &&
+           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_INTERNAL))) {
         return true;
       }
     }

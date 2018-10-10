@@ -1658,7 +1658,7 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
       }));
   expectResponseTimerCreate();
 
-  Http::TestHeaderMapImpl headers{{"x-envoy-grpc-retry-on", "cancelled"},
+  Http::TestHeaderMapImpl headers{{"x-envoy-retry-grpc-on", "cancelled"},
                                   {"x-envoy-internal", "true"},
                                   {"content-type", "application/grpc"},
                                   {"grpc-timeout", "20S"}};
