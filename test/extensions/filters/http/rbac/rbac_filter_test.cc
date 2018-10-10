@@ -45,7 +45,7 @@ public:
 
   void SetUp() {
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
-    EXPECT_CALL(callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+    EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
@@ -65,7 +65,7 @@ public:
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Network::MockConnection> connection_{};
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> req_info_;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   Stats::IsolatedStoreImpl store_;
   RoleBasedAccessControlFilterConfigSharedPtr config_;
 

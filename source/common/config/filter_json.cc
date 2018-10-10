@@ -253,9 +253,11 @@ void FilterJson::translateMongoProxy(
   if (json_config.hasObject("fault")) {
     const auto json_fault = json_config.getObject("fault")->getObject("fixed_delay");
     auto* delay = proto_config.mutable_delay();
+    auto* percentage = delay->mutable_percentage();
 
     delay->set_type(envoy::config::filter::fault::v2::FaultDelay::FIXED);
-    delay->set_percent(static_cast<uint32_t>(json_fault->getInteger("percent")));
+    percentage->set_numerator(static_cast<uint32_t>(json_fault->getInteger("percent")));
+    percentage->set_denominator(envoy::type::FractionalPercent::HUNDRED);
     JSON_UTIL_SET_DURATION_FROM_FIELD(*json_fault, *delay, fixed_delay, duration);
   }
 }
@@ -270,7 +272,10 @@ void FilterJson::translateFaultFilter(
 
   if (!json_config_abort->empty()) {
     auto* abort_fault = proto_config.mutable_abort();
-    abort_fault->set_percent(static_cast<uint32_t>(json_config_abort->getInteger("abort_percent")));
+    auto* percentage = abort_fault->mutable_percentage();
+    percentage->set_numerator(
+        static_cast<uint32_t>(json_config_abort->getInteger("abort_percent")));
+    percentage->set_denominator(envoy::type::FractionalPercent::HUNDRED);
 
     // TODO(mattklein123): Throw error if invalid return code is provided
     abort_fault->set_http_status(
@@ -279,8 +284,11 @@ void FilterJson::translateFaultFilter(
 
   if (!json_config_delay->empty()) {
     auto* delay = proto_config.mutable_delay();
+    auto* percentage = delay->mutable_percentage();
     delay->set_type(envoy::config::filter::fault::v2::FaultDelay::FIXED);
-    delay->set_percent(static_cast<uint32_t>(json_config_delay->getInteger("fixed_delay_percent")));
+    percentage->set_numerator(
+        static_cast<uint32_t>(json_config_delay->getInteger("fixed_delay_percent")));
+    percentage->set_denominator(envoy::type::FractionalPercent::HUNDRED);
     JSON_UTIL_SET_DURATION_FROM_FIELD(*json_config_delay, *delay, fixed_delay, fixed_duration);
   }
 

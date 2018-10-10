@@ -521,13 +521,8 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
 
-  resolver1.expectResolve(*dns_resolver);
-  resolver1.timer_->callback_();
-  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
-  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
-  EXPECT_THAT(
-      std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+  // This is the first time we receveived an update for localhost1, we expect to rebuild.
+  EXPECT_EQ(0UL, stats.counter("cluster.name.update_no_rebuild").value());
 
   resolver1.expectResolve(*dns_resolver);
   resolver1.timer_->callback_();
@@ -536,18 +531,46 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+
+  // Since no change for localhost1, we expect no rebuild.
+  EXPECT_EQ(1UL, stats.counter("cluster.name.update_no_rebuild").value());
+
+  resolver1.expectResolve(*dns_resolver);
+  resolver1.timer_->callback_();
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+
+  // Since no change for localhost1, we expect no rebuild.
+  EXPECT_EQ(2UL, stats.counter("cluster.name.update_no_rebuild").value());
+
+  EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  EXPECT_CALL(membership_updated, ready());
+  resolver2.dns_callback_(TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
+
+  // We received a new set of hosts for localhost2. Should rebuild the cluster.
+  EXPECT_EQ(2UL, stats.counter("cluster.name.update_no_rebuild").value());
+
+  resolver1.expectResolve(*dns_resolver);
+  resolver1.timer_->callback_();
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
+
+  // We again received the same set as before for localhost1. No rebuild this time.
+  EXPECT_EQ(3UL, stats.counter("cluster.name.update_no_rebuild").value());
 
   resolver1.timer_->callback_();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
-      std::list<std::string>({"127.0.0.3:11001"}),
+      std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000)));
-  EXPECT_CALL(membership_updated, ready());
   resolver2.dns_callback_(TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),

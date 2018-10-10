@@ -32,7 +32,7 @@ TcpProxy::ConfigSharedPtr Config(const envoy::api::v2::route::RouteAction& route
  */
 class WsHandlerImpl : public TcpProxy::Filter, public Http::WebSocketProxy {
 public:
-  WsHandlerImpl(HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+  WsHandlerImpl(HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
                 const Router::RouteEntry& route_entry, WebSocketProxyCallbacks& callbacks,
                 Upstream::ClusterManager& cluster_manager,
                 Network::ReadFilterCallbacks* read_callbacks, TcpProxy::ConfigSharedPtr config,
@@ -51,7 +51,7 @@ protected:
   const std::string& getUpstreamCluster() override { return route_entry_.clusterName(); }
   void onInitFailure(UpstreamFailureReason failure_reason) override;
   void onConnectionSuccess() override;
-  RequestInfo::RequestInfo& getRequestInfo() override;
+  StreamInfo::StreamInfo& getStreamInfo() override;
 
 private:
   struct NullHttpConnectionCallbacks : public ConnectionCallbacks {
@@ -62,7 +62,7 @@ private:
   enum class ConnectState { PreConnect, Connected, Failed };
 
   HeaderMap& request_headers_;
-  RequestInfo::RequestInfo& request_info_;
+  StreamInfo::StreamInfo& stream_info_;
   const Router::RouteEntry& route_entry_;
   WebSocketProxyCallbacks& ws_callbacks_;
   NullHttpConnectionCallbacks http_conn_callbacks_;

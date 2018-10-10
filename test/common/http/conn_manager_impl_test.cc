@@ -36,6 +36,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
@@ -209,15 +210,15 @@ public:
     ON_CALL(route_entry, useOldStyleWebSocket()).WillByDefault(Return(true));
     ON_CALL(route_entry, createWebSocketProxy(_, _, _, _, _))
         .WillByDefault(Invoke([this, &route_entry](Http::HeaderMap& request_headers,
-                                                   RequestInfo::RequestInfo& request_info,
+                                                   StreamInfo::StreamInfo& stream_info,
                                                    Http::WebSocketProxyCallbacks& callbacks,
                                                    Upstream::ClusterManager& cluster_manager,
                                                    Network::ReadFilterCallbacks* read_callbacks) {
           auto config(std::make_shared<TcpProxy::Config>(
               envoy::config::filter::network::tcp_proxy::v2::TcpProxy(), factory_context_));
           auto ret = std::make_unique<Http::WebSocket::WsHandlerImpl>(
-              request_headers, request_info, route_entry, callbacks, cluster_manager,
-              read_callbacks, config, test_time_.timeSystem());
+              request_headers, stream_info, route_entry, callbacks, cluster_manager, read_callbacks,
+              config, test_time_.timeSystem());
           return ret;
         }));
   }
@@ -344,7 +345,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
         EXPECT_NE(nullptr, headers.ForwardedFor());
         EXPECT_STREQ("http", headers.ForwardedProto()->value().c_str());
         if (headers.Path()->value() == "/healthcheck") {
-          filter->callbacks_->requestInfo().healthCheck(true);
+          filter->callbacks_->streamInfo().healthCheck(true);
         }
 
         return FilterHeadersStatus::StopIteration;
@@ -566,8 +567,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                     const RequestInfo::RequestInfo&, const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
+                     const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
             return span;
@@ -633,8 +634,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                     const RequestInfo::RequestInfo&, const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
+                     const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
             return span;
@@ -695,8 +696,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                     const RequestInfo::RequestInfo&, const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
+                     const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
             return span;
@@ -762,8 +763,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                     const RequestInfo::RequestInfo&, const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
+                     const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
 
             return span;
@@ -829,8 +830,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                     const RequestInfo::RequestInfo&, const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
+                     const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
 
             return span;
@@ -938,12 +939,12 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
 
   EXPECT_CALL(*handler, log(_, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const RequestInfo::RequestInfo& request_info) {
-        EXPECT_TRUE(request_info.responseCode());
-        EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
-        EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
-        EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
-        EXPECT_NE(nullptr, request_info.routeEntry());
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_TRUE(stream_info.responseCode());
+        EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
+        EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.routeEntry());
       }));
 
   StreamDecoder* decoder = nullptr;
@@ -982,12 +983,12 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
 
   EXPECT_CALL(*handler, log(_, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const RequestInfo::RequestInfo& request_info) {
-        EXPECT_TRUE(request_info.responseCode());
-        EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
-        EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
-        EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
-        EXPECT_NE(nullptr, request_info.routeEntry());
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_TRUE(stream_info.responseCode());
+        EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
+        EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.routeEntry());
       }));
 
   StreamDecoder* decoder = nullptr;
@@ -1029,12 +1030,12 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
 
   EXPECT_CALL(*handler, log(_, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const RequestInfo::RequestInfo& request_info) {
-        EXPECT_TRUE(request_info.responseCode());
-        EXPECT_EQ(request_info.responseCode().value(), uint32_t(400));
-        EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
-        EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
-        EXPECT_EQ(nullptr, request_info.routeEntry());
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_TRUE(stream_info.responseCode());
+        EXPECT_EQ(stream_info.responseCode().value(), uint32_t(400));
+        EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
+        EXPECT_EQ(nullptr, stream_info.routeEntry());
       }));
 
   StreamDecoder* decoder = nullptr;
@@ -1507,7 +1508,7 @@ TEST_F(HttpConnectionManagerImplTest, AllowNonWebSocketOnWebSocketRoute) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketNoThreadLocalCluster) {
   setup(false, "");
 
-  EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cluster_manager_, get(_)).Times(2).WillRepeatedly(Return(nullptr));
   expectOnUpstreamInitFailure();
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
@@ -2639,9 +2640,19 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
   }));
 
   setupFilterChain(3, 2);
+  const std::string fake_cluster1_name = "fake_cluster1";
+  const std::string fake_cluster2_name = "fake_cluster2";
 
-  Router::RouteConstSharedPtr route1 = std::make_shared<NiceMock<Router::MockRoute>>();
-  Router::RouteConstSharedPtr route2 = std::make_shared<NiceMock<Router::MockRoute>>();
+  std::shared_ptr<Upstream::MockThreadLocalCluster> fake_cluster1 =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, get(_))
+      .WillOnce(Return(fake_cluster1.get()))
+      .WillOnce(Return(nullptr));
+
+  std::shared_ptr<Router::MockRoute> route1 = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(route1->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster1_name));
+  std::shared_ptr<Router::MockRoute> route2 = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(route2->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster2_name));
 
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _))
       .WillOnce(Return(route1))
@@ -2651,23 +2662,25 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
-        EXPECT_EQ(route1->routeEntry(),
-                  decoder_filters_[0]->callbacks_->requestInfo().routeEntry());
+        EXPECT_EQ(route1->routeEntry(), decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
         decoder_filters_[0]->callbacks_->clearRouteCache();
         return FilterHeadersStatus::Continue;
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->route());
-        EXPECT_EQ(route2->routeEntry(),
-                  decoder_filters_[1]->callbacks_->requestInfo().routeEntry());
+        EXPECT_EQ(route2->routeEntry(), decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+        // RDS & CDS consistency problem: route2 points to fake_cluster2, which doesn't exist.
+        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->clusterInfo());
         decoder_filters_[1]->callbacks_->clearRouteCache();
         return FilterHeadersStatus::Continue;
       }));
   EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->clusterInfo());
         EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->route());
-        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->requestInfo().routeEntry());
+        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->streamInfo().routeEntry());
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -2722,78 +2735,6 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
       HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
 }
 
-TEST_F(HttpConnectionManagerImplTest, DownstreamWatermarkCallbacks) {
-  setup(false, "");
-  setUpEncoderAndDecoder();
-  sendReqestHeadersAndData();
-
-  // Test what happens when there are no subscribers.
-  conn_manager_->onAboveWriteBufferHighWatermark();
-  conn_manager_->onBelowWriteBufferLowWatermark();
-
-  // The connection manger will outlive callbacks but never reference them once deleted.
-  MockDownstreamWatermarkCallbacks callbacks;
-
-  // Network::Connection callbacks are passed through the codec
-  ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
-  EXPECT_CALL(*codec_, onUnderlyingConnectionAboveWriteBufferHighWatermark());
-  conn_manager_->onAboveWriteBufferHighWatermark();
-  EXPECT_CALL(*codec_, onUnderlyingConnectionBelowWriteBufferLowWatermark());
-  conn_manager_->onBelowWriteBufferLowWatermark();
-
-  // Now add a watermark subscriber and make sure both the high and low watermark callbacks are
-  // propogated.
-  ASSERT_NE(0, decoder_filters_.size());
-  decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
-  // Make sure encoder filter callbacks are propogated to the watermark subscriber.
-  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
-  encoder_filters_[0]->callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
-  encoder_filters_[0]->callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
-
-  ASSERT(stream_callbacks_ != nullptr);
-  // Finally make sure that watermark events on the downstream stream are passed to the watermark
-  // subscriber.
-  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
-  stream_callbacks_->onAboveWriteBufferHighWatermark();
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
-  stream_callbacks_->onBelowWriteBufferLowWatermark();
-
-  // Set things up so the callbacks have been called twice.
-  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
-  stream_callbacks_->onAboveWriteBufferHighWatermark();
-  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
-  encoder_filters_[0]->callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
-
-  // Now unsubscribe and verify no further callbacks are called.
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(0);
-  decoder_filters_[0]->callbacks_->removeDownstreamWatermarkCallbacks(callbacks);
-}
-
-TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOn) {
-  setup(false, "");
-
-  // Make sure codec_ is created.
-  EXPECT_CALL(*codec_, dispatch(_));
-  Buffer::OwnedImpl fake_input("");
-  conn_manager_->onData(fake_input, false);
-
-  // Mark the connection manger as backed up before the stream is created.
-  ASSERT_EQ(decoder_filters_.size(), 0);
-  EXPECT_CALL(*codec_, onUnderlyingConnectionAboveWriteBufferHighWatermark());
-  conn_manager_->onAboveWriteBufferHighWatermark();
-
-  // Now when the stream is created, it should be informed of the connection
-  // callbacks immediately.
-  EXPECT_CALL(filter_callbacks_.connection_, aboveHighWatermark()).WillOnce(Return(true));
-  setUpEncoderAndDecoder();
-  sendReqestHeadersAndData();
-  ASSERT_GE(decoder_filters_.size(), 1);
-  MockDownstreamWatermarkCallbacks callbacks;
-  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
-  decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
-}
-
 TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWithLazyCreation) {
   setup(false, "");
 
@@ -2814,10 +2755,9 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWith
     setUpBufferLimits();
     EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
       decoder = &conn_manager_->newStream(response_encoder_);
+      // Call the high buffer callbacks as the codecs do.
+      stream_callbacks_->onAboveWriteBufferHighWatermark();
     }));
-
-    // Verify the high watermark is passed on.
-    EXPECT_CALL(filter_callbacks_.connection_, aboveHighWatermark()).WillOnce(Return(true));
 
     // Send fake data to kick off newStream being created.
     Buffer::OwnedImpl fake_input2("asdf");
@@ -2868,10 +2808,9 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksUnwoundWithL
     setUpBufferLimits();
     EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
       decoder = &conn_manager_->newStream(response_encoder_);
+      // Call the high buffer callbacks as the codecs do.
+      stream_callbacks_->onAboveWriteBufferHighWatermark();
     }));
-
-    // Verify the high watermark is passed on.
-    EXPECT_CALL(filter_callbacks_.connection_, aboveHighWatermark()).WillOnce(Return(true));
 
     // Send fake data to kick off newStream being created.
     Buffer::OwnedImpl fake_input2("asdf");

@@ -1,8 +1,25 @@
 Version history
 ---------------
 
-1.8.0 (Pending)
+1.9.0 (pending)
 ===============
+* admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
+* fault: removed integer percentage support.
+* http: no longer adding whitespace when appending X-Forwarded-For headers. **Warning**: this is not
+  compatible with 1.7.0 builds prior to `9d3a4eb4ac44be9f0651fcc7f87ad98c538b01ee <https://github.com/envoyproxy/envoy/pull/3610>`_.
+  See `#3611 <https://github.com/envoyproxy/envoy/issues/3611>`_ for details.
+* router: added ability to configure arbitrary :ref:`retriable status codes. <envoy_api_field_route.RouteAction.RetryPolicy.retriable_status_codes>`
+* router: added ability to set attempt count in upstream requests, see :ref:`virtual host's include request
+  attempt count flag <envoy_api_field_route.VirtualHost.include_request_attempt_count>`.
+* router: added internal :ref:`grpc-retry-on <config_http_filters_router_x-envoy-retry-grpc-on>` policy.
+* router: when :ref:`max_grpc_timeout <envoy_api_field_route.RouteAction.max_grpc_timeout>`
+  is set, Envoy will now add or update the grpc-timeout header to reflect Envoy's expected timeout.
+* stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
+* stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
+  its behaviour within TCP and HTTP implementations.
+
+1.8.0 (Oct 4, 2018)
+===================
 * access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>`
   to filter based on the presence of Envoy response flags.
 * access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.
@@ -66,8 +83,8 @@ Version history
   :ref:`destination_port <envoy_api_field_listener.FilterChainMatch.destination_port>` and
   :ref:`prefix_ranges <envoy_api_field_listener.FilterChainMatch.prefix_ranges>`.
 * lua: added :ref:`connection() <config_http_filters_lua_connection_wrapper>` wrapper and *ssl()* API.
-* lua: added :ref:`requestInfo() <config_http_filters_lua_request_info_wrapper>` wrapper and *protocol()* API.
-* lua: added :ref:`requestInfo():dynamicMetadata() <config_http_filters_lua_request_info_dynamic_metadata_wrapper>` API.
+* lua: added :ref:`streamInfo() <config_http_filters_lua_stream_info_wrapper>` wrapper and *protocol()* API.
+* lua: added :ref:`streamInfo():dynamicMetadata() <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>` API.
 * network: introduced :ref:`sni_cluster <config_network_filters_sni_cluster>` network filter that forwards connections to the
   upstream cluster specified by the SNI value presented by the client during a TLS handshake.
 * proxy_protocol: added support for HAProxy Proxy Protocol v2 (AF_INET/AF_INET6 only).
@@ -85,11 +102,11 @@ Version history
 * rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.
 * route checker: Added v2 config support and removed support for v1 configs.
 * router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
+* stats: added :ref:`option to configure the DogStatsD metric name prefix<envoy_api_field_config.metrics.v2.DogStatsdSink.prefix>` to DogStatsdSink.
 * tcp_proxy: added support for :ref:`weighted clusters <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.weighted_clusters>`.
 * thrift_proxy: introduced thrift routing, moved configuration to correct location
 * thrift_proxy: introduced thrift configurable decoder filters
-* tls: implemented `SecretDiscoveryService <https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/\
-  discovery/v2/sds.proto>`_.
+* tls: implemented :ref:`Secret Discovery Service <config_secret_discovery_service>`.
 * tracing: added support for configuration of :ref:`tracing sampling
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
@@ -98,8 +115,8 @@ Version history
   for overriding destination address when using the :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   load balancing policy.
 
-1.7.0
-===============
+1.7.0 (Jun 21, 2018)
+====================
 * access log: added ability to log response trailers.
 * access log: added ability to format START_TIME.
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.

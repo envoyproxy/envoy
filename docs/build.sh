@@ -49,8 +49,10 @@ bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
 # These are the protos we want to put in docs, this list will grow.
 # TODO(htuch): Factor this out of this script.
 PROTO_RST="
+  /envoy/admin/v2alpha/certs/envoy/admin/v2alpha/certs.proto.rst
   /envoy/admin/v2alpha/clusters/envoy/admin/v2alpha/clusters.proto.rst
   /envoy/admin/v2alpha/config_dump/envoy/admin/v2alpha/config_dump.proto.rst
+  /envoy/admin/v2alpha/memory/envoy/admin/v2alpha/memory.proto.rst
   /envoy/admin/v2alpha/clusters/envoy/admin/v2alpha/metrics.proto.rst
   /envoy/api/v2/core/address/envoy/api/v2/core/address.proto.rst
   /envoy/api/v2/core/base/envoy/api/v2/core/base.proto.rst
@@ -87,6 +89,7 @@ PROTO_RST="
   /envoy/config/filter/http/health_check/v2/health_check/envoy/config/filter/http/health_check/v2/health_check.proto.rst
   /envoy/config/filter/http/header_to_metadata/v2/header_to_metadata/envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.proto.rst
   /envoy/config/filter/http/ip_tagging/v2/ip_tagging/envoy/config/filter/http/ip_tagging/v2/ip_tagging.proto.rst
+  /envoy/config/filter/http/jwt_authn/v2alpha/jwt_authn/envoy/config/filter/http/jwt_authn/v2alpha/config.proto.rst
   /envoy/config/filter/http/lua/v2/lua/envoy/config/filter/http/lua/v2/lua.proto.rst
   /envoy/config/filter/http/rate_limit/v2/rate_limit/envoy/config/filter/http/rate_limit/v2/rate_limit.proto.rst
   /envoy/config/filter/http/rbac/v2/rbac/envoy/config/filter/http/rbac/v2/rbac.proto.rst

@@ -130,6 +130,21 @@ public:
                                              uint64_t seed = 0);
 
   /**
+   * Finds a stat in a vector with the given name.
+   * @param name the stat name to look for.
+   * @param v the vector of stats.
+   * @return the stat
+   */
+  template <typename T> static T findByName(const std::vector<T>& v, const std::string& name) {
+    auto pos = std::find_if(v.begin(), v.end(),
+                            [&name](const T& stat) -> bool { return stat->name() == name; });
+    if (pos == v.end()) {
+      return nullptr;
+    }
+    return *pos;
+  }
+
+  /**
    * Find a counter in a stats store.
    * @param store supplies the stats store.
    * @param name supplies the name to search for.
