@@ -149,9 +149,12 @@ public:
   virtual bool implementsSecureTransport() const PURE;
 
   /**
+   * @param overrideServerNameIndication set SNI, disregard the value the factory was configured
+   * with
    * @return Network::TransportSocketPtr a transport socket to be passed to connection.
    */
-  virtual TransportSocketPtr createTransportSocket() const PURE;
+  virtual TransportSocketPtr
+  createTransportSocket(std::string overrideServerNameIndication = "") const PURE;
 };
 
 typedef std::unique_ptr<TransportSocketFactory> TransportSocketFactoryPtr;

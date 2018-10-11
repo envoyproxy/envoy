@@ -420,13 +420,15 @@ ClientSslSocketFactory::ClientSslSocketFactory(ClientContextConfigPtr config,
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
-Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() const {
+Network::TransportSocketPtr
+ClientSslSocketFactory::createTransportSocket(std::string overrideServerNameIndication) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
   auto ssl_ctx = ssl_ctx_;
   if (ssl_ctx) {
-    return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Client);
+    return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Client,
+                                            overrideServerNameIndication);
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.upstream_context_secrets_not_ready_.inc();
@@ -452,7 +454,7 @@ ServerSslSocketFactory::ServerSslSocketFactory(ServerContextConfigPtr config,
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
-Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() const {
+Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket(std::string) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
