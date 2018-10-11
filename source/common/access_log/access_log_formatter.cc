@@ -67,8 +67,7 @@ std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
   log_line.reserve(256);
 
   for (const FormatterProviderPtr& provider : providers_) {
-    log_line +=
-        provider->format(request_headers, response_headers, response_trailers, stream_info);
+    log_line += provider->format(request_headers, response_headers, response_trailers, stream_info);
   }
 
   return log_line;
@@ -101,8 +100,7 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
   rapidjson::StringBuffer strbuf;
   rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
 
-  auto output_map =
-      this->to_map(request_headers, response_headers, response_trailers, stream_info);
+  auto output_map = this->to_map(request_headers, response_headers, response_trailers, stream_info);
   writer.StartObject();
   for (const auto& pair : output_map) {
     writer.Key(pair.first.c_str());
