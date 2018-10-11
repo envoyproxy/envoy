@@ -384,7 +384,7 @@ TEST(AccessLogFormatterTest, startTimeFormatter) {
 
 TEST(AccessLogFormatterTest, JsonFormatterTest) {
   {
-    RequestInfo::MockRequestInfo request_info;
+    StreamInfo::MockStreamInfo stream_info;
     Http::TestHeaderMapImpl request_header{};
     Http::TestHeaderMapImpl response_header{};
     Http::TestHeaderMapImpl response_trailer{};
@@ -392,7 +392,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     envoy::api::v2::core::Metadata metadata;
     populateMetadataTestData(metadata);
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
-    EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
+    EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
     std::map<std::string, std::string> expected_json_map = {{"plain_string", "plain_string_value"}};
 
@@ -401,16 +401,16 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     JsonFormatterImpl formatter(key_mapping);
 
     auto actual_json_map =
-        formatter.to_map(request_header, response_header, response_trailer, request_info);
+        formatter.to_map(request_header, response_header, response_trailer, stream_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
     auto actual_string =
-        formatter.format(request_header, response_header, response_trailer, request_info);
+        formatter.format(request_header, response_header, response_trailer, stream_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
   }
 
   {
-    RequestInfo::MockRequestInfo request_info;
+    StreamInfo::MockStreamInfo stream_info;
     Http::TestHeaderMapImpl request_header{};
     Http::TestHeaderMapImpl response_header{};
     Http::TestHeaderMapImpl response_trailer{};
@@ -418,7 +418,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     envoy::api::v2::core::Metadata metadata;
     populateMetadataTestData(metadata);
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
-    EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
+    EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
     std::map<std::string, std::string> expected_json_map = {{"protocol", "HTTP/1.1"}};
 
@@ -426,16 +426,16 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     JsonFormatterImpl formatter(key_mapping);
 
     auto actual_json_map =
-        formatter.to_map(request_header, response_header, response_trailer, request_info);
+        formatter.to_map(request_header, response_header, response_trailer, stream_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
     auto actual_string =
-        formatter.format(request_header, response_header, response_trailer, request_info);
+        formatter.format(request_header, response_header, response_trailer, stream_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
   }
 
   {
-    RequestInfo::MockRequestInfo request_info;
+    StreamInfo::MockStreamInfo stream_info;
     Http::TestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
     Http::TestHeaderMapImpl response_header{{"some_response_header", "SOME_RESPONSE_HEADER"}};
     Http::TestHeaderMapImpl response_trailer{};
@@ -454,19 +454,19 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     JsonFormatterImpl formatter(key_mapping);
 
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
-    EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
+    EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
     auto actual_json_map =
-        formatter.to_map(request_header, response_header, response_trailer, request_info);
+        formatter.to_map(request_header, response_header, response_trailer, stream_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
     auto actual_string =
-        formatter.format(request_header, response_header, response_trailer, request_info);
+        formatter.format(request_header, response_header, response_trailer, stream_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
   }
 
   {
-    RequestInfo::MockRequestInfo request_info;
+    StreamInfo::MockStreamInfo stream_info;
     Http::TestHeaderMapImpl request_header{{"request_present_header", "REQUEST_PRESENT_HEADER"}};
     Http::TestHeaderMapImpl response_header{{"response_present_header", "RESPONSE_PRESENT_HEADER"}};
     Http::TestHeaderMapImpl response_trailer{};
@@ -489,26 +489,26 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     JsonFormatterImpl formatter(key_mapping);
 
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
-    EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
+    EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
     auto actual_json_map =
-        formatter.to_map(request_header, response_header, response_trailer, request_info);
+        formatter.to_map(request_header, response_header, response_trailer, stream_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
     auto actual_string =
-        formatter.format(request_header, response_header, response_trailer, request_info);
+        formatter.format(request_header, response_header, response_trailer, stream_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
   }
 
   {
-    RequestInfo::MockRequestInfo request_info;
+    StreamInfo::MockStreamInfo stream_info;
     Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
     Http::TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
     Http::TestHeaderMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
 
     envoy::api::v2::core::Metadata metadata;
     populateMetadataTestData(metadata);
-    EXPECT_CALL(request_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
     std::map<std::string, std::string> expected_json_map = {
         {"test_key", "\"test_value\""},
@@ -523,23 +523,23 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     JsonFormatterImpl formatter(key_mapping);
 
     auto actual_json_map =
-        formatter.to_map(request_header, response_header, response_trailer, request_info);
+        formatter.to_map(request_header, response_header, response_trailer, stream_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
     auto actual_string =
-        formatter.format(request_header, response_header, response_trailer, request_info);
+        formatter.format(request_header, response_header, response_trailer, stream_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
   }
 
   {
-    RequestInfo::MockRequestInfo request_info;
+    StreamInfo::MockStreamInfo stream_info;
     Http::TestHeaderMapImpl request_header{};
     Http::TestHeaderMapImpl response_header{};
     Http::TestHeaderMapImpl response_trailer{};
 
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
-    EXPECT_CALL(request_info, startTime()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
 
     // Needed to take into account the behavior in non-GMT timezones.
     struct tm time_val;
@@ -562,11 +562,11 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     JsonFormatterImpl formatter(key_mapping);
 
     auto actual_json_map =
-        formatter.to_map(request_header, response_header, response_trailer, request_info);
+        formatter.to_map(request_header, response_header, response_trailer, stream_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
     auto actual_string =
-        formatter.format(request_header, response_header, response_trailer, request_info);
+        formatter.format(request_header, response_header, response_trailer, stream_info);
     EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
   }
 }

@@ -97,12 +97,12 @@ JsonFormatterImpl::JsonFormatterImpl(
 std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
                                       const Http::HeaderMap& response_headers,
                                       const Http::HeaderMap& response_trailers,
-                                      const RequestInfo::RequestInfo& request_info) const {
+                                      const StreamInfo::StreamInfo& stream_info) const {
   rapidjson::StringBuffer strbuf;
   rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
 
   auto output_map =
-      this->to_map(request_headers, response_headers, response_trailers, request_info);
+      this->to_map(request_headers, response_headers, response_trailers, stream_info);
   writer.StartObject();
   for (const auto& pair : output_map) {
     writer.Key(pair.first.c_str());
@@ -114,11 +114,11 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
 
 std::map<std::string, std::string> JsonFormatterImpl::to_map(
     const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
-    const Http::HeaderMap& response_trailers, const RequestInfo::RequestInfo& request_info) const {
+    const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info) const {
   std::map<std::string, std::string> output;
   for (const auto& pair : json_output_format_) {
     output.emplace(pair.first, pair.second->format(request_headers, response_headers,
-                                                   response_trailers, request_info));
+                                                   response_trailers, stream_info));
   }
   return output;
 }
