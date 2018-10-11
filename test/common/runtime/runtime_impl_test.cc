@@ -125,6 +125,30 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   EXPECT_CALL(generator, random()).WillOnce(Return(2));
   EXPECT_FALSE(loader->snapshot().featureEnabled("file3", 1));
 
+  // Fractional percent feature enablement
+  envoy::type::FractionalPercent fractional_percent;
+  fractional_percent.set_numerator(5);
+  fractional_percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(50));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file8", fractional_percent)); // valid data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(60));
+  EXPECT_FALSE(loader->snapshot().featureEnabled("file8", fractional_percent)); // valid data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(4));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(6));
+  EXPECT_FALSE(
+      loader->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(4));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file1", fractional_percent)); // invalid data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(6));
+  EXPECT_FALSE(loader->snapshot().featureEnabled("file1", fractional_percent)); // invalid data
+
   // Check stable value
   EXPECT_TRUE(loader->snapshot().featureEnabled("file3", 1, 1));
   EXPECT_FALSE(loader->snapshot().featureEnabled("file3", 1, 3));
@@ -142,8 +166,8 @@ TEST_F(DiskBackedLoaderImplTest, GetLayers) {
   run("test/common/runtime/test_data/current", "envoy_override");
   const auto& layers = loader->snapshot().getLayers();
   EXPECT_EQ(3, layers.size());
-  EXPECT_EQ("hello", layers[0]->values().find("file1")->second.string_value_);
-  EXPECT_EQ("hello override", layers[1]->values().find("file1")->second.string_value_);
+  EXPECT_EQ("hello", layers[0]->values().find("file1")->second.raw_string_value_);
+  EXPECT_EQ("hello override", layers[1]->values().find("file1")->second.raw_string_value_);
   // Admin should be last
   EXPECT_NE(nullptr, dynamic_cast<const AdminLayer*>(layers.back().get()));
   EXPECT_TRUE(layers[2]->values().empty());
@@ -151,7 +175,7 @@ TEST_F(DiskBackedLoaderImplTest, GetLayers) {
   loader->mergeValues({{"foo", "bar"}});
   // The old snapshot and its layers should have been invalidated. Refetch.
   const auto& new_layers = loader->snapshot().getLayers();
-  EXPECT_EQ("bar", new_layers[2]->values().find("foo")->second.string_value_);
+  EXPECT_EQ("bar", new_layers[2]->values().find("foo")->second.raw_string_value_);
 }
 
 TEST_F(DiskBackedLoaderImplTest, BadDirectory) {
