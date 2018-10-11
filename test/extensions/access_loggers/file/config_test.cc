@@ -1,8 +1,8 @@
 #include "envoy/config/accesslog/v2/file.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "common/protobuf/protobuf.h"
 #include "common/access_log/access_log_impl.h"
+#include "common/protobuf/protobuf.h"
 
 #include "extensions/access_loggers/file/config.h"
 #include "extensions/access_loggers/file/file_access_log_impl.h"
