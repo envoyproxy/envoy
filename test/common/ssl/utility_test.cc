@@ -41,7 +41,8 @@ TEST(UtilityTest, TestGetSubjectAlternateNamesWithNoSAN) {
 
 TEST(UtilityTest, TestGetSubject) {
   bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
-  EXPECT_EQ("CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US", Utility::getSubjectFromCertificate(*cert));
+  EXPECT_EQ("CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US",
+            Utility::getSubjectFromCertificate(*cert));
 }
 
 TEST(UtilityTest, TestGetSerialNumber) {

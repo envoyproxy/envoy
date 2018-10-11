@@ -1,6 +1,6 @@
-#include "common/common/assert.h"
-
 #include "common/ssl/utility.h"
+
+#include "common/common/assert.h"
 
 #include "absl/strings/str_join.h"
 #include "openssl/x509v3.h"
@@ -59,7 +59,7 @@ std::string Utility::getSubjectFromCertificate(X509& cert) {
 }
 
 int32_t Utility::getDaysUntilExpiration(X509* cert) {
-    if (cert == nullptr) {
+  if (cert == nullptr) {
     return std::numeric_limits<int>::max();
   }
   int days, seconds;

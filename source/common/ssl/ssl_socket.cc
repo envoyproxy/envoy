@@ -245,7 +245,7 @@ std::string SslSocket::uriSanLocalCertificate() const {
   }
   // TODO(PiotrSikora): Figure out if returning only one URI is valid limitation.
   const std::vector<std::string>& san_uris = Utility::getSubjectAltNames(*cert, GEN_URI);
-  return (san_uris.size() > 0) ? san_uris[0]: "";
+  return (san_uris.size() > 0) ? san_uris[0] : "";
 }
 
 std::vector<std::string> SslSocket::dnsSansLocalCertificate() const {
@@ -303,7 +303,7 @@ std::string SslSocket::uriSanPeerCertificate() const {
   }
   // TODO(PiotrSikora): Figure out if returning only one URI is valid limitation.
   const std::vector<std::string>& san_uris = Utility::getSubjectAltNames(*cert, GEN_URI);
-  return (san_uris.size() > 0) ? san_uris[0]: "";
+  return (san_uris.size() > 0) ? san_uris[0] : "";
 }
 
 std::vector<std::string> SslSocket::dnsSansPeerCertificate() const {
