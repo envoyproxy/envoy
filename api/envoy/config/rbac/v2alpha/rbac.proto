@@ -127,8 +127,8 @@ message Permission {
     // match, this permission would match.
     Permission not_rule = 8;
 
-    // The name of the destination server that the client is attempting to connect to.
-    string requested_server_name = 9;
+    // The requested TLS SNI server name from the client's connection request.
+    envoy.type.matcher.StringMatcher requested_server_name = 9;
   }
 }
 

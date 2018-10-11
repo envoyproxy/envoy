@@ -205,27 +205,15 @@ private:
 };
 
 /**
- * Perform a match against the requested SNI server name.
+ * Perform a match against the requested TLS SNI server name.
  */
-class RequestedServerNameMatcher : public Matcher {
+class RequestedServerNameMatcher : public Matcher, Envoy::Matchers::StringMatcher {
 public:
-  /**
-   * The constructor creates a simple regex from the input server name to be
-   * used further while matching. The regex substitutions are described below.
-   *
-   * 1. . with \. to treat the dot as a simple dot, and not a regex dot
-   * 2. * with .+? to enforce a one or more characters match
-   */
-  RequestedServerNameMatcher(const std::string& sni_server_name)
-      : server_name_regex_(RegexUtil::parseRegex(
-            absl::StrReplaceAll(sni_server_name, {{".", "\\."}, {"*", ".+?"}}),
-            std::regex::optimize)) {}
+  RequestedServerNameMatcher(const envoy::type::matcher::StringMatcher& requested_server_name)
+      : Envoy::Matchers::StringMatcher(requested_server_name) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const envoy::api::v2::core::Metadata&) const override;
-
-private:
-  const std::regex server_name_regex_;
 };
 
 } // namespace RBAC

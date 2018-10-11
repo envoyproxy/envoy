@@ -162,7 +162,11 @@ bool PolicyMatcher::matches(const Network::Connection& connection,
 bool RequestedServerNameMatcher::matches(const Network::Connection& connection,
                                          const Envoy::Http::HeaderMap&,
                                          const envoy::api::v2::core::Metadata&) const {
-  return std::regex_match(connection.requestedServerName().data(), server_name_regex_);
+  absl::string_view requested_server_name = connection.requestedServerName();
+  if (!requested_server_name.empty()) { // test for null string_view
+    return match(requested_server_name.data());
+  }
+  return match("");
 }
 
 } // namespace RBAC

@@ -290,27 +290,42 @@ TEST(PolicyMatcher, PolicyMatcher) {
   checkMatcher(matcher, false, conn);
 }
 
+const envoy::type::matcher::StringMatcher createRegexMatcher(std::string str) {
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_regex(str);
+  return matcher;
+}
+
+const envoy::type::matcher::StringMatcher createExactMatcher(std::string str) {
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_exact(str);
+  return matcher;
+}
+
 TEST(RequestedServerNameMatcher, ValidRequestedServerName) {
   Envoy::Network::MockConnection conn;
   EXPECT_CALL(conn, requestedServerName())
       .Times(8)
       .WillRepeatedly(Return(absl::string_view("www.cncf.io")));
 
-  checkMatcher(RequestedServerNameMatcher("www.cncf.io"), true, conn);
-  checkMatcher(RequestedServerNameMatcher("*.cncf.io"), true, conn);
-  checkMatcher(RequestedServerNameMatcher("*.cncf.*"), true, conn);
-  checkMatcher(RequestedServerNameMatcher("www.*"), true, conn);
-  checkMatcher(RequestedServerNameMatcher("*.io"), true, conn);
-  checkMatcher(RequestedServerNameMatcher("*"), true, conn);
-  checkMatcher(RequestedServerNameMatcher("xyz.cncf.io"), false, conn);
-  checkMatcher(RequestedServerNameMatcher("example.com"), false, conn);
+  checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*cncf.io")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*cncf.*")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(createRegexMatcher("www.*")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*io")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*")), true, conn);
+
+  checkMatcher(RequestedServerNameMatcher(createExactMatcher("www.cncf.io")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(createExactMatcher("xyz.cncf.io")), false, conn);
+  checkMatcher(RequestedServerNameMatcher(createExactMatcher("example.com")), false, conn);
 }
 
 TEST(RequestedServerNameMatcher, EmptyRequestedServerName) {
   Envoy::Network::MockConnection conn;
-  EXPECT_CALL(conn, requestedServerName()).Times(1).WillRepeatedly(Return(absl::string_view("")));
+  EXPECT_CALL(conn, requestedServerName()).Times(2).WillRepeatedly(Return(absl::string_view("")));
 
-  checkMatcher(RequestedServerNameMatcher("example.com"), false, conn);
+  checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*")), true, conn);
+
+  checkMatcher(RequestedServerNameMatcher(createExactMatcher("example.com")), false, conn);
 }
 
 } // namespace
