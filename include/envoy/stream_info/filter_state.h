@@ -47,31 +47,52 @@ public:
   }
 
   /**
-   * The addToList, hasList, forEachListItem operate on list data. Multiple
-   * elements could be added the list under the same list_name.
-   * @param list_name the name of the list data being set.
-   * @param item an owning pointer to the item to be appended to the list.
-   * Note that names for list elements do not share the same namespace as
-   * the names for singleton data objects added through setData. All items
+   * @param data_name the name of the data being probed.
+   * @return Whether data of the type and name specified exists in the
+   * data store.
+   */
+  template <typename T> bool hasData(absl::string_view data_name) const {
+    return (hasDataWithName(data_name) &&
+            (dynamic_cast<const T*>(getDataGeneric(data_name)) != nullptr));
+  }
+
+  /**
+   * The addToList, hasListWithName, forEachListItem are variants of the above
+   * functions, that operate on list data. Multiple elements could be added
+   * the list under the same data_name.
+   * @param data_name the name of the list data being set.
+   * @param data an owning pointer to the data to be appended to the list.
+   * Note that data_names for list elements do not share the same namespace as
+   * the data_names for singleton data objects added through setData. All items
    * added to the list must be of the same type.
    */
   template <typename T>
-  void addToList(absl::string_view list_name, std::unique_ptr<Object>&& item) {
-    const auto* list = getList(list_name);
+  void addToList(absl::string_view data_name, std::unique_ptr<Object>&& data) {
+    const auto* list = getList(data_name);
     if (list != nullptr) {
       // Check type of first element in the list
       const T* cast = dynamic_cast<const T*>(list->at(0).get());
       if (!cast) {
         throw EnvoyException(
-            fmt::format("List {} does not conform to the specified type", list_name));
+            fmt::format("List {} does not conform to the specified type", data_name));
       }
     }
 
-    addToListGeneric(list_name, std::move(item));
+    addToListGeneric(data_name, std::move(data));
   }
 
   /**
-   * @param list_name the name of the list data being looked up.
+   * @param data_name the name of the list being probed.
+   * @return Whether a list of the type and name specified exists in the
+   * data store.
+   */
+  template <typename T> bool hasList(absl::string_view data_name) const {
+    const auto* list = getList(data_name);
+    return ((list != nullptr) && (dynamic_cast<const T*>(list->at(0).get()) != nullptr));
+  }
+
+  /**
+   * @param data_name the name of the list data being looked up.
    * @param operation a lambda function that operates on each element in the list,
    * if it exists. The iteration will stop if the lambda function returns false or
    * reaches the end of the list. The iteration order will be the same as the order
@@ -80,19 +101,19 @@ public:
    * will be thrown.
    */
   template <typename T>
-  void forEachListItem(absl::string_view list_name, std::function<bool(const T&)> op) const {
-    const auto* list = getList(list_name);
+  void forEachListItem(absl::string_view data_name, std::function<bool(const T&)> op) const {
+    const auto* list = getList(data_name);
     if (!list) {
       return;
     }
 
     for (const auto& it : *list) {
-      const T* item = dynamic_cast<const T*>(it.get());
-      if (!item) {
+      const T* data = dynamic_cast<const T*>(it.get());
+      if (!data) {
         throw EnvoyException(
-            fmt::format("Element in list {} cannot be coerced to specified type", list_name));
+            fmt::format("Element in list {} cannot be coerced to specified type", data_name));
       }
-      if (!op(*item)) {
+      if (!op(*data)) {
         break;
       }
     }
@@ -103,20 +124,13 @@ public:
    * @return Whether data of any type and the name specified exists in the
    * data store.
    */
-  virtual bool hasData(absl::string_view data_name) const PURE;
-
-  /**
-   * @param list_name the name of the list being probed.
-   * @return Whether a list of any type and the name specified exists in the
-   * data store.
-   */
-  virtual bool hasList(absl::string_view list_name) const PURE;
+  virtual bool hasDataWithName(absl::string_view data_name) const PURE;
 
 protected:
   virtual const Object* getDataGeneric(absl::string_view data_name) const PURE;
   virtual const std::vector<std::unique_ptr<Object>>*
-  getList(absl::string_view list_name) const PURE;
-  virtual void addToListGeneric(absl::string_view list_name, std::unique_ptr<Object>&& item) PURE;
+  getList(absl::string_view data_name) const PURE;
+  virtual void addToListGeneric(absl::string_view data_name, std::unique_ptr<Object>&& data) PURE;
 };
 
 } // namespace StreamInfo

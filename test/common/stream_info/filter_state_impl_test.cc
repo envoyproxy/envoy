@@ -209,16 +209,54 @@ TEST_F(FilterStateImplTest, WrongTypeInforEachListItem) {
                             "Element in list test_name cannot be coerced to specified type");
 }
 
+namespace {
+
+class A : public FilterState::Object {};
+
+class B : public A {};
+
+class C : public B {};
+
+} // namespace
+
+TEST_F(FilterStateImplTest, FungibleInheritance) {
+  filter_state().setData("testB", std::make_unique<B>());
+  EXPECT_TRUE(filter_state().hasData<B>("testB"));
+  EXPECT_TRUE(filter_state().hasData<A>("testB"));
+  EXPECT_FALSE(filter_state().hasData<C>("testB"));
+
+  filter_state().addToList<B>("testB", std::make_unique<B>());
+  EXPECT_TRUE(filter_state().hasList<B>("testB"));
+  EXPECT_TRUE(filter_state().hasList<A>("testB"));
+  EXPECT_FALSE(filter_state().hasList<C>("testB"));
+
+  filter_state().setData("testC", std::make_unique<C>());
+  EXPECT_TRUE(filter_state().hasData<B>("testC"));
+  EXPECT_TRUE(filter_state().hasData<A>("testC"));
+  EXPECT_TRUE(filter_state().hasData<C>("testC"));
+
+  filter_state().addToList<C>("testC", std::make_unique<C>());
+  EXPECT_TRUE(filter_state().hasList<B>("testC"));
+  EXPECT_TRUE(filter_state().hasList<A>("testC"));
+  EXPECT_TRUE(filter_state().hasList<C>("testC"));
+}
+
 TEST_F(FilterStateImplTest, HasData) {
   filter_state().setData("test_1", std::make_unique<SimpleType>(1));
-  EXPECT_TRUE(filter_state().hasData("test_1"));
-  EXPECT_FALSE(filter_state().hasData("test_2"));
+  EXPECT_TRUE(filter_state().hasData<SimpleType>("test_1"));
+  EXPECT_FALSE(filter_state().hasData<SimpleType>("test_2"));
+  EXPECT_FALSE(filter_state().hasData<TestStoredTypeTracking>("test_1"));
+  EXPECT_FALSE(filter_state().hasData<TestStoredTypeTracking>("test_2"));
+  EXPECT_TRUE(filter_state().hasDataWithName("test_1"));
+  EXPECT_FALSE(filter_state().hasDataWithName("test_2"));
 }
 
 TEST_F(FilterStateImplTest, HasList) {
   filter_state().addToList<SimpleType>("test_1", std::make_unique<SimpleType>(1));
-  EXPECT_TRUE(filter_state().hasList("test_1"));
-  EXPECT_FALSE(filter_state().hasList("test_2"));
+  EXPECT_TRUE(filter_state().hasList<SimpleType>("test_1"));
+  EXPECT_FALSE(filter_state().hasList<SimpleType>("test_2"));
+  EXPECT_FALSE(filter_state().hasList<TestStoredTypeTracking>("test_1"));
+  EXPECT_FALSE(filter_state().hasList<TestStoredTypeTracking>("test_2"));
 }
 
 } // namespace StreamInfo
