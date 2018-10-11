@@ -14,14 +14,14 @@
 #include "gtest/gtest.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
+using ::google::jwt_verify::Jwks;
+using ::google::jwt_verify::Status;
+using ::testing::Invoke;
+using ::testing::NiceMock;
+using ::testing::_;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcher;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcherPtr;
 using Envoy::Extensions::HttpFilters::Common::MockJwksFetcher;
-using ::google::jwt_verify::Jwks;
-using ::google::jwt_verify::Status;
-using ::testing::_;
-using ::testing::Invoke;
-using ::testing::NiceMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -53,8 +53,12 @@ public:
     std::function<void(const Status&)> on_complete_cb = [&expected_status](const Status& status) {
       ASSERT_EQ(status, expected_status);
     };
+    auto set_payload_cb = [this](const std::string& issuer, const std::string& payload) {
+      out_issuer_ = issuer;
+      out_payload_ = payload;
+    };
     auto tokens = filter_config_->getExtractor().extract(headers);
-    auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+    auth_->verify(headers, std::move(tokens), std::move(set_payload_cb), std::move(on_complete_cb));
   }
 
   JwtAuthentication proto_config_;
@@ -64,6 +68,8 @@ public:
   AuthenticatorPtr auth_;
   ::google::jwt_verify::JwksPtr jwks_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
+  std::string out_issuer_;
+  std::string out_payload_;
 };
 
 // This test validates a good JWT authentication with a remote Jwks.
@@ -105,6 +111,31 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
 
   // Verify the token is NOT removed.
   EXPECT_TRUE(headers.Authorization());
+
+  // Payload not set by default
+  EXPECT_EQ(out_issuer_, "");
+  EXPECT_EQ(out_payload_, "");
+}
+
+// This test verifies the Jwt payload is set.
+TEST_F(AuthenticatorTest, TestSetPayload) {
+  // Confit payload_in_metadata flag
+  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(true);
+  CreateAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke(
+          [this](const ::envoy::api::v2::core::HttpUri&, JwksFetcher::JwksReceiver& receiver) {
+            receiver.onJwksSuccess(std::move(jwks_));
+          }));
+
+  // Test OK pubkey and its cache
+  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+
+  // Payload is set
+  EXPECT_EQ(out_issuer_, "https://example.com");
+  EXPECT_EQ(out_payload_, ExpectedPayloadValue);
 }
 
 // This test verifies the Jwt with non existing kid
@@ -238,7 +269,8 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   auto tokens = filter_config_->getExtractor().extract(headers);
   // callback should not be called.
   std::function<void(const Status&)> on_complete_cb = [](const Status&) { FAIL(); };
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  auto set_payload_cb = [this](const std::string&, const std::string&) {};
+  auth_->verify(headers, std::move(tokens), std::move(set_payload_cb), std::move(on_complete_cb));
 
   // Destroy the authenticating process.
   auth_->onDestroy();

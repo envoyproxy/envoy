@@ -36,8 +36,14 @@ public:
 
 TEST_F(ProviderVerifierTest, TestOkJWT) {
   MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
+  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(true);
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  EXPECT_CALL(mock_cb_, setPayload(_)).WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
+    EXPECT_TRUE(TestUtility::protoEqual(
+        payload, MessageUtil::keyValueStruct("https://example.com", ExpectedPayloadValue)));
+  }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
 

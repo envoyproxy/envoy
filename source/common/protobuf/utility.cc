@@ -149,6 +149,18 @@ ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const st
   return struct_obj;
 }
 
+ProtobufWkt::Struct
+MessageUtil::stringPairStruct(const std::vector<std::pair<std::string, std::string>>& pairs) {
+  ProtobufWkt::Struct struct_obj;
+  auto fields = struct_obj.mutable_fields();
+  for (const auto& pair : pairs) {
+    ProtobufWkt::Value val;
+    val.set_string_value(pair.second);
+    (*fields)[pair.first] = val;
+  }
+  return struct_obj;
+}
+
 bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2) {
   ProtobufWkt::Value::KindCase kind = v1.kind_case();
   if (kind != v2.kind_case()) {
