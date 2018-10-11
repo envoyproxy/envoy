@@ -71,7 +71,8 @@ public:
    */
   virtual CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options) const PURE;
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   std::string overrideServerNameIndication = "") const PURE;
 
   /**
    * Create a health check connection for this host.
