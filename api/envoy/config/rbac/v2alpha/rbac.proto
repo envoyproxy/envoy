@@ -128,6 +128,24 @@ message Permission {
     Permission not_rule = 8;
 
     // The requested TLS SNI server name from the client's connection request.
+    //
+    // .. attention::
+    //
+    //   This field is primarily used for matching a TLS connection's SNI based
+    //   requested server name. However, this matching might be affected by how
+    //   Envoy is configured as explained below.
+    //
+    //   * If the :ref:`TLS Inspector <config_listener_filters_tls_inspector>`
+    //     filter is not added, and if a `FilterChainMatch` is not defined for
+    //     the :ref:`server name <envoy_api_field_Listener.FilterChainMatch.server_names>`,
+    //     a TLS connection's requested SNI server name will be treated as if it
+    //     wasn't present.
+    //
+    //   * A listener filter may overwrite a connection's requested server name
+    //     within Envoy.
+    //
+    // Please refer to `this FAQ <https://www.envoyproxy.io/docs/envoy/latest/faq/sni>`_
+    // to learn to setup SNI.
     envoy.type.matcher.StringMatcher requested_server_name = 9;
   }
 }

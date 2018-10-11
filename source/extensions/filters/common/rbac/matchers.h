@@ -11,8 +11,6 @@
 #include "common/http/header_utility.h"
 #include "common/network/cidr_range.h"
 
-#include "absl/strings/str_replace.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
