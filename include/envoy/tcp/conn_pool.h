@@ -13,6 +13,18 @@ namespace Tcp {
 namespace ConnectionPool {
 
 /**
+ * Controls the behavior of a canceled connection request.
+ */
+enum class CancelPolicy {
+  // By default, canceled connection requests allow a pending connection to complete and become
+  // available for a future connection request.
+  Default,
+  // When a connection request is canceled, closes a pending connection if there are more pending
+  // connections that pending connection requests.
+  CloseExcess,
+};
+
+/**
  * Handle that allows a pending connection request to be canceled before it is completed.
  */
 class Cancellable {
@@ -20,13 +32,11 @@ public:
   virtual ~Cancellable() {}
 
   /**
-   * Cancel the pending request.
-   * @param close if true the connection pool will close a pending connection as part of
-   *              cancellation (unless the number of pending requests exceeds the number of pending
-   *              connections). If false, the pending request is allowed to complete and becomes
-   *              available for a future connection request.
+   * Cancel the pending connection request.
+   * @param cancel_policy a CancelPolicy that controls the behavior of this connection request
+   *        cancellation.
    */
-  virtual void cancel(bool close = false) PURE;
+  virtual void cancel(CancelPolicy cancel_policy) PURE;
 };
 
 /**

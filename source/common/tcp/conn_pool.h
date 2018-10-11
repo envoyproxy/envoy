@@ -124,7 +124,9 @@ protected:
     ~PendingRequest();
 
     // ConnectionPool::Cancellable
-    void cancel(bool close) override { parent_.onPendingRequestCancel(*this, close); }
+    void cancel(ConnectionPool::CancelPolicy cancel_policy) override {
+      parent_.onPendingRequestCancel(*this, cancel_policy);
+    }
 
     ConnPoolImpl& parent_;
     ConnectionPool::Callbacks& callbacks_;
@@ -135,7 +137,7 @@ protected:
   void assignConnection(ActiveConn& conn, ConnectionPool::Callbacks& callbacks);
   void createNewConnection();
   void onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent event);
-  void onPendingRequestCancel(PendingRequest& request, bool close);
+  void onPendingRequestCancel(PendingRequest& request, ConnectionPool::CancelPolicy cancel_policy);
   virtual void onConnReleased(ActiveConn& conn);
   virtual void onConnDestroyed(ActiveConn& conn);
   void onUpstreamReady();

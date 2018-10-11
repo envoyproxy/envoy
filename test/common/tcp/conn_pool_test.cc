@@ -501,7 +501,7 @@ TEST_F(TcpConnPoolImplTest, MaxPendingRequests) {
   Tcp::ConnectionPool::Cancellable* handle2 = conn_pool_.newConnection(callbacks2);
   EXPECT_EQ(nullptr, handle2);
 
-  handle->cancel(false);
+  handle->cancel(ConnectionPool::CancelPolicy::Default);
 
   EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
   conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -608,7 +608,7 @@ TEST_F(TcpConnPoolImplTest, CancelBeforeBound) {
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(callbacks);
   EXPECT_NE(nullptr, handle);
 
-  handle->cancel(false);
+  handle->cancel(ConnectionPool::CancelPolicy::Default);
   conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   // Cause the connection to go away.
@@ -631,7 +631,7 @@ TEST_F(TcpConnPoolImplTest, CancelAndCloseBeforeBound) {
 
   // Expect the connection is closed.
   EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
-  handle->cancel(true);
+  handle->cancel(ConnectionPool::CancelPolicy::CloseExcess);
 
   dispatcher_.clearDeferredDeleteList();
 }
@@ -864,7 +864,7 @@ TEST_F(TcpConnPoolImplTest, DrainCallback) {
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
   ActiveTestConn c2(*this, 0, ActiveTestConn::Type::Pending);
-  c2.handle_->cancel(false);
+  c2.handle_->cancel(ConnectionPool::CancelPolicy::Default);
 
   EXPECT_CALL(conn_pool_, onConnReleasedForTest());
   EXPECT_CALL(drained, ready());
@@ -888,7 +888,7 @@ TEST_F(TcpConnPoolImplTest, DrainWhileConnecting) {
   EXPECT_NE(nullptr, handle);
 
   conn_pool_.addDrainedCallback([&]() -> void { drained.ready(); });
-  handle->cancel(false);
+  handle->cancel(ConnectionPool::CancelPolicy::Default);
   EXPECT_CALL(*conn_pool_.test_conns_[0].connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(drained, ready());
   conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);

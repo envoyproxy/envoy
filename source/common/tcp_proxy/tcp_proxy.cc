@@ -467,7 +467,7 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
     if (event == Network::ConnectionEvent::LocalClose ||
         event == Network::ConnectionEvent::RemoteClose) {
       // Cancel the conn pool request and close any excess pending requests.
-      upstream_handle_->cancel(true);
+      upstream_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess);
       upstream_handle_ = nullptr;
     }
   }

@@ -204,14 +204,16 @@ void ConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent 
   }
 }
 
-void ConnPoolImpl::onPendingRequestCancel(PendingRequest& request, bool close) {
+void ConnPoolImpl::onPendingRequestCancel(PendingRequest& request,
+                                          ConnectionPool::CancelPolicy cancel_policy) {
   ENVOY_LOG(debug, "canceling pending request");
   request.removeFromList(pending_requests_);
   host_->cluster().stats().upstream_rq_cancelled_.inc();
 
-  // If there are more pending connections than requests, close the most recently created pending
-  // connection.
-  if (close && pending_requests_.size() < pending_conns_.size()) {
+  // If the cancel requests closure of excess connections and there are more pending connections
+  // than requests, close the most recently created pending connection.
+  if (cancel_policy == ConnectionPool::CancelPolicy::CloseExcess &&
+      pending_requests_.size() < pending_conns_.size()) {
     ENVOY_LOG(debug, "canceling pending connection");
     pending_conns_.back()->conn_->close(Network::ConnectionCloseType::NoFlush);
   }
