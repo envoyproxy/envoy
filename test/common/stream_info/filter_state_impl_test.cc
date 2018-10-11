@@ -135,14 +135,14 @@ TEST_F(FilterStateImplTest, WrongTypeGet) {
 }
 
 TEST_F(FilterStateImplTest, IterateThroughListTillEnd) {
-  size_t access_count = 0u;
-  size_t destruction_count = 0u;
+  size_t access_count = 0;
+  size_t destruction_count = 0;
   filter_state().addToList<TestStoredTypeTracking>(
       "test_name", std::make_unique<TestStoredTypeTracking>(5, &access_count, &destruction_count));
   filter_state().addToList<TestStoredTypeTracking>(
       "test_name", std::make_unique<TestStoredTypeTracking>(5, &access_count, &destruction_count));
-  EXPECT_EQ(0u, access_count);
-  EXPECT_EQ(0u, destruction_count);
+  EXPECT_EQ(0, access_count);
+  EXPECT_EQ(0, destruction_count);
 
   filter_state().forEachListItem<TestStoredTypeTracking>("test_name",
                                                          [&](const TestStoredTypeTracking& t) {
@@ -151,7 +151,7 @@ TEST_F(FilterStateImplTest, IterateThroughListTillEnd) {
                                                          });
 
   EXPECT_EQ(2u, access_count);
-  EXPECT_EQ(0u, destruction_count);
+  EXPECT_EQ(0, destruction_count);
 
   resetFilterState();
   EXPECT_EQ(2u, access_count);
@@ -159,14 +159,14 @@ TEST_F(FilterStateImplTest, IterateThroughListTillEnd) {
 }
 
 TEST_F(FilterStateImplTest, IterateThroughListAndBreak) {
-  size_t access_count = 0u;
-  size_t destruction_count = 0u;
+  size_t access_count = 0;
+  size_t destruction_count = 0;
   filter_state().addToList<TestStoredTypeTracking>(
       "test_name", std::make_unique<TestStoredTypeTracking>(5, &access_count, &destruction_count));
   filter_state().addToList<TestStoredTypeTracking>(
       "test_name", std::make_unique<TestStoredTypeTracking>(5, &access_count, &destruction_count));
-  EXPECT_EQ(0u, access_count);
-  EXPECT_EQ(0u, destruction_count);
+  EXPECT_EQ(0, access_count);
+  EXPECT_EQ(0, destruction_count);
 
   filter_state().forEachListItem<TestStoredTypeTracking>("test_name",
                                                          [&](const TestStoredTypeTracking& t) {
@@ -175,7 +175,7 @@ TEST_F(FilterStateImplTest, IterateThroughListAndBreak) {
                                                          });
 
   EXPECT_EQ(1u, access_count);
-  EXPECT_EQ(0u, destruction_count);
+  EXPECT_EQ(0, destruction_count);
 
   resetFilterState();
   EXPECT_EQ(1u, access_count);
