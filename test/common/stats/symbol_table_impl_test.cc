@@ -22,8 +22,8 @@ protected:
     EXPECT_EQ(0, table_.numSymbols());
   }
 
-  //SymbolVec getSymbols(StatName& stat_name) { return stat_name.symbolVec(); }
-  //std::string decodeSymbolVec(const SymbolVec& symbol_vec) { return table_.decode(symbol_vec); }
+  // SymbolVec getSymbols(StatName& stat_name) { return stat_name.symbolVec(); }
+  // std::string decodeSymbolVec(const SymbolVec& symbol_vec) { return table_.decode(symbol_vec); }
   Symbol monotonicCounter() { return table_.monotonicCounter(); }
   std::string encodeDecode(absl::string_view stat_name) {
     return makeStat(stat_name).toString(table_);
@@ -43,9 +43,7 @@ protected:
   std::vector<StatNameStoragePtr> stat_name_storage_;
 };
 
-TEST_F(StatNameTest, AllocFree) {
-  encodeDecode("hello.world");
-}
+TEST_F(StatNameTest, AllocFree) { encodeDecode("hello.world"); }
 
 TEST_F(StatNameTest, TestArbitrarySymbolRoundtrip) {
   const std::vector<std::string> stat_names = {"", " ", "  ", ",", "\t", "$", "%", "`", "."};
@@ -55,7 +53,7 @@ TEST_F(StatNameTest, TestArbitrarySymbolRoundtrip) {
 }
 
 TEST_F(StatNameTest, TestMillionSymbolsRoundtrip) {
-  for (int i = 0; i < 1*1000*1000; ++i) {
+  for (int i = 0; i < 1 * 1000 * 1000; ++i) {
     const std::string stat_name = absl::StrCat("symbol_", i);
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }

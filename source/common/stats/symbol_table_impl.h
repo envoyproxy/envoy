@@ -40,7 +40,7 @@ class StatName;
  * representation during encoding and prior to retained allocation.
  */
 class SymbolEncoding {
- public:
+public:
   /**
    * Before destructing SymbolEncoding, you must call moveToStorage. This
    * transfers ownership, and in particular, the responsibility to call
@@ -65,7 +65,7 @@ class SymbolEncoding {
    * Returns the number of bytes required to represent StatName as a uint8_t
    * array.
    */
-  size_t bytesRequired() const { return size() + 2 /* size encoded as 2 bytes */ ; }
+  size_t bytesRequired() const { return size() + 2 /* size encoded as 2 bytes */; }
 
   /**
    * Returns the number of uint8_t entries we collected while adding symbols.
@@ -80,7 +80,7 @@ class SymbolEncoding {
    */
   void moveToStorage(SymbolStorage array);
 
- private:
+private:
   std::vector<uint8_t> vec_;
 };
 
@@ -91,7 +91,7 @@ class SymbolEncoding {
  *
  * However, we use a uint8_t array to conserve space, as in practice the
  * majority of token instances in stat names draw from a fairly small set
- * of common names, likely less than 100.  The format is somewhat similar
+ * of common names, likely less than 100. The format is somewhat similar
  * to UTF-8, with a variable-length array of uint8_t. See the implementation
  * for details.
  *
@@ -236,10 +236,8 @@ public:
 
   const uint8_t* data() const { return symbol_array_ + 2; }
 
-  void free(SymbolTable& symbol_table) { symbol_table.free(data(), numBytes()); }  // DELETE
-  std::string toString(const SymbolTable& table) const {
-    return table.decode(data(), numBytes());
-  }
+  void free(SymbolTable& symbol_table) { symbol_table.free(data(), numBytes()); } // DELETE
+  std::string toString(const SymbolTable& table) const { return table.decode(data(), numBytes()); }
 
   // Returns a hash of the underlying symbol vector, since StatNames are uniquely defined by their
   // symbol vectors.
@@ -269,7 +267,7 @@ protected:
  * uint8_t array, or embed the characters directly in another structure.
  */
 class StatNameStorage {
- public:
+public:
   StatNameStorage(absl::string_view name, SymbolTable& table);
 
   /**
@@ -288,7 +286,7 @@ class StatNameStorage {
 
   StatName statName() const { return StatName(bytes_.get()); }
 
- private:
+private:
   std::unique_ptr<SymbolStorage> bytes_;
 };
 
@@ -299,9 +297,7 @@ struct StatNameHash {
 };
 
 struct StatNameCompare {
-  bool operator()(const StatName& a, const StatName& b) const {
-    return a == b;
-  }
+  bool operator()(const StatName& a, const StatName& b) const { return a == b; }
 };
 
 } // namespace Stats

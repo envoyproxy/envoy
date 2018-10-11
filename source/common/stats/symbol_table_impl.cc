@@ -9,9 +9,7 @@
 namespace Envoy {
 namespace Stats {
 
-SymbolEncoding::~SymbolEncoding() {
-  ASSERT(vec_.empty());
-}
+SymbolEncoding::~SymbolEncoding() { ASSERT(vec_.empty()); }
 
 void SymbolEncoding::addSymbol(Symbol symbol) {
   // UTF-8-like encoding where a value 127 or less gets written as a single
@@ -65,8 +63,7 @@ void SymbolEncoding::moveToStorage(SymbolStorage symbol_array) {
 
 SymbolTable::SymbolTable()
     // Have to be explicitly initialized, if we want to use the GUARDED_BY macro.
-    : next_symbol_ (0),
-      monotonic_counter_(0) {}
+    : next_symbol_(0), monotonic_counter_(0) {}
 
 SymbolTable::~SymbolTable() {
   // To avoid leaks into the symbol table, we expect all StatNames to be freed.
