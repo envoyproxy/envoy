@@ -73,40 +73,14 @@ public:
 typedef std::shared_ptr<RetryHostPredicate> RetryHostPredicateSharedPtr;
 
 /**
- * Callbacks given to a RetryPriorityFactory that allows adding retry filters.
- */
-class RetryPriorityFactoryCallbacks {
-public:
-  virtual ~RetryPriorityFactoryCallbacks() {}
-
-  /**
-   * Called by the factory to add a RetryPriority.
-   */
-  virtual void addRetryPriority(RetryPrioritySharedPtr filter) PURE;
-};
-
-/**
- * Callbacks given to a RetryHostPredicateFactory that allows adding retry filters.
- */
-class RetryHostPredicateFactoryCallbacks {
-public:
-  virtual ~RetryHostPredicateFactoryCallbacks() {}
-
-  /**
-   * Called by the factory to add a RetryHostPredicate.
-   */
-  virtual void addHostPredicate(RetryHostPredicateSharedPtr filter) PURE;
-};
-
-/**
  * Factory for RetryPriority.
  */
 class RetryPriorityFactory {
 public:
   virtual ~RetryPriorityFactory() {}
 
-  virtual void createRetryPriority(RetryPriorityFactoryCallbacks& callbacks,
-                                   const Protobuf::Message& config, uint32_t retry_count) PURE;
+  virtual RetryPrioritySharedPtr createRetryPriority(const Protobuf::Message& config,
+                                                     uint32_t retry_count) PURE;
 
   virtual std::string name() const PURE;
 
@@ -120,8 +94,8 @@ class RetryHostPredicateFactory {
 public:
   virtual ~RetryHostPredicateFactory() {}
 
-  virtual void createHostPredicate(RetryHostPredicateFactoryCallbacks& callbacks,
-                                   const Protobuf::Message& config, uint32_t retry_count) PURE;
+  virtual RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message& config,
+                                                          uint32_t retry_count) PURE;
 
   /**
    * @return name name of this factory.

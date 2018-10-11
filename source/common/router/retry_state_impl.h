@@ -41,8 +41,11 @@ public:
                           DoRetryCallback callback) override;
 
   void onHostAttempted(Upstream::HostDescriptionConstSharedPtr host) override {
-    std::for_each(retry_host_predicates_.begin(), retry_host_predicates_.end(),
-                  [&host](auto predicate) { predicate->onHostAttempted(host); });
+    std::for_each(
+        retry_host_predicates_.begin(), retry_host_predicates_.end(), [&host](auto predicate) {
+          std::cerr << "ptr: " << reinterpret_cast<uintptr_t>(predicate.get()) << std::endl;
+          predicate->onHostAttempted(host);
+        });
     if (retry_priority_) {
       retry_priority_->onHostAttempted(host);
     }

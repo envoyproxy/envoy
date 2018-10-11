@@ -57,18 +57,17 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
     auto& factory =
         ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
             host_predicate.name());
-
     auto config = ::Envoy::Config::Utility::translateToFactoryConfig(host_predicate, factory);
-    factory.createHostPredicate(*this, *config, num_retries_);
+    retry_host_predicate_configs_.emplace_back(host_predicate.name(), std::move(config));
   }
 
   const auto retry_priority = retry_policy.retry_priority();
   if (!retry_priority.name().empty()) {
     auto& factory = ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
         retry_priority.name());
-
-    auto config = ::Envoy::Config::Utility::translateToFactoryConfig(retry_priority, factory);
-    factory.createRetryPriority(*this, *config, num_retries_);
+    retry_priority_config_ =
+        std::make_pair(retry_priority.name(),
+                       ::Envoy::Config::Utility::translateToFactoryConfig(retry_priority, factory));
   }
 
   auto host_selection_attempts = retry_policy.host_selection_retry_max_attempts();
@@ -79,6 +78,30 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
   for (auto code : retry_policy.retriable_status_codes()) {
     retriable_status_codes_.emplace_back(code);
   }
+}
+
+std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPredicates() const {
+  std::vector<Upstream::RetryHostPredicateSharedPtr> predicates;
+
+  for (const auto& config : retry_host_predicate_configs_) {
+    auto& factory =
+        ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
+            config.first);
+    predicates.emplace_back(factory.createHostPredicate(*config.second, num_retries_));
+  }
+
+  return predicates;
+}
+
+Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
+  if (retry_priority_config_.first.empty()) {
+    return nullptr;
+  }
+
+  auto& factory = ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
+      retry_priority_config_.first);
+
+  return factory.createRetryPriority(*retry_priority_config_.second, num_retries_);
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) {
