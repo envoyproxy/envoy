@@ -12,7 +12,6 @@ package_group(
 proto_library(
     name = "protos",
     deps = [
-        "//envoy/admin/v2alpha:certs",
         "//envoy/admin/v2alpha:clusters",
         "//envoy/admin/v2alpha:config_dump",
         "//envoy/admin/v2alpha:memory",

@@ -145,7 +145,16 @@ parsePerRequestStateField(absl::string_view param_str) {
     const Envoy::StreamInfo::FilterState& per_request_state = stream_info.perRequestState();
 
     // No such value means don't output anything.
-    if (!per_request_state.hasData(param)) {
+    if (!per_request_state.hasDataWithName(param)) {
+      return std::string();
+    }
+
+    // Value exists but isn't string accessible is a contract violation; throw an error.
+    if (!per_request_state.hasData<StringAccessor>(param)) {
+      ENVOY_LOG_MISC(debug,
+                     "Invalid header information: PER_REQUEST_STATE value \"{}\" "
+                     "exists but is not string accessible",
+                     param);
       return std::string();
     }
 

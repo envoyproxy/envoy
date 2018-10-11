@@ -54,8 +54,6 @@ public:
   void removeListeners(uint64_t listener_tag) override;
   void stopListeners(uint64_t listener_tag) override;
   void stopListeners() override;
-  void disableListeners() override;
-  void enableListeners() override;
 
   Network::Listener* findListenerByAddress(const Network::Address::Instance& address) override;
 

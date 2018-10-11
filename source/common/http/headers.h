@@ -47,7 +47,6 @@ public:
   const LowerCaseString EnvoyOverloaded{"x-envoy-overloaded"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
   const LowerCaseString EnvoyRetryGrpcOn{"x-envoy-retry-grpc-on"};
-  const LowerCaseString EnvoyRetriableStatusCodes{"x-envoy-retriable-status-codes"};
   const LowerCaseString EnvoyUpstreamAltStatName{"x-envoy-upstream-alt-stat-name"};
   const LowerCaseString EnvoyUpstreamCanary{"x-envoy-upstream-canary"};
   const LowerCaseString EnvoyUpstreamRequestTimeoutAltResponse{
@@ -147,7 +146,6 @@ public:
     const std::string ConnectFailure{"connect-failure"};
     const std::string RefusedStream{"refused-stream"};
     const std::string Retriable4xx{"retriable-4xx"};
-    const std::string RetriableStatusCodes{"retriable-status-codes"};
   } EnvoyRetryOnValues;
 
   struct {
@@ -155,7 +153,6 @@ public:
     const std::string DeadlineExceeded{"deadline-exceeded"};
     const std::string ResourceExhausted{"resource-exhausted"};
     const std::string Unavailable{"unavailable"};
-    const std::string Internal{"internal"};
   } EnvoyRetryOnGrpcValues;
 
   struct {

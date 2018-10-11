@@ -382,8 +382,6 @@ public:
   ~MockListener();
 
   MOCK_METHOD0(onDestroy, void());
-  MOCK_METHOD0(enable, void());
-  MOCK_METHOD0(disable, void());
 };
 
 class MockConnectionHandler : public ConnectionHandler {
@@ -398,8 +396,6 @@ public:
   MOCK_METHOD1(removeListeners, void(uint64_t listener_tag));
   MOCK_METHOD1(stopListeners, void(uint64_t listener_tag));
   MOCK_METHOD0(stopListeners, void());
-  MOCK_METHOD0(disableListeners, void());
-  MOCK_METHOD0(enableListeners, void());
 };
 
 class MockIp : public Address::Ip {

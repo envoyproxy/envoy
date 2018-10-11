@@ -43,12 +43,10 @@ modify different aspects of the server:
 
   Print a textual table of all available options.
 
-.. _operations_admin_interface_certs:
-
 .. http:get:: /certs
 
-  List out all loaded TLS certificates, including file name, serial number, subject alternate names and days until
-  expiration in JSON format conforming to the :ref:`certificate proto definition <envoy_api_msg_admin.v2alpha.Certificates>`.
+  List out all loaded TLS certificates, including file name, serial number, and days until
+  expiration.
 
 .. _operations_admin_interface_clusters:
 

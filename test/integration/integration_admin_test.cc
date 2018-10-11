@@ -302,7 +302,7 @@ TEST_P(IntegrationAdminTest, Admin) {
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_STREQ("application/json", ContentType(response));
+  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/runtime", "",
                                                 downstreamProtocol(), version_);
@@ -446,13 +446,11 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
 
 // Testing the behavior of StatsMatcher, which allows/denies the  instantiation of stats based on
 // restrictions on their names.
-class StatsMatcherIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::Test,
-      public testing::WithParamInterface<Network::Address::IpVersion> {
+class StatsMatcherIntegrationTest : public HttpIntegrationTest, public testing::Test {
 public:
   StatsMatcherIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), simTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4,
+                            simTime()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(
@@ -471,33 +469,30 @@ public:
   BufferingStreamDecoderPtr response_;
   envoy::config::metrics::v2::StatsMatcher stats_matcher_;
 };
-INSTANTIATE_TEST_CASE_P(IpVersions, StatsMatcherIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
 
 // Verify that StatsMatcher prevents the printing of uninstantiated stats.
-TEST_P(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
+TEST_F(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_prefix("server.");
   initialize();
   makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.")));
 }
 
-TEST_P(StatsMatcherIntegrationTest, ExcludeRequests) {
+TEST_F(StatsMatcherIntegrationTest, ExcludeRequests) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_regex(".*requests.*");
   initialize();
   makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("requests")));
 }
 
-TEST_P(StatsMatcherIntegrationTest, ExcludeExact) {
+TEST_F(StatsMatcherIntegrationTest, ExcludeExact) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
   initialize();
   makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.concurrency")));
 }
 
-TEST_P(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
+TEST_F(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_regex(".*live");
   initialize();
@@ -514,7 +509,7 @@ TEST_P(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
 //      construction time, before setStatsMatcher() is called.
 //
 // If either of these invariants is changed, this test must be rewritten.
-TEST_P(StatsMatcherIntegrationTest, IncludeExact) {
+TEST_F(StatsMatcherIntegrationTest, IncludeExact) {
   stats_matcher_.mutable_inclusion_list()->add_patterns()->set_exact(
       "listener_manager.listener_create_success");
   initialize();

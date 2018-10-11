@@ -217,9 +217,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVari
   ON_CALL(stream_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
   ON_CALL(Const(stream_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
 
-  auto f = StreamInfoHeaderFormatter("PER_REQUEST_STATE(testing)", false);
-  EXPECT_THROW_WITH_MESSAGE(f.format(stream_info), EnvoyException,
-                            "Data stored under testing cannot be coerced to specified type");
+  testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnPerRequestStateVariable) {

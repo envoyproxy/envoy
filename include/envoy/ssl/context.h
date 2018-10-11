@@ -3,13 +3,10 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v2alpha/certs.pb.h"
 #include "envoy/common/pure.h"
 
 namespace Envoy {
 namespace Ssl {
-
-typedef std::unique_ptr<envoy::admin::v2alpha::CertificateDetails> CertificateDetailsPtr;
 
 /**
  * SSL Context is used as a template for SSL connection configuration.
@@ -24,14 +21,16 @@ public:
   virtual size_t daysUntilFirstCertExpires() const PURE;
 
   /**
-   * @return certificate details conforming to proto admin.v2alpha.certs.
+   * @return a string of ca certificate path, certificate serial number and days until certificate
+   * expiration
    */
-  virtual CertificateDetailsPtr getCaCertInformation() const PURE;
+  virtual std::string getCaCertInformation() const PURE;
 
   /**
-   * @return certificate details conforming to proto admin.v2alpha.certs.
+   * @return a string of cert chain certificate path, certificate serial number and days until
+   * certificate expiration
    */
-  virtual CertificateDetailsPtr getCertChainInformation() const PURE;
+  virtual std::string getCertChainInformation() const PURE;
 };
 typedef std::shared_ptr<Context> ContextSharedPtr;
 

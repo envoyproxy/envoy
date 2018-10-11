@@ -16,9 +16,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "context_interface",
     hdrs = ["context.h"],
-    deps = [
-        "@envoy_api//envoy/admin/v2alpha:certs_cc",
-    ],
 )
 
 envoy_cc_library(
