@@ -106,6 +106,16 @@ public:
 class Listener {
 public:
   virtual ~Listener() {}
+
+  /**
+   * Temporarily disable accepting new connections.
+   */
+  virtual void disable() PURE;
+
+  /**
+   * Enable accepting new connections.
+   */
+  virtual void enable() PURE;
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;
