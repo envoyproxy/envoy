@@ -343,7 +343,7 @@ std::string SslSocket::subjectPeerCertificate() const {
   if (!cert) {
     return "";
   }
-  return Utility::getSubjectFromCertificate(*cert.get());
+  return Utility::getSubjectFromCertificate(*cert);
 }
 
 std::string SslSocket::subjectLocalCertificate() const {
