@@ -183,6 +183,18 @@ void SymbolTable::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   ASSERT(monotonic_counter_ != 0);
 }
 
+bool SymbolTable::lessThan(const StatName& a, const StatName& b) const {
+  SymbolVec av = SymbolEncoding::decodeSymbols(a.data(), a.numBytes());
+  SymbolVec bv = SymbolEncoding::decodeSymbols(b.data(), b.numBytes());
+  for (size_t i = 0, n = std::min(av.size(), bv.size()); i < n; ++i) {
+    if (av[i] != bv[i]) {
+      Thread::LockGuard lock(lock_);
+      return fromSymbol(av[i]) < fromSymbol(bv[i]);
+    }
+  }
+  return av.size() < bv.size();
+}
+
 StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table) {
   SymbolEncoding encoding = table.encode(name);
   bytes_.reset(new uint8_t[encoding.bytesRequired()]);

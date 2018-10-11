@@ -216,5 +216,60 @@ TEST_F(StatNameTest, TestShrinkingExpectation) {
   EXPECT_EQ(table_size_0, table_.numSymbols());
 }
 
+// In the tests above we use the StatNameStorage abstraction which is not the
+// most space-efficient strategy in all cases. To use memory more effectively
+// you may want to store bytes in a larger structure. For example, you might
+// want to allocate two different StatName objects in contiguous memory. The
+// safety-net here in terms of leaks is that SymbolTable will assert-fail if
+// you don't free all the StatNames you've allocated bytes for.
+TEST_F(StatNameTest, StoringWithoutStatNameStorage) {
+  SymbolEncoding hello_encoding = table_.encode("hello.world");
+  SymbolEncoding goodbye_encoding = table_.encode("goodbye.world");
+  size_t size = hello_encoding.bytesRequired() + goodbye_encoding.bytesRequired();
+  size_t goodbye_offset = hello_encoding.bytesRequired();
+  std::unique_ptr<SymbolStorage> storage(new uint8_t[size]);
+  hello_encoding.moveToStorage(storage.get());
+  goodbye_encoding.moveToStorage(storage.get() + goodbye_offset);
+
+  StatName hello(storage.get());
+  StatName goodbye(storage.get() + goodbye_offset);
+
+  EXPECT_EQ("hello.world", hello.toString(table_));
+  EXPECT_EQ("goodbye.world", goodbye.toString(table_));
+
+  // If we don't explicitly call free() on the the StatName objects the
+  // SymbolTable will assert on destruction.
+  hello.free(table_);
+  goodbye.free(table_);
+}
+
+TEST_F(StatNameTest, HashTable) {
+  StatName ac = makeStat("a.c");
+  StatName ab = makeStat("a.b");
+  StatName de = makeStat("d.e");
+  StatName da = makeStat("d.a");
+
+  StatNameHashMap<int> name_int_map;
+  name_int_map[ac] = 1;
+  name_int_map[ab] = 0;
+  name_int_map[de] = 3;
+  name_int_map[da] = 2;
+
+  EXPECT_EQ(0, name_int_map[ab]);
+  EXPECT_EQ(1, name_int_map[ac]);
+  EXPECT_EQ(2, name_int_map[da]);
+  EXPECT_EQ(3, name_int_map[de]);
+}
+
+TEST_F(StatNameTest, Sort) {
+  std::vector<StatName> names{makeStat("a.c"),   makeStat("a.b"), makeStat("d.e"),
+                              makeStat("d.a.a"), makeStat("d.a"), makeStat("a.c")};
+  const std::vector<StatName> sorted_names{makeStat("a.b"), makeStat("a.c"),   makeStat("a.c"),
+                                           makeStat("d.a"), makeStat("d.a.a"), makeStat("d.e")};
+  EXPECT_NE(names, sorted_names);
+  std::sort(names.begin(), names.end(), StatNameLessThan(table_));
+  EXPECT_EQ(names, sorted_names);
+}
+
 } // namespace Stats
 } // namespace Envoy

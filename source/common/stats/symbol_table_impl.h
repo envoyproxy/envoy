@@ -140,6 +140,8 @@ public:
     return encode_map_.size();
   }
 
+  bool lessThan(const StatName& a, const StatName& b) const;
+
 private:
   friend class StatName;
   friend class StatNameTest;
@@ -298,6 +300,18 @@ struct StatNameHash {
 
 struct StatNameCompare {
   bool operator()(const StatName& a, const StatName& b) const { return a == b; }
+};
+
+template <class T>
+using StatNameHashMap = std::unordered_map<StatName, T, StatNameHash, StatNameCompare>;
+
+struct StatNameLessThan {
+  StatNameLessThan(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+  bool operator()(const StatName& a, const StatName& b) const {
+    return symbol_table_.lessThan(a, b);
+  }
+
+  SymbolTable& symbol_table_;
 };
 
 } // namespace Stats
