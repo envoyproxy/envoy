@@ -9,6 +9,7 @@
 #include "nghttp2/nghttp2.h"
 
 // A global variable in nghttp2 to disable preface and initial settings for tests.
+// TODO(soya3129): Remove after issue https://github.com/nghttp2/nghttp2/issues/1246 is fixed.
 extern int nghttp2_enable_strict_preface;
 
 namespace Envoy {
