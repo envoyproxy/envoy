@@ -8,6 +8,7 @@
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/tracers/zipkin/span_context_extractor.h"
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 
 namespace Envoy {
@@ -95,51 +96,22 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
                                    const Tracing::Decision tracing_decision) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
-  bool sampled(true);
-
-  if (request_headers.XB3Sampled()) {
-    // Checking if sampled flag has been specified. Also checking for 'true' value, as some old
-    // zipkin tracers may still use that value, although should be 0 or 1.
-    absl::string_view xb3_sampled = request_headers.XB3Sampled()->value().getStringView();
-    sampled = xb3_sampled == ZipkinCoreConstants::get().SAMPLED || xb3_sampled == "true";
-  } else {
-    sampled = tracing_decision.traced;
-  }
-
-  if (request_headers.XB3TraceId() && request_headers.XB3SpanId()) {
-    uint64_t trace_id(0);
-    uint64_t trace_id_high(0);
-    uint64_t span_id(0);
-    uint64_t parent_id(0);
-
-    // Extract trace id - which can either be 128 or 64 bit. For 128 bit,
-    // it needs to be divided into two 64 bit numbers (high and low).
-    if (request_headers.XB3TraceId()->value().size() == 32) {
-      const std::string tid = request_headers.XB3TraceId()->value().c_str();
-      const std::string high_tid = tid.substr(0, 16);
-      const std::string low_tid = tid.substr(16, 16);
-      if (!StringUtil::atoul(high_tid.c_str(), trace_id_high, 16) ||
-          !StringUtil::atoul(low_tid.c_str(), trace_id, 16)) {
-        return Tracing::SpanPtr(new Tracing::NullSpan());
-      }
-    } else if (!StringUtil::atoul(request_headers.XB3TraceId()->value().c_str(), trace_id, 16)) {
-      return Tracing::SpanPtr(new Tracing::NullSpan());
+  SpanContextExtractor extractor(request_headers);
+  bool sampled{extractor.extractSampled(tracing_decision)};
+  try {
+    auto ret_span_context = extractor.extractSpanContext(sampled);
+    if (!ret_span_context.second) {
+      // Create a root Zipkin span. No context was found in the headers.
+      new_zipkin_span =
+          tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time);
+      new_zipkin_span->setSampled(sampled);
+    } else {
+      new_zipkin_span = tracer.startSpan(config, request_headers.Host()->value().c_str(),
+                                         start_time, ret_span_context.first);
     }
 
-    if (!StringUtil::atoul(request_headers.XB3SpanId()->value().c_str(), span_id, 16) ||
-        (request_headers.XB3ParentSpanId() &&
-         !StringUtil::atoul(request_headers.XB3ParentSpanId()->value().c_str(), parent_id, 16))) {
-      return Tracing::SpanPtr(new Tracing::NullSpan());
-    }
-
-    SpanContext context(trace_id_high, trace_id, span_id, parent_id, sampled);
-
-    new_zipkin_span =
-        tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
-  } else {
-    // Create a root Zipkin span. No context was found in the headers.
-    new_zipkin_span = tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time);
-    new_zipkin_span->setSampled(sampled);
+  } catch (const ExtractorException& e) {
+    return Tracing::SpanPtr(new Tracing::NullSpan());
   }
 
   ZipkinSpanPtr active_span(new ZipkinSpan(*new_zipkin_span, tracer));

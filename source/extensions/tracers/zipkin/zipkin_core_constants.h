@@ -36,6 +36,9 @@ public:
   const std::string X_B3_SAMPLED = "X-B3-Sampled";
   const std::string X_B3_FLAGS = "X-B3-Flags";
 
+  // Zipkin b3 siggle header
+  const std::string B3 = "b3";
+
   const std::string SAMPLED = "1";
   const std::string NOT_SAMPLED = "0";
 
