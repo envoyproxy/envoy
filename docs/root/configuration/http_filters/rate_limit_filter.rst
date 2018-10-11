@@ -4,7 +4,6 @@ Rate limit
 ==========
 
 * Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`
-* :ref:`v1 API reference <config_http_filters_rate_limit_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>`
 
 The HTTP rate limit filter will call the rate limit service when the request's route or virtual host

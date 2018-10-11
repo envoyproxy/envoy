@@ -9,7 +9,6 @@ Configuration
 Access logs are configured as part of the :ref:`HTTP connection manager config
 <config_http_conn_man>` or :ref:`TCP Proxy <config_network_filters_tcp_proxy>`.
 
-* :ref:`v1 API reference <config_access_log_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.accesslog.v2.AccessLog>`
 
 .. _config_access_log_format:

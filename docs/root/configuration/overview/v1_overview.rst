@@ -5,8 +5,8 @@ Overview (v1 API)
 
 .. attention::
 
-  The v1 configuration/API is now considered legacy and the `deprecation schedule <https://groups.google.com/forum/#!topic/envoy-announce/Lb1QZcSclGQ>`_
-  has been announced. Please upgrade and use the :ref:`v2 configuration/API <config_overview_v2>`.
+  The v1 configuration/API is unsupported.
+  Please upgrade and use the :ref:`v2 configuration/API <config_overview_v2>`.
 
 The Envoy configuration format is written in JSON and is validated against a JSON schema. The
 schema can be found in :repo:`source/common/json/config_schemas.cc`. The main configuration for the
