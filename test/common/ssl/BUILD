@@ -32,6 +32,7 @@ envoy_cc_test(
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",
         "//source/common/ssl:ssl_socket_lib",
+        "//source/common/ssl:utility_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
