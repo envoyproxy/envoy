@@ -68,7 +68,7 @@ class SymbolEncoding {
   size_t bytesRequired() const { return size() + 2 /* size encoded as 2 bytes */ ; }
 
   /**
-   * Returns the number of symbols in the StatName.
+   * Returns the number of uint8_t entries we collected while adding symbols.
    */
   size_t size() const { return vec_.size(); }
 
@@ -228,28 +228,31 @@ public:
   explicit StatName(const SymbolStorage symbol_array) : symbol_array_(symbol_array) {}
   StatName() : symbol_array_(nullptr) {}
 
-  // Returns the number of uint8_t tokens...
-  size_t size() const {
+  // Returns the number of bytes in the symbol array (not including the overhead
+  // for keeping the size.
+  size_t numBytes() const {
     return symbol_array_[0] | (static_cast<size_t>(symbol_array_[1]) << 8);
   }
 
   const uint8_t* data() const { return symbol_array_ + 2; }
 
-  void free(SymbolTable& symbol_table) { symbol_table.free(data(), size()); }  // DELETE
-  std::string toString(const SymbolTable& table) const { return table.decode(data(), size()); }
+  void free(SymbolTable& symbol_table) { symbol_table.free(data(), numBytes()); }  // DELETE
+  std::string toString(const SymbolTable& table) const {
+    return table.decode(data(), numBytes());
+  }
 
   // Returns a hash of the underlying symbol vector, since StatNames are uniquely defined by their
   // symbol vectors.
   uint64_t hash() const {
     const char* cdata = reinterpret_cast<const char*>(data());
-    return HashUtil::xxHash64(absl::string_view(cdata, size()));
+    return HashUtil::xxHash64(absl::string_view(cdata, numBytes()));
   }
 
   // Compares on the underlying symbol vectors.
   // NB: operator==(std::vector) checks size first, then compares equality for each element.
   bool operator==(const StatName& rhs) const {
-    const size_t sz = size();
-    return sz == rhs.size() && memcmp(data(), rhs.data(), sz * sizeof(uint8_t)) == 0;
+    const size_t sz = numBytes();
+    return sz == rhs.numBytes() && memcmp(data(), rhs.data(), sz * sizeof(uint8_t)) == 0;
   }
   bool operator!=(const StatName& rhs) const { return !(*this == rhs); }
 
@@ -261,10 +264,9 @@ protected:
 };
 
 /**
- * Holds the backing storage for a StatName. Usage of this is not required,
- * as some applications may want to hold multiple StatName objects in one
- * contiguous uint8_t array, or embed the characters directly in another
- * structure.
+ * Holds backing storage for a StatName. Usage of this is not required, as some
+ * applications may want to hold multiple StatName objects in one contiguous
+ * uint8_t array, or embed the characters directly in another structure.
  */
 class StatNameStorage {
  public:
@@ -277,7 +279,13 @@ class StatNameStorage {
    */
   ~StatNameStorage();
 
+  /**
+   * Decremences the reference counts in the SymbolTable.
+   *
+   * @param table the symbol table.
+   */
   void free(SymbolTable& table);
+
   StatName statName() const { return StatName(bytes_.get()); }
 
  private:
