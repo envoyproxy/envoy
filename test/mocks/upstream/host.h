@@ -106,10 +106,9 @@ public:
   MockHost();
   ~MockHost();
 
-  CreateConnectionData
-  createConnection(Event::Dispatcher& dispatcher,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   std::string overrideServerNameIndication = "") const override {
+  CreateConnectionData createConnection(Event::Dispatcher& dispatcher,
+                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
+                                        std::string = "") const override {
     MockCreateConnectionData data = createConnection_(dispatcher, options);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
