@@ -51,7 +51,8 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
         .WillByDefault(Return(EMPTY_STRING));
     filter.onNewConnection();
 
-    EXPECT_FALSE(per_connection_state.hasData(TcpProxy::PerConnectionCluster::Key));
+    EXPECT_FALSE(per_connection_state.hasData<TcpProxy::PerConnectionCluster>(
+        TcpProxy::PerConnectionCluster::Key));
   }
 
   // with sni
@@ -60,7 +61,8 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
         .WillByDefault(Return("filter_state_cluster"));
     filter.onNewConnection();
 
-    EXPECT_TRUE(per_connection_state.hasData(TcpProxy::PerConnectionCluster::Key));
+    EXPECT_TRUE(per_connection_state.hasData<TcpProxy::PerConnectionCluster>(
+        TcpProxy::PerConnectionCluster::Key));
 
     auto per_connection_cluster = per_connection_state.getData<TcpProxy::PerConnectionCluster>(
         TcpProxy::PerConnectionCluster::Key);
