@@ -69,7 +69,7 @@ UpstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
       return doValidate(peer, peers, err);
     };
   }
-
+  std::cout << "******\n\n\nUpstreamAltsTransportSocketConfigFactory:dump config:" << config.DebugString() << std::endl;
   HandshakerFactory factory =
       [handshaker_service](Event::Dispatcher& dispatcher,
                            const Network::Address::InstanceConstSharedPtr& local_address,
@@ -82,6 +82,7 @@ UpstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
     // in this use case. The validation will be performed by TsiSocket with the validator.
     tsi_result status = alts_tsi_handshaker_create(options.get(), "", handshaker_service.c_str(),
                                                    true /* is_client */, &handshaker);
+    std::cout << "********\n\n\nUpstreamAltsTransportSocketConfigFactory:handshaker_service: " << handshaker_service << std::endl;
     CHandshakerPtr handshaker_ptr{handshaker};
 
     if (status != TSI_OK) {
@@ -115,7 +116,7 @@ DownstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
       return doValidate(peer, peers, err);
     };
   }
-
+  std::cout << "******\n\n\nDownstreamAltsTransportSocketConfigFactory:dump config:" << config.DebugString() << std::endl;
   HandshakerFactory factory =
       [handshaker_service](Event::Dispatcher& dispatcher,
                            const Network::Address::InstanceConstSharedPtr&,
@@ -125,6 +126,7 @@ DownstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
     tsi_handshaker* handshaker = nullptr;
     tsi_result status = alts_tsi_handshaker_create(
         options.get(), nullptr, handshaker_service.c_str(), false /* is_client */, &handshaker);
+    std::cout << "********\n\n\nDownstreamAltsTransportSocketConfigFactory:handshaker_service: " << handshaker_service << std::endl;
     CHandshakerPtr handshaker_ptr{handshaker};
 
     if (status != TSI_OK) {
