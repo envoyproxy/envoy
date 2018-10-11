@@ -4,6 +4,7 @@ Version history
 1.9.0 (pending)
 ===============
 * admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
+* config: removed support for the v1 API.
 * fault: removed integer percentage support.
 * http: no longer adding whitespace when appending X-Forwarded-For headers. **Warning**: this is not
   compatible with 1.7.0 builds prior to `9d3a4eb4ac44be9f0651fcc7f87ad98c538b01ee <https://github.com/envoyproxy/envoy/pull/3610>`_.
@@ -31,7 +32,7 @@ Version history
   health check/weight/metadata updates within the given duration.
 * config: regex validation added to limit to a maximum of 1024 characters.
 * config: v1 disabled by default. v1 support remains available until October via flipping --v2-config-only=false.
-* config: v1 disabled by default. v1 support remains available until October via setting :option:`--allow-deprecated-v1-api`.
+* config: v1 disabled by default. v1 support remains available until October via deprecated flag --allow-deprecated-v1-api.
 * config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`  
   stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented 
   in case of schema/validation error.
