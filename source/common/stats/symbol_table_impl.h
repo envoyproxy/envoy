@@ -271,6 +271,7 @@ protected:
 class StatNameStorage {
 public:
   StatNameStorage(absl::string_view name, SymbolTable& table);
+  StatNameStorage(StatNameStorage&& src) : bytes_(std::move(src.bytes_)) {}
 
   /**
    * Before allowing a StatNameStorage to be destroyed, you must call free()
@@ -306,12 +307,12 @@ template <class T>
 using StatNameHashMap = std::unordered_map<StatName, T, StatNameHash, StatNameCompare>;
 
 struct StatNameLessThan {
-  StatNameLessThan(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+  StatNameLessThan(const SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   bool operator()(const StatName& a, const StatName& b) const {
     return symbol_table_.lessThan(a, b);
   }
 
-  SymbolTable& symbol_table_;
+  const SymbolTable& symbol_table_;
 };
 
 } // namespace Stats
