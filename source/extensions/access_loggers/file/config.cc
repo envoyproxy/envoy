@@ -37,7 +37,8 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
     const auto& json_format_map = this->convert_json_format_to_map(fal_config.json_format());
     formatter.reset(new AccessLog::JsonFormatterImpl(json_format_map));
   } else {
-    throw EnvoyException("Invalid access_log format provided. Only 'format' and 'json_format' are supported.");
+    throw EnvoyException(
+        "Invalid access_log format provided. Only 'format' and 'json_format' are supported.");
   }
 
   return std::make_shared<FileAccessLog>(fal_config.path(), std::move(filter), std::move(formatter),
