@@ -2,7 +2,7 @@
 # By default, @envoyproxy/maintainers own everything.
 #*       @envoyproxy/maintainers
 
-# dubbo proxy extension
+# dubbo_proxy extension
 /*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan 
 # thrift_proxy extension
 /*/extensions/filters/network/thrift_proxy @zuercher @brian-pane
