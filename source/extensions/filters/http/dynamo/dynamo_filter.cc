@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/platform.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -136,17 +138,19 @@ std::string DynamoFilter::buildBody(const Buffer::Instance* buffered,
   std::string body;
   if (buffered) {
     uint64_t num_slices = buffered->getRawSlices(nullptr, 0);
-    Buffer::RawSlice slices[num_slices];
+    STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
     buffered->getRawSlices(slices, num_slices);
-    for (Buffer::RawSlice& slice : slices) {
+    for (uint64_t i = 0; i < num_slices; i++) {
+      Buffer::RawSlice& slice = slices[i];
       body.append(static_cast<const char*>(slice.mem_), slice.len_);
     }
   }
 
   uint64_t num_slices = last.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
+  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
   last.getRawSlices(slices, num_slices);
-  for (Buffer::RawSlice& slice : slices) {
+  for (uint64_t i = 0; i < num_slices; i++) {
+    Buffer::RawSlice& slice = slices[i];
     body.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 

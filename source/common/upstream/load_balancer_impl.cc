@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/platform.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
@@ -193,9 +194,9 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   //
   // Basically, fariness across localities within a priority is guaranteed. Fairness across
   // localities across priorities is not.
-  uint64_t local_percentage[num_localities];
+  STACK_ALLOC_ARRAY(local_percentage, uint64_t, num_localities);
   calculateLocalityPercentage(localHostSet().healthyHostsPerLocality(), local_percentage);
-  uint64_t upstream_percentage[num_localities];
+  STACK_ALLOC_ARRAY(upstream_percentage, uint64_t, num_localities);
   calculateLocalityPercentage(host_set.healthyHostsPerLocality(), upstream_percentage);
 
   // If we have lower percent of hosts in the local cluster in the same locality,
