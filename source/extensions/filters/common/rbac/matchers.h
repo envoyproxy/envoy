@@ -203,7 +203,8 @@ private:
 };
 
 /**
- * Perform a match against the requested TLS SNI server name.
+ * Perform a match against the request server from the client's connection
+ * request. This is typically TLS SNI.
  */
 class RequestedServerNameMatcher : public Matcher, Envoy::Matchers::StringMatcher {
 public:

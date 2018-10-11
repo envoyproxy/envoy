@@ -313,8 +313,8 @@ TEST(RequestedServerNameMatcher, ValidRequestedServerName) {
   checkMatcher(RequestedServerNameMatcher(createRegexMatcher("www.*")), true, conn);
   checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*io")), true, conn);
   checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*")), true, conn);
-  checkMatcher(RequestedServerNameMatcher(createExactMatcher("")), false, conn);
 
+  checkMatcher(RequestedServerNameMatcher(createExactMatcher("")), false, conn);
   checkMatcher(RequestedServerNameMatcher(createExactMatcher("www.cncf.io")), true, conn);
   checkMatcher(RequestedServerNameMatcher(createExactMatcher("xyz.cncf.io")), false, conn);
   checkMatcher(RequestedServerNameMatcher(createExactMatcher("example.com")), false, conn);
@@ -325,8 +325,8 @@ TEST(RequestedServerNameMatcher, EmptyRequestedServerName) {
   EXPECT_CALL(conn, requestedServerName()).Times(3).WillRepeatedly(Return(absl::string_view("")));
 
   checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*")), true, conn);
-  checkMatcher(RequestedServerNameMatcher(createExactMatcher("")), true, conn);
 
+  checkMatcher(RequestedServerNameMatcher(createExactMatcher("")), true, conn);
   checkMatcher(RequestedServerNameMatcher(createExactMatcher("example.com")), false, conn);
 }
 
