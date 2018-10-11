@@ -1,6 +1,6 @@
-#include "common/access_log/access_log_manager_impl.h"
-
 #include <string>
+
+#include "common/access_log/access_log_manager_impl.h"
 
 namespace Envoy {
 namespace AccessLog {
