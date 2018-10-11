@@ -1,3 +1,5 @@
+#include "common/access_log/access_log_impl.h"
+
 #include <cstdint>
 #include <string>
 
@@ -9,7 +11,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/access_log/access_log_formatter.h"
-#include "common/access_log/access_log_impl.h"
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"

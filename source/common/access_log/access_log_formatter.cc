@@ -1,8 +1,9 @@
+#include "common/access_log/access_log_formatter.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
