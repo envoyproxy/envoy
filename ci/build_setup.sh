@@ -124,8 +124,8 @@ export BUILDIFIER_BIN="/usr/local/bin/buildifier"
 function cleanup() {
   # Remove build artifacts. This doesn't mess with incremental builds as these
   # are just symlinks.
-  rm -f "${ENVOY_SRCDIR}"/bazel-*
-  rm -f "${ENVOY_CI_DIR}"/bazel-*
+  rm -rf "${ENVOY_SRCDIR}"/bazel-*
+  rm -rf "${ENVOY_CI_DIR}"/bazel-*
   rm -rf "${ENVOY_CI_DIR}"/bazel
   rm -rf "${ENVOY_CI_DIR}"/tools
 }
