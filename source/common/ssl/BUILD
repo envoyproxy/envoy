@@ -112,4 +112,7 @@ envoy_cc_library(
     external_deps = [
         "ssl",
     ],
+    deps = [
+        "//source/common/common:assert_lib",
+    ],
 )
