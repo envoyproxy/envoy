@@ -36,7 +36,7 @@ void FilterStateImpl::addToListGeneric(absl::string_view list_name,
   // TODO(Google): Remove string conversion when fixed internally.
   const std::string name(list_name);
   if (list_storage_.find(name) == list_storage_.end()) {
-    list_storage_[name] = {};
+    list_storage_[name] = std::vector<std::unique_ptr<FilterState::Object>>();
   }
 
   list_storage_[name].push_back(std::move(item));
