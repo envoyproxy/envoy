@@ -880,10 +880,6 @@ void Filter::UpstreamRequest::encodeHeaders(bool end_stream) {
   if (handle) {
     conn_pool_stream_handle_ = handle;
   }
-
-  if (end_stream) {
-    parent_.callbacks_->upstreamRequestComplete();
-  }
 }
 
 void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -1046,6 +1042,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
     if (encode_complete_) {
       stream_info_.onLastUpstreamTxByteSent();
       parent_.callbacks_->streamInfo().onLastUpstreamTxByteSent();
+      parent_.callbacks_->upstreamRequestComplete();
     }
   }
 }
