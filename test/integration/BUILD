@@ -75,6 +75,20 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "find_and_replace_integration_test",
+    srcs = [
+        "find_and_replace_integration_test.cc",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/network/find_and_replace:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
+        "//test/server:utility_lib",
+    ],
+)
+
 # TODO(mattklein123): This test uses extensions mixed in, so we just register all extensions.
 # This will go away when we delete v1 configuration.
 envoy_cc_test(
