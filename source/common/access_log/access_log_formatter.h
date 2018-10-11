@@ -106,12 +106,12 @@ public:
   std::string format(const Http::HeaderMap& request_headers,
                      const Http::HeaderMap& response_headers,
                      const Http::HeaderMap& response_trailers,
-                     const RequestInfo::RequestInfo& request_info) const override;
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
   std::map<std::string, std::string> to_map(const Http::HeaderMap& request_headers,
                                             const Http::HeaderMap& response_headers,
                                             const Http::HeaderMap& response_trailers,
-                                            const RequestInfo::RequestInfo& request_info) const;
+                                            const StreamInfo::StreamInfo& stream_info) const;
 
 private:
   std::vector<FormatterProviderPtr> providers_;
