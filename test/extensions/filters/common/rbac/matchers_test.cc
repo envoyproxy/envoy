@@ -305,7 +305,7 @@ const envoy::type::matcher::StringMatcher createExactMatcher(std::string str) {
 TEST(RequestedServerNameMatcher, ValidRequestedServerName) {
   Envoy::Network::MockConnection conn;
   EXPECT_CALL(conn, requestedServerName())
-      .Times(8)
+      .Times(9)
       .WillRepeatedly(Return(absl::string_view("www.cncf.io")));
 
   checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*cncf.io")), true, conn);
@@ -313,6 +313,7 @@ TEST(RequestedServerNameMatcher, ValidRequestedServerName) {
   checkMatcher(RequestedServerNameMatcher(createRegexMatcher("www.*")), true, conn);
   checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*io")), true, conn);
   checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(createExactMatcher("")), false, conn);
 
   checkMatcher(RequestedServerNameMatcher(createExactMatcher("www.cncf.io")), true, conn);
   checkMatcher(RequestedServerNameMatcher(createExactMatcher("xyz.cncf.io")), false, conn);
@@ -321,9 +322,10 @@ TEST(RequestedServerNameMatcher, ValidRequestedServerName) {
 
 TEST(RequestedServerNameMatcher, EmptyRequestedServerName) {
   Envoy::Network::MockConnection conn;
-  EXPECT_CALL(conn, requestedServerName()).Times(2).WillRepeatedly(Return(absl::string_view("")));
+  EXPECT_CALL(conn, requestedServerName()).Times(3).WillRepeatedly(Return(absl::string_view("")));
 
   checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(createExactMatcher("")), true, conn);
 
   checkMatcher(RequestedServerNameMatcher(createExactMatcher("example.com")), false, conn);
 }
