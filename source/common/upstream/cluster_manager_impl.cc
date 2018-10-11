@@ -715,8 +715,14 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
 
   HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(context);
   if (logical_host) {
-    auto conn_info =
-        logical_host->createConnection(cluster_manager.thread_local_dispatcher_, nullptr);
+    std::string overrideServerNameIndication = "";
+    if (entry->second->cluster_info_->forwardOriginalServerNameIndication() &&
+        context->downstreamConnection()) {
+      overrideServerNameIndication =
+          std::string(context->downstreamConnection()->requestedServerName());
+    }
+    auto conn_info = logical_host->createConnection(cluster_manager.thread_local_dispatcher_,
+                                                    nullptr, overrideServerNameIndication);
     if ((entry->second->cluster_info_->features() &
          ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) &&
         conn_info.connection_ != nullptr) {
