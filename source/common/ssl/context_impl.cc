@@ -438,24 +438,13 @@ SslStats ContextImpl::generateStats(Stats::Scope& store) {
 }
 
 size_t ContextImpl::daysUntilFirstCertExpires() const {
-  int daysUntilExpiration = getDaysUntilExpiration(ca_cert_.get());
+  int daysUntilExpiration = Utility::getDaysUntilExpiration(ca_cert_.get());
   daysUntilExpiration =
-      std::min<int>(getDaysUntilExpiration(cert_chain_.get()), daysUntilExpiration);
+      std::min<int>(Utility::getDaysUntilExpiration(cert_chain_.get()), daysUntilExpiration);
   if (daysUntilExpiration < 0) { // Ensure that the return value is unsigned
     return 0;
   }
   return daysUntilExpiration;
-}
-
-int32_t ContextImpl::getDaysUntilExpiration(const X509* cert) const {
-  if (cert == nullptr) {
-    return std::numeric_limits<int>::max();
-  }
-  int days, seconds;
-  if (ASN1_TIME_diff(&days, &seconds, nullptr, X509_get_notAfter(cert))) {
-    return days;
-  }
-  return 0;
 }
 
 CertificateDetailsPtr ContextImpl::getCaCertInformation() const {
@@ -477,7 +466,7 @@ CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::str
       std::make_unique<envoy::admin::v2alpha::CertificateDetails>();
   certificate_details->set_path(path);
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
-  certificate_details->set_days_until_expiration(getDaysUntilExpiration(cert));
+  certificate_details->set_days_until_expiration(Utility::getDaysUntilExpiration(cert));
 
   for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
     envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
