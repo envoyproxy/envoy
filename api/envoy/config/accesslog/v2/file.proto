@@ -17,7 +17,7 @@ message FileAccessLog {
 
   // Access log format. Envoy supports :ref:`custom access log formats
   // <config_access_log_format>` as well as a :ref:`default format
-  // <config_access_log_default_format>`. 
+  // <config_access_log_default_format>`.
   oneof access_log_format {
     // Access log :ref:`format string<config_access_log_format_strings>`
     string format = 2;
