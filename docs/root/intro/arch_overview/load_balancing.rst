@@ -143,26 +143,6 @@ percentage of healthy hosts multiplied by the overprovisioning factor drops
 below 100. The default value is 1.4, so a priority level or locality will not be
 considered unhealthy until the percentage of healthy endpoints goes below 72%.
 
-.. _arch_overview_load_balancing_panic_threshold:
-
-Panic threshold
----------------
-
-During load balancing, Envoy will generally only consider healthy hosts in an upstream cluster.
-However, if the percentage of healthy hosts in the cluster becomes too low, Envoy will disregard
-health status and balance amongst all hosts. This is known as the *panic threshold*. The default
-panic threshold is 50%. This is :ref:`configurable <config_cluster_manager_cluster_runtime>` via
-runtime as well as in the :ref:`cluster configuration
-<envoy_api_field_Cluster.CommonLbConfig.healthy_panic_threshold>`. The panic threshold
-is used to avoid a situation in which host failures cascade throughout the cluster as load
-increases.
-
-Note that panic thresholds are *per-priority*. This means that if the percentage of healthy nodes
-in a single priority goes below the threshold, that priority will enter panic mode. In general
-it is discouraged to use panic thresholds in conjunction with priorities, as by the time enough
-nodes are unhealthy to trigger the panic threshold most of the traffic should already have spilled
-over to the next priority level.
-
 .. _arch_overview_load_balancing_priority_levels:
 
 Priority levels
@@ -181,43 +161,58 @@ healthy because 80*1.4 > 100. As the number of healthy endpoints dips below 72%,
 goes below 100. At that point the percent of traffic equivalent to the health of P=0 will go to P=0
 and remaining traffic will flow to P=1.
 
+It is important to understand how Envoy evaluates priority levels' health. Each priority level is assigned
+a health value which basically is a percentage of healthy hosts in relation to total number of hosts in a given 
+priority level multiplied by overprovisioning factor of 1.4. 
+A priority level's health is integer value between 0% and 100%. When there are more than one priority levels
+in a cluster, Envoy adds all priority levels' health values and caps it at 100%. This is called normalized total health. Value 0% of 
+normalized total health means that all hosts in all priority levels are unhealthy. Value 100% of normalized total health may 
+describe many situations: all levels have health of 100% or 4 levels have health value of 30% each.
+When normalized total health value is 100%, Envoy assumes that there are enough healthy hosts in all priority 
+levels to handle the load. Not all hosts need to be in one priority as Envoy distributes traffic across priority 
+levels based on each priority level's health value.
+In order for load distribution algorithm and normalized total health calculation to work properly, the number of hosts
+in each priority level should be close. Envoy assumes that for example 100% healthy priority level P=1 is able to take
+the entire traffic from P=0 should all its hosts become unhealthy. If P=0 has 10 hosts and P=1 has only 2 hosts, P=1 may be unable
+to take the entire load from P=0, even though P=1 health is 100%.
+
 Assume a simple set-up with 2 priority levels, P=1 100% healthy.
 
-+----------------------------+---------------------------+----------------------------+
-| P=0 healthy endpoints      | Percent of traffic to P=0 |  Percent of traffic to P=1 |
-+============================+===========================+============================+
-| 100%                       | 100%                      |   0%                       |
-+----------------------------+---------------------------+----------------------------+
-| 72%                        | 100%                      |   0%                       |
-+----------------------------+---------------------------+----------------------------+
-| 71%                        | 99%                       |   1%                       |
-+----------------------------+---------------------------+----------------------------+
-| 50%                        | 70%                       |   30%                      |
-+----------------------------+---------------------------+----------------------------+
-| 25%                        | 35%                       |   65%                      |
-+----------------------------+---------------------------+----------------------------+
-| 0%                         | 0%                        |   100%                     |
-+----------------------------+---------------------------+----------------------------+
++----------------------------+----------------+-----------------+
+| P=0 healthy endpoints      | Traffic to P=0 |  Traffic to P=1 |
++============================+================+=================+
+| 100%                       | 100%           |   0%            |
++----------------------------+----------------+-----------------+
+| 72%                        | 100%           |   0%            |
++----------------------------+----------------+-----------------+
+| 71%                        | 99%            |   1%            |
++----------------------------+----------------+-----------------+
+| 50%                        | 70%            |   30%           |
++----------------------------+----------------+-----------------+
+| 25%                        | 35%            |   65%           |
++----------------------------+----------------+-----------------+
+| 0%                         | 0%             |   100%          |
++----------------------------+----------------+-----------------+
 
 If P=1 becomes unhealthy, it will continue to take spilled load from P=0 until the sum of the health
 P=0 + P=1 goes below 100. At this point the healths will be scaled up to an "effective" health of
 100%.
 
-+------------------------+-------------------------+-----------------+-----------------+
-| P=0 healthy endpoints  | P=1 healthy endpoints   | Traffic to  P=0 |  Traffic to P=1 |
-+========================+=========================+=================+=================+
-| 100%                   |  100%                   | 100%            |   0%            |
-+------------------------+-------------------------+-----------------+-----------------+
-| 72%                    |  72%                    | 100%            |   0%            |
-+------------------------+-------------------------+-----------------+-----------------+
-| 71%                    |  71%                    | 99%             |   1%            |
-+------------------------+-------------------------+-----------------+-----------------+
-| 50%                    |  50%                    | 70%             |   30%           |
-+------------------------+-------------------------+-----------------+-----------------+
-| 25%                    |  100%                   | 35%             |   65%           |
-+------------------------+-------------------------+-----------------+-----------------+
-| 25%                    |  25%                    | 50%             |   50%           |
-+------------------------+-------------------------+-----------------+-----------------+
++------------------------+-------------------------+-----------------+----------------+
+| P=0 healthy endpoints  | P=1 healthy endpoints   | Traffic to  P=0 | Traffic to P=1 |
++========================+=========================+=================+================+
+| 100%                   |  100%                   | 100%            |   0%           |
++------------------------+-------------------------+-----------------+----------------+
+| 72%                    |  72%                    | 100%            |   0%           |
++------------------------+-------------------------+-----------------+----------------+
+| 71%                    |  71%                    | 99%             |   1%           |
++------------------------+-------------------------+-----------------+----------------+
+| 50%                    |  50%                    | 70%             |   30%          |
++------------------------+-------------------------+-----------------+----------------+
+| 25%                    |  100%                   | 35%             |   65%          |
++------------------------+-------------------------+-----------------+----------------+
+| 25%                    |  25%                    | 50%             |   50%          |
++------------------------+-------------------------+-----------------+----------------+
 
 As more priorities are added, each level consumes load equal to its "scaled" effective health, so
 P=2 would only receive traffic if the combined health of P=0 + P=1 was less than 100.
@@ -242,10 +237,81 @@ To sum this up in pseudo algorithms:
 
 ::
 
-  load to P_0 = min(100, health(P_0) * 100 / total_health)
+  load to P_0 = min(100, health(P_0) * 100 / normalized_total_health)
   health(P_X) = 140 * healthy_P_X_backends / total_P_X_backends
-  total_health = min(100, Σ(health(P_0)...health(P_X))
+  normalized_total_health = min(100, Σ(health(P_0)...health(P_X))
   load to P_X = 100 - Σ(percent_load(P_0)..percent_load(P_X-1))
+
+.. _arch_overview_load_balancing_panic_threshold:
+
+Panic threshold
+---------------
+
+During load balancing, Envoy will generally only consider healthy hosts in an upstream cluster.
+However, if the percentage of healthy hosts in the cluster becomes too low, Envoy will disregard
+health status and balance amongst all hosts. This is known as the *panic threshold*. The default
+panic threshold is 50%. This is :ref:`configurable <config_cluster_manager_cluster_runtime>` via
+runtime as well as in the :ref:`cluster configuration
+<envoy_api_field_Cluster.CommonLbConfig.healthy_panic_threshold>`. The panic threshold
+is used to avoid a situation in which host failures cascade throughout the cluster as load
+increases.
+
+Panic thresholds work in conjunction with priorities. If number of healthy hosts in a given priority
+goes down, Envoy will try to shift some traffic to lower priorities. If it succeeds in finding enough 
+healthy hosts in lower priorities, Envoy will disregard panic thresholds. In mathematical terms, 
+if normalized total health across all priority levels is 100%, Envoy disregards panic thresholds but continues to
+distribute traffic load across priorities according to algorithm described :ref:`here <arch_overview_load_balancing_priority_levels>`. 
+However, when value of normalized total health drops below 100%, Envoy assumes that there is not enough healthy
+hosts across all priority levels. It continues to distribute traffic load across priorities, but if a specific priority level's
+health is below panic threshold, traffic will go to all hosts in that priority regardless of their health.
+
+The following examples explain relationship between normalized total health and panic threshold. It is 
+assumed that default value of 50% is used for panic threshold.
+
+Assume a simple set-up with 2 priority levels, P=1 100% healthy. In this scenario
+normalized total health is always 100% and P=0 never enters panic mode and Envoy is able to shift entire traffic to P=1.
+
++-------------+------------+--------------+------------+--------------+--------------+
+| P=0 healthy | Traffic    | P=0 in panic | Traffic    | P=1 in panic | normalized   |
+| endpoints   |  to P=0    |              | to P=1     |              | total health |
++=============+============+==============+============+==============+==============+
+| 100%        |  100%      | NO           |   0%       | NO           |  100%        |
++-------------+------------+--------------+------------+--------------+--------------+
+| 72%         |  100%      | NO           |   0%       | NO           |  100%        |
++-------------+------------+--------------+------------+--------------+--------------+
+| 71%         |  100%      | NO           |   0%       | NO           |  100%        |
++-------------+------------+--------------+------------+--------------+--------------+
+| 50%         |  100%      | NO           |   0%       | NO           |  100%        |
++-------------+------------+--------------+------------+--------------+--------------+
+| 25%         |  100%      | NO           |   0%       | NO           |  100%        |
++-------------+------------+--------------+------------+--------------+--------------+
+| 0%          |  100%      | NO           |   0%       | NO           |  100%        |
++-------------+------------+--------------+------------+--------------+--------------+
+
+If P=1 becomes unhealthy, panic threshold continues to be disregarded until the sum of the health
+P=0 + P=1 goes below 100%. At this point Envoy starts checking panic threshold value for each 
+priority.
+
++-------------+-------------+----------+--------------+----------+--------------+-------------+
+| P=0 healthy | P=1 healthy | Traffic  | P=0 in panic | Traffic  | P=1 in panic | normalized  |
+| endpoints   | endpoints   | to P=0   |              | to P=1   |              | total health|
++=============+=============+==========+==============+==========+==============+=============+
+| 100%        |  100%       |  100%    | NO           |   0%     | NO           |  100%       |
++-------------+-------------+----------+--------------+----------+--------------+-------------+
+| 72%         |  72%        |  100%    | NO           |   0%     | NO           |  100%       |
++-------------+-------------+----------+--------------+----------+--------------+-------------+
+| 71%         |  71%        |  99%     | NO           |   1%     | NO           |  100%       |
++-------------+-------------+----------+--------------+----------+--------------+-------------+
+| 50%         |  60%        |  50%     | NO           |   50%    | NO           |  100%       |
++-------------+-------------+----------+--------------+----------+--------------+-------------+
+| 25%         |  100%       |  25%     | NO           |   75%    | NO           |  100%       |
++-------------+-------------+----------+--------------+----------+--------------+-------------+
+| 25%         |  25%        |  50%     | YES          |   50%    | YES          |  70%        |
++-------------+-------------+----------+--------------+----------+--------------+-------------+
+| 5%          |  65%        |  7%      | YES          |   93%    | NO           |  98%        |
++-------------+-------------+----------+--------------+----------+--------------+-------------+
+
+Note that panic thresholds can be configured *per-priority*.
 
 .. _arch_overview_load_balancing_zone_aware_routing:
 
