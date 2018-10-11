@@ -6,6 +6,7 @@ Version history
 * admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * config: removed support for the v1 API.
 * fault: removed integer percentage support.
+* http: added limits to the number and length of header modifications in all fields request_headers_to_add and response_headers_to_add. These limits are very high and should only be used as a last-resort safeguard.
 * http: no longer adding whitespace when appending X-Forwarded-For headers. **Warning**: this is not
   compatible with 1.7.0 builds prior to `9d3a4eb4ac44be9f0651fcc7f87ad98c538b01ee <https://github.com/envoyproxy/envoy/pull/3610>`_.
   See `#3611 <https://github.com/envoyproxy/envoy/issues/3611>`_ for details.

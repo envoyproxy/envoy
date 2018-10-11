@@ -80,7 +80,8 @@ message VirtualHost {
   // enclosing :ref:`envoy_api_msg_RouteConfiguration`. For more information, including
   // details on header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
-  repeated core.HeaderValueOption request_headers_to_add = 7;
+  repeated core.HeaderValueOption request_headers_to_add = 7
+      [(validate.rules).repeated .max_items = 1000];
 
   // Specifies a list of HTTP headers that should be removed from each request
   // handled by this virtual host.
@@ -92,7 +93,8 @@ message VirtualHost {
   // enclosing :ref:`envoy_api_msg_RouteConfiguration`. For more information, including
   // details on header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
-  repeated core.HeaderValueOption response_headers_to_add = 10;
+  repeated core.HeaderValueOption response_headers_to_add = 10
+      [(validate.rules).repeated .max_items = 1000];
 
   // Specifies a list of HTTP headers that should be removed from each response
   // handled by this virtual host.
@@ -171,7 +173,8 @@ message Route {
   // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details on
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
-  repeated core.HeaderValueOption request_headers_to_add = 9;
+  repeated core.HeaderValueOption request_headers_to_add = 9
+      [(validate.rules).repeated .max_items = 1000];
 
   // Specifies a list of HTTP headers that should be removed from each request
   // matching this route.
@@ -183,7 +186,8 @@ message Route {
   // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including
   // details on header value syntax, see the documentation on
   // :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`.
-  repeated core.HeaderValueOption response_headers_to_add = 10;
+  repeated core.HeaderValueOption response_headers_to_add = 10
+      [(validate.rules).repeated .max_items = 1000];
 
   // Specifies a list of HTTP headers that should be removed from each response
   // to requests matching this route.
@@ -223,7 +227,8 @@ message WeightedCluster {
     // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details on
     // header value syntax, see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
-    repeated core.HeaderValueOption request_headers_to_add = 4;
+    repeated core.HeaderValueOption request_headers_to_add = 4
+        [(validate.rules).repeated .max_items = 1000];
 
     // Specifies a list of HTTP headers that should be removed from each request when
     // this cluster is selected through the enclosing :ref:`envoy_api_msg_route.RouteAction`.
@@ -236,7 +241,8 @@ message WeightedCluster {
     // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details on
     // header value syntax, see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
-    repeated core.HeaderValueOption response_headers_to_add = 5;
+    repeated core.HeaderValueOption response_headers_to_add = 5
+        [(validate.rules).repeated .max_items = 1000];
 
     // Specifies a list of headers to be removed from responses when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_route.RouteAction`.
