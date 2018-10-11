@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/retry/other_priority/other_priority_config.pb.validate.h"
 #include "envoy/upstream/retry.h"
 
 #include "common/protobuf/protobuf.h"
@@ -22,7 +23,8 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr(new ::Envoy::ProtobufWkt::Empty());
+    return ProtobufTypes::MessagePtr(
+        new envoy::config::retry::other_priority::OtherPriorityConfig());
   }
 };
 

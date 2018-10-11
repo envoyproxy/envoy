@@ -8,13 +8,11 @@ following are the command line options that Envoy supports.
 
 .. option:: -c <path string>, --config-path <path string>
 
-  *(optional)* The path to the v1 or v2 :ref:`JSON/YAML/proto3 configuration
+  *(optional)* The path to the v2 :ref:`JSON/YAML/proto3 configuration
   file <config>`. If this flag is missing, :option:`--config-yaml` is required.
   This will be parsed as a :ref:`v2 bootstrap configuration file
-  <config_overview_v2_bootstrap>`. On failure, if :option:`--allow-deprecated-v1-api`,
-  is set, it will be considered as a :ref:`v1 JSON
-  configuration file <config_overview_v1>`. For v2 configuration files, valid
-  extensions are ``.json``, ``.yaml``, ``.pb`` and ``.pb_text``, which indicate
+  <config_overview_v2_bootstrap>`.
+  Valid extensions are ``.json``, ``.yaml``, ``.pb`` and ``.pb_text``, which indicate
   JSON, YAML, `binary proto3
   <https://developers.google.com/protocol-buffers/docs/encoding>`_ and `text
   proto3
@@ -26,7 +24,6 @@ following are the command line options that Envoy supports.
   *(optional)* The YAML string for a v2 bootstrap configuration. If :option:`--config-path` is also set,
    the values in this YAML string will override and merge with the bootstrap loaded from :option:`--config-path`.
    Because YAML is a superset of JSON, a JSON string may also be passed to :option:`--config-yaml`.
-   :option:`--config-yaml` is not compatible with bootstrap v1.
 
    Example overriding the node id on the command line:
 
@@ -36,14 +33,6 @@ following are the command line options that Envoy supports.
 
   *(deprecated)* This flag used to allow opting into only using a
   :ref:`v2 bootstrap configuration file <config_overview_v2_bootstrap>`. This is now set by default.
-
-.. option:: --allow-deprecated-v1-api
-
-  *(optional)* This flag determines whether the configuration file should only
-  be parsed as a :ref:`v2 bootstrap configuration file
-  <config_overview_v2_bootstrap>`. If specified when a v2 bootstrap
-  config parse fails, a second attempt to parse the config as a :ref:`v1 JSON
-  configuration file <config_overview_v1>` will be made.
 
 .. option:: --mode <string>
 

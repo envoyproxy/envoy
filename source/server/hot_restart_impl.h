@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/options.h"
 #include "envoy/stats/stats_options.h"
@@ -156,39 +157,46 @@ private:
     GetStatsReply = 9
   };
 
-  struct RpcBase {
+  PACKED_STRUCT(struct RpcBase {
     RpcBase(RpcMessageType type, uint64_t length = sizeof(RpcBase))
         : type_(type), length_(length) {}
 
     RpcMessageType type_;
     uint64_t length_;
-  } __attribute__((packed));
+  });
 
-  struct RpcGetListenSocketRequest : public RpcBase {
-    RpcGetListenSocketRequest() : RpcBase(RpcMessageType::GetListenSocketRequest, sizeof(*this)) {}
+  PACKED_STRUCT(struct RpcGetListenSocketRequest
+                : public RpcBase {
+                  RpcGetListenSocketRequest()
+                      : RpcBase(RpcMessageType::GetListenSocketRequest, sizeof(*this)) {}
 
-    char address_[256]{0};
-  } __attribute__((packed));
+                  char address_[256]{0};
+                });
 
-  struct RpcGetListenSocketReply : public RpcBase {
-    RpcGetListenSocketReply() : RpcBase(RpcMessageType::GetListenSocketReply, sizeof(*this)) {}
+  PACKED_STRUCT(struct RpcGetListenSocketReply
+                : public RpcBase {
+                  RpcGetListenSocketReply()
+                      : RpcBase(RpcMessageType::GetListenSocketReply, sizeof(*this)) {}
 
-    int fd_{0};
-  } __attribute__((packed));
+                  int fd_{0};
+                });
 
-  struct RpcShutdownAdminReply : public RpcBase {
-    RpcShutdownAdminReply() : RpcBase(RpcMessageType::ShutdownAdminReply, sizeof(*this)) {}
+  PACKED_STRUCT(struct RpcShutdownAdminReply
+                : public RpcBase {
+                  RpcShutdownAdminReply()
+                      : RpcBase(RpcMessageType::ShutdownAdminReply, sizeof(*this)) {}
 
-    uint64_t original_start_time_{0};
-  } __attribute__((packed));
+                  uint64_t original_start_time_{0};
+                });
 
-  struct RpcGetStatsReply : public RpcBase {
-    RpcGetStatsReply() : RpcBase(RpcMessageType::GetStatsReply, sizeof(*this)) {}
+  PACKED_STRUCT(struct RpcGetStatsReply
+                : public RpcBase {
+                  RpcGetStatsReply() : RpcBase(RpcMessageType::GetStatsReply, sizeof(*this)) {}
 
-    uint64_t memory_allocated_{0};
-    uint64_t num_connections_{0};
-    uint64_t unused_[16]{0};
-  } __attribute__((packed));
+                  uint64_t memory_allocated_{0};
+                  uint64_t num_connections_{0};
+                  uint64_t unused_[16]{0};
+                });
 
   template <class rpc_class, RpcMessageType rpc_type> rpc_class* receiveTypedRpc() {
     RpcBase* base_message = receiveRpc(true);

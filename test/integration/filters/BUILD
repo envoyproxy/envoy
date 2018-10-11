@@ -46,3 +46,17 @@ envoy_cc_test_library(
         "//source/common/network:connection_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "random_pause_filter_lib",
+    srcs = [
+        "random_pause_filter.cc",
+    ],
+    deps = [
+        ":pass_through_filter_lib",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//source/common/network:connection_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

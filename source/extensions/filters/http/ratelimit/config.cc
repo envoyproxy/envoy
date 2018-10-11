@@ -20,9 +20,8 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::rate_limit::v2::RateLimit& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.domain().empty());
-  FilterConfigSharedPtr filter_config(new FilterConfig(proto_config, context.localInfo(),
-                                                       context.scope(), context.runtime(),
-                                                       context.clusterManager()));
+  FilterConfigSharedPtr filter_config(
+      new FilterConfig(proto_config, context.localInfo(), context.scope(), context.runtime()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
   return
       [filter_config, timeout_ms, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
