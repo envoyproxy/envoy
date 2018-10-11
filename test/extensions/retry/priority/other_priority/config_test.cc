@@ -25,7 +25,11 @@ public:
 
     envoy::config::retry::other_priority::OtherPriorityConfig config;
     config.set_update_frequency(update_frequency_);
-    factory->createRetryPriority(*this, config, 3);
+    // Use createEmptyConfigProto to exercise that code path. This ensures the proto returned
+    // by that method is compatible with the downcast in createRetryPriority.
+    auto empty = factory->createEmptyConfigProto();
+    empty->MergeFrom(config);
+    factory->createRetryPriority(*this, *empty, 3);
   }
 
   // Upstream::RetryPriorityFactoryCallbacks

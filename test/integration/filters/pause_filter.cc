@@ -14,7 +14,6 @@ namespace Envoy {
 // connection back-up when an encode is finished, and unblocking it when the
 // next stream starts to decode headers.
 // Allows regression tests for https://github.com/envoyproxy/envoy/issues/4541
-// TODO(alyssawilk) turn this up for more tests.
 class TestPauseFilter : public PassThroughFilter {
 public:
   // Pass in a some global filter state to ensure the Network::Connection is
