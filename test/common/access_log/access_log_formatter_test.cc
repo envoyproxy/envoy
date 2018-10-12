@@ -401,7 +401,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     JsonFormatterImpl formatter(key_mapping);
 
     auto actual_json_map =
-        formatter.to_map(request_header, response_header, response_trailer, stream_info);
+        formatter.toMap(request_header, response_header, response_trailer, stream_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
     auto actual_string =
@@ -426,7 +426,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     JsonFormatterImpl formatter(key_mapping);
 
     auto actual_json_map =
-        formatter.to_map(request_header, response_header, response_trailer, stream_info);
+        formatter.toMap(request_header, response_header, response_trailer, stream_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
     auto actual_string =
@@ -457,7 +457,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
     auto actual_json_map =
-        formatter.to_map(request_header, response_header, response_trailer, stream_info);
+        formatter.toMap(request_header, response_header, response_trailer, stream_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
     auto actual_string =
@@ -492,7 +492,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
     auto actual_json_map =
-        formatter.to_map(request_header, response_header, response_trailer, stream_info);
+        formatter.toMap(request_header, response_header, response_trailer, stream_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
     auto actual_string =
@@ -523,7 +523,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     JsonFormatterImpl formatter(key_mapping);
 
     auto actual_json_map =
-        formatter.to_map(request_header, response_header, response_trailer, stream_info);
+        formatter.toMap(request_header, response_header, response_trailer, stream_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
     auto actual_string =
@@ -562,7 +562,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     JsonFormatterImpl formatter(key_mapping);
 
     auto actual_json_map =
-        formatter.to_map(request_header, response_header, response_trailer, stream_info);
+        formatter.toMap(request_header, response_header, response_trailer, stream_info);
     EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
 
     auto actual_string =

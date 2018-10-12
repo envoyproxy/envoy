@@ -95,7 +95,7 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
                                       const Http::HeaderMap& response_headers,
                                       const Http::HeaderMap& response_trailers,
                                       const StreamInfo::StreamInfo& stream_info) const {
-  auto output_map = this->to_map(request_headers, response_headers, response_trailers, stream_info);
+  auto output_map = this->toMap(request_headers, response_headers, response_trailers, stream_info);
 
   ProtobufWkt::Struct output_struct;
   for (const auto& pair : output_map) {
@@ -114,7 +114,7 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
   return log_line;
 }
 
-std::unordered_map<std::string, std::string> JsonFormatterImpl::to_map(
+std::unordered_map<std::string, std::string> JsonFormatterImpl::toMap(
     const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
     const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info) const {
   std::unordered_map<std::string, std::string> output;
