@@ -479,18 +479,6 @@ std::string HessianUtils::peekByte(Buffer::Instance& buffer, size_t* size, uint6
     *size = delta_length + 1;
     return result;
 
-  case 0x34:
-  case 0x35:
-  case 0x36:
-  case 0x37:
-    delta_length = (code - 0x34) * 256 + buffer.peekInt<uint8_t>(offset + 1);
-    if (delta_length + 2 + offset > buffer.length()) {
-      throw EnvoyException("buffer underflow");
-    }
-    buffer.copyOut(offset + 2, delta_length, allocStringBuffer(&result, delta_length + 1));
-    *size = delta_length + 2;
-    return result;
-
   case 0x42:
     if (offset + 3 > buffer.length()) {
       throw EnvoyException("buffer underflow");

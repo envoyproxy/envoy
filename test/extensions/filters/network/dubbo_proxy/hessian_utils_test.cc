@@ -653,6 +653,24 @@ TEST(HessianUtilsTest, peekDate) {
 
   {
     Buffer::OwnedImpl buffer;
+    buffer.add(std::string({0x4b, 0x00, 0x00, 0x00, 0x00}));
+    size_t size;
+    auto t = HessianUtils::peekDate(buffer, &size);
+    EXPECT_EQ(5, size);
+    EXPECT_EQ(0, t.count());
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({0x4b, 0x00, '\xe3', '\x83', '\x8f'}));
+    size_t size;
+    auto t = HessianUtils::peekDate(buffer, &size);
+    EXPECT_EQ(5, size);
+    EXPECT_EQ(894621060000, t.count());
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
     buffer.add(std::string({0x4a, 0x00, 0x00, 0x00, '\xd0', 0x4b, '\x92', '\x84', '\xb8'}));
     size_t size = 0;
     auto t = HessianUtils::peekDate(buffer, &size);
