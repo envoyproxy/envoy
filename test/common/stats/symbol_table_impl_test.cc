@@ -388,6 +388,9 @@ TEST(Symbol, Memory) {
       names.emplace_back(StatNameStorage(stat, table));
     };
     symbol_table_mem_used = test_memory_usage(record_stat);
+    for (StatNameStorage& name : names) {
+      name.free(table);
+    }
   }
 
   // In manual tests, string memory used 7759488 in this example, and

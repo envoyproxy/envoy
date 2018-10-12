@@ -1,5 +1,6 @@
 #include "extensions/filters/http/squash/squash_filter.h"
 
+#include "envoy/common/platform.h"
 #include "envoy/http/codes.h"
 
 #include "common/common/empty_string.h"
@@ -303,10 +304,11 @@ void SquashFilter::cleanup() {
 Json::ObjectSharedPtr SquashFilter::getJsonBody(Http::MessagePtr&& m) {
   Buffer::InstancePtr& data = m->body();
   uint64_t num_slices = data->getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
+  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
   data->getRawSlices(slices, num_slices);
   std::string jsonbody;
-  for (Buffer::RawSlice& slice : slices) {
+  for (uint64_t i = 0; i < num_slices; i++) {
+    Buffer::RawSlice& slice = slices[i];
     jsonbody += std::string(static_cast<const char*>(slice.mem_), slice.len_);
   }
 

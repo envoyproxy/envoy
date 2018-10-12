@@ -150,8 +150,7 @@ Symbol SymbolTable::toSymbol(absl::string_view sv) EXCLUSIVE_LOCKS_REQUIRED(lock
     auto decode_insert = decode_map_.insert({next_symbol_, std::move(str)});
     ASSERT(decode_insert.second);
 
-    auto encode_insert = encode_map_.insert(
-        {decode_insert.first->second, {.symbol_ = next_symbol_, .ref_count_ = 1}});
+    auto encode_insert = encode_map_.insert({decode_insert.first->second, {next_symbol_, 1}});
     ASSERT(encode_insert.second);
 
     result = next_symbol_;
