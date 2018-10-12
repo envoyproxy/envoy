@@ -121,7 +121,7 @@ TEST_F(StatNameTest, TestSymbolConsistency) {
 TEST_F(StatNameTest, TestSameValueOnPartialFree) {
   // This should hold true for components as well. Since "foo" persists even when "foo.bar" is
   // freed, we expect both instances of "foo" to have the same symbol.
-  StatName stat_foo(makeStat("foo"));
+  makeStat("foo");
   StatNameStorage stat_foobar_1(makeStatStorage("foo.bar"));
   SymbolVec stat_foobar_1_symbols = getSymbols(stat_foobar_1.statName());
   stat_foobar_1.free(table_);
