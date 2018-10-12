@@ -214,7 +214,9 @@ StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table) {
 }
 
 StatNameStorage::~StatNameStorage() {
-  // StatNameStorage is not fully RAII: you must free it with
+  // StatNameStorage is not fully RAII: you must call free(SymbolTable&) to
+  // decrement the reference counts held by the SymbolTable on behalf of
+  // this StatName.
   ASSERT(bytes_.get() == nullptr);
 }
 
