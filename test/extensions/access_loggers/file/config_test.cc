@@ -134,13 +134,14 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonConversionTest) {
     config.set_name(AccessLogNames::get().File);
     envoy::config::accesslog::v2::FileAccessLog fal_config;
     fal_config.set_path("/dev/null");
-    
+
     ProtobufWkt::Value string_value;
     string_value.set_string_value(std::string{"some_nested_value"});
 
     ProtobufWkt::Value struct_value;
-    (*struct_value.mutable_struct_value()->mutable_fields())[std::string{"some_nested_key"}] = string_value;
-    
+    (*struct_value.mutable_struct_value()->mutable_fields())[std::string{"some_nested_key"}] =
+        string_value;
+
     auto json_format = fal_config.mutable_json_format();
     (*json_format->mutable_fields())[std::string{"top_level_key"}] = struct_value;
 
