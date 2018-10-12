@@ -11,6 +11,11 @@ echo "build ${BAZEL_BUILD_OPTIONS}" >> tools/bazel.rc
 # by clang-tidy
 "${ENVOY_SRCDIR}/tools/gen_compilation_database.py" --run_bazel_build
 
+# It had to be in ENVOY_CI_DIR to run bazel to generate compile database, but clang-tidy-diff
+# diff against current directory, moving them to ENVOY_SRCDIR.
+mv ./compile_commands.json "${ENVOY_SRCDIR}/compile_commands.json"
+cd "${ENVOY_SRCDIR}"
+
 if [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
   echo "Running full clang-tidy..."
   run-clang-tidy-7
