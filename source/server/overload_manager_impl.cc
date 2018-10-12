@@ -152,6 +152,14 @@ void OverloadManagerImpl::start() {
   timer_->enableTimer(refresh_interval_);
 }
 
+void OverloadManagerImpl::stop() {
+  // Disable any pending timeouts.
+  timer_.reset();
+
+  // Clear the resource map to block on any pending updates.
+  resources_.clear();
+}
+
 void OverloadManagerImpl::registerForAction(const std::string& action,
                                             Event::Dispatcher& dispatcher,
                                             OverloadActionCb callback) {
