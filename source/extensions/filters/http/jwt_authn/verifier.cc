@@ -53,15 +53,17 @@ public:
     payload_pairs_.push_back({issuer, payload});
   }
 
-  bool hasPayload() const { return !payload_pairs_.empty(); }
+  void setPayload() {
+    if (payload_pairs_.empty()) {
+      return;
+    }
 
-  ProtobufWkt::Struct getPayload() const {
     ProtobufWkt::Struct struct_obj;
     auto fields = struct_obj.mutable_fields();
     for (const auto& pair : payload_pairs_) {
       *(*fields)[pair.first].mutable_struct_value() = pair.second;
     }
-    return struct_obj;
+    callback_->setPayload(struct_obj);
   }
 
 private:
@@ -82,10 +84,9 @@ public:
       return parent_->onComplete(status, context);
     }
 
-    if (Status::Ok == status && context.hasPayload()) {
-      context.callback()->setPayload(context.getPayload());
+    if (Status::Ok == status) {
+      context.setPayload();
     }
-
     context.callback()->onComplete(status);
     context.cancel();
   }
