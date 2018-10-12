@@ -82,9 +82,9 @@ public:
     for (const auto& it : statuses) {
       auto mock_auth = std::make_unique<MockAuthenticator>();
       EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _, _))
-          .WillOnce(Invoke([ issuer = it.first, status = it.second ](
-              Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-              SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
+          .WillOnce(Invoke([issuer = it.first, status = it.second](
+                               Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
+                               SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
             if (status == Status::Ok) {
               set_payload_cb(issuer, issuer + "-payload");
             }
@@ -102,9 +102,11 @@ public:
     for (std::size_t i = 0; i < providers.size(); ++i) {
       auto mock_auth = std::make_unique<MockAuthenticator>();
       EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _, _))
-          .WillOnce(Invoke([&callbacks, iss = providers[i] ](
-              Http::HeaderMap&, std::vector<JwtLocationConstPtr>*, SetPayloadCallback,
-              AuthenticatorCallback callback) { callbacks[iss] = std::move(callback); }));
+          .WillOnce(Invoke(
+              [&callbacks, iss = providers[i]](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
+                                               SetPayloadCallback, AuthenticatorCallback callback) {
+                callbacks[iss] = std::move(callback);
+              }));
       EXPECT_CALL(*mock_auth.get(), onDestroy()).Times(1);
       mock_auths_[providers[i]] = std::move(mock_auth);
     }
