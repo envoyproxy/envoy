@@ -110,7 +110,7 @@ public:
 
   std::unordered_map<std::string, std::string>
   toMap(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
-         const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info) const;
+        const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info) const;
 
 private:
   std::vector<FormatterProviderPtr> providers_;
