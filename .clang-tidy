@@ -3,7 +3,7 @@ Checks:          'clang-diagnostic-*,clang-analyzer-*,abseil-*,bugprone-*,modern
 #TODO(lizan): grow this list, fix possible warnings and make more checks as error
 WarningsAsErrors: 'bugprone-assert-side-effect,modernize-make-shared,modernize-make-unique,readability-redundant-smartptr-get,readability-braces-around-statements'
 
-CheckOptions:    
+CheckOptions:
   - key:             bugprone-assert-side-effect.AssertMacros
     value:           'ASSERT'
 

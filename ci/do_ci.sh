@@ -174,18 +174,8 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   exit 0
 elif [[ "$1" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
-  echo "Generating compilation database..."
   cd "${ENVOY_CI_DIR}"
-
-  # The compilation database generate script doesn't support passing build options via CLI.
-  # Writing them into bazelrc
-  echo "build ${BAZEL_BUILD_OPTIONS}" >> tools/bazel.rc
-
-  # bazel build need to be run to setup virtual includes, generating files which are consumed
-  # by clang-tidy
-  "${ENVOY_SRCDIR}/tools/gen_compilation_database.py" --run_bazel_build
-  run-clang-tidy-7
-
+  ./run_clang_tidy.sh
   exit 0
 elif [[ "$1" == "bazel.coverity" ]]; then
   # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy
