@@ -108,7 +108,7 @@ public:
                      const Http::HeaderMap& response_trailers,
                      const StreamInfo::StreamInfo& stream_info) const override;
 
-  std::map<std::string, std::string> to_map(const Http::HeaderMap& request_headers,
+  std::unordered_map<std::string, std::string> to_map(const Http::HeaderMap& request_headers,
                                             const Http::HeaderMap& response_headers,
                                             const Http::HeaderMap& response_trailers,
                                             const StreamInfo::StreamInfo& stream_info) const;

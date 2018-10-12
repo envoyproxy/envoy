@@ -110,10 +110,10 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
   return fmt::format("{}\n", strbuf.GetString());
 }
 
-std::map<std::string, std::string> JsonFormatterImpl::to_map(
+std::unordered_map<std::string, std::string> JsonFormatterImpl::to_map(
     const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
     const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info) const {
-  std::map<std::string, std::string> output;
+  std::unordered_map<std::string, std::string> output;
   for (const auto& pair : json_output_format_) {
     output.emplace(pair.first, pair.second->format(request_headers, response_headers,
                                                    response_trailers, stream_info));
