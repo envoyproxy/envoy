@@ -109,6 +109,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
 
 TEST(FileAccessLogConfigTest, FileAccessLogJsonConversionTest) {
   {
+    // Make sure we fail if you set a bool value in the format dictionary
     envoy::config::filter::accesslog::v2::AccessLog config;
     config.set_name(AccessLogNames::get().File);
     envoy::config::accesslog::v2::FileAccessLog fal_config;
@@ -129,6 +130,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonConversionTest) {
   }
 
   {
+    // Make sure we fail if you set a nested Struct value in the format dictionary
     envoy::config::filter::accesslog::v2::AccessLog config;
     config.set_name(AccessLogNames::get().File);
     envoy::config::accesslog::v2::FileAccessLog fal_config;
