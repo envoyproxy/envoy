@@ -50,10 +50,13 @@ TEST(UtilityTest, TestGetSerialNumber) {
   EXPECT_EQ("f3828eb24fd779d0", Utility::getSerialNumberFromCertificate(*cert));
 }
 
-TEST(UtilityTest, TestDaysUntilExpiration) {
-  bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
-  EXPECT_EQ(270, Utility::getDaysUntilExpiration(cert.get()));
-}
+/*
+ * Commented out due to https://github.com/envoyproxy/envoy/issues/4703
+ * TEST(UtilityTest, TestDaysUntilExpiration) {
+ *   bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
+ *   EXPECT_EQ(270, Utility::getDaysUntilExpiration(cert.get()));
+ * }
+ */
 
 TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
   EXPECT_EQ(std::numeric_limits<int>::max(), Utility::getDaysUntilExpiration(nullptr));

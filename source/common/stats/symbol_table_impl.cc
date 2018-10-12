@@ -108,12 +108,14 @@ SymbolEncoding SymbolTable::encode(const absl::string_view name) {
 }
 
 std::string SymbolTable::decode(const SymbolStorage symbol_array, size_t size) const {
-  // Before taking the lock, decode the array of symbols from the SymbolStorage.
-  SymbolVec symbols = SymbolEncoding::decodeSymbols(symbol_array, size);
+  return decode(SymbolEncoding::decodeSymbols(symbol_array, size));
+}
 
+std::string SymbolTable::decode(const SymbolVec& symbols) const {
   std::vector<absl::string_view> name_tokens;
   name_tokens.reserve(symbols.size());
   {
+    // Hold the lock only while decoding symbols.
     Thread::LockGuard lock(lock_);
     for (Symbol symbol : symbols) {
       name_tokens.push_back(fromSymbol(symbol));

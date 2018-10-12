@@ -24,8 +24,10 @@ protected:
     EXPECT_EQ(0, table_.numSymbols());
   }
 
-  // SymbolVec getSymbols(StatName& stat_name) { return stat_name.symbolVec(); }
-  // std::string decodeSymbolVec(const SymbolVec& symbol_vec) { return table_.decode(symbol_vec); }
+  SymbolVec getSymbols(StatName stat_name) {
+    return SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.numBytes());
+  }
+  std::string decodeSymbolVec(const SymbolVec& symbol_vec) { return table_.decode(symbol_vec); }
   Symbol monotonicCounter() { return table_.monotonicCounter(); }
   std::string encodeDecode(absl::string_view stat_name) {
     return makeStat(stat_name).toString(table_);
@@ -81,7 +83,6 @@ TEST_F(StatNameTest, TestSuccessfulDecode) {
   EXPECT_EQ(stat_name_1.toString(table_), stat_name);
 }
 
-/*
 TEST_F(StatNameTest, TestBadDecodes) {
   {
     // If a symbol doesn't exist, decoding it should trigger an ASSERT() and crash.
@@ -94,11 +95,11 @@ TEST_F(StatNameTest, TestBadDecodes) {
     SymbolVec vec_1 = getSymbols(stat_name_1);
     // Decoding a symbol vec that exists is perfectly normal...
     EXPECT_NO_THROW(decodeSymbolVec(vec_1));
-    stat_name_1.free(table_);
+    clearStorage();
     // But when the StatName is destroyed, its symbols are as well.
     EXPECT_DEATH(decodeSymbolVec(vec_1), "");
   }
-  }*/
+}
 
 TEST_F(StatNameTest, TestDifferentStats) {
   StatName stat_name_1(makeStat("foo.bar"));
@@ -107,7 +108,6 @@ TEST_F(StatNameTest, TestDifferentStats) {
   EXPECT_NE(stat_name_1, stat_name_2);
 }
 
-/*
 TEST_F(StatNameTest, TestSymbolConsistency) {
   StatName stat_name_1(makeStat("foo.bar"));
   StatName stat_name_2(makeStat("bar.foo"));
@@ -117,17 +117,14 @@ TEST_F(StatNameTest, TestSymbolConsistency) {
   EXPECT_EQ(vec_1[0], vec_2[1]);
   EXPECT_EQ(vec_2[0], vec_1[1]);
 }
-*/
 
-/*
 TEST_F(StatNameTest, TestSameValueOnPartialFree) {
   // This should hold true for components as well. Since "foo" persists even when "foo.bar" is
   // freed, we expect both instances of "foo" to have the same symbol.
   StatName stat_foo(makeStat("foo"));
-  StatName stat_foobar_1(makeStat("foo.bar"));
-  SymbolVec stat_foobar_1_symbols = getSymbols(stat_foobar_1);
+  StatNameStorage stat_foobar_1(makeStatStorage("foo.bar"));
+  SymbolVec stat_foobar_1_symbols = getSymbols(stat_foobar_1.statName());
   stat_foobar_1.free(table_);
-
   StatName stat_foobar_2(makeStat("foo.bar"));
   SymbolVec stat_foobar_2_symbols = getSymbols(stat_foobar_2);
 
@@ -135,7 +132,6 @@ TEST_F(StatNameTest, TestSameValueOnPartialFree) {
             stat_foobar_2_symbols[0]); // Both "foo" components have the same symbol,
   // And we have no expectation for the "bar" components, because of the free pool.
 }
-*/
 
 TEST_F(StatNameTest, FreePoolTest) {
   // To ensure that the free pool is being used, we should be able to cycle through a large number

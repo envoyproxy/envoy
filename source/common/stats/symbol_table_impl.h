@@ -194,6 +194,7 @@ private:
    * @return std::string the retrieved stat name.
    */
   std::string decode(const SymbolStorage symbol_vec, size_t size) const;
+  std::string decode(const SymbolVec& symbols) const;
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
