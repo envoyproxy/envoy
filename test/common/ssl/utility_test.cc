@@ -52,7 +52,7 @@ TEST(UtilityTest, TestGetSerialNumber) {
 
 TEST(UtilityTest, TestDaysUntilExpiration) {
   bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
-  EXPECT_EQ(270, Utility::getDaysUntilExpiration(cert.get()));
+  EXPECT_LE(0, Utility::getDaysUntilExpiration(cert.get()));
 }
 
 TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
