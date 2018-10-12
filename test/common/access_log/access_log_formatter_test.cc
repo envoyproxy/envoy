@@ -394,7 +394,8 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-    std::unordered_map<std::string, std::string> expected_json_map = {{"plain_string", "plain_string_value"}};
+    std::unordered_map<std::string, std::string> expected_json_map = {
+        {"plain_string", "plain_string_value"}};
 
     const std::map<const std::string, const std::string> key_mapping = {
         {"plain_string", "plain_string_value"}};
@@ -452,7 +453,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
         {"nonexistent_response_header", "%RESP(nonexistent_response_header)%"},
         {"some_response_header", "%RESP(some_response_header)%"}};
     JsonFormatterImpl formatter(key_mapping);
-    
+
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
