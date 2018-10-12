@@ -163,6 +163,12 @@ if __name__ == "__main__":
                                 "unexpected direct external dependency on protobuf")
   errors += checkUnfixableError("proto_deps.cc",
                                 "unexpected direct dependency on google.protobuf")
+  errors += checkUnfixableError("attribute_packed.cc",
+                                "Don't use __attribute__((packed))")
+  errors += checkUnfixableError("designated_initializers.cc",
+                                "Don't use designated initializers")
+  errors += checkUnfixableError("elvis_operator.cc",
+                                "Don't use the '?:' operator")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",

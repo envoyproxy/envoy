@@ -75,6 +75,7 @@ public:
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
   uint32_t priority_{};
   uint32_t overprovisioning_factor_{};
+  bool run_in_panic_mode_ = false;
 };
 
 class MockPrioritySet : public PrioritySet {
