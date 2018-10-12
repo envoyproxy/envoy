@@ -71,6 +71,7 @@ typedef std::shared_ptr<Instance> InstanceSharedPtr;
 
 /**
  * Interface for access log formatter.
+ * Formatters combine the output of FormatterProviders into a log output line.
  */
 class Formatter {
 public:
@@ -85,12 +86,17 @@ public:
 typedef std::unique_ptr<Formatter> FormatterPtr;
 
 /**
- * Interface for access log provider
+ * Interface for access log provider.
+ * FormatterProviders extract information from a request.
  */
 class FormatterProvider {
 public:
   virtual ~FormatterProvider() {}
 
+  /**
+   * Extract a value from the provided headers/trailers/stream.
+   * @return a string containing the extracted value.
+   */
   virtual std::string format(const Http::HeaderMap& request_headers,
                              const Http::HeaderMap& response_headers,
                              const Http::HeaderMap& response_trailers,
