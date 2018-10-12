@@ -99,7 +99,7 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
 
   ProtobufWkt::Struct output_struct;
   for (const auto& pair : output_map) {
-    Protobuf::Value string_value;
+    ProtobufWkt::Value string_value;
     string_value.set_string_value(pair.second);
     (*output_struct.mutable_fields())[pair.first] = string_value;
   }
