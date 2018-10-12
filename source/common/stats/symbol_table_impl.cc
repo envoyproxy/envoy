@@ -192,6 +192,10 @@ void SymbolTable::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
 }
 
 bool SymbolTable::lessThan(const StatName& a, const StatName& b) const {
+  // Constructing two temp vectors during lessThan is not strictly necessary.
+  // If this becomes a performance bottleneck (e.g. during sorting), we could
+  // provide an iterator-like interface for incrementally decoding the symbols
+  // without allocating memory.
   SymbolVec av = SymbolEncoding::decodeSymbols(a.data(), a.numBytes());
   SymbolVec bv = SymbolEncoding::decodeSymbols(b.data(), b.numBytes());
   for (size_t i = 0, n = std::min(av.size(), bv.size()); i < n; ++i) {

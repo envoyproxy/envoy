@@ -58,8 +58,7 @@ public:
   void addSymbol(Symbol symbol);
 
   /**
-   * Decodes a symbol from a uint8_t array. When the last symbol is found,
-   * false is returned as well as the symbol.
+   * Decodes a uint8_t array into a SymbolVec.
    */
   static SymbolVec decodeSymbols(const SymbolStorage array, size_t size);
 
