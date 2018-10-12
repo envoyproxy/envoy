@@ -64,7 +64,7 @@ bool StringMatcher::match(const ProtobufWkt::Value& value) const {
   return match(value.string_value());
 }
 
-bool StringMatcher::match(const std::string& value) const {
+bool StringMatcher::match(const absl::string_view value) const {
   switch (matcher_.match_pattern_case()) {
   case envoy::type::matcher::StringMatcher::kExact:
     return matcher_.exact() == value;
@@ -73,7 +73,7 @@ bool StringMatcher::match(const std::string& value) const {
   case envoy::type::matcher::StringMatcher::kSuffix:
     return absl::EndsWith(value, matcher_.suffix());
   case envoy::type::matcher::StringMatcher::kRegex:
-    return std::regex_match(value, regex_);
+    return std::regex_match(value.begin(), value.end(), regex_);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
