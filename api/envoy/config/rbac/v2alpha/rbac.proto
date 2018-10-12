@@ -126,6 +126,27 @@ message Permission {
     // match, this permission would not match. Conversely, if the value of `not_rule` would not
     // match, this permission would match.
     Permission not_rule = 8;
+
+    // The request server from the client's connection request. This is
+    // typically TLS SNI.
+    //
+    // .. attention::
+    //
+    //   The behavior of this field may be affected by how Envoy is configured
+    //   as explained below.
+    //
+    //   * If the :ref:`TLS Inspector <config_listener_filters_tls_inspector>`
+    //     filter is not added, and if a `FilterChainMatch` is not defined for
+    //     the :ref:`server name <envoy_api_field_Listener.FilterChainMatch.server_names>`,
+    //     a TLS connection's requested SNI server name will be treated as if it
+    //     wasn't present.
+    //
+    //   * A :ref:`listener filter <arch_overview_listener_filters>` may
+    //     overwrite a connection's requested server name within Envoy.
+    //
+    // Please refer to :ref:`this FAQ entry <faq_how_to_setup_sni>` to learn to
+    // setup SNI.
+    envoy.type.matcher.StringMatcher requested_server_name = 9;
   }
 }
 

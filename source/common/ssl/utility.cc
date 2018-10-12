@@ -59,6 +59,7 @@ std::string Utility::getSubjectFromCertificate(X509& cert) {
 }
 
 int32_t Utility::getDaysUntilExpiration(X509* cert) {
+  // TODO(lizan): Plumbing TimeSource to here.
   if (cert == nullptr) {
     return std::numeric_limits<int>::max();
   }
