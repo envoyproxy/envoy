@@ -85,12 +85,6 @@ public:
    * @return the float at offset in buffer
    */
   static float peekFloat(Buffer::Instance& buffer, uint64_t offset = 0);
-  /**
-   * Reads and drains a double from a buffer.
-   * @param buffer Buffer::Instance containing data to decode
-   * @return the double at the start of buffer
-   */
-  static double drainDouble(Buffer::Instance& buffer);
 };
 
 } // namespace DubboProxy
