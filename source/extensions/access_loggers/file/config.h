@@ -22,7 +22,7 @@ public:
 
 private:
   std::map<const std::string, const std::string>
-  convert_json_format_to_map(ProtobufWkt::Struct config);
+  convertJsonFormatToMap(ProtobufWkt::Struct config);
 };
 
 } // namespace File

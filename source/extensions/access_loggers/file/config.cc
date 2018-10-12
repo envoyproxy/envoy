@@ -34,7 +34,7 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
     }
   } else if (fal_config.access_log_format_case() ==
              envoy::config::accesslog::v2::FileAccessLog::kJsonFormat) {
-    const auto& json_format_map = this->convert_json_format_to_map(fal_config.json_format());
+    const auto& json_format_map = this->convertJsonFormatToMap(fal_config.json_format());
     formatter.reset(new AccessLog::JsonFormatterImpl(json_format_map));
   } else {
     throw EnvoyException(
@@ -52,7 +52,7 @@ ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {
 std::string FileAccessLogFactory::name() const { return AccessLogNames::get().File; }
 
 std::map<const std::string, const std::string>
-FileAccessLogFactory::convert_json_format_to_map(ProtobufWkt::Struct json_format) {
+FileAccessLogFactory::convertJsonFormatToMap(ProtobufWkt::Struct json_format) {
   std::map<const std::string, const std::string> output;
   for (const auto& pair : json_format.fields()) {
     if (pair.second.kind_case() != ProtobufWkt::Value::kStringValue) {
