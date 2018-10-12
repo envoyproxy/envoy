@@ -53,7 +53,7 @@ public:
     std::function<void(const Status&)> on_complete_cb = [&expected_status](const Status& status) {
       ASSERT_EQ(status, expected_status);
     };
-    auto set_payload_cb = [this](const std::string& issuer, const std::string& payload) {
+    auto set_payload_cb = [this](const std::string& issuer, const ProtobufWkt::Struct& payload) {
       out_issuer_ = issuer;
       out_payload_ = payload;
     };
@@ -69,7 +69,7 @@ public:
   ::google::jwt_verify::JwksPtr jwks_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   std::string out_issuer_;
-  std::string out_payload_;
+  ProtobufWkt::Struct out_payload_;
 };
 
 // This test validates a good JWT authentication with a remote Jwks.
@@ -114,7 +114,6 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
 
   // Payload not set by default
   EXPECT_EQ(out_issuer_, "");
-  EXPECT_EQ(out_payload_, "");
 }
 
 // This test verifies the Jwt payload is set.
@@ -135,7 +134,10 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
 
   // Payload is set
   EXPECT_EQ(out_issuer_, "https://example.com");
-  EXPECT_EQ(out_payload_, ExpectedPayloadValue);
+
+  ProtobufWkt::Struct expected_payload;
+  MessageUtil::loadFromJson(ExpectedPayloadJSON, expected_payload);
+  EXPECT_TRUE(TestUtility::protoEqual(out_payload_, expected_payload));
 }
 
 // This test verifies the Jwt with non existing kid

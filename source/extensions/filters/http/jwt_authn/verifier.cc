@@ -49,20 +49,27 @@ public:
   void storeAuth(AuthenticatorPtr&& auth) { auths_.emplace_back(std::move(auth)); }
 
   // Add a pair of (issuer, payload), called by Authenticator
-  void addPayload(const std::string& issuer, const std::string& payload) {
+  void addPayload(const std::string& issuer, const ProtobufWkt::Struct& payload) {
     payload_pairs_.push_back({issuer, payload});
   }
 
   bool hasPayload() const { return !payload_pairs_.empty(); }
 
-  ProtobufWkt::Struct getPayload() const { return MessageUtil::stringPairStruct(payload_pairs_); }
+  ProtobufWkt::Struct getPayload() const {
+    ProtobufWkt::Struct struct_obj;
+    auto fields = struct_obj.mutable_fields();
+    for (const auto& pair : payload_pairs_) {
+      *(*fields)[pair.first].mutable_struct_value() = pair.second;
+    }
+    return struct_obj;
+  }
 
 private:
   Http::HeaderMap& headers_;
   Verifier::Callbacks* callback_;
   std::unordered_map<const Verifier*, CompletionState> completion_states_;
   std::vector<AuthenticatorPtr> auths_;
-  std::vector<std::pair<std::string, std::string>> payload_pairs_;
+  std::vector<std::pair<std::string, ProtobufWkt::Struct>> payload_pairs_;
 };
 
 // base verifier for provider_name, provider_and_audiences, and allow_missing_or_failed.
@@ -111,7 +118,7 @@ public:
     auto auth = auth_factory_.create(getAudienceChecker(), provider_name_, false);
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(ctximpl.headers(), extractor_->extract(ctximpl.headers()),
-                 [&ctximpl](const std::string& issuer, const std::string& payload) {
+                 [&ctximpl](const std::string& issuer, const ProtobufWkt::Struct& payload) {
                    ctximpl.addPayload(issuer, payload);
                  },
                  [this, context](const Status& status) {
@@ -160,7 +167,7 @@ public:
     auto auth = auth_factory_.create(nullptr, absl::nullopt, true);
     extractor_.sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(ctximpl.headers(), extractor_.extract(ctximpl.headers()),
-                 [&ctximpl](const std::string& issuer, const std::string& payload) {
+                 [&ctximpl](const std::string& issuer, const ProtobufWkt::Struct& payload) {
                    ctximpl.addPayload(issuer, payload);
                  },
                  [this, context](const Status& status) {

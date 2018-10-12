@@ -271,14 +271,6 @@ public:
    * @param value the string value to associate with the key
    */
   static ProtobufWkt::Struct keyValueStruct(const std::string& key, const std::string& value);
-
-  /**
-   * Utility method to create a Struct containing a vector of key/value pairs.
-   *
-   * @param pairs a vector of string pairs
-   */
-  static ProtobufWkt::Struct
-  stringPairStruct(const std::vector<std::pair<std::string, std::string>>& pairs);
 };
 
 class ValueUtil {

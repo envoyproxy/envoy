@@ -161,7 +161,7 @@ message JwtProvider {
   // If true, successfully verified JWT payloads will be written to StreamInfo DynamicMetadata
   // in the format as: *namespace* is the jwt_authn filter name as **envoy.filters.http.jwt_authn**
   // The value is the *protobuf::Struct*. Its *fields* contains the JWT **issuer** as the key and
-  // the **jwt_payload** as string value for each verified token.
+  // the value is the *protobuf::Struct* converted from JWT JSON payload.
   bool payload_in_metadata = 9;
 }
 

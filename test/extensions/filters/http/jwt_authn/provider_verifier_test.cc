@@ -18,6 +18,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
+ProtobufWkt::Struct getExpectedPayload() {
+  ProtobufWkt::Struct expected_payload;
+  MessageUtil::loadFromJson(ExpectedPayloadJSON, expected_payload);
+
+  ProtobufWkt::Struct struct_obj;
+  *(*struct_obj.mutable_fields())["https://example.com"].mutable_struct_value() = expected_payload;
+  return struct_obj;
+}
+
 class ProviderVerifierTest : public ::testing::Test {
 public:
   void createVerifier() {
@@ -41,8 +50,7 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
 
   EXPECT_CALL(mock_cb_, setPayload(_)).WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
-    EXPECT_TRUE(TestUtility::protoEqual(
-        payload, MessageUtil::keyValueStruct("https://example.com", ExpectedPayloadValue)));
+    EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload()));
   }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);

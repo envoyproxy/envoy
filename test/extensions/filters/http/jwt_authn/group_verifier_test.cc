@@ -86,7 +86,8 @@ public:
                                Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
                                SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
             if (status == Status::Ok) {
-              set_payload_cb(issuer, issuer + "-payload");
+              ProtobufWkt::Struct empty_struct;
+              set_payload_cb(issuer, empty_struct);
             }
             callback(status);
           }));
@@ -94,6 +95,18 @@ public:
       mock_auths_[it.first] = std::move(mock_auth);
     }
     createVerifier();
+  }
+
+  // This expected payload is only for createSyncMockAuthsAndVerifier() function
+  // which set an empty payload struct for each issuer.
+  static ProtobufWkt::Struct getExpectedPayload(const std::vector<std::string>& issuers) {
+    ProtobufWkt::Struct struct_obj;
+    auto fields = struct_obj.mutable_fields();
+    for (const auto& issuer : issuers) {
+      ProtobufWkt::Struct empty_struct;
+      *(*fields)[issuer].mutable_struct_value() = empty_struct;
+    }
+    return struct_obj;
   }
 
   std::unordered_map<std::string, AuthenticatorCallback>
@@ -157,9 +170,7 @@ rules:
   createSyncMockAuthsAndVerifier(StatusMap{{"example_provider", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setPayload(_)).WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
-    EXPECT_TRUE(TestUtility::protoEqual(
-        payload,
-        MessageUtil::stringPairStruct({{"example_provider", "example_provider-payload"}})));
+    EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload({"example_provider"})));
   }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
@@ -212,11 +223,8 @@ TEST_F(GroupVerifierTest, TestRequiresAll) {
       StatusMap{{"example_provider", Status::Ok}, {"other_provider", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setPayload(_)).WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
-    EXPECT_TRUE(
-        TestUtility::protoEqual(payload, MessageUtil::stringPairStruct({
-                                             {"example_provider", "example_provider-payload"},
-                                             {"other_provider", "other_provider-payload"},
-                                         })));
+    EXPECT_TRUE(TestUtility::protoEqual(
+        payload, getExpectedPayload({"example_provider", "other_provider"})));
   }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
@@ -305,10 +313,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyFirstAuthOK) {
   createSyncMockAuthsAndVerifier(StatusMap{{"example_provider", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setPayload(_)).WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
-    EXPECT_TRUE(
-        TestUtility::protoEqual(payload, MessageUtil::stringPairStruct({
-                                             {"example_provider", "example_provider-payload"},
-                                         })));
+    EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload({"example_provider"})));
   }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
@@ -329,9 +334,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyLastAuthOk) {
       StatusMap{{"example_provider", Status::JwtUnknownIssuer}, {"other_provider", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setPayload(_)).WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
-    EXPECT_TRUE(TestUtility::protoEqual(payload, MessageUtil::stringPairStruct({
-                                                     {"other_provider", "other_provider-payload"},
-                                                 })));
+    EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload({"other_provider"})));
   }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
@@ -373,10 +376,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllFirstAnyIsOk) {
   createSyncMockAuthsAndVerifier(StatusMap{{"provider_1", Status::Ok}, {"provider_3", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setPayload(_)).WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
-    EXPECT_TRUE(TestUtility::protoEqual(payload, MessageUtil::stringPairStruct({
-                                                     {"provider_1", "provider_1-payload"},
-                                                     {"provider_3", "provider_3-payload"},
-                                                 })));
+    EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload({"provider_1", "provider_3"})));
   }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
@@ -394,10 +394,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllLastAnyIsOk) {
                                            {"provider_3", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setPayload(_)).WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
-    EXPECT_TRUE(TestUtility::protoEqual(payload, MessageUtil::stringPairStruct({
-                                                     {"provider_2", "provider_2-payload"},
-                                                     {"provider_3", "provider_3-payload"},
-                                                 })));
+    EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload({"provider_2", "provider_3"})));
   }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);

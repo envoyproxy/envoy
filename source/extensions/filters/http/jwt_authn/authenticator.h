@@ -19,7 +19,7 @@ typedef std::unique_ptr<Authenticator> AuthenticatorPtr;
 
 typedef std::function<void(const ::google::jwt_verify::Status& status)> AuthenticatorCallback;
 
-typedef std::function<void(const std::string&, const std::string&)> SetPayloadCallback;
+typedef std::function<void(const std::string&, const ProtobufWkt::Struct&)> SetPayloadCallback;
 
 /**
  *  CreateJwksFetcherCb is a callback interface for creating a JwksFetcher instance.
