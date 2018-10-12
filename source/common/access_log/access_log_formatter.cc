@@ -105,7 +105,10 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
   }
 
   std::string log_line;
-  ProtobufUtil::MessageToJsonString(output_struct, &log_line);
+  auto conversion_status = ProtobufUtil::MessageToJsonString(output_struct, &log_line);
+  if (!conversion_status.ok()) {
+    throw EnvoyException(fmt::format("Unable to convert access log to json: {}", conversion_status.ToString()));
+  }
 
   return log_line;
 }
