@@ -21,8 +21,7 @@ public:
   std::string name() const override;
 
 private:
-  std::map<const std::string, const std::string>
-  convertJsonFormatToMap(ProtobufWkt::Struct config);
+  std::map<const std::string, const std::string> convertJsonFormatToMap(ProtobufWkt::Struct config);
 };
 
 } // namespace File
