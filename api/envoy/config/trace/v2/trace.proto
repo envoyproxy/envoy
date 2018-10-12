@@ -80,6 +80,14 @@ message DynamicOtConfig {
   google.protobuf.Struct config = 2;
 }
 
+// Configuration for the Datadog tracer.
+message DatadogConfig {
+  // The cluster to use for submitting traces to the Datadog agent.
+  string collector_cluster = 1 [(validate.rules).string.min_bytes = 1];
+  string service_name = 2 [(validate.rules).string.min_bytes = 1];
+  bool priority_sampling = 3;
+}
+
 // Configuration structure.
 message TraceServiceConfig {
   // The upstream gRPC cluster that hosts the metrics service.

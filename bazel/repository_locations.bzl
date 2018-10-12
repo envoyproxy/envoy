@@ -82,6 +82,14 @@ REPOSITORY_LOCATIONS = dict(
         commit = "d6f78d948c53f3b400bb46996eb3084359914f9b",
         remote = "https://github.com/google/googleapis",
     ),
+    com_github_datadog_dd_opentracing_cpp = dict(
+        commit = "92d7ee11f61361ca23e00b48d328fb4e494534c4",  # v0.3.1
+        remote = "https://github.com/DataDog/dd-opentracing-cpp",
+    ),
+    com_github_msgpack_msgpack_c = dict(
+        commit = "83a82e3eb512b18d4149cabb7eb43c7e8bc081af",
+        remote = "https://github.com/msgpack/msgpack-c",  # v3.1.1
+    ),
     com_github_google_jwt_verify = dict(
         commit = "66792a057ec54e4b75c6a2eeda4e98220bd12a9a",  # 2018-08-17
         remote = "https://github.com/google/jwt_verify_lib",
