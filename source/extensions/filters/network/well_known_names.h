@@ -14,8 +14,6 @@ class NetworkFilterNameValues {
 public:
   // Client ssl auth filter
   const std::string ClientSslAuth = "envoy.client_ssl_auth";
-  // Dubbo proxy filter
-  const std::string DubboProxy = "envoy.filters.network.dubbo_proxy";
   // Echo filter
   const std::string Echo = "envoy.echo";
   // HTTP connection manager filter
