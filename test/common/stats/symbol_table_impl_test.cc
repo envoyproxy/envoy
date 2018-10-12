@@ -1,5 +1,6 @@
 #include <string>
 
+#include "common/common/logger.h"
 #include "common/memory/stats.h"
 #include "common/stats/symbol_table_impl.h"
 
@@ -370,7 +371,9 @@ TEST(SymbolTableTest, Memory) {
     size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
     foreach_stat(fn);
     size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
-    EXPECT_GT(end_mem, start_mem);
+    if (end_mem != 0) { // See warning below for asan, tsan, and mac.
+      EXPECT_GT(end_mem, start_mem);
+    }
     return end_mem - start_mem;
   };
 
@@ -392,11 +395,19 @@ TEST(SymbolTableTest, Memory) {
     }
   }
 
-  // In manual tests, string memory used 7759488 in this example, and
-  // symbol-table mem used 1739672. Setting the benchmark at 7759488/4 =
-  // 1939872, which should allow for some slop and platform dependence
-  // in the allocation library.
-  EXPECT_LT(symbol_table_mem_used, string_mem_used / 4);
+  // This test only works if Memory::Stats::totalCurrentlyAllocated() works, which
+  // appears not to be the case in some tests, including asan, tsan, and mac.
+  if (Memory::Stats::totalCurrentlyAllocated() == 0) {
+    std::cerr << "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0."
+              << std::endl;
+  } else {
+    // In manual tests, string memory used 7759488 in this example, and
+    // symbol-table mem used 1739672. Setting the benchmark at 7759488/4 =
+    // 1939872, which should allow for some slop and platform dependence
+    // in the allocation library.
+
+    EXPECT_LT(symbol_table_mem_used, string_mem_used / 4);
+  }
 }
 
 } // namespace Stats
