@@ -20,7 +20,7 @@ enum class CancelPolicy {
   // available for a future connection request.
   Default,
   // When a connection request is canceled, closes a pending connection if there are more pending
-  // connections that pending connection requests.
+  // connections than pending connection requests.
   CloseExcess,
 };
 
