@@ -17,6 +17,7 @@ public:
   const Object* getDataGeneric(absl::string_view data_name) const override;
   void addToListGeneric(absl::string_view data_name, std::unique_ptr<Object>&& data) override;
   const std::vector<std::unique_ptr<Object>>* getList(absl::string_view data_name) const override;
+  bool hasListWithName(absl::string_view) const override;
 
 private:
   // The explicit non-type-specific comparator is necessary to allow use of find() method

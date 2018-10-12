@@ -6,8 +6,9 @@ namespace Envoy {
 namespace StreamInfo {
 
 void FilterStateImpl::setData(absl::string_view data_name, std::unique_ptr<Object>&& data) {
-  // TODO(Google): Remove string conversion when fixed internally.
-  // absl::string_view will not convert to std::string without an explicit cast; see
+  // TODO(Google): Remove string conversion when fixed internally. Fixing
+  // this TODO will also require an explicit cast from absl::string_view to
+  // std::string in the data_storage_ index below; see
   // https://github.com/abseil/abseil-cpp/blob/master/absl/strings/string_view.h#L328
   const std::string name(data_name);
   if (data_storage_.find(name) != data_storage_.end()) {
@@ -49,6 +50,10 @@ FilterStateImpl::getList(absl::string_view data_name) const {
     return nullptr;
   }
   return &it->second;
+}
+
+bool FilterStateImpl::hasListWithName(absl::string_view data_name) const {
+  return list_storage_.count(std::string(data_name)) > 0;
 }
 
 } // namespace StreamInfo

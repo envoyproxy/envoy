@@ -59,7 +59,7 @@ public:
   /**
    * The addToList, hasListWithName, forEachListItem are variants of the above
    * functions, that operate on list data. Multiple elements could be added
-   * the list under the same data_name.
+   * to the list under the same data_name.
    * @param data_name the name of the list data being set.
    * @param data an owning pointer to the data to be appended to the list.
    * Note that data_names for list elements do not share the same namespace as
@@ -125,6 +125,13 @@ public:
    * data store.
    */
   virtual bool hasDataWithName(absl::string_view data_name) const PURE;
+
+  /**
+   * @param data_name the name of the list data being probed.
+   * @return Whether a list of any type and the name specified exists in the
+   * data store.
+   */
+  virtual bool hasListWithName(absl::string_view data_name) const PURE;
 
 protected:
   virtual const Object* getDataGeneric(absl::string_view data_name) const PURE;
