@@ -74,9 +74,10 @@ protected:
   OverloadManagerImplTest()
       : factory1_("envoy.resource_monitors.fake_resource1"),
         factory2_("envoy.resource_monitors.fake_resource2"), register_factory1_(factory1_),
-        register_factory2_(factory2_), timer_(new NiceMock<Event::MockTimer>()) {}
+        register_factory2_(factory2_) {}
 
   void setDispatcherExpectation() {
+    timer_ = new NiceMock<Event::MockTimer>();
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&](Event::TimerCb cb) {
       timer_cb_ = cb;
       return timer_;
@@ -199,6 +200,8 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   EXPECT_EQ(2, cb_count);
   EXPECT_EQ(0, active_gauge.value());
   EXPECT_EQ(40, pressure_gauge2.value());
+
+  manager->stop();
 }
 
 TEST_F(OverloadManagerImplTest, FailedUpdates) {
@@ -213,6 +216,8 @@ TEST_F(OverloadManagerImplTest, FailedUpdates) {
   EXPECT_EQ(1, failed_updates.value());
   timer_cb_();
   EXPECT_EQ(2, failed_updates.value());
+
+  manager->stop();
 }
 
 TEST_F(OverloadManagerImplTest, SkippedUpdates) {
@@ -236,6 +241,8 @@ TEST_F(OverloadManagerImplTest, SkippedUpdates) {
   post_cb();
   timer_cb_();
   EXPECT_EQ(2, skipped_updates.value());
+
+  manager->stop();
 }
 
 TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
