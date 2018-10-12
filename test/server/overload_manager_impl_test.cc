@@ -74,12 +74,12 @@ protected:
   OverloadManagerImplTest()
       : factory1_("envoy.resource_monitors.fake_resource1"),
         factory2_("envoy.resource_monitors.fake_resource2"), register_factory1_(factory1_),
-        register_factory2_(factory2_) {}
+        register_factory2_(factory2_), timer_(new NiceMock<Event::MockTimer>()) {}
 
   void setDispatcherExpectation() {
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&](Event::TimerCb cb) {
       timer_cb_ = cb;
-      return new NiceMock<Event::MockTimer>();
+      return timer_;
     }));
   }
 
@@ -129,6 +129,7 @@ protected:
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Event::MockTimer>* timer_; // not owned
   Stats::IsolatedStoreImpl stats_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
   Event::TimerCb timer_cb_;
@@ -306,6 +307,17 @@ TEST_F(OverloadManagerImplTest, DuplicateTrigger) {
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException, "Duplicate trigger .*");
 }
+
+TEST_F(OverloadManagerImplTest, Shutdown) {
+  setDispatcherExpectation();
+
+  auto manager(createOverloadManager(getConfig()));
+  manager->start();
+
+  EXPECT_CALL(*timer_, disableTimer());
+  manager->stop();
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

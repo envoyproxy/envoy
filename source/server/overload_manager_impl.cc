@@ -154,7 +154,9 @@ void OverloadManagerImpl::start() {
 
 void OverloadManagerImpl::stop() {
   // Disable any pending timeouts.
-  timer_.reset();
+  if (timer_) {
+    timer_->disableTimer();
+  }
 
   // Clear the resource map to block on any pending updates.
   resources_.clear();
