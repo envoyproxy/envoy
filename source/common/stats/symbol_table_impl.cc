@@ -9,6 +9,9 @@
 namespace Envoy {
 namespace Stats {
 
+static uint32_t SpilloverMask = 0x80;
+static uint32_t Low7Bits = 0x7f;
+
 SymbolEncoding::~SymbolEncoding() { ASSERT(vec_.empty()); }
 
 void SymbolEncoding::addSymbol(Symbol symbol) {
@@ -21,9 +24,9 @@ void SymbolEncoding::addSymbol(Symbol symbol) {
   // high-order bit 0.
   do {
     if (symbol < (1 << 7)) {
-      vec_.push_back(symbol);
+      vec_.push_back(symbol); // symbols <= 127 get encoded in one byte.
     } else {
-      vec_.push_back((symbol & 0x7f) | 0x80);
+      vec_.push_back((symbol & Low7Bits) | SpilloverMask); // symbols >= 128 need spillover bytes.
     }
     symbol >>= 7;
   } while (symbol != 0);
@@ -38,8 +41,12 @@ SymbolVec SymbolEncoding::decodeSymbols(const SymbolStorage array, size_t size) 
     ASSERT(size > 0);
     --size;
     ++array;
-    symbol |= (uc & 0x7f) << shift;
-    if ((uc & 0x80) == 0) {
+
+    // Inverse addSymbol encoding, walking down the bytes, shifting them into
+    // symbol, until a byte with a zero high order bit indicates this symbol is
+    // complete and we can move ot the next one.
+    symbol |= (uc & Low7Bits) << shift;
+    if ((uc & SpilloverMask) == 0) {
       symbol_vec.push_back(symbol);
       if (size == 0) {
         return symbol_vec;
@@ -58,7 +65,7 @@ void SymbolEncoding::moveToStorage(SymbolStorage symbol_array) {
   symbol_array[0] = sz & 0xff;
   symbol_array[1] = sz >> 8;
   memcpy(symbol_array + 2, vec_.data(), sz * sizeof(uint8_t));
-  vec_.clear();
+  vec_.clear(); // Logically transfer ownership, enabling empty assert on destruct.
 }
 
 SymbolTable::SymbolTable()
