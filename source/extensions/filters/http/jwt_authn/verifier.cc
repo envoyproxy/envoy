@@ -49,7 +49,7 @@ public:
   void storeAuth(AuthenticatorPtr&& auth) { auths_.emplace_back(std::move(auth)); }
 
   // Add a pair of (issuer, payload), called by Authenticator
-  void addPaylod(const std::string& issuer, const std::string& payload) {
+  void addPayload(const std::string& issuer, const std::string& payload) {
     payload_pairs_.push_back({issuer, payload});
   }
 
@@ -112,7 +112,7 @@ public:
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(ctximpl.headers(), extractor_->extract(ctximpl.headers()),
                  [&ctximpl](const std::string& issuer, const std::string& payload) {
-                   ctximpl.addPaylod(issuer, payload);
+                   ctximpl.addPayload(issuer, payload);
                  },
                  [this, context](const Status& status) {
                    onComplete(status, static_cast<ContextImpl&>(*context));
@@ -161,7 +161,7 @@ public:
     extractor_.sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(ctximpl.headers(), extractor_.extract(ctximpl.headers()),
                  [&ctximpl](const std::string& issuer, const std::string& payload) {
-                   ctximpl.addPaylod(issuer, payload);
+                   ctximpl.addPayload(issuer, payload);
                  },
                  [this, context](const Status& status) {
                    onComplete(status, static_cast<ContextImpl&>(*context));
