@@ -44,7 +44,9 @@ public:
   /**
    * Before destructing SymbolEncoding, you must call moveToStorage. This
    * transfers ownership, and in particular, the responsibility to call
-   * SymbolTable::clear() on all referenced symbols.
+   * SymbolTable::clear() on all referenced symbols. If we ever wanted
+   * to be able to destruct a SymbolEncoding without transferring it
+   * we could add a clear(SymbolTable&) method.
    */
   ~SymbolEncoding();
 
@@ -86,20 +88,25 @@ private:
 
 /**
  * SymbolTable manages a namespace optimized for stats, which are typically
- * composed of arrays of "."-separated tokens, with a very strong overlap
- * between the tokens. Each token is called a Symbol (uint32_t).
+ * composed of arrays of "."-separated tokens, with a significant overlap
+ * between the tokens. Each token is mapped to a Symbol (uint32_t) and
+ * reference-counted so that no-longer-used symbols can be reclaimed.
  *
- * However, we use a uint8_t array to conserve space, as in practice the
- * majority of token instances in stat names draw from a fairly small set
- * of common names, likely less than 100. The format is somewhat similar
- * to UTF-8, with a variable-length array of uint8_t. See the implementation
- * for details.
+ * We use a uint8_t array to encode arrays of symbols in order to conserve
+ * space, as in practice the majority of token instances in stat names draw from
+ * a fairly small set of common names, typically less than 100. The format is
+ * somewhat similar to UTF-8, with a variable-length array of uint8_t. See the
+ * implementation for details.
  *
- * StatNameStorage manages the memory for the byte-encoding. Not all StatNames
- * are backed by StatNameStorage -- the storage may be inlined into another
- * object such as HeapStatData. StaNameStorage is not fully RAII -- in
+ * StatNameStorage can be used to manage memory for the byte-encoding. Not all
+ * StatNames are backed by StatNameStorage -- the storage may be inlined into
+ * another object such as HeapStatData. StaNameStorage is not fully RAII --
+ * instead the owner must call free(SymbolTable&) explicitly before
+ * StatNameStorage is destructed. This saves 8 bytes of storage per stat.
  *
- * A StatNameRef is a copyable and assignable reference to this storage.
+ * A StatName is a copyable and assignable reference to this storage. It does
+ * not own the storage or keep it alive via reference counts; the owner must
+ * ensure the backing store lives as long as the StatName.
  *
  * The underlying Symbol / SymbolVec data structures are private to the
  * impl. One side effect of the non-monotonically-increasing symbol counter is
@@ -113,11 +120,9 @@ public:
   ~SymbolTable();
 
   /**
-   * Encodes a stat name using the symbol table, returning an
-   * SymbolEncoding. The SymbolEncoding is not intended for long-term storage,
-   * but is instead used to encode a StatName. You must first encode a string
-   * into a SymbolEncoding in order to properly size the backing-store for a
-   * StatName.
+   * Encodes a stat name using the symbol table, returning a SymbolEncoding. The
+   * SymbolEncoding is not intended for long-term storage, but is used to help
+   * allocate and StatName with the correct amount of storage.
    *
    * When a name is encoded, it bumps reference counts held in the table for
    * each symbol. The caller is responsible for creating a StatName using this
@@ -140,7 +145,33 @@ public:
     return encode_map_.size();
   }
 
+  /**
+   * Deterines whether one StatName lexically precedes another. Note that
+   * the lexical order may not exactly match the lexical order of the
+   * elaborated strings. For example, stat-name of "-.-" would lexically
+   * sort after "---" but when encoded as a StatName would come lexically
+   * earlier. In practice this is unlikely to matter as those are not
+   * reasonable names for Envoy stats.
+   *
+   * Note that this operation has to be performed with the context of the
+   * SymbolTable so that the individual Symbol objects can be converted
+   * into strings for lexical comparison.
+   *
+   * @param a the first stat name
+   * @param b the second stat name
+   * @return bool true if a lexically precedes b.
+   */
   bool lessThan(const StatName& a, const StatName& b) const;
+
+  /**
+   * Since SymbolTable does manual reference counting, a client of SymbolTable
+   * must manually call free(symbol_vec) when it is freeing the backing store
+   * for a StatName. This way, the symbol table will grow and shrink
+   * dynamically, instead of being write-only.
+   *
+   * @param symbol_vec the vector of symbols to be freed.
+   */
+  void free(StatName stat_name);
 
 private:
   friend class StatName;
@@ -163,15 +194,6 @@ private:
    * @return std::string the retrieved stat name.
    */
   std::string decode(const SymbolStorage symbol_vec, size_t size) const;
-
-  /**
-   * Since SymbolTable does manual reference counting, a client of SymbolTable (such as
-   * StatName) must manually call free(symbol_vec) when it is freeing the stat it represents. This
-   * way, the symbol table will grow and shrink dynamically, instead of being write-only.
-   *
-   * @param symbol_vec the vector of symbols to be freed.
-   */
-  void free(const SymbolStorage symbol_vec, size_t size);
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
@@ -230,19 +252,15 @@ public:
   explicit StatName(const SymbolStorage symbol_array) : symbol_array_(symbol_array) {}
   StatName() : symbol_array_(nullptr) {}
 
-  // Returns the number of bytes in the symbol array (not including the overhead
-  // for keeping the size.
-  size_t numBytes() const {
-    return symbol_array_[0] | (static_cast<size_t>(symbol_array_[1]) << 8);
-  }
-
-  const uint8_t* data() const { return symbol_array_ + 2; }
-
-  void free(SymbolTable& symbol_table) { symbol_table.free(data(), numBytes()); } // DELETE
   std::string toString(const SymbolTable& table) const { return table.decode(data(), numBytes()); }
 
-  // Returns a hash of the underlying symbol vector, since StatNames are uniquely defined by their
-  // symbol vectors.
+  /**
+   * Note that this hash function will return a different hash than that of
+   * the elaborated string.
+   *
+   * @return uint64_t a hash of the underlying symbol vector, since StatNames
+   *                  are uniquely defined by their symbol vectors.
+   */
   uint64_t hash() const {
     const char* cdata = reinterpret_cast<const char*>(data());
     return HashUtil::xxHash64(absl::string_view(cdata, numBytes()));
@@ -258,8 +276,21 @@ public:
 
 protected:
   friend SymbolTable;
-
   friend class StatNameTest;
+
+  /**
+   * @return size_t the number of bytes in the symbol array, excluding the two-byte
+   *                 overhead for the size itself.
+   */
+  size_t numBytes() const {
+    return symbol_array_[0] | (static_cast<size_t>(symbol_array_[1]) << 8);
+  }
+
+  /**
+   * @return uint8_t* A pointer to the first byte of data (skipping over size bytes).
+   */
+  const uint8_t* data() const { return symbol_array_ + 2; }
+
   const uint8_t* symbol_array_;
 };
 
@@ -287,25 +318,30 @@ public:
    */
   void free(SymbolTable& table);
 
+  /**
+   * @return StatName a reference to the owned storage.
+   */
   StatName statName() const { return StatName(bytes_.get()); }
 
 private:
   std::unique_ptr<SymbolStorage> bytes_;
 };
 
-using StatNameStoragePtr = std::unique_ptr<StatNameStorage>;
-
+// Helper class for constructing hash-tables with StatName keys.
 struct StatNameHash {
   size_t operator()(const StatName& a) const { return a.hash(); }
 };
 
+// Helper class for constructing hash-tables with StatName keys.
 struct StatNameCompare {
   bool operator()(const StatName& a, const StatName& b) const { return a == b; }
 };
 
+// Value-templatized hash-map with StatName key.
 template <class T>
 using StatNameHashMap = std::unordered_map<StatName, T, StatNameHash, StatNameCompare>;
 
+// Helper class for sorting StatNames.
 struct StatNameLessThan {
   StatNameLessThan(const SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   bool operator()(const StatName& a, const StatName& b) const {

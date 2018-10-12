@@ -115,9 +115,9 @@ std::string SymbolTable::decode(const SymbolStorage symbol_array, size_t size) c
   return absl::StrJoin(name_tokens, ".");
 }
 
-void SymbolTable::free(const SymbolStorage symbol_array, size_t size) {
+void SymbolTable::free(StatName stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolStorage.
-  SymbolVec symbols = SymbolEncoding::decodeSymbols(symbol_array, size);
+  SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.numBytes());
 
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
@@ -206,7 +206,7 @@ StatNameStorage::~StatNameStorage() {
 }
 
 void StatNameStorage::free(SymbolTable& table) {
-  statName().free(table);
+  table.free(statName());
   bytes_.reset();
 }
 

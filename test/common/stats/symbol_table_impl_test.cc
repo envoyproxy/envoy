@@ -17,7 +17,7 @@ protected:
 
   void clearStorage() {
     for (auto& stat_name_storage : stat_name_storage_) {
-      stat_name_storage->free(table_);
+      stat_name_storage.free(table_);
     }
     stat_name_storage_.clear();
     EXPECT_EQ(0, table_.numSymbols());
@@ -30,18 +30,16 @@ protected:
     return makeStat(stat_name).toString(table_);
   }
 
-  StatNameStoragePtr makeStatStorage(absl::string_view name) {
-    return std::make_unique<StatNameStorage>(name, table_);
-  }
+  StatNameStorage makeStatStorage(absl::string_view name) { return StatNameStorage(name, table_); }
 
   StatName makeStat(absl::string_view name) {
     stat_name_storage_.emplace_back(makeStatStorage(name));
-    return stat_name_storage_.back()->statName();
+    return stat_name_storage_.back().statName();
   }
 
   SymbolTable table_;
 
-  std::vector<StatNameStoragePtr> stat_name_storage_;
+  std::vector<StatNameStorage> stat_name_storage_;
 };
 
 TEST_F(StatNameTest, AllocFree) { encodeDecode("hello.world"); }
@@ -179,41 +177,41 @@ TEST_F(StatNameTest, TestShrinkingExpectation) {
   // ::size() is a public function, but should only be used for testing.
   size_t table_size_0 = table_.numSymbols();
 
-  StatNameStoragePtr stat_a(makeStatStorage("a"));
+  StatNameStorage stat_a(makeStatStorage("a"));
   size_t table_size_1 = table_.numSymbols();
 
-  StatNameStoragePtr stat_aa(makeStatStorage("a.a"));
+  StatNameStorage stat_aa(makeStatStorage("a.a"));
   EXPECT_EQ(table_size_1, table_.numSymbols());
 
-  StatNameStoragePtr stat_ab(makeStatStorage("a.b"));
+  StatNameStorage stat_ab(makeStatStorage("a.b"));
   size_t table_size_2 = table_.numSymbols();
 
-  StatNameStoragePtr stat_ac(makeStatStorage("a.c"));
+  StatNameStorage stat_ac(makeStatStorage("a.c"));
   size_t table_size_3 = table_.numSymbols();
 
-  StatNameStoragePtr stat_acd(makeStatStorage("a.c.d"));
+  StatNameStorage stat_acd(makeStatStorage("a.c.d"));
   size_t table_size_4 = table_.numSymbols();
 
-  StatNameStoragePtr stat_ace(makeStatStorage("a.c.e"));
+  StatNameStorage stat_ace(makeStatStorage("a.c.e"));
   size_t table_size_5 = table_.numSymbols();
   EXPECT_GE(table_size_5, table_size_4);
 
-  stat_ace->free(table_);
+  stat_ace.free(table_);
   EXPECT_EQ(table_size_4, table_.numSymbols());
 
-  stat_acd->free(table_);
+  stat_acd.free(table_);
   EXPECT_EQ(table_size_3, table_.numSymbols());
 
-  stat_ac->free(table_);
+  stat_ac.free(table_);
   EXPECT_EQ(table_size_2, table_.numSymbols());
 
-  stat_ab->free(table_);
+  stat_ab.free(table_);
   EXPECT_EQ(table_size_1, table_.numSymbols());
 
-  stat_aa->free(table_);
+  stat_aa.free(table_);
   EXPECT_EQ(table_size_1, table_.numSymbols());
 
-  stat_a->free(table_);
+  stat_a.free(table_);
   EXPECT_EQ(table_size_0, table_.numSymbols());
 }
 
@@ -240,8 +238,8 @@ TEST_F(StatNameTest, StoringWithoutStatNameStorage) {
 
   // If we don't explicitly call free() on the the StatName objects the
   // SymbolTable will assert on destruction.
-  hello.free(table_);
-  goodbye.free(table_);
+  table_.free(hello);
+  table_.free(goodbye);
 }
 
 TEST_F(StatNameTest, HashTable) {
@@ -274,7 +272,7 @@ TEST_F(StatNameTest, Sort) {
 
 // Tests the memory savings realized from using symbol tables with 1k clusters. This
 // test shows the memory drops from almost 8M to less than 2M.
-TEST(Symbol, Memory) {
+TEST(SymbolTableTest, Memory) {
   // These are stats that are repeated for each cluster as of Oct 2018.
   const std::vector<std::string> cluster_stats({"bind_errors",
                                                 "lb_healthy_panic",
@@ -372,6 +370,7 @@ TEST(Symbol, Memory) {
     size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
     foreach_stat(fn);
     size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+    EXPECT_GT(end_mem, start_mem);
     return end_mem - start_mem;
   };
 
@@ -394,8 +393,9 @@ TEST(Symbol, Memory) {
   }
 
   // In manual tests, string memory used 7759488 in this example, and
-  // symbol-table mem used 1739672. Setitng the benchmark at 7759488/4 =
-  // 1939872, which should allow for some slop in the malloc library.
+  // symbol-table mem used 1739672. Setting the benchmark at 7759488/4 =
+  // 1939872, which should allow for some slop and platform dependence
+  // in the allocation library.
   EXPECT_LT(symbol_table_mem_used, string_mem_used / 4);
 }
 
