@@ -13,8 +13,6 @@
 
 #include "absl/strings/str_split.h"
 #include "fmt/format.h"
-#include "rapidjson/prettywriter.h"
-#include "rapidjson/stringbuffer.h"
 
 using Envoy::Config::Metadata;
 
@@ -97,17 +95,19 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
                                       const Http::HeaderMap& response_headers,
                                       const Http::HeaderMap& response_trailers,
                                       const StreamInfo::StreamInfo& stream_info) const {
-  rapidjson::StringBuffer strbuf;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
-
   auto output_map = this->to_map(request_headers, response_headers, response_trailers, stream_info);
-  writer.StartObject();
+
+  ProtobufWkt::Struct output_struct;
   for (const auto& pair : output_map) {
-    writer.Key(pair.first.c_str());
-    writer.String(pair.second.c_str());
+    Protobuf::Value string_value;
+    string_value.set_string_value(pair.second);
+    (*output_struct.mutable_fields())[pair.first] = string_value;
   }
-  writer.EndObject();
-  return fmt::format("{}\n", strbuf.GetString());
+
+  std::string log_line;
+  ProtobufUtil::MessageToJsonString(output_struct, &log_line);
+
+  return log_line;
 }
 
 std::unordered_map<std::string, std::string> JsonFormatterImpl::to_map(

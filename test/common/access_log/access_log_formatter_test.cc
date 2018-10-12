@@ -452,7 +452,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
         {"nonexistent_response_header", "%RESP(nonexistent_response_header)%"},
         {"some_response_header", "%RESP(some_response_header)%"}};
     JsonFormatterImpl formatter(key_mapping);
-
+    
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
