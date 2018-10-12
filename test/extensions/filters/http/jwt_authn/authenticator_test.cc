@@ -269,8 +269,7 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   auto tokens = filter_config_->getExtractor().extract(headers);
   // callback should not be called.
   std::function<void(const Status&)> on_complete_cb = [](const Status&) { FAIL(); };
-  auto set_payload_cb = [this](const std::string&, const std::string&) {};
-  auth_->verify(headers, std::move(tokens), std::move(set_payload_cb), std::move(on_complete_cb));
+  auth_->verify(headers, std::move(tokens), nullptr, std::move(on_complete_cb));
 
   // Destroy the authenticating process.
   auth_->onDestroy();
