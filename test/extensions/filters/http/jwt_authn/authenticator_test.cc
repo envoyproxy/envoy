@@ -14,14 +14,14 @@
 #include "gtest/gtest.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
-using ::google::jwt_verify::Jwks;
-using ::google::jwt_verify::Status;
-using ::testing::Invoke;
-using ::testing::NiceMock;
-using ::testing::_;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcher;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcherPtr;
 using Envoy::Extensions::HttpFilters::Common::MockJwksFetcher;
+using ::google::jwt_verify::Jwks;
+using ::google::jwt_verify::Status;
+using ::testing::_;
+using ::testing::Invoke;
+using ::testing::NiceMock;
 
 namespace Envoy {
 namespace Extensions {
