@@ -10,6 +10,7 @@
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/thread_local_store.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -651,13 +652,12 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
     // Skip this test for platforms where we can't measure memory.
     return;
   }
-  for (int i = 0; i < 100000; ++i) {
-    const std::string name = absl::StrCat("stat", i);
-    store_->counter(name);
-  }
+  TestUtil::foreachStat(1000, [this](absl::string_view name) {
+                                store_->counter(std::string(name));
+                              });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 29 * million); // actual value: 2893664 as of 10/12/2018
+  EXPECT_LT(end_mem - start_mem, 32 * million); // actual value: 31492864 as of 10/12/2018
 }
 
 TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
@@ -668,13 +668,12 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
     // Skip this test for platforms where we can't measure memory.
     return;
   }
-  for (int i = 0; i < 100000; ++i) {
-    const std::string name = absl::StrCat("stat", i);
-    store_->counter(name);
-  }
+  TestUtil::foreachStat(1000, [this](absl::string_view name) {
+                                store_->counter(std::string(name));
+                              });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 37 * million); // actual value: 36205264 as of 10/12/2018
+  EXPECT_LT(end_mem - start_mem, 41 * million); // actual value: 40411536 as of 10/12/2018
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
