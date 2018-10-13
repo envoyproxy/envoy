@@ -191,20 +191,25 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(
 
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
-    const std::string& name,
-    std::unordered_map<std::string, std::shared_ptr<StatType>>& central_cache_map,
-    MakeStatFn<StatType> make_stat, std::shared_ptr<StatType>* tls_ref) {
+    const std::string& name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
+    MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache) {
 
   // If we have a valid cache entry, return it.
-  if (tls_ref && *tls_ref) {
-    return **tls_ref;
+  if (tls_cache) {
+    auto pos = tls_cache->find(name.c_str());
+    if (pos != tls_cache->end()) {
+      return *pos->second;
+    }
   }
 
   // We must now look in the central store so we must be locked. We grab a reference to the
   // central store location. It might contain nothing. In this case, we allocate a new stat.
   Thread::LockGuard lock(parent_.lock_);
-  std::shared_ptr<StatType>& central_ref = central_cache_map[name];
-  if (!central_ref) {
+  auto p = central_cache_map.find(name.c_str());
+  std::shared_ptr<StatType>* central_ref = nullptr;
+  if (p != central_cache_map.end()) {
+    central_ref = &(p->second);
+  } else {
     std::vector<Tag> tags;
 
     // Tag extraction occurs on the original, untruncated name so the extraction
@@ -219,16 +224,17 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
                        std::move(tags));
       ASSERT(stat != nullptr);
     }
-    central_ref = stat;
+    central_ref = &central_cache_map[stat->nameCStr()];
+    *central_ref = stat;
   }
 
-  // If we have a TLS location to store or allocation into, do it.
-  if (tls_ref) {
-    *tls_ref = central_ref;
+  // If we have a TLS cache, insert the stat.
+  if (tls_cache) {
+    tls_cache->insert(std::make_pair((*central_ref)->nameCStr(), *central_ref));
   }
 
   // Finally we return the reference.
-  return *central_ref;
+  return **central_ref;
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
@@ -244,10 +250,10 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // We now try to acquire a *reference* to the TLS cache shared pointer. This might remain null
   // if we don't have TLS initialized currently. The de-referenced pointer might be null if there
   // is no cache entry.
-  CounterSharedPtr* tls_ref = nullptr;
+  StatMap<CounterSharedPtr>* tls_cache = nullptr;
+
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref =
-        &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].counters_[final_name];
+    tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].counters_;
   }
 
   return safeMakeStat<Counter>(
@@ -256,7 +262,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
          std::vector<Tag>&& tags) -> CounterSharedPtr {
         return allocator.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
       },
-      tls_ref);
+      tls_cache);
 }
 
 void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& histogram,
@@ -285,9 +291,9 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
     return null_gauge_;
   }
 
-  GaugeSharedPtr* tls_ref = nullptr;
+  StatMap<GaugeSharedPtr>* tls_cache = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].gauges_[final_name];
+    tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].gauges_;
   }
 
   return safeMakeStat<Gauge>(
@@ -296,7 +302,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
          std::vector<Tag>&& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
       },
-      tls_ref);
+      tls_cache);
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
@@ -314,7 +320,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref = &parent_.tls_->getTyped<TlsCache>()
                    .scope_cache_[this->scope_id_]
-                   .parent_histograms_[final_name];
+                   .parent_histograms_[final_name.c_str()];
   }
 
   if (tls_ref && *tls_ref) {
@@ -322,7 +328,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   }
 
   Thread::LockGuard lock(parent_.lock_);
-  ParentHistogramImplSharedPtr& central_ref = central_cache_.histograms_[final_name];
+  ParentHistogramImplSharedPtr& central_ref = central_cache_.histograms_[final_name.c_str()];
   if (!central_ref) {
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
@@ -348,7 +354,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
   // during recordValue, the prefix is already attached to the name.
   TlsHistogramSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_[name];
+    tls_ref =
+        &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_[name.c_str()];
   }
 
   if (tls_ref && *tls_ref) {

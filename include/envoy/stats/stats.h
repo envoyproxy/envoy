@@ -23,7 +23,20 @@ public:
   /**
    * Returns the full name of the Metric.
    */
-  virtual const std::string name() const PURE;
+  virtual std::string name() const PURE;
+
+  /**
+   * Returns the full name of the Metric as a nul-terminated string. The
+   * intention is use this as a hash-map key, so that the stat name storage
+   * is not duplicated in every map. You cannot use name() above for this,
+   * as it returns a std::string by value, as not all stat implementations
+   * containe the name as a std::string.
+   *
+   * Note that in the future, the plan is to replace this method with one that
+   * returns a reference to a StatName (see
+   * sourcce/common/stats/symbol_table_impl.h).
+   */
+  virtual const char* nameCStr() const PURE;
 
   /**
    * Returns a vector of configurable tags to identify this Metric.

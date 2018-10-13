@@ -10,6 +10,7 @@
 
 #include "envoy/thread_local/thread_local.h"
 
+#include "common/common/hash.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/source_impl.h"
@@ -48,7 +49,8 @@ public:
   bool used() const override { return flags_ & Flags::Used; }
 
   // Stats::Metric
-  const std::string name() const override { return name_; }
+  std::string name() const override { return name_; }
+  const char* nameCStr() const override { return name_.c_str(); }
 
 private:
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
@@ -91,7 +93,8 @@ public:
   const std::string summary() const override;
 
   // Stats::Metric
-  const std::string name() const override { return name_; }
+  std::string name() const override { return name_; }
+  const char* nameCStr() const override { return name_.c_str(); }
 
 private:
   bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
@@ -214,17 +217,19 @@ public:
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
 
 private:
+  template <class Stat> using StatMap = CharStarHashMap<Stat>;
+
   struct TlsCacheEntry {
-    std::unordered_map<std::string, CounterSharedPtr> counters_;
-    std::unordered_map<std::string, GaugeSharedPtr> gauges_;
-    std::unordered_map<std::string, TlsHistogramSharedPtr> histograms_;
-    std::unordered_map<std::string, ParentHistogramSharedPtr> parent_histograms_;
+    StatMap<CounterSharedPtr> counters_;
+    StatMap<GaugeSharedPtr> gauges_;
+    StatMap<TlsHistogramSharedPtr> histograms_;
+    StatMap<ParentHistogramSharedPtr> parent_histograms_;
   };
 
   struct CentralCacheEntry {
-    std::unordered_map<std::string, CounterSharedPtr> counters_;
-    std::unordered_map<std::string, GaugeSharedPtr> gauges_;
-    std::unordered_map<std::string, ParentHistogramImplSharedPtr> histograms_;
+    StatMap<CounterSharedPtr> counters_;
+    StatMap<GaugeSharedPtr> gauges_;
+    StatMap<ParentHistogramImplSharedPtr> histograms_;
   };
 
   struct ScopeImpl : public TlsScope {
@@ -263,9 +268,8 @@ private:
      */
     template <class StatType>
     StatType&
-    safeMakeStat(const std::string& name,
-                 std::unordered_map<std::string, std::shared_ptr<StatType>>& central_cache_map,
-                 MakeStatFn<StatType> make_stat, std::shared_ptr<StatType>* tls_ref);
+    safeMakeStat(const std::string& name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
+                 MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache);
 
     static std::atomic<uint64_t> next_scope_id_;
 

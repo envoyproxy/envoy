@@ -77,7 +77,7 @@ struct RawStatData {
   /**
    * Returns the name as a std::string.
    */
-  std::string name() const { return std::string(name_); }
+  const char* name() const { return name_; }
 
   std::atomic<uint64_t> value_;
   std::atomic<uint64_t> pending_increment_;

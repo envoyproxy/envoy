@@ -6,7 +6,10 @@
 namespace Envoy {
 namespace Stats {
 
-HeapStatData::HeapStatData(absl::string_view key) : name_(key.data(), key.size()) {}
+HeapStatData::HeapStatData(absl::string_view key) {
+  memcpy(name_, key.data(), key.size());
+  name_[key.size()] = '\0';
+}
 
 HeapStatDataAllocator::HeapStatDataAllocator() {}
 
@@ -15,11 +18,12 @@ HeapStatDataAllocator::~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {
   // Any expected truncation of name is done at the callsite. No truncation is
   // required to use this allocator.
-  auto data = std::make_unique<HeapStatData>(name);
+  void* memory = ::malloc(sizeof(HeapStatData) + name.size() + 1);
+  std::unique_ptr<HeapStatData> data(new (memory) HeapStatData(name));
   Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data.get());
-  HeapStatData* existing_data = *ret.first;
   lock.release();
+  HeapStatData* existing_data = *ret.first;
 
   if (ret.second) {
     return data.release();
@@ -40,7 +44,10 @@ void HeapStatDataAllocator::free(HeapStatData& data) {
     ASSERT(key_removed == 1);
   }
 
-  delete &data;
+  // The memory was allocated by malloc() and constructed by placed new, so
+  // it should be explicitly deconstructed and then freed().
+  data.~HeapStatData();
+  ::free(&data);
 }
 
 template class StatDataAllocatorImpl<HeapStatData>;
