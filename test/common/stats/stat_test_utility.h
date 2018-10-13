@@ -7,6 +7,12 @@ namespace Envoy {
 namespace Stats {
 namespace TestUtil {
 
+// We can only test absolute memory usage if the malloc library is a known
+// quantity. This decision is centralized here.
+#ifdef TCMALLOC
+#define ENABLE_MEMORY_USAGE_TESTS
+#endif
+
 /**
  * Calls a fn with every stat name in the system for the given number of
  * clusters, as of Oct 12, 2018.

@@ -644,6 +644,8 @@ TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 }
 
+#ifdef ENABLE_MEMORY_USAGE_TESTS
+
 // Tests how much memory is consumed allocating 100k stats.
 TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
   const size_t million = 1000 * 1000;
@@ -673,6 +675,8 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
   EXPECT_LT(start_mem, end_mem);
   EXPECT_LT(end_mem - start_mem, 41 * million); // actual value: 40411536 as of 10/12/2018
 }
+
+#endif // ENABLE_MEMORY_USAGE_TESTS
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   InSequence s;
