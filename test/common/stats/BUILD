@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -39,6 +40,7 @@ envoy_cc_test(
     name = "symbol_table_impl_test",
     srcs = ["symbol_table_impl_test.cc"],
     deps = [
+        ":stat_test_utility_lib",
         "//source/common/common:thread_lib",
         "//source/common/memory:stats_lib",
         "//source/common/stats:symbol_table_lib",
@@ -73,6 +75,15 @@ envoy_cc_test(
     deps = [
         "//source/common/stats:tag_producer_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "stat_test_utility_lib",
+    srcs = ["stat_test_utility.cc"],
+    hdrs = ["stat_test_utility.h"],
+    external_deps = [
+        "abseil_strings",
     ],
 )
 
