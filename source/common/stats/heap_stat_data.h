@@ -17,8 +17,6 @@ namespace Stats {
  * so that it can be allocated efficiently from the heap on demand.
  */
 struct HeapStatData {
-  explicit HeapStatData(absl::string_view key);
-
   /**
    * @returns absl::string_view the name as a string_view.
    */
@@ -29,11 +27,22 @@ struct HeapStatData {
    */
   const char* name() const { return name_; }
 
+  static HeapStatData* alloc(absl::string_view name);
+  void free();
+
   std::atomic<uint64_t> value_{0};
   std::atomic<uint64_t> pending_increment_{0};
   std::atomic<uint16_t> flags_{0};
   std::atomic<uint16_t> ref_count_{1};
   char name_[];
+
+private:
+  /**
+   * You cannot construct/destruct a HeapStatData directly with new/delete as
+   * it's variable-size. Use alloc()/free() methods above.
+   */
+  explicit HeapStatData(absl::string_view name);
+  ~HeapStatData() {}
 };
 
 /**

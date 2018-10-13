@@ -18,17 +18,17 @@ HeapStatDataAllocator::~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {
   // Any expected truncation of name is done at the callsite. No truncation is
   // required to use this allocator.
-  void* memory = ::malloc(sizeof(HeapStatData) + name.size() + 1);
-  std::unique_ptr<HeapStatData> data(new (memory) HeapStatData(name));
+  HeapStatData* data = HeapStatData::alloc(name);
   Thread::ReleasableLockGuard lock(mutex_);
-  auto ret = stats_.insert(data.get());
+  auto ret = stats_.insert(data);
   HeapStatData* existing_data = *ret.first;
   lock.release();
 
   if (ret.second) {
-    return data.release();
+    return data;
   }
   ++existing_data->ref_count_;
+  data->free();
   return existing_data;
 }
 
@@ -44,10 +44,18 @@ void HeapStatDataAllocator::free(HeapStatData& data) {
     ASSERT(key_removed == 1);
   }
 
-  // The memory was allocated by malloc() and constructed by placed new, so
-  // it should be explicitly deconstructed and then freed().
-  data.~HeapStatData();
-  ::free(&data);
+  data.free();
+}
+
+HeapStatData* HeapStatData::alloc(absl::string_view name) {
+  void* memory = ::malloc(sizeof(HeapStatData) + name.size() + 1);
+  ASSERT(memory);
+  return new (memory) HeapStatData(name);
+}
+
+void HeapStatData::free() {
+  this->~HeapStatData();
+  ::free(this); // matches malloc() call above.
 }
 
 template class StatDataAllocatorImpl<HeapStatData>;

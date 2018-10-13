@@ -368,16 +368,13 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
 
   // See comments in counter() which explains the logic here.
 
-  // Here prefix will not be considered because, by the time ParentHistogram calls this method
-  // during recordValue, the prefix is already attached to the name.
-  TlsHistogramSharedPtr* tls_ref = nullptr;
+  StatMap<TlsHistogramSharedPtr>* tls_cache = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref =
-        &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_[name.c_str()];
-  }
-
-  if (tls_ref && *tls_ref) {
-    return **tls_ref;
+    tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_;
+    auto p = tls_cache->find(name.c_str());
+    if (p != tls_cache->end()) {
+      return *p->second;
+    }
   }
 
   std::vector<Tag> tags;
@@ -387,8 +384,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
 
   parent.addTlsHistogram(hist_tls_ptr);
 
-  if (tls_ref) {
-    *tls_ref = hist_tls_ptr;
+  if (tls_cache) {
+    tls_cache->insert(std::make_pair(hist_tls_ptr->nameCStr(), hist_tls_ptr));
   }
   return *hist_tls_ptr;
 }
