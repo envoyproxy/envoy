@@ -268,6 +268,8 @@ TEST_F(StatNameTest, Sort) {
   EXPECT_EQ(names, sorted_names);
 }
 
+#ifdef ENABLE_MEMORY_USAGE_TESTS
+
 // Tests the memory savings realized from using symbol tables with 1k clusters. This
 // test shows the memory drops from almost 8M to less than 2M.
 TEST(SymbolTableTest, Memory) {
@@ -314,6 +316,8 @@ TEST(SymbolTableTest, Memory) {
     EXPECT_LT(symbol_table_mem_used, string_mem_used / 4);
   }
 }
+
+#endif // ENABLE_MEMORY_USAGE_TESTS
 
 } // namespace Stats
 } // namespace Envoy
