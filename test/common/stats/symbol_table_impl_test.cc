@@ -206,7 +206,7 @@ TEST(SymbolTableTest, Memory) {
     SymbolTableImpl table;
     std::vector<StatNamePtr> names;
     auto record_stat = [&names, &table](absl::string_view stat) {
-                         names.emplace_back(table.encode(stat));
+      names.emplace_back(table.encode(stat));
     };
     symbol_table_mem_used = test_memory_usage(record_stat);
   }
