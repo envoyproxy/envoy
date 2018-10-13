@@ -350,8 +350,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
     std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
     auto stat = std::make_shared<ParentHistogramImpl>(
         final_name, parent_, *this, std::move(tag_extracted_name), std::move(tags));
-    central_cache_.histograms_.insert(std::make_pair(stat->nameCStr(), stat));
-    central_ref = &stat;
+    central_ref = &central_cache_.histograms_[stat->nameCStr()];
+    *central_ref = stat;
   }
 
   if (tls_cache != nullptr) {
