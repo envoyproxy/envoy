@@ -1122,15 +1122,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
         option->hashKey(hash_key);
       }
     }
-
-    // in case of TLS connections, and in case the SNI is forwarded, add the SNI to the hash key,
-    // so the pool will contain TLS connections with the identical SNI
-    if (!context->downstreamConnection()->requestedServerName().empty() &&
-        cluster_info_->forwardOriginalServerNameIndication()) {
-      std::hash<std::string> hash_function;
-      hash_key.push_back(
-          hash_function(std::string(context->downstreamConnection()->requestedServerName())));
-    }
   }
 
   ConnPoolsContainer& container = parent_.host_http_conn_pool_map_[host];
@@ -1168,6 +1159,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
         have_options = true;
         option->hashKey(hash_key);
       }
+    }
+
+    // in case of connections that have a requested server name, and in case this requested
+    // server name is forwarded, add the it to the hash key,
+    // so the pool will contain connections with the identical requested server name
+    if (!context->downstreamConnection()->requestedServerName().empty() &&
+        cluster_info_->forwardOriginalServerNameIndication()) {
+      std::hash<std::string> hash_function;
+      hash_key.push_back(
+          hash_function(std::string(context->downstreamConnection()->requestedServerName())));
     }
   }
 
