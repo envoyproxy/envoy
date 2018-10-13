@@ -19,7 +19,6 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/str_join.h"
-#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Stats {

@@ -14,9 +14,8 @@
 #include "common/stats/source_impl.h"
 #include "common/stats/utility.h"
 
-#include "circllhist.h"
-
 #include "absl/container/flat_hash_map.h"
+#include "circllhist.h"
 
 namespace Envoy {
 namespace Stats {
