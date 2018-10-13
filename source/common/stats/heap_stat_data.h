@@ -25,7 +25,7 @@ struct HeapStatData {
   absl::string_view key() const { return name_; }
 
   /**
-   * @returns std::string the name as a std::string.
+   * @returns std::string the name as a const char*.
    */
   const char* name() const { return name_; }
 
@@ -54,7 +54,7 @@ public:
 
 private:
   struct HeapStatHash {
-    size_t operator()(const HeapStatData* a) const { return HashUtil::xxHash64(a->name()); }
+    size_t operator()(const HeapStatData* a) const { return HashUtil::xxHash64(a->key()); }
   };
   struct HeapStatCompare {
     bool operator()(const HeapStatData* a, const HeapStatData* b) const {

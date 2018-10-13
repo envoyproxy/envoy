@@ -5,7 +5,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <unordered_set>
 
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/sink.h"
@@ -38,7 +37,7 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
-  std::unordered_set<std::string> names;
+  CharStarHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& counter : scope->central_cache_.counters_) {
@@ -61,7 +60,7 @@ ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
-  std::unordered_set<std::string> names;
+  CharStarHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& gauge : scope->central_cache_.gauges_) {
@@ -239,6 +238,12 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // Determine the final name based on the prefix and the passed name.
+  //
+  // Note that we can do map.find(final_name.c_str()), but we cannot do
+  // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
+  // a temporary, and address sanitization errors would follow. Instead we must
+  // do a find() first, using tha if it succeeds. If it fails, then after we
+  // construct the stat we can insert it into the required maps.
   std::string final_name = prefix_ + name;
 
   // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the hot path) could
@@ -247,11 +252,9 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
     return null_counter_;
   }
 
-  // We now try to acquire a *reference* to the TLS cache shared pointer. This might remain null
-  // if we don't have TLS initialized currently. The de-referenced pointer might be null if there
-  // is no cache entry.
+  // We now find the TLS cache. This might remain null if we don't have TLS
+  // initialized currently.
   StatMap<CounterSharedPtr>* tls_cache = nullptr;
-
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].counters_;
   }
@@ -284,6 +287,12 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
+  //
+  // Note that we can do map.find(final_name.c_str()), but we cannot do
+  // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
+  // a temporary, and address sanitization errors would follow. Instead we must
+  // do a find() first, using tha if it succeeds. If it fails, then after we
+  // construct the stat we can insert it into the required maps.
   std::string final_name = prefix_ + name;
 
   // See warning/comments in counter().
@@ -308,6 +317,12 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
+  //
+  // Note that we can do map.find(final_name.c_str()), but we cannot do
+  // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
+  // a temporary, and address sanitization errors would follow. Instead we must
+  // do a find() first, using tha if it succeeds. If it fails, then after we
+  // construct the stat we can insert it into the required maps.
   std::string final_name = prefix_ + name;
 
   // See warning/comments in counter().
@@ -316,7 +331,6 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   }
 
   StatMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
-
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_cache =
         &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].parent_histograms_;
