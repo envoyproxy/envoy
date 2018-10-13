@@ -109,29 +109,19 @@ def _genrule_environment(ctx):
     if "gcc" in c_compiler or "g++" in c_compiler:
         force_ld_gold = ["-fuse-ld=gold"]
 
-    # Tests that examine memory usage should be skipped when we are building
-    # for coverage, tsan, or asan.
-
-    enable_memory_usage_tests = True
     cc_flags = []
     ld_flags = []
     ld_libs = []
     if ctx.var.get("ENVOY_CONFIG_COVERAGE"):
         ld_libs += ["-lgcov"]
-        enable_memory_usage_test = False
     if ctx.var.get("ENVOY_CONFIG_ASAN"):
         cc_flags += asan_flags
         ld_flags += asan_flags
         ld_flags += force_ld_gold
-        enable_memory_usage_test = False
     if ctx.var.get("ENVOY_CONFIG_TSAN"):
         cc_flags += tsan_flags
         ld_flags += tsan_flags
         ld_flags += force_ld_gold
-        enable_memory_usage_test = False
-
-    if enable_memory_usage_tests:
-        cc_flags += "-DENABLE_MEMORY_USAGE_TESTS=1"
 
     lines.append("export CFLAGS=%r" % (" ".join(cc_flags),))
     lines.append("export LDFLAGS=%r" % (" ".join(ld_flags),))

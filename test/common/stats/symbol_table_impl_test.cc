@@ -1,7 +1,9 @@
 #include <string>
 
+#include "common/memory/stats.h"
 #include "common/stats/symbol_table_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
@@ -179,6 +181,51 @@ TEST_F(StatNameTest, TestShrinkingExpectation) {
   stat_a.reset();
   EXPECT_EQ(table_size_0, table_.size());
 }
+
+#ifdef ENABLE_MEMORY_USAGE_TESTS
+
+// Tests the memory savings realized from using symbol tables with 1k clusters. This
+// test shows the memory drops from almost 8M to less than 2M.
+TEST(SymbolTableTest, Memory) {
+  // Tests a stat-name allocation strategy.
+  auto test_memory_usage = [](std::function<void(absl::string_view)> fn) -> size_t {
+    size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+    TestUtil::foreachStat(1000, fn);
+    size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+    if (end_mem != 0) { // See warning below for asan, tsan, and mac.
+      EXPECT_GT(end_mem, start_mem);
+    }
+    return end_mem - start_mem;
+  };
+
+  size_t string_mem_used, symbol_table_mem_used;
+  {
+    std::vector<std::string> names;
+    auto record_stat = [&names](absl::string_view stat) { names.push_back(std::string(stat)); };
+    string_mem_used = test_memory_usage(record_stat);
+  }
+  {
+    SymbolTableImpl table;
+    std::vector<StatNamePtr> names;
+    auto record_stat = [&names, &table](absl::string_view stat) {
+      names.emplace_back(table.encode(stat));
+    };
+    symbol_table_mem_used = test_memory_usage(record_stat);
+  }
+
+  // This test only works if Memory::Stats::totalCurrentlyAllocated() works, which
+  // appears not to be the case in some tests, including asan, tsan, and mac.
+  if (Memory::Stats::totalCurrentlyAllocated() == 0) {
+    std::cerr << "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0."
+              << std::endl;
+  } else {
+    // In manual tests, string memory used 7759488 in this example, and
+    // symbol-table mem used 5663936.
+    EXPECT_LT(symbol_table_mem_used, string_mem_used);
+  }
+}
+
+#endif // ENABLE_MEMORY_USAGE_TESTS
 
 } // namespace Stats
 } // namespace Envoy
