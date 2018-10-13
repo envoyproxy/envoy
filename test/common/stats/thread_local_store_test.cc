@@ -6,6 +6,7 @@
 #include "envoy/config/metrics/v2/stats.pb.h"
 
 #include "common/common/c_smart_ptr.h"
+#include "common/memory/stats.h"
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/thread_local_store.h"
 
@@ -619,6 +620,8 @@ public:
     // sets up a thread_local_store with raw stat alloc.
   }
   void TearDown() override {
+    store_->shutdownThreading();
+    tls_.shutdownThread();
     store_.reset(); // delete before the allocator.
   }
 
@@ -638,9 +641,40 @@ TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   // This works fine, and we can find it by its long name because heap-stats do not
   // get truncsated.
   EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
+}
 
-  store_->shutdownThreading();
-  tls_.shutdownThread();
+// Tests how much memory is consumed allocating 100k stats.
+TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
+  const size_t million = 1000 * 1000;
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+  if (start_mem == 0) {
+    // Skip this test for platforms where we can't measure memory.
+    return;
+  }
+  for (int i = 0; i < 100000; ++i) {
+    const std::string name = absl::StrCat("stat", i);
+    store_->counter(name);
+  }
+  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+  EXPECT_LT(start_mem, end_mem);
+  EXPECT_LT(end_mem - start_mem, 29 * million); // actual value: 2893664 as of 10/12/2018
+}
+
+TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
+  const size_t million = 1000 * 1000;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+  if (start_mem == 0) {
+    // Skip this test for platforms where we can't measure memory.
+    return;
+  }
+  for (int i = 0; i < 100000; ++i) {
+    const std::string name = absl::StrCat("stat", i);
+    store_->counter(name);
+  }
+  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+  EXPECT_LT(start_mem, end_mem);
+  EXPECT_LT(end_mem - start_mem, 37 * million); // actual value: 36205264 as of 10/12/2018
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {

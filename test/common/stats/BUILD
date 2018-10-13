@@ -78,6 +78,7 @@ envoy_cc_test(
     name = "thread_local_store_test",
     srcs = ["thread_local_store_test.cc"],
     deps = [
+        "//source/common/memory:stats_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:thread_local_store_lib",
