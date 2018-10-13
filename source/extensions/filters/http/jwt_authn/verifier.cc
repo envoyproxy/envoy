@@ -50,20 +50,13 @@ public:
 
   // Add a pair of (issuer, payload), called by Authenticator
   void addPayload(const std::string& issuer, const ProtobufWkt::Struct& payload) {
-    payload_pairs_.push_back({issuer, payload});
+    *(*payload_.mutable_fields())[issuer].mutable_struct_value() = payload;
   }
 
   void setPayload() {
-    if (payload_pairs_.empty()) {
-      return;
+    if (payload_.fields().size() > 0) {
+      callback_->setPayload(payload_);
     }
-
-    ProtobufWkt::Struct struct_obj;
-    auto fields = struct_obj.mutable_fields();
-    for (const auto& pair : payload_pairs_) {
-      *(*fields)[pair.first].mutable_struct_value() = pair.second;
-    }
-    callback_->setPayload(struct_obj);
   }
 
 private:
@@ -71,7 +64,7 @@ private:
   Verifier::Callbacks* callback_;
   std::unordered_map<const Verifier*, CompletionState> completion_states_;
   std::vector<AuthenticatorPtr> auths_;
-  std::vector<std::pair<std::string, ProtobufWkt::Struct>> payload_pairs_;
+  ProtobufWkt::Struct payload_;
 };
 
 // base verifier for provider_name, provider_and_audiences, and allow_missing_or_failed.
