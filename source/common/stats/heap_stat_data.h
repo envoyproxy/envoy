@@ -53,10 +53,10 @@ public:
   bool requiresBoundedStatNameSize() const override { return false; }
 
 private:
-  struct HeapStatHash_ {
-    size_t operator()(const HeapStatData* a) const { return HashUtil::xxHash64(a->key()); }
+  struct HeapStatHash {
+    size_t operator()(const HeapStatData* a) const { return HashUtil::xxHash64(a->name()); }
   };
-  struct HeapStatCompare_ {
+  struct HeapStatCompare {
     bool operator()(const HeapStatData* a, const HeapStatData* b) const {
       return (a->key() == b->key());
     }
@@ -65,7 +65,7 @@ private:
   // TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/3927 and
   //  https://github.com/envoyproxy/envoy/issues/3585, which can help reorganize
   // the heap stats using a ref-counted symbol table to compress the stat strings.
-  typedef std::unordered_set<HeapStatData*, HeapStatHash_, HeapStatCompare_> StatSet;
+  using StatSet = std::unordered_set<HeapStatData*, HeapStatHash, HeapStatCompare>;
 
   // An unordered set of HeapStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher.

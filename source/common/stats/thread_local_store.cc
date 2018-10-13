@@ -315,31 +315,35 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
     return null_histogram_;
   }
 
-  ParentHistogramSharedPtr* tls_ref = nullptr;
+  StatMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
 
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref = &parent_.tls_->getTyped<TlsCache>()
-                   .scope_cache_[this->scope_id_]
-                   .parent_histograms_[final_name.c_str()];
-  }
-
-  if (tls_ref && *tls_ref) {
-    return **tls_ref;
+    tls_cache =
+        &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].parent_histograms_;
+    auto p = tls_cache->find(final_name.c_str());
+    if (p != tls_cache->end()) {
+      return *p->second;
+    }
   }
 
   Thread::LockGuard lock(parent_.lock_);
-  ParentHistogramImplSharedPtr& central_ref = central_cache_.histograms_[final_name.c_str()];
-  if (!central_ref) {
+  auto p = central_cache_.histograms_.find(final_name.c_str());
+  ParentHistogramImplSharedPtr* central_ref = nullptr;
+  if (p != central_cache_.histograms_.end()) {
+    central_ref = &p->second;
+  } else {
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
-    central_ref.reset(new ParentHistogramImpl(final_name, parent_, *this,
-                                              std::move(tag_extracted_name), std::move(tags)));
+    auto stat = std::make_shared<ParentHistogramImpl>(
+        final_name, parent_, *this, std::move(tag_extracted_name), std::move(tags));
+    central_cache_.histograms_.insert(std::make_pair(stat->nameCStr(), stat));
+    central_ref = &stat;
   }
 
-  if (tls_ref) {
-    *tls_ref = central_ref;
+  if (tls_cache != nullptr) {
+    tls_cache->insert(std::make_pair((*central_ref)->nameCStr(), *central_ref));
   }
-  return *central_ref;
+  return **central_ref;
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name,

@@ -2,13 +2,13 @@
 
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
+#include "common/common/utility.h"
 
 namespace Envoy {
 namespace Stats {
 
 HeapStatData::HeapStatData(absl::string_view key) {
-  memcpy(name_, key.data(), key.size());
-  name_[key.size()] = '\0';
+  StringUtil::strlcpy(name_, key.data(), key.size() + 1);
 }
 
 HeapStatDataAllocator::HeapStatDataAllocator() {}
@@ -22,8 +22,8 @@ HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {
   std::unique_ptr<HeapStatData> data(new (memory) HeapStatData(name));
   Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data.get());
-  lock.release();
   HeapStatData* existing_data = *ret.first;
+  lock.release();
 
   if (ret.second) {
     return data.release();
