@@ -6,7 +6,6 @@
 #include <list>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 
 #include "envoy/thread_local/thread_local.h"
 
@@ -16,6 +15,8 @@
 #include "common/stats/utility.h"
 
 #include "circllhist.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Stats {
@@ -287,7 +288,7 @@ private:
     // to reference the cache, and then subsequently cache flushed, leaving nothing in the central
     // store. See the overview for more information. This complexity is required for lockless
     // operation in the fast path.
-    std::unordered_map<uint64_t, TlsCacheEntry> scope_cache_;
+    absl::flat_hash_map<uint64_t, TlsCacheEntry> scope_cache_;
   };
 
   std::string getTagsForName(const std::string& name, std::vector<Tag>& tags) const;
@@ -301,7 +302,7 @@ private:
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
   mutable Thread::MutexBasicLockable lock_;
-  std::unordered_set<ScopeImpl*> scopes_ GUARDED_BY(lock_);
+  absl::flat_hash_set<ScopeImpl*> scopes_ GUARDED_BY(lock_);
   ScopePtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;

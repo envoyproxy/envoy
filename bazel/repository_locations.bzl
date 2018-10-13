@@ -10,7 +10,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
-        commit = "92e07e5590752d6b8e67f7f2f86c6286561e8cea",  # 2018-08-01
+        commit = "48cd2c3f351ff188bc85684b84a91b6e6d17d896",  # 2018-09-27
         remote = "https://github.com/abseil/abseil-cpp",
     ),
     com_github_apache_thrift = dict(
