@@ -1,8 +1,12 @@
 #pragma once
 
+#include <map>
 #include <string>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/typed_metadata.h"
+#include "envoy/registry/registry.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -44,6 +48,29 @@ public:
   static ProtobufWkt::Value& mutableMetadataValue(envoy::api::v2::core::Metadata& metadata,
                                                   const std::string& filter,
                                                   const std::string& key);
+};
+
+template <typename factoryClass> class TypedMetadataImpl : public TypedMetadata {
+public:
+  static_assert(std::is_base_of<Config::TypedMetadataFactory, factoryClass>::value,
+                "Factory type must be inherited from Envoy::Config::TypedMetadataFactory.");
+  TypedMetadataImpl(const ::envoy::api::v2::core::Metadata& metadata) : data_() {
+    auto& dataByKey = metadata.filter_metadata();
+    for (const auto& it : Registry::FactoryRegistry<factoryClass>::factories()) {
+      const auto& metaIter = dataByKey.find(it.first);
+      if (metaIter != dataByKey.end()) {
+        data_[it.second->name()] = it.second->parse(metaIter->second);
+      }
+    }
+  }
+
+  const StreamInfo::FilterState::Object* getData(const std::string& key) const override {
+    const auto& it = data_.find(key);
+    return it == data_.end() ? nullptr : it->second.get();
+  }
+
+private:
+  std::map<std::string, std::unique_ptr<const StreamInfo::FilterState::Object>> data_;
 };
 
 } // namespace Config

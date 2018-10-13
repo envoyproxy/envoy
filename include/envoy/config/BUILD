@@ -24,3 +24,12 @@ envoy_cc_library(
         "//source/common/protobuf",
     ],
 )
+
+envoy_cc_library(
+    name = "typed_metadata_interface",
+    hdrs = ["typed_metadata.h"],
+    deps = [
+        "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/protobuf",
+    ],
+)

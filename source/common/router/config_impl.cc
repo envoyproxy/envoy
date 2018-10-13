@@ -290,6 +290,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                                       route.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
                                                        route.response_headers_to_remove())),
+      metadata_(route.metadata()), typed_metadata_(route.metadata()),
       match_grpc_(route.match().has_grpc()), opaque_config_(parseOpaqueConfig(route)),
       decorator_(parseDecorator(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
@@ -302,10 +303,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     if (filter_it != route.route().metadata_match().filter_metadata().end()) {
       metadata_match_criteria_.reset(new MetadataMatchCriteriaImpl(filter_it->second));
     }
-  }
-
-  if (route.has_metadata()) {
-    metadata_ = route.metadata();
   }
 
   // If this is a weighted_cluster, we create N internal route entries
