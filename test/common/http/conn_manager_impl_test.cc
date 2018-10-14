@@ -514,7 +514,8 @@ TEST_F(HttpConnectionManagerImplTest, PauseResume100Continue) {
   setUpEncoderAndDecoder();
   sendReqestHeadersAndData();
 
-  // Stop the 100-Continue at encoder filter 0. Encoder filter 1 should not yet receive the 100-Continue
+  // Stop the 100-Continue at encoder filter 0. Encoder filter 1 should not yet receive the
+  // 100-Continue
   EXPECT_CALL(*encoder_filters_[0], encode100ContinueHeaders(_))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*encoder_filters_[1], encode100ContinueHeaders(_)).Times(0);
@@ -544,14 +545,14 @@ TEST_F(HttpConnectionManagerImplTest, PauseResume100ContinueForReversedEncoders)
   setUpEncoderAndDecoder();
   sendReqestHeadersAndData();
 
-  // Stop the 100-Continue at encoder filter 1. Encoder filter 0 should not yet receive the 100-Continue
+  // Stop the 100-Continue at encoder filter 1. Encoder filter 0 should not yet receive the
+  // 100-Continue
   EXPECT_CALL(*encoder_filters_[1], encode100ContinueHeaders(_))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*encoder_filters_[0], encode100ContinueHeaders(_)).Times(0);
   EXPECT_CALL(response_encoder_, encode100ContinueHeaders(_)).Times(0);
   HeaderMapPtr continue_headers{new TestHeaderMapImpl{{":status", "100"}}};
-  decoder_filters_[1]->callbacks_->encode100ContinueHeaders(
-      std::move(continue_headers));
+  decoder_filters_[1]->callbacks_->encode100ContinueHeaders(std::move(continue_headers));
 
   // Have the encoder filter 1 continue. Make sure the 100-Continue is resumed as expected.
   EXPECT_CALL(*encoder_filters_[0], encode100ContinueHeaders(_))
@@ -565,8 +566,7 @@ TEST_F(HttpConnectionManagerImplTest, PauseResume100ContinueForReversedEncoders)
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
   HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
-  decoder_filters_[1]->callbacks_->encodeHeaders(std::move(response_headers),
-                                                 false);
+  decoder_filters_[1]->callbacks_->encodeHeaders(std::move(response_headers), false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
@@ -3310,8 +3310,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFiltersWithReversedEncoders) {
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
   EXPECT_CALL(*encoder_filters_[1], encodeTrailers(_))
       .WillOnce(Return(FilterTrailersStatus::StopIteration));
-  EXPECT_EQ(ssl_connection_.get(),
-            encoder_filters_[1]->callbacks_->connection()->ssl());
+  EXPECT_EQ(ssl_connection_.get(), encoder_filters_[1]->callbacks_->connection()->ssl());
   decoder_filters_[2]->callbacks_->encodeHeaders(
       HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, false);
   Buffer::OwnedImpl response_body("response");
@@ -3333,8 +3332,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFiltersWithReversedEncoders) {
   expectOnDestroy();
   encoder_filters_[1]->callbacks_->continueEncoding();
 
-  EXPECT_EQ(ssl_connection_.get(),
-            encoder_filters_[0]->callbacks_->connection()->ssl());
+  EXPECT_EQ(ssl_connection_.get(), encoder_filters_[0]->callbacks_->connection()->ssl());
 }
 
 TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {

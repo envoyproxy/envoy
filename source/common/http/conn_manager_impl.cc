@@ -461,11 +461,11 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
   if (connection_manager_.config_.reverseEncodersOrder()) {
     wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
   } else {
-      if (connection_manager_.config_.reverseEncodersOrder()) {
-        wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
-      } else {
-        wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
-      }
+    if (connection_manager_.config_.reverseEncodersOrder()) {
+      wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
+    } else {
+      wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
+    }
   }
 }
 
