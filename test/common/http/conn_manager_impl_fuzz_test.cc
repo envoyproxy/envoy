@@ -88,7 +88,7 @@ public:
   DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
-  bool reverseEncodersOrder() override { return reverse_encoders_order_; }
+  bool reverseEncodersOrder() override { return false; }
   bool generateRequestId() override { return true; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
@@ -122,7 +122,6 @@ public:
   MockStreamDecoderFilter* decoder_filter_{};
   MockStreamEncoderFilter* encoder_filter_{};
   NiceMock<MockFilterChainFactory> filter_factory_;
-  bool reverse_encoders_order_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   Event::SimulatedTimeSystem time_system_;
   RouteConfigProvider route_config_provider_;
