@@ -108,7 +108,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   Event::MockTimer* timer = nullptr;
   Event::TimerCb timer_cb;
   InSequence s;
-  
+
   //  for connection timer.
   EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
     timer_cb = cb;
@@ -206,7 +206,7 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
       EXPECT_TRUE(
           IsSubstring("", "", "bar does not match foo type URL is DiscoveryResponse", e->what()));
     }));
-    
+
     // Validate that config rejected case goes in to back-off timer.
     EXPECT_CALL(random_, random());
     EXPECT_CALL(*timer, enableTimer(_));
