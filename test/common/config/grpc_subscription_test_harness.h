@@ -33,13 +33,19 @@ public:
   GrpcSubscriptionTestHarness()
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
-        async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()) {
+        async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()),
+        rejected_timer_(new Event::MockTimer()) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-      timer_cb_ = timer_cb;
-      return timer_;
-    }));
+    EXPECT_CALL(dispatcher_, createTimer_(_))
+        .WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+          timer_cb_ = timer_cb;
+          return timer_;
+        }))
+        .WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+          rejected_cb_ = timer_cb;
+          return rejected_timer_;
+        }));
     subscription_.reset(new GrpcEdsSubscriptionImpl(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
         *method_descriptor_, stats_, stats_store_));
@@ -105,14 +111,20 @@ public:
     EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(typed_resources), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
+      EXPECT_CALL(*rejected_timer_, disableTimer());
       expectSendMessage(last_cluster_names_, version);
       version_ = version;
     } else {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+      EXPECT_CALL(random_, random());
+      EXPECT_CALL(*rejected_timer_, enableTimer(_));
       expectSendMessage(last_cluster_names_, version_, Grpc::Status::GrpcStatus::Internal,
                         "bad config");
     }
     subscription_->grpcMux().onReceiveMessage(std::move(response));
+    if (!accept) {
+      rejected_cb_();
+    }
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
@@ -133,7 +145,9 @@ public:
   Event::MockDispatcher dispatcher_;
   Runtime::MockRandomGenerator random_;
   Event::MockTimer* timer_;
+  Event::MockTimer* rejected_timer_;
   Event::TimerCb timer_cb_;
+  Event::TimerCb rejected_cb_;
   envoy::api::v2::core::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
   Grpc::MockAsyncStream async_stream_;
