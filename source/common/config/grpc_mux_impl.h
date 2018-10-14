@@ -43,6 +43,8 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   // TODO(htuch): Make this configurable or some static.
+  const uint32_t REJECTED_INITIAL_DELAY_MS = 1; // First failure should be responded immediately.
+  const uint32_t REJECTED_MAX_DELAY_MS = 60000; // Do not cross more than 60s
   const uint32_t RETRY_INITIAL_DELAY_MS = 500;
   const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
 
@@ -96,6 +98,20 @@ private:
     TokenBucketPtr limit_request_;
     // Limits warning messages when too many requests is detected.
     TokenBucketPtr limit_log_;
+    // BackOffStrategy used for update rejected cases.
+    BackOffStrategyPtr rejected_backoff_strategy_;
+    // Timer used for update rejected cases.
+    Event::TimerPtr rejected_timer_;
+
+    void enableRejectedTimer() {
+      rejected_timer_->enableTimer(
+          std::chrono::milliseconds(rejected_backoff_strategy_->nextBackOffMs()));
+    }
+
+    void resetRejectedState() {
+      rejected_backoff_strategy_->reset();
+      rejected_timer_->disableTimer();
+    }
   };
 
   const LocalInfo::LocalInfo& local_info_;
@@ -106,6 +122,7 @@ private:
   // Envoy's dependendency ordering.
   std::list<std::string> subscriptions_;
   Event::TimerPtr retry_timer_;
+  Event::Dispatcher& dispatcher_;
   Runtime::RandomGenerator& random_;
   TimeSource& time_source_;
   BackOffStrategyPtr backoff_strategy_;

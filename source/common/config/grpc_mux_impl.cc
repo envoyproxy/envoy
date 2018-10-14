@@ -14,7 +14,8 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
                          const Protobuf::MethodDescriptor& service_method,
                          Runtime::RandomGenerator& random, Stats::Scope& scope)
     : local_info_(local_info), async_client_(std::move(async_client)),
-      service_method_(service_method), random_(random), time_source_(dispatcher.timeSystem()),
+      service_method_(service_method), dispatcher_(dispatcher), random_(random),
+      time_source_(dispatcher.timeSystem()),
       control_plane_stats_(generateControlPlaneStats(scope)) {
   Config::Utility::checkLocalInfo("ads", local_info);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
@@ -116,9 +117,14 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
     api_state_[type_url].limit_request_ = std::make_unique<TokenBucketImpl>(100, time_source_, 5);
     // Bucket contains 1 token maximum and refills 1 token on every ~5 seconds.
     api_state_[type_url].limit_log_ = std::make_unique<TokenBucketImpl>(1, time_source_, 0.2);
+    api_state_[type_url].limit_log_ = std::make_unique<TokenBucketImpl>(1, time_source_, 0.2);
     api_state_[type_url].request_.set_type_url(type_url);
     api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
     api_state_[type_url].subscribed_ = true;
+    api_state_[type_url].rejected_backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(
+        REJECTED_INITIAL_DELAY_MS, REJECTED_MAX_DELAY_MS, random_);
+    api_state_[type_url].rejected_timer_ =
+        dispatcher_.createTimer([this, &type_url]() -> void { sendDiscoveryRequest(type_url); });
     subscriptions_.emplace_back(type_url);
   }
 
@@ -232,7 +238,15 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     error_detail->set_message(e.what());
   }
   api_state_[type_url].request_.set_response_nonce(message->nonce());
-  sendDiscoveryRequest(type_url);
+
+  // If update is rejected continuously, this may become too chatty. Having back-off here gives
+  // chance for Envoy and Management Server to recover.
+  if (api_state_[type_url].request_.has_error_detail()) {
+    api_state_[type_url].enableRejectedTimer();
+  } else {
+    api_state_[type_url].resetRejectedState();
+    sendDiscoveryRequest(type_url);
+  }
 }
 
 void GrpcMuxImpl::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {

@@ -107,14 +107,18 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
 TEST_F(GrpcMuxImplTest, ResetStream) {
   Event::MockTimer* timer = nullptr;
   Event::TimerCb timer_cb;
+  // Connection timer.
+  InSequence s;
   EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
     timer_cb = cb;
     EXPECT_EQ(nullptr, timer);
     timer = new Event::MockTimer();
     return timer;
   }));
+  // rejected request timers.
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(3);
   setup();
-  InSequence s;
+
   auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
   auto bar_sub = grpc_mux_->subscribe("bar", {}, callbacks_);
   auto baz_sub = grpc_mux_->subscribe("baz", {"z"}, callbacks_);
@@ -162,11 +166,27 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
 
 // Validate behavior when type URL mismatches occur.
 TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
+
+  Event::MockTimer* timer = nullptr;
+  Event::TimerCb timer_cb;
+
+  InSequence s;
+  // Connection timer.
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+
+  // rejected request timer.
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
+    timer_cb = cb;
+    EXPECT_EQ(nullptr, timer);
+    timer = new Event::MockTimer();
+    return timer;
+  }));
+
   setup();
 
   std::unique_ptr<envoy::api::v2::DiscoveryResponse> invalid_response(
       new envoy::api::v2::DiscoveryResponse());
-  InSequence s;
+
   auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
 
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
@@ -187,12 +207,15 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
       EXPECT_TRUE(
           IsSubstring("", "", "bar does not match foo type URL is DiscoveryResponse", e->what()));
     }));
-
+    // Validate that config rejected case goes in to back-off timer.
+    EXPECT_CALL(random_, random());
+    EXPECT_CALL(*timer, enableTimer(_));
     expectSendMessage("foo", {"x", "y"}, "", "", Grpc::Status::GrpcStatus::Internal,
                       fmt::format("bar does not match foo type URL is DiscoveryResponse {}",
                                   invalid_response->DebugString()));
     grpc_mux_->onReceiveMessage(std::move(invalid_response));
   }
+  timer_cb();
   expectSendMessage("foo", {}, "");
 }
 
