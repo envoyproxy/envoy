@@ -7,11 +7,12 @@ namespace Envoy {
 namespace Stats {
 namespace TestUtil {
 
-// We can only test absolute memory usage if the malloc library is a known
-// quantity. This decision is centralized here.
-#ifdef TCMALLOC
-#define ENABLE_MEMORY_USAGE_TESTS
-#endif
+/**
+ * Determines whether the library has deterministic malloc-stats results.
+ *
+ * @return bool true if the Memory::Stats::totalCurrentlyAllocated() has stable results.
+ */
+bool hasDeterministicMallocStats();
 
 /**
  * Calls a fn with every stat name in the system for the given number of
@@ -20,7 +21,7 @@ namespace TestUtil {
  * @param num_clusters the number of clusters for which to generate stats.
  * @param fn the function to call with every stat name.
  */
-void foreachStat(int num_clusters, std::function<void(absl::string_view)> fn);
+void forEachStat(int num_clusters, std::function<void(absl::string_view)> fn);
 
 } // namespace TestUtil
 } // namespace Stats

@@ -1,10 +1,26 @@
 #include "test/common/stats/stat_test_utility.h"
 
+#include "common/memory/stats.h"
+
 namespace Envoy {
 namespace Stats {
 namespace TestUtil {
 
-void foreachStat(int num_clusters, std::function<void(absl::string_view)> fn) {
+bool hasDeterministicMallocStats() {
+  // We can only test absolute memory usage if the malloc library is a known
+  // quantity. This decision is centralized here. As the preferred malloc
+  // library for Envoy is TCMALLOC that's what we test for here. If we switch
+  // to a different malloc library than we'd have to re-evaluate all the
+  // thresholds in the tests referencing ENABLE_MEMORY_USAGE_TESTS.
+#ifdef TCMALLOC
+  const std::string str("surely this will have to allocate some memory");
+  return Memory::Stats::totalCurrentlyAllocated() != 0;
+#else
+  return false;
+#endif
+}
+
+void forEachStat(int num_clusters, std::function<void(absl::string_view)> fn) {
   // These are stats that are repeated for each cluster as of Oct 2018.
   static const char* cluster_stats[] = {"bind_errors",
                                         "lb_healthy_panic",
