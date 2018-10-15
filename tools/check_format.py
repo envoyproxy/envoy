@@ -197,6 +197,20 @@ def checkSourceLine(line, file_path, reportError):
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.
     reportError("Don't use free std::atomic_* functions, use std::atomic<T> members instead.")
+  if '__attribute__((packed))' in line and file_path != './include/envoy/common/platform.h':
+    # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
+    # can be used instead
+    reportError("Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
+                "in include/envoy/common/platform.h instead")
+  if re.search("\{\s*\.\w+\s*\=", line):
+    # Designated initializers are not part of the C++14 standard and are not supported
+    # by MSVC
+    reportError("Don't use designated initializers in struct initialization, "
+                "they are not part of C++14")
+  if ' ?: ' in line:
+    # The ?: operator is non-standard, it is a GCC extension
+    reportError("Don't use the '?:' operator, it is a non-standard GCC extension")
+
 
 def checkBuildLine(line, file_path, reportError):
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:

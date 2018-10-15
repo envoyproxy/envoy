@@ -3,6 +3,7 @@
 
 #include "common/ssl/utility.h"
 
+#include "test/common/ssl/ssl_test_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -11,17 +12,6 @@
 
 namespace Envoy {
 namespace Ssl {
-
-namespace {
-bssl::UniquePtr<X509> readCertFromFile(const std::string& path) {
-  FILE* fp = fopen(TestEnvironment::runfilesPath(path).c_str(), "r");
-  EXPECT_NE(fp, nullptr);
-  bssl::UniquePtr<X509> cert(PEM_read_X509(fp, nullptr, nullptr, nullptr));
-  EXPECT_NE(cert, nullptr);
-  fclose(fp);
-  return cert;
-}
-} // namespace
 
 TEST(UtilityTest, TestGetSubjectAlternateNamesWithDNS) {
   bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
@@ -47,6 +37,26 @@ TEST(UtilityTest, TestGetSubjectAlternateNamesWithNoSAN) {
   const std::vector<std::string>& uri_subject_alt_names =
       Utility::getSubjectAltNames(*cert, GEN_URI);
   EXPECT_EQ(0, uri_subject_alt_names.size());
+}
+
+TEST(UtilityTest, TestGetSubject) {
+  bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
+  EXPECT_EQ("CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US",
+            Utility::getSubjectFromCertificate(*cert));
+}
+
+TEST(UtilityTest, TestGetSerialNumber) {
+  bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
+  EXPECT_EQ("f3828eb24fd779d0", Utility::getSerialNumberFromCertificate(*cert));
+}
+
+TEST(UtilityTest, TestDaysUntilExpiration) {
+  bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
+  EXPECT_LE(0, Utility::getDaysUntilExpiration(cert.get()));
+}
+
+TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
+  EXPECT_EQ(std::numeric_limits<int>::max(), Utility::getDaysUntilExpiration(nullptr));
 }
 
 } // namespace Ssl
