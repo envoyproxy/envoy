@@ -28,3 +28,32 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
     ],
 )
+
+envoy_cc_library(
+    name = "protocol_interface",
+    hdrs = ["protocol.h"],
+    deps = [
+        ":buffer_helper_lib",
+        "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "dubbo_protocol_impl_lib",
+    srcs = ["dubbo_protocol_impl.cc"],
+    hdrs = ["dubbo_protocol_impl.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":buffer_helper_lib",
+        ":protocol_interface",
+        "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "fake_dubbo_proxy_target",
+    deps = [
+        ":dubbo_protocol_impl_lib",
+        ":hessian_utils_lib",
+    ],
+)
