@@ -237,14 +237,14 @@ message CommonTlsContext {
 
   // Config for validation context via SDS API.
   message ValidationContextSdsConfig {
+    // Config for fetching validation context via SDS API.
+    SdsSecretConfig sds_secret_config = 1;
+
     // An optional list of Subject Alternative Names. If specified, Envoy will ignore
     // CertificateValidationContext.verify_subject_alt_name received from SDS API,
     // and will use this list to verify that the Subject Alternative Name of the presented
     // certificate matches one of the specified values.
-    repeated string override_verify_subject_alt_name = 1;
-
-    // Config for fetching validation context via SDS API.
-    SdsSecretConfig sds_secret_config = 2;
+    repeated string override_verify_subject_alt_name = 2;
   }
 
   oneof validation_context_type {
