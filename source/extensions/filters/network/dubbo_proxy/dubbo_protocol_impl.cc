@@ -6,6 +6,13 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
+namespace {
+
+constexpr uint16_t MagicNumber = 0xdabb;
+constexpr uint8_t MessageTypeMask = 0x80;
+constexpr uint8_t EventMask = 0x20;
+
+} // namespace
 
 // Consistent with the SerializationType
 bool isValidSerializationType(SerializationType type) {
@@ -61,7 +68,7 @@ void ResponseMessageImpl::fromBuffer(Buffer::Instance& buffer) {
 }
 
 bool DubboProtocolImpl::decode(Buffer::Instance& buffer, Protocol::Context* context) {
-  if (buffer.length() < MessageSize) {
+  if (buffer.length() < DubboProtocolImpl::MessageSize) {
     return false;
   }
 

@@ -18,7 +18,7 @@ namespace DubboProxy {
 class ProtocolNameValues {
 public:
   // Dubbo protocol
-  const std::string DUBBO = "dubbo";
+  const std::string Dubbo = "dubbo";
 };
 
 typedef ConstSingleton<ProtocolNameValues> ProtocolNames;

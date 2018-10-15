@@ -74,17 +74,14 @@ typedef std::unique_ptr<ResponseMessageImpl> ResponseMessageImplPtr;
 class DubboProtocolImpl : public Protocol {
 public:
   DubboProtocolImpl(ProtocolCallbacks& callbacks) : callbacks_(callbacks) {}
-  const std::string& name() const override { return ProtocolNames::get().DUBBO; }
+  const std::string& name() const override { return ProtocolNames::get().Dubbo; }
   virtual bool decode(Buffer::Instance& buffer, Protocol::Context* context) override;
 
-  static const uint8_t MessageSize = 16;
-  static const int32_t MaxBodySize = 16 * 1024 * 1024;
+  static constexpr uint8_t MessageSize = 16;
+  static constexpr int32_t MaxBodySize = 16 * 1024 * 1024;
 
 private:
   ProtocolCallbacks& callbacks_;
-  static const uint16_t MagicNumber = 0xdabb;
-  static const uint8_t MessageTypeMask = 0x80;
-  static const uint8_t EventMask = 0x20;
 };
 
 } // namespace DubboProxy

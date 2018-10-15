@@ -18,7 +18,7 @@ using testing::StrictMock;
 
 TEST(DubboProtocolImplTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
-  StrictMock<MockProtocolCallbacks> cb;
+  MockProtocolCallbacks cb;
   DubboProtocolImpl dubbo_protocol(cb);
   Protocol::Context context;
   EXPECT_FALSE(dubbo_protocol.decode(buffer, &context));
@@ -27,13 +27,13 @@ TEST(DubboProtocolImplTest, NotEnoughData) {
 }
 
 TEST(DubboProtocolImplTest, Name) {
-  StrictMock<MockProtocolCallbacks> cb;
+  MockProtocolCallbacks cb;
   DubboProtocolImpl dubbo_protocol(cb);
   EXPECT_EQ(dubbo_protocol.name(), "dubbo");
 }
 
 TEST(DubboProtocolImplTest, Normal) {
-  StrictMock<MockProtocolCallbacks> cb;
+  MockProtocolCallbacks cb;
   DubboProtocolImpl dubbo_protocol(cb);
   // Normal dubbo request message
   {
@@ -63,7 +63,7 @@ TEST(DubboProtocolImplTest, Normal) {
 }
 
 TEST(DubboProtocolImplTest, InvalidProtocol) {
-  StrictMock<MockProtocolCallbacks> cb;
+  MockProtocolCallbacks cb;
   DubboProtocolImpl dubbo_protocol(cb);
   Protocol::Context context;
 
