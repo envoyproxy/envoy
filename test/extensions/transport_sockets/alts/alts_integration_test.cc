@@ -116,8 +116,9 @@ public:
   }
 
   std::string wrongHandshakerServerAddress() {
-    return absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
-                        std::to_string(fake_handshaker_server_port_ + 1));
+    return " ";
+    // return absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
+    //                     std::to_string(fake_handshaker_server_port_ + 1));
   }
 
   Network::Address::InstanceConstSharedPtr getAddress(const Network::Address::IpVersion& version,
