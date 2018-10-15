@@ -42,21 +42,24 @@ TEST_F(SslContextImplTest, TestdNSNameMatching) {
 }
 
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
-  bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
   std::vector<std::string> verify_subject_alt_name_list = {"server1.example.com",
                                                            "server2.example.com"};
   EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
 }
 
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
-  bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_uri_cert.pem");
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"));
   std::vector<std::string> verify_subject_alt_name_list = {"spiffe://lyft.com/fake-team",
                                                            "spiffe://lyft.com/test-team"};
   EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
 }
 
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
-  bssl::UniquePtr<X509> cert = readCertFromFile("test/common/ssl/test_data/san_dns_cert.pem");
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
   std::vector<std::string> verify_subject_alt_name_list = {"foo", "bar"};
   EXPECT_FALSE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
 }
