@@ -98,9 +98,10 @@ CaptureSocketFactory::CaptureSocketFactory(
     : path_prefix_(path_prefix), format_(format),
       transport_socket_factory_(std::move(transport_socket_factory)) {}
 
-Network::TransportSocketPtr CaptureSocketFactory::createTransportSocket(std::string) const {
-  return std::make_unique<CaptureSocket>(path_prefix_, format_,
-                                         transport_socket_factory_->createTransportSocket());
+Network::TransportSocketPtr
+CaptureSocketFactory::createTransportSocket(absl::optional<std::string>) const {
+  return std::make_unique<CaptureSocket>(
+      path_prefix_, format_, transport_socket_factory_->createTransportSocket(absl::nullopt));
 }
 
 bool CaptureSocketFactory::implementsSecureTransport() const {

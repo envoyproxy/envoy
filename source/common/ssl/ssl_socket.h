@@ -38,7 +38,7 @@ class SslSocket : public Network::TransportSocket,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslSocket(ContextSharedPtr ctx, InitialState state,
-            std::string overrideServerNameIndication = "");
+            absl::optional<std::string> overrideServerName);
 
   // Ssl::Connection
   bool peerCertificatePresented() const override;
@@ -92,7 +92,7 @@ public:
                          Stats::Scope& stats_scope);
 
   Network::TransportSocketPtr
-  createTransportSocket(std::string overrideServerNameIndication = "") const override;
+  createTransportSocket(absl::optional<std::string> overrideServerName) const override;
   bool implementsSecureTransport() const override;
 
   // Secret::SecretCallbacks
@@ -114,7 +114,7 @@ public:
                          Stats::Scope& stats_scope, const std::vector<std::string>& server_names);
 
   Network::TransportSocketPtr
-  createTransportSocket(std::string overrideServerNameIndication = "") const override;
+  createTransportSocket(absl::optional<std::string> overrideServerName) const override;
   bool implementsSecureTransport() const override;
 
   // Secret::SecretCallbacks

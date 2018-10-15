@@ -36,9 +36,9 @@ public:
 } // namespace
 
 SslSocket::SslSocket(ContextSharedPtr ctx, InitialState state,
-                     std::string overrideServerNameIndication)
+                     absl::optional<std::string> overrideServerName)
     : ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
-      ssl_(ctx_->newSsl(overrideServerNameIndication)) {
+      ssl_(ctx_->newSsl(overrideServerName.value())) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_.get());
   } else {
@@ -420,15 +420,15 @@ ClientSslSocketFactory::ClientSslSocketFactory(ClientContextConfigPtr config,
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
-Network::TransportSocketPtr
-ClientSslSocketFactory::createTransportSocket(std::string overrideServerNameIndication) const {
+Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
+    absl::optional<std::string> overrideServerName) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
   auto ssl_ctx = ssl_ctx_;
   if (ssl_ctx) {
     return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Client,
-                                            overrideServerNameIndication);
+                                            overrideServerName.value());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.upstream_context_secrets_not_ready_.inc();
@@ -454,13 +454,15 @@ ServerSslSocketFactory::ServerSslSocketFactory(ServerContextConfigPtr config,
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
-Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket(std::string) const {
+Network::TransportSocketPtr
+ServerSslSocketFactory::createTransportSocket(absl::optional<std::string>) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
   auto ssl_ctx = ssl_ctx_;
   if (ssl_ctx) {
-    return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Server);
+    return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Server,
+                                            absl::nullopt);
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();

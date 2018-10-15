@@ -165,7 +165,7 @@ public:
   CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   std::string overrideServerNameIndication = "") const override;
+                   absl::optional<std::string> overrideServerName) const override;
   CreateConnectionData createHealthCheckConnection(Event::Dispatcher& dispatcher) const override;
   std::vector<Stats::GaugeSharedPtr> gauges() const override { return stats_store_.gauges(); }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
@@ -196,7 +196,7 @@ protected:
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                    Network::Address::InstanceConstSharedPtr address,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   std::string overrideServerNameIndication);
+                   absl::optional<std::string> overrideServerName);
 
 private:
   std::atomic<uint64_t> health_flags_{};

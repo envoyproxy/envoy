@@ -30,7 +30,7 @@ class RawBufferSocketFactory : public TransportSocketFactory {
 public:
   // Network::TransportSocketFactory
   TransportSocketPtr
-  createTransportSocket(std::string overrideServerNameIndication = "") const override;
+  createTransportSocket(absl::optional<std::string> overrideServerName) const override;
   bool implementsSecureTransport() const override;
 };
 

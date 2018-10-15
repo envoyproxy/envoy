@@ -315,7 +315,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.conn_connect_ms_.reset(
       new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_connect_ms_));
   Upstream::Host::CreateConnectionData data =
-      parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_);
+      parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_, absl::nullopt);
   real_host_description_ = data.host_description_;
   codec_client_ = parent_.createCodecClient(data);
   codec_client_->addConnectionCallbacks(*this);

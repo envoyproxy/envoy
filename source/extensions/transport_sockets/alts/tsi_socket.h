@@ -99,7 +99,7 @@ public:
 
   bool implementsSecureTransport() const override;
   Network::TransportSocketPtr
-  createTransportSocket(std::string overrideServerNameIndication = "") const override;
+  createTransportSocket(absl::optional<std::string> overrideServerName) const override;
 
 private:
   HandshakerFactory handshaker_factory_;

@@ -4,6 +4,8 @@
 #include "envoy/common/pure.h"
 #include "envoy/ssl/connection.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -149,12 +151,12 @@ public:
   virtual bool implementsSecureTransport() const PURE;
 
   /**
-   * @param overrideServerNameIndication set SNI, disregard the value the factory was configured
-   * with
+   * @param overrideServerName set server name, disregard the value the factory was
+   * configured with
    * @return Network::TransportSocketPtr a transport socket to be passed to connection.
    */
   virtual TransportSocketPtr
-  createTransportSocket(std::string overrideServerNameIndication = "") const PURE;
+  createTransportSocket(absl::optional<std::string> overrideServerName) const PURE;
 };
 
 typedef std::unique_ptr<TransportSocketFactory> TransportSocketFactoryPtr;
