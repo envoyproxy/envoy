@@ -80,3 +80,7 @@ TBD
 ## Tags and Tag Extraction
 
 TBD
+
+## Disabling statistics by substring or regex
+
+TBD
