@@ -20,7 +20,10 @@ enum class CancelPolicy {
   // available for a future connection request.
   Default,
   // When a connection request is canceled, closes a pending connection if there are more pending
-  // connections than pending connection requests.
+  // connections than pending connection requests. CloseExcess is useful for callers that never
+  // re-use connections (e.g. by closing rather than releasing connections). Using CloseExcess in
+  // this situation guarantees that no idle connections will be held open by the conn pool awaiting
+  // a connection request.
   CloseExcess,
 };
 

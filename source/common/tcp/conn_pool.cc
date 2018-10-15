@@ -260,6 +260,19 @@ void ConnPoolImpl::processIdleConnection(ActiveConn& conn, bool new_connection, 
     conn.wrapper_.reset();
   }
 
+  // TODO(zuercher): As a future improvement, we may wish to close extra connections when there are
+  // no pending requests rather than moving them to ready_conns_. For conn pool callers that re-use
+  // connections it is possible that a busy connection may be re-assigned to a pending request
+  // while a new connection is pending. The current behavior is to move the pending connection to
+  // the ready list to await a future request. For some protocols, e.g. mysql which has the server
+  // transmit handshake data on connect, it may be desirable to close the connection if no pending
+  // request is available. The CloseExcess flag for cancel is related: if we close pending
+  // connections without requests here it becomes superfluous (instead of closing connections at
+  // cancel time we'd wait until they completed and close them here). Finally, we want to avoid
+  // requiring operators to correct configure clusters to get the necessary pending connection
+  // behavior (e.g. we want to find a way to enable the new behavior without having to configure
+  // it on a cluster).
+
   if (pending_requests_.empty() || delay) {
     // There is nothing to service or delayed processing is requested, so just move the connection
     // into the ready list.
