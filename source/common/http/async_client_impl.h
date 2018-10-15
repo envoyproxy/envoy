@@ -19,6 +19,7 @@
 #include "envoy/router/shadow_writer.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/empty_string.h"
@@ -219,13 +220,6 @@ private:
     }
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
-    bool useOldStyleWebSocket() const override { return false; }
-    Http::WebSocketProxyPtr createWebSocketProxy(Http::HeaderMap&, StreamInfo::StreamInfo&,
-                                                 Http::WebSocketProxyCallbacks&,
-                                                 Upstream::ClusterManager&,
-                                                 Network::ReadFilterCallbacks*) const override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
     bool includeVirtualHostRateLimits() const override { return true; }
     const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
     const Router::PathMatchCriterion& pathMatchCriterion() const override {

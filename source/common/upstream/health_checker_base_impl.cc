@@ -3,6 +3,7 @@
 #include "envoy/data/core/v2alpha/health_check_event.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "common/network/utility.h"
 #include "common/router/router.h"
 
 namespace Envoy {
