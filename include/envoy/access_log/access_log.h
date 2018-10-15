@@ -81,7 +81,7 @@ public:
    * Return a formatted access log line.
    * @param request_headers supplies thte request headers.
    * @param response_headers supplies the response headers.
-   * @param response_trailes supplies the response trailers.
+   * @param response_trailers supplies the response trailers.
    * @param stream_info supplies the stream info.
    * @return a string containing the complete formatted access log line.
    */
@@ -105,7 +105,7 @@ public:
    * Extract a value from the provided headers/trailers/stream.
    * @param request_headers supplies thte request headers.
    * @param response_headers supplies the response headers.
-   * @param response_trailes supplies the response trailers.
+   * @param response_trailers supplies the response trailers.
    * @param stream_info supplies the stream info.
    * @return a string containing a single value extracted from the provided headers/stream.
    */
