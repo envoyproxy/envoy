@@ -2907,7 +2907,7 @@ virtual_hosts:
     domains: ["www1.lyft.com"]
     routes:
       - match: { prefix: "/" }
-        metadata: { filter_metadata: { com.bar.foo: { baz: test_value }, baz: {name: meh}} }
+        metadata: { filter_metadata: { com.bar.foo: { baz: test_value }, baz: {name: meh} } }
         decorator:
           operation: hello
         route:
