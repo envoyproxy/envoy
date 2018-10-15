@@ -10,11 +10,13 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/type/percent.pb.validate.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "openssl/rand.h"
 
@@ -172,8 +174,31 @@ const std::string& SnapshotImpl::get(const std::string& key) const {
   if (entry == values_.end()) {
     return EMPTY_STRING;
   } else {
-    return entry->second.string_value_;
+    return entry->second.raw_string_value_;
   }
+}
+
+bool SnapshotImpl::featureEnabled(const std::string& key,
+                                  const envoy::type::FractionalPercent& default_value) const {
+  return featureEnabled(key, default_value, generator_.random());
+}
+
+bool SnapshotImpl::featureEnabled(const std::string& key,
+                                  const envoy::type::FractionalPercent& default_value,
+                                  uint64_t random_value) const {
+  const auto& entry = values_.find(key);
+  uint64_t numerator, denominator;
+  if (entry == values_.end() || !entry->second.fractional_percent_value_.has_value()) {
+    numerator = default_value.numerator();
+    denominator =
+        ProtobufPercentHelper::fractionalPercentDenominatorToInt(default_value.denominator());
+  } else {
+    numerator = entry->second.fractional_percent_value_->numerator();
+    denominator = ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+        entry->second.fractional_percent_value_->denominator());
+  }
+
+  return random_value % denominator < numerator;
 }
 
 uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value) const {
@@ -201,15 +226,40 @@ SnapshotImpl::SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
   stats.num_keys_.set(values_.size());
 }
 
-Snapshot::Entry SnapshotImpl::createEntry(const std::string& value) {
-  Entry entry{value, absl::nullopt};
-  // As a perf optimization, attempt to convert the entry's string into an integer. If we don't
-  // succeed that's fine.
-  uint64_t converted;
-  if (StringUtil::atoul(entry.string_value_.c_str(), converted)) {
-    entry.uint_value_ = converted;
-  }
+SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
+  Entry entry;
+  entry.raw_string_value_ = value;
+
+  // As a perf optimization, attempt to parse the entry's string and store it inside the struct. If
+  // we don't succeed that's fine.
+  resolveEntryType(entry);
+
   return entry;
+}
+
+bool SnapshotImpl::parseEntryUintValue(Entry& entry) {
+  uint64_t converted_uint64;
+  if (StringUtil::atoul(entry.raw_string_value_.c_str(), converted_uint64)) {
+    entry.uint_value_ = converted_uint64;
+    return true;
+  }
+  return false;
+}
+
+void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
+  envoy::type::FractionalPercent converted_fractional_percent;
+  try {
+    MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent);
+  } catch (const ProtoValidationException& ex) {
+    ENVOY_LOG(error, "unable to validate fraction percent runtime proto: {}", ex.what());
+    return;
+  } catch (const EnvoyException& ex) {
+    // An EnvoyException is thrown when we try to parse a bogus string as a protobuf. This is fine,
+    // since there was no expectation that the raw string was a valid proto.
+    return;
+  }
+
+  entry.fractional_percent_value_ = converted_fractional_percent;
 }
 
 void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>& values) {

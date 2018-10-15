@@ -48,6 +48,7 @@ public:
          const envoy::api::v2::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config) {}
   using LoadBalancerBase::chooseHostSet;
+  using LoadBalancerBase::isInPanic;
   using LoadBalancerBase::percentageLoad;
 
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
@@ -71,12 +72,23 @@ public:
     host_set.runCallbacks({}, {});
   }
 
-  std::vector<uint32_t> getLoadPercentage() {
-    std::vector<uint32_t> ret;
+  template <typename T, typename FUNC>
+  std::vector<T> aggregatePrioritySetsValues(TestLb& lb, FUNC func) {
+    std::vector<T> ret;
+
     for (size_t i = 0; i < priority_set_.host_sets_.size(); ++i) {
-      ret.push_back(lb_.percentageLoad(i));
+      ret.push_back((lb.*func)(i));
     }
+
     return ret;
+  }
+
+  std::vector<uint32_t> getLoadPercentage() {
+    return aggregatePrioritySetsValues<uint32_t>(lb_, &TestLb::percentageLoad);
+  }
+
+  std::vector<bool> getPanic() {
+    return aggregatePrioritySetsValues<bool>(lb_, &TestLb::isInPanic);
   }
 
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
@@ -157,25 +169,34 @@ TEST_P(LoadBalancerBaseTest, OverProvisioningFactor) {
 
 TEST_P(LoadBalancerBaseTest, GentleFailover) {
   // With 100% of P=0 hosts healthy, P=0 gets all the load.
+  // None of the levels is in Panic mode
   updateHostSet(host_set_, 1, 1);
   updateHostSet(failover_host_set_, 1, 1);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(100, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false));
 
   // Health P=0 == 50*1.4 == 70
+  // Total health = 70 + 70 >= 100%. None of the levels should be in panic mode.
   updateHostSet(host_set_, 2 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 2 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(70, 30));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false));
 
   // Health P=0 == 25*1.4 == 35   P=1 is healthy so takes all spillover.
+  // Total health = 35+100 >= 100%. P=0 is below Panic level but it is ignored, because
+  // Total health >= 100%.
   updateHostSet(host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 2 /* num_hosts */, 2 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(35, 65));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false));
 
   // Health P=0 == 25*1.4 == 35   P=1 == 35
   // Health is then scaled up by (100 / (35 + 35) == 50)
+  // Total health = 35% + 35% is less than 100%. Panic levels per priority kick in.
   updateHostSet(host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(50, 50));
+  ASSERT_THAT(getPanic(), ElementsAre(true, true));
 }
 
 TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
@@ -185,6 +206,7 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 1, 1);
   updateHostSet(tertiary_host_set_, 1, 1);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(100, 0, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false, false));
 
   // Health P=0 == 50*1.4 == 70
   // Health P=0 == 50, so can take the 30% spillover.
@@ -219,6 +241,42 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(34, 33, 33));
+  ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
+
+  // Levels P=0 and P=1 are totally down. P=2 is totally healthy.
+  // 100% of the traffic should go to P=2 and P=0 and P=1 should
+  // not be in panic mode.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 5 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 100));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false, false));
+
+  // Levels P=0 and P=1 are totally down. P=2 is 80*1.4 >= 100% healthy.
+  // 100% of the traffic should go to P=2 and P=0 and P=1 should
+  // not be in panic mode.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 4 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 100));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false, false));
+
+  // Levels P=0 and P=1 are totally down. P=2 is 40*1.4=56%% healthy.
+  // 100% of the traffic should go to P=2. All levels P=0, P=1 and P=2 should
+  // be in panic mode even though P=0 and P=1 do not receive any load.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 100));
+  ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
+
+  // All levels are completely down. 100% of traffic should go to P=0
+  // and P=0 should be in panic mode
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(100, _, _));
+  ASSERT_THAT(getPanic(), ElementsAre(true, _, _));
 
   // Rounding errors should be picked up by the first healthy priority.
   updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
@@ -852,7 +910,6 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   HostsPerLocalitySharedPtr local_hosts_per_locality = makeHostsPerLocality({{}, {}});
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
-      .WillOnce(Return(50))
       .WillOnce(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillOnce(Return(true));

@@ -9,7 +9,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
-#include "common/http/filter_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 
@@ -98,7 +97,7 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
 }
 
 void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
-  cluster_ = Http::FilterUtility::resolveClusterInfo(decoder_callbacks_, cm_);
+  cluster_ = decoder_callbacks_->clusterInfo();
   if (!cluster_) {
     return;
   }
