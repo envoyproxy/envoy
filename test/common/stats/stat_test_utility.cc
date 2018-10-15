@@ -11,7 +11,7 @@ bool hasDeterministicMallocStats() {
   // quantity. This decision is centralized here. As the preferred malloc
   // library for Envoy is TCMALLOC that's what we test for here. If we switch
   // to a different malloc library than we'd have to re-evaluate all the
-  // thresholds in the tests referencing ENABLE_MEMORY_USAGE_TESTS.
+  // thresholds in the tests referencing hasDeterministicMallocStats().
 #ifdef TCMALLOC
   const std::string str("surely this will have to allocate some memory");
   return Memory::Stats::totalCurrentlyAllocated() != 0;
