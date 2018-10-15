@@ -85,6 +85,7 @@ envoy_cc_fuzz_test(
     corpus = "config_corpus",
     deps = [
         "//source/server/config_validation:server_lib",
+        "//source/server:proto_descriptors_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
