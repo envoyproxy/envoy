@@ -28,7 +28,7 @@ Traffic shifting between two upstreams
 
 The :ref:`runtime <envoy_api_field_route.RouteMatch.runtime_fraction>` object
 in the route configuration determines the probability of selecting a
-particular route (and hence its cluster). By using the runtime_fraction
+particular route (and hence its cluster). By using the *runtime_fraction*
 configuration, traffic to a particular route in a virtual host can be
 gradually shifted from one cluster to another. Consider the following
 example configuration, where two versions ``helloworld_v1`` and
@@ -38,22 +38,23 @@ envoy configuration file.
 .. code-block:: yaml
 
   virtual_hosts:
-     - name: "www2"
-       domains: ["*"]
+     - name: www2
+       domains:
+       - '*'
        routes:
          - match:
-             prefix: "/"
+             prefix: /
              runtime_fraction:
                default_value:
                  numerator: 50
                  denominator: HUNDRED
-               runtime_key: "routing.traffic_shift.helloworld"
+               runtime_key: routing.traffic_shift.helloworld
            route:
-             cluster: "helloworld_v1"
+             cluster: helloworld_v1
          - match:
-             prefix: "/"
+             prefix: /
            route:
-             cluster: "helloworld_v2"
+             cluster: helloworld_v2
 
 
 Envoy matches routes with a :ref:`first match <config_http_conn_man_route_table_route_matching>` policy.
@@ -101,10 +102,11 @@ to each upstream cluster.
 .. code-block:: yaml
 
   virtual_hosts:
-     - name: "www2"
-       domains: ["*"]
+     - name: www2
+       domains:
+       - '*'
        routes:
-         - match: { prefix: "/" }
+         - match: { prefix: / }
            route:
              weighted_clusters:
                clusters:
