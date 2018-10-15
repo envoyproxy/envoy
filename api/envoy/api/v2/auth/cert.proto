@@ -235,12 +235,23 @@ message CommonTlsContext {
   // Configs for fetching TLS certificates via SDS API.
   repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6;
 
+  // Config for validation context via SDS API.
+  message ValidationContextSdsConfig {
+    // An optional list of Subject Alternative Names. If specified, Envoy will ignore the
+    // Subject Alternative Names received from SDS API, and use this list to verify that the
+    // Subject Alternative Name of the presented certificate matches one of the specified values.
+    repeated string override_verify_subject_alt_name = 1;
+
+    // Config for fetching validation context via SDS API.
+    SdsSecretConfig sds_secret_config = 2;
+  }
+
   oneof validation_context_type {
     // How to validate peer certificates.
     CertificateValidationContext validation_context = 3;
 
-    // Config for fetching validation context via SDS API.
-    SdsSecretConfig validation_context_sds_secret_config = 7;
+    // Configs for validation context that include SDS config.
+    ValidationContextSdsConfig validation_context_sds_secret_config = 7;
   }
 
   // Supplies the list of ALPN protocols that the listener should expose. In
