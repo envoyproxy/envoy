@@ -1,4 +1,4 @@
-### Envoy Stats System
+# Envoy Stats System
 
 Envoy statistics track numeric metrics on an Envoy instance, optionally spanning
 binary restarts. The metrics are tracked as:
@@ -48,8 +48,8 @@ This implementation is complicated so here is a rough overview of the threading 
 
 Each Histogram implementation will have 2 parts.
 
- * "main" thread parent which is called "ParentHistogram".
- * "per-thread" collector which is called "ThreadLocalHistogram".
+ * *main* thread parent which is called `ParentHistogram`.
+ * *per-thread* collector which is called `ThreadLocalHistogram`.
 
 Worker threads will write to ParentHistogram which checks whether a TLS
 histogram is available. If there is one it will write to it, otherwise creates
@@ -57,17 +57,17 @@ new one and writes to it. During the flush process the following sequence is
 followed.
 
  * The main thread starts the flush process by posting a message to every worker which tells the
-   worker to swap its "active" histogram with its "backup" histogram. This is achieved via a call
-   to "beginMerge" method.
+   worker to swap its *active* histogram with its *backup* histogram. This is achieved via a call
+   to the `beginMerge` method.
  * Each TLS histogram has 2 histograms it makes use of, swapping back and forth. It manages a
    current_active index via which it writes to the correct histogram.
  * When all workers have done, the main thread continues with the flush process where the
-   "actual" merging happens.
+   *actual* merging happens.
  * As the active histograms are swapped in TLS histograms, on the main thread, we can be sure
-   that no worker is writing into the "backup" histogram.
+   that no worker is writing into the *backup* histogram.
  * The main thread now goes through all histograms, collect them across each worker and
-   accumulates in to "interval" histograms.
- * Finally the main "interval" histogram is merged to "cumulative" histogram.
+   accumulates in to *interval* histograms.
+ * Finally the main *interval* histogram is merged to *cumulative* histogram.
 
 ## Stat naming infrastructure and scopes
 
