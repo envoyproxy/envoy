@@ -77,6 +77,14 @@ class Formatter {
 public:
   virtual ~Formatter() {}
 
+  /**
+   * Return a formatted access log line.
+   * @param request_headers supplies thte request headers.
+   * @param response_headers supplies the response headers.
+   * @param response_trailes supplies the response trailers.
+   * @param stream_info supplies the stream info.
+   * @return a string containing the complete formatted access log line.
+   */
   virtual std::string format(const Http::HeaderMap& request_headers,
                              const Http::HeaderMap& response_headers,
                              const Http::HeaderMap& response_trailers,
@@ -95,12 +103,16 @@ public:
 
   /**
    * Extract a value from the provided headers/trailers/stream.
-   * @return a string containing the extracted value.
+   * @param request_headers supplies thte request headers.
+   * @param response_headers supplies the response headers.
+   * @param response_trailes supplies the response trailers.
+   * @param stream_info supplies the stream info.
+   * @return a string containing a single value extracted from the provided headers/stream.
    */
   virtual std::string format(const Http::HeaderMap& request_headers,
                              const Http::HeaderMap& response_headers,
                              const Http::HeaderMap& response_trailers,
-                             const StreamInfo::StreamInfo& request_info) const PURE;
+                             const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 typedef std::unique_ptr<FormatterProvider> FormatterProviderPtr;
