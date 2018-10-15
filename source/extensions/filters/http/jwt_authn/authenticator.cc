@@ -227,11 +227,11 @@ void AuthenticatorImpl::verifyKey() {
     // Remove JWT from headers.
     curr_token_->removeJwt(*headers_);
   }
-  if (set_payload_cb_ && provider.payload_in_metadata()) {
+  if (set_payload_cb_ && !provider.payload_in_metadata().empty()) {
     try {
       ProtobufWkt::Struct payload_pb;
       MessageUtil::loadFromJson(jwt_->payload_str_, payload_pb);
-      set_payload_cb_(jwt_->iss_, payload_pb);
+      set_payload_cb_(provider.payload_in_metadata(), payload_pb);
     } catch (EnvoyException ex) {
       ENVOY_LOG(warn, "Error in converting payload for issuer {}, error: {}", jwt_->iss_,
                 ex.what());

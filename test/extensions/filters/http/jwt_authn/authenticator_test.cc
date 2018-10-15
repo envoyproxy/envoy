@@ -53,8 +53,8 @@ public:
     std::function<void(const Status&)> on_complete_cb = [&expected_status](const Status& status) {
       ASSERT_EQ(status, expected_status);
     };
-    auto set_payload_cb = [this](const std::string& issuer, const ProtobufWkt::Struct& payload) {
-      out_issuer_ = issuer;
+    auto set_payload_cb = [this](const std::string& name, const ProtobufWkt::Struct& payload) {
+      out_name_ = name;
       out_payload_ = payload;
     };
     auto tokens = filter_config_->getExtractor().extract(headers);
@@ -68,7 +68,7 @@ public:
   AuthenticatorPtr auth_;
   ::google::jwt_verify::JwksPtr jwks_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
-  std::string out_issuer_;
+  std::string out_name_;
   ProtobufWkt::Struct out_payload_;
 };
 
@@ -113,13 +113,14 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
   EXPECT_TRUE(headers.Authorization());
 
   // Payload not set by default
-  EXPECT_EQ(out_issuer_, "");
+  EXPECT_EQ(out_name_, "");
 }
 
 // This test verifies the Jwt payload is set.
 TEST_F(AuthenticatorTest, TestSetPayload) {
   // Confit payload_in_metadata flag
-  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(true);
+  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(
+      "my_payload");
   CreateAuthenticator();
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke(
@@ -133,7 +134,7 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
   expectVerifyStatus(Status::Ok, headers);
 
   // Payload is set
-  EXPECT_EQ(out_issuer_, "https://example.com");
+  EXPECT_EQ(out_name_, "my_payload");
 
   ProtobufWkt::Struct expected_payload;
   MessageUtil::loadFromJson(ExpectedPayloadJSON, expected_payload);

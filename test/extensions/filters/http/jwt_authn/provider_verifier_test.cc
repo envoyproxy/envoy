@@ -18,12 +18,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-ProtobufWkt::Struct getExpectedPayload() {
+ProtobufWkt::Struct getExpectedPayload(const std::string& name) {
   ProtobufWkt::Struct expected_payload;
   MessageUtil::loadFromJson(ExpectedPayloadJSON, expected_payload);
 
   ProtobufWkt::Struct struct_obj;
-  *(*struct_obj.mutable_fields())["https://example.com"].mutable_struct_value() = expected_payload;
+  *(*struct_obj.mutable_fields())[name].mutable_struct_value() = expected_payload;
   return struct_obj;
 }
 
@@ -45,12 +45,13 @@ public:
 
 TEST_F(ProviderVerifierTest, TestOkJWT) {
   MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
-  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(true);
+  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(
+      "my_payload");
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
 
   EXPECT_CALL(mock_cb_, setPayload(_)).WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
-    EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload()));
+    EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload("my_payload")));
   }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
