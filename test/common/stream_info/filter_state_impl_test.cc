@@ -134,6 +134,8 @@ TEST_F(FilterStateImplTest, WrongTypeGet) {
                             "Data stored under test_name cannot be coerced to specified type");
 }
 
+// Add elements to filter state list and simulate a consumer iterating over
+// all elements.
 TEST_F(FilterStateImplTest, IterateThroughListTillEnd) {
   size_t access_count = 0;
   size_t destruction_count = 0;
@@ -158,6 +160,8 @@ TEST_F(FilterStateImplTest, IterateThroughListTillEnd) {
   EXPECT_EQ(2u, destruction_count);
 }
 
+// Add elements to filter state list and simulate a consumer iterating over
+// elements and breaking out of the loop by returning false.
 TEST_F(FilterStateImplTest, IterateThroughListAndBreak) {
   size_t access_count = 0;
   size_t destruction_count = 0;
@@ -182,6 +186,8 @@ TEST_F(FilterStateImplTest, IterateThroughListAndBreak) {
   EXPECT_EQ(2u, destruction_count);
 }
 
+// Check that list and (unary) data elements have no namespace conflicts by
+// adding a list element and a data element with same key.
 TEST_F(FilterStateImplTest, NoNameConflictBetweenDataAndList) {
   filter_state().setData("test_1", std::make_unique<SimpleType>(1));
   filter_state().addToList<SimpleType>("test_1", std::make_unique<SimpleType>(2));
@@ -192,7 +198,8 @@ TEST_F(FilterStateImplTest, NoNameConflictBetweenDataAndList) {
   });
 }
 
-TEST_F(FilterStateImplTest, NameConflictDifferentTypesOfList) {
+// Check that adding different types to the same list causes exception.
+TEST_F(FilterStateImplTest, ErrorAddingDifferentTypesToSameList) {
   filter_state().addToList<SimpleType>("test_1", std::make_unique<SimpleType>(1));
   EXPECT_THROW_WITH_MESSAGE(
       filter_state().addToList<TestStoredTypeTracking>(
@@ -200,7 +207,8 @@ TEST_F(FilterStateImplTest, NameConflictDifferentTypesOfList) {
       EnvoyException, "List test_1 does not conform to the specified type");
 }
 
-TEST_F(FilterStateImplTest, WrongTypeInforEachListItem) {
+// Check that adding ForEachListItem throws error when types don't match.
+TEST_F(FilterStateImplTest, WrongTypeInForEachListItem) {
   filter_state().addToList<TestStoredTypeTracking>(
       "test_name", std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr));
   EXPECT_THROW_WITH_MESSAGE(filter_state().forEachListItem<SimpleType>(
