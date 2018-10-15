@@ -37,7 +37,7 @@ enum class MessageType : uint8_t {
 
 /**
  * Dubbo protocol response status types.
- * See org.apache.dubbo.remoting.exchange.codec
+ * See org.apache.dubbo.remoting.exchange
  */
 enum class ResponseStatus : uint8_t {
   Ok = 20,

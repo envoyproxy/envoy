@@ -11,6 +11,8 @@ namespace {
 constexpr uint16_t MagicNumber = 0xdabb;
 constexpr uint8_t MessageTypeMask = 0x80;
 constexpr uint8_t EventMask = 0x20;
+constexpr uint8_t TwoWayMask = 0x40;
+constexpr uint8_t SerializationTypeMask = 0x1f;
 
 } // namespace
 

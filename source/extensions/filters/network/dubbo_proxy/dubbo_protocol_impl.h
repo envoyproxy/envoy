@@ -46,8 +46,6 @@ public:
   virtual bool isTwoWay() const override { return is_two_way_; }
 
 private:
-  static const uint8_t TwoWayMask = 0x40;
-  static const uint8_t SerializationTypeMask = 0x1f;
   SerializationType type_;
   bool is_two_way_;
 };

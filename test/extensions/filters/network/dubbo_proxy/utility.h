@@ -10,12 +10,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-inline void addInt32(Buffer::Instance& buffer, int32_t value) {
+inline void addInt32(Buffer::Instance& buffer, uint32_t value) {
   value = htobe32(value);
   buffer.add(&value, 4);
 }
 
-inline void addInt64(Buffer::Instance& buffer, int64_t value) {
+inline void addInt64(Buffer::Instance& buffer, uint64_t value) {
   value = htobe64(value);
   buffer.add(&value, 8);
 }
