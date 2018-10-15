@@ -26,6 +26,8 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Permis
     return std::make_shared<const MetadataMatcher>(permission.metadata());
   case envoy::config::rbac::v2alpha::Permission::RuleCase::kNotRule:
     return std::make_shared<const NotMatcher>(permission.not_rule());
+  case envoy::config::rbac::v2alpha::Permission::RuleCase::kRequestedServerName:
+    return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -155,6 +157,12 @@ bool PolicyMatcher::matches(const Network::Connection& connection,
                             const envoy::api::v2::core::Metadata& metadata) const {
   return permissions_.matches(connection, headers, metadata) &&
          principals_.matches(connection, headers, metadata);
+}
+
+bool RequestedServerNameMatcher::matches(const Network::Connection& connection,
+                                         const Envoy::Http::HeaderMap&,
+                                         const envoy::api::v2::core::Metadata&) const {
+  return match(connection.requestedServerName());
 }
 
 } // namespace RBAC

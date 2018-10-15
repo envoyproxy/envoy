@@ -105,7 +105,8 @@ message HealthCheck {
     // health checked cluster. For more information, including details on header value syntax, see
     // the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
-    repeated core.HeaderValueOption request_headers_to_add = 6;
+    repeated core.HeaderValueOption request_headers_to_add = 6
+        [(validate.rules).repeated .max_items = 1000];
 
     // Specifies a list of HTTP headers that should be removed from each request that is sent to the
     // health checked cluster.

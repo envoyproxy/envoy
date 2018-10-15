@@ -45,7 +45,7 @@ void InjectedResourceMonitor::updateResourceUsage(Server::ResourceMonitor::Callb
 
   ASSERT(pressure_.has_value() != error_.has_value());
   if (pressure_.has_value()) {
-    callbacks.onSuccess({.resource_pressure_ = *pressure_});
+    callbacks.onSuccess({*pressure_});
   } else {
     callbacks.onFailure(*error_);
   }
