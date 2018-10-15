@@ -15,12 +15,16 @@ public:
   void setData(absl::string_view data_name, std::unique_ptr<Object>&& data) override;
   bool hasDataWithName(absl::string_view) const override;
   const Object* getDataGeneric(absl::string_view data_name) const override;
+  void addToListGeneric(absl::string_view data_name, std::unique_ptr<Object>&& data) override;
+  const std::vector<std::unique_ptr<Object>>* getList(absl::string_view data_name) const override;
+  bool hasListWithName(absl::string_view) const override;
 
 private:
   // The explicit non-type-specific comparator is necessary to allow use of find() method
   // with absl::string_view. See
   // https://stackoverflow.com/questions/20317413/what-are-transparent-comparators.
   std::map<std::string, std::unique_ptr<Object>, std::less<>> data_storage_;
+  std::map<std::string, std::vector<std::unique_ptr<Object>>, std::less<>> list_storage_;
 };
 
 } // namespace StreamInfo
