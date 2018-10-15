@@ -13,7 +13,7 @@ binary restarts. The metrics are tracked as:
 
 TBD
 
-## Performacne and Thread Local Storage
+## Performance and Thread Local Storage
 
 This implementation supports the following features:
 
