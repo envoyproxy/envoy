@@ -90,7 +90,7 @@ public:
 };
 
 /**
- * See https://dubbo.incubator.apache.org/#!/docs/dev/implementation.md?lang=en-us
+ * See https://dubbo.incubator.apache.org/en-us/docs/dev/implementation.html
  */
 class Protocol {
 public:

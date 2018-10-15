@@ -49,11 +49,3 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
     ],
 )
-
-envoy_cc_library(
-    name = "fake_dubbo_proxy_target",
-    deps = [
-        ":dubbo_protocol_impl_lib",
-        ":hessian_utils_lib",
-    ],
-)
