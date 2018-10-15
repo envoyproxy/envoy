@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/platform.h"
 #include "envoy/http/codec.h"
 
 #include "common/common/empty_string.h"
@@ -89,9 +90,9 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
     return false;
   }
 
-  Buffer::RawSlice lhs_slices[lhs_num_slices];
+  STACK_ALLOC_ARRAY(lhs_slices, Buffer::RawSlice, lhs_num_slices);
   lhs.getRawSlices(lhs_slices, lhs_num_slices);
-  Buffer::RawSlice rhs_slices[rhs_num_slices];
+  STACK_ALLOC_ARRAY(rhs_slices, Buffer::RawSlice, rhs_num_slices);
   rhs.getRawSlices(rhs_slices, rhs_num_slices);
   for (size_t i = 0; i < lhs_num_slices; i++) {
     if (lhs_slices[i].len_ != rhs_slices[i].len_) {

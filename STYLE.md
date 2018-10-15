@@ -65,8 +65,6 @@
   In most cases tests can and should be structured so this is not necessary.
 * Tests default to StrictMock so will fail if hitting unexpected warnings. Feel free to use
   NiceMock for mocks whose behavior is not the focus of a test.
-* There are probably a few other things missing from this list. We will add them as they
-  are brought to our attention.
 * [Thread
   annotations](https://github.com/abseil/abseil-cpp/blob/master/absl/base/thread_annotations.h),
   such as `GUARDED_BY`, should be used for shared state guarded by
@@ -75,6 +73,7 @@
   rather than using the 'static' keyword. Note that the
   [Google C++ style guide](https://google.github.io/styleguide/cppguide.html#Unnamed_Namespaces_and_Static_Variables)
    allows either, but in Envoy we prefer annonymous namespaces.
+* Braces are required for all control statements include single line if, while, etc. statements.
 
 # Error handling
 

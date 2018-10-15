@@ -69,15 +69,12 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
     const struct sockaddr_in6* sin6 = reinterpret_cast<const struct sockaddr_in6*>(&ss);
     ASSERT(AF_INET6 == sin6->sin6_family);
     if (!v6only && IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-#ifndef s6_addr32
-#ifdef __APPLE__
-#define s6_addr32 __u6_addr.__u6_addr32
+#if defined(__APPLE__)
+      struct sockaddr_in sin = {
+          {}, AF_INET, sin6->sin6_port, {sin6->sin6_addr.__u6_addr.__u6_addr32[3]}, {}};
+#else
+      struct sockaddr_in sin = {AF_INET, sin6->sin6_port, {sin6->sin6_addr.s6_addr32[3]}, {}};
 #endif
-#endif
-      struct sockaddr_in sin = {.sin_family = AF_INET,
-                                .sin_port = sin6->sin6_port,
-                                .sin_addr = {.s_addr = sin6->sin6_addr.s6_addr32[3]},
-                                .sin_zero = {}};
       return std::make_shared<Address::Ipv4Instance>(&sin);
     } else {
       return std::make_shared<Address::Ipv6Instance>(*sin6, v6only);

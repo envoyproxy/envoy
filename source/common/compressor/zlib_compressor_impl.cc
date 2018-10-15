@@ -1,6 +1,7 @@
 #include "common/compressor/zlib_compressor_impl.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 
 #include "common/common/assert.h"
 
@@ -35,10 +36,11 @@ uint64_t ZlibCompressorImpl::checksum() { return zstream_ptr_->adler; }
 
 void ZlibCompressorImpl::compress(Buffer::Instance& buffer, State state) {
   const uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
+  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
   buffer.getRawSlices(slices, num_slices);
 
-  for (const Buffer::RawSlice& input_slice : slices) {
+  for (uint64_t i = 0; i < num_slices; i++) {
+    const Buffer::RawSlice& input_slice = slices[i];
     zstream_ptr_->avail_in = input_slice.len_;
     zstream_ptr_->next_in = static_cast<Bytef*>(input_slice.mem_);
     // Z_NO_FLUSH tells the compressor to take the data in and compresses it as much as possible

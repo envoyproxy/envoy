@@ -61,11 +61,11 @@ void BufferFilter::initConfig() {
   const std::string& name = HttpFilterNames::get().Buffer;
   const auto* entry = callbacks_->route()->routeEntry();
 
+  const BufferFilterSettings* tmp = entry->perFilterConfigTyped<BufferFilterSettings>(name);
   const BufferFilterSettings* route_local =
-      entry->perFilterConfigTyped<BufferFilterSettings>(name)
-          ?: entry->virtualHost().perFilterConfigTyped<BufferFilterSettings>(name);
+      tmp ? tmp : entry->virtualHost().perFilterConfigTyped<BufferFilterSettings>(name);
 
-  settings_ = route_local ?: settings_;
+  settings_ = route_local ? route_local : settings_;
 }
 
 Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap&, bool end_stream) {

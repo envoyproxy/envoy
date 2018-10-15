@@ -262,16 +262,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "filter_utility_lib",
-    srcs = ["filter_utility.cc"],
-    hdrs = ["filter_utility.h"],
-    deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "header_utility_lib",
     srcs = ["header_utility.cc"],
     hdrs = ["header_utility.h"],

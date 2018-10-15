@@ -50,7 +50,7 @@ public:
     envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
     MessageUtil::loadFromYaml(yaml, proto_config);
 
-    config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, cm_));
+    config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_));
 
     client_ = new RateLimit::MockClient();
     filter_.reset(new Filter(config_, RateLimit::ClientPtr{client_}));
@@ -84,7 +84,6 @@ public:
   Buffer::OwnedImpl response_data_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Router::MockRateLimitPolicyEntry> route_rate_limit_;
   NiceMock<Router::MockRateLimitPolicyEntry> vh_rate_limit_;
   std::vector<RateLimit::Descriptor> descriptor_{{{{"descriptor_key", "descriptor_value"}}}};
@@ -123,7 +122,7 @@ TEST_F(HttpRateLimitFilterTest, NoRoute) {
 TEST_F(HttpRateLimitFilterTest, NoCluster) {
   SetUpTest(filter_config_);
 
-  ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
+  ON_CALL(filter_callbacks_, clusterInfo()).WillByDefault(Return(nullptr));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -220,8 +219,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
       .Times(0);
   request_callbacks_->complete(RateLimit::LimitStatus::OK, nullptr);
 
-  EXPECT_EQ(1U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.ok").value());
 }
 
 TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
@@ -272,8 +270,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(true, (expected_headers == response_headers));
 
-  EXPECT_EQ(1U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.ok").value());
 }
 
 TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
@@ -301,8 +298,7 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_headers_));
 
-  EXPECT_EQ(1U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.ok").value());
 }
 
 TEST_F(HttpRateLimitFilterTest, ImmediateErrorResponse) {
@@ -330,10 +326,9 @@ TEST_F(HttpRateLimitFilterTest, ImmediateErrorResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_headers_));
 
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.error").value());
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.error").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
                     .counter("ratelimit.failure_mode_allowed")
                     .value());
 }
@@ -361,10 +356,9 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponse) {
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited))
       .Times(0);
 
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.error").value());
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.error").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
                     .counter("ratelimit.failure_mode_allowed")
                     .value());
 }
@@ -389,10 +383,9 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
               setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError))
       .Times(0);
 
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.error").value());
-  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.error").value());
+  EXPECT_EQ(0U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
                     .counter("ratelimit.failure_mode_allowed")
                     .value());
 }
@@ -420,14 +413,9 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
   request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, nullptr);
 
   EXPECT_EQ(1U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.over_limit")
-                .value());
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_4xx").value());
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_429").value());
+            filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.over_limit").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_429").value());
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
@@ -463,14 +451,9 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
   request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, std::move(h));
 
   EXPECT_EQ(1U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.over_limit")
-                .value());
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_4xx").value());
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_429").value());
+            filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.over_limit").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_429").value());
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
@@ -501,14 +484,9 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_headers_));
 
   EXPECT_EQ(1U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.over_limit")
-                .value());
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_4xx").value());
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_429").value());
+            filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.over_limit").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_429").value());
 }
 
 TEST_F(HttpRateLimitFilterTest, ResetDuringCall) {
@@ -651,8 +629,7 @@ TEST_F(HttpRateLimitFilterTest, InternalRequestType) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_headers_));
 
-  EXPECT_EQ(1U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.ok").value());
 }
 
 TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
@@ -695,8 +672,7 @@ TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_headers_));
 
-  EXPECT_EQ(1U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.ok").value());
 }
 
 TEST_F(HttpRateLimitFilterTest, ExcludeVirtualHost) {
@@ -736,8 +712,7 @@ TEST_F(HttpRateLimitFilterTest, ExcludeVirtualHost) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_headers_));
 
-  EXPECT_EQ(1U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.ok").value());
 }
 
 TEST_F(HttpRateLimitFilterTest, ConfigValueTest) {

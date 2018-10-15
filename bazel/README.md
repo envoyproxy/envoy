@@ -230,7 +230,9 @@ To build and run tests with the gcc compiler's [address sanitizer
 bazel test -c dbg --config=asan //test/...
 ```
 
-The ASAN failure stack traces include line numbers as a result of running ASAN with a `dbg` build above.
+The ASAN failure stack traces include line numbers as a result of running ASAN with a `dbg` build above. If the
+stack trace is not symbolized, try setting the ASAN_SYMBOLIZER_PATH environment variable to point to the
+llvm-symbolizer binary (or make sure the llvm-symbolizer is in your $PATH).
 
 If you have clang-5.0 or newer, additional checks are provided with:
 

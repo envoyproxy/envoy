@@ -1,10 +1,12 @@
 #include <string>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/rds.pb.validate.h"
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
+#include "common/config/utility.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/string_accessor_impl.h"
@@ -161,29 +163,30 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"list_key\"])", "");
 }
 
-// Breaks tsan/asan builds by trying to allocate a lot of memory.
-// Works on debug builds and needs to be fixed. See
-// https://github.com/envoyproxy/envoy/issues/4268
-TEST_F(StreamInfoHeaderFormatterTest, DISABLED_UserDefinedHeadersConsideredHarmful) {
-  // This must be an inline header to get the append-in-place semantics.
-  const char* header_name = "connection";
-  Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
-  const uint32_t num_header_chunks = 10;
-  const uint64_t length = std::numeric_limits<uint32_t>::max() / num_header_chunks;
-  std::string really_long_string(length + 1, 'a');
-  for (uint32_t i = 0; i < num_header_chunks; ++i) {
-    envoy::api::v2::core::HeaderValueOption* header = to_add.Add();
-    header->mutable_header()->set_key(header_name);
-    header->mutable_header()->set_value(really_long_string);
+// Replaces the test of user-defined-headers acting as a Query of Death with
+// size checks on user defined headers.
+TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
+  {
+    envoy::api::v2::RouteConfiguration route;
+    envoy::api::v2::core::HeaderValueOption* header = route.mutable_request_headers_to_add()->Add();
+    std::string long_string(16385, 'a');
+    header->mutable_header()->set_key("header_name");
+    header->mutable_header()->set_value(long_string);
     header->mutable_append()->set_value(true);
+    EXPECT_THROW_WITH_REGEX(MessageUtil::validate(route), ProtoValidationException,
+                            "Proto constraint validation failed.*");
   }
-
-  HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
-
-  Http::TestHeaderMapImpl header_map{{":method", "POST"}};
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_DEATH_LOG_TO_STDERR(req_header_parser->evaluateHeaders(header_map, stream_info),
-                             "Trying to allocate overly large headers.");
+  {
+    envoy::api::v2::RouteConfiguration route;
+    for (int i = 0; i < 1001; ++i) {
+      envoy::api::v2::core::HeaderValueOption* header =
+          route.mutable_request_headers_to_add()->Add();
+      header->mutable_header()->set_key("header_name");
+      header->mutable_header()->set_value("value");
+    }
+    EXPECT_THROW_WITH_REGEX(MessageUtil::validate(route), ProtoValidationException,
+                            "Proto constraint validation failed.*");
+  }
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMissingHost) {
