@@ -222,7 +222,7 @@ TEST(SymbolTableTest, Memory) {
               << std::endl;
   } else {
     // In manual tests, string memory used 7759488 in this example, and
-    // symbol-table mem used 5663936.
+    // symbol-table mem used 5663936, as of Oct 15, 2018.
     EXPECT_LT(symbol_table_mem_used, string_mem_used);
   }
 }
