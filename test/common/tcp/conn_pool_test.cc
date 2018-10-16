@@ -181,7 +181,7 @@ public:
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
         conn_pool_{new ConnPoolImpl(dispatcher_,
                                     Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
-                                    Upstream::ResourcePriority::Default, nullptr)} {}
+                                    Upstream::ResourcePriority::Default, nullptr, absl::nullopt)} {}
 
   ~TcpConnPoolImplDestructorTest() {}
 
