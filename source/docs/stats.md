@@ -15,9 +15,10 @@ In order to support restarting the Envoy binary without losing counter and gauge
 values, they are stored in a shared-memory block, including stats that are
 created dynamically at runtime in response to discovery of new clusters at
 runtime. To simplify memmory management, each stat is allocated a fixed amount
-of storage, controlled via command-line flags: `--max-stats` and
-`max-obj-name-len`, which dictate size of the pre-allocated shared-memory
-block. See
+of storage, controlled via [command-line
+flags](https://www.envoyproxy.io/docs/envoy/latest/operations/cli):
+`--max-stats` and `--max-obj-name-len`, which determine the size of the pre-allocated
+shared-memory block. See
 [RawStatData](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/raw_stat_data.h).
 
 Note in particular that the full stat name is retained in shared-memory, making
@@ -103,7 +104,7 @@ Stat names are replicated in several places in various forms.
  * Held fully elaborated next to the values, in `RawStatData` and `HeapStatData`
  * As keys of multiple maps in `ThreadLocalStore` for capturing all stats in a scope,
    and each per-thread caches.
- * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/metric_impl.h
+ * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/metric_impl.h)
    in a transformed state, with tags extracted into vectors of name/value strings.
  * In static strings across the codebase where stats are referenced
  * In a [set of
@@ -115,6 +116,8 @@ stat name storage, making stat names dominate memory usage, particularly for
 deployments with large numbers of clusters and threads.
 
 ## Tags and Tag Extraction
+
+TBD
 
 ## Disabling statistics by substring or regex
 
