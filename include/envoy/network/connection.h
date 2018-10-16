@@ -240,13 +240,14 @@ public:
   virtual const ConnectionSocket::OptionsSharedPtr& socketOptions() const PURE;
 
   /**
-   * Object on which filters can share data on a per-connection basis.
-   * Only one filter can produce a named data object, but it may be
-   * consumed by many other objects.
-   * @return the per-connection state associated with this connection.
+   * The StreamInfo object associated with this connection. Used for
+   * logging purposes typically. Individual filters may add specific
+   * information through dynamicAttribites interface in the stream info
+   * object.
+   *
+   * @return streaminfo associated with this connection.
    */
-  virtual StreamInfo::FilterState& perConnectionState() PURE;
-  virtual const StreamInfo::FilterState& perConnectionState() const PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   /**
    * Set the timeout for delayed connection close()s.

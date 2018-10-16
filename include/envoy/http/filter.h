@@ -132,8 +132,8 @@ public:
   virtual uint64_t streamId() PURE;
 
   /**
-   * @return streamInfo for logging purposes. Individual filter may add specific information to be
-   * put into the access log.
+   * @return streamInfo for logging purposes. Individual filters may add specific information to be
+   * put into the access log through dynamicAttributes.
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
 

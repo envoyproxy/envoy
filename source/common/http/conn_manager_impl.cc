@@ -397,6 +397,10 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   }
   stream_info_.setRequestedServerName(
       connection_manager_.read_callbacks_->connection().requestedServerName());
+
+  // Initialize the dynamic attribute list in stream info with a well known attribute
+  stream_info_.dynamic_attributes_.addToListGeneric(StreamInfo::HCM_ATTRIBUTES,
+                                                    std::make_unique<StreamInfo::DynamicAttribute>(StreamInfo::HCM_ATTRIBUTES, StreamInfo::HCM_ATTRIBUTES));
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {

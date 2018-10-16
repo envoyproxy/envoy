@@ -182,8 +182,11 @@ struct StreamInfoImpl : public StreamInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  FilterState& perRequestState() override { return per_request_state_; }
-  const FilterState& perRequestState() const override { return per_request_state_; }
+  FilterState& dynamicAttributes() override { return dynamic_attributes_; }
+  const FilterState& dynamicAttributes() const override { return dynamic_attributes_; }
+
+  FilterState& perRequestState() override { return dynamic_attributes_; }
+  const FilterState& perRequestState() const override { return dynamic_attributes_; }
 
   void setRequestedServerName(absl::string_view requested_server_name) override {
     requested_server_name_ = std::string(requested_server_name);
@@ -211,7 +214,7 @@ struct StreamInfoImpl : public StreamInfo {
   bool hc_request_{};
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
-  FilterStateImpl per_request_state_{};
+  FilterStateImpl dynamic_attributes_{};
 
 private:
   uint64_t bytes_received_{};

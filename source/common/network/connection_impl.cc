@@ -50,6 +50,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
                                       [this]() -> void { this->onLowWatermark(); },
                                       [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), id_(next_global_id_++) {
+  // TODO: Need to initialize stream_info_ which requires TimeSource. Where is TimeSource coming from??
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
   RELEASE_ASSERT(fd() != -1, "");
@@ -65,6 +66,14 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   transport_socket_->setTransportSocketCallbacks(*this);
+
+  stream_info_.setDownstreamLocalAddress(localAddress());
+  stream_info_.setDownstreamRemoteAddress(remoteAddress());
+  stream_info_.setRequestedServerName(requestedServerName());
+
+  // Initialize the dynamic attribute list in stream info with a well known attribute
+  stream_info_.dynamic_attributes_.addToListGeneric(StreamInfo::CONNECTION_ATTRIBUTES,
+                                                    std::make_unique<StreamInfo::DynamicAttribute>(StreamInfo::CONNECTION_ATTRIBUTES, StreamInfo::CONNECTION_ATTRIBUTES));
 }
 
 ConnectionImpl::~ConnectionImpl() {
