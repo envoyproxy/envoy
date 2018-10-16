@@ -24,10 +24,10 @@ Note in particular that the full stat name is retained in shared-memory, making
 it easy to correlate stats across restarts even as the dynamic cluster
 configuration changes.
 
-One challenge with this fixed memory allocation strategy limits cluster
-scalabilty. An deployment wishing to use a single Envoy instance to manage tens
-of thousands of clusters -- each with its own set of scoped stats, will use more
-memory than is ideal.
+One challenge with this fixed memory allocation strategy is that it limits
+cluster scalabilty. A deployment wishing to use a single Envoy instance to
+manage tens of thousands of clusters, each with its own set of scoped stats,
+will use more memory than is ideal.
 
 A flag `--disable-hot-restart` pivots the system toward an alternate heap-based
 stat allocator that allocates stats on demand in the heap, with no preset limits
