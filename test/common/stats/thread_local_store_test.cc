@@ -644,24 +644,30 @@ TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 }
 
-#ifdef ENABLE_MEMORY_USAGE_TESTS
-
 // Tests how much memory is consumed allocating 100k stats.
 TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
+  if (!TestUtil::hasDeterministicMallocStats()) {
+    return;
+  }
+
   const size_t million = 1000 * 1000;
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
   if (start_mem == 0) {
     // Skip this test for platforms where we can't measure memory.
     return;
   }
-  TestUtil::foreachStat(1000,
+  TestUtil::forEachStat(1000,
                         [this](absl::string_view name) { store_->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 25 * million); // actual value: 24068784 as of 10/12/2018
+  EXPECT_LT(end_mem - start_mem, 25 * million); // actual value: 24068784 as of Oct 16, 2018
 }
 
 TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
+  if (!TestUtil::hasDeterministicMallocStats()) {
+    return;
+  }
+
   const size_t million = 1000 * 1000;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
@@ -669,14 +675,12 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
     // Skip this test for platforms where we can't measure memory.
     return;
   }
-  TestUtil::foreachStat(1000,
+  TestUtil::forEachStat(1000,
                         [this](absl::string_view name) { store_->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 29 * million); // actual value: 28301056 as of 10/12/2018
+  EXPECT_LT(end_mem - start_mem, 29 * million); // actual value: 28301056 as of Oct 16, 2018
 }
-
-#endif // ENABLE_MEMORY_USAGE_TESTS
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   InSequence s;
