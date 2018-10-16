@@ -199,14 +199,13 @@ public:
       EXPECT_CALL(*filter, onDestroy());
     }
 
-    if (reverse_encoders_order_) {
-      for (int i = encoder_filters_.size() - 1; i >= 0; --i) {
-        EXPECT_CALL(*encoder_filters_[i], onDestroy());
-      }
+    auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
+      EXPECT_CALL(*filter, onDestroy());
+    };
+    if (reverse_encode_order_) {
+      std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
     } else {
-      for (auto filter : encoder_filters_) {
-        EXPECT_CALL(*filter, onDestroy());
-      }
+      std::for_each(encoder_filters_.begin(), encoder_filters_.end(), setup_filter_expect);
     }
 
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
@@ -263,7 +262,7 @@ public:
   DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
-  bool reverseEncodersOrder() override { return reverse_encoders_order_; }
+  bool reverseEncodeOrder() override { return reverse_encode_order_; }
   bool generateRequestId() override { return true; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
@@ -301,7 +300,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   MockServerConnection* codec_;
   NiceMock<MockFilterChainFactory> filter_factory_;
-  bool reverse_encoders_order_{false};
+  bool reverse_encode_order_{false};
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_;
   NiceMock<Network::MockDrainDecision> drain_close_;
@@ -539,7 +538,7 @@ TEST_F(HttpConnectionManagerImplTest, PauseResume100Continue) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, PauseResume100ContinueForReversedEncoders) {
-  reverse_encoders_order_ = true;
+  reverse_encode_order_ = true;
   proxy_100_continue_ = true;
   setup(false, "envoy-custom-server", false);
   setUpEncoderAndDecoder();
@@ -3246,8 +3245,10 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
   EXPECT_EQ(ssl_connection_.get(), encoder_filters_[1]->callbacks_->connection()->ssl());
 }
 
+// MultipleFiltersWithReversedEncoders verifies the same case of MultipleFilters, except that the
+// encode filters are placed in reverse order to the configuration.
 TEST_F(HttpConnectionManagerImplTest, MultipleFiltersWithReversedEncoders) {
-  reverse_encoders_order_ = true;
+  reverse_encode_order_ = true;
   InSequence s;
   setup(false, "");
 

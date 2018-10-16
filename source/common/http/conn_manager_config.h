@@ -213,7 +213,7 @@ public:
    * @return whether the connection manager will reverse the order of encoder
    * filters in the HTTP filter chain.
    */
-  virtual bool reverseEncodersOrder() PURE;
+  virtual bool reverseEncodeOrder() PURE;
 
   /**
    * @return whether the connection manager will generate a fresh x-request-id if the request does

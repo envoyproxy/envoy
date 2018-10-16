@@ -351,7 +351,7 @@ message HttpConnectionManager {
 
   // If true, the order of encoder filters will be reversed to that of filters
   // configured in the HTTP filter chain.
-  bool reverse_encoders_order = 27;
+  bool reverse_encode_order = 27;
 }
 
 message Rds {
