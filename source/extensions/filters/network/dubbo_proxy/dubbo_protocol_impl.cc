@@ -13,6 +13,10 @@ constexpr uint8_t MessageTypeMask = 0x80;
 constexpr uint8_t EventMask = 0x20;
 constexpr uint8_t TwoWayMask = 0x40;
 constexpr uint8_t SerializationTypeMask = 0x1f;
+constexpr uint64_t FlagOffset = 2;
+constexpr uint64_t StatusOffset = 3;
+constexpr uint64_t RequestIDOffset = 4;
+constexpr uint64_t BodySizeOffset = 12;
 
 } // namespace
 
@@ -49,7 +53,7 @@ bool isValidResponseStatus(ResponseStatus status) {
 
 void RequestMessageImpl::fromBuffer(Buffer::Instance& data) {
   ASSERT(data.length() >= DubboProtocolImpl::MessageSize);
-  uint8_t flag = data.peekInt<uint8_t>(2);
+  uint8_t flag = data.peekInt<uint8_t>(FlagOffset);
   is_two_way_ = (flag & TwoWayMask) == TwoWayMask ? true : false;
   type_ = static_cast<SerializationType>(flag & SerializationTypeMask);
   if (!isValidSerializationType(type_)) {
@@ -61,7 +65,7 @@ void RequestMessageImpl::fromBuffer(Buffer::Instance& data) {
 
 void ResponseMessageImpl::fromBuffer(Buffer::Instance& buffer) {
   ASSERT(buffer.length() >= DubboProtocolImpl::MessageSize);
-  status_ = static_cast<ResponseStatus>(buffer.peekInt<uint8_t>(3));
+  status_ = static_cast<ResponseStatus>(buffer.peekInt<uint8_t>(StatusOffset));
   if (!isValidResponseStatus(status_)) {
     throw EnvoyException(
         fmt::format("invalid dubbo message response status {}",
@@ -79,11 +83,12 @@ bool DubboProtocolImpl::decode(Buffer::Instance& buffer, Protocol::Context* cont
     throw EnvoyException(fmt::format("invalid dubbo message magic number {}", magic_number));
   }
 
-  uint8_t flag = buffer.peekInt<uint8_t>(2);
-  MessageType type = static_cast<MessageType>((flag & MessageTypeMask) >> 7);
+  uint8_t flag = buffer.peekInt<uint8_t>(FlagOffset);
+  MessageType type =
+      (flag & MessageTypeMask) == MessageTypeMask ? MessageType::Request : MessageType::Response;
   bool is_event = (flag & EventMask) == EventMask ? true : false;
-  int64_t request_id = buffer.peekBEInt<int64_t>(4);
-  int32_t body_size = buffer.peekBEInt<int32_t>(12);
+  int64_t request_id = buffer.peekBEInt<int64_t>(RequestIDOffset);
+  int32_t body_size = buffer.peekBEInt<int32_t>(BodySizeOffset);
 
   if (body_size > MaxBodySize || body_size <= 0) {
     throw EnvoyException(fmt::format("invalid dubbo message size {}", body_size));
