@@ -1209,7 +1209,7 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     const Network::ConnectionSocket::OptionsSharedPtr& options) {
   return Tcp::ConnectionPool::InstancePtr{
-      new Tcp::ConnPoolImpl(dispatcher, host, priority, options)};
+      new Tcp::ConnPoolImpl(dispatcher, host, priority, options, absl::nullopt)};
 }
 
 ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
