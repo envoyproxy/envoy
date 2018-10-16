@@ -386,13 +386,6 @@ private:
   struct RuntimeData {
     std::string fractional_runtime_key_{};
     envoy::type::FractionalPercent fractional_runtime_default_{};
-
-    // Relating to the deprecated 'runtime' field.
-    std::string runtime_key_{};
-    uint64_t runtime_default_{};
-
-    // Indicates whether to use the deprecated 'runtime' field or 'fractional_percent'.
-    bool legacy_runtime_data_{};
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {
