@@ -605,7 +605,8 @@ TEST_F(ThriftRouterTest, UnexpectedRouterDestroyBeforeUpstreamConnect) {
   startRequest(MessageType::Call);
 
   EXPECT_EQ(1, context_.cluster_manager_.tcp_conn_pool_.handles_.size());
-  EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_.handles_.front(), cancel());
+  EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_.handles_.front(),
+              cancel(Tcp::ConnectionPool::CancelPolicy::Default));
   destroyRouter();
 }
 
