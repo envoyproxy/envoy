@@ -8,7 +8,6 @@ that Envoy is deployed for. The filter's main job is to follow the instructions 
 configured :ref:`route table <envoy_api_msg_RouteConfiguration>`. In addition to forwarding and
 redirection, the filter also handles retry, statistics, etc.
 
-* :ref:`v1 API reference <config_http_filters_router_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.router.v2.Router>`
 
 .. _config_http_filters_router_headers_consumed:

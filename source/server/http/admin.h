@@ -50,8 +50,7 @@ class AdminImpl : public Admin,
                   public Http::ConnectionManagerConfig,
                   Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminImpl(const std::string& access_log_path, const std::string& profile_path,
-            Server::Instance& server);
+  AdminImpl(const std::string& profile_path, Server::Instance& server);
 
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response, AdminStream& admin_stream);
@@ -68,7 +67,7 @@ public:
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
-  void startHttpListener(const std::string& address_out_path,
+  void startHttpListener(const std::string& access_log_path, const std::string& address_out_path,
                          Network::Address::InstanceConstSharedPtr address,
                          Stats::ScopePtr&& listener_scope) override;
 

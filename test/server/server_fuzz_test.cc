@@ -34,10 +34,7 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
   // config_validation_fuzz_test doesn't need to do this sanitization, so should pickup the coverage
   // we lose here. If we don't sanitize here, we get flakes due to port bind conflicts, file
   // conflicts, etc.
-  output.mutable_admin()->set_access_log_path(test_env.temporaryPath("admin.log"));
-  if (output.admin().has_address()) {
-    makePortHermetic(test_env, *output.mutable_admin()->mutable_address());
-  }
+  output.clear_admin();
   if (output.has_runtime()) {
     output.mutable_runtime()->set_symlink_root(test_env.temporaryPath(""));
   }
