@@ -17,7 +17,7 @@ namespace Extensions {
 namespace Retry {
 namespace Priority {
 
-class RetryPriorityTest : public ::testing::Test, Upstream::RetryPriorityFactoryCallbacks {
+class RetryPriorityTest : public ::testing::Test {
 public:
   void initialize() {
     auto factory = Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(
@@ -29,12 +29,7 @@ public:
     // by that method is compatible with the downcast in createRetryPriority.
     auto empty = factory->createEmptyConfigProto();
     empty->MergeFrom(config);
-    factory->createRetryPriority(*this, *empty, 3);
-  }
-
-  // Upstream::RetryPriorityFactoryCallbacks
-  void addRetryPriority(Upstream::RetryPrioritySharedPtr retry_priority) override {
-    retry_priority_ = retry_priority;
+    retry_priority_ = factory->createRetryPriority(*empty, 3);
   }
 
   void addHosts(size_t priority, int count, int healthy_count) {

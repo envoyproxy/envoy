@@ -16,26 +16,14 @@ namespace Extensions {
 namespace Retry {
 namespace Host {
 
-struct TestHostPredicateFactoryCallback : public Upstream::RetryHostPredicateFactoryCallbacks {
-
-  void addHostPredicate(Upstream::RetryHostPredicateSharedPtr host_predicate) {
-    host_predicate_ = host_predicate;
-  }
-
-  Upstream::RetryHostPredicateSharedPtr host_predicate_;
-};
-
 TEST(OtherHostsRetryPredicateConfigTest, PredicateTest) {
   auto factory = Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
       RetryHostPredicateValues::get().PreviousHostsPredicate);
 
   ASSERT_NE(nullptr, factory);
 
-  TestHostPredicateFactoryCallback callback;
   ProtobufWkt::Struct config;
-  factory->createHostPredicate(callback, config, 3);
-
-  auto predicate = callback.host_predicate_;
+  auto predicate = factory->createHostPredicate(config, 3);
 
   auto host1 = std::make_shared<NiceMock<Upstream::MockHost>>();
   auto host1_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 123);
