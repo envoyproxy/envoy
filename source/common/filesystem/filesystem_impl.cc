@@ -11,6 +11,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
 
@@ -141,7 +142,7 @@ FileImpl::~FileImpl() {
 
 void FileImpl::doWrite(Buffer::Instance& buffer) {
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
+  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
   buffer.getRawSlices(slices, num_slices);
 
   // We must do the actual writes to disk under lock, so that we don't intermix chunks from
@@ -154,7 +155,8 @@ void FileImpl::doWrite(Buffer::Instance& buffer) {
   //            process lock or had multiple locks.
   {
     Thread::LockGuard lock(file_lock_);
-    for (Buffer::RawSlice& slice : slices) {
+    for (uint64_t i = 0; i < num_slices; i++) {
+      Buffer::RawSlice& slice = slices[i];
       const Api::SysCallSizeResult result = os_sys_calls_.write(fd_, slice.mem_, slice.len_);
       ASSERT(result.rc_ == static_cast<ssize_t>(slice.len_));
       stats_.write_completed_.inc();

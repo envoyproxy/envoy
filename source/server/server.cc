@@ -475,7 +475,7 @@ void InstanceImpl::terminate() {
   stats_store_.shutdownThreading();
 
   if (overload_manager_) {
-    overload_manager_.reset();
+    overload_manager_->stop();
   }
 
   // Shutdown all the workers now that the main dispatch loop is done.

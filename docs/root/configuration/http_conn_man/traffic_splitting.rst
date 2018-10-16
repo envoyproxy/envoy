@@ -3,11 +3,6 @@
 Traffic Shifting/Splitting
 ===========================================
 
-.. attention::
-
-  This section is written for the v1 API but the concepts also apply to the v2 API. It will be
-  rewritten to target the v2 API in a future release.
-
 .. contents::
   :local:
 
@@ -31,41 +26,36 @@ section describes this scenario in more detail.
 Traffic shifting between two upstreams
 --------------------------------------
 
-The :ref:`runtime <envoy_api_field_route.RouteMatch.runtime>` object
+The :ref:`runtime <envoy_api_field_route.RouteMatch.runtime_fraction>` object
 in the route configuration determines the probability of selecting a
-particular route (and hence its cluster). By using the runtime
+particular route (and hence its cluster). By using the *runtime_fraction*
 configuration, traffic to a particular route in a virtual host can be
 gradually shifted from one cluster to another. Consider the following
 example configuration, where two versions ``helloworld_v1`` and
 ``helloworld_v2`` of a service named ``helloworld`` are declared in the
 envoy configuration file.
 
-.. code-block:: json
+.. code-block:: yaml
 
-    {
-      "route_config": {
-        "virtual_hosts": [
-          {
-            "name": "helloworld",
-            "domains": ["*"],
-            "routes": [
-              {
-                "prefix": "/",
-                "cluster": "helloworld_v1",
-                "runtime": {
-                  "key": "routing.traffic_shift.helloworld",
-                  "default": 50
-                }
-              },
-              {
-                "prefix": "/",
-                "cluster": "helloworld_v2",
-              }
-            ]
-          }
-        ]
-      }
-    }
+  virtual_hosts:
+     - name: www2
+       domains:
+       - '*'
+       routes:
+         - match:
+             prefix: /
+             runtime_fraction:
+               default_value:
+                 numerator: 50
+                 denominator: HUNDRED
+               runtime_key: routing.traffic_shift.helloworld
+           route:
+             cluster: helloworld_v1
+         - match:
+             prefix: /
+           route:
+             cluster: helloworld_v2
+
 
 Envoy matches routes with a :ref:`first match <config_http_conn_man_route_table_route_matching>` policy.
 If the route has a runtime object, the request will be additionally matched based on the runtime
@@ -109,31 +99,24 @@ configuration block in a route can be used to specify multiple upstream clusters
 along with weights that indicate the **percentage** of traffic to be sent
 to each upstream cluster.
 
-.. code-block:: json
+.. code-block:: yaml
 
-    {
-      "route_config": {
-        "virtual_hosts": [
-          {
-            "name": "helloworld",
-            "domains": ["*"],
-            "routes": [
-              {
-                "prefix": "/",
-                "weighted_clusters": {
-                  "runtime_key_prefix" : "routing.traffic_split.helloworld",
-                  "clusters" : [
-                    { "name" : "helloworld_v1", "weight" : 33 },
-                    { "name" : "helloworld_v2", "weight" : 33 },
-                    { "name" : "helloworld_v3", "weight" : 34 }
-                  ]
-                }
-              }
-            ]
-          }
-        ]
-      }
-    }
+  virtual_hosts:
+     - name: www2
+       domains:
+       - '*'
+       routes:
+         - match: { prefix: / }
+           route:
+             weighted_clusters:
+               clusters:
+                 - name: helloworld_v1
+                   weight: 33
+                 - name: helloworld_v2
+                   weight: 33
+                 - name: helloworld_v3
+                   weight: 34
+
 
 By default, the weights must sum to exactly 100. In the V2 API, the
 :ref:`total weight <envoy_api_field_route.WeightedCluster.total_weight>` defaults to 100, but can
