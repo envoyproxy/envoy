@@ -25,24 +25,17 @@ message AccessLog {
   // Filter which is used to determine if the access log needs to be written.
   AccessLogFilter filter = 2;
 
+  // Custom configuration that depends on the access log being instantiated. Built-in
+  // configurations include:
+  //
+  // #. "envoy.file_access_log": :ref:`FileAccessLog
+  //    <envoy_api_msg_config.accesslog.v2.FileAccessLog>`
+  // #. "envoy.http_grpc_access_log": :ref:`HttpGrpcAccessLogConfig
+  //    <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`
   oneof config_type {
-    // Custom configuration that depends on the access log being instantiated. Built-in
-    // configurations include:
-    //
-    // #. "envoy.file_access_log": :ref:`FileAccessLog
-    //    <envoy_api_msg_config.accesslog.v2.FileAccessLog>`
-    // #. "envoy.http_grpc_access_log": :ref:`HttpGrpcAccessLogConfig
-    //    <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`
     google.protobuf.Struct config = 3;
 
     // [#not-implemented-hide:]
-    // Custom configuration that depends on the access log being instantiated. Built-in
-    // configurations include:
-    //
-    // #. "envoy.file_access_log": :ref:`FileAccessLog
-    //    <envoy_api_msg_config.accesslog.v2.FileAccessLog>`
-    // #. "envoy.http_grpc_access_log": :ref:`HttpGrpcAccessLogConfig
-    //    <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`
     google.protobuf.Any typed_config = 4;
   }
 }

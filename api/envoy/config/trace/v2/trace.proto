@@ -27,20 +27,15 @@ message Tracing {
     // *envoy.dynamic.ot* are built-in trace drivers.
     string name = 1 [(validate.rules).string.min_bytes = 1];
 
+    // Trace driver specific configuration which depends on the driver being instantiated.
+    // See the :ref:`LightstepConfig
+    // <envoy_api_msg_config.trace.v2.LightstepConfig>`, :ref:`ZipkinConfig
+    // <envoy_api_msg_config.trace.v2.ZipkinConfig>`, and :ref:`DynamicOtConfig
+    // <envoy_api_msg_config.trace.v2.DynamicOtConfig>` trace drivers for examples.
     oneof config_type {
-      // Trace driver specific configuration which depends on the driver being
-      // instantiated. See the :ref:`LightstepConfig
-      // <envoy_api_msg_config.trace.v2.LightstepConfig>`, :ref:`ZipkinConfig
-      // <envoy_api_msg_config.trace.v2.ZipkinConfig>`, and :ref:`DynamicOtConfig
-      // <envoy_api_msg_config.trace.v2.DynamicOtConfig>` trace drivers for examples.
       google.protobuf.Struct config = 2;
 
       // [#not-implemented-hide:]
-      // Trace driver specific configuration which depends on the driver being
-      // instantiated. See the :ref:`LightstepConfig
-      // <envoy_api_msg_config.trace.v2.LightstepConfig>`, :ref:`ZipkinConfig
-      // <envoy_api_msg_config.trace.v2.ZipkinConfig>`, and :ref:`DynamicOtConfig
-      // <envoy_api_msg_config.trace.v2.DynamicOtConfig>` trace drivers for examples.
       google.protobuf.Any typed_config = 3;
     }
   }

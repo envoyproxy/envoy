@@ -26,12 +26,11 @@ message ResourceMonitor {
   //   <envoy_api_msg_config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig>`
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
+  // Configuration for the resource monitor being instantiated.
   oneof config_type {
-    // Configuration for the resource monitor being instantiated.
     google.protobuf.Struct config = 2;
 
     // [#not-implemented-hide:]
-    // Configuration for the resource monitor being instantiated.
     google.protobuf.Any typed_config = 3;
   }
 }

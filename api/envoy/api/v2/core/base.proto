@@ -182,14 +182,12 @@ message TransportSocket {
   // socket implementation.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
+  // Implementation specific configuration which depends on the implementation being instantiated.
+  // See the supported transport socket implementations for further documentation.
   oneof config_type {
-    // Implementation specific configuration which depends on the implementation being instantiated.
-    // See the supported transport socket implementations for further documentation.
     google.protobuf.Struct config = 2;
 
     // [#not-implemented-hide:]
-    // Implementation specific configuration which depends on the implementation being instantiated.
-    // See the supported transport socket implementations for further documentation.
     google.protobuf.Any typed_config = 3;
   }
 }

@@ -89,14 +89,12 @@ message ThriftFilter {
   // * :ref:`envoy.filters.thrift.router <config_thrift_filters_router>`
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
+  // Filter specific configuration which depends on the filter being instantiated. See the supported
+  // filters for further documentation.
   oneof config_type {
-    // Filter specific configuration which depends on the filter being
-    // instantiated. See the supported filters for further documentation.
     google.protobuf.Struct config = 2;
 
     // [#not-implemented-hide:]
-    // Filter specific configuration which depends on the filter being
-    // instantiated. See the supported filters for further documentation.
     google.protobuf.Any typed_config = 3;
   }
 }
