@@ -240,6 +240,11 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we would do
     // that tracking here.
     api_state_[type_url].request_.set_version_info(message->version_info());
+
+    // Clear the error detail related to rejected to timer if it exists.
+    if (api_state_[type_url].request_.has_error_detail()) {
+      api_state_[type_url].request_.clear_error_detail();
+    }
   } catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "gRPC config for {} update rejected: {}", message->type_url(), e.what());
     for (auto watch : api_state_[type_url].watches_) {

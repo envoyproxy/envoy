@@ -106,8 +106,7 @@ private:
     bool rejected_request_pending_{};
 
     void enableRejectedTimer() {
-      // if there is a rejected request timer already in place for this typrUrl, do not enable
-      // timer.
+      // if rejected request is pending for this typrUrl, do not enable timer.
       if (rejected_request_pending_) {
         return;
       }

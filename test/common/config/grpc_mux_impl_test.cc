@@ -219,6 +219,141 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   expectSendMessage("foo", {}, "");
 }
 
+// Validate behavior when update reject is followed by update success.
+TEST_F(GrpcMuxImplTest, UpdateSuccessFollowedByRejectIsProcessedCorrectly) {
+  Event::MockTimer* timer = nullptr;
+  Event::TimerCb timer_cb;
+
+  InSequence s;
+  // for connection timer.
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+
+  // for rejected request timer.
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
+    timer_cb = cb;
+    EXPECT_EQ(nullptr, timer);
+    timer = new Event::MockTimer();
+    return timer;
+  }));
+
+  setup();
+
+  std::unique_ptr<envoy::api::v2::DiscoveryResponse> invalid_response(
+      new envoy::api::v2::DiscoveryResponse());
+
+  auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
+
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage("foo", {"x", "y"}, "");
+  grpc_mux_->start();
+
+  {
+    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+        new envoy::api::v2::DiscoveryResponse());
+    response->set_type_url("bar");
+    grpc_mux_->onReceiveMessage(std::move(response));
+  }
+
+  {
+    invalid_response->set_type_url("foo");
+    invalid_response->mutable_resources()->Add()->set_type_url("bar");
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)).WillOnce(Invoke([](const EnvoyException* e) {
+      EXPECT_TRUE(
+          IsSubstring("", "", "bar does not match foo type URL is DiscoveryResponse", e->what()));
+    }));
+
+    // Validate that config rejected case goes in to back-off timer.
+    EXPECT_CALL(random_, random());
+    EXPECT_CALL(*timer, enableTimer(_));
+    grpc_mux_->onReceiveMessage(std::move(invalid_response));
+  }
+
+  // Validate that a another success message while the pending rejection is in progress is
+  // responded.
+  {
+    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+        new envoy::api::v2::DiscoveryResponse());
+    response->set_type_url("foo");
+    // Validate that timer is reset.
+    EXPECT_CALL(*timer, disableTimer());
+    expectSendMessage("foo", {"x", "y"}, "");
+    grpc_mux_->onReceiveMessage(std::move(response));
+  }
+  expectSendMessage("foo", {}, "");
+}
+
+// Validate behavior when two update rejects does not queue additional message in timer.
+TEST_F(GrpcMuxImplTest, UpdateRejectWhenAlreadyOneIsQueuedDoesNotEnableTimer) {
+  Event::MockTimer* timer = nullptr;
+  Event::TimerCb timer_cb;
+
+  InSequence s;
+  // for connection timer.
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+
+  // for rejected request timer.
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
+    timer_cb = cb;
+    EXPECT_EQ(nullptr, timer);
+    timer = new Event::MockTimer();
+    return timer;
+  }));
+
+  setup();
+
+  std::unique_ptr<envoy::api::v2::DiscoveryResponse> invalid_response(
+      new envoy::api::v2::DiscoveryResponse());
+  std::unique_ptr<envoy::api::v2::DiscoveryResponse> invalid_response_2(
+      new envoy::api::v2::DiscoveryResponse());
+  auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
+
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage("foo", {"x", "y"}, "");
+  grpc_mux_->start();
+
+  {
+    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+        new envoy::api::v2::DiscoveryResponse());
+    response->set_type_url("bar");
+    grpc_mux_->onReceiveMessage(std::move(response));
+  }
+
+  {
+    invalid_response->set_type_url("foo");
+    invalid_response->mutable_resources()->Add()->set_type_url("bar");
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)).WillOnce(Invoke([](const EnvoyException* e) {
+      EXPECT_TRUE(
+          IsSubstring("", "", "bar does not match foo type URL is DiscoveryResponse", e->what()));
+    }));
+
+    // Validate that config rejected case goes in to back-off timer.
+    EXPECT_CALL(random_, random());
+    EXPECT_CALL(*timer, enableTimer(_));
+    grpc_mux_->onReceiveMessage(std::move(invalid_response));
+  }
+
+  // Validate that a another reject message while the pending rejection is in progress does not
+  // queue a message in timer.
+  {
+    invalid_response_2->set_type_url("foo");
+    invalid_response_2->mutable_resources()->Add()->set_type_url("bar");
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)).WillOnce(Invoke([](const EnvoyException* e) {
+      EXPECT_TRUE(
+          IsSubstring("", "", "bar does not match foo type URL is DiscoveryResponse", e->what()));
+    }));
+
+    // Validate that the message is not queued in timer.
+    EXPECT_CALL(random_, random()).Times(0);
+    EXPECT_CALL(*timer, enableTimer(_)).Times(0);
+    expectSendMessage("foo", {"x", "y"}, "", "", Grpc::Status::GrpcStatus::Internal,
+                      fmt::format("bar does not match foo type URL is DiscoveryResponse {}",
+                                  invalid_response->DebugString()));
+    grpc_mux_->onReceiveMessage(std::move(invalid_response));
+  }
+  timer_cb();
+  expectSendMessage("foo", {}, "");
+}
+
 // Validate behavior when watches has an unknown resource name.
 TEST_F(GrpcMuxImplTest, WildcardWatch) {
   setup();
