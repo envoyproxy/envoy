@@ -37,8 +37,7 @@ public:
 
 SslSocket::SslSocket(ContextSharedPtr ctx, InitialState state,
                      absl::optional<std::string> overrideServerName)
-    : ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
-      ssl_(ctx_->newSsl(overrideServerName.value())) {
+    : ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), ssl_(ctx_->newSsl(overrideServerName)) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_.get());
   } else {
