@@ -177,6 +177,7 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
     std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
         new envoy::api::v2::DiscoveryResponse());
     response->set_type_url("bar");
+    EXPECT_CALL(async_stream_, resetStream());
     grpc_mux_->onReceiveMessage(std::move(response));
   }
 
@@ -431,6 +432,40 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
   // The message should be rejected.
   expectSendMessage(type_url, {}, "", "bar");
   EXPECT_LOG_CONTAINS("warning", "Ignoring unwatched type URL " + type_url,
+                      grpc_mux_->onReceiveMessage(std::move(response)));
+}
+
+//  Verifies that a protocol violation resets the stream.
+TEST_F(GrpcMuxImplTest, ProtocolViolationResetsStream) {
+  setup();
+
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+
+  const std::string& cla_type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& cluster_type_url = Config::TypeUrl::get().Cluster;
+
+  grpc_mux_->start();
+  // subscribe for cluster load assignment.
+  expectSendMessage(cla_type_url, {"y"}, "");
+  expectSendMessage(cla_type_url, {}, "");
+  grpc_mux_->subscribe(cla_type_url, {"y"}, callbacks_);
+
+  // simulate the server sending Cluster response back.
+  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+      new envoy::api::v2::DiscoveryResponse());
+  response->set_nonce("bar");
+  response->set_version_info("1");
+  response->set_type_url(cluster_type_url);
+
+  envoy::api::v2::Cluster cluster;
+  cluster.set_name("test_cluster");
+  response->add_resources()->PackFrom(cluster);
+
+  // Strean should be closed because this is a protocol violation.
+  EXPECT_CALL(async_stream_, resetStream());
+  EXPECT_LOG_CONTAINS("warning",
+                      "Protocol Error: gRPC Message for type URL "
+                      "type.googleapis.com/envoy.api.v2.Cluster received before subscription",
                       grpc_mux_->onReceiveMessage(std::move(response)));
 }
 
