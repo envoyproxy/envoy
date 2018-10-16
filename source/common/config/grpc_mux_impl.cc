@@ -64,13 +64,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
     api_state.pending_ = true;
     return;
   }
-
-  if (api_state.paused_) {
-    ENVOY_LOG(trace, "API {} paused during sendDiscoveryRequest(), setting pending.", type_url);
-    api_state.pending_ = true;
-    return;
-  }
-
+  
   if (!api_state.limit_request_->consume() && api_state.limit_log_->consume()) {
     ENVOY_LOG(warn, "{}", fmt::format("Too many sendDiscoveryRequest calls for {}", type_url));
   }
