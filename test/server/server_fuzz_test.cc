@@ -62,7 +62,7 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
   DangerousDeprecatedTestTime test_time;
   Fuzz::PerTestEnvironment test_env;
 
-  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
+  RELEASE_ASSERT(validateProtoDescriptors(), "");
 
   {
     const std::string bootstrap_path = test_env.temporaryPath("bootstrap.pb_text");
