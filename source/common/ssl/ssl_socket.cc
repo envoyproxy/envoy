@@ -427,7 +427,7 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
   auto ssl_ctx = ssl_ctx_;
   if (ssl_ctx) {
     return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Client,
-                                            overrideServerName.value());
+                                            overrideServerName);
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.upstream_context_secrets_not_ready_.inc();

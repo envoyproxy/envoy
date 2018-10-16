@@ -722,7 +722,7 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
           std::string(context->downstreamConnection()->requestedServerName());
     }
     auto conn_info = logical_host->createConnection(cluster_manager.thread_local_dispatcher_,
-                                                    nullptr, overrideServerName.value());
+                                                    nullptr, overrideServerName);
     if ((entry->second->cluster_info_->features() &
          ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) &&
         conn_info.connection_ != nullptr) {
