@@ -444,7 +444,7 @@ public:
   ~MockTransportSocketFactory();
 
   MOCK_CONST_METHOD0(implementsSecureTransport, bool());
-  MOCK_CONST_METHOD1(createTransportSocket, TransportSocketPtr(std::string));
+  MOCK_CONST_METHOD1(createTransportSocket, TransportSocketPtr(absl::optional<std::string>));
 };
 
 class MockTransportSocketCallbacks : public TransportSocketCallbacks {
