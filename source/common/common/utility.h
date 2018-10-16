@@ -290,7 +290,7 @@ public:
    * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
    * @param keep_empty_string result contains empty strings if the string starts or ends with
    * 'split', or if instances of 'split' are adjacent; default = false.
-   * @return true if found and false otherwise.
+   * @return vector containing views of the split strings
    */
   static std::vector<absl::string_view> splitToken(absl::string_view source,
                                                    absl::string_view delimiters,

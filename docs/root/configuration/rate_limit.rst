@@ -7,7 +7,6 @@ The :ref:`rate limit service <arch_overview_rate_limit>` configuration specifies
 limit service Envoy should talk to when it needs to make global rate limit decisions. If no rate
 limit service is configured, a "null" service will be used which will always return OK if called.
 
-* :ref:`v1 API reference <config_rate_limit_service_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.ratelimit.v2.RateLimitServiceConfig>`
 
 gRPC service IDL

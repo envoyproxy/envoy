@@ -86,6 +86,7 @@ message ThriftFilter {
   //
   // [#comment:TODO(zuercher): Auto generate the following list]
   // * :ref:`envoy.filters.thrift.router <config_thrift_filters_router>`
+  // * :ref:`envoy.filters.thrift.rate_limit <config_thrift_filters_rate_limit>`
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Filter specific configuration which depends on the filter being
