@@ -52,9 +52,11 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
 
 /**
  * Thrift rate limit filter instance. Calls the rate limit service with the given configuration
- * parameters. If the rate limit service returns an error or an over limit an application
- * exception is returned, but the downstream connection is otherwise preserved. If the rate limit
- * service allows the request, no modifications are made and further filters progress as normal.
+ * parameters. If the rate limit service returns an over limit response, an application exception
+ * is returned, but the downstream connection is otherwise preserved. If the rate limit service
+ * allows the request, no modifications are made and further filters progress as normal. If an
+ * error is returned and the failure_mode_deny option is enabled, an application exception is
+ * returned. By default, errors allow the request to continue.
  */
 class Filter : public ThriftProxy::ThriftFilters::DecoderFilter,
                public RateLimit::RequestCallbacks {
