@@ -596,9 +596,8 @@ Http::Code AdminImpl::handlerPrometheusStats(absl::string_view, Http::HeaderMap&
 }
 
 std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
-  // The name must match the regex [a-zA-Z_:][a-zA-Z0-9_:]* as required by
-  // prometheus. Of which the colon is reserved and should not be exported.
-  // Refer to https://prometheus.io/docs/concepts/data_model/.
+  // The name must match the regex [a-zA-Z_][a-zA-Z0-9_]* as required by
+  // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
   std::string stats_name = std::regex_replace(name, PromRegex, "_");
   if (stats_name[0] >= '0' && stats_name[0] <= '9') {
     return fmt::format("_{}", stats_name);
