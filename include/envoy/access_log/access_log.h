@@ -71,7 +71,7 @@ typedef std::shared_ptr<Instance> InstanceSharedPtr;
 
 /**
  * Interface for access log formatter.
- * Formatters combine the output of FormatterProviders into a log output line.
+ * Formatters provide a complete access log output line for the given headers/trailers/stream.
  */
 class Formatter {
 public:
@@ -79,11 +79,11 @@ public:
 
   /**
    * Return a formatted access log line.
-   * @param request_headers supplies thte request headers.
+   * @param request_headers supplies the request headers.
    * @param response_headers supplies the response headers.
    * @param response_trailers supplies the response trailers.
    * @param stream_info supplies the stream info.
-   * @return a string containing the complete formatted access log line.
+   * @return std::string string containing the complete formatted access log line.
    */
   virtual std::string format(const Http::HeaderMap& request_headers,
                              const Http::HeaderMap& response_headers,
@@ -95,7 +95,7 @@ typedef std::unique_ptr<Formatter> FormatterPtr;
 
 /**
  * Interface for access log provider.
- * FormatterProviders extract information from a request.
+ * FormatterProviders extract information from the given headers/trailers/stream.
  */
 class FormatterProvider {
 public:
@@ -103,11 +103,11 @@ public:
 
   /**
    * Extract a value from the provided headers/trailers/stream.
-   * @param request_headers supplies thte request headers.
+   * @param request_headers supplies the request headers.
    * @param response_headers supplies the response headers.
    * @param response_trailers supplies the response trailers.
    * @param stream_info supplies the stream info.
-   * @return a string containing a single value extracted from the provided headers/stream.
+   * @return std::string containing a single value extracted from the given headers/trailers/stream.
    */
   virtual std::string format(const Http::HeaderMap& request_headers,
                              const Http::HeaderMap& response_headers,
