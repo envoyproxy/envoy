@@ -13,8 +13,10 @@ bool hasDeterministicMallocStats() {
   // to a different malloc library than we'd have to re-evaluate all the
   // thresholds in the tests referencing hasDeterministicMallocStats().
 #ifdef TCMALLOC
-  const std::string str("surely this will have to allocate some memory");
-  return Memory::Stats::totalCurrentlyAllocated() != 0;
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+  std::unique_ptr<char[]> data(new char[10000]);
+  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+  return end_mem - start_mem >= 10000; // actually 10240
 #else
   return false;
 #endif
