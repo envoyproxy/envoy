@@ -45,18 +45,18 @@ public:
          Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
          ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime);
 
-  // Tracer::OpenTracingDriver
-  opentracing::Tracer& tracer() override;
-  PropagationMode propagationMode() const override {
-    return Common::Ot::OpenTracingDriver::PropagationMode::TracerNative;
-  }
-
   // Getters to return the DatadogDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
   Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   DatadogTracerStats& tracerStats() { return tracer_stats_; }
   const datadog::opentracing::TracerOptions& tracerOptions() { return tracer_options_; }
+
+  // Tracer::OpenTracingDriver
+  opentracing::Tracer& tracer() override;
+  PropagationMode propagationMode() const override {
+    return Common::Ot::OpenTracingDriver::PropagationMode::TracerNative;
+  }
 
 private:
   /**

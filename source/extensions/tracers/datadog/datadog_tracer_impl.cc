@@ -32,13 +32,18 @@ Driver::Driver(const envoy::config::trace::v2::DatadogConfig& datadog_config,
   }
   cluster_ = cluster->info();
 
+  // Default tracer options.
   tracer_options_.operation_name_override = "envoy.proxy";
-  if (datadog_config.service_name().size() > 0) {
+  tracer_options_.service = "envoy";
+  tracer_options_.priority_sampling = true;
+
+  // Configuration overrides for tracer options.
+  if (!datadog_config.service_name().empty()) {
     tracer_options_.service = datadog_config.service_name();
-  } else {
-    tracer_options_.service = "envoy";
   }
-  tracer_options_.priority_sampling = datadog_config.priority_sampling();
+  if (!datadog_config.priority_sampling()) {
+    tracer_options_.priority_sampling = false;
+  }
 
   tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     auto tp = datadog::opentracing::makeTracerAndEncoder(tracer_options_);
@@ -80,7 +85,6 @@ void TraceReporter::flushTraces() {
     message->headers().insertPath().value(encoder_->path());
     message->headers().insertHost().value(driver_.cluster()->name());
     for (auto& h : encoder_->headers()) {
-      ENVOY_LOG(debug, "Adding header {}: {}", h.first, h.second);
       message->headers().addCopy(Http::LowerCaseString(h.first), h.second);
     }
 
