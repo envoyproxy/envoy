@@ -65,9 +65,18 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
     return;
   }
 
+  if (api_state.paused_) {
+    ENVOY_LOG(trace, "API {} paused during sendDiscoveryRequest(), setting pending.", type_url);
+    api_state.pending_ = true;
+    return;
+  }
+
   if (!api_state.limit_request_->consume() && api_state.limit_log_->consume()) {
     ENVOY_LOG(warn, "{}", fmt::format("Too many sendDiscoveryRequest calls for {}", type_url));
   }
+
+  // if there is a rejected request pending, reset it so that timer won't send duplicate request.
+  api_state.rejected_request_pending_ = false;
 
   auto& request = api_state.request_;
   request.mutable_resource_names()->Clear();
@@ -122,8 +131,12 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
     api_state_[type_url].subscribed_ = true;
     api_state_[type_url].rejected_backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(
         REJECTED_INITIAL_DELAY_MS, REJECTED_MAX_DELAY_MS, random_);
-    api_state_[type_url].rejected_timer_ =
-        dispatcher_.createTimer([this, &type_url]() -> void { sendDiscoveryRequest(type_url); });
+    api_state_[type_url].rejected_timer_ = dispatcher_.createTimer([this, &type_url]() -> void {
+      // Only send the request if it is pending, otherwise just ignore this call back.
+      if (api_state_[type_url].rejected_request_pending_) {
+        sendDiscoveryRequest(type_url);
+      }
+    });
     subscriptions_.emplace_back(type_url);
   }
 
@@ -239,7 +252,7 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
   api_state_[type_url].request_.set_response_nonce(message->nonce());
 
   // If update is rejected continuously, this may become too chatty. Having back-off here gives
-  // chance for Envoy and Management Server to recover.
+  // a chance for Envoy and Management Server to recover.
   if (api_state_[type_url].request_.has_error_detail()) {
     api_state_[type_url].enableRejectedTimer();
   } else {

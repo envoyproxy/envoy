@@ -102,13 +102,22 @@ private:
     BackOffStrategyPtr rejected_backoff_strategy_;
     // Timer used for update rejected cases.
     Event::TimerPtr rejected_timer_;
+    // Was a DiscoveryRequest pending with rejected timer.
+    bool rejected_request_pending_{};
 
     void enableRejectedTimer() {
+      // if there is a rejected request timer already in place for this typrUrl, do not enable
+      // timer.
+      if (rejected_request_pending_) {
+        return;
+      }
+      rejected_request_pending_ = true;
       rejected_timer_->enableTimer(
           std::chrono::milliseconds(rejected_backoff_strategy_->nextBackOffMs()));
     }
 
     void resetRejectedState() {
+      rejected_request_pending_ = false;
       rejected_backoff_strategy_->reset();
       rejected_timer_->disableTimer();
     }
