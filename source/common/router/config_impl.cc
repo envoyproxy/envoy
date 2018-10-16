@@ -380,8 +380,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
-  return !runtime_ ? true : loader_.snapshot().featureEnabled(runtime_->fractional_runtime_key_,
-                                           runtime_->fractional_runtime_default_, random_value);
+  return !runtime_ ? true
+                   : loader_.snapshot().featureEnabled(runtime_->fractional_runtime_key_,
+                                                       runtime_->fractional_runtime_default_,
+                                                       random_value);
 }
 
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
