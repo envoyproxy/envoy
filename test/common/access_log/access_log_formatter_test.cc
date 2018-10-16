@@ -401,13 +401,10 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
         {"plain_string", "plain_string_value"}};
     JsonFormatterImpl formatter(key_mapping);
 
-    auto actual_json_map =
-        formatter.toMap(request_header, response_header, response_trailer, stream_info);
-    EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
-
-    auto actual_string =
-        formatter.format(request_header, response_header, response_trailer, stream_info);
-    EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
+    const auto parsed = Json::Factory::loadFromString(formatter.format(request_header, response_header, response_trailer, stream_info));
+    for (const auto& pair : expected_json_map) {
+      EXPECT_EQ(parsed->getString(pair.first), pair.second);
+    }
   }
 
   {
@@ -426,13 +423,10 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     const std::map<const std::string, const std::string> key_mapping = {{"protocol", "%PROTOCOL%"}};
     JsonFormatterImpl formatter(key_mapping);
 
-    auto actual_json_map =
-        formatter.toMap(request_header, response_header, response_trailer, stream_info);
-    EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
-
-    auto actual_string =
-        formatter.format(request_header, response_header, response_trailer, stream_info);
-    EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
+    const auto parsed = Json::Factory::loadFromString(formatter.format(request_header, response_header, response_trailer, stream_info));
+    for (const auto& pair : expected_json_map) {
+      EXPECT_EQ(parsed->getString(pair.first), pair.second);
+    }
   }
 
   {
@@ -457,13 +451,10 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-    auto actual_json_map =
-        formatter.toMap(request_header, response_header, response_trailer, stream_info);
-    EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
-
-    auto actual_string =
-        formatter.format(request_header, response_header, response_trailer, stream_info);
-    EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
+    const auto parsed = Json::Factory::loadFromString(formatter.format(request_header, response_header, response_trailer, stream_info));
+    for (const auto& pair : expected_json_map) {
+      EXPECT_EQ(parsed->getString(pair.first), pair.second);
+    }
   }
 
   {
@@ -492,13 +483,10 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-    auto actual_json_map =
-        formatter.toMap(request_header, response_header, response_trailer, stream_info);
-    EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
-
-    auto actual_string =
-        formatter.format(request_header, response_header, response_trailer, stream_info);
-    EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
+    const auto parsed = Json::Factory::loadFromString(formatter.format(request_header, response_header, response_trailer, stream_info));
+    for (const auto& pair : expected_json_map) {
+      EXPECT_EQ(parsed->getString(pair.first), pair.second);
+    }
   }
 
   {
@@ -523,13 +511,10 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
 
     JsonFormatterImpl formatter(key_mapping);
 
-    auto actual_json_map =
-        formatter.toMap(request_header, response_header, response_trailer, stream_info);
-    EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
-
-    auto actual_string =
-        formatter.format(request_header, response_header, response_trailer, stream_info);
-    EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
+    const auto parsed = Json::Factory::loadFromString(formatter.format(request_header, response_header, response_trailer, stream_info));
+    for (const auto& pair : expected_json_map) {
+      EXPECT_EQ(parsed->getString(pair.first), pair.second);
+    }
   }
 
   {
@@ -562,13 +547,10 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
         {"all_zeroes", "%START_TIME(%f.%1f.%2f.%3f)%"}};
     JsonFormatterImpl formatter(key_mapping);
 
-    auto actual_json_map =
-        formatter.toMap(request_header, response_header, response_trailer, stream_info);
-    EXPECT_THAT(actual_json_map, ::testing::ContainerEq(expected_json_map));
-
-    auto actual_string =
-        formatter.format(request_header, response_header, response_trailer, stream_info);
-    EXPECT_NO_THROW(Json::Factory::loadFromString(actual_string));
+    const auto parsed = Json::Factory::loadFromString(formatter.format(request_header, response_header, response_trailer, stream_info));
+    for (const auto& pair : expected_json_map) {
+      EXPECT_EQ(parsed->getString(pair.first), pair.second);
+    }
   }
 }
 
