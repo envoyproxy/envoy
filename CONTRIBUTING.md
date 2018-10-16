@@ -48,7 +48,7 @@ maximize the chances of your PR being merged.
   above policy. They are
   [frozen](https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/v2_overview#status).
   There will be no changes leading to wire incompatibility (as describe in the
-  [API style guide](api/STYLE.md), however fields may be deprecated over time.
+  [API style guide](api/STYLE.md)), however fields may be deprecated over time.
   When a field is deprecated, it will follow the deprecation release cycle
   described above.
 * No configuration field or message in the `v2` namespace may be deprecated
