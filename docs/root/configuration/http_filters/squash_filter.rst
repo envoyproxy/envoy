@@ -20,7 +20,6 @@ request, before the request arrive to the application code, without any changes 
 Configuration
 -------------
 
-* :ref:`v1 API reference <config_http_filters_squash_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.squash.v2.Squash>`
 
 How it works
