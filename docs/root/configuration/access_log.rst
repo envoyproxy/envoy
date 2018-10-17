@@ -91,8 +91,6 @@ This allows you to specify a custom key for each command operator.
 Format dictionaries have the following restrictions:
 
 * The dictionary must map strings to strings (specifically, strings to command operators). Nesting is not currently supported.
-* Each value in the dictionary can only contain one command operator.
-
 
 Command Operators
 -----------------
