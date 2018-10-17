@@ -2,8 +2,8 @@
 
 #include <functional>
 #include <string>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/time.h"
@@ -112,7 +112,7 @@ public:
 private:
   std::vector<FormatterProviderPtr> providers_;
   std::map<const std::string, Envoy::AccessLog::FormatterPtr> json_output_format_;
-  
+
   std::unordered_map<std::string, std::string>
   toMap(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
         const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info) const;
