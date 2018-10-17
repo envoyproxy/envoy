@@ -46,6 +46,7 @@ A sample filter configuration for a gRPC authorization server:
       http2_protocol_options: {}
       hosts:
         - socket_address: { address: 127.0.0.1, port_value: 10003 }
+      connect_timeout: 0.25s
 
 A sample filter configuration for a raw HTTP authorization server:
 
