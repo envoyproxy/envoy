@@ -6,7 +6,8 @@
 
 #include "extensions/filters/http/common/empty_http_filter_config.h"
 
-#include "test/integration/filters/pass_through_filter.h"
+#include "extensions/filters/http/common/pass_through_filter.h"
+
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -14,7 +15,7 @@ namespace Envoy {
 // This filter exists to synthetically test network backup by faking TCP
 // connection back-up when an encode is finished, blocking and unblocking
 // randomly.
-class RandomPauseFilter : public PassThroughFilter {
+class RandomPauseFilter : public Http::PassThroughFilter {
 public:
   RandomPauseFilter(absl::Mutex& rand_lock, TestRandomGenerator& rng)
       : rand_lock_(rand_lock), rng_(rng) {}
@@ -30,7 +31,7 @@ public:
         connection()->onHighWatermark();
       }
     }
-    return PassThroughFilter::encodeData(buf, end_stream);
+    return Http::PassThroughFilter::encodeData(buf, end_stream);
   }
 
   Network::ConnectionImpl* connection() {
