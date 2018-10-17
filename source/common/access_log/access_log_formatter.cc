@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -72,8 +71,7 @@ std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
   return log_line;
 }
 
-JsonFormatterImpl::JsonFormatterImpl(
-    std::unordered_map<std::string, std::string>& format_mapping) {
+JsonFormatterImpl::JsonFormatterImpl(std::unordered_map<std::string, std::string>& format_mapping) {
   for (const auto& pair : format_mapping) {
     auto providers = AccessLogFormatParser::parse(pair.second);
     json_output_format_.emplace(pair.first, FormatterPtr{new FormatterImpl(pair.second)});
@@ -96,7 +94,8 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
   std::string log_line;
   auto conversion_status = ProtobufUtil::MessageToJsonString(output_struct, &log_line);
   if (!conversion_status.ok()) {
-    log_line = fmt::format("Error serializing access log to JSON: {}", conversion_status.ToString());
+    log_line =
+        fmt::format("Error serializing access log to JSON: {}", conversion_status.ToString());
   }
 
   return log_line;
