@@ -2,6 +2,7 @@
 
 #include "absl/strings/string_view.h"
 #include "fmt/format.h"
+#include "fmt/ostream.h"
 
 // NOLINT(namespace-envoy)
 
