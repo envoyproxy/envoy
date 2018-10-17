@@ -1010,7 +1010,7 @@ virtual_hosts:
 // Validate that we can't remove :-prefixed request headers.
 TEST(RouteMatcherTest, TestRequestHeadersToRemoveNoPseudoHeader) {
   for (const std::string& header : {":path", ":authority", ":method", ":scheme", ":status",
-                                    ":protocol", ":no-chunks", ":status"}) {
+                                    ":protocol", ":no-chunks", ":status", "host"}) {
     const std::string yaml = fmt::format(R"EOF(
 name: foo
 virtual_hosts:
@@ -1027,7 +1027,7 @@ virtual_hosts:
     envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
 
     EXPECT_THROW_WITH_MESSAGE(TestConfigImpl config(route_config, factory_context, true),
-                              EnvoyException, ":-prefixed headers may not be removed");
+                              EnvoyException, ":-prefixed or host headers may not be removed");
   }
 }
 
