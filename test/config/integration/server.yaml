@@ -22,11 +22,9 @@ static_resources:
               - routes:
                 - prefix: "/"
                   cluster: cluster_1
-                  runtime_fraction:
-                    runtime_key: some_key
-                    default_value:
-                      numerator: 0
-                      denominator: HUNDRED
+                  runtime:
+                    key: some_key
+                    default: 0
                 - prefix: "/test/long/url"
                   rate_limits:
                   - actions:
@@ -134,11 +132,9 @@ static_resources:
                 require_ssl: all
               - routes:
                 - cluster: cluster_1
-                  runtime_fraction:
-                    runtime_key: some_key
-                    default_value:
-                      numerator: 0
-                      denominator: HUNDRED
+                  runtime:
+                    key: some_key
+                    default: 0
                   prefix: "/"
                 - rate_limits:
                   - actions:
@@ -269,11 +265,9 @@ static_resources:
                 require_ssl: all
               - routes:
                 - cluster: cluster_1
-                  runtime_fraction:
-                    runtime_key: some_key
-                    default_value:
-                      numerator: 0
-                      denominator: HUNDRED
+                  runtime:
+                    key: some_key
+                    default: 0
                   prefix: "/"
                 - prefix: "/test/long/url"
                   rate_limits:
