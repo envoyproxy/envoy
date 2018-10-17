@@ -110,12 +110,12 @@ export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci
 
 # Hack due to https://github.com/envoyproxy/envoy/issues/838 and the need to have
 # .bazelrc available for build linkstamping.
-ln -sf "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
-ln -sf "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_CI_DIR}"/
 mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
 mkdir -p "${ENVOY_CI_DIR}"/bazel
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CI_DIR}"/bazel/
+ln -sf "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
+ln -sf "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_CI_DIR}"/
 
 export BUILDIFIER_BIN="/usr/local/bin/buildifier"
 
