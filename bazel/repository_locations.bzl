@@ -43,9 +43,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/fmtlib/fmt/archive/5.2.1.tar.gz"],
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "0ba31b9e7f8e43a7be328ab0236d57810e5d4fc8a1a7842df665ae22d5cbd128",
-        strip_prefix = "spdlog-1.2.0",
-        urls = ["https://github.com/gabime/spdlog/archive/v1.2.0.tar.gz"],
+        sha256 = "867a4b7cedf9805e6f76d3ca41889679054f7e5a3b67722fe6d0eae41852a767",
+        strip_prefix = "spdlog-1.2.1",
+        urls = ["https://github.com/gabime/spdlog/archive/v1.2.1.tar.gz"],
     ),
     com_github_gcovr_gcovr = dict(
         sha256 = "8a60ba6242d67a58320e9e16630d80448ef6d5284fda5fb3eff927b63c8b04a2",
