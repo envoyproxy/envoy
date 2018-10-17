@@ -9,13 +9,41 @@ binary restarts. The metrics are tracked as:
    data accumulates. Unliked counters and gauges, histogram data is not retained across
    binary restarts.
 
-## Controlling hot-restart
+## Hot-restart: `RawStatData` vs `HeapStatData`
 
-TBD
+In order to support restarting the Envoy binary without losing counter and gauge
+values, they are stored in a shared-memory block, including stats that are
+created dynamically at runtime in response to discovery of new clusters at
+runtime. To simplify memmory management, each stat is allocated a fixed amount
+of storage, controlled via [command-line
+flags](https://www.envoyproxy.io/docs/envoy/latest/operations/cli):
+`--max-stats` and `--max-obj-name-len`, which determine the size of the pre-allocated
+shared-memory block. See
+[RawStatData](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/raw_stat_data.h).
+
+Note in particular that the full stat name is retained in shared-memory, making
+it easy to correlate stats across restarts even as the dynamic cluster
+configuration changes.
+
+One challenge with this fixed memory allocation strategy is that it limits
+cluster scalabilty. A deployment wishing to use a single Envoy instance to
+manage tens of thousands of clusters, each with its own set of scoped stats,
+will use more memory than is ideal.
+
+A flag `--disable-hot-restart` pivots the system toward an alternate heap-based
+stat allocator that allocates stats on demand in the heap, with no preset limits
+on the number of stats or their length. See
+[HeapStatData](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/heap_stat_data.h).
 
 ## Performance and Thread Local Storage
 
-This implementation supports the following features:
+A key tenant of the Envoy architecture is high performance on machines with
+large numbers of cores. See
+https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310 for details. This
+requires lock-free access to stats on the fast path -- when proxying requests.
+
+For stats, this is implemented in
+[ThreadLocalStore](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/thread_local_store.h), supporting the following features:
 
  * Thread local per scope stat caching.
  * Overlapping scopes with proper reference counting (2 scopes with the same name will point to
@@ -69,13 +97,23 @@ followed.
    accumulates in to *interval* histograms.
  * Finally the main *interval* histogram is merged to *cumulative* histogram.
 
-## Stat naming infrastructure and scopes
+## Stat naming infrastructure and memory consumption
 
-TBD
+Stat names are replicated in several places in various forms.
 
-## Stat memory consumption
+ * Held fully elaborated next to the values, in `RawStatData` and `HeapStatData`
+ * As keys of multiple maps in `ThreadLocalStore` for capturing all stats in a scope,
+   and each per-thread caches.
+ * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/metric_impl.h)
+   in a transformed state, with tags extracted into vectors of name/value strings.
+ * In static strings across the codebase where stats are referenced
+ * In a [set of
+   regexes](https://github.com/envoyproxy/envoy/blob/master/source/common/config/well_known_names.cc)
+   used to perform tag extraction.
 
-TBD
+These copies -- particularly the keys in thread-local storage -- multiply the
+stat name storage, making stat names dominate memory usage, particularly for
+deployments with large numbers of clusters and threads.
 
 ## Tags and Tag Extraction
 
