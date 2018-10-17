@@ -11,9 +11,6 @@ class MessageImpl : public virtual Message {
 public:
   MessageImpl(int64_t request_id, int32_t body_size, bool is_event)
       : request_id_(request_id), body_size_(body_size), is_event_(is_event) {}
-
-  virtual void fromBuffer(Buffer::Instance& data) PURE;
-
   virtual ~MessageImpl() {}
   virtual int32_t bodySize() const override { return body_size_; }
 
@@ -38,7 +35,7 @@ public:
   using MessageImpl::MessageImpl;
 
   virtual ~RequestMessageImpl() {}
-  virtual void fromBuffer(Buffer::Instance& data) override;
+  void fromBuffer(Buffer::Instance& data);
   virtual MessageType messageType() const override { return MessageType::Request; }
 
   virtual SerializationType serializationType() const override { return type_; }
@@ -57,7 +54,7 @@ public:
   using MessageImpl::MessageImpl;
 
   virtual ~ResponseMessageImpl() {}
-  virtual void fromBuffer(Buffer::Instance& data) override;
+  void fromBuffer(Buffer::Instance& data);
 
   virtual MessageType messageType() const override { return MessageType::Response; }
 
