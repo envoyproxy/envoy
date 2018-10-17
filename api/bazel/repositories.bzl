@@ -1,8 +1,10 @@
 BAZEL_SKYLIB_RELEASE = "0.5.0"
-BAZEL_SKYLIB_SHA = "b5f6abe419da897b7901f90cbab08af958b97a8f3575b0d3dd062ac7ce78541f"
+BAZEL_SKYLIB_SHA256 = "b5f6abe419da897b7901f90cbab08af958b97a8f3575b0d3dd062ac7ce78541f"
+
+GOGOPROTO_RELEASE = "1.1.1"
+GOGOPROTO_SHA256 = "9f8c2ad49849ab063cd9fef67e77d49606640044227ecf7f3617ea2c92ef147c"
 
 GOOGLEAPIS_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411"  # May 23, 2018
-GOGOPROTO_SHA = "1adfc126b41513cc696b209667c8656ea7aac67c"  # v1.0.0
 PROMETHEUS_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
 OPENCENSUS_SHA = "ab82e5fdec8267dc2a726544b10af97675970847"  # May 23, 2018
 
@@ -13,9 +15,9 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 def api_dependencies():
     native.http_archive(
         name = "bazel_skylib",
-        url = "https://github.com/bazelbuild/bazel-skylib/archive/" + BAZEL_SKYLIB_RELEASE + ".tar.gz",
-        sha256 = BAZEL_SKYLIB_SHA,
+        sha256 = BAZEL_SKYLIB_SHA256,
         strip_prefix = "bazel-skylib-" + BAZEL_SKYLIB_RELEASE,
+        url = "https://github.com/bazelbuild/bazel-skylib/archive/" + BAZEL_SKYLIB_RELEASE + ".tar.gz",
     )
     git_repository(
         name = "com_lyft_protoc_gen_validate",
@@ -189,8 +191,9 @@ py_proto_library(
 
     native.new_http_archive(
         name = "com_github_gogo_protobuf",
-        strip_prefix = "protobuf-" + GOGOPROTO_SHA,
-        url = "https://github.com/gogo/protobuf/archive/" + GOGOPROTO_SHA + ".tar.gz",
+        sha256 = GOGOPROTO_SHA256,
+        strip_prefix = "protobuf-" + GOGOPROTO_RELEASE,
+        url = "https://github.com/gogo/protobuf/archive/v" + GOGOPROTO_RELEASE + ".tar.gz",
         build_file_content = """
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
