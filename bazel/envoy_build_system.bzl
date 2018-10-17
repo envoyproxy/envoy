@@ -173,9 +173,11 @@ def envoy_cc_library(
         linkstamp = None,
         tags = [],
         deps = [],
+        linkopts = [],
         strip_include_prefix = None):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
+        linkopts = ["-lprofiler", "-ltcmalloc"]
 
     native.cc_library(
         name = name,
@@ -193,11 +195,12 @@ def envoy_cc_library(
         ],
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
         alwayslink = 1,
-        linkstatic = 1,
+        linkstatic = envoy_select_linkstatic(),
         linkstamp = select({
             repository + "//bazel:windows_x86_64": None,
             "//conditions:default": linkstamp,
         }),
+        linkopts = envoy_select_linkopts(linkopts = linkopts),
         strip_include_prefix = strip_include_prefix,
     )
 
@@ -226,7 +229,7 @@ def envoy_cc_binary(
         copts = envoy_copts(repository),
         linkopts = linkopts,
         testonly = testonly,
-        linkstatic = 1,
+        linkstatic = envoy_select_linkstatic(),
         visibility = visibility,
         malloc = tcmalloc_external_dep(repository),
         stamp = 1,
@@ -246,7 +249,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         name = name,
         copts = envoy_copts("@envoy", test = True),
         linkopts = envoy_test_linkopts(),
-        linkstatic = 1,
+        linkstatic = envoy_select_linkstatic(),
         args = [PACKAGE_NAME + "/" + corpus],
         # No fuzzing on OS X.
         deps = select({
@@ -262,7 +265,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         name = name + "_driverless",
         copts = envoy_copts("@envoy", test = True),
         linkopts = envoy_test_linkopts(),
-        linkstatic = 1,
+        linkstatic = envoy_select_linkstatic(),
         testonly = 1,
         deps = [":" + test_lib_name],
         tags = ["manual"] + tags,
@@ -297,7 +300,7 @@ def envoy_cc_test(
         name = name,
         copts = envoy_copts(repository, test = True),
         linkopts = envoy_test_linkopts(),
-        linkstatic = 1,
+        linkstatic = envoy_select_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
         deps = [
             ":" + name + "_lib",
@@ -334,7 +337,7 @@ def envoy_cc_test_library(
         ],
         tags = tags,
         alwayslink = 1,
-        linkstatic = 1,
+        linkstatic = envoy_select_linkstatic(),
     )
 
 # Envoy test binaries should be specified with this function.
@@ -411,7 +414,7 @@ def envoy_proto_library(name, external_deps = [], **kwargs):
         external_proto_deps = external_proto_deps,
         # Avoid generating .so, we don't need it, can interfere with builds
         # such as OSS-Fuzz.
-        linkstatic = 1,
+        linkstatic = envoy_select_linkstatic(),
         visibility = ["//visibility:public"],
         **kwargs
     )
@@ -481,4 +484,18 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
         "@bazel_tools//tools/osx:darwin": [],
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": default or [],
+    })
+
+# Selects the given list of linkopts if dynamic linking is enabled.
+def envoy_select_linkopts(linkopts = []):
+    return select({
+        "//bazel:dynamic_linking": linkopts,
+        "//conditions:default": [],
+    })
+
+# Selects linkstatic option based on whether dynamic linking is enabled.
+def envoy_select_linkstatic():
+    return select({
+        "//bazel:dynamic_linking": 0,
+        "//conditions:default": 1,
     })

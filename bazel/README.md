@@ -95,6 +95,11 @@ By default Clang drops some debug symbols that are required for pretty printing 
 More information can be found [here](https://bugs.llvm.org/show_bug.cgi?id=24202). The easy solution
 is to set ```--copt=-fno-limit-debug-info``` on the CLI or in your bazel.rc file.
 
+## Dynamic linking of third-party libraties
+
+By default all third-party libraries are linked statically. But dynamic linking can be enabled by
+option ```--define dynamic_linking=enabled```.
+
 # Testing Envoy with Bazel
 
 All the Envoy tests can be built and run with:

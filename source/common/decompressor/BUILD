@@ -18,4 +18,5 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
     ],
+    linkopts = ["-lz"],
 )

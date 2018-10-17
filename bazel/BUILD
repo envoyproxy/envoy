@@ -128,3 +128,8 @@ config_setting(
     name = "force_libcpp",
     values = {"define": "force_libcpp=enabled"},
 )
+
+config_setting(
+    name = "dynamic_linking",
+    values = {"define": "dynamic_linking=enabled"},
+)

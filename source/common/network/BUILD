@@ -77,6 +77,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
     ],
+    linkopts = ["-lcares"],
 )
 
 envoy_cc_library(
