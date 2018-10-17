@@ -276,7 +276,8 @@ public:
   virtual Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
-                      const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
+                      const Network::ConnectionSocket::OptionsSharedPtr& options,
+                      absl::optional<std::string> overrideServerName) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

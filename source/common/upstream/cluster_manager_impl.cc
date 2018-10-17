@@ -1147,6 +1147,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   // Inherit socket options from downstream connection, if set.
   std::vector<uint8_t> hash_key = {uint8_t(priority)};
 
+  absl::optional<std::string> overrideServerName;
+
   // Use downstream connection socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with
   // different options are not pooled together.
@@ -1164,11 +1166,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     // in case of connections that have a requested server name, and in case this requested
     // server name is forwarded, add the it to the hash key,
     // so the pool will contain connections with the identical requested server name
-    if (!context->downstreamConnection()->requestedServerName().empty() &&
-        cluster_info_->forwardOriginalServerNameIndication()) {
+    std::string requestedServerName =
+        std::string(context->downstreamConnection()->requestedServerName());
+    if (!requestedServerName.empty() && cluster_info_->forwardOriginalServerNameIndication()) {
       std::hash<std::string> hash_function;
-      hash_key.push_back(
-          hash_function(std::string(context->downstreamConnection()->requestedServerName())));
+      hash_key.push_back(hash_function(requestedServerName));
+      overrideServerName.value() = requestedServerName;
     }
   }
 
@@ -1176,7 +1179,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   if (!container.pools_[hash_key]) {
     container.pools_[hash_key] = parent_.parent_.factory_.allocateTcpConnPool(
         parent_.thread_local_dispatcher_, host, priority,
-        have_options ? context->downstreamConnection()->socketOptions() : nullptr);
+        have_options ? context->downstreamConnection()->socketOptions() : nullptr,
+        overrideServerName);
   }
 
   return container.pools_[hash_key].get();
@@ -1207,9 +1211,10 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
-    const Network::ConnectionSocket::OptionsSharedPtr& options) {
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    absl::optional<std::string> overrideServerName) {
   return Tcp::ConnectionPool::InstancePtr{
-      new Tcp::ConnPoolImpl(dispatcher, host, priority, options, absl::nullopt)};
+      new Tcp::ConnPoolImpl(dispatcher, host, priority, options, overrideServerName)};
 }
 
 ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(

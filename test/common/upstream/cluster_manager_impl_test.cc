@@ -70,7 +70,8 @@ public:
 
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
-                      const Network::ConnectionSocket::OptionsSharedPtr&) override {
+                      const Network::ConnectionSocket::OptionsSharedPtr&,
+                      absl::optional<std::string>) override {
     return Tcp::ConnectionPool::InstancePtr{allocateTcpConnPool_(host)};
   }
 

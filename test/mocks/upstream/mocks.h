@@ -175,11 +175,11 @@ public:
                                      ResourcePriority priority, Http::Protocol protocol,
                                      const Network::ConnectionSocket::OptionsSharedPtr& options));
 
-  MOCK_METHOD4(
-      allocateTcpConnPool,
-      Tcp::ConnectionPool::InstancePtr(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
-                                       ResourcePriority priority,
-                                       const Network::ConnectionSocket::OptionsSharedPtr& options));
+  MOCK_METHOD4(allocateTcpConnPool, Tcp::ConnectionPool::InstancePtr(
+                                        Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                                        ResourcePriority priority,
+                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
+                                        absl::optional<std::string>));
 
   MOCK_METHOD5(clusterFromProto,
                ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
