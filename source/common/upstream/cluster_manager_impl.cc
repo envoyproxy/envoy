@@ -715,7 +715,7 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
 
   HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(context);
   if (logical_host) {
-    absl::optional<std::string> overrideServerName = "";
+    absl::optional<std::string> overrideServerName;
     if (entry->second->cluster_info_->forwardOriginalServerNameIndication() && context &&
         context->downstreamConnection()) {
       overrideServerName.value() =
