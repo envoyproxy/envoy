@@ -1,5 +1,7 @@
 #include "extensions/access_loggers/file/config.h"
 
+#include <unordered_map>
+
 #include "envoy/config/accesslog/v2/file.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
@@ -10,8 +12,7 @@
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
-#include <unordered_map>
- 
+
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
