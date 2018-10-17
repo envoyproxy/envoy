@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -72,7 +73,7 @@ std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
 }
 
 JsonFormatterImpl::JsonFormatterImpl(
-    const std::map<const std::string, const std::string>& format_mapping) {
+    std::unordered_map<std::string, std::string>& format_mapping) {
   for (const auto& pair : format_mapping) {
     auto providers = AccessLogFormatParser::parse(pair.second);
 

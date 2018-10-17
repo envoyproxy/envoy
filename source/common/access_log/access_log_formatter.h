@@ -3,6 +3,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/time.h"
@@ -100,7 +101,7 @@ private:
 
 class JsonFormatterImpl : public Formatter {
 public:
-  JsonFormatterImpl(const std::map<const std::string, const std::string>& format_mapping);
+  JsonFormatterImpl(std::unordered_map<std::string, std::string>& format_mapping);
 
   // Formatter::format
   std::string format(const Http::HeaderMap& request_headers,
