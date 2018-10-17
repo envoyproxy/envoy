@@ -82,7 +82,7 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
                                       const Http::HeaderMap& response_headers,
                                       const Http::HeaderMap& response_trailers,
                                       const StreamInfo::StreamInfo& stream_info) const {
-  auto output_map = this->toMap(request_headers, response_headers, response_trailers, stream_info);
+  const auto output_map = this->toMap(request_headers, response_headers, response_trailers, stream_info);
 
   ProtobufWkt::Struct output_struct;
   for (const auto& pair : output_map) {
@@ -92,7 +92,7 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
   }
 
   std::string log_line;
-  auto conversion_status = ProtobufUtil::MessageToJsonString(output_struct, &log_line);
+  const auto conversion_status = ProtobufUtil::MessageToJsonString(output_struct, &log_line);
   if (!conversion_status.ok()) {
     log_line =
         fmt::format("Error serializing access log to JSON: {}", conversion_status.ToString());
