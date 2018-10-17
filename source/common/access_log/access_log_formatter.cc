@@ -76,19 +76,7 @@ JsonFormatterImpl::JsonFormatterImpl(
     std::unordered_map<std::string, std::string>& format_mapping) {
   for (const auto& pair : format_mapping) {
     auto providers = AccessLogFormatParser::parse(pair.second);
-
-    // Enforce that each key only has one format specifier in it
-    if (providers.size() > 1) {
-      throw EnvoyException(fmt::format(
-          "More than one format specifier was provided in the JSON log format: {}", pair.second));
-    }
-
-    if (providers.size() < 1) {
-      throw EnvoyException(
-          fmt::format("No format specifier was provided in the JSON log format: {}", pair.second));
-    }
-
-    json_output_format_.emplace(pair.first, std::move(providers[0]));
+    json_output_format_.emplace(pair.first, FormatterPtr{new FormatterImpl(pair.second)});
   }
 }
 

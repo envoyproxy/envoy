@@ -397,7 +397,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
     std::unordered_map<std::string, std::string> expected_json_map = {
         {"plain_string", "plain_string_value"}};
 
-    const std::map<const std::string, const std::string> key_mapping = {
+    std::unordered_map<std::string, std::string> key_mapping = {
         {"plain_string", "plain_string_value"}};
     JsonFormatterImpl formatter(key_mapping);
 
@@ -420,7 +420,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
 
     std::unordered_map<std::string, std::string> expected_json_map = {{"protocol", "HTTP/1.1"}};
 
-    const std::map<const std::string, const std::string> key_mapping = {{"protocol", "%PROTOCOL%"}};
+    std::unordered_map<std::string, std::string> key_mapping = {{"protocol", "%PROTOCOL%"}};
     JsonFormatterImpl formatter(key_mapping);
 
     const auto parsed = Json::Factory::loadFromString(formatter.format(request_header, response_header, response_trailer, stream_info));
@@ -441,7 +441,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
         {"nonexistent_response_header", "-"},
         {"some_response_header", "SOME_RESPONSE_HEADER"}};
 
-    const std::map<const std::string, const std::string> key_mapping = {
+    std::unordered_map<std::string, std::string> key_mapping = {
         {"protocol", "%PROTOCOL%"},
         {"some_request_header", "%REQ(some_request_header)%"},
         {"nonexistent_response_header", "%RESP(nonexistent_response_header)%"},
@@ -469,7 +469,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
         {"response_absent_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"},
         {"response_present_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"}};
 
-    const std::map<const std::string, const std::string> key_mapping = {
+    std::unordered_map<std::string, std::string> key_mapping = {
         {"request_present_header_or_request_absent_header",
          "%REQ(request_present_header?request_absent_header)%"},
         {"request_absent_header_or_request_present_header",
@@ -504,7 +504,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
         {"test_obj", "{\"inner_key\":\"inner_value\"}"},
         {"test_obj.inner_key", "\"inner_value\""}};
 
-    const std::map<const std::string, const std::string> key_mapping = {
+    std::unordered_map<std::string, std::string> key_mapping = {
         {"test_key", "%DYNAMIC_METADATA(com.test:test_key)%"},
         {"test_obj", "%DYNAMIC_METADATA(com.test:test_obj)%"},
         {"test_obj.inner_key", "%DYNAMIC_METADATA(com.test:test_obj:inner_key)%"}};
@@ -539,7 +539,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
         {"default", "2018-03-28T23:35:58.000Z"},
         {"all_zeroes", "000000000.0.00.000"}};
 
-    const std::map<const std::string, const std::string> key_mapping = {
+    std::unordered_map<std::string, std::string> key_mapping = {
         {"simple_date", "%START_TIME(%Y/%m/%d)%"},
         {"test_time", "%START_TIME(%s)%"},
         {"bad_format", "%START_TIME(bad_format)%"},
@@ -552,6 +552,31 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
       EXPECT_EQ(parsed->getString(pair.first), pair.second);
     }
   }
+}
+
+TEST(AccessLogFormatterTest, JsonFormatterMultiTokenTest) {
+  {
+    StreamInfo::MockStreamInfo stream_info;
+    Http::TestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
+    Http::TestHeaderMapImpl response_header{{"some_response_header", "SOME_RESPONSE_HEADER"}};
+    Http::TestHeaderMapImpl response_trailer{};
+
+    std::unordered_map<std::string, std::string> expected_json_map = {
+        {"multi_token_field", "HTTP/1.1 plainstring SOME_REQUEST_HEADER SOME_RESPONSE_HEADER"}};
+
+    std::unordered_map<std::string, std::string> key_mapping = {
+        {"multi_token_field", "%PROTOCOL% plainstring %REQ(some_request_header)% %RESP(some_response_header)%"}};
+    JsonFormatterImpl formatter(key_mapping);
+
+    absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+    EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+    const auto parsed = Json::Factory::loadFromString(formatter.format(request_header, response_header, response_trailer, stream_info));
+    for (const auto& pair : expected_json_map) {
+      EXPECT_EQ(parsed->getString(pair.first), pair.second);
+    }
+  }
+
 }
 
 TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {

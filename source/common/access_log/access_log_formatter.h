@@ -111,7 +111,7 @@ public:
 
 private:
   std::vector<FormatterProviderPtr> providers_;
-  std::map<const std::string, Envoy::AccessLog::FormatterProviderPtr> json_output_format_;
+  std::map<const std::string, Envoy::AccessLog::FormatterPtr> json_output_format_;
   
   std::unordered_map<std::string, std::string>
   toMap(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
