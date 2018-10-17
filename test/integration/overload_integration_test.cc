@@ -61,13 +61,23 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Put envoy in overloaded state and check that it drops new requests.
+  // Test both header-only and header+body requests since the code paths are slightly different.
   updateResource(0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
 
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeRequestWithBody(request_headers, 10);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("envoy overloaded", response->body());
+  codec_client_->close();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());

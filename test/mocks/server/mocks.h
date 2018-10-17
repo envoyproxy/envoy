@@ -120,9 +120,10 @@ public:
   MOCK_METHOD1(removeHandler, bool(const std::string& prefix));
   MOCK_METHOD0(socket, Network::Socket&());
   MOCK_METHOD0(getConfigTracker, ConfigTracker&());
-  MOCK_METHOD3(startHttpListener, void(const std::string& address_out_path,
-                                       Network::Address::InstanceConstSharedPtr address,
-                                       Stats::ScopePtr&& listener_scope));
+  MOCK_METHOD4(startHttpListener,
+               void(const std::string& access_log_path, const std::string& address_out_path,
+                    Network::Address::InstanceConstSharedPtr address,
+                    Stats::ScopePtr&& listener_scope));
   MOCK_METHOD4(request, Http::Code(absl::string_view path_and_query, absl::string_view method,
                                    Http::HeaderMap& response_headers, std::string& body));
   MOCK_METHOD1(addListenerToHandler, void(Network::ConnectionHandler* handler));

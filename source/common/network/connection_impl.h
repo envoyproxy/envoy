@@ -20,6 +20,7 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+class RandomPauseFilter;
 class TestPauseFilter;
 
 namespace Network {
@@ -151,6 +152,7 @@ protected:
   Event::FileEventPtr file_event_;
 
 private:
+  friend class ::Envoy::RandomPauseFilter;
   friend class ::Envoy::TestPauseFilter;
 
   void onFileEvent(uint32_t events);

@@ -808,7 +808,7 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
   for (const auto& layer : layers) {
     for (auto& kv : entry_objects) {
       const auto it = layer->values().find(kv.first);
-      const auto& entry_value = it == layer->values().end() ? "" : it->second.string_value_;
+      const auto& entry_value = it == layer->values().end() ? "" : it->second.raw_string_value_;
       rapidjson::Value entry_value_object;
       entry_value_object.SetString(entry_value.c_str(), allocator);
       if (!entry_value.empty()) {
@@ -849,7 +849,7 @@ std::string AdminImpl::runtimeAsJson(
     if (entry.second.uint_value_) {
       entry_value.SetUint64(entry.second.uint_value_.value());
     } else {
-      entry_value.SetString(entry.second.string_value_.c_str(), allocator);
+      entry_value.SetString(entry.second.raw_string_value_.c_str(), allocator);
     }
     entry_obj.AddMember("value", entry_value, allocator);
 
@@ -899,9 +899,15 @@ void AdminFilter::onComplete() {
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
-void AdminImpl::startHttpListener(const std::string& address_out_path,
+void AdminImpl::startHttpListener(const std::string& access_log_path,
+                                  const std::string& address_out_path,
                                   Network::Address::InstanceConstSharedPtr address,
                                   Stats::ScopePtr&& listener_scope) {
+  // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
+  // hard dependency here.
+  access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
+      access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
+      server_.accessLogManager()));
   socket_ = std::make_unique<Network::TcpListenSocket>(address, nullptr, true);
   listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
   if (!address_out_path.empty()) {
@@ -915,8 +921,7 @@ void AdminImpl::startHttpListener(const std::string& address_out_path,
   }
 }
 
-AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profile_path,
-                     Server::Instance& server)
+AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
     : server_(server), profile_path_(profile_path),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(
@@ -959,13 +964,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
       },
-      admin_filter_chain_(std::make_shared<AdminFilterChain>()) {
-  // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
-  // hard dependency here.
-  access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
-      server.accessLogManager()));
-}
+      admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance&,

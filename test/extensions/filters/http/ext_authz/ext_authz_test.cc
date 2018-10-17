@@ -155,7 +155,7 @@ TEST_P(HttpExtAuthzFilterParamTest, NoRoute) {
 // Test that the request continues when the authorization service cluster is not present.
 TEST_P(HttpExtAuthzFilterParamTest, NoCluster) {
 
-  ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
+  EXPECT_CALL(filter_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -190,8 +190,7 @@ TEST_P(HttpExtAuthzFilterParamTest, OkResponse) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
-  EXPECT_EQ(1U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.ok").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
 }
 
 // Test that an synchronous OK response from the authorization service, on the call stack, results
@@ -217,8 +216,7 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateOkResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
-  EXPECT_EQ(1U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.ok").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
 }
 
 // Test that an synchronous denied response from the authorization service passing additional HTTP
@@ -249,9 +247,7 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateDeniedResponseWithHttpAttributes) {
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.denied").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
 }
 
 // Test that an synchronous ok response from the authorization service passing additional HTTP
@@ -320,9 +316,7 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateDeniedResponse) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
 
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.denied").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
 }
 
 // Test that a denied response results in the connection closing with a 401 response to the client.
@@ -354,12 +348,8 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponseWith401) {
   response.status_code = Http::Code::Unauthorized;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.denied").value());
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_4xx").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
 }
 
 // Test that a denied response results in the connection closing with a 403 response to the client.
@@ -389,15 +379,9 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponseWith403) {
   response.status_code = Http::Code::Forbidden;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.denied").value());
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_4xx").value());
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_403").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_403").value());
 }
 
 // Verify that authz response memory is not used after free.
@@ -445,15 +429,9 @@ TEST_P(HttpExtAuthzFilterParamTest, DestroyResponseBeforeSendLocalReply) {
 
   request_callbacks_->onComplete(std::move(response_ptr));
 
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.denied").value());
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_4xx").value());
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_403").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_403").value());
 }
 
 // Verify that authz denied response headers overrides the existing encoding headers.
@@ -506,15 +484,9 @@ TEST_P(HttpExtAuthzFilterParamTest, OverrideEncodingHeaders) {
 
   request_callbacks_->onComplete(std::move(response_ptr));
 
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.denied").value());
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_4xx").value());
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_403").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_403").value());
 }
 
 // Test that when a connection awaiting a authorization response is canceled then the
@@ -581,9 +553,7 @@ TEST_F(HttpExtAuthzFilterTest, ErrorFailClose) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.error").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
 }
 
 // Test when failure_mode_allow is set and the response from the authorization service is Error that
@@ -608,9 +578,7 @@ TEST_F(HttpExtAuthzFilterTest, ErrorOpen) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.error").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
 }
 
 // Test when failure_mode_allow is set and the response from the authorization service is an
@@ -636,10 +604,9 @@ TEST_F(HttpExtAuthzFilterTest, ImmediateErrorOpen) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.error").value());
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
                     .counter("ext_authz.failure_mode_allowed")
                     .value());
 }

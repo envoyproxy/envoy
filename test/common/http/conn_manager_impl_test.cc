@@ -181,7 +181,7 @@ public:
         }));
   }
 
-  void sendReqestHeadersAndData() {
+  void sendRequestHeadersAndData() {
     EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
         .WillOnce(Return(FilterHeadersStatus::StopIteration));
     auto status = streaming_filter_ ? FilterDataStatus::StopIterationAndWatermark
@@ -464,7 +464,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFiltersProxy
   proxy_100_continue_ = false;
   setup(false, "envoy-custom-server", false);
   setUpEncoderAndDecoder();
-  sendReqestHeadersAndData();
+  sendRequestHeadersAndData();
 
   // Akin to 100ContinueResponseWithEncoderFilters below, but with
   // proxy_100_continue_ false. Verify the filters do not get the 100 continue
@@ -488,7 +488,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFilters) {
   proxy_100_continue_ = true;
   setup(false, "envoy-custom-server", false);
   setUpEncoderAndDecoder();
-  sendReqestHeadersAndData();
+  sendRequestHeadersAndData();
 
   EXPECT_CALL(*encoder_filters_[0], encode100ContinueHeaders(_))
       .WillOnce(Return(FilterHeadersStatus::Continue));
@@ -511,7 +511,7 @@ TEST_F(HttpConnectionManagerImplTest, PauseResume100Continue) {
   proxy_100_continue_ = true;
   setup(false, "envoy-custom-server", false);
   setUpEncoderAndDecoder();
-  sendReqestHeadersAndData();
+  sendRequestHeadersAndData();
 
   // Stop the 100-Continue at encoder filter 0. Encoder filter 1 should not yet receive the
   // 100-Continue
@@ -2731,7 +2731,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
 TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   setup(false, "");
   setUpEncoderAndDecoder();
-  sendReqestHeadersAndData();
+  sendRequestHeadersAndData();
 
   // Mimic the upstream connection backing up. The router would call
   // onDecoderFilterAboveWriteBufferHighWatermark which should readDisable the stream and increment
@@ -2819,7 +2819,7 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWith
           decoder_filters_[0]->callbacks_->addDecodedData(data, true);
           return FilterHeadersStatus::Continue;
         }));
-    sendReqestHeadersAndData();
+    sendRequestHeadersAndData();
     ASSERT_GE(decoder_filters_.size(), 1);
     MockDownstreamWatermarkCallbacks callbacks;
     EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
@@ -2879,7 +2879,7 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksUnwoundWithL
           decoder_filters_[0]->callbacks_->addDecodedData(data, true);
           return FilterHeadersStatus::Continue;
         }));
-    sendReqestHeadersAndData();
+    sendRequestHeadersAndData();
     ASSERT_GE(decoder_filters_.size(), 1);
     MockDownstreamWatermarkCallbacks callbacks;
     EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark()).Times(0);
@@ -2892,7 +2892,7 @@ TEST_F(HttpConnectionManagerImplTest, AlterFilterWatermarkLimits) {
   initial_buffer_limit_ = 100;
   setup(false, "");
   setUpEncoderAndDecoder();
-  sendReqestHeadersAndData();
+  sendRequestHeadersAndData();
 
   // Check initial limits.
   EXPECT_EQ(initial_buffer_limit_, decoder_filters_[0]->callbacks_->decoderBufferLimit());
@@ -2925,7 +2925,7 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   // The filter is a streaming filter. Sending 4 bytes should hit the
   // watermark limit and disable reads on the stream.
   EXPECT_CALL(stream_, readDisable(true));
-  sendReqestHeadersAndData();
+  sendRequestHeadersAndData();
 
   // Change the limit so the buffered data is below the new watermark. The
   // stream should be read-enabled
@@ -2961,7 +2961,7 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
   streaming_filter_ = false;
   setup(false, "");
   setUpEncoderAndDecoder();
-  sendReqestHeadersAndData();
+  sendRequestHeadersAndData();
 
   // Set the filter to be a buffering filter. Sending any data will hit the
   // watermark limit and result in a 413 being sent to the user.
@@ -3019,7 +3019,7 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
   initial_buffer_limit_ = 10;
   setup(false, "");
   setUpEncoderAndDecoder();
-  sendReqestHeadersAndData();
+  sendRequestHeadersAndData();
 
   // Start the response without processing the request headers through all
   // filters.
@@ -3053,7 +3053,7 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
   initial_buffer_limit_ = 10;
   setup(false, "");
   setUpEncoderAndDecoder();
-  sendReqestHeadersAndData();
+  sendRequestHeadersAndData();
 
   // Start the response, and make sure the request headers are fully processed.
   HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
@@ -3362,7 +3362,7 @@ TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     HeaderMapPtr headers{
         new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-    decoder->decodeHeaders(std::move(headers), true);
+    decoder->decodeHeaders(std::move(headers), false);
   }));
 
   // 503 direct response when overloaded.
