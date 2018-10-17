@@ -231,13 +231,21 @@ TEST_F(OptionsImplTest, IncompleteComponentLogLevel) {
                           "component log level not correctly specified 'upstream'");
 }
 
-// Test that the test constructor comes up with the same default values as the main constructor. 
+// Test that the test constructor comes up with the same default values as the main constructor.
 TEST_F(OptionsImplTest, SaneTestConstructor) {
-  std::unique_ptr<OptionsImpl> regular_options_impl(createOptionsImpl(""));
-  OptionsImpl test_options_impl("server_cluster", "service_node", "service_zone", spdlog::level::level_enum::info);
+  std::unique_ptr<OptionsImpl> regular_options_impl(createOptionsImpl("envoy"));
+  OptionsImpl test_options_impl("service_cluster", "service_node", "service_zone", spdlog::level::level_enum::info);
+
+  // Specified by constructor
+  EXPECT_EQ("service_cluster", test_options_impl.serviceClusterName());
+  EXPECT_EQ("service_node", test_options_impl.serviceNodeName());
+  EXPECT_EQ("service_zone", test_options_impl.serviceZone());
+  EXPECT_EQ(spdlog::level::level_enum::info, test_options_impl.logLevel());
+
+  // Special (simplified) for tests
+  EXPECT_EQ(1u, test_options_impl.concurrency());
 
   EXPECT_EQ(regular_options_impl->baseId(), test_options_impl.baseId());
-  EXPECT_EQ(regular_options_impl->concurrency(), test_options_impl.concurrency());
   EXPECT_EQ(regular_options_impl->configPath(), test_options_impl.configPath());
   EXPECT_EQ(regular_options_impl->configYaml(), test_options_impl.configYaml());
   EXPECT_EQ(regular_options_impl->v2ConfigOnly(), test_options_impl.v2ConfigOnly());
