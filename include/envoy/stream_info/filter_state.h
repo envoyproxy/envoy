@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"

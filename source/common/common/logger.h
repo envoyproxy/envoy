@@ -146,6 +146,12 @@ public:
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
   void flush() override { sink_->flush(); }
+  void set_pattern(const std::string& pattern) override {
+    set_formatter(spdlog::details::make_unique<spdlog::pattern_formatter>(pattern));
+  }
+  void set_formatter(std::unique_ptr<spdlog::formatter> formatter) override {
+    formatter_ = std::move(formatter);
+  }
 
   /**
    * @return bool whether a lock has been established.
@@ -170,6 +176,7 @@ private:
 
   SinkDelegate* sink_{nullptr};
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
+  std::unique_ptr<spdlog::formatter> formatter_;
 };
 
 /**
