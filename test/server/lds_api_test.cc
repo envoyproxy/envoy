@@ -301,6 +301,7 @@ TEST_F(LdsApiTest, Basic) {
 
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
+  EXPECT_EQ(1UL, store_.gauge("listener_manager.lds.last_update_success").value());
   EXPECT_EQ(18068408981723255507U, store_.gauge("listener_manager.lds.version").value());
 }
 
@@ -409,7 +410,8 @@ TEST_F(LdsApiTest, Failure) {
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
   EXPECT_EQ(1UL, store_.counter("listener_manager.lds.update_failure").value());
   // Validate that the schema error increments update_rejected stat.
-  EXPECT_EQ(1UL, store_.counter("listener_manager.lds.update_failure").value());
+  EXPECT_EQ(1UL, store_.counter("listener_manager.lds.update_rejected").value());
+  EXPECT_EQ(0UL, store_.gauge("listener_manager.lds.last_update_success").value());
   EXPECT_EQ(0UL, store_.gauge("listener_manager.lds.version").value());
 }
 

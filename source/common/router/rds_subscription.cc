@@ -45,6 +45,7 @@ void RdsSubscription::parseResponse(const Http::Message& response) {
   callbacks_->onConfigUpdate(resources, hash.first);
   stats_.version_.set(hash.second);
   stats_.update_success_.inc();
+  stats_.last_update_success_.set(1);
 }
 
 void RdsSubscription::onFetchComplete() {}
@@ -58,6 +59,7 @@ void RdsSubscription::onFetchFailure(const EnvoyException* e) {
     stats_.update_failure_.inc();
     ENVOY_LOG(debug, "rds: fetch failure: network error");
   }
+  stats_.last_update_success_.set(0);
 }
 
 } // namespace Router

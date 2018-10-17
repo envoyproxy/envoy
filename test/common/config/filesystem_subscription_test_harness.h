@@ -87,10 +87,11 @@ public:
   }
 
   void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,
-                   uint64_t version) override {
+                   uint64_t last_update_success, uint64_t version) override {
     // The first attempt always fail unless there was a file there to begin with.
     SubscriptionTestHarness::verifyStats(attempt, success, rejected,
-                                         failure + (file_at_start_ ? 0 : 1), version);
+                                         failure + (file_at_start_ ? 0 : 1),
+                                         last_update_success, version);
   }
 
   const std::string path_;

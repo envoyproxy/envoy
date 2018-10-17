@@ -54,6 +54,7 @@ public:
     // the configuration update targets.
     callbacks_->onConfigUpdate(typed_resources, version_info);
     stats_.update_success_.inc();
+    stats_.last_update_success_.set(1);
     stats_.update_attempt_.inc();
     stats_.version_.set(HashUtil::xxHash64(version_info));
     ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources: {}", type_url_,
@@ -69,6 +70,7 @@ public:
       stats_.update_rejected_.inc();
       ENVOY_LOG(warn, "gRPC config for {} rejected: {}", type_url_, e->what());
     }
+    stats_.last_update_success_.set(0);
     stats_.update_attempt_.inc();
     callbacks_->onConfigUpdateFailed(e);
   }

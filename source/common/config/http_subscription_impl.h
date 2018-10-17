@@ -88,9 +88,11 @@ public:
       request_.set_version_info(message.version_info());
       stats_.version_.set(HashUtil::xxHash64(request_.version_info()));
       stats_.update_success_.inc();
+      stats_.last_update_success_.set(1);
     } catch (const EnvoyException& e) {
       ENVOY_LOG(warn, "REST config update rejected: {}", e.what());
       stats_.update_rejected_.inc();
+      stats_.last_update_success_.set(0);
       callbacks_->onConfigUpdateFailed(&e);
     }
   }
@@ -105,6 +107,7 @@ public:
 private:
   void handleFailure(const EnvoyException* e) {
     stats_.update_failure_.inc();
+    stats_.last_update_success_.set(0);
     callbacks_->onConfigUpdateFailed(e);
   }
 

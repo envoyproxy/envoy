@@ -52,6 +52,7 @@ void LdsSubscription::parseResponse(const Http::Message& response) {
   callbacks_->onConfigUpdate(resources, hash.first);
   stats_.version_.set(hash.second);
   stats_.update_success_.inc();
+  stats_.last_update_success_.set(1);
 }
 
 void LdsSubscription::onFetchComplete() {}
@@ -65,6 +66,7 @@ void LdsSubscription::onFetchFailure(const EnvoyException* e) {
     stats_.update_failure_.inc();
     ENVOY_LOG(info, "lds: fetch failure: network error");
   }
+  stats_.last_update_success_.set(0);
 }
 
 } // namespace Server

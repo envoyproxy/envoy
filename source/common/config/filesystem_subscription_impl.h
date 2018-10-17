@@ -65,6 +65,7 @@ private:
       callbacks_->onConfigUpdate(typed_resources, message.version_info());
       stats_.version_.set(HashUtil::xxHash64(message.version_info()));
       stats_.update_success_.inc();
+      stats_.last_update_success_.set(1);
       ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_,
                 message.DebugString());
     } catch (const EnvoyException& e) {
@@ -75,6 +76,7 @@ private:
         ENVOY_LOG(warn, "Filesystem config update failure: {}", e.what());
         stats_.update_failure_.inc();
       }
+      stats_.last_update_success_.set(0);
       callbacks_->onConfigUpdateFailed(&e);
     }
   }

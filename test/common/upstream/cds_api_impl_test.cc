@@ -210,6 +210,7 @@ TEST_F(CdsApiImplTest, Basic) {
 
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_success").value());
+  EXPECT_EQ(1UL, store_.gauge("cluster_manager.cds.last_update_success").value());
   EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json).first, cds_->versionInfo());
   EXPECT_EQ(1872764556139482420U, store_.gauge("cluster_manager.cds.version").value());
 }
@@ -245,6 +246,7 @@ TEST_F(CdsApiImplTest, Failure) {
   EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_failure").value());
   // Validate that the schema error increments update_rejected stat.
   EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_rejected").value());
+  EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.last_update_success").value());
   EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.version").value());
 }
 
@@ -269,6 +271,7 @@ TEST_F(CdsApiImplTest, FailureArray) {
   EXPECT_EQ("", cds_->versionInfo());
   EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_attempt").value());
   EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_rejected").value());
+  EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.last_update_success").value());
   EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.version").value());
 }
 

@@ -27,4 +27,5 @@ stats tree. The stats tree contains the following statistics:
   update_success, Counter, Total API fetches completed successfully
   update_failure, Counter, Total API fetches that failed because of network errors
   update_rejected, Counter, Total API fetches that failed because of schema/validation errors
+  last_update_success, Gauge, Boolean indicating that the last update completed successfully
   version, Gauge, Hash of the contents from the last successful API fetch

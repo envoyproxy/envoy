@@ -78,6 +78,7 @@ public:
   COUNTER(update_success)                      \
   COUNTER(update_failure)                      \
   COUNTER(update_rejected)                     \
+  GAUGE(last_update_success)                   \
   GAUGE(version)
 // clang-format on
 
