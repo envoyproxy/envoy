@@ -136,7 +136,7 @@ private:
 
 /**
  * Stacks logging sinks, so you can temporarily override the logging mechanism, restoring
- * the prevoius state when the DelegatingSink is destructed.
+ * the previous state when the DelegatingSink is destructed.
  */
 class DelegatingLogSink : public spdlog::sinks::sink {
 public:
@@ -249,7 +249,7 @@ private:
 };
 
 /**
- * Mixin class that allows any class to peform logging with a logger of a particular ID.
+ * Mixin class that allows any class to perform logging with a logger of a particular ID.
  */
 template <Id id> class Loggable {
 protected:
