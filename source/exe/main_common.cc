@@ -52,6 +52,13 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem* time_sys
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
 
+  // Used in both Serve and Validate modes.
+  if (!component_factory) {
+    default_component_factory_ = absl::make_unique<ProdComponentFactory>();
+    component_factory = default_component_factory_.get();
+  }
+  component_factory_ = component_factory;
+
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
   case Server::Mode::Serve: {
@@ -71,11 +78,6 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem* time_sys
       default_test_hooks_ = absl::make_unique<DefaultTestHooks>();
       test_hooks = default_test_hooks_.get();
     }
-    if (!component_factory) {
-      default_component_factory_ = absl::make_unique<ProdComponentFactory>();
-      component_factory = default_component_factory_.get();
-    }
-    component_factory_ = component_factory;
     if (!random_generator) {
       random_generator = absl::make_unique<Runtime::RandomGeneratorImpl>();
     }
