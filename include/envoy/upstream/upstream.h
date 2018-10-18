@@ -414,11 +414,11 @@ public:
 // clang-format on
 
 /**
- * Report the circuit breaker state via a guage, 0 for closed, 1 for open.
+ * Report the circuit breaker state via a gauge, 0 for closed, 1 for open.
  */
 // clang-format off
-#define SET_CIRCUIT_BREAKER_STATE(guage, resource)                                                 \
-  guage.set(resource.canCreate() ? 0 : 1);
+#define SET_CIRCUIT_BREAKER_STATE(gauge, resource)                                                 \
+  gauge.set(resource.canCreate() ? 0 : 1);
 // clang-format on
 
 /**
