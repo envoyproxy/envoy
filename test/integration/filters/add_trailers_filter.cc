@@ -5,13 +5,12 @@
 #include "envoy/server/filter_config.h"
 
 #include "extensions/filters/http/common/empty_http_filter_config.h"
-
-#include "test/integration/filters/pass_through_filter.h"
+#include "extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 
 // A test filter that inserts trailers at the end of encode/decode
-class AddTrailersStreamFilter : public PassThroughFilter {
+class AddTrailersStreamFilter : public Http::PassThroughFilter {
 public:
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) {
     if (end_stream) {
