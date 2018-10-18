@@ -304,6 +304,138 @@ TEST_P(AdminRequestTest, AdminRequestAfterRun) {
   EXPECT_EQ(1, lambda_destroy_count);
 }
 
+class MonitoredTimeSystem : public Event::RealTimeSystem {
+ public:
+  Event::SchedulerPtr createScheduler(Event::Libevent::BasePtr& libevent) override {
+    scheduler_created_ = true;
+    return RealTimeSystem::createScheduler(libevent);
+  }
+
+  bool scheduler_created_{false};
+};
+
+class MonitoredTestHooks : public TestHooks {
+ public:
+  void onWorkerListenerAdded() { ++listeners_added_; on_changed_.Notify(); }
+  void onWorkerListenerRemoved() { ++listeners_removed_; on_changed_.Notify(); }
+  
+  absl::Notification on_changed_;
+  int listeners_added_{};
+  int listeners_removed_{};
+};
+
+class MonitoredComponentFactory : public ProdComponentFactory {
+ public:
+  Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
+    ++drain_manager_creations_;
+    return ProdComponentFactory::createDrainManager(server);
+  }
+  Runtime::LoaderPtr createRuntime(Server::Instance& server,
+                                   Server::Configuration::Initial& config) override {
+    ++runtime_creations_;
+    return ProdComponentFactory::createRuntime(server, config);
+  }
+
+  int drain_manager_creations_{};
+  int runtime_creations_{};
+};
+
+class MonitoredRandomGenerator : public Runtime::RandomGeneratorImpl {
+ public:
+  uint64_t random() override {
+    ++random_called_;
+    return RandomGeneratorImpl::random();
+  }
+  std::string uuid() override {
+    ++uuid_called_;
+    return RandomGeneratorImpl::uuid();
+  }
+  int random_called_{0};
+  int uuid_called_{0};
+};
+
+class MainCommonBaseTest : public MainCommonTest {
+ protected:
+  MainCommonBaseTest()
+      : test_random_generator_(absl::make_unique<MonitoredRandomGenerator>()),
+        test_random_generator_ptr_(test_random_generator_.get()),
+        envoy_return_(false) {
+    options_ = absl::make_unique<OptionsImpl>(
+        argc(), argv(), [](uint64_t, uint64_t, bool) -> std::string { return "1"; },
+        spdlog::level::info);
+    options_->setHotRestartDisabled(true);
+  }
+
+  // Runs an admin request specified in path, blocking until completion, and
+  // returning the response body.
+  std::string adminRequest(absl::string_view path, absl::string_view method) {
+    absl::Notification done;
+    std::string out;
+    main_common_base_->adminRequest(
+        path, method,
+        [&done, &out](const Http::HeaderMap& /*response_headers*/, absl::string_view body) {
+          out = std::string(body);
+          done.Notify();
+        });
+    done.WaitForNotification();
+    return out;
+  }
+
+  // Initiates Envoy running in its own thread.
+  void startEnvoy() {
+    envoy_thread_ = std::make_unique<Thread::Thread>([this]() {
+      // Note: main_common_base_ is accesesed in the testing thread, but
+      // is race-free, as MainCommonBase::run() does not return until
+      // triggered with an adminRequest POST to /quitquitquit, which
+      // is done in the testing thread.
+      main_common_base_ = std::make_unique<MainCommonBase>(
+          *options_, &test_time_system_, &test_hooks_, &test_component_factory_,
+          std::move(test_random_generator_));
+      bool status = main_common_base_->run();
+      main_common_base_.reset();
+      envoy_return_ = status;
+      finished_.Notify();
+    });
+  }
+
+  // Having triggered Envoy to quit (via signal or /quitquitquit), this blocks until Envoy exits.
+  bool waitForEnvoyToExit() {
+    finished_.WaitForNotification();
+    envoy_thread_->join();
+    return envoy_return_;
+  }
+
+  std::unique_ptr<Thread::Thread> envoy_thread_;
+  std::unique_ptr<MainCommonBase> main_common_base_;
+  std::unique_ptr<OptionsImpl> options_;
+
+  MonitoredTimeSystem test_time_system_;
+  MonitoredTestHooks test_hooks_;
+  MonitoredComponentFactory test_component_factory_;
+  std::unique_ptr<MonitoredRandomGenerator> test_random_generator_;
+  MonitoredRandomGenerator* test_random_generator_ptr_{}; 
+  
+  absl::Notification finished_;
+  bool envoy_return_;
+};
+
+// Test for confirming that the extended, test-oriented constructor arguments are used.
+// AdminRequestTest to enable running of server to test that listener addition is seen.
+TEST_P(MainCommonBaseTest, Constructor) {
+  EXPECT_FALSE(test_time_system_.scheduler_created_);
+  EXPECT_EQ(0, test_hooks_.listeners_added_);
+  EXPECT_EQ(0, test_component_factory_.runtime_creations_);
+  EXPECT_EQ(0, test_random_generator_ptr_->random_called_);
+
+  startEnvoy();
+  test_hooks_.on_changed_.WaitForNotification();
+
+  EXPECT_TRUE(test_time_system_.scheduler_created_);
+  EXPECT_LT(0, test_hooks_.listeners_added_);
+  EXPECT_LT(0, test_component_factory_.runtime_creations_);
+  EXPECT_LT(0, test_random_generator_ptr_->random_called_);
+}
+
 // Verifies that the Logger::Registry is usable after constructing and
 // destructing MainCommon.
 TEST_P(MainCommonTest, ConstructDestructLogger) {
