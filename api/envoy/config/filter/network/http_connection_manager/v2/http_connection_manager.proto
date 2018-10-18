@@ -19,7 +19,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 27]
+// [#comment:next free field: 28]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -348,6 +348,15 @@ message HttpConnectionManager {
     repeated HttpFilter filters = 2;
   };
   repeated UpgradeConfig upgrade_configs = 23;
+
+  // If true, the order of encoder filters will be reversed to that of filters
+  // configured in the HTTP filter chain. Otherwise, it will keep the existing
+  // order.
+  // Note: this is a bug fix for Envoy, which is designed to have the reversed
+  // order of encode filters to that of decode ones, (see
+  // https://github.com/envoyproxy/envoy/issues/4599 for details). When we remove this field, envoy
+  // will have the same behavior when it sets true.
+  google.protobuf.BoolValue bugfix_reverse_encode_order = 27 [deprecated = true];
 }
 
 message Rds {
