@@ -11,9 +11,10 @@ OPENCENSUS_SHA = "ab82e5fdec8267dc2a726544b10af97675970847"  # May 23, 2018
 PGV_GIT_SHA = "30da78c4bcdd477b3c24d13e43cf39361ae3859f"  # Sep 27, 2018
 
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 def api_dependencies():
-    native.http_archive(
+    http_archive(
         name = "bazel_skylib",
         sha256 = BAZEL_SKYLIB_SHA256,
         strip_prefix = "bazel-skylib-" + BAZEL_SKYLIB_RELEASE,
@@ -24,7 +25,7 @@ def api_dependencies():
         remote = "https://github.com/lyft/protoc-gen-validate.git",
         commit = PGV_GIT_SHA,
     )
-    native.new_http_archive(
+    http_archive(
         name = "googleapis",
         strip_prefix = "googleapis-" + GOOGLEAPIS_SHA,
         url = "https://github.com/googleapis/googleapis/archive/" + GOOGLEAPIS_SHA + ".tar.gz",
@@ -189,7 +190,7 @@ py_proto_library(
 """,
     )
 
-    native.new_http_archive(
+    http_archive(
         name = "com_github_gogo_protobuf",
         sha256 = GOGOPROTO_SHA256,
         strip_prefix = "protobuf-" + GOGOPROTO_RELEASE,
@@ -250,7 +251,7 @@ py_proto_library(
         """,
     )
 
-    native.new_http_archive(
+    http_archive(
         name = "prometheus_metrics_model",
         strip_prefix = "client_model-" + PROMETHEUS_SHA,
         url = "https://github.com/prometheus/client_model/archive/" + PROMETHEUS_SHA + ".tar.gz",
@@ -275,7 +276,7 @@ go_proto_library(
         """,
     )
 
-    native.new_http_archive(
+    http_archive(
         name = "io_opencensus_trace",
         strip_prefix = "opencensus-proto-" + OPENCENSUS_SHA + "/opencensus/proto/trace",
         url = "https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_SHA + ".tar.gz",
