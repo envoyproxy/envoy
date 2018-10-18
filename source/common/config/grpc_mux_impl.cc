@@ -15,7 +15,8 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
                          Runtime::RandomGenerator& random, Stats::Scope& scope)
     : local_info_(local_info), async_client_(std::move(async_client)),
       service_method_(service_method), random_(random), time_source_(dispatcher.timeSystem()),
-      control_plane_stats_(generateControlPlaneStats(scope)) {
+      control_plane_stats_(generateControlPlaneStats(scope)),
+      dispatcher_(dispatcher) {
   Config::Utility::checkLocalInfo("ads", local_info);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
@@ -64,9 +65,9 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
     return;
   }
 
-  if (!api_state.limit_request_->consume() && api_state.limit_log_->consume()) {
-    ENVOY_LOG(warn, "{}", fmt::format("Too many sendDiscoveryRequest calls for {}", type_url));
-  }
+  // if (!api_state.limit_request_->consume() && api_state.limit_log_->consume()) {
+  //   ENVOY_LOG(warn, "{}", fmt::format("Too many sendDiscoveryRequest calls for {}", type_url));
+  // }
 
   auto& request = api_state.request_;
   request.mutable_resource_names()->Clear();
@@ -119,6 +120,17 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
     api_state_[type_url].request_.set_type_url(type_url);
     api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
     api_state_[type_url].subscribed_ = true;
+    api_state_[type_url].request_timer_ = dispatcher_.createTimer([this, &type_url]() -> void {
+      // If it is under rate limit, just process the request, otherwise enable the timer for later processing
+      // when rate limits are available.
+      if (api_state_[type_url].limit_request_->consume()) {
+        api_state_[type_url].request_queue_.pop(); 
+        sendDiscoveryRequest(type_url); 
+      } else {
+        // TODO(ramaraochavali): instead of fixed delay, use jitter exponential delay??.
+        api_state_[type_url].request_timer_->enableTimer(std::chrono::milliseconds(10000));
+      }
+    });
     subscriptions_.emplace_back(type_url);
   }
 
@@ -232,7 +244,10 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     error_detail->set_message(e.what());
   }
   api_state_[type_url].request_.set_response_nonce(message->nonce());
-  sendDiscoveryRequest(type_url);
+  // put the request in queue with some random message id.
+  api_state_[type_url].request_queue_.push(random_.random()); 
+  // enable the timer immediately and ratelimit in the timer lambda if needed.
+  api_state_[type_url].request_timer_->enableTimer(std::chrono::milliseconds(0));
 }
 
 void GrpcMuxImpl::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {

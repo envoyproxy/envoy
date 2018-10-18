@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <queue>
 
 #include "envoy/common/time.h"
 #include "envoy/common/token_bucket.h"
@@ -96,6 +97,9 @@ private:
     TokenBucketPtr limit_request_;
     // Limits warning messages when too many requests is detected.
     TokenBucketPtr limit_log_;
+    // Queue
+    std::queue<uint64_t> request_queue_;
+    Event::TimerPtr request_timer_;
   };
 
   const LocalInfo::LocalInfo& local_info_;
@@ -110,6 +114,7 @@ private:
   TimeSource& time_source_;
   BackOffStrategyPtr backoff_strategy_;
   ControlPlaneStats control_plane_stats_;
+  Event::Dispatcher& dispatcher_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {
