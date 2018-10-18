@@ -8,6 +8,8 @@ A logged warning is expected for each deprecated item that is in deprecation win
 
 ## Version 1.9.0 (pending)
 
+* Use of the v2 API "deprecated_v1" fields is deprecated.
+
 ## Version 1.8.0 (Oct 4, 2018)
 
 * Use of the v1 API (including `*.deprecated_v1` fields in the v2 API) is deprecated.

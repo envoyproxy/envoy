@@ -98,7 +98,7 @@ message Listener {
   }
 
   // [#not-implemented-hide:]
-  DeprecatedV1 deprecated_v1 = 7;
+  DeprecatedV1 deprecated_v1 = 7 [deprecated = true];
 
   enum DrainType {
     // Drain in response to calling /healthcheck/fail admin endpoint (along with the health check
