@@ -265,13 +265,21 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithoutAccessLog) {
                             "An admin access log path is required for a listening server.");
 }
 
+// Empty bootstrap succeeeds.
+TEST_P(ServerInstanceImplTest, EmptyBootstrap) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.v2_config_only_ = true;
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+}
+
 // Negative test for protoc-gen-validate constraints.
 TEST_P(ServerInstanceImplTest, ValidateFail) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   options_.v2_config_only_ = true;
   try {
-    initialize("test/server/empty_bootstrap.yaml");
+    initialize("test/server/empty_runtime.yaml");
     FAIL();
   } catch (const EnvoyException& e) {
     EXPECT_THAT(e.what(), HasSubstr("Proto constraint validation failed"));
@@ -312,14 +320,14 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
   }
 }
 
+// When there are no bootstrap CLI options, either for content or path, we can load the server with
+// an empty config.
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
-  EXPECT_THROW_WITH_MESSAGE(
-      server_.reset(new InstanceImpl(
-          options_, test_time_.timeSystem(),
-          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-          hooks_, restart_, stats_store_, fakelock_, component_factory_,
-          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_)),
-      EnvoyException, "unable to read file: ");
+  EXPECT_NO_THROW(server_.reset(new InstanceImpl(
+      options_, test_time_.timeSystem(),
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+      hooks_, restart_, stats_store_, fakelock_, component_factory_,
+      std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_)));
 }
 
 // Validate that when std::exception is unexpectedly thrown, we exit safely.
