@@ -84,7 +84,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
   string_value.set_string_value("%PROTOCOL%");
 
   auto json_format = fal_config.mutable_json_format();
-  (*json_format->mutable_fields())[std::string{"protocol"}] = string_value;
+  (*json_format->mutable_fields())["protocol"] = string_value;
 
   EXPECT_EQ(fal_config.access_log_format_case(),
             envoy::config::accesslog::v2::FileAccessLog::kJsonFormat);
@@ -118,7 +118,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithBoolValueTest) {
     ProtobufWkt::Value bool_value;
     bool_value.set_bool_value(false);
     auto json_format = fal_config.mutable_json_format();
-    (*json_format->mutable_fields())[std::string{"protocol"}] = bool_value;
+    (*json_format->mutable_fields())["protocol"] = bool_value;
 
     MessageUtil::jsonConvert(fal_config, *config.mutable_config());
     NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -138,14 +138,14 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithNestedKeyTest) {
     fal_config.set_path("/dev/null");
 
     ProtobufWkt::Value string_value;
-    string_value.set_string_value(std::string{"some_nested_value"});
+    string_value.set_string_value("some_nested_value");
 
     ProtobufWkt::Value struct_value;
-    (*struct_value.mutable_struct_value()->mutable_fields())[std::string{"some_nested_key"}] =
+    (*struct_value.mutable_struct_value()->mutable_fields())["some_nested_key"] =
         string_value;
 
     auto json_format = fal_config.mutable_json_format();
-    (*json_format->mutable_fields())[std::string{"top_level_key"}] = struct_value;
+    (*json_format->mutable_fields())["top_level_key"] = struct_value;
 
     MessageUtil::jsonConvert(fal_config, *config.mutable_config());
     NiceMock<Server::Configuration::MockFactoryContext> context;
