@@ -209,7 +209,6 @@ void FilterJson::translateHttpConnectionManager(
 
   JSON_UTIL_SET_BOOL(json_config, proto_config, use_remote_address);
   JSON_UTIL_SET_BOOL(json_config, proto_config, generate_request_id);
-  JSON_UTIL_SET_BOOL(json_config, proto_config, bugfix_reverse_encode_order);
 
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       ForwardClientCertDetails fcc_details{};
