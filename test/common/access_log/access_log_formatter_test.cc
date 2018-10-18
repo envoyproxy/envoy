@@ -382,12 +382,12 @@ TEST(AccessLogFormatterTest, startTimeFormatter) {
   }
 }
 
-TEST(AccessLogFormatterTest, JsonFormatterTest) {
+TEST(AccessLogFormatterTest, JsonFormatterPlainStringTest) {
   {
     StreamInfo::MockStreamInfo stream_info;
-    Http::TestHeaderMapImpl request_header{};
-    Http::TestHeaderMapImpl response_header{};
-    Http::TestHeaderMapImpl response_trailer{};
+    Http::TestHeaderMapImpl request_header;
+    Http::TestHeaderMapImpl response_header;
+    Http::TestHeaderMapImpl response_trailer;
 
     envoy::api::v2::core::Metadata metadata;
     populateMetadataTestData(metadata);
@@ -407,12 +407,13 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
       EXPECT_EQ(parsed->getString(pair.first), pair.second);
     }
   }
-
+}
+TEST(AccessLogFormatterTest, JsonFormatterSingleOperatorTest) {
   {
     StreamInfo::MockStreamInfo stream_info;
-    Http::TestHeaderMapImpl request_header{};
-    Http::TestHeaderMapImpl response_header{};
-    Http::TestHeaderMapImpl response_trailer{};
+    Http::TestHeaderMapImpl request_header;
+    Http::TestHeaderMapImpl response_header;
+    Http::TestHeaderMapImpl response_trailer;
 
     envoy::api::v2::core::Metadata metadata;
     populateMetadataTestData(metadata);
@@ -430,12 +431,14 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
       EXPECT_EQ(parsed->getString(pair.first), pair.second);
     }
   }
+}
 
+TEST(AccessLogFormatterTest, JsonFormatterNonExistentHeaderTest) {
   {
     StreamInfo::MockStreamInfo stream_info;
     Http::TestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
     Http::TestHeaderMapImpl response_header{{"some_response_header", "SOME_RESPONSE_HEADER"}};
-    Http::TestHeaderMapImpl response_trailer{};
+    Http::TestHeaderMapImpl response_trailer;
 
     std::unordered_map<std::string, std::string> expected_json_map = {
         {"protocol", "HTTP/1.1"},
@@ -459,12 +462,14 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
       EXPECT_EQ(parsed->getString(pair.first), pair.second);
     }
   }
+}
 
+TEST(AccessLogFormatterTest, JsonFormatterAlternateHeaderTest) {
   {
     StreamInfo::MockStreamInfo stream_info;
     Http::TestHeaderMapImpl request_header{{"request_present_header", "REQUEST_PRESENT_HEADER"}};
     Http::TestHeaderMapImpl response_header{{"response_present_header", "RESPONSE_PRESENT_HEADER"}};
-    Http::TestHeaderMapImpl response_trailer{};
+    Http::TestHeaderMapImpl response_trailer;
 
     std::unordered_map<std::string, std::string> expected_json_map = {
         {"request_present_header_or_request_absent_header", "REQUEST_PRESENT_HEADER"},
@@ -492,7 +497,9 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
       EXPECT_EQ(parsed->getString(pair.first), pair.second);
     }
   }
+}
 
+TEST(AccessLogFormatterTest, JsonFormatterDynamicMetadataTest) {
   {
     StreamInfo::MockStreamInfo stream_info;
     Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
@@ -521,12 +528,14 @@ TEST(AccessLogFormatterTest, JsonFormatterTest) {
       EXPECT_EQ(parsed->getString(pair.first), pair.second);
     }
   }
+}
 
+TEST(AccessLogFormatterTest, JsonFormatterStartTimeTest) {
   {
     StreamInfo::MockStreamInfo stream_info;
-    Http::TestHeaderMapImpl request_header{};
-    Http::TestHeaderMapImpl response_header{};
-    Http::TestHeaderMapImpl response_trailer{};
+    Http::TestHeaderMapImpl request_header;
+    Http::TestHeaderMapImpl response_header;
+    Http::TestHeaderMapImpl response_trailer;
 
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
@@ -565,7 +574,7 @@ TEST(AccessLogFormatterTest, JsonFormatterMultiTokenTest) {
     StreamInfo::MockStreamInfo stream_info;
     Http::TestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
     Http::TestHeaderMapImpl response_header{{"some_response_header", "SOME_RESPONSE_HEADER"}};
-    Http::TestHeaderMapImpl response_trailer{};
+    Http::TestHeaderMapImpl response_trailer;
 
     std::unordered_map<std::string, std::string> expected_json_map = {
         {"multi_token_field", "HTTP/1.1 plainstring SOME_REQUEST_HEADER SOME_RESPONSE_HEADER"}};
