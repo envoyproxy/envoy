@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -31,6 +32,7 @@ envoy_cc_test(
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",
         "//source/common/ssl:ssl_socket_lib",
+        "//source/common/ssl:utility_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
@@ -57,6 +59,7 @@ envoy_cc_test(
         "//test/common/ssl/test_data:certs",
     ],
     deps = [
+        ":ssl_test_utils",
         "//source/common/json:json_loader_lib",
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",
@@ -65,6 +68,34 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "utility_test",
+    srcs = [
+        "utility_test.cc",
+    ],
+    data = [
+        "gen_unittest_certs.sh",
+        "//test/common/ssl/test_data:certs",
+    ],
+    external_deps = ["ssl"],
+    deps = [
+        ":ssl_test_utils",
+        "//source/common/ssl:utility_lib",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "ssl_test_utils",
+    srcs = [
+        "ssl_test_utility.h",
+    ],
+    deps = [
+        "//source/common/ssl:utility_lib",
         "//test/test_common:environment_lib",
     ],
 )

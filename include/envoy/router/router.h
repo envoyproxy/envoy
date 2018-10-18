@@ -151,6 +151,8 @@ public:
   static const uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x40;
   static const uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x80;
   static const uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
+  static const uint32_t RETRY_ON_GRPC_INTERNAL           = 0x200;
+  static const uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
   // clang-format on
 
   virtual ~RetryPolicy() {}
@@ -171,13 +173,15 @@ public:
   virtual uint32_t retryOn() const PURE;
 
   /**
-   * Initializes the RetryHostPredicates to be used with this retry attempt.
+   * Initializes a new set of RetryHostPredicates to be used when retrying with this retry policy.
    * @return list of RetryHostPredicates to use
    */
   virtual std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const PURE;
 
   /**
-   * @return the RetryPriority to use when determining priority load for retries.
+   * Initializes a RetryPriority to be used when retrying with this retry policy.
+   * @return the RetryPriority to use when determining priority load for retries, or nullptr
+   * if none should be used.
    */
   virtual Upstream::RetryPrioritySharedPtr retryPriority() const PURE;
 
@@ -186,6 +190,12 @@ public:
    * for a retry attempt.
    */
   virtual uint32_t hostSelectionMaxAttempts() const PURE;
+
+  /**
+   * List of status codes that should trigger a retry when the retriable-status-codes retry
+   * policy is enabled.
+   */
+  virtual const std::vector<uint32_t>& retriableStatusCodes() const PURE;
 };
 
 /**
@@ -345,6 +355,11 @@ public:
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
     return dynamic_cast<const Derived*>(perFilterConfig(name));
   }
+
+  /**
+   * @return bool whether to include the request count header in upstream requests.
+   */
+  virtual bool includeAttemptCount() const PURE;
 };
 
 /**
@@ -612,7 +627,14 @@ public:
    */
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
     return dynamic_cast<const Derived*>(perFilterConfig(name));
-  }
+  };
+
+  /**
+   * True if the virtual host this RouteEntry belongs to is configured to include the attempt
+   * count header.
+   * @return bool whether x-envoy-attempt-count should be included on the upstream request.
+   */
+  virtual bool includeAttemptCount() const PURE;
 };
 
 /**

@@ -140,6 +140,7 @@ public:
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
+  bool includeAttemptCount() const override { return include_attempt_count_; }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -176,6 +177,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   PerFilterConfigs per_filter_configs_;
+  const bool include_attempt_count_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
@@ -183,9 +185,8 @@ typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
 /**
  * Implementation of RetryPolicy that reads from the proto route config.
  */
-class RetryPolicyImpl : public RetryPolicy,
-                        Upstream::RetryHostPredicateFactoryCallbacks,
-                        Upstream::RetryPriorityFactoryCallbacks {
+class RetryPolicyImpl : public RetryPolicy {
+
 public:
   RetryPolicyImpl(const envoy::api::v2::route::RouteAction& config);
 
@@ -193,30 +194,26 @@ public:
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
-  std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override {
-    return retry_host_predicates_;
-  }
-  Upstream::RetryPrioritySharedPtr retryPriority() const override { return retry_priority_; }
+  std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override;
+  Upstream::RetryPrioritySharedPtr retryPriority() const override;
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_attempts_; }
-
-  // Upstream::RetryHostPredicateFactoryCallbacks
-  void addHostPredicate(Upstream::RetryHostPredicateSharedPtr predicate) override {
-    retry_host_predicates_.emplace_back(predicate);
-  }
-
-  // Upstream::RetryHostPredicateFactoryCallbacks
-  void addRetryPriority(Upstream::RetryPrioritySharedPtr retry_priority) override {
-    ASSERT(!retry_priority_);
-    retry_priority_ = retry_priority;
+  const std::vector<uint32_t>& retriableStatusCodes() const override {
+    return retriable_status_codes_;
   }
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
-  std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
+  // Each pair contains the name and config proto to be used to create the RetryHostPredicates
+  // that should be used when with this policy.
+  std::vector<std::pair<std::string, ProtobufTypes::MessagePtr>> retry_host_predicate_configs_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
+  // Name and config proto to use to create the RetryPriority to use with this policy. Default
+  // initialized when no RetryPriority should be used.
+  std::pair<std::string, ProtobufTypes::MessagePtr> retry_priority_config_;
   uint32_t host_selection_attempts_{1};
+  std::vector<uint32_t> retriable_status_codes_;
 };
 
 /**
@@ -353,6 +350,7 @@ public:
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
   const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
+  bool includeAttemptCount() const override { return vhost_.includeAttemptCount(); }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -386,8 +384,15 @@ protected:
 
 private:
   struct RuntimeData {
-    uint64_t numerator_val_{};
-    uint64_t denominator_val_{};
+    std::string fractional_runtime_key_{};
+    envoy::type::FractionalPercent fractional_runtime_default_{};
+
+    // Relating to the deprecated 'runtime' field.
+    std::string runtime_key_{};
+    uint64_t runtime_default_{};
+
+    // Indicates whether to use the deprecated 'runtime' field or 'fractional_percent'.
+    bool legacy_runtime_data_{};
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {
@@ -453,6 +458,8 @@ private:
     const PathMatchCriterion& pathMatchCriterion() const override {
       return parent_->pathMatchCriterion();
     }
+
+    bool includeAttemptCount() const override { return parent_->includeAttemptCount(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -522,6 +529,8 @@ private:
   parseOpaqueConfig(const envoy::api::v2::route::Route& route);
 
   static DecoratorConstPtr parseDecorator(const envoy::api::v2::route::Route& route);
+
+  bool evaluateRuntimeMatch(const uint64_t random_value) const;
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;

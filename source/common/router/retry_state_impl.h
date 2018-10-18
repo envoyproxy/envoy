@@ -89,6 +89,7 @@ private:
   std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
   uint32_t host_selection_max_attempts_;
+  std::vector<uint32_t> retriable_status_codes_;
 };
 
 } // namespace Router

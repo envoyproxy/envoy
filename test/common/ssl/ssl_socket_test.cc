@@ -45,7 +45,7 @@ namespace Ssl {
 
 namespace {
 
-void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_json,
+void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_yaml,
               const std::string& expected_digest, const std::string& expected_uri,
               const std::string& expected_local_uri, const std::string& expected_serial_number,
               const std::string& expected_subject, const std::string& expected_local_subject,
@@ -55,8 +55,9 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Runtime::MockLoader runtime;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
 
-  Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, factory_context);
+  envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
@@ -69,8 +70,9 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
-  Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, factory_context);
+  envoy::api::v2::auth::UpstreamTlsContext client_tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(client_tls_context, factory_context);
   Ssl::ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                         stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
@@ -313,22 +315,28 @@ INSTANTIATE_TEST_CASE_P(IpVersions, SslSocketTest,
                         TestUtility::ipTestParamsToString);
 
 TEST_P(SslSocketTest, GetCertDigest) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+)EOF";
 
-  testUtil(client_ctx_json, server_ctx_json,
+  testUtil(client_ctx_yaml, server_ctx_yaml,
            "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", "",
            "f3828eb24fd779cf", "", "", "", "ssl.handshake", true, GetParam());
 }
@@ -472,165 +480,210 @@ TEST_P(SslSocketTest, GetCertDigestInline) {
 }
 
 TEST_P(SslSocketTest, GetCertDigestServerCertWithIntermediateCA) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+)EOF";
 
-  testUtil(client_ctx_json, server_ctx_json,
+  testUtil(client_ctx_yaml, server_ctx_yaml,
            "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", "",
            "f3828eb24fd779cf", "", "", "", "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslSocketTest, GetCertDigestServerCertWithoutCommonName) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_only_dns_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_only_dns_key.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_only_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_only_dns_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+)EOF";
 
-  testUtil(client_ctx_json, server_ctx_json,
+  testUtil(client_ctx_yaml, server_ctx_yaml,
            "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", "",
            "f3828eb24fd779cf", "", "", "", "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslSocketTest, GetUriWithUriSan) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_subject_alt_name": [ "spiffe://lyft.com/test-team" ]
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+      verify_subject_alt_name: "spiffe://lyft.com/test-team"
+)EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", "",
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "spiffe://lyft.com/test-team", "",
            "de8a932ffc6a57da", "", "", "", "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslSocketTest, GetNoUriWithDnsSan) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+)EOF";
 
   // The SAN field only has DNS, expect "" for uriSanPeerCertificate().
-  testUtil(client_ctx_json, server_ctx_json, "", "", "", "f3828eb24fd779d0", "", "", "",
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "f3828eb24fd779d0", "", "", "",
            "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslSocketTest, NoCert) {
-  std::string client_ctx_json = "{}";
-
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem"
-  }
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "", "ssl.no_certificate", true,
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+)EOF";
+
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.no_certificate", true,
            GetParam());
 }
 
 TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+)EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "spiffe://lyft.com/test-team",
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "spiffe://lyft.com/test-team",
            "f3828eb24fd779cf", "", "", "", "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslSocketTest, GetSubjectsWithBothCerts) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "require_client_certificate": true
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+  require_client_certificate: true
+)EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "", "f3828eb24fd779cf",
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "f3828eb24fd779cf",
            "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US",
            "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US", "",
            "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslSocketTest, GetPeerCert) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "require_client_certificate": true
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+  require_client_certificate: true
+)EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "", "f3828eb24fd779cf",
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "f3828eb24fd779cf",
            "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US",
            "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US",
            "-----BEGIN%20CERTIFICATE-----%0A"
@@ -655,75 +708,99 @@ TEST_P(SslSocketTest, GetPeerCert) {
 }
 
 TEST_P(SslSocketTest, FailedClientAuthCaVerificationNoClientCert) {
-  std::string client_ctx_json = "{}";
-
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "require_client_certificate": true
-  }
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "", "ssl.fail_verify_no_cert",
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+  require_client_certificate: true
+)EOF";
+
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_no_cert",
            false, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientAuthCaVerification) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+)EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "", "ssl.fail_verify_error",
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_error",
            false, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
-  std::string client_ctx_json = "{}";
-
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_subject_alt_name": [ "example.com" ]
-  }
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "", "ssl.fail_verify_no_cert",
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+      verify_subject_alt_name: "example.com"
+)EOF";
+
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_no_cert",
            false, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_subject_alt_name": [ "example.com" ]
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+      verify_subject_alt_name: "example.com"
+)EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "", "ssl.fail_verify_san",
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_san",
            false, GetParam());
 }
 
@@ -818,43 +895,54 @@ TEST_P(SslSocketTest, FailedClientCertAllowServerExpiredWrongCAVerification) {
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashVerification) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+      verify_certificate_hash: "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
+)EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", "",
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "spiffe://lyft.com/test-team", "",
            "de8a932ffc6a57da", "", "", "", "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashVerificationNoCA) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      verify_certificate_hash: "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
+)EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", "",
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "spiffe://lyft.com/test-team", "",
            "de8a932ffc6a57da", "", "", "", "ssl.handshake", true, GetParam());
 }
 
@@ -939,95 +1027,123 @@ TEST_P(SslSocketTest, ClientCertificateHashListVerificationNoCA) {
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoClientCertificate) {
-  std::string client_ctx_json = "{}";
-
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
-  }
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "", "ssl.fail_verify_no_cert",
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+      verify_certificate_hash: "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
+)EOF";
+
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_no_cert",
            false, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCANoClientCertificate) {
-  std::string client_ctx_json = "{}";
-
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
-  }
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "", "ssl.fail_verify_no_cert",
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      verify_certificate_hash: "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
+)EOF";
+
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_no_cert",
            false, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongClientCertificate) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+      verify_certificate_hash: "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
+)EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "",
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "",
            "ssl.fail_verify_cert_hash", false, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCAWrongClientCertificate) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      verify_certificate_hash: "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
+)EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "",
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "",
            "ssl.fail_verify_cert_hash", false, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongCA) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
+)EOF";
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/fake_ca_cert.pem",
-    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/fake_ca_cert.pem"
+      verify_certificate_hash: "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
+)EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "", "ssl.fail_verify_error",
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_error",
            false, GetParam());
 }
 
@@ -1539,16 +1655,21 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_certificates.pem"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_certificates.pem"
+)EOF";
 
-  Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, factory_context_);
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
@@ -1596,16 +1717,21 @@ TEST_P(SslSocketTest, HalfClose) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_certificates.pem"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_certificates.pem"
+)EOF";
 
-  Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, factory_context_);
+  envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context_);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
@@ -1619,13 +1745,13 @@ TEST_P(SslSocketTest, HalfClose) {
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
   std::shared_ptr<Network::MockReadFilter> client_read_filter(new Network::MockReadFilter());
 
-  std::string client_ctx_json = R"EOF(
-  {
-  }
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
   )EOF";
 
-  Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, factory_context_);
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -1679,16 +1805,21 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   Runtime::MockLoader runtime;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_certificates.pem"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_certificates.pem"
+)EOF";
 
-  Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, factory_context);
+  envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
@@ -1699,15 +1830,18 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true, false);
 
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+)EOF";
 
-  Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, factory_context);
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context);
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -1756,23 +1890,26 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
 namespace {
 
 // Test connecting with a client to server1, then trying to reuse the session on server2
-void testTicketSessionResumption(const std::string& server_ctx_json1,
+void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                                  const std::vector<std::string>& server_names1,
-                                 const std::string& server_ctx_json2,
+                                 const std::string& server_ctx_yaml2,
                                  const std::vector<std::string>& server_names2,
-                                 const std::string& client_ctx_json, bool expect_reuse,
+                                 const std::string& client_ctx_yaml, bool expect_reuse,
                                  const Network::Address::IpVersion ip_version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   ContextManagerImpl manager(runtime);
 
-  Json::ObjectSharedPtr server_ctx_loader1 = TestEnvironment::jsonLoadFromString(server_ctx_json1);
-  Json::ObjectSharedPtr server_ctx_loader2 = TestEnvironment::jsonLoadFromString(server_ctx_json2);
+  envoy::api::v2::auth::DownstreamTlsContext server_tls_context1;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml1), server_tls_context1);
   auto server_cfg1 =
-      std::make_unique<ServerContextConfigImpl>(*server_ctx_loader1, factory_context);
+      std::make_unique<ServerContextConfigImpl>(server_tls_context1, factory_context);
+
+  envoy::api::v2::auth::DownstreamTlsContext server_tls_context2;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml2), server_tls_context2);
   auto server_cfg2 =
-      std::make_unique<ServerContextConfigImpl>(*server_ctx_loader2, factory_context);
+      std::make_unique<ServerContextConfigImpl>(server_tls_context2, factory_context);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory1(std::move(server_cfg1), manager,
                                                          stats_store, server_names1);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory2(std::move(server_cfg2), manager,
@@ -1789,8 +1926,9 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
   Network::ListenerPtr listener1 = dispatcher.createListener(socket1, callbacks, true, false);
   Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, true, false);
 
-  Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, factory_context);
+  envoy::api::v2::auth::UpstreamTlsContext client_tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(client_tls_context, factory_context);
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket1.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -1875,232 +2013,261 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
 } // namespace
 
 TEST_P(SslSocketTest, TicketSessionResumption) {
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "session_ticket_key_paths": ["{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"]
-  }
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
   )EOF";
 
-  std::string client_ctx_json = R"EOF(
-  {
-  }
-  )EOF";
-
-  testTicketSessionResumption(server_ctx_json, {}, server_ctx_json, {}, client_ctx_json, true,
+  testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
                               GetParam());
 }
 
 TEST_P(SslSocketTest, TicketSessionResumptionWithClientCA) {
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "session_ticket_key_paths": ["{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"],
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+)EOF";
 
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
-  }
-  )EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+)EOF";
 
-  testTicketSessionResumption(server_ctx_json, {}, server_ctx_json, {}, client_ctx_json, true,
+  testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
                               GetParam());
 }
 
 TEST_P(SslSocketTest, TicketSessionResumptionRotateKey) {
-  std::string server_ctx_json1 = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
-    ]
-  }
+  const std::string server_ctx_yaml1 = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+)EOF";
+
+  const std::string server_ctx_yaml2 = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_b"
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
   )EOF";
 
-  std::string server_ctx_json2 = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_b",
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
-    ]
-  }
-  )EOF";
-
-  std::string client_ctx_json = R"EOF(
-  {
-  }
-  )EOF";
-
-  testTicketSessionResumption(server_ctx_json1, {}, server_ctx_json2, {}, client_ctx_json, true,
+  testTicketSessionResumption(server_ctx_yaml1, {}, server_ctx_yaml2, {}, client_ctx_yaml, true,
                               GetParam());
 }
 
 TEST_P(SslSocketTest, TicketSessionResumptionWrongKey) {
-  std::string server_ctx_json1 = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
-    ]
-  }
+  const std::string server_ctx_yaml1 = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+)EOF";
+
+  const std::string server_ctx_yaml2 = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_b"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
   )EOF";
 
-  std::string server_ctx_json2 = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_b"
-    ]
-  }
-  )EOF";
-
-  std::string client_ctx_json = R"EOF(
-  {
-  }
-  )EOF";
-
-  testTicketSessionResumption(server_ctx_json1, {}, server_ctx_json2, {}, client_ctx_json, false,
+  testTicketSessionResumption(server_ctx_yaml1, {}, server_ctx_yaml2, {}, client_ctx_yaml, false,
                               GetParam());
 }
 
 // Sessions cannot be resumed even though the server certificates are the same,
 // because of the different SNI requirements.
 TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerNames) {
-  std::string server_ctx_json1 = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
-    ]
-  }
-  )EOF";
+  const std::string server_ctx_yaml1 = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+)EOF";
+
+  const std::string server_ctx_yaml2 = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+)EOF";
 
   std::vector<std::string> server_names1 = {"server1.example.com"};
 
-  std::string server_ctx_json2 = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
-    ]
-  }
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
   )EOF";
 
-  std::string client_ctx_json = R"EOF(
-  {
-  }
-  )EOF";
-
-  testTicketSessionResumption(server_ctx_json1, server_names1, server_ctx_json2, {},
-                              client_ctx_json, false, GetParam());
+  testTicketSessionResumption(server_ctx_yaml1, server_names1, server_ctx_yaml2, {},
+                              client_ctx_yaml, false, GetParam());
 }
 
 // Sessions can be resumed because the server certificates are different but the CN/SANs and
 // issuer are identical
 TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCert) {
-  std::string server_ctx_json1 = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
-    ]
-  }
+  const std::string server_ctx_yaml1 = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+)EOF";
+
+  const std::string server_ctx_yaml2 = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert2.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key2.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
   )EOF";
 
-  std::string server_ctx_json2 = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert2.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key2.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
-    ]
-  }
-  )EOF";
-
-  std::string client_ctx_json = R"EOF(
-  {
-  }
-  )EOF";
-
-  testTicketSessionResumption(server_ctx_json1, {}, server_ctx_json2, {}, client_ctx_json, true,
+  testTicketSessionResumption(server_ctx_yaml1, {}, server_ctx_yaml2, {}, client_ctx_yaml, true,
                               GetParam());
 }
 
 // Sessions cannot be resumed because the server certificates are different, CN/SANs are identical,
 // but the issuer is different.
 TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertIntermediateCA) {
-  std::string server_ctx_json1 = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
-    ]
-  }
+  const std::string server_ctx_yaml1 = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+)EOF";
+
+  const std::string server_ctx_yaml2 = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
   )EOF";
 
-  std::string server_ctx_json2 = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
-    ]
-  }
-  )EOF";
-
-  std::string client_ctx_json = R"EOF(
-  {
-  }
-  )EOF";
-
-  testTicketSessionResumption(server_ctx_json1, {}, server_ctx_json2, {}, client_ctx_json, false,
+  testTicketSessionResumption(server_ctx_yaml1, {}, server_ctx_yaml2, {}, client_ctx_yaml, false,
                               GetParam());
 }
 
 // Sessions cannot be resumed because the server certificates are different and the SANs
 // are not identical
 TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertDifferentSAN) {
-  std::string server_ctx_json1 = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
-    ]
-  }
+  const std::string server_ctx_yaml1 = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+)EOF";
+
+  const std::string server_ctx_yaml2 = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
   )EOF";
 
-  std::string server_ctx_json2 = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
-    ]
-  }
-  )EOF";
-
-  std::string client_ctx_json = R"EOF(
-  {
-  }
-  )EOF";
-
-  testTicketSessionResumption(server_ctx_json1, {}, server_ctx_json2, {}, client_ctx_json, false,
+  testTicketSessionResumption(server_ctx_yaml1, {}, server_ctx_yaml2, {}, client_ctx_yaml, false,
                               GetParam());
 }
 
@@ -2110,31 +2277,41 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "session_ticket_key_paths": ["{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"],
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "require_client_certificate": true
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+  require_client_certificate: true
+)EOF";
 
-  std::string server2_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "session_ticket_key_paths": ["{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"],
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/fake_ca_cert.pem",
-    "require_client_certificate": true
-  }
-  )EOF";
+  const std::string server2_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/fake_ca_cert.pem"
+  require_client_certificate: true
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+)EOF";
 
-  Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, factory_context_);
-  Json::ObjectSharedPtr server2_ctx_loader = TestEnvironment::jsonLoadFromString(server2_ctx_json);
-  auto server2_cfg =
-      std::make_unique<ServerContextConfigImpl>(*server2_ctx_loader, factory_context_);
+  envoy::api::v2::auth::DownstreamTlsContext tls_context1;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context1);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context1, factory_context_);
+  envoy::api::v2::auth::DownstreamTlsContext tls_context2;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(server2_ctx_yaml), tls_context2);
+  auto server2_cfg = std::make_unique<ServerContextConfigImpl>(tls_context2, factory_context_);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
@@ -2149,16 +2326,19 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true, false);
   Network::ListenerPtr listener2 = dispatcher_->createListener(socket2, callbacks, true, false);
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+)EOF";
 
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
-  }
-  )EOF";
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
 
-  Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, factory_context_);
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -2235,17 +2415,22 @@ TEST_P(SslSocketTest, SslError) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_certificate_hash": "7B:0C:3F:0D:97:0E:FC:16:70:11:7A:0C:35:75:54:6B:17:AB:CF:20:D8:AA:A0:ED:87:08:0F:FB:60:4C:40:77"
-  }
-  )EOF";
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/fake_ca_cert.pem"
+      verify_certificate_hash: "7B:0C:3F:0D:97:0E:FC:16:70:11:7A:0C:35:75:54:6B:17:AB:CF:20:D8:AA:A0:ED:87:08:0F:FB:60:4C:40:77"
+)EOF";
 
-  Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, factory_context_);
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
@@ -2535,33 +2720,45 @@ TEST_P(SslSocketTest, EcdhCurves) {
 }
 
 TEST_P(SslSocketTest, RevokedCertificate) {
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl"
-  }
-  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl"
+)EOF";
 
   // This should fail, since the certificate has been revoked.
-  std::string revoked_client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
-  }
-  )EOF";
-  testUtil(revoked_client_ctx_json, server_ctx_json, "", "", "", "db6c9a4af16d9091", "", "", "",
+  const std::string revoked_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+)EOF";
+
+  testUtil(revoked_client_ctx_yaml, server_ctx_yaml, "", "", "", "db6c9a4af16d9091", "", "", "",
            "ssl.fail_verify_error", false, GetParam());
 
   // This should succeed, since the cert isn't revoked.
-  std::string successful_client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert2.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key2.pem"
-  }
-  )EOF";
-  testUtil(successful_client_ctx_json, server_ctx_json, "", "", "", "db6c9a4af16d9091", "", "", "",
+  const std::string successful_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert2.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key2.pem"
+)EOF";
+
+  testUtil(successful_client_ctx_yaml, server_ctx_yaml, "", "", "", "db6c9a4af16d9091", "", "", "",
            "ssl.handshake", true, GetParam());
 }
 
@@ -2665,18 +2862,19 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
 class SslReadBufferLimitTest : public SslSocketTest {
 public:
   void initialize() {
-    server_ctx_loader_ = TestEnvironment::jsonLoadFromString(server_ctx_json_);
+    MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml_),
+                              downstream_tls_context_);
     auto server_cfg =
-        std::make_unique<ServerContextConfigImpl>(*server_ctx_loader_, factory_context_);
+        std::make_unique<ServerContextConfigImpl>(downstream_tls_context_, factory_context_);
     manager_.reset(new ContextManagerImpl(runtime_));
     server_ssl_socket_factory_.reset(new ServerSslSocketFactory(
         std::move(server_cfg), *manager_, stats_store_, std::vector<std::string>{}));
 
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
-    client_ctx_loader_ = TestEnvironment::jsonLoadFromString(client_ctx_json_);
+    MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml_), upstream_tls_context_);
     auto client_cfg =
-        std::make_unique<ClientContextConfigImpl>(*client_ctx_loader_, factory_context_);
+        std::make_unique<ClientContextConfigImpl>(upstream_tls_context_, factory_context_);
 
     client_ssl_socket_factory_.reset(
         new ClientSslSocketFactory(std::move(client_cfg), *manager_, stats_store_));
@@ -2828,25 +3026,33 @@ public:
                                    true};
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
-  std::string server_ctx_json_ = R"EOF(
-    {
-      "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-      "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-      "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
-    }
-    )EOF";
-  std::string client_ctx_json_ = R"EOF(
-    {
-      "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-      "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
-    }
-  )EOF";
+  const std::string server_ctx_yaml_ = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+)EOF";
+
+  const std::string client_ctx_yaml_ = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+)EOF";
+
   Runtime::MockLoader runtime_;
-  Json::ObjectSharedPtr server_ctx_loader_;
+  envoy::api::v2::auth::DownstreamTlsContext downstream_tls_context_;
   std::unique_ptr<ContextManagerImpl> manager_;
   Network::TransportSocketFactoryPtr server_ssl_socket_factory_;
   Network::ListenerPtr listener_;
-  Json::ObjectSharedPtr client_ctx_loader_;
+  envoy::api::v2::auth::UpstreamTlsContext upstream_tls_context_;
   ClientContextSharedPtr client_ctx_;
   Network::TransportSocketFactoryPtr client_ssl_socket_factory_;
   Network::ClientConnectionPtr client_connection_;

@@ -280,6 +280,15 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimit
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
 
+TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
+  config_helper_.addFilter(R"EOF(
+  name: random-pause-filter
+  config: {}
+  )EOF");
+
+  manySimultaneousRequests(1024 * 20, 1024 * 20);
+}
+
 TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   TestRandomGenerator rand;

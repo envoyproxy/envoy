@@ -6,7 +6,6 @@ Administration interface
 Envoy exposes a local administration interface that can be used to query and
 modify different aspects of the server:
 
-* :ref:`v1 API reference <config_admin_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.bootstrap.v2.Admin>`
 
 .. _operations_admin_interface_security:
@@ -43,10 +42,12 @@ modify different aspects of the server:
 
   Print a textual table of all available options.
 
+.. _operations_admin_interface_certs:
+
 .. http:get:: /certs
 
-  List out all loaded TLS certificates, including file name, serial number, and days until
-  expiration.
+  List out all loaded TLS certificates, including file name, serial number, subject alternate names and days until
+  expiration in JSON format conforming to the :ref:`certificate proto definition <envoy_api_msg_admin.v2alpha.Certificates>`.
 
 .. _operations_admin_interface_clusters:
 

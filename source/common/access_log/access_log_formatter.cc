@@ -42,7 +42,7 @@ AccessLogFormatUtils::durationToString(const absl::optional<std::chrono::nanosec
 }
 
 std::string AccessLogFormatUtils::durationToString(const std::chrono::nanoseconds& time) {
-  return fmt::FormatInt(std::chrono::duration_cast<std::chrono::milliseconds>(time).count()).str();
+  return fmt::format_int(std::chrono::duration_cast<std::chrono::milliseconds>(time).count()).str();
 }
 
 const std::string&
@@ -237,7 +237,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "BYTES_RECEIVED") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return fmt::FormatInt(stream_info.bytesReceived()).str();
+      return fmt::format_int(stream_info.bytesReceived()).str();
     };
   } else if (field_name == "PROTOCOL") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
@@ -245,12 +245,12 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "RESPONSE_CODE") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return stream_info.responseCode() ? fmt::FormatInt(stream_info.responseCode().value()).str()
+      return stream_info.responseCode() ? fmt::format_int(stream_info.responseCode().value()).str()
                                         : "0";
     };
   } else if (field_name == "BYTES_SENT") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return fmt::FormatInt(stream_info.bytesSent()).str();
+      return fmt::format_int(stream_info.bytesSent()).str();
     };
   } else if (field_name == "DURATION") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
