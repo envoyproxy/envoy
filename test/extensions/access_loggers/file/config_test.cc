@@ -141,8 +141,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithNestedKeyTest) {
     string_value.set_string_value("some_nested_value");
 
     ProtobufWkt::Value struct_value;
-    (*struct_value.mutable_struct_value()->mutable_fields())["some_nested_key"] =
-        string_value;
+    (*struct_value.mutable_struct_value()->mutable_fields())["some_nested_key"] = string_value;
 
     auto json_format = fal_config.mutable_json_format();
     (*json_format->mutable_fields())["top_level_key"] = struct_value;

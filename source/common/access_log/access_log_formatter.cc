@@ -82,8 +82,7 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
                                       const Http::HeaderMap& response_headers,
                                       const Http::HeaderMap& response_trailers,
                                       const StreamInfo::StreamInfo& stream_info) const {
-  const auto output_map =
-      toMap(request_headers, response_headers, response_trailers, stream_info);
+  const auto output_map = toMap(request_headers, response_headers, response_trailers, stream_info);
 
   ProtobufWkt::Struct output_struct;
   for (const auto& pair : output_map) {
