@@ -124,7 +124,7 @@ message Bootstrap {
   Runtime runtime = 11;
 
   // Configuration for the local administration HTTP server.
-  Admin admin = 12 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  Admin admin = 12;
 
   // Optional overload manager configuration.
   envoy.config.overload.v2alpha.OverloadManager overload_manager = 15;
