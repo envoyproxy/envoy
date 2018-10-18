@@ -8,6 +8,8 @@ A logged warning is expected for each deprecated item that is in deprecation win
 
 ## Version 1.9.0 (pending)
 
+* Use of the boolean field `bugfix_reverse_encode_order` in [http_connection_manager.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto) is deprecated. This is a bug fix to resolve issue [#4599](https://github.com/envoyproxy/envoy/issues/4599) for envoy where it is designed to have the encode filters in reversed order to the configuration.
+
 ## Version 1.8.0 (Oct 4, 2018)
 
 * Use of the v1 API (including `*.deprecated_v1` fields in the v2 API) is deprecated.

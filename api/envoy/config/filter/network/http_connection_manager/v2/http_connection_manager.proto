@@ -351,7 +351,9 @@ message HttpConnectionManager {
 
   // If true, the order of encoder filters will be reversed to that of filters
   // configured in the HTTP filter chain.
-  bool reverse_encode_order = 27;
+  // Note: this is a bug fix for envoy, which is designed to have the reversed
+  // order of encode filters to that of decode ones.
+  bool bugfix_reverse_encode_order = 27 [deprecated = true];
 }
 
 message Rds {
