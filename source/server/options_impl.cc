@@ -34,7 +34,7 @@
 namespace Envoy {
 OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                          const HotRestartVersionCb& hot_restart_version_cb,
-                         spdlog::level::level_enum default_log_level) {
+                         spdlog::level::level_enum default_log_level) : v2_config_only_(true) {
   std::string log_levels_string = "Log levels: ";
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
     log_levels_string += fmt::format("[{}]", spdlog::level::level_names[i]);

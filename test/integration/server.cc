@@ -32,6 +32,7 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
   test_options.setConcurrency(1u);
   test_options.setConfigPath(config_path);
   test_options.setConfigYaml(config_yaml);
+  test_options.setV2ConfigOnly(false);
   test_options.setLocalAddressIpVersion(ip_version);
   test_options.setLogFormat(Logger::Logger::DEFAULT_LOG_FORMAT);
   test_options.setRestartEpoch(0u);
