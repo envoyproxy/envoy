@@ -6,7 +6,7 @@ REPOSITORY_LOCATIONS = dict(
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        commit = "ab36a84b91b3116bacc85973995504818748d8a9",  # chromium-69.0.3497.81
+        commit = "060e9a583976e73d1ea8b2bfe8b9cab33c62fa17",  # chromium-70.0.3538.67
         remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
