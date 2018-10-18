@@ -5,6 +5,7 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -36,11 +37,8 @@ TEST(SniCluster, ConfigTest) {
 TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
 
-  StreamInfo::FilterStateImpl per_connection_state;
-  ON_CALL(filter_callbacks.connection_, perConnectionState())
-      .WillByDefault(ReturnRef(per_connection_state));
-  ON_CALL(Const(filter_callbacks.connection_), perConnectionState())
-      .WillByDefault(ReturnRef(per_connection_state));
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(filter_callbacks.connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   SniClusterFilter filter;
   filter.initializeReadFilterCallbacks(filter_callbacks);
@@ -51,7 +49,7 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
         .WillByDefault(Return(EMPTY_STRING));
     filter.onNewConnection();
 
-    EXPECT_FALSE(per_connection_state.hasData<TcpProxy::PerConnectionCluster>(
+    EXPECT_FALSE(stream_info.perRequestState().hasData<TcpProxy::PerConnectionCluster>(
         TcpProxy::PerConnectionCluster::Key));
   }
 
@@ -61,11 +59,12 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
         .WillByDefault(Return("filter_state_cluster"));
     filter.onNewConnection();
 
-    EXPECT_TRUE(per_connection_state.hasData<TcpProxy::PerConnectionCluster>(
+    EXPECT_TRUE(stream_info.perRequestState().hasData<TcpProxy::PerConnectionCluster>(
         TcpProxy::PerConnectionCluster::Key));
 
-    auto per_connection_cluster = per_connection_state.getData<TcpProxy::PerConnectionCluster>(
-        TcpProxy::PerConnectionCluster::Key);
+    auto per_connection_cluster =
+        stream_info.perRequestState().getData<TcpProxy::PerConnectionCluster>(
+            TcpProxy::PerConnectionCluster::Key);
     EXPECT_EQ(per_connection_cluster.value(), "filter_state_cluster");
   }
 }

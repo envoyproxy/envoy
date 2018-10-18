@@ -9,7 +9,9 @@
 #include "envoy/common/time.h"
 #include "envoy/http/protocol.h"
 #include "envoy/stream_info/filter_state.h"
-#include "envoy/upstream/upstream.h"
+#include "envoy/upstream/host_description.h"
+
+#include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 
