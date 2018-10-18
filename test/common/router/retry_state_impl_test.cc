@@ -431,6 +431,7 @@ TEST_F(RouterRetryStateImplTest, MaxRetriesHeader) {
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->callback_();
 
+  EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_open_.value());
   EXPECT_EQ(RetryStatus::No, state_->shouldRetry(nullptr, connect_failure_, callback_));
 
   EXPECT_EQ(3UL, cluster_.stats().upstream_rq_retry_.value());
@@ -468,6 +469,7 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
 
   EXPECT_EQ(3UL, cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_success_.value());
+  EXPECT_EQ(0UL, cluster_.stats().upstream_rq_retry_open_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, HostSelectionAttempts) {

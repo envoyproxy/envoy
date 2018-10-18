@@ -40,6 +40,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_connect_timeout, Counter, Total connection connect timeouts
   upstream_cx_idle_timeout, Counter, Total connection idle timeouts
   upstream_cx_connect_attempts_exceeded, Counter, Total consecutive connection failures exceeding configured connection attempts
+  upstream_cx_open, Gauge, Whether the connection circuit breaker is open
   upstream_cx_overflow, Counter, Total times that the cluster's connection circuit breaker overflowed
   upstream_cx_connect_ms, Histogram, Connection establishment milliseconds
   upstream_cx_length_ms, Histogram, Connection length milliseconds
@@ -60,17 +61,20 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_total, Counter, Total requests
   upstream_rq_active, Gauge, Total active requests
   upstream_rq_pending_total, Counter, Total requests pending a connection pool connection
+  upstream_rq_pending_open, Gauge, Whether the pending requests circuit breaker is open
   upstream_rq_pending_overflow, Counter, Total requests that overflowed connection pool circuit breaking and were failed
   upstream_rq_pending_failure_eject, Counter, Total requests that were failed due to a connection pool connection failure
   upstream_rq_pending_active, Gauge, Total active requests pending a connection pool connection
   upstream_rq_cancelled, Counter, Total requests cancelled before obtaining a connection pool connection
   upstream_rq_maintenance_mode, Counter, Total requests that resulted in an immediate 503 due to :ref:`maintenance mode<config_http_filters_router_runtime_maintenance_mode>`
   upstream_rq_timeout, Counter, Total requests that timed out waiting for a response
+  upstream_rq_open, Gauge, Whether the requests circuit breaker is open
   upstream_rq_per_try_timeout, Counter, Total requests that hit the per try timeout
   upstream_rq_rx_reset, Counter, Total requests that were reset remotely
   upstream_rq_tx_reset, Counter, Total requests that were reset locally
   upstream_rq_retry, Counter, Total request retries
   upstream_rq_retry_success, Counter, Total request retry successes
+  upstream_rq_retry_open, Gauge, Whether the retry circuit breaker is open
   upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking
   upstream_flow_control_paused_reading_total, Counter, Total number of times flow control paused reading from upstream
   upstream_flow_control_resumed_reading_total, Counter, Total number of times flow control resumed reading from upstream

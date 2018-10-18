@@ -348,6 +348,7 @@ public:
   COUNTER  (upstream_cx_connect_timeout)                                                           \
   COUNTER  (upstream_cx_idle_timeout)                                                              \
   COUNTER  (upstream_cx_connect_attempts_exceeded)                                                 \
+  GAUGE    (upstream_cx_open)                                                                      \
   COUNTER  (upstream_cx_overflow)                                                                  \
   HISTOGRAM(upstream_cx_connect_ms)                                                                \
   HISTOGRAM(upstream_cx_length_ms)                                                                 \
@@ -369,17 +370,20 @@ public:
   GAUGE    (upstream_rq_active)                                                                    \
   COUNTER  (upstream_rq_completed)                                                                 \
   COUNTER  (upstream_rq_pending_total)                                                             \
+  GAUGE    (upstream_rq_pending_open)                                                              \
   COUNTER  (upstream_rq_pending_overflow)                                                          \
   COUNTER  (upstream_rq_pending_failure_eject)                                                     \
   GAUGE    (upstream_rq_pending_active)                                                            \
   COUNTER  (upstream_rq_cancelled)                                                                 \
   COUNTER  (upstream_rq_maintenance_mode)                                                          \
   COUNTER  (upstream_rq_timeout)                                                                   \
+  GAUGE    (upstream_rq_open)                                                                      \
   COUNTER  (upstream_rq_per_try_timeout)                                                           \
   COUNTER  (upstream_rq_rx_reset)                                                                  \
   COUNTER  (upstream_rq_tx_reset)                                                                  \
   COUNTER  (upstream_rq_retry)                                                                     \
   COUNTER  (upstream_rq_retry_success)                                                             \
+  GAUGE    (upstream_rq_retry_open)                                                                \
   COUNTER  (upstream_rq_retry_overflow)                                                            \
   COUNTER  (upstream_flow_control_paused_reading_total)                                            \
   COUNTER  (upstream_flow_control_resumed_reading_total)                                           \
@@ -407,6 +411,14 @@ public:
 // clang-format off
 #define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER)                                                     \
   COUNTER (upstream_rq_dropped)
+// clang-format on
+
+/**
+ * Report the circuit breaker state via a guage, 0 for closed, 1 for open.
+ */
+// clang-format off
+#define SET_CIRCUIT_BREAKER_STATE(guage, resource)                                                 \
+  guage.set(resource.canCreate() ? 0 : 1);
 // clang-format on
 
 /**
