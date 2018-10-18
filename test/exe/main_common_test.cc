@@ -308,7 +308,13 @@ TEST_P(AdminRequestTest, AdminRequestAfterRun) {
 // destructing MainCommon.
 TEST_P(MainCommonTest, ConstructDestructLogger) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
-  Logger::Registry::getSink()->log({});
+
+  const std::string logger_name = "logger";
+  spdlog::details::log_msg log_msg;
+  log_msg.logger_name = &logger_name;
+  log_msg.level = spdlog::level::level_enum::err;
+
+  Logger::Registry::getSink()->log(log_msg);
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminRequestTest,
