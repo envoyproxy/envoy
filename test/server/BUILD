@@ -197,6 +197,7 @@ envoy_cc_test(
         ":empty_bootstrap.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",
+        ":node_bootstrap_without_access_log.yaml",
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",
     ],

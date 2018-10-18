@@ -357,7 +357,6 @@ is out of scope for this documentation. If *x-request-id* is propagated across a
 following features are available:
 
 * Stable :ref:`access logging <config_access_log>` via the
-  :ref:`v1 API runtime filter<config_http_con_manager_access_log_filters_runtime_v1>` or the
   :ref:`v2 API runtime filter<envoy_api_field_config.filter.accesslog.v2.AccessLogFilter.runtime_filter>`.
 * Stable tracing when performing random sampling via the :ref:`tracing.random_sampling
   <config_http_conn_man_runtime_random_sampling>` runtime setting or via forced tracing using the
@@ -435,9 +434,8 @@ Custom request/response headers
 -------------------------------
 
 Custom request/response headers can be added to a request/response at the weighted cluster,
-route, virtual host, and/or global route configuration level. See the relevant :ref:`v1
-<config_http_conn_man_route_table>` and :ref:`v2 <envoy_api_msg_RouteConfiguration>` API
-documentation.
+route, virtual host, and/or global route configuration level. See the
+:ref:`v2 <envoy_api_msg_RouteConfiguration>` API documentation.
 
 No *:*-prefixed pseudo-header may be modified via this mechanism. The *:path*
 and *:authority* headers may instead be modified via mechanisms such as

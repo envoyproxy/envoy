@@ -12,6 +12,9 @@ namespace ThriftFilters {
  */
 class ThriftFilterNameValues {
 public:
+  // Ratelimit filter
+  const std::string RATE_LIMIT = "envoy.filters.thrift.rate_limit";
+
   // Router filter
   const std::string ROUTER = "envoy.filters.thrift.router";
 };

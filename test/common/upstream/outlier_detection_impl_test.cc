@@ -523,6 +523,21 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   EXPECT_EQ(-1, detector->successRateEjectionThreshold());
 }
 
+// Validate that empty hosts doesn't crash success rate handling when success_rate_minimum_hosts is
+// zero. This is a regression test for earlier divide-by-zero behavior.
+TEST_F(OutlierDetectorImplTest, EmptySuccessRate) {
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
+  loadRq(hosts_, 200, 503);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.success_rate_minimum_hosts", 5))
+      .WillByDefault(Return(0));
+  interval_timer_->callback_();
+}
+
 TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
