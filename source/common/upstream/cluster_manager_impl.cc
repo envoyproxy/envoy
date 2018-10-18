@@ -719,8 +719,7 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
     if (entry->second->cluster_info_->forwardOriginalServerNameIndication() && context &&
         context->downstreamConnection() &&
         !context->downstreamConnection()->requestedServerName().empty()) {
-      overrideServerName.value() =
-          std::string(context->downstreamConnection()->requestedServerName());
+      overrideServerName = std::string(context->downstreamConnection()->requestedServerName());
     }
     auto conn_info = logical_host->createConnection(cluster_manager.thread_local_dispatcher_,
                                                     nullptr, overrideServerName);
@@ -1172,7 +1171,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     if (!requestedServerName.empty() && cluster_info_->forwardOriginalServerNameIndication()) {
       std::hash<std::string> hash_function;
       hash_key.push_back(hash_function(requestedServerName));
-      overrideServerName.value() = requestedServerName;
+      overrideServerName = requestedServerName;
     }
   }
 
