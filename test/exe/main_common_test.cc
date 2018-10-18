@@ -9,6 +9,7 @@
 #include "server/options_impl.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -304,28 +305,34 @@ TEST_P(AdminRequestTest, AdminRequestAfterRun) {
   EXPECT_EQ(1, lambda_destroy_count);
 }
 
-class MonitoredTimeSystem : public Event::RealTimeSystem {
- public:
+class MonitoredTimeSystem : public Event::SimulatedTimeSystem {
+public:
   Event::SchedulerPtr createScheduler(Event::Libevent::BasePtr& libevent) override {
     scheduler_created_ = true;
-    return RealTimeSystem::createScheduler(libevent);
+    return SimulatedTimeSystem::createScheduler(libevent);
   }
 
   bool scheduler_created_{false};
 };
 
 class MonitoredTestHooks : public TestHooks {
- public:
-  void onWorkerListenerAdded() { ++listeners_added_; on_changed_.Notify(); }
-  void onWorkerListenerRemoved() { ++listeners_removed_; on_changed_.Notify(); }
-  
+public:
+  void onWorkerListenerAdded() {
+    ++listeners_added_;
+    on_changed_.Notify();
+  }
+  void onWorkerListenerRemoved() {
+    ++listeners_removed_;
+    on_changed_.Notify();
+  }
+
   absl::Notification on_changed_;
   int listeners_added_{};
   int listeners_removed_{};
 };
 
 class MonitoredComponentFactory : public ProdComponentFactory {
- public:
+public:
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
     ++drain_manager_creations_;
     return ProdComponentFactory::createDrainManager(server);
@@ -341,7 +348,7 @@ class MonitoredComponentFactory : public ProdComponentFactory {
 };
 
 class MonitoredRandomGenerator : public Runtime::RandomGeneratorImpl {
- public:
+public:
   uint64_t random() override {
     ++random_called_;
     return RandomGeneratorImpl::random();
@@ -355,11 +362,10 @@ class MonitoredRandomGenerator : public Runtime::RandomGeneratorImpl {
 };
 
 class MainCommonBaseTest : public MainCommonTest {
- protected:
+protected:
   MainCommonBaseTest()
       : test_random_generator_(absl::make_unique<MonitoredRandomGenerator>()),
-        test_random_generator_ptr_(test_random_generator_.get()),
-        envoy_return_(false) {
+        test_random_generator_ptr_(test_random_generator_.get()), envoy_return_(false) {
     options_ = absl::make_unique<OptionsImpl>(
         argc(), argv(), [](uint64_t, uint64_t, bool) -> std::string { return "1"; },
         spdlog::level::info);
@@ -388,9 +394,9 @@ class MainCommonBaseTest : public MainCommonTest {
       // is race-free, as MainCommonBase::run() does not return until
       // triggered with an adminRequest POST to /quitquitquit, which
       // is done in the testing thread.
-      main_common_base_ = std::make_unique<MainCommonBase>(
-          *options_, &test_time_system_, &test_hooks_, &test_component_factory_,
-          std::move(test_random_generator_));
+      main_common_base_ = std::make_unique<MainCommonBase>(*options_, &test_time_system_,
+                                                           &test_hooks_, &test_component_factory_,
+                                                           std::move(test_random_generator_));
       bool status = main_common_base_->run();
       main_common_base_.reset();
       envoy_return_ = status;
@@ -413,8 +419,8 @@ class MainCommonBaseTest : public MainCommonTest {
   MonitoredTestHooks test_hooks_;
   MonitoredComponentFactory test_component_factory_;
   std::unique_ptr<MonitoredRandomGenerator> test_random_generator_;
-  MonitoredRandomGenerator* test_random_generator_ptr_{}; 
-  
+  MonitoredRandomGenerator* test_random_generator_ptr_{};
+
   absl::Notification finished_;
   bool envoy_return_;
 };

@@ -29,10 +29,9 @@ public:
 class MainCommonBase {
 public:
   MainCommonBase(OptionsImpl& options);
-  // For testing.  Passed arguments will be used if not null.  Reasonable
+  // For testing. Passed arguments will be used if not null. Reasonable
   // (production) defaults will be created if they are null.
-  MainCommonBase(OptionsImpl& options, Event::TimeSystem* time_system,
-                 TestHooks* test_hooks,
+  MainCommonBase(OptionsImpl& options, Event::TimeSystem* time_system, TestHooks* test_hooks,
                  Server::ComponentFactory* component_factory,
                  std::unique_ptr<Runtime::RandomGenerator>&& random_generator);
   ~MainCommonBase();

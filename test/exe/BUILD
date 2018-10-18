@@ -30,6 +30,7 @@ envoy_cc_test(
     deps = [
         "//source/exe:envoy_main_common_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 

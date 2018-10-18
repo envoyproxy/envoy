@@ -44,10 +44,8 @@ MainCommonBase::MainCommonBase(OptionsImpl& options)
     : MainCommonBase(options, nullptr, nullptr, nullptr,
                      std::unique_ptr<Runtime::RandomGenerator>()) {}
 
-MainCommonBase::MainCommonBase(OptionsImpl& options,
-                               Event::TimeSystem* time_system,
-                               TestHooks* test_hooks,
-                               Server::ComponentFactory* component_factory,
+MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem* time_system,
+                               TestHooks* test_hooks, Server::ComponentFactory* component_factory,
                                std::unique_ptr<Runtime::RandomGenerator>&& random_generator)
     : options_(options) {
   ares_library_init(ARES_LIB_INIT_ALL);
