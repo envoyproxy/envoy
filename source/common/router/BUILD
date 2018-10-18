@@ -45,6 +45,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/http/tunnel:tunnel_handler_lib",
         "//source/common/http/websocket:ws_handler_lib",
         "//source/common/protobuf:utility_lib",
     ],

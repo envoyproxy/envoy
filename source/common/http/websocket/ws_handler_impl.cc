@@ -43,8 +43,7 @@ TcpProxy::ConfigSharedPtr Config(const envoy::api::v2::route::RouteAction& route
 }
 
 WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-                             const Router::RouteEntry& route_entry,
-                             WebSocketProxyCallbacks& callbacks,
+                             const Router::RouteEntry& route_entry, HeadersOnlyCallback& callbacks,
                              Upstream::ClusterManager& cluster_manager,
                              Network::ReadFilterCallbacks* read_callbacks,
                              TcpProxy::ConfigSharedPtr config, Event::TimeSystem& time_system)

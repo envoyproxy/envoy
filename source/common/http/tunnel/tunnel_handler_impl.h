@@ -4,7 +4,6 @@
 
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
-#include "envoy/http/websocket.h"
 #include "envoy/network/filter.h"
 #include "envoy/router/router.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -14,10 +13,10 @@
 
 namespace Envoy {
 namespace Http {
-namespace WebSocket {
+namespace Tunnel {
 
 /**
- * @return TcpProxy::ConfigSharedPtr to use in creating instances of WsHandlerImpl.
+ * @return TcpProxy::ConfigSharedPtr to use in creating instances of TunnelHandlerImpl.
  */
 TcpProxy::ConfigSharedPtr Config(const envoy::api::v2::route::RouteAction& route_config,
                                  Server::Configuration::FactoryContext& factory_context);
@@ -30,13 +29,13 @@ TcpProxy::ConfigSharedPtr Config(const envoy::api::v2::route::RouteAction& route
  * All data will be proxied back and forth between the two connections, without any
  * knowledge of the underlying WebSocket protocol.
  */
-class WsHandlerImpl : public TcpProxy::Filter, public Http::WebSocketProxy {
+class TunnelHandlerImpl : public TcpProxy::Filter, public Http::TunnelProxy {
 public:
-  WsHandlerImpl(HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-                const Router::RouteEntry& route_entry, HeadersOnlyCallback& callbacks,
-                Upstream::ClusterManager& cluster_manager,
-                Network::ReadFilterCallbacks* read_callbacks, TcpProxy::ConfigSharedPtr config,
-                Event::TimeSystem& time_system);
+  TunnelHandlerImpl(HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
+                    const Router::RouteEntry& route_entry, HeadersOnlyCallback& callbacks,
+                    Upstream::ClusterManager& cluster_manager,
+                    Network::ReadFilterCallbacks* read_callbacks, TcpProxy::ConfigSharedPtr config,
+                    Event::TimeSystem& time_system);
 
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
@@ -64,15 +63,15 @@ private:
   HeaderMap& request_headers_;
   StreamInfo::StreamInfo& stream_info_;
   const Router::RouteEntry& route_entry_;
-  HeadersOnlyCallback& ws_callbacks_;
+  HeadersOnlyCallback& tunnel_callbacks_;
   NullHttpConnectionCallbacks http_conn_callbacks_;
   Buffer::OwnedImpl queued_data_;
   bool queued_end_stream_{false};
   ConnectState state_{ConnectState::PreConnect};
 };
 
-typedef std::unique_ptr<WsHandlerImpl> WsHandlerImplPtr;
+typedef std::unique_ptr<TunnelHandlerImpl> TunnelHandlerImplPtr;
 
-} // namespace WebSocket
+} // namespace Tunnel
 } // namespace Http
 } // namespace Envoy

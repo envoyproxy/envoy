@@ -102,6 +102,11 @@ uint64_t getResponseStatus(const HeaderMap& headers);
 bool isUpgrade(const HeaderMap& headers);
 
 /**
+ * @return true if this is a simple CONNECT request, false otherwise.
+ */
+bool isConnectRequest(const HeaderMap& headers);
+
+/**
  * @return true if this is a CONNECT request with a :protocol header present, false otherwise.
  */
 bool isH2UpgradeRequest(const HeaderMap& headers);

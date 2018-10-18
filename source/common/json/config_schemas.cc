@@ -678,6 +678,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       "host_rewrite" : {"type" : "string"},
       "auto_host_rewrite" : {"type" : "boolean"},
       "use_websocket" : {"type" : "boolean"},
+      "allow_tunnel" : {"type" : "boolean"},
       "case_sensitive" : {"type" : "boolean"},
       "timeout_ms" : {"type" : "integer"},
       "runtime" : {

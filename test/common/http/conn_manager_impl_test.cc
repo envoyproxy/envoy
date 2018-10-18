@@ -211,7 +211,7 @@ public:
     ON_CALL(route_entry, createWebSocketProxy(_, _, _, _, _))
         .WillByDefault(Invoke([this, &route_entry](Http::HeaderMap& request_headers,
                                                    StreamInfo::StreamInfo& stream_info,
-                                                   Http::WebSocketProxyCallbacks& callbacks,
+                                                   Http::HeadersOnlyCallback& callbacks,
                                                    Upstream::ClusterManager& cluster_manager,
                                                    Network::ReadFilterCallbacks* read_callbacks) {
           auto config(std::make_shared<TcpProxy::Config>(

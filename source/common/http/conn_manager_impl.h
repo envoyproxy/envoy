@@ -32,6 +32,7 @@
 #include "common/http/user_agent.h"
 #include "common/http/utility.h"
 #include "common/stream_info/stream_info_impl.h"
+#include "common/tcp_proxy/tcp_proxy.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -264,7 +265,7 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
-                        public WebSocketProxyCallbacks,
+                        public HeadersOnlyCallback,
                         public Tracing::Config {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
@@ -317,9 +318,9 @@ private:
     }
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
-    // Http::WebSocketProxyCallbacks
-    void sendHeadersOnlyResponse(HeaderMap& headers) override {
-      encodeHeaders(nullptr, headers, true);
+    // Http::HeadersOnlyCallback
+    void sendHeadersOnlyResponse(HeaderMap& headers, bool end_of_stream) override {
+      encodeHeaders(nullptr, headers, end_of_stream);
     }
 
     // Tracing::TracingConfig
@@ -387,6 +388,7 @@ private:
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
+    TcpProxy::Filter* tunnel_{};
     HeaderMapPtr continue_headers_;
     HeaderMapPtr response_headers_;
     Buffer::WatermarkBufferPtr buffered_response_data_;
@@ -460,6 +462,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cluster_manager_;
   WebSocketProxyPtr ws_connection_;
+  TunnelProxyPtr tunnel_connection_{nullptr};
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
   // References into the overload manager thread local state map. Using these lets us avoid a map

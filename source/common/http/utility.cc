@@ -204,10 +204,13 @@ bool Utility::isUpgrade(const HeaderMap& headers) {
                                            Http::Headers::get().ConnectionValues.Upgrade.c_str()));
 }
 
-bool Utility::isH2UpgradeRequest(const HeaderMap& headers) {
+bool Utility::isConnectRequest(const HeaderMap& headers) {
   return headers.Method() &&
-         headers.Method()->value().c_str() == Http::Headers::get().MethodValues.Connect &&
-         headers.Protocol() && !headers.Protocol()->value().empty();
+         headers.Method()->value().c_str() == Http::Headers::get().MethodValues.Connect;
+}
+
+bool Utility::isH2UpgradeRequest(const HeaderMap& headers) {
+  return isConnectRequest(headers) && headers.Protocol() && !headers.Protocol()->value().empty();
 }
 
 bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {

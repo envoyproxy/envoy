@@ -116,6 +116,7 @@ envoy_cc_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/http:tunnel_interface",
         "//include/envoy/http:websocket_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:connection_interface",
@@ -142,6 +143,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/runtime:uuid_util_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/common/tcp_proxy",
         "//source/common/tracing:http_tracer_lib",
     ],
 )

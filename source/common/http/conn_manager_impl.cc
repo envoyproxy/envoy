@@ -192,6 +192,15 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     }
   }
 
+  if (stream.tunnel_ != nullptr) {
+    const void* tcp_tunnel = reinterpret_cast<void*>(stream.tunnel_);
+    if (ws_connection_.get() == tcp_tunnel) {
+      ws_connection_.reset(nullptr);
+    } else if (tunnel_connection_.get() == tcp_tunnel) {
+      tunnel_connection_.reset(nullptr);
+    }
+  }
+
   read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
 }
 
@@ -219,6 +228,10 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
   // will still be processed as a normal HTTP/1.1 request, where Envoy will
   // detect the WebSocket upgrade and establish a connection to the
   // upstream.
+  if (tunnel_connection_) {
+    return tunnel_connection_->onData(data, end_stream);
+  }
+
   if (isOldStyleWebSocketConnection()) {
     return ws_connection_->onData(data, end_stream);
   }
@@ -269,7 +282,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       }
 
       if (!streams_.empty() && streams_.front()->state_.remote_complete_ &&
-          !isOldStyleWebSocketConnection()) {
+          !isOldStyleWebSocketConnection() && tunnel_connection_ == nullptr) {
         read_callbacks_->connection().readDisable(true);
       }
     }
@@ -440,7 +453,7 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
     // TODO(htuch): We could send trailers here with an x-envoy timeout header
     // or gRPC status code, and/or set H2 RST_STREAM error.
     connection_manager_.doEndStream(*this);
-  } else {
+  } else if (tunnel_ == nullptr) {
     sendLocalReply(request_headers_ != nullptr &&
                        Grpc::Common::hasGrpcContentType(*request_headers_),
                    Http::Code::RequestTimeout, "stream timeout", nullptr, is_head_request_);
@@ -591,7 +604,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // when the allow_absolute_url flag is enabled on the HCM.
   // https://tools.ietf.org/html/rfc7230#section-5.3 We also need to check for the existence of
   // :path because CONNECT does not have a path, and we don't support that currently.
-  if (!request_headers_->Path() || request_headers_->Path()->value().c_str()[0] != '/') {
+  if (!request_headers_->Path() || (!Utility::isConnectRequest(*request_headers_) &&
+                                    request_headers_->Path()->value().c_str()[0] != '/')) {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
                    is_head_request_);
@@ -623,6 +637,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     const bool old_style_websocket =
         (route_entry != nullptr) && route_entry->useOldStyleWebSocket();
     const bool websocket_requested = Utility::isWebSocketUpgradeRequest(*request_headers_);
+    const bool is_tunnel_allowed = route_entry != nullptr && route_entry->isTunnelAllowed();
+    const bool is_connect = is_tunnel_allowed && Utility::isConnectRequest(*request_headers_);
 
     if (websocket_requested && old_style_websocket) {
       ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
@@ -631,9 +647,23 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
           *request_headers_, stream_info_, *this, connection_manager_.cluster_manager_,
           connection_manager_.read_callbacks_);
       ASSERT(connection_manager_.ws_connection_ != nullptr);
+
+      tunnel_ = dynamic_cast<TcpProxy::Filter*>(connection_manager_.ws_connection_.get());
+      ASSERT(tunnel_ != nullptr);
+
       connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
       connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
       connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
+      return;
+    } else if (is_connect) {
+      ENVOY_STREAM_LOG(error, "found CONNECT tunnel request. (end_stream={}):", *this, end_stream);
+
+      connection_manager_.tunnel_connection_ = route_entry->createTunnelHandler(
+          *request_headers_, stream_info_, *this, connection_manager_.cluster_manager_,
+          connection_manager_.read_callbacks_);
+      tunnel_ = dynamic_cast<TcpProxy::Filter*>(connection_manager_.tunnel_connection_.get());
+      ASSERT(connection_manager_.tunnel_connection_ != nullptr);
+      ASSERT(tunnel_ != nullptr);
       return;
     } else if (upgrade_rejected) {
       // Do not allow WebSocket upgrades if the route does not support it.
@@ -778,7 +808,12 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
 
   // If the initial websocket upgrade request had an HTTP body
   // let's send this up
-  if (connection_manager_.isOldStyleWebSocketConnection()) {
+  if (connection_manager_.tunnel_connection_ != nullptr) {
+    if (data.length() > 0) {
+      connection_manager_.tunnel_connection_->onData(data, false);
+    }
+    return;
+  } else if (connection_manager_.isOldStyleWebSocketConnection()) {
     if (data.length() > 0) {
       connection_manager_.ws_connection_->onData(data, false);
     }

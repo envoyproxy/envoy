@@ -220,12 +220,20 @@ private:
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
     bool useOldStyleWebSocket() const override { return false; }
+    bool isTunnelAllowed() const override { return false; }
     Http::WebSocketProxyPtr createWebSocketProxy(Http::HeaderMap&, StreamInfo::StreamInfo&,
-                                                 Http::WebSocketProxyCallbacks&,
+                                                 Http::HeadersOnlyCallback&,
                                                  Upstream::ClusterManager&,
                                                  Network::ReadFilterCallbacks*) const override {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
+
+    Http::TunnelProxyPtr createTunnelHandler(Http::HeaderMap&, StreamInfo::StreamInfo&,
+                                             Http::HeadersOnlyCallback&, Upstream::ClusterManager&,
+                                             Network::ReadFilterCallbacks*) const override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
+
     bool includeVirtualHostRateLimits() const override { return true; }
     const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
     const Router::PathMatchCriterion& pathMatchCriterion() const override {

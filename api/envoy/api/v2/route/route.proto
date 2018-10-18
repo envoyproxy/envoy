@@ -768,6 +768,19 @@ message RouteAction {
   // This can be used to prevent unexpected upstream request timeouts due to potentially long
   // time gaps between gRPC request and response in gRPC streaming mode.
   google.protobuf.Duration max_grpc_timeout = 23 [(gogoproto.stdduration) = true];
+
+  enum ConnectTunnelAction {
+    // CONNECT tunnel requests are denied - default
+    DENY = 0;
+    // CONNECT tunnel requests are allowed and the upstream is the origin server. TCP Connect and
+    // return 200 OK
+    ORIGIN_CONNECT = 1;
+    // Forward the CONNECT request to the upstream for handling
+    FORWARD = 2;
+  }
+  // Indicates that a HTTP/1.1 client connection to this particular route is allowed to
+  // downgrade to L4 Tunnel. The default is false.
+  ConnectTunnelAction tunnel_action = 25 [(validate.rules).enum.defined_only = true];
 }
 
 message RedirectAction {

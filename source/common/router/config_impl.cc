@@ -26,6 +26,7 @@
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/http/headers.h"
+#include "common/http/tunnel/tunnel_handler_impl.h"
 #include "common/http/utility.h"
 #include "common/http/websocket/ws_handler_impl.h"
 #include "common/protobuf/protobuf.h"
@@ -289,6 +290,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                    ? Http::WebSocket::Config(route.route(), factory_context)
                    : nullptr;
       }()),
+      tunnel_config_([&]() -> TcpProxy::ConfigSharedPtr {
+        return (route.route().tunnel_action() == envoy::api::v2::route::RouteAction::ORIGIN_CONNECT)
+                   ? Http::Tunnel::Config(route.route(), factory_context)
+                   : nullptr;
+      }()),
       cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
@@ -421,11 +427,20 @@ const std::string& RouteEntryImplBase::clusterName() const { return cluster_name
 
 Http::WebSocketProxyPtr RouteEntryImplBase::createWebSocketProxy(
     Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-    Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
+    Http::HeadersOnlyCallback& callbacks, Upstream::ClusterManager& cluster_manager,
     Network::ReadFilterCallbacks* read_callbacks) const {
   return std::make_unique<Http::WebSocket::WsHandlerImpl>(
       request_headers, stream_info, *this, callbacks, cluster_manager, read_callbacks,
       websocket_config_, time_system_);
+}
+
+Http::TunnelProxyPtr RouteEntryImplBase::createTunnelHandler(
+    Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
+    Http::HeadersOnlyCallback& callbacks, Upstream::ClusterManager& cluster_manager,
+    Network::ReadFilterCallbacks* read_callbacks) const {
+  return std::make_unique<Http::Tunnel::TunnelHandlerImpl>(
+      request_headers, stream_info, *this, callbacks, cluster_manager, read_callbacks,
+      tunnel_config_, time_system_);
 }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,

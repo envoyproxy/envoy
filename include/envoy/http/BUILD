@@ -58,8 +58,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "tunnel_interface",
+    hdrs = ["tunnel.h"],
+    deps = [
+        ":header_map_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "websocket_interface",
     hdrs = ["websocket.h"],
+    deps = [
+        ":header_map_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "headers_only_callback_interface",
+    hdrs = ["headers_only_callback.h"],
     deps = [
         ":header_map_interface",
     ],

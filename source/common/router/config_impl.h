@@ -339,11 +339,17 @@ public:
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
   bool useOldStyleWebSocket() const override { return websocket_config_ != nullptr; }
+  bool isTunnelAllowed() const override { return tunnel_config_ != nullptr; }
   Http::WebSocketProxyPtr
   createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-                       Http::WebSocketProxyCallbacks& callbacks,
+                       Http::HeadersOnlyCallback& callbacks,
                        Upstream::ClusterManager& cluster_manager,
                        Network::ReadFilterCallbacks* read_callbacks) const override;
+  Http::TunnelProxyPtr
+  createTunnelHandler(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
+                      Http::HeadersOnlyCallback& callbacks,
+                      Upstream::ClusterManager& cluster_manager,
+                      Network::ReadFilterCallbacks* read_callbacks) const override;
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
@@ -443,14 +449,24 @@ private:
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
     bool useOldStyleWebSocket() const override { return parent_->useOldStyleWebSocket(); }
+    bool isTunnelAllowed() const override { return parent_->isTunnelAllowed(); }
     Http::WebSocketProxyPtr
     createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-                         Http::WebSocketProxyCallbacks& callbacks,
+                         Http::HeadersOnlyCallback& callbacks,
                          Upstream::ClusterManager& cluster_manager,
                          Network::ReadFilterCallbacks* read_callbacks) const override {
       return parent_->createWebSocketProxy(request_headers, stream_info, callbacks, cluster_manager,
                                            read_callbacks);
     }
+    Http::TunnelProxyPtr
+    createTunnelHandler(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
+                        Http::HeadersOnlyCallback& callbacks,
+                        Upstream::ClusterManager& cluster_manager,
+                        Network::ReadFilterCallbacks* read_callbacks) const override {
+      return parent_->createTunnelHandler(request_headers, stream_info, callbacks, cluster_manager,
+                                          read_callbacks);
+    }
+
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
     }
@@ -540,6 +556,7 @@ private:
                                  // to virtual host is currently safe.
   const bool auto_host_rewrite_;
   const TcpProxy::ConfigSharedPtr websocket_config_;
+  const TcpProxy::ConfigSharedPtr tunnel_config_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
   const Http::Code cluster_not_found_response_code_;

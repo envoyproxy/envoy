@@ -13,6 +13,8 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/headers_only_callback.h"
+#include "envoy/http/tunnel.h"
 #include "envoy/http/websocket.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
@@ -573,6 +575,11 @@ public:
   virtual bool useOldStyleWebSocket() const PURE;
 
   /**
+   * @return bool true if this route can be a plain tcp tunnel
+   */
+  virtual bool isTunnelAllowed() const PURE;
+
+  /**
    * Create an instance of a WebSocketProxy, using the configuration in this route.
    *
    * This may only be called if useWebSocket() returns true on this RouteEntry.
@@ -582,9 +589,23 @@ public:
    */
   virtual Http::WebSocketProxyPtr
   createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-                       Http::WebSocketProxyCallbacks& callbacks,
+                       Http::HeadersOnlyCallback& callbacks,
                        Upstream::ClusterManager& cluster_manager,
                        Network::ReadFilterCallbacks* read_callbacks) const PURE;
+
+  /**
+   * Create an instance of a TunnelProxy, using the configuration in this route.
+   *
+   * This shall be called when the request uses the 'CONNECT' verb
+   *
+   * @return TunnelHandler An instance of a ConnectHandler with the configuration specified
+   *         in this route.
+   */
+  virtual Http::TunnelProxyPtr
+  createTunnelHandler(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
+                      Http::HeadersOnlyCallback& callbacks,
+                      Upstream::ClusterManager& cluster_manager,
+                      Network::ReadFilterCallbacks* read_callbacks) const PURE;
 
   /**
    * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
