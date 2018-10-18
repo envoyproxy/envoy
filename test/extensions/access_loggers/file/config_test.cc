@@ -107,7 +107,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
                             "Didn't find a registered implementation for name: 'INVALID'");
 }
 
-TEST(FileAccessLogConfigTest, FileAccessLogJsonConversionTest) {
+TEST(FileAccessLogConfigTest, FileAccessLogJsonWithBoolValueTest) {
   {
     // Make sure we fail if you set a bool value in the format dictionary
     envoy::config::filter::accesslog::v2::AccessLog config;
@@ -127,7 +127,9 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonConversionTest) {
                               EnvoyException,
                               "Only string values are supported in the JSON access log format.");
   }
+}
 
+TEST(FileAccessLogConfigTest, FileAccessLogJsonWithNestedKeyTest) {
   {
     // Make sure we fail if you set a nested Struct value in the format dictionary
     envoy::config::filter::accesslog::v2::AccessLog config;
