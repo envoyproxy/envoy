@@ -91,8 +91,10 @@ void ConnectionImpl::StreamImpl::encode100ContinueHeaders(const HeaderMap& heade
 void ConnectionImpl::StreamImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   std::vector<nghttp2_nv> final_headers;
 
+  // This must exist outside of the scope of isUpgrade as the underlying memory is
+  // needed until submitHeaders has been called.
+  Http::HeaderMapPtr modified_headers;
   if (Http::Utility::isUpgrade(headers)) {
-    Http::HeaderMapPtr modified_headers;
     modified_headers = std::make_unique<Http::HeaderMapImpl>(headers);
     transformUpgradeFromH1toH2(*modified_headers);
     buildHeaders(final_headers, *modified_headers);
