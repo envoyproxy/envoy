@@ -31,7 +31,6 @@ The semantics of listener updates are as follows:
 Configuration
 -------------
 
-* :ref:`v1 LDS API <config_listeners_lds_v1>`
 * :ref:`v2 LDS API <v2_grpc_streaming_endpoints>`
 
 Statistics

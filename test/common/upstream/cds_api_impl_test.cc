@@ -85,7 +85,7 @@ public:
                       {":authority", "foo_cluster"},
                       {"content-type", "application/json"},
                       {"content-length",
-                       request->body() ? fmt::FormatInt(request->body()->length()).str() : "0"}}),
+                       request->body() ? fmt::format_int(request->body()->length()).str() : "0"}}),
                   request->headers());
               callbacks_ = &callbacks;
               return &request_;

@@ -17,7 +17,7 @@ namespace Extensions {
 namespace Retry {
 namespace Priority {
 
-class RetryPriorityTest : public ::testing::Test, Upstream::RetryPriorityFactoryCallbacks {
+class RetryPriorityTest : public ::testing::Test {
 public:
   void initialize() {
     auto factory = Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(
@@ -25,12 +25,11 @@ public:
 
     envoy::config::retry::other_priority::OtherPriorityConfig config;
     config.set_update_frequency(update_frequency_);
-    factory->createRetryPriority(*this, config, 3);
-  }
-
-  // Upstream::RetryPriorityFactoryCallbacks
-  void addRetryPriority(Upstream::RetryPrioritySharedPtr retry_priority) override {
-    retry_priority_ = retry_priority;
+    // Use createEmptyConfigProto to exercise that code path. This ensures the proto returned
+    // by that method is compatible with the downcast in createRetryPriority.
+    auto empty = factory->createEmptyConfigProto();
+    empty->MergeFrom(config);
+    retry_priority_ = factory->createRetryPriority(*empty, 3);
   }
 
   void addHosts(size_t priority, int count, int healthy_count) {

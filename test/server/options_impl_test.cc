@@ -57,17 +57,6 @@ TEST_F(OptionsImplTest, InvalidCommandLine) {
                           "Couldn't find match for argument");
 }
 
-TEST_F(OptionsImplTest, v1Allowed) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl(
-      "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
-      "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
-      "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 --log-format [%v] "
-      "--parent-shutdown-time-s 90 --log-path /foo/bar --allow-deprecated-v1-api "
-      "--disable-hot-restart");
-  EXPECT_EQ(Server::Mode::Validate, options->mode());
-  EXPECT_FALSE(options->v2ConfigOnly());
-}
-
 TEST_F(OptionsImplTest, v1Disallowed) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
@@ -111,7 +100,6 @@ TEST_F(OptionsImplTest, All) {
 
 TEST_F(OptionsImplTest, SetAll) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
-  bool v2_config_only = options->v2ConfigOnly();
   bool hot_restart_disabled = options->hotRestartDisabled();
   Stats::StatsOptionsImpl stats_options;
   stats_options.max_obj_name_length_ = 54321;
@@ -121,7 +109,6 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setConcurrency(42);
   options->setConfigPath("foo");
   options->setConfigYaml("bogus:");
-  options->setV2ConfigOnly(!options->v2ConfigOnly());
   options->setAdminAddressPath("path");
   options->setLocalAddressIpVersion(Network::Address::IpVersion::v6);
   options->setDrainTime(std::chrono::seconds(42));
@@ -143,7 +130,6 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(42U, options->concurrency());
   EXPECT_EQ("foo", options->configPath());
   EXPECT_EQ("bogus:", options->configYaml());
-  EXPECT_EQ(!v2_config_only, options->v2ConfigOnly());
   EXPECT_EQ("path", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v6, options->localAddressIpVersion());
   EXPECT_EQ(std::chrono::seconds(42), options->drainTime());

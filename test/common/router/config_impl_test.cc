@@ -32,6 +32,7 @@
 using testing::_;
 using testing::ContainerEq;
 using testing::ElementsAreArray;
+using testing::Matcher;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
@@ -1009,7 +1010,7 @@ virtual_hosts:
 // Validate that we can't remove :-prefixed request headers.
 TEST(RouteMatcherTest, TestRequestHeadersToRemoveNoPseudoHeader) {
   for (const std::string& header : {":path", ":authority", ":method", ":scheme", ":status",
-                                    ":protocol", ":no-chunks", ":status"}) {
+                                    ":protocol", ":no-chunks", ":status", "host"}) {
     const std::string yaml = fmt::format(R"EOF(
 name: foo
 virtual_hosts:
@@ -1026,7 +1027,7 @@ virtual_hosts:
     envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
 
     EXPECT_THROW_WITH_MESSAGE(TestConfigImpl config(route_config, factory_context, true),
-                              EnvoyException, ":-prefixed headers may not be removed");
+                              EnvoyException, ":-prefixed or host headers may not be removed");
   }
 }
 
@@ -1994,15 +1995,16 @@ TEST(RouteMatcherTest, Runtime) {
   Runtime::MockSnapshot snapshot;
 
   ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
-  EXPECT_CALL(snapshot, getInteger("some_key", 50))
-      .Times(testing::AtLeast(1))
-      .WillRepeatedly(Return(42));
 
   TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
+  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 41)).WillRepeatedly(Return(true));
+  ;
   EXPECT_EQ("something_else",
             config.route(genHeaders("www.lyft.com", "/", "GET"), 41)->routeEntry()->clusterName());
 
+  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 43)).WillRepeatedly(Return(false));
+  ;
   EXPECT_EQ("www2",
             config.route(genHeaders("www.lyft.com", "/", "GET"), 43)->routeEntry()->clusterName());
 }
@@ -2032,66 +2034,21 @@ virtual_hosts:
   Runtime::MockSnapshot snapshot;
   ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
 
-  const std::string runtime_fraction = R"EOF(
-    numerator: 42
-    denominator: HUNDRED
-  )EOF";
-  EXPECT_CALL(snapshot, get("bogus_key"))
-      .Times(testing::AtLeast(1))
-      .WillRepeatedly(ReturnRef(runtime_fraction));
-
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
 
+  EXPECT_CALL(snapshot,
+              featureEnabled("bogus_key", Matcher<const envoy::type::FractionalPercent&>(_), 41))
+      .WillRepeatedly(Return(true));
   EXPECT_EQ(
       "something_else",
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 41)->routeEntry()->clusterName());
 
+  EXPECT_CALL(snapshot,
+              featureEnabled("bogus_key", Matcher<const envoy::type::FractionalPercent&>(_), 43))
+      .WillRepeatedly(Return(false));
   EXPECT_EQ(
       "www2",
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 43)->routeEntry()->clusterName());
-}
-
-TEST(RouteMatcherTest, FractionalRuntimeDefault) {
-  std::string yaml = R"EOF(
-virtual_hosts:
-  - name: "www2"
-    domains: ["www.lyft.com"]
-    routes:
-      - match:
-          prefix: "/"
-          runtime_fraction:
-            default_value:
-              numerator: 50
-              denominator: MILLION
-            runtime_key: "bogus_key"
-        route:
-          cluster: "something_else"
-      - match:
-          prefix: "/"
-        route:
-          cluster: "www2"
-  )EOF";
-
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Runtime::MockSnapshot snapshot;
-  ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
-
-  const std::string runtime_fraction = R"EOF(
-    this string is nonsense and should fail parsing
-  )EOF";
-  EXPECT_CALL(snapshot, get("bogus_key"))
-      .Times(testing::AtLeast(1))
-      .WillRepeatedly(ReturnRef(runtime_fraction));
-
-  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
-
-  EXPECT_EQ(
-      "something_else",
-      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 49)->routeEntry()->clusterName());
-
-  EXPECT_EQ(
-      "www2",
-      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 51)->routeEntry()->clusterName());
 }
 
 TEST(RouteMatcherTest, ShadowClusterNotFound) {
@@ -2197,6 +2154,26 @@ TEST(RouteMatcherTest, ClusterNotFoundNotCheckingViaConfig) {
   EXPECT_CALL(factory_context.cluster_manager_, get("www2")).WillRepeatedly(Return(nullptr));
 
   TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true);
+}
+
+TEST(RouteMatcherTest, AttemptCountHeader) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    include_request_attempt_count: true
+    routes:
+      - match: { prefix: "/"}
+        route:
+          cluster: "whatever"
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+
+  EXPECT_TRUE(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->includeAttemptCount());
 }
 
 TEST(RouteMatchTest, ClusterNotFoundResponseCode) {
@@ -4756,6 +4733,69 @@ virtual_hosts:
   Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
   EXPECT_EQ(7 * 1000, route_entry->idleTimeout().value().count());
+}
+
+TEST(RouteConfigurationV2, RetriableStatusCodes) {
+  const std::string ExplicitIdleTimeot = R"EOF(
+name: RetriableStatusCodes
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          retry_policy:
+            retriable_status_codes: [100, 200]
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(ExplicitIdleTimeot), factory_context,
+                        true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
+  const std::vector<uint32_t> expected_codes{100, 200};
+  EXPECT_EQ(expected_codes, retry_policy.retriableStatusCodes());
+}
+
+// Verifies that we're creating a new instance of the retry plugins on each call instead of always
+// returning the same one.
+TEST(RouteConfigurationV2, RetryPluginsAreNotReused) {
+  const std::string ExplicitIdleTimeot = R"EOF(
+name: RetriableStatusCodes
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          retry_policy:
+            retry_host_predicate:
+            - name: envoy.test_host_predicate
+            retry_priority:
+              name: envoy.test_retry_priority
+  )EOF";
+
+  Upstream::MockRetryPriority priority({});
+  Upstream::MockRetryPriorityFactory priority_factory(priority);
+  Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_priority_factory(priority_factory);
+
+  Upstream::TestRetryHostPredicateFactory host_predicate_factory;
+  Registry::InjectFactory<Upstream::RetryHostPredicateFactory> inject_predicate_factory(
+      host_predicate_factory);
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(ExplicitIdleTimeot), factory_context,
+                        true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
+  const auto priority1 = retry_policy.retryPriority();
+  const auto priority2 = retry_policy.retryPriority();
+  EXPECT_NE(priority1, priority2);
+  const auto predicates1 = retry_policy.retryHostPredicates();
+  const auto predicates2 = retry_policy.retryHostPredicates();
+  EXPECT_NE(predicates1, predicates2);
 }
 
 class PerFilterConfigsTest : public testing::Test {

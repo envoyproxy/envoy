@@ -46,34 +46,62 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
     return;
   }
 
-  per_try_timeout_ = std::chrono::milliseconds(
-      PROTOBUF_GET_MS_OR_DEFAULT(config.retry_policy(), per_try_timeout, 0));
-  num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_policy(), num_retries, 1);
-  retry_on_ = RetryStateImpl::parseRetryOn(config.retry_policy().retry_on());
-  retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
+  const auto& retry_policy = config.retry_policy();
+  per_try_timeout_ =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
+  num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
+  retry_on_ = RetryStateImpl::parseRetryOn(retry_policy.retry_on());
+  retry_on_ |= RetryStateImpl::parseRetryGrpcOn(retry_policy.retry_on());
 
-  for (const auto& host_predicate : config.retry_policy().retry_host_predicate()) {
+  for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
     auto& factory =
         ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
             host_predicate.name());
-
     auto config = ::Envoy::Config::Utility::translateToFactoryConfig(host_predicate, factory);
-    factory.createHostPredicate(*this, *config, num_retries_);
+    retry_host_predicate_configs_.emplace_back(host_predicate.name(), std::move(config));
   }
 
-  const auto retry_priority = config.retry_policy().retry_priority();
+  const auto retry_priority = retry_policy.retry_priority();
   if (!retry_priority.name().empty()) {
     auto& factory = ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
         retry_priority.name());
-
-    auto config = ::Envoy::Config::Utility::translateToFactoryConfig(retry_priority, factory);
-    factory.createRetryPriority(*this, *config, num_retries_);
+    retry_priority_config_ =
+        std::make_pair(retry_priority.name(),
+                       ::Envoy::Config::Utility::translateToFactoryConfig(retry_priority, factory));
   }
 
-  auto host_selection_attempts = config.retry_policy().host_selection_retry_max_attempts();
+  auto host_selection_attempts = retry_policy.host_selection_retry_max_attempts();
   if (host_selection_attempts) {
     host_selection_attempts_ = host_selection_attempts;
   }
+
+  for (auto code : retry_policy.retriable_status_codes()) {
+    retriable_status_codes_.emplace_back(code);
+  }
+}
+
+std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPredicates() const {
+  std::vector<Upstream::RetryHostPredicateSharedPtr> predicates;
+
+  for (const auto& config : retry_host_predicate_configs_) {
+    auto& factory =
+        ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
+            config.first);
+    predicates.emplace_back(factory.createHostPredicate(*config.second, num_retries_));
+  }
+
+  return predicates;
+}
+
+Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
+  if (retry_priority_config_.first.empty()) {
+    return nullptr;
+  }
+
+  auto& factory = ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
+      retry_priority_config_.first);
+
+  return factory.createRetryPriority(*retry_priority_config_.second, num_retries_);
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) {
@@ -351,15 +379,28 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 }
 
+bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
+  if (!runtime_) {
+    return true;
+  }
+
+  if (runtime_->legacy_runtime_data_) {
+    // Use the deprecated 'runtime' field from the route.
+    return loader_.snapshot().featureEnabled(runtime_->runtime_key_, runtime_->runtime_default_,
+                                             random_value);
+  }
+
+  return loader_.snapshot().featureEnabled(runtime_->fractional_runtime_key_,
+                                           runtime_->fractional_runtime_default_, random_value);
+}
+
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
   bool matches = true;
 
-  if (runtime_) {
-    matches &= random_value % runtime_->denominator_val_ < runtime_->numerator_val_;
-    if (!matches) {
-      // No need to waste further cycles calculating a route match.
-      return false;
-    }
+  matches &= evaluateRuntimeMatch(random_value);
+  if (!matches) {
+    // No need to waste further cycles calculating a route match.
+    return false;
   }
 
   if (match_grpc_) {
@@ -424,28 +465,13 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
   RuntimeData runtime_data;
 
   if (route_match.runtime_specifier_case() == envoy::api::v2::route::RouteMatch::kRuntimeFraction) {
-    envoy::type::FractionalPercent fractional_percent;
-    const std::string& fraction_yaml =
-        loader_.snapshot().get(route_match.runtime_fraction().runtime_key());
-
-    try {
-      MessageUtil::loadFromYamlAndValidate(fraction_yaml, fractional_percent);
-    } catch (const EnvoyException& ex) {
-      ENVOY_LOG(error, "failed to parse string value for runtime key {}: {}",
-                route_match.runtime_fraction().runtime_key(), ex.what());
-      fractional_percent = route_match.runtime_fraction().default_value();
-    }
-
-    runtime_data.numerator_val_ = fractional_percent.numerator();
-    runtime_data.denominator_val_ =
-        ProtobufPercentHelper::fractionalPercentDenominatorToInt(fractional_percent.denominator());
+    runtime_data.fractional_runtime_default_ = route_match.runtime_fraction().default_value();
+    runtime_data.fractional_runtime_key_ = route_match.runtime_fraction().runtime_key();
+    runtime_data.legacy_runtime_data_ = false;
   } else if (route_match.runtime_specifier_case() == envoy::api::v2::route::RouteMatch::kRuntime) {
-    // For backwards compatibility, the deprecated 'runtime' field must be converted to a
-    // RuntimeData format with a variable denominator type. The 'runtime' field assumes a percentage
-    // (0-100), so the hard-coded denominator value reflects this.
-    runtime_data.denominator_val_ = 100;
-    runtime_data.numerator_val_ = loader_.snapshot().getInteger(
-        route_match.runtime().runtime_key(), route_match.runtime().default_value());
+    runtime_data.runtime_default_ = route_match.runtime().default_value();
+    runtime_data.runtime_key_ = route_match.runtime().runtime_key();
+    runtime_data.legacy_runtime_data_ = true;
   } else {
     return runtime;
   }
@@ -737,7 +763,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
                                                       virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
-      per_filter_configs_(virtual_host.per_filter_config(), factory_context) {
+      per_filter_configs_(virtual_host.per_filter_config(), factory_context),
+      include_attempt_count_(virtual_host.include_request_attempt_count()) {
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::route::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::NONE;

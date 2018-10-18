@@ -231,6 +231,7 @@ void InstanceImpl::initialize(Options& options,
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
+  stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
 
   server_stats_.reset(
       new ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});
@@ -258,11 +259,14 @@ void InstanceImpl::initialize(Options& options,
   info.original_start_time_ = original_start_time_;
   restarter_.shutdownParentAdmin(info);
   original_start_time_ = info.original_start_time_;
-  admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
-                             initial_config.admin().profilePath(), *this));
+  admin_.reset(new AdminImpl(initial_config.admin().profilePath(), *this));
   if (initial_config.admin().address()) {
+    if (initial_config.admin().accessLogPath().empty()) {
+      throw EnvoyException("An admin access log path is required for a listening server.");
+    }
     ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
-    admin_->startHttpListener(options.adminAddressPath(), initial_config.admin().address(),
+    admin_->startHttpListener(initial_config.admin().accessLogPath(), options.adminAddressPath(),
+                              initial_config.admin().address(),
                               stats_store_.createScope("listener.admin."));
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
@@ -275,6 +279,10 @@ void InstanceImpl::initialize(Options& options,
 
   loadServerFlags(initial_config.flagsPath());
 
+  // Initialize the overload manager early so other modules can register for actions.
+  overload_manager_.reset(
+      new OverloadManagerImpl(dispatcher(), stats(), threadLocal(), bootstrap_.overload_manager()));
+
   // Workers get created first so they register for thread local updates.
   listener_manager_.reset(
       new ListenerManagerImpl(*this, listener_component_factory_, worker_factory_, time_system_));
@@ -282,10 +290,6 @@ void InstanceImpl::initialize(Options& options,
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
   thread_local_.registerThread(*dispatcher_, true);
-
-  // Initialize the overload manager early so other modules can register for actions.
-  overload_manager_.reset(
-      new OverloadManagerImpl(dispatcher(), stats(), threadLocal(), bootstrap_.overload_manager()));
 
   // We can now initialize stats for threading.
   stats_store_.initializeThreading(*dispatcher_, thread_local_);
@@ -472,6 +476,10 @@ void InstanceImpl::terminate() {
 
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
+
+  if (overload_manager_) {
+    overload_manager_->stop();
+  }
 
   // Shutdown all the workers now that the main dispatch loop is done.
   if (listener_manager_.get() != nullptr) {
