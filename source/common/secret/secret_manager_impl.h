@@ -24,6 +24,9 @@ public:
   CertificateValidationContextConfigProviderSharedPtr
   findStaticCertificateValidationContextProvider(const std::string& name) const override;
 
+  TrustedCaConfigProviderSharedPtr
+  findStaticTrustedCaConfigProvider(const std::string& name) const override;
+
   TlsCertificateConfigProviderSharedPtr createInlineTlsCertificateProvider(
       const envoy::api::v2::auth::TlsCertificate& tls_certificate) override;
 
@@ -40,6 +43,9 @@ public:
   findOrCreateCertificateValidationContextProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+
+  TrustedCaConfigProviderSharedPtr
+  createInlineTrustedCaProvider(const envoy::api::v2::core::DataSource& trusted_ca) override;
 
 private:
   template <class SecretType>
@@ -86,6 +92,9 @@ private:
   // Manages pairs of secret name and CertificateValidationContextConfigProviderSharedPtr.
   std::unordered_map<std::string, CertificateValidationContextConfigProviderSharedPtr>
       static_certificate_validation_context_providers_;
+
+  // Manages pairs of secret name and TrustedCaConfigProviderSharedPtr.
+  std::unordered_map<std::string, TrustedCaConfigProviderSharedPtr> static_trusted_ca_providers_;      
 
   // map hash code of SDS config source and SdsApi object.
   DynamicSecretProviders<TlsCertificateSdsApi> certificate_providers_;

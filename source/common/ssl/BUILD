@@ -106,6 +106,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "trusted_ca_config_impl_lib",
+    srcs = ["trusted_ca_config_impl.cc"],
+    hdrs = ["trusted_ca_config_impl.h"],
+    deps = [
+        "//include/envoy/ssl:trusted_ca_config_interface",
+        "//source/common/common:empty_string",
+        "//source/common/config:datasource_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],

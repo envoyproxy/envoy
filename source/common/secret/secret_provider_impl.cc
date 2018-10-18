@@ -3,6 +3,7 @@
 #include "common/common/assert.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
 #include "common/ssl/tls_certificate_config_impl.h"
+#include "common/ssl/trusted_ca_config_impl.h"
 
 namespace Envoy {
 namespace Secret {
@@ -15,6 +16,10 @@ CertificateValidationContextConfigProviderImpl::CertificateValidationContextConf
     const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context)
     : certificate_validation_context_(std::make_unique<Ssl::CertificateValidationContextConfigImpl>(
           certificate_validation_context)) {}
+
+TrustedCaConfigProviderImpl::TrustedCaConfigProviderImpl(
+    const envoy::api::v2::core::DataSource& trusted_ca)
+    : trusted_ca_(std::make_unique<Ssl::TrustedCaConfigImpl>(trusted_ca)) {}
 
 } // namespace Secret
 } // namespace Envoy

@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/ssl/trusted_ca_config.h"
 
 namespace Envoy {
 namespace Secret {
@@ -39,6 +40,9 @@ typedef SecretProvider<Ssl::CertificateValidationContextConfig>
     CertificateValidationContextConfigProvider;
 typedef std::shared_ptr<CertificateValidationContextConfigProvider>
     CertificateValidationContextConfigProviderSharedPtr;
+
+typedef SecretProvider<Ssl::TrustedCaConfig> TrustedCaConfigProvider;
+typedef std::shared_ptr<TrustedCaConfigProvider> TrustedCaConfigProviderSharedPtr;
 
 } // namespace Secret
 } // namespace Envoy
