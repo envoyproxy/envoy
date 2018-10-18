@@ -146,7 +146,7 @@ private:
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
   std::map<std::string, std::unique_ptr<FilterFactoriesList>> upgrade_filter_factories_;
-  const bool reverse_encode_order_;
+  const bool reverse_encode_order_{};
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;

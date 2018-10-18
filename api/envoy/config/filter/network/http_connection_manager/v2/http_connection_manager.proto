@@ -353,7 +353,7 @@ message HttpConnectionManager {
   // configured in the HTTP filter chain.
   // Note: this is a bug fix for envoy, which is designed to have the reversed
   // order of encode filters to that of decode ones.
-  bool bugfix_reverse_encode_order = 27 [deprecated = true];
+  google.protobuf.BoolValue bugfix_reverse_encode_order = 27 [deprecated = true];
 }
 
 message Rds {
