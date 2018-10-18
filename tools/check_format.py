@@ -33,6 +33,7 @@ REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
                        './source/exe/main_common.h',
                        './source/server/config_validation/server.cc',
                        './source/common/common/perf_annotation.h',
+                       './test/common/common/mutex_contention_test.cc', # Mutex contention can't be faked.
                        './test/test_common/simulated_time_system.cc',
                        './test/test_common/simulated_time_system.h',
                        './test/test_common/test_time.cc',

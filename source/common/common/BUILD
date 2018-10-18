@@ -105,6 +105,13 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "mutex_contention",
+    hdrs = ["mutex_contention.h"],
+    deps = [
+    ],
+)
+
 # All non-essential logger delegates should go here to reduce dependencies that
 # minimal_logger_lib maintains.
 envoy_cc_library(

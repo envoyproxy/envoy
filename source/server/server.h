@@ -50,7 +50,10 @@ namespace Server {
   GAUGE(total_connections)                                                                         \
   GAUGE(version)                                                                                   \
   GAUGE(days_until_first_cert_expiring)                                                            \
-  GAUGE(hot_restart_epoch)
+  GAUGE(hot_restart_epoch)                                                                         \
+  GAUGE(mutex_contention_count)                                                                    \
+  GAUGE(mutex_contention_wait_cycles)                                                              \
+  GAUGE(mutex_contention_lifetime_wait_cycles)
 // clang-format on
 
 struct ServerStats {
@@ -185,6 +188,7 @@ public:
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_->statsFlushInterval();
   }
+  void RegisterMutexContentionStats();
 
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
