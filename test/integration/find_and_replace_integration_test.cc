@@ -72,7 +72,6 @@ TEST_P(FindAndReplaceIntegrationTest, Basic) {
   EXPECT_TRUE(StringUtil::caseFindToken(upstream_data, "\r\n", "GET /test HTTP/1.1"));
   EXPECT_TRUE(StringUtil::caseFindToken(upstream_data, "\r\n", "Connection: Upgrade"));
   EXPECT_TRUE(StringUtil::caseFindToken(upstream_data, "\r\n", "Upgrade: Websocket"));
-  EXPECT_TRUE(StringUtil::caseFindToken(upstream_data, "\r\n", "Host: another.example.com"));
   EXPECT_TRUE(StringUtil::caseFindToken(upstream_data, "\r\n", "SomeHeader: somevalue"));
 
   std::string response = "This isn't even an http response. Send back whatever the upstream likes.";
