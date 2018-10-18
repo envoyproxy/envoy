@@ -68,8 +68,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
   if (config.trustedCa() != nullptr && config.trustedCa()->caCert().empty() &&
       config.certificateValidationContext() != nullptr) {
     if (!config.certificateValidationContext()->certificateRevocationList().empty()) {
-      throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",
-                                       config.certificateValidationContext()->certificateRevocationList()));
+      throw EnvoyException(
+          fmt::format("Failed to load CRL from {} without trusted CA",
+                      config.certificateValidationContext()->certificateRevocationList()));
     }
     if (!config.certificateValidationContext()->verifySubjectAltNameList().empty()) {
       throw EnvoyException(fmt::format("SAN-based verification of peer certificates without "
@@ -81,12 +82,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
     }
   }
 
-  if (config.trustedCa() != nullptr &&
-      !config.trustedCa()->caCert().empty()) {
+  if (config.trustedCa() != nullptr && !config.trustedCa()->caCert().empty()) {
     ca_file_path_ = config.trustedCa()->caCertPath();
-    bssl::UniquePtr<BIO> bio(
-        BIO_new_mem_buf(const_cast<char*>(config.trustedCa()->caCert().data()),
-                        config.trustedCa()->caCert().size()));
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(config.trustedCa()->caCert().data()),
+                                             config.trustedCa()->caCert().size()));
     RELEASE_ASSERT(bio != nullptr, "");
     // Based on BoringSSL's X509_load_cert_crl_file().
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(
@@ -532,27 +531,9 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
 
-  if (config.trustedCa() != nullptr && config.trustedCa()->caCert().empty() &&
-      config.certificateValidationContext() != nullptr) {
-    if (!config.certificateValidationContext()->certificateRevocationList().empty()) {
-      throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",
-                                       config.certificateValidationContext()->certificateRevocationList()));
-    }
-    if (!config.certificateValidationContext()->verifySubjectAltNameList().empty()) {
-      throw EnvoyException(fmt::format("SAN-based verification of peer certificates without "
-                                       "trusted CA is insecure and not allowed"));
-    }
-    if (config.certificateValidationContext()->allowExpiredCertificate()) {
-      throw EnvoyException(
-          fmt::format("Certificate validity period is always ignored without trusted CA"));
-    }
-  }
-    
-  if (config.trustedCa() != nullptr &&
-      !config.trustedCa()->caCert().empty()) {
-    bssl::UniquePtr<BIO> bio(
-        BIO_new_mem_buf(const_cast<char*>(config.trustedCa()->caCert().data()),
-                        config.trustedCa()->caCert().size()));
+  if (config.trustedCa() != nullptr && !config.trustedCa()->caCert().empty()) {
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(config.trustedCa()->caCert().data()),
+                                             config.trustedCa()->caCert().size()));
     RELEASE_ASSERT(bio != nullptr, "");
     // Based on BoringSSL's SSL_add_file_cert_subjects_to_stack().
     bssl::UniquePtr<STACK_OF(X509_NAME)> list(sk_X509_NAME_new(

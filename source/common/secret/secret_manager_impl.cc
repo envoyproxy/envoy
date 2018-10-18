@@ -35,13 +35,10 @@ void SecretManagerImpl::addStaticSecret(const envoy::api::v2::auth::Secret& secr
     break;
   }
   case envoy::api::v2::auth::Secret::TypeCase::kTrustedCa: {
-    auto secret_provider = std::make_shared<TrustedCaConfigProviderImpl>(
-        secret.trusted_ca());
-    if (!static_trusted_ca_providers_
-             .insert(std::make_pair(secret.name(), secret_provider))
+    auto secret_provider = std::make_shared<TrustedCaConfigProviderImpl>(secret.trusted_ca());
+    if (!static_trusted_ca_providers_.insert(std::make_pair(secret.name(), secret_provider))
              .second) {
-      throw EnvoyException(fmt::format(
-          "Duplicate static TrustedCa secret name {}", secret.name()));
+      throw EnvoyException(fmt::format("Duplicate static TrustedCa secret name {}", secret.name()));
     }
     break;
   }
@@ -66,7 +63,7 @@ SecretManagerImpl::findStaticCertificateValidationContextProvider(const std::str
 TrustedCaConfigProviderSharedPtr
 SecretManagerImpl::findStaticTrustedCaConfigProvider(const std::string& name) const {
   auto secret = static_trusted_ca_providers_.find(name);
-  return (secret != static_trusted_ca_providers_.end()) ? secret->second : nullptr;  
+  return (secret != static_trusted_ca_providers_.end()) ? secret->second : nullptr;
 }
 
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::createInlineTlsCertificateProvider(
@@ -81,9 +78,9 @@ SecretManagerImpl::createInlineCertificateValidationContextProvider(
       certificate_validation_context);
 }
 
-TrustedCaConfigProviderSharedPtr
-SecretManagerImpl::createInlineTrustedCaProvider(const envoy::api::v2::core::DataSource& trusted_ca) {
-  return std::make_shared<TrustedCaConfigProviderImpl>(trusted_ca);  
+TrustedCaConfigProviderSharedPtr SecretManagerImpl::createInlineTrustedCaProvider(
+    const envoy::api::v2::core::DataSource& trusted_ca) {
+  return std::make_shared<TrustedCaConfigProviderImpl>(trusted_ca);
 }
 
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(

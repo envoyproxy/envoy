@@ -23,8 +23,7 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
                                     config.verify_certificate_hash().end()),
       verify_certificate_spki_list_(config.verify_certificate_spki().begin(),
                                     config.verify_certificate_spki().end()),
-      allow_expired_certificate_(config.allow_expired_certificate()) {
-}
+      allow_expired_certificate_(config.allow_expired_certificate()) {}
 
 } // namespace Ssl
 } // namespace Envoy

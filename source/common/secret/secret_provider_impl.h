@@ -2,8 +2,8 @@
 
 #include <functional>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
@@ -44,9 +44,7 @@ class TrustedCaConfigProviderImpl : public TrustedCaConfigProvider {
 public:
   TrustedCaConfigProviderImpl(const envoy::api::v2::core::DataSource& trusted_ca);
 
-  const Ssl::TrustedCaConfig* secret() const override {
-    return trusted_ca_.get();
-  }
+  const Ssl::TrustedCaConfig* secret() const override { return trusted_ca_.get(); }
 
   Common::CallbackHandle* addUpdateCallback(std::function<void()>) override { return nullptr; }
 
