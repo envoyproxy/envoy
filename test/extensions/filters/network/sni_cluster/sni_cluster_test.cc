@@ -39,6 +39,7 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(filter_callbacks.connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  ON_CALL(Const(filter_callbacks.connection_), streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   SniClusterFilter filter;
   filter.initializeReadFilterCallbacks(filter_callbacks);

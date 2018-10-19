@@ -95,6 +95,7 @@ template <class T> static void initializeMockConnection(T& connection) {
   }));
 
   ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(connection.stream_info_));
+  ON_CALL(Const(connection), streamInfo()).WillByDefault(ReturnRef(connection.stream_info_));
 }
 
 MockConnection::MockConnection() {

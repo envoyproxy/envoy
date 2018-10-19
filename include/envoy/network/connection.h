@@ -247,6 +247,7 @@ public:
    * @return StreamInfo object associated with this connection.
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 
   /**
    * Set the timeout for delayed connection close()s.

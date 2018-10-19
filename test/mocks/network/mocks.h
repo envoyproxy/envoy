@@ -89,6 +89,7 @@ public:
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
+  MOCK_CONST_METHOD0(streamInfo, const StreamInfo::StreamInfo&());
   MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
 };
@@ -131,6 +132,7 @@ public:
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
+  MOCK_CONST_METHOD0(streamInfo, const StreamInfo::StreamInfo&());
   MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
 
