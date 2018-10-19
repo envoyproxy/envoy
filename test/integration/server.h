@@ -218,13 +218,11 @@ typedef std::unique_ptr<IntegrationTestServer> IntegrationTestServerPtr;
 
 /**
  * Wrapper for running the real server for the purpose of integration tests.
- * Designed to be inherited from for enhancing server functionality; see
+ * This class is an Abstract Base Class and delegates ownership and management 
+ * of the actual envoy server to a derived class.  See the documentation for
  * createAndRunEnvoyServer().
- * If a subclass is used, that subclass may tear down the server in its
- * destructor.  If it does, it should call serverShutDown().  See that
- * function for details.
  */
-class IntegrationTestServer : Logger::Loggable<Logger::Id::testing>,
+class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
                               public TestHooks,
                               public IntegrationTestServerStats,
                               public Server::ComponentFactory {
@@ -239,7 +237,7 @@ public:
   Server::InstanceImpl& server() {
     RELEASE_ASSERT(server_ != nullptr, "");
     return *server_;
-  }
+  }  
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
     on_worker_listener_added_cb_ = on_worker_listener_added;
   }
@@ -308,6 +306,9 @@ protected:
   // Note that the server will be deleted before this method returns. so the
   // server instance pointer returned through
   // |set_return_values| must be nulled on return from this function.
+  // The subclass is also responsible for tearing down this server in its destructor.
+  // Note that variables refering to the server (e.g. admin_address_, server_) may not be
+  // relied on during destruction.  
   virtual void createAndRunEnvoyServer(
       OptionsImpl& options,
       Event::TimeSystem& time_system,
@@ -315,19 +316,13 @@ protected:
       TestHooks& hooks,
       Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
       Runtime::RandomGeneratorPtr&& random_generator,
-      std::function<void(int, Stats::Store*, Server::Instance*)> set_return_values);
+      std::function<void(int, Stats::Store*, Server::Instance*)> set_return_values) PURE;
 
-  // If there is any cleanup to be done by derived classes on server shutdown,
-  // it must be done in the derived class destructor.  Too many envoy integration
-  // tests rely on proper cleanup being done through ~IntegrationTestServer(),
-  // and virtual functions cannot be called in destructors to customize that
-  // cleanup since the derived class will already have been torn down at that
-  // point.  In this case, the derived class destructor should call
-  // serverShutDown() to signal that the base class does not need to shut down
-  // the server.  If this function is not called, the base class will attempt to
-  // shut the server down through the admin interface to the server specified to
-  // |set_return_values| above.
-  void serverShutDown();
+  // Owned by this class because the actual allocation is done on the
+  // stack in a thread spawned by the class.
+  Server::Instance* server_;
+  Stats::Store* stat_store_{};
+  Network::Address::InstanceConstSharedPtr admin_address_;
 
 private:
   /**
@@ -342,12 +337,28 @@ private:
   Thread::MutexBasicLockable listeners_mutex_;
   uint64_t pending_listeners_;
   ConditionalInitializer server_set_;
-  std::unique_ptr<Server::InstanceImpl> server_;
   Server::TestDrainManager* drain_manager_{};
-  Stats::Store* stat_store_{};
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
-  Network::Address::InstanceConstSharedPtr admin_address_;
+};
+
+// Default implementation of IntegrationTestServer
+class IntegrationTestServerImpl : public IntegrationTestServer {
+ public:
+  IntegrationTestServerImpl(Event::TestTimeSystem& time_system, const std::string& config_path)
+      : IntegrationTestServer(time_system, config_path) {}
+      
+  ~IntegrationTestServerImpl() override;
+  
+ private:
+  void createAndRunEnvoyServer(
+      OptionsImpl& options,
+      Event::TimeSystem& time_system,
+      Network::Address::InstanceConstSharedPtr local_address,
+      TestHooks& hooks,
+      Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
+      Runtime::RandomGeneratorPtr&& random_generator,
+      std::function<void(int, Stats::Store*, Server::Instance*)> set_return_values) override; 
 };
 
 } // namespace Envoy

@@ -27,7 +27,7 @@ IntegrationTestServer::create(const std::string& config_path,
                               const Network::Address::IpVersion version,
                               std::function<void()> pre_worker_start_test_steps, bool deterministic,
                               Event::TestTimeSystem& time_system) {
-  IntegrationTestServerPtr server{new IntegrationTestServer(time_system, config_path)};
+  IntegrationTestServerPtr server{new IntegrationTestServerImpl(time_system, config_path)};
   server->start(version, pre_worker_start_test_steps, deterministic);
   return server;
 }
@@ -58,6 +58,7 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
 }
 
 IntegrationTestServer::~IntegrationTestServer() {
+<<<<<<< HEAD
   ENVOY_LOG(info, "stopping integration test server");
 
   if (admin_address_ != nullptr) {
@@ -67,6 +68,18 @@ IntegrationTestServer::~IntegrationTestServer() {
     EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   }
 
+||||||| merged common ancestors
+  ENVOY_LOG(info, "stopping integration test server");
+
+  if (admin_address_ != nullptr) {
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        admin_address_, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
+    EXPECT_TRUE(response->complete());
+    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  }
+=======
+  // Derived class must have shutdown server.
+>>>>>>> Part way through server ownership refactor; tests passing
   thread_->join();
 }
 
@@ -122,5 +135,45 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
 Server::TestOptionsImpl Server::TestOptionsImpl::asConfigYaml() {
   return TestOptionsImpl("", Filesystem::fileReadToEnd(config_path_), local_address_ip_version_);
 }
+
+void IntegrationTestServerImpl::createAndRunEnvoyServer(
+    OptionsImpl& options,
+    Event::TimeSystem& time_system,
+    Network::Address::InstanceConstSharedPtr local_address,
+    TestHooks& hooks,
+    Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
+    Runtime::RandomGeneratorPtr&& random_generator,
+    std::function<void(int, Stats::Store*, Server::Instance*)> set_return_values) {
+
+  Server::HotRestartNopImpl restarter;
+  ThreadLocal::InstanceImpl tls;
+  Stats::HeapStatDataAllocator stats_allocator;
+  Stats::ThreadLocalStoreImpl stat_store(options.statsOptions(), stats_allocator);
+
+  Server::InstanceImpl server(
+      options, time_system, local_address, hooks, restarter,
+      stat_store, access_log_lock, component_factory, std::move(random_generator),
+      tls);
+  set_return_values(server.listenerManager().listeners().size(),
+                    &stat_store,
+                    &server);
+  server.run();
+}
+
+IntegrationTestServerImpl::~IntegrationTestServerImpl() {
+  ENVOY_LOG(info, "stopping integration test server");
+
+  Network::Address::InstanceConstSharedPtr admin_address(admin_address_);
+  admin_address_ = nullptr;
+  server_ = nullptr;
+  stat_store_ = nullptr;
+
+  if (admin_address != nullptr) {
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
+    EXPECT_TRUE(response->complete());
+    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  }
+}  
 
 } // namespace Envoy
