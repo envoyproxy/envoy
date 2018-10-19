@@ -235,13 +235,14 @@ protected:
 
   bool enable_half_close_{false};
 
+  // True if test will use a fixed RNG value.
+  bool deterministic_{};
+
 private:
   // The type for the Envoy-to-backend connection
   FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
   // True if initialized() has been called.
   bool initialized_{};
-  // True if test will use a fixed RNG value.
-  bool deterministic_{};
 };
 
 } // namespace Envoy
