@@ -93,7 +93,7 @@ known to work.
 
 By default Clang drops some debug symbols that are required for pretty printing to work correctly.
 More information can be found [here](https://bugs.llvm.org/show_bug.cgi?id=24202). The easy solution
-is to set ```--copt=-fno-limit-debug-info``` on the CLI or in your bazel.rc file.
+is to set ```--copt=-fno-limit-debug-info``` on the CLI or in your .bazelrc file.
 
 # Testing Envoy with Bazel
 
