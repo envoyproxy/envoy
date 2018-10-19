@@ -16,15 +16,90 @@ Access logs are configured as part of the :ref:`HTTP connection manager config
 Format rules
 ------------
 
-The access log format string contains either command operators or other characters interpreted as a
-plain string. The access log formatter does not make any assumptions about a new line separator, so one
+Access log formats contain command operators that extract the relevant data and insert it.
+They support two formats: :ref:`"format strings" <config_access_log_format_strings>` and
+:ref:`"format dictionaries" <config_access_log_format_dictionaries>`. In both cases, the command operators
+are used to extract the relevant data, which is then inserted into the specified log format.
+Only one access log format may be specified at a time.
+
+.. _config_access_log_format_strings:
+
+Format Strings
+--------------
+
+Format strings are plain strings, specified using the ``format`` key. They may contain
+either command operators or other characters interpreted as a plain string. 
+The access log formatter does not make any assumptions about a new line separator, so one
 has to specified as part of the format string.
 See the :ref:`default format <config_access_log_default_format>` for an example.
-Note that the access log line will contain a '-' character for every not set/empty value.
 
-The same format strings are used by different types of access logs (such as HTTP and TCP). Some
+.. _config_access_log_default_format:
+
+Default Format String
+---------------------
+
+If custom format string is not specified, Envoy uses the following default format:
+
+.. code-block:: none
+
+  [%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%"
+  %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%
+  %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%" "%REQ(USER-AGENT)%"
+  "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"\n
+
+Example of the default Envoy access log format:
+
+.. code-block:: none
+
+  [2016-04-15T20:17:00.310Z] "POST /api/v1/locations HTTP/2" 204 - 154 0 226 100 "10.0.35.28"
+  "nsq2http" "cc21d9b0-cf5c-432b-8c7e-98aeb7988cd2" "locations" "tcp://10.0.2.1:80"
+
+.. _config_access_log_format_dictionaries:
+
+Format Dictionaries
+-------------------
+
+Format dictionaries are dictionaries that specify a structured access log output format,
+specified using the ``json_format`` key. This allows logs to be output in a structured format
+such as JSON.
+Similar to format strings, command operators are evaluated and their values inserted into the format
+dictionary to construct the log output.
+
+For example, with the following format provided in the configuration:
+
+.. code-block:: json
+
+  {
+    "config": {
+      "json_format": {
+          "protocol": "%PROTOCOL%",
+          "duration": "%DURATION%",
+          "my_custom_header": "%REQ(MY_CUSTOM_HEADER)%"
+      }
+    }
+  }
+  
+The following JSON object would be written to the log file:
+
+.. code-block:: json
+
+  {"protocol": "HTTP/1.1", "duration": "123", "my_custom_header": "value_of_MY_CUSTOM_HEADER"}
+
+This allows you to specify a custom key for each command operator.
+
+Format dictionaries have the following restrictions:
+
+* The dictionary must map strings to strings (specifically, strings to command operators). Nesting is not currently supported.
+
+Command Operators
+-----------------
+
+Command operators are used to extract values that will be inserted into the access logs.
+The same operators are used by different types of access logs (such as HTTP and TCP). Some
 fields may have slightly different meanings, depending on what type of log it is. Differences
 are noted.
+
+Note that if a value is not set/empty, the logs will contain a '-' character.
 
 The following command operators are supported:
 
@@ -231,24 +306,3 @@ The following command operators are supported:
     String value set on ssl connection socket for Server Name Indication (SNI)
   TCP
     String value set on ssl connection socket for Server Name Indication (SNI)
-
-.. _config_access_log_default_format:
-
-Default format
---------------
-
-If custom format is not specified, Envoy uses the following default format:
-
-.. code-block:: none
-
-  [%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%"
-  %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%
-  %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%" "%REQ(USER-AGENT)%"
-  "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"\n
-
-Example of the default Envoy access log format:
-
-.. code-block:: none
-
-  [2016-04-15T20:17:00.310Z] "POST /api/v1/locations HTTP/2" 204 - 154 0 226 100 "10.0.35.28"
-  "nsq2http" "cc21d9b0-cf5c-432b-8c7e-98aeb7988cd2" "locations" "tcp://10.0.2.1:80"
