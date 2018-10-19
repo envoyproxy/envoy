@@ -45,6 +45,8 @@ public:
     onDecodeComplete();
   }
 
+  void decodeMetadata(MetadataMap& metadata_map) override { inner_.decodeMetadata(metadata_map); }
+
 protected:
   StreamDecoderWrapper(StreamDecoder& inner) : inner_(inner) {}
 
@@ -85,6 +87,10 @@ public:
   void encodeTrailers(const HeaderMap& trailers) override {
     inner_.encodeTrailers(trailers);
     onEncodeComplete();
+  }
+
+  void encodeMetadata(const MetadataMap& metadata_map) override {
+    inner_.encodeMetadata(metadata_map);
   }
 
   Stream& getStream() override { return inner_.getStream(); }

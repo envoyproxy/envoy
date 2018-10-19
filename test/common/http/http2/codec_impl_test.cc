@@ -361,6 +361,49 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
   response_encoder_->encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
 }
 
+TEST_P(Http2CodecImplTest, SmallMetadataTest) {
+  initialize();
+
+  // Generates a valid stream_id by sending a request header.
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  MetadataMap metadata_map = {
+      {"header_key1", "header_value1"},
+      {"header_key2", "header_value2"},
+      {"header_key3", "header_value3"},
+      {"header_key4", "header_value4"},
+  };
+
+  EXPECT_CALL(request_decoder_, decodeMetadata_(_));
+  request_encoder_->encodeMetadata(metadata_map);
+
+  EXPECT_CALL(response_decoder_, decodeMetadata_(_));
+  response_encoder_->encodeMetadata(metadata_map);
+}
+
+TEST_P(Http2CodecImplTest, LargeMetadataTest) {
+  initialize();
+
+  // Generates a valid stream_id by sending a request header.
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  MetadataMap metadata_map = {
+      {"header_key1", std::string(50 * 1024, 'a')},
+  };
+
+  EXPECT_CALL(request_decoder_, decodeMetadata_(_));
+  request_encoder_->encodeMetadata(metadata_map);
+
+  EXPECT_CALL(response_decoder_, decodeMetadata_(_));
+  response_encoder_->encodeMetadata(metadata_map);
+}
+
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
 
 TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {

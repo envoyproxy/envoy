@@ -3,9 +3,10 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/http/codec.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
-#include "common/http/http2/metadata_interface.h"
 
 #include "nghttp2/nghttp2.h"
 
@@ -19,7 +20,10 @@ class MetadataEncoderDecoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test
 // map of string key value pairs.
 class MetadataDecoder : Logger::Loggable<Logger::Id::http2> {
 public:
-  MetadataDecoder(uint64_t stream_id, MetadataCallback cb);
+  /**
+   * @param metadata_map is where to save the decoded metadata.
+   */
+  MetadataDecoder(MetadataCallback cb, MetadataMap& metadata_map);
 
   /**
    * Calls this function when METADATA frame payload is received. The payload doesn't need to be
@@ -44,11 +48,6 @@ public:
    */
   Buffer::OwnedImpl& payload() { return payload_; }
 
-  /**
-   * @return stream_id.
-   */
-  uint64_t getStreamId() const { return stream_id_; }
-
 private:
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
   /**
@@ -61,14 +60,11 @@ private:
   // Metadata event callback function.
   MetadataCallback callback_;
 
-  // Metadata that is currently under decoding.
-  MetadataMap metadata_map_;
-
   // Payload received.
   Buffer::OwnedImpl payload_;
 
-  // The stream id the decoder is associated with.
-  const uint64_t stream_id_;
+  // Metadata that is currently under decoding.
+  MetadataMap& metadata_map_;
 
   // Payload size limit. If the payload received exceeds the limit, fails the connection.
   const uint64_t max_payload_size_bound_ = 1024 * 1024;

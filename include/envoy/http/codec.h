@@ -7,6 +7,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
 
 namespace Envoy {
@@ -52,6 +53,12 @@ public:
    * @return Stream& the backing stream.
    */
   virtual Stream& getStream() PURE;
+
+  /**
+   * Encode METADATA.
+   * @param metadata_map is the METADATA to encode.
+   */
+  virtual void encodeMetadata(const MetadataMap& metadata_map) PURE;
 };
 
 /**
@@ -86,6 +93,12 @@ public:
    * @param trailers supplies the decoded trailers.
    */
   virtual void decodeTrailers(HeaderMapPtr&& trailers) PURE;
+
+  /**
+   * Called with decoded METADATA.
+   * @param decoded METADATA.
+   */
+  virtual void decodeMetadata(MetadataMap& metadata_map) PURE;
 };
 
 /**
