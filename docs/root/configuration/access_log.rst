@@ -13,7 +13,7 @@ Access logs are configured as part of the :ref:`HTTP connection manager config
 
 .. _config_access_log_format:
 
-Format rules
+Format Rules
 ------------
 
 Access log formats contain command operators that extract the relevant data and insert it.
@@ -306,3 +306,4 @@ The following command operators are supported:
     String value set on ssl connection socket for Server Name Indication (SNI)
   TCP
     String value set on ssl connection socket for Server Name Indication (SNI)
+
