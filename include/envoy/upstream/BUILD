@@ -10,7 +10,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "cluster_manager_interface",
-    hdrs = ["cluster_manager.h"],
+    hdrs = ["cluster_manager.h", "grpc_mux_factory.h"],
     deps = [
         ":health_checker_interface",
         ":load_balancer_interface",

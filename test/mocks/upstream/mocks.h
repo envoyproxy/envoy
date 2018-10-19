@@ -268,6 +268,7 @@ public:
   MOCK_METHOD0(shutdown, void());
   MOCK_CONST_METHOD0(bindConfig, const envoy::api::v2::core::BindConfig&());
   MOCK_METHOD0(adsMux, Config::GrpcMux&());
+  MOCK_METHOD0(muxFactory, Config::GrpcMuxFactory&());
   MOCK_METHOD0(grpcAsyncClientManager, Grpc::AsyncClientManager&());
   MOCK_CONST_METHOD0(versionInfo, const std::string());
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
@@ -280,6 +281,7 @@ public:
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   envoy::api::v2::core::BindConfig bind_config_;
   NiceMock<Config::MockGrpcMux> ads_mux_;
+  NiceMock<Config::MockGrpcMuxFactory> mux_factory_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   std::string local_cluster_name_;
   NiceMock<MockClusterManagerFactory> cluster_manager_factory_;

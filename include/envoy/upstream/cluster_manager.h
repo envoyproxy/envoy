@@ -10,6 +10,7 @@
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
+#include "envoy/upstream/grpc_mux_factory.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"
@@ -182,6 +183,8 @@ public:
    * @return GrpcMux& ADS API provider referencee.
    */
   virtual Config::GrpcMux& adsMux() PURE;
+
+  virtual Config::GrpcMuxFactory& muxFactory() PURE;
 
   /**
    * @return Grpc::AsyncClientManager& the cluster manager's gRPC client manager.

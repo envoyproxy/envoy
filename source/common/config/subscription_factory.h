@@ -65,14 +65,15 @@ public:
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method), stats));
         break;
       case envoy::api::v2::core::ApiConfigSource::GRPC: {
-        result.reset(new GrpcSubscriptionImpl<ResourceType>(
-            local_info,
-            Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
-                                                           config.api_config_source(), scope)
-                ->create(),
-            dispatcher, random,
-            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), stats,
-            scope));
+	    Config::GrpcMux* mux =
+	            cm.muxFactory().getOrCreateMux(local_info,
+                                               Config::Utility::factoryForGrpcApiConfigSource(
+                                                      cm.grpcAsyncClientManager(),config.api_config_source(), scope)->create(),
+                                               dispatcher,
+                                               *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method),
+                                               random, config.api_config_source(), scope,
+                                               Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name()));
+        result.reset(new GrpcMuxSubscriptionImpl<ResourceType>(*mux, stats));
         break;
       }
       default:

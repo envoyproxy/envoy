@@ -14,6 +14,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//include/envoy/config:grpc_mux_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/config:subscription_interface",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",

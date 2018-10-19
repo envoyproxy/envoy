@@ -203,6 +203,7 @@ public:
   const envoy::api::v2::core::BindConfig& bindConfig() const override { return bind_config_; }
 
   Config::GrpcMux& adsMux() override { return *ads_mux_; }
+  Config::GrpcMuxFactory& muxFactory() override { return *mux_factory_; }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
   const std::string& localClusterName() const override { return local_cluster_name_; }
@@ -327,6 +328,42 @@ private:
     bool destroying_{};
   };
 
+  class GrpcMuxFactoryImpl : public Config::GrpcMuxFactory {
+  public:
+    GrpcMuxFactoryImpl() : muxes_() {}
+
+    Config::GrpcMux* getOrCreateMux(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
+                                    Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
+                                    Runtime::RandomGenerator& random,
+                                    const ::envoy::api::v2::core::ApiConfigSource& config_source,
+                                    Stats::Scope& scope, const std::string type_url) override {
+
+      std::string mux_key; // config_source_name + type_url
+      switch(config_source.grpc_services(0).target_specifier_case()) {
+        case envoy::api::v2::core::GrpcService::kEnvoyGrpc: {
+          mux_key = config_source.grpc_services(0).envoy_grpc().cluster_name() + type_url;
+          break;
+        }
+        case envoy::api::v2::core::GrpcService::kGoogleGrpc: {
+          mux_key = config_source.grpc_services(0).google_grpc().target_uri() + type_url;
+          break;
+        }
+        default:
+          NOT_REACHED_GCOVR_EXCL_LINE;
+      }
+
+      if (muxes_.find(mux_key) == muxes_.end()) {
+        auto mux = new Config::GrpcMuxImpl(local_info, std::move(async_client), dispatcher, service_method, random,
+                                           scope);
+        muxes_.insert({mux_key, mux});
+      }
+      return muxes_.at(mux_key);
+    }
+
+  private:
+    std::unordered_map<std::string, Config::GrpcMux*> muxes_;
+  };
+
   struct ClusterData {
     ClusterData(const envoy::api::v2::Cluster& cluster_config, const std::string& version_info,
                 bool added_via_api, ClusterSharedPtr&& cluster, TimeSource& time_source)
@@ -437,6 +474,7 @@ private:
   TimeSource& time_source_;
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
+  Config::GrpcMuxFactoryPtr mux_factory_;
 };
 
 } // namespace Upstream

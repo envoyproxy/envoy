@@ -3,6 +3,7 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/upstream/grpc_mux_factory.h"
 
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
@@ -72,6 +73,17 @@ public:
                                     const std::string& version_info));
   MOCK_METHOD1(onConfigUpdateFailed, void(const EnvoyException* e));
   MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
+};
+
+class MockGrpcMuxFactory : public GrpcMuxFactory {
+public:
+    MockGrpcMuxFactory() {};
+    virtual ~MockGrpcMuxFactory() {};
+
+    MOCK_METHOD8(getOrCreateMux, GrpcMux*(const LocalInfo::LocalInfo &local_info, Grpc::AsyncClientPtr async_client,
+            Event::Dispatcher &dispatcher, const Protobuf::MethodDescriptor &service_method,
+            Runtime::RandomGenerator &random, const ::envoy::api::v2::core::ApiConfigSource& config_source,
+            Stats::Scope& scope, std::string type_url));
 };
 
 } // namespace Config
