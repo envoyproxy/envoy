@@ -106,6 +106,7 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
 // Validate behavior when multiple type URL watches are maintained and the stream is reset.
 TEST_F(GrpcMuxImplTest, ResetStream) {
   InSequence s;
+
   Event::MockTimer* timer = nullptr;
   Event::TimerCb timer_cb;
   EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
@@ -114,7 +115,8 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
     timer = new Event::MockTimer();
     return timer;
   }));
-  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(3);
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+
   setup();
   auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
   auto bar_sub = grpc_mux_->subscribe("bar", {}, callbacks_);
@@ -163,23 +165,11 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
 
 // Validate behavior when type URL mismatches occur.
 TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
-   InSequence s;
-
-  Event::MockTimer* timer = nullptr;
-  Event::TimerCb timer_cb;
-  EXPECT_CALL(dispatcher_, createTimer_(_));
-  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
-    timer_cb = cb;
-    EXPECT_EQ(nullptr, timer);
-    timer = new Event::MockTimer();
-    return timer;
-  }));
-
   setup();
 
   std::unique_ptr<envoy::api::v2::DiscoveryResponse> invalid_response(
       new envoy::api::v2::DiscoveryResponse());
-
+  InSequence s;
   auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
 
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
@@ -200,33 +190,20 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
       EXPECT_TRUE(
           IsSubstring("", "", "bar does not match foo type URL is DiscoveryResponse", e->what()));
     }));
-    EXPECT_CALL(random_, random());
-    EXPECT_CALL(*timer, enableTimer(_));
+
     expectSendMessage("foo", {"x", "y"}, "", "", Grpc::Status::GrpcStatus::Internal,
                       fmt::format("bar does not match foo type URL is DiscoveryResponse {}",
                                   invalid_response->DebugString()));
     grpc_mux_->onReceiveMessage(std::move(invalid_response));
   }
-  timer_cb();
   expectSendMessage("foo", {}, "");
 }
 
 // Validate behavior when watches has an unknown resource name.
 TEST_F(GrpcMuxImplTest, WildcardWatch) {
-  InSequence s;
-
-  Event::MockTimer* timer = nullptr;
-  Event::TimerCb timer_cb;
-  EXPECT_CALL(dispatcher_, createTimer_(_));
-  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
-    timer_cb = cb;
-    EXPECT_EQ(nullptr, timer);
-    timer = new Event::MockTimer();
-    return timer;
-  }));
-
   setup();
 
+  InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   auto foo_sub = grpc_mux_->subscribe(type_url, {}, callbacks_);
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
@@ -250,30 +227,15 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
               resources[0].UnpackTo(&expected_assignment);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
             }));
-    EXPECT_CALL(random_, random());
-    EXPECT_CALL(*timer, enableTimer(_));
     expectSendMessage(type_url, {}, "1");
     grpc_mux_->onReceiveMessage(std::move(response));
   }
-  timer_cb();
 }
 
 // Validate behavior when watches specify resources (potentially overlapping).
 TEST_F(GrpcMuxImplTest, WatchDemux) {
-  InSequence s;
-
-  Event::MockTimer* timer = nullptr;
-  Event::TimerCb timer_cb;
-  EXPECT_CALL(dispatcher_, createTimer_(_));
-  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
-    timer_cb = cb;
-    EXPECT_EQ(nullptr, timer);
-    timer = new Event::MockTimer();
-    return timer;
-  }));
-
   setup();
-
+  InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   NiceMock<MockGrpcMuxCallbacks> foo_callbacks;
   auto foo_sub = grpc_mux_->subscribe(type_url, {"x", "y"}, foo_callbacks);
@@ -304,12 +266,9 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
               resources[0].UnpackTo(&expected_assignment);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
             }));
-    EXPECT_CALL(random_, random());
-    EXPECT_CALL(*timer, enableTimer(_));
     expectSendMessage(type_url, {"y", "z", "x"}, "1");
     grpc_mux_->onReceiveMessage(std::move(response));
   }
-  timer_cb();
 
   {
     std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
@@ -347,12 +306,9 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
               resources[1].UnpackTo(&expected_assignment);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_y));
             }));
-    EXPECT_CALL(random_, random());
-    EXPECT_CALL(*timer, enableTimer(_));
     expectSendMessage(type_url, {"y", "z", "x"}, "2");
     grpc_mux_->onReceiveMessage(std::move(response));
   }
-  timer_cb();
 
   expectSendMessage(type_url, {"x", "y"}, "2");
   expectSendMessage(type_url, {}, "2");
@@ -369,24 +325,12 @@ protected:
 
 //  Verifies that warning messages get logged when Envoy detects too many requests.
 TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequests) {
-  InSequence s;
-
-  Event::MockTimer* timer = nullptr;
-  Event::TimerCb timer_cb;
-  EXPECT_CALL(dispatcher_, createTimer_(_));
-  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
-    timer_cb = cb;
-    EXPECT_EQ(nullptr, timer);
-    timer = new Event::MockTimer();
-    return timer;
-  }));
-
-  setup();
-
-  EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(100));
+  EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(99));
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(mock_time_system_, monotonicTime())
       .WillRepeatedly(Return(std::chrono::steady_clock::time_point{}));
+
+  setup();
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
@@ -395,38 +339,22 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequests) {
       response->set_version_info("baz");
       response->set_nonce("bar");
       response->set_type_url("foo");
-      EXPECT_CALL(random_, random());
-      EXPECT_CALL(*timer, enableTimer(_));
       grpc_mux_->onReceiveMessage(std::move(response));
     }
   };
 
   auto foo_sub = grpc_mux_->subscribe("foo", {"x"}, callbacks_);
+
   expectSendMessage("foo", {"x"}, "");
   grpc_mux_->start();
+  std::cout << "after on start..."
+            << "\n";
 
   // Exhausts the limit.
   onReceiveMessage(99);
 
-  // API calls go over the limit for the first time.
-  EXPECT_LOG_CONTAINS("warning", "Too many sendDiscoveryRequest calls for foo",
-                      onReceiveMessage(1));
-
-  // Logging limiter waits for 5s, so a second warning message is expected.
-  EXPECT_CALL(mock_time_system_, monotonicTime())
-      .Times(4)
-      .WillOnce(Return(std::chrono::steady_clock::time_point{}))
-      .WillOnce(Return(std::chrono::steady_clock::time_point{std::chrono::seconds(5)}))
-      .WillOnce(Return(std::chrono::steady_clock::time_point{std::chrono::seconds(6)}))
-      .WillOnce(Return(std::chrono::steady_clock::time_point{std::chrono::seconds(7)}));
-
-  // API calls go over the limit for the second time.
-  EXPECT_LOG_CONTAINS("warning", "Too many sendDiscoveryRequest calls for foo",
-                      onReceiveMessage(1));
-
-  // Without waiting full 5s, no rate limit log is expected.
-  EXPECT_LOG_NOT_CONTAINS("warning", "Too many sendDiscoveryRequest calls for foo",
-                          onReceiveMessage(1));
+  // API calls go over the limit should log the message.
+  EXPECT_LOG_CONTAINS("warning", "Too many sendDiscoveryRequest calls", onReceiveMessage(1));
 }
 
 //  Verifies that a messsage with no resources is accepted.

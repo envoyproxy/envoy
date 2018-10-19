@@ -1,7 +1,7 @@
 #pragma once
 
-#include <unordered_map>
 #include <queue>
+#include <unordered_map>
 
 #include "envoy/common/time.h"
 #include "envoy/common/token_bucket.h"
@@ -52,6 +52,8 @@ private:
   void establishNewStream();
   void sendDiscoveryRequest(const std::string& type_url);
   void handleFailure();
+  void queueDiscoveryRequest(const std::string& type_url);
+  void drainRequests();
   ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
     const std::string control_plane_prefix = "control_plane.";
     return {ALL_CONTROL_PLANE_STATS(POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
@@ -93,13 +95,6 @@ private:
     bool pending_{};
     // Has this API been tracked in subscriptions_?
     bool subscribed_{};
-    // Detects when Envoy is making too many requests.
-    TokenBucketPtr limit_request_;
-    // Limits warning messages when too many requests is detected.
-    TokenBucketPtr limit_log_;
-    // Queue
-    std::queue<uint64_t> request_queue_;
-    Event::TimerPtr request_timer_;
   };
 
   const LocalInfo::LocalInfo& local_info_;
@@ -114,7 +109,11 @@ private:
   TimeSource& time_source_;
   BackOffStrategyPtr backoff_strategy_;
   ControlPlaneStats control_plane_stats_;
-  Event::Dispatcher& dispatcher_;
+  // Detects when Envoy is making too many requests.
+  TokenBucketPtr limit_request_;
+
+  std::queue<std::string> request_queue_;
+  Event::TimerPtr drain_request_timer_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {

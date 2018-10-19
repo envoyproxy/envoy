@@ -25,4 +25,12 @@ bool TokenBucketImpl::consume(uint64_t tokens) {
   return true;
 }
 
+uint64_t TokenBucketImpl::nextTokenAvailableMs() {
+  // If there are tokens available, return immediately.
+  if (tokens_ >= 1) {
+    return 0;
+  }
+  return (60 / fill_rate_) * 1000;
+}
+
 } // namespace Envoy
