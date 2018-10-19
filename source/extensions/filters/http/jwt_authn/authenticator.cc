@@ -7,6 +7,7 @@
 #include "common/common/logger.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/protobuf/protobuf.h"
 
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
@@ -228,14 +229,14 @@ void AuthenticatorImpl::verifyKey() {
     curr_token_->removeJwt(*headers_);
   }
   if (set_payload_cb_ && !provider.payload_in_metadata().empty()) {
-    try {
-      ProtobufWkt::Struct payload_pb;
-      MessageUtil::loadFromJson(jwt_->payload_str_, payload_pb);
-      set_payload_cb_(provider.payload_in_metadata(), payload_pb);
-    } catch (EnvoyException ex) {
-      ENVOY_LOG(warn, "Error in converting payload for issuer {}, error: {}", jwt_->iss_,
-                ex.what());
-    }
+    Protobuf::util::JsonParseOptions options;
+    ProtobufWkt::Struct payload_pb;
+    const auto status =
+        Protobuf::util::JsonStringToMessage(jwt_->payload_str_, &payload_pb, options);
+    // payload_str_ have been verified as valid JSON already.
+    // All valid JSON should be able to parse into a portobuf Struct.
+    RELEASE_ASSERT(status.ok(), "Failed to parse JWT payload json into protobuf Struct");
+    set_payload_cb_(provider.payload_in_metadata(), payload_pb);
   }
 
   doneWithStatus(Status::Ok);
