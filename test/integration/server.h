@@ -218,6 +218,11 @@ typedef std::unique_ptr<IntegrationTestServer> IntegrationTestServerPtr;
 
 /**
  * Wrapper for running the real server for the purpose of integration tests.
+ * Designed to be inherited from for enhancing server functionality; see
+ * createAndRunEnvoyServer().
+ * If a subclass is used, that subclass may tear down the server in its
+ * destructor.  If it does, it should call serverShutDown().  See that
+ * function for details.
  */
 class IntegrationTestServer : Logger::Loggable<Logger::Id::testing>,
                               public TestHooks,
@@ -295,6 +300,34 @@ public:
 protected:
   IntegrationTestServer(Event::TestTimeSystem& time_system, const std::string& config_path)
       : time_system_(time_system), config_path_(config_path) {}
+
+  // Create the running envoy server.  Note that values are returned from this function
+  // through a callback, as this function will be called on another thread and is expected
+  // to block until the envoy server has run to completion.
+  // |set_return_values| must be called after the server is created but before it is run.
+  // Note that the server will be deleted before this method returns. so the
+  // server instance pointer returned through
+  // |set_return_values| must be nulled on return from this function.
+  virtual void createAndRunEnvoyServer(
+      OptionsImpl& options,
+      Event::TimeSystem& time_system,
+      Network::Address::InstanceConstSharedPtr local_address,
+      TestHooks& hooks,
+      Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
+      Runtime::RandomGeneratorPtr&& random_generator,
+      std::function<void(int, Stats::Store*, Server::Instance*)> set_return_values);
+
+  // If there is any cleanup to be done by derived classes on server shutdown,
+  // it must be done in the derived class destructor.  Too many envoy integration
+  // tests rely on proper cleanup being done through ~IntegrationTestServer(),
+  // and virtual functions cannot be called in destructors to customize that
+  // cleanup since the derived class will already have been torn down at that
+  // point.  In this case, the derived class destructor should call
+  // serverShutDown() to signal that the base class does not need to shut down
+  // the server.  If this function is not called, the base class will attempt to
+  // shut the server down through the admin interface to the server specified to
+  // |set_return_values| above.
+  void serverShutDown();
 
 private:
   /**
