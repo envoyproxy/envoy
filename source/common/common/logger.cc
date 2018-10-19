@@ -49,7 +49,14 @@ void StderrSinkDelegate::flush() {
 }
 
 void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
-  sink_->log(msg.formatted.str());
+  if (!formatter_) {
+    sink_->log(fmt::to_string(msg.raw));
+    return;
+  }
+
+  fmt::memory_buffer formatted;
+  formatter_->format(msg, formatted);
+  sink_->log(fmt::to_string(formatted));
 }
 
 DelegatingLogSinkPtr DelegatingLogSink::init() {

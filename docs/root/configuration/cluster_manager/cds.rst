@@ -12,7 +12,6 @@ clusters depending on what is required.
   Any clusters that are statically defined within the Envoy configuration cannot be modified or
   removed via the CDS API.
 
-* :ref:`v1 CDS API <config_cluster_manager_cds_v1>`
 * :ref:`v2 CDS API <v2_grpc_streaming_endpoints>`
 
 Statistics

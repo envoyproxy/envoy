@@ -382,6 +382,197 @@ TEST(AccessLogFormatterTest, startTimeFormatter) {
   }
 }
 
+void verifyJsonOutput(std::string json_string,
+                      std::unordered_map<std::string, std::string> expected_map) {
+  const auto parsed = Json::Factory::loadFromString(json_string);
+  for (const auto& pair : expected_map) {
+    EXPECT_EQ(parsed->getString(pair.first), pair.second);
+  }
+}
+
+TEST(AccessLogFormatterTest, JsonFormatterPlainStringTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestHeaderMapImpl request_header;
+  Http::TestHeaderMapImpl response_header;
+  Http::TestHeaderMapImpl response_trailer;
+
+  envoy::api::v2::core::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  std::unordered_map<std::string, std::string> expected_json_map = {
+      {"plain_string", "plain_string_value"}};
+
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"plain_string", "plain_string_value"}};
+  JsonFormatterImpl formatter(key_mapping);
+
+  verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
+                   expected_json_map);
+}
+TEST(AccessLogFormatterTest, JsonFormatterSingleOperatorTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestHeaderMapImpl request_header;
+  Http::TestHeaderMapImpl response_header;
+  Http::TestHeaderMapImpl response_trailer;
+
+  envoy::api::v2::core::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  std::unordered_map<std::string, std::string> expected_json_map = {{"protocol", "HTTP/1.1"}};
+
+  std::unordered_map<std::string, std::string> key_mapping = {{"protocol", "%PROTOCOL%"}};
+  JsonFormatterImpl formatter(key_mapping);
+
+  verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
+                   expected_json_map);
+}
+
+TEST(AccessLogFormatterTest, JsonFormatterNonExistentHeaderTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
+  Http::TestHeaderMapImpl response_header{{"some_response_header", "SOME_RESPONSE_HEADER"}};
+  Http::TestHeaderMapImpl response_trailer;
+
+  std::unordered_map<std::string, std::string> expected_json_map = {
+      {"protocol", "HTTP/1.1"},
+      {"some_request_header", "SOME_REQUEST_HEADER"},
+      {"nonexistent_response_header", "-"},
+      {"some_response_header", "SOME_RESPONSE_HEADER"}};
+
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"protocol", "%PROTOCOL%"},
+      {"some_request_header", "%REQ(some_request_header)%"},
+      {"nonexistent_response_header", "%RESP(nonexistent_response_header)%"},
+      {"some_response_header", "%RESP(some_response_header)%"}};
+  JsonFormatterImpl formatter(key_mapping);
+
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
+                   expected_json_map);
+}
+
+TEST(AccessLogFormatterTest, JsonFormatterAlternateHeaderTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestHeaderMapImpl request_header{{"request_present_header", "REQUEST_PRESENT_HEADER"}};
+  Http::TestHeaderMapImpl response_header{{"response_present_header", "RESPONSE_PRESENT_HEADER"}};
+  Http::TestHeaderMapImpl response_trailer;
+
+  std::unordered_map<std::string, std::string> expected_json_map = {
+      {"request_present_header_or_request_absent_header", "REQUEST_PRESENT_HEADER"},
+      {"request_absent_header_or_request_present_header", "REQUEST_PRESENT_HEADER"},
+      {"response_absent_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"},
+      {"response_present_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"}};
+
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"request_present_header_or_request_absent_header",
+       "%REQ(request_present_header?request_absent_header)%"},
+      {"request_absent_header_or_request_present_header",
+       "%REQ(request_absent_header?request_present_header)%"},
+      {"response_absent_header_or_response_absent_header",
+       "%RESP(response_absent_header?response_present_header)%"},
+      {"response_present_header_or_response_absent_header",
+       "%RESP(response_present_header?response_absent_header)%"}};
+  JsonFormatterImpl formatter(key_mapping);
+
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
+                   expected_json_map);
+}
+
+TEST(AccessLogFormatterTest, JsonFormatterDynamicMetadataTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
+  Http::TestHeaderMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
+
+  envoy::api::v2::core::Metadata metadata;
+  populateMetadataTestData(metadata);
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  std::unordered_map<std::string, std::string> expected_json_map = {
+      {"test_key", "\"test_value\""},
+      {"test_obj", "{\"inner_key\":\"inner_value\"}"},
+      {"test_obj.inner_key", "\"inner_value\""}};
+
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"test_key", "%DYNAMIC_METADATA(com.test:test_key)%"},
+      {"test_obj", "%DYNAMIC_METADATA(com.test:test_obj)%"},
+      {"test_obj.inner_key", "%DYNAMIC_METADATA(com.test:test_obj:inner_key)%"}};
+
+  JsonFormatterImpl formatter(key_mapping);
+
+  verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
+                   expected_json_map);
+}
+
+TEST(AccessLogFormatterTest, JsonFormatterStartTimeTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestHeaderMapImpl request_header;
+  Http::TestHeaderMapImpl response_header;
+  Http::TestHeaderMapImpl response_trailer;
+
+  time_t test_epoch = 1522280158;
+  SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+  EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
+
+  // Needed to take into account the behavior in non-GMT timezones.
+  struct tm time_val;
+  gmtime_r(&test_epoch, &time_val);
+  time_t expected_time_t = mktime(&time_val);
+
+  std::unordered_map<std::string, std::string> expected_json_map = {
+      {"simple_date", "2018/03/28"},
+      {"test_time", fmt::format("{}", expected_time_t)},
+      {"bad_format", "bad_format"},
+      {"default", "2018-03-28T23:35:58.000Z"},
+      {"all_zeroes", "000000000.0.00.000"}};
+
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"simple_date", "%START_TIME(%Y/%m/%d)%"},
+      {"test_time", "%START_TIME(%s)%"},
+      {"bad_format", "%START_TIME(bad_format)%"},
+      {"default", "%START_TIME%"},
+      {"all_zeroes", "%START_TIME(%f.%1f.%2f.%3f)%"}};
+  JsonFormatterImpl formatter(key_mapping);
+
+  verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
+                   expected_json_map);
+}
+
+TEST(AccessLogFormatterTest, JsonFormatterMultiTokenTest) {
+  {
+    StreamInfo::MockStreamInfo stream_info;
+    Http::TestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
+    Http::TestHeaderMapImpl response_header{{"some_response_header", "SOME_RESPONSE_HEADER"}};
+    Http::TestHeaderMapImpl response_trailer;
+
+    std::unordered_map<std::string, std::string> expected_json_map = {
+        {"multi_token_field", "HTTP/1.1 plainstring SOME_REQUEST_HEADER SOME_RESPONSE_HEADER"}};
+
+    std::unordered_map<std::string, std::string> key_mapping = {
+        {"multi_token_field",
+         "%PROTOCOL% plainstring %REQ(some_request_header)% %RESP(some_response_header)%"}};
+    JsonFormatterImpl formatter(key_mapping);
+
+    absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+    EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+    const auto parsed = Json::Factory::loadFromString(
+        formatter.format(request_header, response_header, response_trailer, stream_info));
+    for (const auto& pair : expected_json_map) {
+      EXPECT_EQ(parsed->getString(pair.first), pair.second);
+    }
+  }
+}
+
 TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
