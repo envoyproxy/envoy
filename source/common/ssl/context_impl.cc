@@ -20,6 +20,7 @@
 #include "openssl/hmac.h"
 #include "openssl/rand.h"
 #include "openssl/x509v3.h"
+#include <openssl/ssl.h>
 
 namespace Envoy {
 namespace Ssl {
@@ -483,16 +484,40 @@ CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::str
 
 ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config)
     : ContextImpl(scope, config), server_name_indication_(config.serverNameIndication()),
-      allow_renegotiation_(config.allowRenegotiation()) {
+      allow_renegotiation_(config.allowRenegotiation()), allow_session_resumption_(config.allowSessionResumption()) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
                                      parsed_alpn_protocols_.size());
     RELEASE_ASSERT(rc == 0, "");
   }
+
+  if (allow_session_resumption_) {
+    SSL_CTX_set_session_cache_mode(ctx_.get(), SSL_SESS_CACHE_CLIENT|SSL_SESS_CACHE_NO_INTERNAL);
+    SSL_CTX_sess_set_new_cb(
+      ctx_.get(),
+      [](SSL * ssl, SSL_SESSION *session) {
+        ContextImpl* context_impl = static_cast<ContextImpl*>(
+                SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslContextIndex()));
+        ClientContextImpl* client_context_impl = dynamic_cast<ClientContextImpl*>(context_impl);
+        int len = i2d_SSL_SESSION(session, NULL);
+        if (len <= ENVOY_MAX_SESSION_SIZE) {
+            client_context_impl->session_.resize(len);
+            unsigned char* temp = client_context_impl->session_.data();
+            i2d_SSL_SESSION(session, &temp);
+        }
+        return 0;
+      });
+  }
 }
 
 bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
   bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl());
+
+  if (allow_session_resumption_ && !session_.empty()) {
+      const unsigned char* temp = session_.data();
+      SSL_SESSION *session = d2i_SSL_SESSION(NULL, &temp, session_.size());
+      SSL_set_session(ssl_con.get(), session);
+  }
 
   if (!server_name_indication_.empty()) {
     int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication_.c_str());

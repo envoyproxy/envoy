@@ -279,6 +279,9 @@ message UpstreamTlsContext {
   //
   //   TLS renegotiation is considered insecure and shouldn't be used unless absolutely necessary.
   bool allow_renegotiation = 3;
+
+  // If true, clients will resume TLS sessions
+  bool allow_session_resumption = 4;
 }
 
 message DownstreamTlsContext {

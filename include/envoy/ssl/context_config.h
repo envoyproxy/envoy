@@ -86,6 +86,10 @@ public:
    * @return true if server-initiated TLS renegotiation will be allowed.
    */
   virtual bool allowRenegotiation() const PURE;
+  /**
+   * @return true if client should resume TLS sessions
+   */
+  virtual bool allowSessionResumption() const PURE;
 };
 
 typedef std::unique_ptr<ClientContextConfig> ClientContextConfigPtr;

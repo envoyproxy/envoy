@@ -19,6 +19,8 @@ namespace Envoy {
 #error Envoy requires BoringSSL
 #endif
 
+#define ENVOY_MAX_SESSION_SIZE 4096
+
 namespace Ssl {
 
 // clang-format off
@@ -146,6 +148,8 @@ public:
 private:
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
+  const bool allow_session_resumption_;
+  std::vector<uint8_t> session_;
 };
 
 class ServerContextImpl : public ContextImpl, public ServerContext {
