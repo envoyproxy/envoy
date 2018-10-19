@@ -18,8 +18,8 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
       control_plane_stats_(generateControlPlaneStats(scope)) {
   Config::Utility::checkLocalInfo("ads", local_info);
 
-  // Bucket contains 100 tokens maximum and refills at 5 tokens/sec.
-  limit_request_ = std::make_unique<TokenBucketImpl>(100, time_source_, 5);
+  // Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
+  limit_request_ = std::make_unique<TokenBucketImpl>(100, time_source_, 10);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   drain_request_timer_ = dispatcher.createTimer([this]() -> void { drainRequests(); });
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
