@@ -112,6 +112,12 @@ public:
   static Address::InstanceConstSharedPtr getLocalAddress(const Address::IpVersion version);
 
   /**
+   * Determine whether this is a local address.
+   * @return bool the address is a local address.
+   */
+  static bool isLocalConnection(const Address::Instance&, const Address::Instance&);
+
+  /**
    * Determine whether this is an internal (RFC1918) address.
    * @return bool the address is an RFC1918 address.
    */

@@ -208,6 +208,21 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
   return ret;
 }
 
+bool Utility::isLocalConnection(const Address::Instance& local_address,
+                                const Address::Instance& remote_address) {
+  auto local_ip = local_address.ip();
+  auto remote_ip = remote_address.ip();
+  if (local_ip && remote_ip) {
+    if (local_ip->ipv4() && remote_ip->ipv4()) {
+      return local_ip->ipv4()->address() == remote_ip->ipv4()->address();
+    } else if (local_ip->ipv6() && remote_ip->ipv6()) {
+      return local_ip->ipv6()->address() == remote_ip->ipv6()->address();
+    }
+  }
+
+  return local_address == remote_address;
+}
+
 bool Utility::isInternalAddress(const Address::Instance& address) {
   if (address.type() != Address::Type::Ip) {
     return false;

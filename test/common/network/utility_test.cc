@@ -132,6 +132,85 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
 
 TEST(NetworkUtility, GetOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
 
+TEST(NetworkUtility, LocalConnection) {
+  EXPECT_TRUE(Utility::isLocalConnection(Address::Ipv4Instance("127.0.0.1"),
+                                         Address::Ipv4Instance("127.0.0.1")));
+  EXPECT_FALSE(Utility::isLocalConnection(Address::Ipv4Instance("127.0.0.1"),
+                                          Address::Ipv4Instance("127.0.0.2")));
+  EXPECT_TRUE(Utility::isLocalConnection(Address::Ipv4Instance("10.0.0.1"),
+                                         Address::Ipv4Instance("10.0.0.1")));
+  EXPECT_FALSE(Utility::isLocalConnection(Address::Ipv4Instance("10.0.0.1"),
+                                          Address::Ipv4Instance("10.0.0.2")));
+  EXPECT_TRUE(Utility::isLocalConnection(Address::Ipv4Instance("192.168.0.1"),
+                                         Address::Ipv4Instance("192.168.0.1")));
+  EXPECT_FALSE(Utility::isLocalConnection(Address::Ipv4Instance("192.168.0.1"),
+                                          Address::Ipv4Instance("192.168.0.2")));
+  EXPECT_TRUE(Utility::isLocalConnection(Address::Ipv4Instance("172.16.0.1"),
+                                         Address::Ipv4Instance("172.16.0.1")));
+  EXPECT_FALSE(Utility::isLocalConnection(Address::Ipv4Instance("172.16.0.1"),
+                                          Address::Ipv4Instance("172.16.0.2")));
+  EXPECT_TRUE(Utility::isLocalConnection(Address::Ipv4Instance("172.30.2.1"),
+                                         Address::Ipv4Instance("172.30.2.1")));
+  EXPECT_FALSE(Utility::isLocalConnection(Address::Ipv4Instance("172.30.2.1"),
+                                          Address::Ipv4Instance("172.30.2.2")));
+  EXPECT_TRUE(Utility::isLocalConnection(Address::Ipv4Instance("11.0.0.1"),
+                                         Address::Ipv4Instance("11.0.0.1")));
+  EXPECT_FALSE(Utility::isLocalConnection(Address::Ipv4Instance("11.0.0.1"),
+                                          Address::Ipv4Instance("11.0.0.2")));
+
+  EXPECT_TRUE(
+      Utility::isLocalConnection(Address::Ipv6Instance("fd00::"), Address::Ipv6Instance("fd00::")));
+  EXPECT_FALSE(Utility::isLocalConnection(Address::Ipv6Instance("fd00::"),
+                                          Address::Ipv6Instance("fd00::1")));
+  EXPECT_TRUE(
+      Utility::isLocalConnection(Address::Ipv6Instance("::1"), Address::Ipv6Instance("::1")));
+  EXPECT_FALSE(
+      Utility::isLocalConnection(Address::Ipv6Instance("::1"), Address::Ipv6Instance("::2")));
+  EXPECT_TRUE(
+      Utility::isLocalConnection(Address::Ipv6Instance("fdff::"), Address::Ipv6Instance("fdff::")));
+  EXPECT_FALSE(Utility::isLocalConnection(Address::Ipv6Instance("fdff::"),
+                                          Address::Ipv6Instance("fdff::1")));
+  EXPECT_TRUE(
+      Utility::isLocalConnection(Address::Ipv6Instance("fd01::"), Address::Ipv6Instance("fd01::")));
+  EXPECT_FALSE(Utility::isLocalConnection(Address::Ipv6Instance("fd01::"),
+                                          Address::Ipv6Instance("fd01::1")));
+  EXPECT_TRUE(
+      Utility::isLocalConnection(Address::Ipv6Instance("fd12:3456:7890:1234:5678:9012:3456:7890"),
+                                 Address::Ipv6Instance("fd12:3456:7890:1234:5678:9012:3456:7890")));
+  EXPECT_FALSE(
+      Utility::isLocalConnection(Address::Ipv6Instance("fd12:3456:7890:1234:5678:9012:3456:7891"),
+                                 Address::Ipv6Instance("fd12:3456:7890:1234:5678:9012:3456:7890")));
+  EXPECT_TRUE(
+      Utility::isLocalConnection(Address::Ipv6Instance("fd::"), Address::Ipv6Instance("fd::")));
+  EXPECT_FALSE(
+      Utility::isLocalConnection(Address::Ipv6Instance("fd::"), Address::Ipv6Instance("fd::1")));
+  EXPECT_TRUE(Utility::isLocalConnection(Address::Ipv6Instance("::"), Address::Ipv6Instance("::")));
+  EXPECT_FALSE(
+      Utility::isLocalConnection(Address::Ipv6Instance("::"), Address::Ipv6Instance("::1")));
+  EXPECT_TRUE(
+      Utility::isLocalConnection(Address::Ipv6Instance("fc00::"), Address::Ipv6Instance("fc00::")));
+  EXPECT_FALSE(Utility::isLocalConnection(Address::Ipv6Instance("fc00::"),
+                                          Address::Ipv6Instance("fc00::1")));
+  EXPECT_TRUE(
+      Utility::isLocalConnection(Address::Ipv6Instance("fe00::"), Address::Ipv6Instance("fe00::")));
+  EXPECT_FALSE(Utility::isLocalConnection(Address::Ipv6Instance("fe00::"),
+                                          Address::Ipv6Instance("fe00::1")));
+
+  EXPECT_TRUE(
+      Utility::isLocalConnection(Address::PipeInstance("/hello"), Address::PipeInstance("/hello")));
+  EXPECT_FALSE(
+      Utility::isLocalConnection(Address::PipeInstance("/hello"), Address::PipeInstance("/world")));
+
+  EXPECT_FALSE(
+      Utility::isLocalConnection(Address::Ipv6Instance("::"), Address::Ipv4Instance("0.0.0.0")));
+  EXPECT_FALSE(
+      Utility::isLocalConnection(Address::Ipv6Instance("::1"), Address::Ipv4Instance("0.0.0.1")));
+  EXPECT_FALSE(
+      Utility::isLocalConnection(Address::Ipv6Instance("::1"), Address::PipeInstance("/hello")));
+  EXPECT_FALSE(Utility::isLocalConnection(Address::Ipv4Instance("10.0.0.1"),
+                                          Address::PipeInstance("/hello")));
+}
+
 TEST(NetworkUtility, InternalAddress) {
   EXPECT_TRUE(Utility::isInternalAddress(Address::Ipv4Instance("127.0.0.1")));
   EXPECT_TRUE(Utility::isInternalAddress(Address::Ipv4Instance("10.0.0.1")));
