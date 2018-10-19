@@ -5,6 +5,7 @@ Version history
 ===============
 * admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * config: removed support for the v1 API.
+* config: implement rate limiting for discovery request calls.
 * fault: removed integer percentage support.
 * http: added limits to the number and length of header modifications in all fields request_headers_to_add and response_headers_to_add. These limits are very high and should only be used as a last-resort safeguard.
 * http: no longer adding whitespace when appending X-Forwarded-For headers. **Warning**: this is not

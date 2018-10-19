@@ -249,9 +249,7 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     error_detail->set_message(e.what());
   }
   api_state_[type_url].request_.set_response_nonce(message->nonce());
-  // put the request in queue with type url.
-  request_queue_.push(type_url);
-  drainRequests();
+  queueDiscoveryRequest(type_url);
 }
 
 void GrpcMuxImpl::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
