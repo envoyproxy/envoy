@@ -353,6 +353,7 @@ public:
   MOCK_METHOD0(close, void());
 
   Address::InstanceConstSharedPtr local_address_;
+  Address::InstanceConstSharedPtr remote_address_;
 };
 
 class MockListenerConfig : public ListenerConfig {
