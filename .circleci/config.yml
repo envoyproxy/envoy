@@ -60,12 +60,10 @@ jobs:
      - run:
          name: enable ipv6
          command: |
-           cat \<<'EOF' | sudo tee /etc/docker/daemon.json
-           {
+           echo '{
              "ipv6": true,
              "fixed-cidr-v6": "2001:db8:1::/64"
-           }
-           EOF
+           }' | sudo tee /etc/docker/daemon.json
 
            sudo service docker restart
      - run: dig go.googlesource.com A go.googlesource.com AAAA # Debug IPv6 network issues

@@ -116,9 +116,6 @@ protected:
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
   static SslStats generateStats(Stats::Scope& scope);
 
-  // TODO: Move helper function to the `Ssl::Utility` namespace.
-  int32_t getDaysUntilExpiration(const X509* cert) const;
-
   std::string getCaFileName() const { return ca_file_path_; };
   std::string getCertChainFileName() const { return cert_chain_file_path_; };
 

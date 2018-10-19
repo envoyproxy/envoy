@@ -9,7 +9,7 @@ namespace Fuzz {
 
 DEFINE_PROTO_FUZZER(const test::common::access_log::TestCase& input) {
   try {
-    std::vector<AccessLog::FormatterPtr> formatters =
+    std::vector<AccessLog::FormatterProviderPtr> formatters =
         AccessLog::AccessLogFormatParser::parse(input.format());
     for (const auto& it : formatters) {
       it->format(

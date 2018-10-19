@@ -71,6 +71,7 @@ def main():
     # See https://github.com/envoyproxy/envoy/issues/1341
     argv.append("-fno-limit-debug-info")
     argv.append("-Wthread-safety")
+    argv.append("-Wgnu-conditional-omitted-operand")
   elif "gcc" in compiler or "g++" in compiler:
     # -Wmaybe-initialized is warning about many uses of absl::optional. Disable
     # to prevent build breakage. This option does not exist in clang, so setting

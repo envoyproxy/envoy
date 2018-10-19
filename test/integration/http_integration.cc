@@ -840,8 +840,8 @@ void HttpIntegrationTest::testGrpcRetry() {
 // healthy.
 void HttpIntegrationTest::testRetryPriority() {
   const Upstream::PriorityLoad priority_load{0, 100};
-  Upstream::MockRetryPriorityFactory factory(
-      std::make_shared<NiceMock<Upstream::MockRetryPriority>>(priority_load));
+  NiceMock<Upstream::MockRetryPriority> retry_priority(priority_load);
+  Upstream::MockRetryPriorityFactory factory(retry_priority);
 
   Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_factory(factory);
 

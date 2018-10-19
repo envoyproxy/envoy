@@ -5,7 +5,7 @@ set -e
 echo "Generating compilation database..."
 # The compilation database generate script doesn't support passing build options via CLI.
 # Writing them into bazelrc
-echo "build ${BAZEL_BUILD_OPTIONS}" >> tools/bazel.rc
+echo "build ${BAZEL_BUILD_OPTIONS}" >> .bazelrc
 
 # bazel build need to be run to setup virtual includes, generating files which are consumed
 # by clang-tidy
