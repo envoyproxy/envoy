@@ -17,6 +17,15 @@
 
 * Exceptions are allowed and encouraged where appropriate. When using exceptions, do not add
   additional error handing that cannot possibly happen in the case an exception is thrown.
+* Do use exceptions for:
+  - Configuration ingestion error handling. Invalid configurations (dynamic and
+    static) should throw meaningful `EnvoyException`s, the configuration
+    ingestion code will catch these.
+  - To indicate constructor failure.
+* Do not use exceptions on the data path for general purpose error handling.
+  There are some specific places we use them today, for example when wrapping
+  codecs, and legacy sites but it makes filter behavior far easier to reason
+  about if exceptions do not occur.
 * References are always preferred over pointers when the reference cannot be null. This
   includes both const and non-const references.
 * Function names should all use camel case starting with a lower case letter (e.g., `doFoo()`).
