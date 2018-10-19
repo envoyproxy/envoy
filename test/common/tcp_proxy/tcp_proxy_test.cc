@@ -1148,8 +1148,8 @@ TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
   setup();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.perRequestState().setData(
-      "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"));
+  stream_info.filterState().setData("envoy.tcp_proxy.cluster",
+                                    std::make_unique<PerConnectionCluster>("filter_state_cluster"));
   ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 

@@ -311,10 +311,10 @@ public:
    * For singleton data objects, only one filter can produce a named data object.
    * List data objects can be updated by multiple filters (append only). Both object
    * types can be consumed by multiple filters.
-   * @return the per-request state associated with this request.
+   * @return the filter state associated with this request.
    */
-  virtual FilterState& perRequestState() PURE;
-  virtual const FilterState& perRequestState() const PURE;
+  virtual FilterState& filterState() PURE;
+  virtual const FilterState& filterState() const PURE;
 
   /**
    * @param SNI value requested

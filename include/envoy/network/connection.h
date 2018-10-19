@@ -242,7 +242,9 @@ public:
   /**
    * The StreamInfo object associated with this connection. This is typically
    * used for logging purposes. Individual filters may add specific information
-   * via the FilterState object within the StreamInfo object.
+   * via the FilterState object within the StreamInfo object. The StreamInfo
+   * object in this context is one per connection i.e. different than the one in
+   * the http ConnectionManager implementation which is one per request.
    *
    * @return StreamInfo object associated with this connection.
    */
