@@ -101,6 +101,11 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
   }
 }
 
+void IntegrationTestServer::serverReady() {
+  pending_listeners_ = server().listenerManager().listeners().size();
+  server_set_.setReady();
+}
+
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic) {
   Server::TestOptionsImpl options(config_path_, version);
@@ -120,16 +125,7 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   }
   createAndRunEnvoyServer(
       options, time_system_, Network::Utility::getLocalAddress(version), *this,
-      lock, *this, std::move(random_generator),
-      [this](int listeners_size, Stats::Store* stat_store, Server::Instance* server) -> void {
-        server_ = server;
-        admin_address_ = server_->admin().socket().localAddress();
-        pending_listeners_ = listeners_size;
-        stat_store_ = stat_store;
-        server_set_.setReady();
-      });
-  server_ = nullptr;
-  stat_store_ = nullptr;
+      lock, *this, std::move(random_generator));
 }
 
 Server::TestOptionsImpl Server::TestOptionsImpl::asConfigYaml() {
@@ -142,9 +138,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Network::Address::InstanceConstSharedPtr local_address,
     TestHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
-    Runtime::RandomGeneratorPtr&& random_generator,
-    std::function<void(int, Stats::Store*, Server::Instance*)> set_return_values) {
-
+    Runtime::RandomGeneratorPtr&& random_generator) {
   Server::HotRestartNopImpl restarter;
   ThreadLocal::InstanceImpl tls;
   Stats::HeapStatDataAllocator stats_allocator;
@@ -154,9 +148,10 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
       options, time_system, local_address, hooks, restarter,
       stat_store, access_log_lock, component_factory, std::move(random_generator),
       tls);
-  set_return_values(server.listenerManager().listeners().size(),
-                    &stat_store,
-                    &server);
+  server_ = &server;
+  stat_store_ = &stat_store;
+  admin_address_ = server.admin().socket().localAddress();
+  serverReady();
   server.run();
 }
 
