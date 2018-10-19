@@ -372,11 +372,10 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
 }
 
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
-                                           const std::vector<std::string>& port_names,
-                                           Event::TestTimeSystem& time_system) {
+                                           const std::vector<std::string>& port_names) {
   test_server_ = createIntegrationTestServer(
       TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_),
-      nullptr, time_system);
+      nullptr, *time_system_);
   registerTestServerPorts(port_names);
 }
 
