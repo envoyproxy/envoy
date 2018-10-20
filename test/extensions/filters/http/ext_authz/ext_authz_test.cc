@@ -69,8 +69,7 @@ public:
   void initialize(const std::string yaml) {
     envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
     MessageUtil::loadFromYaml(yaml, proto_config);
-    config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, cm_));
-
+    config_.reset(new FilterConfig(proto_config, local_info_, runtime_, stats_store_, cm_));
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_.reset(new Filter(config_, Filters::Common::ExtAuthz::ClientPtr{client_}));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
@@ -92,8 +91,7 @@ class HttpExtAuthzFilterParamTest : public TestWithParam<CreateFilterConfigFunc*
 public:
   virtual void SetUp() override {
     envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config = (*GetParam())();
-    config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, cm_));
-
+    config_.reset(new FilterConfig(proto_config, local_info_, runtime_, stats_store_, cm_));
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_.reset(new Filter(config_, Filters::Common::ExtAuthz::ClientPtr{client_}));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
@@ -132,12 +130,26 @@ TEST_F(HttpExtAuthzFilterTest, TestAllowedRequestHeaders) {
   )EOF";
 
   initialize(config);
-  EXPECT_EQ(config_->allowedRequestHeaders().size(), 4);
+  
+  // Check allowed request headers.
+  EXPECT_EQ(config_->allowedRequestHeaders().size(), 11);
   EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Path), 1);
   EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Method), 1);
   EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Host), 1);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Authorization), 1);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().UserAgent), 1);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Cookie), 1);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().ForwardedFor), 1);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().ForwardedHost), 1);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().ForwardedProto), 1);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().ProxyAuthorization), 1);
   EXPECT_EQ(config_->allowedRequestHeaders().count(Http::LowerCaseString{"bar_header_key"}), 1);
-  EXPECT_EQ(config_->allowedAuthorizationHeaders().size(), 1);
+  
+  // Check allowed authorization headers.
+  EXPECT_EQ(config_->allowedAuthorizationHeaders().size(), 4);
+  EXPECT_EQ(config_->allowedAuthorizationHeaders().count(Http::Headers::get().WWWAuthenticate), 1);
+  EXPECT_EQ(config_->allowedAuthorizationHeaders().count(Http::Headers::get().ProxyAuthenticate), 1);
+  EXPECT_EQ(config_->allowedAuthorizationHeaders().count(Http::Headers::get().Location), 1);
   EXPECT_EQ(config_->allowedAuthorizationHeaders().count(Http::LowerCaseString{"foo_header_key"}),
             1);
 }

@@ -52,6 +52,12 @@ struct LowerCaseStringHash {
 typedef std::unordered_set<LowerCaseString, LowerCaseStringHash> LowerCaseStrUnorderedSet;
 
 /**
+ * Convenient type for a vector of lower case string and string pair.
+ */
+typedef std::vector<std::pair<const Http::LowerCaseString, const std::string>>
+    LowerCaseStringPairVec;
+
+/**
  * This is a string implementation for use in header processing. It is heavily optimized for
  * performance. It supports 3 different types of storage and can switch between them:
  * 1) A reference.

@@ -36,77 +36,47 @@ enum class FilterRequestType { Internal, External, Both };
 class FilterConfig {
 public:
   FilterConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
-               const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime, Upstream::ClusterManager& cm)
-      : local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm),
-        cluster_name_(config.grpc_service().envoy_grpc().cluster_name()),
-        allowed_authorization_headers_(
-            toAuthorizationHeaders(config.http_service().allowed_authorization_headers())),
-        allowed_request_headers_(toRequestHeaders(config.http_service().allowed_request_headers())),
-        failure_mode_allow_(config.failure_mode_allow()),
-        authorization_headers_to_add_(
-            toAuthorizationHeadersToAdd(config.http_service().authorization_headers_to_add())) {}
+               const LocalInfo::LocalInfo& local_info, const Runtime::Loader& runtime,
+               Stats::Scope& scope, Upstream::ClusterManager& cm);
 
-  const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
-  Runtime::Loader& runtime() { return runtime_; }
-  Stats::Scope& scope() { return scope_; }
-  std::string cluster() { return cluster_name_; }
-  Upstream::ClusterManager& cm() { return cm_; }
+  const LocalInfo::LocalInfo& localInfo() { return local_info_; }
+  const Runtime::Loader& runtime() { return runtime_; }
+  const std::string& cluster() { return cluster_name_; }
+
   const Http::LowerCaseStrUnorderedSet& allowedAuthorizationHeaders() {
     return allowed_authorization_headers_;
   }
+
   const Http::LowerCaseStrUnorderedSet& allowedRequestHeaders() { return allowed_request_headers_; }
 
-  bool failureModeAllow() const { return failure_mode_allow_; }
-
-  const Filters::Common::ExtAuthz::HeaderKeyValueVector& authorizationHeadersToAdd() const {
+  const Http::LowerCaseStringPairVec& authorizationHeadersToAdd() {
     return authorization_headers_to_add_;
   }
 
+  Stats::Scope& scope() const { return scope_; }
+  Upstream::ClusterManager& cm() const { return cm_; }
+
+  bool failureModeAllow() const { return failure_mode_allow_; }
+
 private:
-  static Http::LowerCaseStrUnorderedSet toRequestHeaders(
-      const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& request_headers) {
-    Http::LowerCaseStrUnorderedSet headers;
-    headers.reserve(request_headers.size() + 3);
-    headers.emplace(Http::Headers::get().Path);
-    headers.emplace(Http::Headers::get().Method);
-    headers.emplace(Http::Headers::get().Host);
-    for (const auto& header : request_headers) {
-      headers.emplace(header);
-    }
-    return headers;
-  }
-
+  static Http::LowerCaseStrUnorderedSet
+  toRequestHeaders(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& request_headers);
   static Http::LowerCaseStrUnorderedSet toAuthorizationHeaders(
-      const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& response_headers) {
-    Http::LowerCaseStrUnorderedSet headers;
-    headers.reserve(response_headers.size());
-    for (const auto& header : response_headers) {
-      headers.emplace(header);
-    }
-    return headers;
-  }
-
-  static Filters::Common::ExtAuthz::HeaderKeyValueVector toAuthorizationHeadersToAdd(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& to_add_headers) {
-    Filters::Common::ExtAuthz::HeaderKeyValueVector headers;
-    headers.reserve(to_add_headers.size());
-    for (const auto& header : to_add_headers) {
-      headers.emplace_back(
-          std::make_pair(Http::LowerCaseString(header.key()), std::string(header.value())));
-    }
-    return headers;
-  }
+      const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& response_headers);
+  static Http::LowerCaseStringPairVec toAuthorizationHeadersToAdd(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& to_add_headers);
 
   const LocalInfo::LocalInfo& local_info_;
+  const Runtime::Loader& runtime_;
+  const Http::LowerCaseStrUnorderedSet allowed_authorization_headers_;
+  const Http::LowerCaseStrUnorderedSet allowed_request_headers_;
+  const Http::LowerCaseStringPairVec authorization_headers_to_add_;
+  const std::string cluster_name_;
+
   Stats::Scope& scope_;
-  Runtime::Loader& runtime_;
   Upstream::ClusterManager& cm_;
-  std::string cluster_name_;
-  Http::LowerCaseStrUnorderedSet allowed_authorization_headers_;
-  Http::LowerCaseStrUnorderedSet allowed_request_headers_;
+
   bool failure_mode_allow_;
-  const Filters::Common::ExtAuthz::HeaderKeyValueVector authorization_headers_to_add_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;

@@ -25,6 +25,8 @@ public:
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
   const LowerCaseString Authorization{"authorization"};
+  const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
+  const LowerCaseString ProxyAuthorization{"proxy-authorization"};
   const LowerCaseString CacheControl{"cache-control"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
@@ -63,6 +65,7 @@ public:
   const LowerCaseString Expect{"expect"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
+  const LowerCaseString ForwardedHost{"x-forwarded-host"};
   const LowerCaseString ForwardedProto{"x-forwarded-proto"};
   const LowerCaseString GrpcMessage{"grpc-message"};
   const LowerCaseString GrpcStatus{"grpc-status"};
@@ -92,6 +95,7 @@ public:
   const LowerCaseString UserAgent{"user-agent"};
   const LowerCaseString Vary{"vary"};
   const LowerCaseString Via{"via"};
+  const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XB3TraceId{"x-b3-traceid"};
   const LowerCaseString XB3SpanId{"x-b3-spanid"};
   const LowerCaseString XB3ParentSpanId{"x-b3-parentspanid"};

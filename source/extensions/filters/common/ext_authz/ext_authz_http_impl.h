@@ -12,8 +12,6 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-typedef std::vector<std::pair<const Http::LowerCaseString, const std::string>> HeaderKeyValueVector;
-
 /**
  * This client implementation is used when the Ext_Authz filter needs to communicate with an
  * HTTP authorization server. Unlike the gRPC client that allows the server to define the
@@ -31,7 +29,7 @@ public:
                              const std::string& path_prefix,
                              const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers,
                              const Http::LowerCaseStrUnorderedSet& allowed_request_headers,
-                             const HeaderKeyValueVector& authorization_headers_to_add);
+                             const Http::LowerCaseStringPairVec& authorization_headers_to_add);
   ~RawHttpClientImpl();
 
   // ExtAuthz::Client
@@ -49,7 +47,7 @@ private:
   const std::string path_prefix_;
   const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers_;
   const Http::LowerCaseStrUnorderedSet& allowed_request_headers_;
-  const HeaderKeyValueVector& authorization_headers_to_add_;
+  const Http::LowerCaseStringPairVec& authorization_headers_to_add_;
   absl::optional<std::chrono::milliseconds> timeout_;
   Upstream::ClusterManager& cm_;
   Http::AsyncClient::Request* request_{};

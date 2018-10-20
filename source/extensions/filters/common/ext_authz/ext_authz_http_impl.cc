@@ -44,7 +44,7 @@ RawHttpClientImpl::RawHttpClientImpl(
     const absl::optional<std::chrono::milliseconds>& timeout, const std::string& path_prefix,
     const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers,
     const Http::LowerCaseStrUnorderedSet& allowed_request_headers,
-    const HeaderKeyValueVector& authorization_headers_to_add)
+    const Http::LowerCaseStringPairVec& authorization_headers_to_add)
     : cluster_name_(cluster_name), path_prefix_(path_prefix),
       allowed_authorization_headers_(allowed_authorization_headers),
       allowed_request_headers_(allowed_request_headers),
