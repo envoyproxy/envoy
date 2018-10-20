@@ -296,7 +296,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), idle_timeout)),
       max_grpc_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), max_grpc_timeout)),
       loader_(factory_context.runtime()), runtime_(loadRuntimeData(route.match())),
+      scheme_redirect_(route.redirect().scheme_redirect()),
       host_redirect_(route.redirect().host_redirect()),
+      port_redirect_(route.redirect().port_redirect()
+                         ? ":" + std::to_string(route.redirect().port_redirect())
+                         : ""),
       path_redirect_(route.redirect().path_redirect()),
       https_redirect_(route.redirect().https_redirect()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
@@ -498,14 +502,46 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
 std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
   ASSERT(isDirectResponse());
 
-  const char* final_host;
-  absl::string_view final_path;
   const char* final_scheme;
+  absl::string_view final_host;
+  absl::string_view final_port;
+  absl::string_view final_path;
+
+  if (!scheme_redirect_.empty()) {
+    final_scheme = scheme_redirect_.c_str();
+  } else if (https_redirect_) {
+    final_scheme = Http::Headers::get().SchemeValues.Https.c_str();
+  } else {
+    ASSERT(headers.ForwardedProto());
+    final_scheme = headers.ForwardedProto()->value().c_str();
+  }
+
+  if (!port_redirect_.empty()) {
+    final_port = port_redirect_.c_str();
+  } else {
+    final_port = "";
+  }
+
   if (!host_redirect_.empty()) {
     final_host = host_redirect_.c_str();
   } else {
     ASSERT(headers.Host());
     final_host = headers.Host()->value().c_str();
+    if (!final_port.empty()) {
+      size_t host_end;
+      // Detect if IPv6 URI
+      if (final_host[0] == '[') {
+        host_end = final_host.rfind("]:");
+        if (host_end != absl::string_view::npos) {
+          host_end += 1; // advance to :
+        }
+      } else {
+        host_end = final_host.rfind(":");
+      }
+      if (host_end != absl::string_view::npos) {
+        final_host = final_host.substr(0, host_end);
+      }
+    }
   }
 
   if (!path_redirect_.empty()) {
@@ -521,14 +557,7 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
     }
   }
 
-  if (https_redirect_) {
-    final_scheme = Http::Headers::get().SchemeValues.Https.c_str();
-  } else {
-    ASSERT(headers.ForwardedProto());
-    final_scheme = headers.ForwardedProto()->value().c_str();
-  }
-
-  return fmt::format("{}://{}{}", final_scheme, final_host, final_path);
+  return fmt::format("{}://{}{}{}", final_scheme, final_host, final_port, final_path);
 }
 
 std::multimap<std::string, std::string>
