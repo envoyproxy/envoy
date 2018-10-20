@@ -13,6 +13,10 @@
 namespace Envoy {
 namespace StreamInfo {
 
+/**
+ * FilterState represents dynamically generated information regarding a stream
+ * (TCP or HTTP level) by various filters in Envoy.
+ */
 class FilterState {
 public:
   class Object {

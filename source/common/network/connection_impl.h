@@ -15,7 +15,7 @@
 #include "common/event/libevent.h"
 #include "common/network/filter_manager_impl.h"
 #include "common/ssl/ssl_socket.h"
-#include "common/stream_info/filter_state_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -93,10 +93,8 @@ public:
     return socket_->options();
   }
   absl::string_view requestedServerName() const override { return socket_->requestedServerName(); }
-  StreamInfo::FilterState& perConnectionState() override { return per_connection_state_; }
-  const StreamInfo::FilterState& perConnectionState() const override {
-    return per_connection_state_;
-  }
+  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
 
   // Network::BufferSource
   BufferSource::StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
@@ -136,7 +134,7 @@ protected:
   TransportSocketPtr transport_socket_;
   FilterManagerImpl filter_manager_;
   ConnectionSocketPtr socket_;
-  StreamInfo::FilterStateImpl per_connection_state_;
+  StreamInfo::StreamInfoImpl stream_info_;
 
   Buffer::OwnedImpl read_buffer_;
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
