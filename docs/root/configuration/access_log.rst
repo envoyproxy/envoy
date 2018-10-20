@@ -191,6 +191,7 @@ The following command operators are supported:
   the descriptions do not apply. Possible values are:
 
   HTTP and TCP
+    * **UC**: Upstrean connection termination in addtion to 503 response code.
     * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
     * **UF**: Upstream connection failure in addition to 503 response code.
     * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
