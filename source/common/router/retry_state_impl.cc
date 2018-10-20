@@ -187,9 +187,6 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
 
 bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_headers) {
   if (retry_on_ & RetryPolicy::RETRY_ON_5XX) {
-    // wouldRetry() is passed null headers when there was an upstream reset. Currently we count an
-    // upstream reset as a "5xx" (since it will result in one). We may eventually split this out
-    // into its own type. I.e., RETRY_ON_RESET.
     if (Http::CodeUtility::is5xx(Http::Utility::getResponseStatus(response_headers))) {
       return true;
     }
