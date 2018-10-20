@@ -11,6 +11,7 @@ Version history
 * http: no longer adding whitespace when appending X-Forwarded-For headers. **Warning**: this is not
   compatible with 1.7.0 builds prior to `9d3a4eb4ac44be9f0651fcc7f87ad98c538b01ee <https://github.com/envoyproxy/envoy/pull/3610>`_.
   See `#3611 <https://github.com/envoyproxy/envoy/issues/3611>`_ for details.
+* network: removed the reference to `FilterState` in `Connection` in favor of `StreamInfo`.
 * rbac: added support for permission matching by :ref:`requested server name <envoy_api_field_config.rbac.v2alpha.Permission.requested_server_name>`.
 * router: added ability to configure arbitrary :ref:`retriable status codes. <envoy_api_field_route.RouteAction.RetryPolicy.retriable_status_codes>`
 * router: added ability to set attempt count in upstream requests, see :ref:`virtual host's include request
@@ -24,6 +25,7 @@ Version history
 * stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
+* stream: renamed `perRequestState` to `filterState` in `StreamInfo`.
 * thrift_proxy: introduced thrift rate limiter filter
 * upstream: changed how load calculation for :ref:`priority levels<arch_overview_load_balancing_priority_levels>` and :ref:`panic thresholds<arch_overview_load_balancing_panic_threshold>` interact. As long as normalized total health is 100% panic thresholds are disregarded. 
 
