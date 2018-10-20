@@ -264,18 +264,18 @@ public:
   Stats::CounterSharedPtr counter(const std::string& name) override {
     // When using the thread local store, only counters() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
-    return TestUtility::findCounter(*stat_store(), name);
+    return TestUtility::findCounter(stat_store(), name);
   }
 
   Stats::GaugeSharedPtr gauge(const std::string& name) override {
     // When using the thread local store, only gauges() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
-    return TestUtility::findGauge(*stat_store(), name);
+    return TestUtility::findGauge(stat_store(), name);
   }
 
-  std::vector<Stats::CounterSharedPtr> counters() override { return stat_store()->counters(); }
+  std::vector<Stats::CounterSharedPtr> counters() override { return stat_store().counters(); }
 
-  std::vector<Stats::GaugeSharedPtr> gauges() override { return stat_store()->gauges(); }
+  std::vector<Stats::GaugeSharedPtr> gauges() override { return stat_store().gauges(); }
 
   // TestHooks
   void onWorkerListenerAdded() override;
@@ -293,7 +293,7 @@ public:
 
   // Should not be called until createAndRunEnvoyServer() is called.
   virtual Server::Instance& server() PURE;
-  virtual Stats::Store* stat_store() PURE;
+  virtual Stats::Store& stat_store() PURE;
   virtual Network::Address::InstanceConstSharedPtr admin_address() PURE;
 
 protected:
@@ -347,7 +347,10 @@ class IntegrationTestServerImpl : public IntegrationTestServer {
     RELEASE_ASSERT(server_ != nullptr, "");
     return *server_;
   }  
-  Stats::Store* stat_store() override { return stat_store_; }
+  Stats::Store& stat_store() override {
+    RELEASE_ASSERT(stat_store_ != nullptr, "");
+    return *stat_store_;
+  }
   Network::Address::InstanceConstSharedPtr admin_address() override { return admin_address_; }
 
  private:
