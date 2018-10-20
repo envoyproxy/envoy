@@ -128,7 +128,7 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
       dispatcher.exit();
     }
   };
-  auto exitSecondTime = [&]() {
+  auto closeSecondTime = [&]() {
     if (++counter == 2) {
       dispatcher.exit();
     }
@@ -143,9 +143,9 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   } else {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { exitSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { exitSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
   }
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
@@ -257,7 +257,7 @@ const std::string testUtilV2(
       dispatcher.exit();
     }
   };
-  auto exitSecondTime = [&]() {
+  auto closeSecondTime = [&]() {
     if (++counter == 2) {
       dispatcher.exit();
     }
@@ -275,9 +275,9 @@ const std::string testUtilV2(
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   } else {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { exitSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { exitSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
   }
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
