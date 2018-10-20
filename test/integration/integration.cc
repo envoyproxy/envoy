@@ -396,4 +396,13 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
   connection.run();
 }
 
+IntegrationTestServerPtr BaseIntegrationTest::createIntegrationTestServer(
+    const std::string& bootstrap_path,
+    std::function<void()> pre_worker_start_test_steps,
+    Event::TestTimeSystem& time_system) {
+  return IntegrationTestServer::create(bootstrap_path, version_,
+                                       pre_worker_start_test_steps, deterministic_,
+                                       time_system);
+}
+
 } // namespace Envoy

@@ -58,28 +58,7 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
 }
 
 IntegrationTestServer::~IntegrationTestServer() {
-<<<<<<< HEAD
-  ENVOY_LOG(info, "stopping integration test server");
-
-  if (admin_address_ != nullptr) {
-    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-        admin_address_, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
-    EXPECT_TRUE(response->complete());
-    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  }
-
-||||||| merged common ancestors
-  ENVOY_LOG(info, "stopping integration test server");
-
-  if (admin_address_ != nullptr) {
-    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-        admin_address_, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
-    EXPECT_TRUE(response->complete());
-    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  }
-=======
   // Derived class must have shutdown server.
->>>>>>> Part way through server ownership refactor; tests passing
   thread_->join();
 }
 
@@ -116,7 +95,6 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   Stats::HeapStatDataAllocator stats_allocator;
   Stats::StatsOptionsImpl stats_options;
   Stats::ThreadLocalStoreImpl stats_store(stats_options, stats_allocator);
-  stat_store_ = &stats_store;
   Runtime::RandomGeneratorPtr random_generator;
   if (deterministic) {
     random_generator = std::make_unique<testing::NiceMock<Runtime::MockRandomGenerator>>();
@@ -133,7 +111,7 @@ Server::TestOptionsImpl Server::TestOptionsImpl::asConfigYaml() {
 }
 
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
-    OptionsImpl& options,
+    Server::TestOptionsImpl& options,
     Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address,
     TestHooks& hooks,

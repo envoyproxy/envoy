@@ -305,7 +305,7 @@ protected:
   // has been started.
   // The subclass is also responsible for tearing down this server in its destructor.
   virtual void createAndRunEnvoyServer(
-      OptionsImpl& options,
+      Server::TestOptionsImpl& options,
       Event::TimeSystem& time_system,
       Network::Address::InstanceConstSharedPtr local_address,
       TestHooks& hooks,
@@ -355,7 +355,7 @@ class IntegrationTestServerImpl : public IntegrationTestServer {
 
  private:
   void createAndRunEnvoyServer(
-      OptionsImpl& options,
+      Server::TestOptionsImpl& options,
       Event::TimeSystem& time_system,
       Network::Address::InstanceConstSharedPtr local_address,
       TestHooks& hooks,
