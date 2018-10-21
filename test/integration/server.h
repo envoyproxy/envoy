@@ -360,7 +360,7 @@ private:
                                Runtime::RandomGeneratorPtr&& random_generator) override;
 
   // Owned by this class. An owning pointer is not used because the actual allocation is done
-  // on a stack in a thread spawned by the class.
+  // on a stack in a non-main thread.
   Server::Instance* server_;
   Stats::Store* stat_store_{};
   Network::Address::InstanceConstSharedPtr admin_address_;
