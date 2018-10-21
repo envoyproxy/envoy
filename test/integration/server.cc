@@ -28,20 +28,14 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
                                   Network::Address::IpVersion ip_version) {
   OptionsImpl test_options("cluster_name", "node_name", "zone_name", spdlog::level::info);
 
-  test_options.setBaseId(0u);
-  test_options.setConcurrency(1u);
   test_options.setConfigPath(config_path);
   test_options.setConfigYaml(config_yaml);
   test_options.setV2ConfigOnly(false);
   test_options.setLocalAddressIpVersion(ip_version);
-  test_options.setLogFormat(Logger::Logger::DEFAULT_LOG_FORMAT);
-  test_options.setRestartEpoch(0u);
   test_options.setFileFlushIntervalMsec(std::chrono::milliseconds(50));
   test_options.setDrainTime(std::chrono::seconds(1));
   test_options.setParentShutdownTime(std::chrono::seconds(2));
-  test_options.setMode(Server::Mode::Serve);
   test_options.setMaxStats(16384u);
-  test_options.setHotRestartDisabled(false);
 
   return test_options;
 }
