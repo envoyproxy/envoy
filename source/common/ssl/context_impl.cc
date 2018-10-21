@@ -467,6 +467,12 @@ CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::str
   certificate_details->set_path(path);
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
   certificate_details->set_days_until_expiration(Utility::getDaysUntilExpiration(cert));
+  ProtobufWkt::Timestamp* valid_from = certificate_details->mutable_valid_from();
+  valid_from->MergeFrom(
+      Protobuf::util::TimeUtil::MillisecondsToTimestamp(Utility::getValidFrom(cert) * 1000));
+  ProtobufWkt::Timestamp* expiration_time = certificate_details->mutable_expiration_time();
+  expiration_time->MergeFrom(
+      Protobuf::util::TimeUtil::MillisecondsToTimestamp(Utility::getExpirationTime(cert) * 1000));
 
   for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
     envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
