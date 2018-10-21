@@ -374,8 +374,8 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
   test_server_ = createIntegrationTestServer(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_),
-      nullptr, *time_system_);
+      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), nullptr,
+      *time_system_);
   registerTestServerPorts(port_names);
 }
 
@@ -396,13 +396,12 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
   connection.run();
 }
 
-IntegrationTestServerPtr BaseIntegrationTest::createIntegrationTestServer(
-    const std::string& bootstrap_path,
-    std::function<void()> pre_worker_start_test_steps,
-    Event::TestTimeSystem& time_system) {
-  return IntegrationTestServer::create(bootstrap_path, version_,
-                                       pre_worker_start_test_steps, deterministic_,
-                                       time_system);
+IntegrationTestServerPtr
+BaseIntegrationTest::createIntegrationTestServer(const std::string& bootstrap_path,
+                                                 std::function<void()> pre_worker_start_test_steps,
+                                                 Event::TestTimeSystem& time_system) {
+  return IntegrationTestServer::create(bootstrap_path, version_, pre_worker_start_test_steps,
+                                       deterministic_, time_system);
 }
 
 } // namespace Envoy

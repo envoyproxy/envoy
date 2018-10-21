@@ -96,9 +96,8 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   } else {
     random_generator = std::make_unique<Runtime::RandomGeneratorImpl>();
   }
-  createAndRunEnvoyServer(
-      options, time_system_, Network::Utility::getLocalAddress(version), *this,
-      lock, *this, std::move(random_generator));
+  createAndRunEnvoyServer(options, time_system_, Network::Utility::getLocalAddress(version), *this,
+                          lock, *this, std::move(random_generator));
 }
 
 Server::TestOptionsImpl Server::TestOptionsImpl::asConfigYaml() {
@@ -106,10 +105,8 @@ Server::TestOptionsImpl Server::TestOptionsImpl::asConfigYaml() {
 }
 
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
-    Server::TestOptionsImpl& options,
-    Event::TimeSystem& time_system,
-    Network::Address::InstanceConstSharedPtr local_address,
-    TestHooks& hooks,
+    Server::TestOptionsImpl& options, Event::TimeSystem& time_system,
+    Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
   Server::HotRestartNopImpl restarter;
@@ -117,10 +114,8 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
   Stats::HeapStatDataAllocator stats_allocator;
   Stats::ThreadLocalStoreImpl stat_store(options.statsOptions(), stats_allocator);
 
-  Server::InstanceImpl server(
-      options, time_system, local_address, hooks, restarter,
-      stat_store, access_log_lock, component_factory, std::move(random_generator),
-      tls);
+  Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
+                              access_log_lock, component_factory, std::move(random_generator), tls);
   server_ = &server;
   stat_store_ = &stat_store;
   admin_address_ = server.admin().socket().localAddress();

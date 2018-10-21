@@ -207,10 +207,10 @@ public:
 protected:
   // Create the envoy server in another thread and start it.
   // Will not return until that server is listening.
-  virtual IntegrationTestServerPtr createIntegrationTestServer(
-      const std::string& bootstrap_path,
-      std::function<void()> pre_worker_start_steps,
-      Event::TestTimeSystem& time_system);
+  virtual IntegrationTestServerPtr
+  createIntegrationTestServer(const std::string& bootstrap_path,
+                              std::function<void()> pre_worker_start_steps,
+                              Event::TestTimeSystem& time_system);
 
   bool initialized() const { return initialized_; }
 

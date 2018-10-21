@@ -218,8 +218,8 @@ typedef std::unique_ptr<IntegrationTestServer> IntegrationTestServerPtr;
 
 /**
  * Wrapper for running the real server for the purpose of integration tests.
- * This class is an Abstract Base Class and delegates ownership and management 
- * of the actual envoy server to a derived class.  See the documentation for
+ * This class is an Abstract Base Class and delegates ownership and management
+ * of the actual envoy server to a derived class. See the documentation for
  * createAndRunEnvoyServer().
  */
 class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
@@ -300,19 +300,18 @@ protected:
   IntegrationTestServer(Event::TestTimeSystem& time_system, const std::string& config_path)
       : time_system_(time_system), config_path_(config_path) {}
 
-  // Create the running envoy server.  This function will call serverReady() when the virtual
+  // Create the running envoy server. This function will call serverReady() when the virtual
   // functions server(), stat_store(), and admin_address() may be called, but before the server
   // has been started.
   // The subclass is also responsible for tearing down this server in its destructor.
-  virtual void createAndRunEnvoyServer(
-      Server::TestOptionsImpl& options,
-      Event::TimeSystem& time_system,
-      Network::Address::InstanceConstSharedPtr local_address,
-      TestHooks& hooks,
-      Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
-      Runtime::RandomGeneratorPtr&& random_generator) PURE;
+  virtual void createAndRunEnvoyServer(Server::TestOptionsImpl& options,
+                                       Event::TimeSystem& time_system,
+                                       Network::Address::InstanceConstSharedPtr local_address,
+                                       TestHooks& hooks, Thread::BasicLockable& access_log_lock,
+                                       Server::ComponentFactory& component_factory,
+                                       Runtime::RandomGeneratorPtr&& random_generator) PURE;
 
-  // Will be called by subclass on server thread when the server is ready to be accessed.  The
+  // Will be called by subclass on server thread when the server is ready to be accessed. The
   // server may not have been run yet, but all server access methods (server(), stat_store(),
   // adminAddress()) will be available.
   void serverReady();
@@ -337,32 +336,30 @@ private:
 
 // Default implementation of IntegrationTestServer
 class IntegrationTestServerImpl : public IntegrationTestServer {
- public:
+public:
   IntegrationTestServerImpl(Event::TestTimeSystem& time_system, const std::string& config_path)
       : IntegrationTestServer(time_system, config_path) {}
-      
+
   ~IntegrationTestServerImpl() override;
-  
+
   Server::Instance& server() override {
     RELEASE_ASSERT(server_ != nullptr, "");
     return *server_;
-  }  
+  }
   Stats::Store& stat_store() override {
     RELEASE_ASSERT(stat_store_ != nullptr, "");
     return *stat_store_;
   }
   Network::Address::InstanceConstSharedPtr admin_address() override { return admin_address_; }
 
- private:
-  void createAndRunEnvoyServer(
-      Server::TestOptionsImpl& options,
-      Event::TimeSystem& time_system,
-      Network::Address::InstanceConstSharedPtr local_address,
-      TestHooks& hooks,
-      Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
-      Runtime::RandomGeneratorPtr&& random_generator) override;
+private:
+  void createAndRunEnvoyServer(Server::TestOptionsImpl& options, Event::TimeSystem& time_system,
+                               Network::Address::InstanceConstSharedPtr local_address,
+                               TestHooks& hooks, Thread::BasicLockable& access_log_lock,
+                               Server::ComponentFactory& component_factory,
+                               Runtime::RandomGeneratorPtr&& random_generator) override;
 
-  // Owned by this class.  An owning pointer is not used because the actual allocation is done
+  // Owned by this class. An owning pointer is not used because the actual allocation is done
   // on a stack in a thread spawned by the class.
   Server::Instance* server_;
   Stats::Store* stat_store_{};
