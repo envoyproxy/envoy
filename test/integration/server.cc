@@ -88,13 +88,8 @@ void IntegrationTestServer::serverReady() {
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic) {
   Server::TestOptionsImpl options(config_path_, version);
-  Server::HotRestartNopImpl restarter;
   Thread::MutexBasicLockable lock;
 
-  ThreadLocal::InstanceImpl tls;
-  Stats::HeapStatDataAllocator stats_allocator;
-  Stats::StatsOptionsImpl stats_options;
-  Stats::ThreadLocalStoreImpl stats_store(stats_options, stats_allocator);
   Runtime::RandomGeneratorPtr random_generator;
   if (deterministic) {
     random_generator = std::make_unique<testing::NiceMock<Runtime::MockRandomGenerator>>();
@@ -147,6 +142,6 @@ IntegrationTestServerImpl::~IntegrationTestServerImpl() {
     EXPECT_TRUE(response->complete());
     EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   }
-}  
+}
 
 } // namespace Envoy
