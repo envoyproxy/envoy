@@ -6,15 +6,20 @@
 
 #include "common/filesystem/filesystem_impl.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
 #include "test/integration/utility.h"
+#include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using Envoy::Http::Headers;
+using Envoy::Http::HeaderValueOf;
+using Envoy::Http::HttpStatusIs;
 using testing::EndsWith;
 using testing::HasSubstr;
 using testing::MatchesRegex;
@@ -58,7 +63,7 @@ TEST_P(IntegrationTest, ConnectionClose) {
   codec_client_->waitForDisconnect();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
@@ -104,6 +109,12 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 
 TEST_P(IntegrationTest, Retry) { testRetry(); }
 
+TEST_P(IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
+
+TEST_P(IntegrationTest, RetryHostPredicateFilter) { testRetryHostPredicateFilter(); }
+
+TEST_P(IntegrationTest, RetryPriority) { testRetryPriority(); }
+
 TEST_P(IntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
 
 TEST_P(IntegrationTest, EnvoyHandlingDuplicate100Continues) { testEnvoyHandling100Continue(true); }
@@ -121,6 +132,8 @@ TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
 }
 
 TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(); }
+
+TEST_P(IntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(true); }
 
 TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   testUpstreamDisconnectWithTwoRequests();
@@ -165,9 +178,9 @@ TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_NE(response->headers().GrpcStatus(), nullptr);
-  EXPECT_STREQ("2", response->headers().GrpcStatus()->value().c_str()); // Unknown gRPC error
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  EXPECT_THAT(response->headers(),
+              HeaderValueOf(Headers::get().GrpcStatus, "2")); // Unknown gRPC error
 }
 
 TEST_P(IntegrationTest, HittingEncoderFilterLimit) { testHittingEncoderFilterLimit(); }
@@ -225,21 +238,20 @@ TEST_P(IntegrationTest, TestHead) {
   // Without an explicit content length, assume we chunk for HTTP/1.1
   auto response = sendRequestAndWaitForResponse(head_request, 0, default_response_headers_, 0);
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_TRUE(response->headers().ContentLength() == nullptr);
-  ASSERT_TRUE(response->headers().TransferEncoding() != nullptr);
-  EXPECT_EQ(Http::Headers::get().TransferEncodingValues.Chunked,
-            response->headers().TransferEncoding()->value().c_str());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  EXPECT_EQ(response->headers().ContentLength(), nullptr);
+  EXPECT_THAT(response->headers(),
+              HeaderValueOf(Headers::get().TransferEncoding,
+                            Http::Headers::get().TransferEncodingValues.Chunked));
   EXPECT_EQ(0, response->body().size());
 
   // Preserve explicit content length.
   Http::TestHeaderMapImpl content_length_response{{":status", "200"}, {"content-length", "12"}};
   response = sendRequestAndWaitForResponse(head_request, 0, content_length_response, 0);
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  ASSERT_TRUE(response->headers().ContentLength() != nullptr);
-  EXPECT_STREQ(response->headers().ContentLength()->value().c_str(), "12");
-  EXPECT_TRUE(response->headers().TransferEncoding() == nullptr);
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().ContentLength, "12"));
+  EXPECT_EQ(response->headers().TransferEncoding(), nullptr);
   EXPECT_EQ(0, response->body().size());
 
   cleanupUpstreamAndDownstream();
@@ -323,7 +335,7 @@ TEST_P(IntegrationTest, TestFailedBind) {
                               {"x-envoy-upstream-rq-timeout-ms", "1000"}});
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_THAT(response->headers(), HttpStatusIs("503"));
   EXPECT_LT(0, test_server_->counter("cluster.cluster_0.bind_errors")->value());
 }
 
@@ -348,20 +360,127 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
                                                                    {"via", "foo"},
                                                                    {"connection", "close"}});
   waitForNextUpstreamRequest();
-  EXPECT_STREQ("foo, bar",
-               upstream_request_->headers().get(Http::Headers::get().Via)->value().c_str());
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().Via, "foo, bar"));
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
   codec_client_->waitForDisconnect();
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_STREQ("bar", response->headers().Via()->value().c_str());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().Via, "bar"));
 }
 
 // Validate that 100-continue works as expected with via header addition on both request and
 // response path.
 TEST_P(IntegrationTest, ViaAppendWith100Continue) {
   config_helper_.addConfigModifier(setVia("foo"));
+}
+
+// Test delayed close semantics for downstream HTTP/1.1 connections. When an early response is
+// sent by Envoy, it will wait for response acknowledgment (via FIN/RST) from the client before
+// closing the socket (with a timeout for ensuring cleanup).
+TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
+  // This test will trigger an early 413 Payload Too Large response due to buffer limits being
+  // exceeded. The following filter is needed since the router filter will never trigger a 413.
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.setBufferLimits(1024, 1024);
+  initialize();
+
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("413", response->headers().Status()->value().c_str());
+  // With no delayed close processing, Envoy will close the connection immediately after flushing
+  // and this should instead return true.
+  EXPECT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
+
+  // Issue a local close and check that the client did not pick up a remote close which can happen
+  // when delayed close semantics are disabled.
+  codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
+  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::LocalClose);
+}
+
+// Test configuration of the delayed close timeout on downstream HTTP/1.1 connections. A value of 0
+// disables delayed close processing.
+TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_delayed_close_timeout()->set_seconds(0);
+      });
+  initialize();
+
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
+
+  response->waitForEndStream();
+  // There is a potential race in the client's response processing when delayed close logic is
+  // disabled in Envoy (see https://github.com/envoyproxy/envoy/issues/2929). Depending on timing,
+  // a client may receive an RST prior to reading the response data from the socket, which may clear
+  // the receive buffers. Also, clients which don't flush the receive buffer upon receiving a remote
+  // close may also lose data (Envoy is susceptible to this).
+  // Therefore, avoid checking response code/payload here and instead simply look for the remote
+  // close.
+  EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
+  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
+}
+
+// Test that delay closed connections are eventually force closed when the timeout triggers.
+TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        // 200ms.
+        hcm.mutable_delayed_close_timeout()->set_nanos(200000000);
+      });
+
+  initialize();
+
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
+
+  response->waitForEndStream();
+  // The delayed close timeout should trigger since client is not closing the connection.
+  EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(2000)));
+  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
+            1);
 }
 
 } // namespace Envoy

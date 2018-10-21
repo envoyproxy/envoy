@@ -8,7 +8,7 @@ External Authorization
 The external authorization HTTP filter calls an external gRPC or HTTP service to check if the incoming
 HTTP request is authorized or not.
 If the request is deemed unauthorized then the request will be denied normally with 403 (Forbidden) response.
-Note that sending additional custom metadata from the authorization service to the upstream, or to the downstream is 
+Note that sending additional custom metadata from the authorization service to the upstream, to the downstream or to the authorization service is 
 also possible. This is explained in more details at :ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2alpha.ExtAuthz>`.
 
 .. tip::
@@ -46,6 +46,7 @@ A sample filter configuration for a gRPC authorization server:
       http2_protocol_options: {}
       hosts:
         - socket_address: { address: 127.0.0.1, port_value: 10003 }
+      connect_timeout: 0.25s
 
 A sample filter configuration for a raw HTTP authorization server:
 

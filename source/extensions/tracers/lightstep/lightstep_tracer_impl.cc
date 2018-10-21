@@ -19,7 +19,7 @@ namespace Lightstep {
 
 void LightStepLogger::operator()(lightstep::LogLevel level,
                                  opentracing::string_view message) const {
-  const fmt::StringRef fmt_message{message.data(), message.size()};
+  const fmt::string_view fmt_message{message.data(), message.size()};
   switch (level) {
   case lightstep::LogLevel::debug:
     ENVOY_LOG(debug, "{}", fmt_message);
@@ -129,7 +129,7 @@ void LightStepDriver::TlsLightStepTracer::enableTimer() {
   flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
 }
 
-LightStepDriver::LightStepDriver(const Json::Object& config,
+LightStepDriver::LightStepDriver(const envoy::config::trace::v2::LightstepConfig& lightstep_config,
                                  Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
                                  ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                                  std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
@@ -138,10 +138,10 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
       tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
       tls_{tls.allocateSlot()}, runtime_{runtime}, options_{std::move(options)},
       propagation_mode_{propagation_mode} {
-  Upstream::ThreadLocalCluster* cluster = cm_.get(config.getString("collector_cluster"));
+  Upstream::ThreadLocalCluster* cluster = cm_.get(lightstep_config.collector_cluster());
   if (!cluster) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
-                                     config.getString("collector_cluster")));
+                                     lightstep_config.collector_cluster()));
   }
   cluster_ = cluster->info();
 

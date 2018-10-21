@@ -46,9 +46,10 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                TransportSocketPtr&& transport_socket, bool connected)
     : transport_socket_(std::move(transport_socket)), filter_manager_(*this, *this),
-      socket_(std::move(socket)), write_buffer_(dispatcher.getWatermarkFactory().create(
-                                      [this]() -> void { this->onLowWatermark(); },
-                                      [this]() -> void { this->onHighWatermark(); })),
+      socket_(std::move(socket)), stream_info_(dispatcher.timeSystem()),
+      write_buffer_(
+          dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
+                                                  [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), id_(next_global_id_++) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -68,7 +69,8 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 }
 
 ConnectionImpl::~ConnectionImpl() {
-  ASSERT(fd() == -1);
+  ASSERT(fd() == -1 && delayed_close_timer_ == nullptr,
+         "ConnectionImpl was unexpectedly torn down without being closed.");
 
   // In general we assume that owning code has called close() previously to the destructor being
   // run. This generally must be done so that callbacks run in the correct context (vs. deferred
@@ -106,10 +108,51 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
     closeSocket(ConnectionEvent::LocalClose);
   } else {
-    // TODO(mattklein123): We need a flush timer here. We might never get open socket window.
-    ASSERT(type == ConnectionCloseType::FlushWrite);
-    close_with_flush_ = true;
+    ASSERT(type == ConnectionCloseType::FlushWrite ||
+           type == ConnectionCloseType::FlushWriteAndDelay);
+
+    // No need to continue if a FlushWrite/FlushWriteAndDelay has already been issued and there is a
+    // pending delayed close.
+    //
+    // An example of this condition manifests when a downstream connection is closed early by Envoy,
+    // such as when a route can't be matched:
+    //   In ConnectionManagerImpl::onData()
+    //     1) Via codec_->dispatch(), a local reply with a 404 is sent to the client
+    //       a) ConnectionManagerImpl::doEndStream() issues the first connection close() via
+    //          ConnectionManagerImpl::checkForDeferredClose()
+    //     2) A second close is issued by a subsequent call to
+    //        ConnectionManagerImpl::checkForDeferredClose() prior to returning from onData()
+    if (delayed_close_) {
+      return;
+    }
+
+    delayed_close_ = true;
+    const bool delayed_close_timeout_set = delayedCloseTimeout().count() > 0;
+
+    // NOTE: the delayed close timeout (if set) affects both FlushWrite and FlushWriteAndDelay
+    // closes:
+    //   1. For FlushWrite, the timeout sets an upper bound on how long to wait for the flush to
+    //   complete before the connection is locally closed.
+    //   2. For FlushWriteAndDelay, the timeout specifies an upper bound on how long to wait for the
+    //   flush to complete and the peer to close the connection before it is locally closed.
+
+    // All close types that follow do not actually close() the socket immediately so that buffered
+    // data can be written. However, we do want to stop reading to apply TCP backpressure.
     read_enabled_ = false;
+
+    // Force a closeSocket() after the write buffer is flushed if the close_type calls for it or if
+    // no delayed close timeout is set.
+    close_after_flush_ = !delayed_close_timeout_set || type == ConnectionCloseType::FlushWrite;
+
+    // Create and activate a timer which will immediately close the connection if triggered.
+    // A config value of 0 disables the timeout.
+    if (delayed_close_timeout_set) {
+      delayed_close_timer_ = dispatcher_.createTimer([this]() -> void { onDelayedCloseTimeout(); });
+      ENVOY_CONN_LOG(debug, "setting delayed close timer with timeout {} ms", *this,
+                     delayedCloseTimeout().count());
+      delayed_close_timer_->enableTimer(delayedCloseTimeout());
+    }
+
     file_event_->setEnabled(Event::FileReadyType::Write |
                             (enable_half_close_ ? 0 : Event::FileReadyType::Closed));
   }
@@ -118,7 +161,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 Connection::State ConnectionImpl::state() const {
   if (fd() == -1) {
     return State::Closed;
-  } else if (close_with_flush_) {
+  } else if (delayed_close_) {
     return State::Closing;
   } else {
     return State::Open;
@@ -128,6 +171,12 @@ Connection::State ConnectionImpl::state() const {
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   if (fd() == -1) {
     return;
+  }
+
+  // No need for a delayed close (if pending) now that the socket is being closed.
+  if (delayed_close_timer_) {
+    delayed_close_timer_->disableTimer();
+    delayed_close_timer_ = nullptr;
   }
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
@@ -234,7 +283,7 @@ void ConnectionImpl::readDisable(bool disable) {
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
   // back pressure at the kernel layer, but still get timely notification of a FIN. Note that
-  // we are not gaurenteed to get notified, so even if the remote has closed, we may not know
+  // we are not guaranteed to get notified, so even if the remote has closed, we may not know
   // until we try to write. Further note that currently we optionally don't correctly handle half
   // closed TCP connections in the sense that we assume that a remote FIN means the remote intends a
   // full close.
@@ -247,7 +296,7 @@ void ConnectionImpl::readDisable(bool disable) {
     read_enabled_ = false;
 
     // If half-close semantics are enabled, we never want early close notifications; we
-    // always want to read all avaiable data, even if the other side has closed.
+    // always want to read all available data, even if the other side has closed.
     if (detect_early_close_ && !enable_half_close_) {
       file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
     } else {
@@ -488,7 +537,7 @@ void ConnectionImpl::onWriteReady() {
     // write callback. This can happen if we manage to complete the SSL handshake in the write
     // callback, raise a connected event, and close the connection.
     closeSocket(ConnectionEvent::RemoteClose);
-  } else if ((close_with_flush_ && new_buffer_size == 0) || bothSidesHalfClosed()) {
+  } else if ((close_after_flush_ && new_buffer_size == 0) || bothSidesHalfClosed()) {
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     closeSocket(ConnectionEvent::LocalClose);
   } else if (result.action_ == PostIoAction::KeepOpen && result.bytes_processed_ > 0) {
@@ -533,6 +582,14 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 bool ConnectionImpl::bothSidesHalfClosed() {
   // If the write_buffer_ is not empty, then the end_stream has not been sent to the transport yet.
   return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
+}
+
+void ConnectionImpl::onDelayedCloseTimeout() {
+  ENVOY_CONN_LOG(debug, "triggered delayed close", *this);
+  if (connection_stats_ != nullptr && connection_stats_->delayed_close_timeouts_ != nullptr) {
+    connection_stats_->delayed_close_timeouts_->inc();
+  }
+  closeSocket(ConnectionEvent::LocalClose);
 }
 
 ClientConnectionImpl::ClientConnectionImpl(

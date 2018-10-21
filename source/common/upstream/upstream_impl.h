@@ -7,7 +7,6 @@
 #include <functional>
 #include <list>
 #include <memory>
-#include <shared_mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -26,6 +25,7 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
+#include "envoy/upstream/locality.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/callback_impl.h"
@@ -36,11 +36,12 @@
 #include "common/network/utility.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/locality.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
 #include "server/init_manager_impl.h"
+
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -64,7 +65,8 @@ public:
       Network::Address::InstanceConstSharedPtr dest_address,
       const envoy::api::v2::core::Metadata& metadata,
       const envoy::api::v2::core::Locality& locality,
-      const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config)
+      const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
+      uint32_t priority)
       : cluster_(cluster), hostname_(hostname), address_(dest_address),
         health_check_address_(health_check_config.port_value() == 0
                                   ? dest_address
@@ -75,7 +77,8 @@ public:
                     .bool_value()),
         metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)),
         locality_(locality), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
-                                                   POOL_GAUGE(stats_store_))} {}
+                                                   POOL_GAUGE(stats_store_))},
+        priority_(priority) {}
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
@@ -91,11 +94,11 @@ public:
   // TODO(rgs1): we should move to absl locks, once there's support for R/W locks. We should
   // also add lock annotations, once they work correctly with R/W locks.
   const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const override {
-    std::shared_lock<std::shared_timed_mutex> lock(metadata_mutex_);
+    absl::ReaderMutexLock lock(&metadata_mutex_);
     return metadata_;
   }
   virtual void metadata(const envoy::api::v2::core::Metadata& new_metadata) override {
-    std::unique_lock<std::shared_timed_mutex> lock(metadata_mutex_);
+    absl::WriterMutexLock lock(&metadata_mutex_);
     metadata_ = std::make_shared<envoy::api::v2::core::Metadata>(new_metadata);
   }
 
@@ -127,6 +130,8 @@ public:
   // Setting health check address is usually done at initialization. This is NOP by default.
   void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr) override {}
   const envoy::api::v2::core::Locality& locality() const override { return locality_; }
+  uint32_t priority() const override { return priority_; }
+  void priority(uint32_t priority) override { priority_ = priority; }
 
 protected:
   ClusterInfoConstSharedPtr cluster_;
@@ -134,13 +139,14 @@ protected:
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
-  mutable std::shared_timed_mutex metadata_mutex_;
-  std::shared_ptr<envoy::api::v2::core::Metadata> metadata_;
+  mutable absl::Mutex metadata_mutex_;
+  std::shared_ptr<envoy::api::v2::core::Metadata> metadata_ GUARDED_BY(metadata_mutex_);
   const envoy::api::v2::core::Locality locality_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;
   HealthCheckHostMonitorPtr health_checker_;
+  std::atomic<uint32_t> priority_;
 };
 
 /**
@@ -154,8 +160,10 @@ public:
            Network::Address::InstanceConstSharedPtr address,
            const envoy::api::v2::core::Metadata& metadata, uint32_t initial_weight,
            const envoy::api::v2::core::Locality& locality,
-           const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config)
-      : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config),
+           const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
+           uint32_t priority)
+      : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
+                            priority),
         used_(true) {
     weight(initial_weight);
   }
@@ -557,11 +565,6 @@ private:
   uint64_t pending_initialize_health_checks_{};
 };
 
-typedef std::unique_ptr<HostVector> HostListPtr;
-typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
-    LocalityWeightsMap;
-typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
-
 /**
  * Manages PriorityState of a cluster. PriorityState is a per-priority binding of a set of hosts
  * with its corresponding locality weight map. This is useful to store priorities/hosts/localities
@@ -579,7 +582,7 @@ public:
   // priority is specified by locality_lb_endpoint.priority()).
   //
   // The specified health_checker_flag is used to set the registered-host's health-flag when the
-  // lb_endpoint health status is unhealty, draining or timeout.
+  // lb_endpoint health status is unhealthy, draining or timeout.
   void
   registerHostForPriority(const std::string& hostname,
                           Network::Address::InstanceConstSharedPtr address,
@@ -651,7 +654,7 @@ protected:
    * @param hosts_added_to_current_priority will be populated with hosts added to the priority.
    * @param hosts_removed_from_current_priority will be populated with hosts removed from the
    * priority.
-   * @param updated_hosts is used to aggregate the new state of all hosts accross priority, and will
+   * @param updated_hosts is used to aggregate the new state of all hosts across priority, and will
    * be updated with the hosts that remain in this priority after the update.
    * @return whether the hosts for the priority changed.
    */

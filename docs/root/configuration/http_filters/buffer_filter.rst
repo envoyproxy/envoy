@@ -7,7 +7,6 @@ The buffer filter is used to stop filter iteration and wait for a fully buffered
 This is useful in different situations including protecting some applications from having to deal
 with partial requests and high network latency.
 
-* :ref:`v1 API reference <config_http_filters_buffer_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.buffer.v2.Buffer>`
 
 Per-Route Configuration
@@ -20,8 +19,9 @@ the virtual host, route, or weighted cluster.
 Statistics
 ----------
 
-The buffer filter outputs statistics in the *http.<stat_prefix>.buffer.* namespace. The :ref:`stat
-prefix <config_http_conn_man_stat_prefix>` comes from the owning HTTP connection manager.
+The buffer filter outputs statistics in the *http.<stat_prefix>.buffer.* namespace. The :ref:`stat prefix
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stat_prefix>` comes from the
+owning HTTP connection manager.
 
 .. csv-table::
   :header: Name, Type, Description

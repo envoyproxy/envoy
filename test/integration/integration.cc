@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/platform.h"
 #include "envoy/http/header_map.h"
 
 #include "common/api/api_impl.h"
@@ -91,9 +92,10 @@ void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool 
 void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream) {
   saw_end_stream_ = end_stream;
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
+  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
   data.getRawSlices(slices, num_slices);
-  for (Buffer::RawSlice& slice : slices) {
+  for (uint64_t i = 0; i < num_slices; i++) {
+    Buffer::RawSlice& slice = slices[i];
     body_.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 
@@ -211,10 +213,10 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
-                                         const std::string& config)
+                                         TestTimeSystemPtr time_system, const std::string& config)
     : api_(new Api::Impl(std::chrono::milliseconds(10000))),
-      mock_buffer_factory_(new NiceMock<MockBufferFactory>),
-      dispatcher_(new Event::DispatcherImpl(test_time_.timeSource(),
+      mock_buffer_factory_(new NiceMock<MockBufferFactory>), time_system_(std::move(time_system)),
+      dispatcher_(new Event::DispatcherImpl(*time_system_,
                                             Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
       version_(version), config_helper_(version, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
@@ -224,7 +226,7 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
   // notification and clear the pool connection if necessary. A real fix would require adding fairly
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  time_system_->sleep(std::chrono::milliseconds(10));
   ON_CALL(*mock_buffer_factory_, create_(_, _))
       .WillByDefault(Invoke([](std::function<void()> below_low,
                                std::function<void()> above_high) -> Buffer::Instance* {
@@ -254,10 +256,11 @@ void BaseIntegrationTest::initialize() {
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
     if (autonomous_upstream_) {
-      fake_upstreams_.emplace_back(new AutonomousUpstream(0, upstream_protocol_, version_));
+      fake_upstreams_.emplace_back(
+          new AutonomousUpstream(0, upstream_protocol_, version_, *time_system_));
     } else {
       fake_upstreams_.emplace_back(
-          new FakeUpstream(0, upstream_protocol_, version_, enable_half_close_));
+          new FakeUpstream(0, upstream_protocol_, version_, *time_system_, enable_half_close_));
     }
   }
 }
@@ -341,8 +344,8 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
-  test_server_ = IntegrationTestServer::create(bootstrap_path, version_,
-                                               pre_worker_start_test_steps_, deterministic_);
+  test_server_ = IntegrationTestServer::create(
+      bootstrap_path, version_, pre_worker_start_test_steps_, deterministic_, *time_system_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0) {
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.
@@ -372,7 +375,7 @@ void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(
       TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_, nullptr,
-      deterministic_);
+      deterministic_, *time_system_);
   registerTestServerPorts(port_names);
 }
 

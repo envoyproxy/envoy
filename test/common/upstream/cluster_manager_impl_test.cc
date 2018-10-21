@@ -24,6 +24,7 @@
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -164,9 +165,7 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 
 class ClusterManagerImplTest : public testing::Test {
 public:
-  ClusterManagerImplTest() : time_source_(system_time_source_, monotonic_time_source_) {
-    factory_.dispatcher_.setTimeSource(time_source_);
-  }
+  ClusterManagerImplTest() { factory_.dispatcher_.setTimeSystem(time_system_); }
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(
@@ -241,10 +240,8 @@ public:
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
-  NiceMock<MockSystemTimeSource> system_time_source_;
-  NiceMock<MockMonotonicTimeSource> monotonic_time_source_;
+  Event::SimulatedTimeSystem time_system_;
   MockLocalClusterUpdate local_cluster_update_;
-  TimeSource time_source_;
 };
 
 envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {
@@ -294,8 +291,7 @@ TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
-  EXPECT_CALL(system_time_source_, currentTime())
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 
   const std::string yaml = R"EOF(
   static_resources:
@@ -762,8 +758,9 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   EXPECT_EQ(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
             cluster_manager_->get("cluster_1")->loadBalancer().chooseHost(nullptr));
 
-  // Local reference, primary reference, thread local reference, host reference.
-  EXPECT_EQ(4U, cluster.info().use_count());
+  // Local reference, primary reference, thread local reference, host reference, async client
+  // reference.
+  EXPECT_EQ(5U, cluster.info().use_count());
 
   // Thread local reference should be gone.
   factory_.tls_.shutdownThread();
@@ -771,8 +768,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
-  EXPECT_CALL(system_time_source_, currentTime())
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 
   const std::string json = fmt::sprintf(
       R"EOF(
@@ -990,8 +986,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 }
 
 TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
-  EXPECT_CALL(system_time_source_, currentTime())
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 
   const std::string json = R"EOF(
   {
@@ -1861,13 +1856,40 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
   HostVector hosts_removed;
 
   // The first update should be applied immediately, because even though it's mergeable
-  // it's outside a merge window.
+  // it's outside the default merge window of 3 seconds (found in debugger as value of
+  // cluster.info()->lbConfig().update_merge_window() in ClusterManagerImpl::scheduleUpdate.
+  time_system_.sleep(std::chrono::seconds(60));
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
                                                               hosts_per_locality, {}, hosts_added,
                                                               hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+}
+
+// Tests that mergeable updates inside of a window are not applied immediately.
+TEST_F(ClusterManagerImplTest, MergedUpdatesInsideWindow) {
+  createWithLocalClusterUpdate();
+
+  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
+  HostVectorSharedPtr hosts(
+      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_added;
+  HostVector hosts_removed;
+
+  // The first update will not be applied, as we make it inside the default mergeable window of
+  // 3 seconds (found in debugger as value of cluster.info()->lbConfig().update_merge_window()
+  // in ClusterManagerImpl::scheduleUpdate. Note that initially the update-time is
+  // default-initialized to a monotonic time of 0, as is SimulatedTimeSystem::monotonic_time_.
+  time_system_.sleep(std::chrono::seconds(2));
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                              hosts_per_locality, {}, hosts_added,
+                                                              hosts_removed, absl::nullopt);
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 }
 

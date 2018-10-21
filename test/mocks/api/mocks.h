@@ -6,11 +6,13 @@
 #include "envoy/api/api.h"
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
 #include "envoy/stats/store.h"
 
 #include "common/api/os_sys_calls_impl.h"
 
 #include "test/mocks/filesystem/mocks.h"
+#include "test/test_common/test_time_system.h"
 
 #include "gmock/gmock.h"
 
@@ -23,11 +25,11 @@ public:
   ~MockApi();
 
   // Api::Api
-  Event::DispatcherPtr allocateDispatcher(TimeSource& time_source) override {
-    return Event::DispatcherPtr{allocateDispatcher_(time_source)};
+  Event::DispatcherPtr allocateDispatcher(Event::TimeSystem& time_system) override {
+    return Event::DispatcherPtr{allocateDispatcher_(time_system)};
   }
 
-  MOCK_METHOD1(allocateDispatcher_, Event::Dispatcher*(TimeSource&));
+  MOCK_METHOD1(allocateDispatcher_, Event::Dispatcher*(Event::TimeSystem&));
   MOCK_METHOD4(createFile,
                Filesystem::FileSharedPtr(const std::string& path, Event::Dispatcher& dispatcher,
                                          Thread::BasicLockable& lock, Stats::Store& stats_store));

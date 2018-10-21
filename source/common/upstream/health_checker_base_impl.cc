@@ -87,20 +87,22 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
     base_time_ms = no_traffic_interval_.count();
   }
 
-  if (interval_jitter_percent_ > 0) {
-    base_time_ms += random_.random() % (interval_jitter_percent_ * base_time_ms / 100);
+  const uint64_t jitter_percent_mod = interval_jitter_percent_ * base_time_ms / 100;
+  if (jitter_percent_mod > 0) {
+    base_time_ms += random_.random() % jitter_percent_mod;
   }
 
   if (interval_jitter_.count() > 0) {
     base_time_ms += (random_.random() % interval_jitter_.count());
   }
 
-  uint64_t min_interval = runtime_.snapshot().getInteger("health_check.min_interval", 0);
-  uint64_t max_interval = runtime_.snapshot().getInteger("health_check.max_interval",
-                                                         std::numeric_limits<uint64_t>::max());
+  const uint64_t min_interval = runtime_.snapshot().getInteger("health_check.min_interval", 0);
+  const uint64_t max_interval = runtime_.snapshot().getInteger(
+      "health_check.max_interval", std::numeric_limits<uint64_t>::max());
 
   uint64_t final_ms = std::min(base_time_ms, max_interval);
-  final_ms = std::max(final_ms, min_interval);
+  // We force a non-zero final MS, to prevent live lock.
+  final_ms = std::max(uint64_t(1), std::max(final_ms, min_interval));
   return std::chrono::milliseconds(final_ms);
 }
 
@@ -287,8 +289,7 @@ void HealthCheckEventLoggerImpl::logEjectUnhealthy(
   *event.mutable_host() = std::move(address);
   event.set_cluster_name(host->cluster().name());
   event.mutable_eject_unhealthy_event()->set_failure_type(failure_type);
-  TimestampUtil::systemClockToTimestamp(system_time_source_.currentTime(),
-                                        *event.mutable_timestamp());
+  TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
   // Make sure the type enums make it into the JSON
   const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
                                                           /* always_print_primitive_fields */ true);
@@ -305,8 +306,7 @@ void HealthCheckEventLoggerImpl::logAddHealthy(
   *event.mutable_host() = std::move(address);
   event.set_cluster_name(host->cluster().name());
   event.mutable_add_healthy_event()->set_first_check(first_check);
-  TimestampUtil::systemClockToTimestamp(system_time_source_.currentTime(),
-                                        *event.mutable_timestamp());
+  TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
   // Make sure the type enums make it into the JSON
   const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
                                                           /* always_print_primitive_fields */ true);

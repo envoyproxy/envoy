@@ -24,7 +24,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   // test in the forked process to avoid confusion when the fork happens.
   Stats::IsolatedStoreImpl stats_store;
   DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl dispatcher(test_time.timeSource());
+  Event::DispatcherImpl dispatcher(test_time.timeSystem());
 
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
                                   true);
@@ -79,7 +79,7 @@ protected:
       : version_(GetParam()),
         alt_address_(Network::Test::findOrCheckFreePort(
             Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
-        dispatcher_(test_time_.timeSource()) {}
+        dispatcher_(test_time_.timeSystem()) {}
 
   const Address::IpVersion version_;
   const Address::InstanceConstSharedPtr alt_address_;
@@ -238,6 +238,45 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
         EXPECT_EQ(*conn->localAddress(), *local_dst_address);
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
+        dispatcher_.exit();
+      }));
+
+  dispatcher_.run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ListenerImplTest, DisableAndEnableListener) {
+  testing::InSequence s1;
+
+  TcpListenSocket socket(Network::Test::getAnyAddress(version_), nullptr, true);
+  MockListenerCallbacks listener_callbacks;
+  TestListenerImpl listener(dispatcher_, socket, listener_callbacks, true, true);
+
+  // When listener is disabled, the timer should fire before any connection is accepted.
+  listener.disable();
+
+  ClientConnectionPtr client_connection =
+      dispatcher_.createClientConnection(socket.localAddress(), Address::InstanceConstSharedPtr(),
+                                         Network::Test::createRawBufferSocket(), nullptr);
+  client_connection->connect();
+  Event::TimerPtr timer = dispatcher_.createTimer([&] {
+    client_connection->close(ConnectionCloseType::NoFlush);
+    dispatcher_.exit();
+  });
+  timer->enableTimer(std::chrono::milliseconds(2000));
+
+  EXPECT_CALL(listener_callbacks, onAccept_(_, _)).Times(0);
+
+  dispatcher_.run(Event::Dispatcher::RunType::Block);
+
+  // When the listener is re-enabled, the pending connection should be accepted.
+  listener.enable();
+
+  EXPECT_CALL(listener, getLocalAddress(_))
+      .WillOnce(Invoke(
+          [](int fd) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(fd); }));
+  EXPECT_CALL(listener_callbacks, onAccept_(_, _))
+      .WillOnce(Invoke([&](ConnectionSocketPtr&, bool) -> void {
+        client_connection->close(ConnectionCloseType::NoFlush);
         dispatcher_.exit();
       }));
 

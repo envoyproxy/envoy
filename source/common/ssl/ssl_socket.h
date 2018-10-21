@@ -11,7 +11,9 @@
 
 #include "common/common/logger.h"
 #include "common/ssl/context_impl.h"
+#include "common/ssl/utility.h"
 
+#include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -69,11 +71,6 @@ private:
   void drainErrorQueue();
   void shutdownSsl();
 
-  // TODO: Move helper functions to the `Ssl::Utility` namespace.
-  std::string getUriSanFromCertificate(X509* cert) const;
-  std::string getSubjectFromCertificate(X509* cert) const;
-  std::vector<std::string> getDnsSansFromCertificate(X509* cert) const;
-
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
   bssl::UniquePtr<SSL> ssl_;
@@ -103,7 +100,8 @@ private:
   Stats::Scope& stats_scope_;
   SslSocketFactoryStats stats_;
   ClientContextConfigPtr config_;
-  ClientContextSharedPtr ssl_ctx_;
+  mutable absl::Mutex ssl_ctx_mu_;
+  ClientContextSharedPtr ssl_ctx_ GUARDED_BY(ssl_ctx_mu_);
 };
 
 class ServerSslSocketFactory : public Network::TransportSocketFactory,
@@ -126,7 +124,8 @@ private:
   SslSocketFactoryStats stats_;
   ServerContextConfigPtr config_;
   const std::vector<std::string> server_names_;
-  ServerContextSharedPtr ssl_ctx_;
+  mutable absl::Mutex ssl_ctx_mu_;
+  ServerContextSharedPtr ssl_ctx_ GUARDED_BY(ssl_ctx_mu_);
 };
 
 } // namespace Ssl

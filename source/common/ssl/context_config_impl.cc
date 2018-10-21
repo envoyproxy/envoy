@@ -65,6 +65,9 @@ getCertificateValidationContextConfigProvider(
                                          sds_secret_config.name()));
       }
       return secret_provider;
+    } else {
+      return factory_context.secretManager().findOrCreateCertificateValidationContextProvider(
+          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
     }
   }
   return nullptr;
@@ -98,7 +101,6 @@ ContextConfigImpl::ContextConfigImpl(
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), DEFAULT_ECDH_CURVES)),
       tls_certficate_provider_(getTlsCertificateConfigProvider(config, factory_context)),
-      secret_update_callback_handle_(nullptr),
       certficate_validation_context_provider_(
           getCertificateValidationContextConfigProvider(config, factory_context)),
       min_protocol_version_(
@@ -107,8 +109,11 @@ ContextConfigImpl::ContextConfigImpl(
                                                 TLS1_2_VERSION)) {}
 
 ContextConfigImpl::~ContextConfigImpl() {
-  if (secret_update_callback_handle_) {
-    secret_update_callback_handle_->remove();
+  if (tc_update_callback_handle_) {
+    tc_update_callback_handle_->remove();
+  }
+  if (cvc_update_callback_handle_) {
+    cvc_update_callback_handle_->remove();
   }
 }
 
@@ -189,7 +194,10 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       }()) {
   // TODO(PiotrSikora): Support multiple TLS certificates.
   if ((config.common_tls_context().tls_certificates().size() +
-       config.common_tls_context().tls_certificate_sds_secret_configs().size()) != 1) {
+       config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
+    throw EnvoyException("No TLS certificates found for server context");
+  } else if ((config.common_tls_context().tls_certificates().size() +
+              config.common_tls_context().tls_certificate_sds_secret_configs().size()) > 1) {
     throw EnvoyException("A single TLS certificate is required for server contexts");
   }
 }

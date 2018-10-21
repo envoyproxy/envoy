@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/address.h"
 #include "envoy/network/dns.h"
@@ -164,10 +165,10 @@ private:
         int answer_size = ips != nullptr ? ips->size() : 0;
         answer_size += !encodedCname.empty() ? 1 : 0;
 
-        // The response begins with the intial part of the request
+        // The response begins with the initial part of the request
         // (including the question section).
         const size_t response_base_len = HFIXEDSZ + name_len + QFIXEDSZ;
-        unsigned char response_base[response_base_len];
+        STACK_ALLOC_ARRAY(response_base, unsigned char, response_base_len);
         memcpy(response_base, request, response_base_len);
         DNS_HEADER_SET_QR(response_base, 1);
         DNS_HEADER_SET_AA(response_base, 0);
@@ -322,7 +323,7 @@ private:
 
 class DnsImplConstructor : public testing::Test {
 protected:
-  DnsImplConstructor() : dispatcher_(test_time_.timeSource()) {}
+  DnsImplConstructor() : dispatcher_(test_time_.timeSystem()) {}
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
 };
@@ -402,7 +403,7 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
 
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
-  DnsImplTest() : dispatcher_(test_time_.timeSource()) {}
+  DnsImplTest() : dispatcher_(test_time_.timeSystem()) {}
 
   void SetUp() override {
     resolver_ = dispatcher_.createDnsResolver({});
@@ -492,7 +493,6 @@ TEST_P(DnsImplTest, LocalLookup) {
                            [&](const std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                              address_list = results;
                            }));
-    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
     EXPECT_TRUE(hasAddress(address_list, "127.0.0.1"));
     EXPECT_FALSE(hasAddress(address_list, "::1"));
   }
@@ -507,7 +507,6 @@ TEST_P(DnsImplTest, LocalLookup) {
                              address_list = results;
                            }))
         << error_msg;
-    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
     EXPECT_TRUE(hasAddress(address_list, "::1")) << error_msg;
     EXPECT_FALSE(hasAddress(address_list, "127.0.0.1"));
 
@@ -517,7 +516,6 @@ TEST_P(DnsImplTest, LocalLookup) {
                              address_list = results;
                            }))
         << error_msg;
-    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
     EXPECT_FALSE(hasAddress(address_list, "127.0.0.1"));
     EXPECT_TRUE(hasAddress(address_list, "::1")) << error_msg;
   }
@@ -555,6 +553,29 @@ TEST_P(DnsImplTest, DnsIpAddressVersionV6) {
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(hasAddress(address_list, "1::2"));
+}
+
+// Validate exception behavior during c-ares callbacks.
+TEST_P(DnsImplTest, CallbackException) {
+  // Force immediate resolution, which will trigger a c-ares exception unsafe
+  // state providing regression coverage for #4307.
+  EXPECT_EQ(nullptr, resolver_->resolve(
+                         "1.2.3.4", DnsLookupFamily::V4Only,
+                         [&](const std::list<Address::InstanceConstSharedPtr> &&
+                             /*results*/) -> void { throw EnvoyException("Envoy exception"); }));
+  EXPECT_THROW_WITH_MESSAGE(dispatcher_.run(Event::Dispatcher::RunType::Block), EnvoyException,
+                            "Envoy exception");
+  EXPECT_EQ(nullptr, resolver_->resolve(
+                         "1.2.3.4", DnsLookupFamily::V4Only,
+                         [&](const std::list<Address::InstanceConstSharedPtr> &&
+                             /*results*/) -> void { throw std::runtime_error("runtime error"); }));
+  EXPECT_THROW_WITH_MESSAGE(dispatcher_.run(Event::Dispatcher::RunType::Block), EnvoyException,
+                            "runtime error");
+  EXPECT_EQ(nullptr, resolver_->resolve("1.2.3.4", DnsLookupFamily::V4Only,
+                                        [&](const std::list<Address::InstanceConstSharedPtr> &&
+                                            /*results*/) -> void { throw std::string(); }));
+  EXPECT_THROW_WITH_MESSAGE(dispatcher_.run(Event::Dispatcher::RunType::Block), EnvoyException,
+                            "unknown");
 }
 
 TEST_P(DnsImplTest, DnsIpAddressVersion) {

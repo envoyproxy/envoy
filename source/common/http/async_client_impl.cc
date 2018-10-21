@@ -29,15 +29,15 @@ const AsyncStreamImpl::NullPathMatchCriterion
     AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
 const std::list<LowerCaseString> AsyncStreamImpl::NullConfig::internal_only_headers_;
 
-AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,
-                                 Event::Dispatcher& dispatcher,
+AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
+                                 Stats::Store& stats_store, Event::Dispatcher& dispatcher,
                                  const LocalInfo::LocalInfo& local_info,
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random,
                                  Router::ShadowWriterPtr&& shadow_writer)
     : cluster_(cluster),
       config_("http.async-client.", local_info, stats_store, cm, runtime, random,
-              std::move(shadow_writer), true, false, false, dispatcher.timeSource()),
+              std::move(shadow_writer), true, false, false, dispatcher.timeSystem()),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -78,15 +78,15 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
                                  const absl::optional<std::chrono::milliseconds>& timeout,
                                  bool buffer_body_for_retry)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
-      router_(parent.config_), request_info_(Protocol::Http11),
+      router_(parent.config_), stream_info_(Protocol::Http11, parent.dispatcher().timeSystem()),
       tracing_config_(Tracing::EgressConfig::get()),
-      route_(std::make_shared<RouteImpl>(parent_.cluster_.name(), timeout)) {
+      route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), timeout)) {
   if (buffer_body_for_retry) {
     buffered_body_.reset(new Buffer::OwnedImpl());
   }
 
   router_.setDecoderFilterCallbacks(*this);
-  // TODO(mattklein123): Correctly set protocol in request info when we support access logging.
+  // TODO(mattklein123): Correctly set protocol in stream info when we support access logging.
 }
 
 void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {

@@ -90,7 +90,7 @@ public:
                       {":authority", "foo_cluster"},
                       {"content-type", "application/json"},
                       {"content-length",
-                       request->body() ? fmt::FormatInt(request->body()->length()).str() : "0"}}),
+                       request->body() ? fmt::format_int(request->body()->length()).str() : "0"}}),
                   request->headers());
               callbacks_ = &callbacks;
               return &request_;
@@ -407,7 +407,9 @@ TEST_F(LdsApiTest, Failure) {
   EXPECT_EQ("", lds_->versionInfo());
 
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
-  EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_failure").value());
+  EXPECT_EQ(1UL, store_.counter("listener_manager.lds.update_failure").value());
+  // Validate that the schema error increments update_rejected stat.
+  EXPECT_EQ(1UL, store_.counter("listener_manager.lds.update_failure").value());
   EXPECT_EQ(0UL, store_.gauge("listener_manager.lds.version").value());
 }
 

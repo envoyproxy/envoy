@@ -5,6 +5,7 @@
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
@@ -13,6 +14,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -34,10 +36,8 @@ namespace {
 // is provided in [grpc_]subscription_impl_test.cc.
 class GrpcMuxImplTest : public testing::Test {
 public:
-  GrpcMuxImplTest()
-      : async_client_(new Grpc::MockAsyncClient()),
-        mock_time_source_(mock_system_time_, mock_monotonic_time_) {
-    dispatcher_.setTimeSource(mock_time_source_);
+  GrpcMuxImplTest() : async_client_(new Grpc::MockAsyncClient()) {
+    dispatcher_.setTimeSystem(time_system_);
   }
 
   void setup() {
@@ -45,7 +45,7 @@ public:
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_));
+        random_, stats_));
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -77,10 +77,9 @@ public:
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
   NiceMock<MockGrpcMuxCallbacks> callbacks_;
-  NiceMock<MockSystemTimeSource> mock_system_time_;
-  NiceMock<MockMonotonicTimeSource> mock_monotonic_time_;
-  TimeSource mock_time_source_;
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Stats::IsolatedStoreImpl stats_;
 };
 
 // Validate behavior when multiple type URL watches are maintained, watches are created/destroyed
@@ -94,6 +93,7 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
   grpc_mux_->start();
+  EXPECT_EQ(1, stats_.gauge("control_plane.connected_state").value());
   expectSendMessage("bar", {"z"}, "");
   auto bar_z_sub = grpc_mux_->subscribe("bar", {"z"}, callbacks_);
   expectSendMessage("bar", {"zz", "z"}, "");
@@ -128,6 +128,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   ASSERT_TRUE(timer != nullptr); // initialized from dispatcher mock.
   EXPECT_CALL(*timer, enableTimer(_));
   grpc_mux_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
+  EXPECT_EQ(0, stats_.gauge("control_plane.connected_state").value());
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
@@ -250,7 +251,9 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
     envoy::api::v2::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
     response->add_resources()->PackFrom(load_assignment);
-    EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "1")).Times(0);
+    EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "1"))
+        .WillOnce(Invoke([](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                            const std::string&) { EXPECT_TRUE(resources.empty()); }));
     EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
         .WillOnce(
             Invoke([&load_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -308,60 +311,22 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   expectSendMessage(type_url, {}, "2");
 }
 
-// Validate behavior when we have multiple watchers that send empty updates.
-TEST_F(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
-  setup();
-  InSequence s;
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  NiceMock<MockGrpcMuxCallbacks> foo_callbacks;
-  auto foo_sub = grpc_mux_->subscribe(type_url, {"x", "y"}, foo_callbacks);
+// Exactly one test requires a mock time system to provoke behavior that cannot
+// easily be achieved with a SimulatedTimeSystem.
+class GrpcMuxImplTestWithMockTimeSystem : public GrpcMuxImplTest {
+protected:
+  GrpcMuxImplTestWithMockTimeSystem() { dispatcher_.setTimeSystem(mock_time_system_); }
 
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage(type_url, {"x", "y"}, "");
-  grpc_mux_->start();
-
-  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-      new envoy::api::v2::DiscoveryResponse());
-  response->set_type_url(type_url);
-  response->set_version_info("1");
-
-  EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1")).Times(0);
-  expectSendMessage(type_url, {"x", "y"}, "1");
-  grpc_mux_->onReceiveMessage(std::move(response));
-
-  expectSendMessage(type_url, {}, "1");
-}
-
-// Validate behavior when we have Single Watcher that sends Empty updates.
-TEST_F(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
-  setup();
-  const std::string& type_url = Config::TypeUrl::get().Cluster;
-  NiceMock<MockGrpcMuxCallbacks> foo_callbacks;
-  auto foo_sub = grpc_mux_->subscribe(type_url, {}, foo_callbacks);
-
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage(type_url, {}, "");
-  grpc_mux_->start();
-
-  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-      new envoy::api::v2::DiscoveryResponse());
-  response->set_type_url(type_url);
-  response->set_version_info("1");
-  // Validate that onConfigUpdate is called with empty resources.
-  EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
-      .WillOnce(Invoke([](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                          const std::string&) { EXPECT_TRUE(resources.empty()); }));
-  expectSendMessage(type_url, {}, "1");
-  grpc_mux_->onReceiveMessage(std::move(response));
-}
+  MockTimeSystem mock_time_system_;
+};
 
 //  Verifies that warning messages get logged when Envoy detects too many requests.
-TEST_F(GrpcMuxImplTest, TooManyRequests) {
+TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequests) {
   setup();
 
   EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(100));
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-  EXPECT_CALL(mock_monotonic_time_, currentTime())
+  EXPECT_CALL(mock_time_system_, monotonicTime())
       .WillRepeatedly(Return(std::chrono::steady_clock::time_point{}));
 
   const auto onReceiveMessage = [&](uint64_t burst) {
@@ -387,7 +352,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequests) {
                       onReceiveMessage(1));
 
   // Logging limiter waits for 5s, so a second warning message is expected.
-  EXPECT_CALL(mock_monotonic_time_, currentTime())
+  EXPECT_CALL(mock_time_system_, monotonicTime())
       .Times(4)
       .WillOnce(Return(std::chrono::steady_clock::time_point{}))
       .WillOnce(Return(std::chrono::steady_clock::time_point{std::chrono::seconds(5)}))
@@ -476,7 +441,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_),
+          random_, stats_),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
@@ -489,7 +454,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_),
+          random_, stats_),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");

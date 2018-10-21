@@ -4,7 +4,17 @@
 
 namespace Envoy {
 
-DangerousDeprecatedTestTime::DangerousDeprecatedTestTime()
-    : time_source_(system_time_, monotonic_time_) {}
+DangerousDeprecatedTestTime::DangerousDeprecatedTestTime() {}
 
+namespace Event {
+
+void TestRealTimeSystem::sleep(const Duration& duration) { std::this_thread::sleep_for(duration); }
+
+Thread::CondVar::WaitStatus TestRealTimeSystem::waitFor(Thread::MutexBasicLockable& lock,
+                                                        Thread::CondVar& condvar,
+                                                        const Duration& duration) noexcept {
+  return condvar.waitFor(lock, duration);
+}
+
+} // namespace Event
 } // namespace Envoy

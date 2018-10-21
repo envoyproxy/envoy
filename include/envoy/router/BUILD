@@ -44,6 +44,7 @@ envoy_cc_library(
         "//include/envoy/http:websocket_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:resource_manager_interface",
+        "//include/envoy/upstream:retry_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2:rds_cc",
@@ -71,6 +72,6 @@ envoy_cc_library(
     hdrs = ["string_accessor.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/request_info:filter_state_interface",
+        "//include/envoy/stream_info:filter_state_interface",
     ],
 )

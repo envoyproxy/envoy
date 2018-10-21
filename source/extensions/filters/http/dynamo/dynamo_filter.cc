@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/platform.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -23,7 +25,7 @@ namespace Dynamo {
 
 Http::FilterHeadersStatus DynamoFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   if (enabled_) {
-    start_decode_ = std::chrono::steady_clock::now();
+    start_decode_ = time_system_.monotonicTime();
     operation_ = RequestParser::parseOperation(headers);
     return Http::FilterHeadersStatus::StopIteration;
   } else {
@@ -136,17 +138,19 @@ std::string DynamoFilter::buildBody(const Buffer::Instance* buffered,
   std::string body;
   if (buffered) {
     uint64_t num_slices = buffered->getRawSlices(nullptr, 0);
-    Buffer::RawSlice slices[num_slices];
+    STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
     buffered->getRawSlices(slices, num_slices);
-    for (Buffer::RawSlice& slice : slices) {
+    for (uint64_t i = 0; i < num_slices; i++) {
+      Buffer::RawSlice& slice = slices[i];
       body.append(static_cast<const char*>(slice.mem_), slice.len_);
     }
   }
 
   uint64_t num_slices = last.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
+  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
   last.getRawSlices(slices, num_slices);
-  for (Buffer::RawSlice& slice : slices) {
+  for (uint64_t i = 0; i < num_slices; i++) {
+    Buffer::RawSlice& slice = slices[i];
     body.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 
@@ -172,7 +176,7 @@ void DynamoFilter::chargeBasicStats(uint64_t status) {
 void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::string& entity_type,
                                         uint64_t status) {
   std::chrono::milliseconds latency = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::steady_clock::now() - start_decode_);
+      time_system_.monotonicTime() - start_decode_);
 
   std::string group_string =
       Http::CodeUtility::groupStringForResponseCode(static_cast<Http::Code>(status));

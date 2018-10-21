@@ -10,7 +10,7 @@ std::string echo_config;
 class EchoIntegrationTest : public BaseIntegrationTest,
                             public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  EchoIntegrationTest() : BaseIntegrationTest(GetParam(), echo_config) {}
+  EchoIntegrationTest() : BaseIntegrationTest(GetParam(), realTime(), echo_config) {}
 
   // Called once by the gtest framework before any EchoIntegrationTests are run.
   static void SetUpTestCase() {
@@ -130,10 +130,17 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
     RawConnectionDriver connection2(
         new_listener_port, buffer,
         [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
-    connection2.run(Event::Dispatcher::RunType::NonBlock);
+    while (connection2.connecting()) {
+      // Don't busy loop, but OS X often needs a moment to decide this connection isn't happening.
+      timeSystem().sleep(std::chrono::milliseconds(10));
+
+      connection2.run(Event::Dispatcher::RunType::NonBlock);
+    }
     if (connection2.connection().state() == Network::Connection::State::Closed) {
       connect_fail = true;
       break;
+    } else {
+      connection2.close();
     }
   }
   ASSERT_TRUE(connect_fail);

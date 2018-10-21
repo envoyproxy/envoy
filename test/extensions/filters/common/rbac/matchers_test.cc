@@ -192,32 +192,44 @@ TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnection ssl;
 
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("foo"));
-  EXPECT_CALL(Const(conn), ssl()).WillOnce(Return(&ssl));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("foo"));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
 
   envoy::config::rbac::v2alpha::Principal_Authenticated auth;
-  auth.set_name("foo");
+  auth.mutable_principal_name()->set_exact("foo");
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
+
+  auth.mutable_principal_name()->set_exact("bar");
+  checkMatcher(AuthenticatedMatcher(auth), false, conn);
 }
 
 TEST(AuthenticatedMatcher, subjectPeerCertificate) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnection ssl;
 
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return(""));
-  EXPECT_CALL(ssl, subjectPeerCertificate()).WillOnce(Return("bar"));
-  EXPECT_CALL(Const(conn), ssl()).WillOnce(Return(&ssl));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(""));
+  EXPECT_CALL(ssl, subjectPeerCertificate()).WillRepeatedly(Return("bar"));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
 
   envoy::config::rbac::v2alpha::Principal_Authenticated auth;
-  auth.set_name("bar");
+  auth.mutable_principal_name()->set_exact("bar");
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
+
+  auth.mutable_principal_name()->set_exact("foo");
+  checkMatcher(AuthenticatedMatcher(auth), false, conn);
 }
 
 TEST(AuthenticatedMatcher, AnySSLSubject) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnection ssl;
-  EXPECT_CALL(Const(conn), ssl()).WillOnce(Return(&ssl));
-  checkMatcher(AuthenticatedMatcher({}), true, conn);
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("foo"));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
+
+  envoy::config::rbac::v2alpha::Principal_Authenticated auth;
+  checkMatcher(AuthenticatedMatcher(auth), true, conn);
+
+  auth.mutable_principal_name()->set_regex(".*");
+  checkMatcher(AuthenticatedMatcher(auth), true, conn);
 }
 
 TEST(AuthenticatedMatcher, NoSSL) {
@@ -251,8 +263,8 @@ TEST(PolicyMatcher, PolicyMatcher) {
   envoy::config::rbac::v2alpha::Policy policy;
   policy.add_permissions()->set_destination_port(123);
   policy.add_permissions()->set_destination_port(456);
-  policy.add_principals()->mutable_authenticated()->set_name("foo");
-  policy.add_principals()->mutable_authenticated()->set_name("bar");
+  policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("foo");
+  policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("bar");
 
   RBAC::PolicyMatcher matcher(policy);
 
@@ -276,6 +288,46 @@ TEST(PolicyMatcher, PolicyMatcher) {
   EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
   checkMatcher(matcher, false, conn);
+}
+
+const envoy::type::matcher::StringMatcher createRegexMatcher(std::string str) {
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_regex(str);
+  return matcher;
+}
+
+const envoy::type::matcher::StringMatcher createExactMatcher(std::string str) {
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_exact(str);
+  return matcher;
+}
+
+TEST(RequestedServerNameMatcher, ValidRequestedServerName) {
+  Envoy::Network::MockConnection conn;
+  EXPECT_CALL(conn, requestedServerName())
+      .Times(9)
+      .WillRepeatedly(Return(absl::string_view("www.cncf.io")));
+
+  checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*cncf.io")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*cncf.*")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(createRegexMatcher("www.*")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*io")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*")), true, conn);
+
+  checkMatcher(RequestedServerNameMatcher(createExactMatcher("")), false, conn);
+  checkMatcher(RequestedServerNameMatcher(createExactMatcher("www.cncf.io")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(createExactMatcher("xyz.cncf.io")), false, conn);
+  checkMatcher(RequestedServerNameMatcher(createExactMatcher("example.com")), false, conn);
+}
+
+TEST(RequestedServerNameMatcher, EmptyRequestedServerName) {
+  Envoy::Network::MockConnection conn;
+  EXPECT_CALL(conn, requestedServerName()).Times(3).WillRepeatedly(Return(absl::string_view("")));
+
+  checkMatcher(RequestedServerNameMatcher(createRegexMatcher(".*")), true, conn);
+
+  checkMatcher(RequestedServerNameMatcher(createExactMatcher("")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(createExactMatcher("example.com")), false, conn);
 }
 
 } // namespace

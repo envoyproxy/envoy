@@ -5,9 +5,11 @@
 #include "common/secret/sds_api.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_impl.h"
+#include "common/ssl/utility.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/common/ssl/ssl_certs_test.h"
+#include "test/common/ssl/ssl_test_utility.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -15,7 +17,9 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "openssl/x509v3.h"
 
+using Envoy::Protobuf::util::MessageDifferencer;
 using testing::NiceMock;
 using testing::ReturnRef;
 
@@ -38,52 +42,38 @@ TEST_F(SslContextImplTest, TestdNSNameMatching) {
 }
 
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
-  FILE* fp = fopen(
-      TestEnvironment::runfilesPath("test/common/ssl/test_data/san_dns_cert.pem").c_str(), "r");
-  EXPECT_NE(fp, nullptr);
-  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
-  EXPECT_NE(cert, nullptr);
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
   std::vector<std::string> verify_subject_alt_name_list = {"server1.example.com",
                                                            "server2.example.com"};
-  EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list));
-  X509_free(cert);
-  fclose(fp);
+  EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
 }
 
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
-  FILE* fp = fopen(
-      TestEnvironment::runfilesPath("test/common/ssl/test_data/san_uri_cert.pem").c_str(), "r");
-  EXPECT_NE(fp, nullptr);
-  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
-  EXPECT_NE(cert, nullptr);
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"));
   std::vector<std::string> verify_subject_alt_name_list = {"spiffe://lyft.com/fake-team",
                                                            "spiffe://lyft.com/test-team"};
-  EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list));
-  X509_free(cert);
-  fclose(fp);
+  EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
 }
 
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
-  FILE* fp = fopen(
-      TestEnvironment::runfilesPath("test/common/ssl/test_data/san_dns_cert.pem").c_str(), "r");
-  EXPECT_NE(fp, nullptr);
-  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
-  EXPECT_NE(cert, nullptr);
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
   std::vector<std::string> verify_subject_alt_name_list = {"foo", "bar"};
-  EXPECT_FALSE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list));
-  X509_free(cert);
-  fclose(fp);
+  EXPECT_FALSE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
 }
 
 TEST_F(SslContextImplTest, TestCipherSuites) {
-  std::string json = R"EOF(
-  {
-    "cipher_suites": "-ALL:+[AES128-SHA|BOGUS1]:BOGUS2:AES256-SHA"
-  }
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites: "-ALL:+[AES128-SHA|BOGUS1]:BOGUS2:AES256-SHA"
   )EOF";
 
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  ClientContextConfigImpl cfg(*loader, factory_context_);
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  ClientContextConfigImpl cfg(tls_context, factory_context_);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
@@ -94,15 +84,19 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
 }
 
 TEST_F(SslContextImplTest, TestExpiringCert) {
-  std::string json = R"EOF(
-  {
-      "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-      "private_key_file": "{{ test_tmpdir }}/unittestkey.pem"
-  }
-  )EOF";
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+ )EOF";
 
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  ClientContextConfigImpl cfg(*loader, factory_context_);
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+
+  ClientContextConfigImpl cfg(tls_context, factory_context_);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
@@ -117,15 +111,18 @@ TEST_F(SslContextImplTest, TestExpiringCert) {
 }
 
 TEST_F(SslContextImplTest, TestExpiredCert) {
-  std::string json = R"EOF(
-  {
-      "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/expired_cert.pem",
-      "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/expired_key.pem"
-  }
-  )EOF";
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/expired_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/expired_key.pem"
+)EOF";
 
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  ClientContextConfigImpl cfg(*loader, factory_context_);
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  ClientContextConfigImpl cfg(tls_context, factory_context_);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
@@ -134,16 +131,21 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformation) {
-  std::string json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
-  }
-  )EOF";
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+)EOF";
 
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  ClientContextConfigImpl cfg(*loader, factory_context_);
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  ClientContextConfigImpl cfg(tls_context, factory_context_);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
@@ -155,16 +157,83 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   // For the cert_chain, it is dynamically created when we run_envoy_test.sh which changes the
   // serial number with
   // every build. For cert_chain output, we check only for the certificate path.
-  std::string ca_cert_partial_output(TestEnvironment::substitute(
-      "Certificate Path: {{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem, Serial Number: "
-      "eaf3b0ea1d0e579a, "
-      "Days until Expiration: "));
-  std::string cert_chain_partial_output(
-      TestEnvironment::substitute("Certificate Path: {{ test_tmpdir }}/unittestcert.pem"));
+  std::string ca_cert_json = R"EOF({
+ "path": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+ "serial_number": "eaf3b0ea1d0e579a",
+ "subject_alt_names": [],
+ }
+)EOF";
 
-  EXPECT_TRUE(context->getCaCertInformation().find(ca_cert_partial_output) != std::string::npos);
-  EXPECT_TRUE(context->getCertChainInformation().find(cert_chain_partial_output) !=
-              std::string::npos);
+  std::string cert_chain_json = R"EOF({
+ "path": "{{ test_tmpdir }}/unittestcert.pem",
+ }
+)EOF";
+
+  std::string ca_cert_partial_output(TestEnvironment::substitute(ca_cert_json));
+  std::string cert_chain_partial_output(TestEnvironment::substitute(cert_chain_json));
+  envoy::admin::v2alpha::CertificateDetails certificate_details, cert_chain_details;
+  MessageUtil::loadFromJson(ca_cert_partial_output, certificate_details);
+  MessageUtil::loadFromJson(cert_chain_partial_output, cert_chain_details);
+
+  MessageDifferencer message_differencer;
+  message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
+  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()));
+}
+
+TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem"
+)EOF";
+
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  ClientContextConfigImpl cfg(tls_context, factory_context_);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
+  Stats::IsolatedStoreImpl store;
+
+  ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
+  std::string ca_cert_json = R"EOF({
+ "path": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem",
+ "serial_number": "b13ff63f2dbc118d",
+ "subject_alt_names": [
+  {
+   "dns": "server1.example.com"
+  }
+ ]
+ }
+)EOF";
+
+  std::string cert_chain_json = R"EOF({
+ "path": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem",
+ }
+)EOF";
+
+  // This is similar to the hack above, but right now we generate the ca_cert and it expires in 15
+  // days only in the first second that it's valid. We will partially match for up until Days until
+  // Expiration: 1.
+  // For the cert_chain, it is dynamically created when we run_envoy_test.sh which changes the
+  // serial number with
+  // every build. For cert_chain output, we check only for the certificate path.
+  std::string ca_cert_partial_output(TestEnvironment::substitute(ca_cert_json));
+  std::string cert_chain_partial_output(TestEnvironment::substitute(cert_chain_json));
+  envoy::admin::v2alpha::CertificateDetails certificate_details, cert_chain_details;
+  MessageUtil::loadFromJson(ca_cert_partial_output, certificate_details);
+  MessageUtil::loadFromJson(cert_chain_partial_output, cert_chain_details);
+
+  MessageDifferencer message_differencer;
+  message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
+  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()));
 }
 
 TEST_F(SslContextImplTest, TestNoCert) {
@@ -174,8 +243,8 @@ TEST_F(SslContextImplTest, TestNoCert) {
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
   ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
-  EXPECT_EQ("", context->getCaCertInformation());
-  EXPECT_EQ("", context->getCertChainInformation());
+  EXPECT_EQ(nullptr, context->getCaCertInformation());
+  EXPECT_EQ(nullptr, context->getCertChainInformation());
 }
 
 class SslServerContextImplTicketTest : public SslContextImplTest {
@@ -202,58 +271,62 @@ public:
     loadConfig(server_context_config);
   }
 
-  static void loadConfigJson(const std::string& json) {
-    Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
+  static void loadConfigYaml(const std::string& yaml) {
+    envoy::api::v2::auth::DownstreamTlsContext tls_context;
+    MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
-    ServerContextConfigImpl cfg(*loader, factory_context);
+    ServerContextConfigImpl cfg(tls_context, factory_context);
     loadConfig(cfg);
   }
 };
 
 TEST_F(SslServerContextImplTicketTest, TicketKeySuccess) {
   // Both keys are valid; no error should be thrown
-  std::string json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a",
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_b"
-    ]
-  }
-  )EOF";
-
-  EXPECT_NO_THROW(loadConfigJson(json));
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_b"
+)EOF";
+  EXPECT_NO_THROW(loadConfigYaml(yaml));
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidLen) {
   // First key is valid, second key isn't. Should throw if any keys are invalid.
-  std::string json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a",
-      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_wrong_len"
-    ]
-  }
-  )EOF";
-
-  EXPECT_THROW(loadConfigJson(json), EnvoyException);
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_wrong_len"
+)EOF";
+  EXPECT_THROW(loadConfigYaml(yaml), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidCannotRead) {
-  std::string json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "session_ticket_key_paths": [
-      "{{ test_rundir }}/test/common/ssl/test_data/this_file_does_not_exist"
-    ]
-  }
-  )EOF";
-
-  EXPECT_THROW(loadConfigJson(json), std::exception);
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/this_file_does_not_exist"
+)EOF";
+  EXPECT_THROW(loadConfigYaml(yaml), std::exception);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyNone) {
@@ -304,55 +377,68 @@ TEST_F(SslServerContextImplTicketTest, TicketKeySdsFail) {
 }
 
 TEST_F(SslServerContextImplTicketTest, CRLSuccess) {
-  std::string json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl"
-  }
-  )EOF";
-
-  EXPECT_NO_THROW(loadConfigJson(json));
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl"
+)EOF";
+  EXPECT_NO_THROW(loadConfigYaml(yaml));
 }
 
 TEST_F(SslServerContextImplTicketTest, CRLInvalid) {
-  std::string json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
-  }
-  )EOF";
-
-  EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
+)EOF";
+  EXPECT_THROW_WITH_REGEX(loadConfigYaml(yaml), EnvoyException,
                           "^Failed to load CRL from .*/not_a_crl.crl$");
 }
 
 TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
-  std::string json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
-    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
-  }
-  )EOF";
-
-  EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+    validation_context:
+      crl:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
+)EOF";
+  EXPECT_THROW_WITH_REGEX(loadConfigYaml(yaml), EnvoyException,
                           "^Failed to load CRL from .* without trusted CA$");
 }
 
 TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
-  std::string json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
-    "verify_subject_alt_name": [ "spiffe://lyft.com/testclient" ]
-  }
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(loadConfigJson(json), EnvoyException,
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+    validation_context:
+      verify_subject_alt_name: "spiffe://lyft.com/testclient"
+)EOF";
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException,
                             "SAN-based verification of peer certificates without trusted CA "
                             "is insecure and not allowed");
 }
@@ -455,6 +541,48 @@ TEST(ClientContextConfigImplTest, SecretNotReady) {
   ClientContextConfigImpl client_context_config(tls_context, factory_context);
   // When sds secret is not downloaded, config is not ready.
   EXPECT_FALSE(client_context_config.isReady());
+  // Set various callbacks to config.
+  NiceMock<Secret::MockSecretCallbacks> secret_callback;
+  client_context_config.setSecretUpdateCallback(
+      [&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+  client_context_config.setSecretUpdateCallback([]() {});
+}
+
+// Validate client context config supports SDS, and is marked as not ready if dynamic
+// certificate validation context is not yet downloaded.
+TEST(ClientContextConfigImplTest, ValidationContextNotReady) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockRandomGenerator> random;
+  Stats::IsolatedStoreImpl stats;
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context, random()).WillOnce(ReturnRef(random));
+  EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats));
+  EXPECT_CALL(factory_context, clusterManager()).WillOnce(ReturnRef(cluster_manager));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+  auto sds_secret_configs =
+      tls_context.mutable_common_tls_context()->mutable_validation_context_sds_secret_config();
+  sds_secret_configs->set_name("abc.com");
+  sds_secret_configs->mutable_sds_config();
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+  // When sds secret is not downloaded, config is not ready.
+  EXPECT_FALSE(client_context_config.isReady());
+  // Set various callbacks to config.
+  NiceMock<Secret::MockSecretCallbacks> secret_callback;
+  client_context_config.setSecretUpdateCallback(
+      [&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+  client_context_config.setSecretUpdateCallback([]() {});
 }
 
 // Validate that client context config with static TLS certificates is created successfully.
@@ -610,7 +738,7 @@ TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl client_context_config(tls_context, factory_context), EnvoyException,
-      "A single TLS certificate is required for server contexts");
+      "No TLS certificates found for server context");
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   EXPECT_THROW_WITH_MESSAGE(
@@ -623,7 +751,7 @@ TEST(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl server_context_config(tls_context, factory_context), EnvoyException,
-      "A single TLS certificate is required for server contexts");
+      "No TLS certificates found for server context");
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
   EXPECT_THROW_WITH_MESSAGE(
@@ -653,6 +781,48 @@ TEST(ServerContextConfigImplTest, SecretNotReady) {
   ServerContextConfigImpl server_context_config(tls_context, factory_context);
   // When sds secret is not downloaded, config is not ready.
   EXPECT_FALSE(server_context_config.isReady());
+  // Set various callbacks to config.
+  NiceMock<Secret::MockSecretCallbacks> secret_callback;
+  server_context_config.setSecretUpdateCallback(
+      [&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+  server_context_config.setSecretUpdateCallback([]() {});
+}
+
+// Validate server context config supports SDS, and is marked as not ready if dynamic
+// certificate validation context is not yet downloaded.
+TEST(ServerContextConfigImplTest, ValidationContextNotReady) {
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockRandomGenerator> random;
+  Stats::IsolatedStoreImpl stats;
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context, random()).WillOnce(ReturnRef(random));
+  EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats));
+  EXPECT_CALL(factory_context, clusterManager()).WillOnce(ReturnRef(cluster_manager));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+  auto sds_secret_configs =
+      tls_context.mutable_common_tls_context()->mutable_validation_context_sds_secret_config();
+  sds_secret_configs->set_name("abc.com");
+  sds_secret_configs->mutable_sds_config();
+  ServerContextConfigImpl server_context_config(tls_context, factory_context);
+  // When sds secret is not downloaded, config is not ready.
+  EXPECT_FALSE(server_context_config.isReady());
+  // Set various callbacks to config.
+  NiceMock<Secret::MockSecretCallbacks> secret_callback;
+  server_context_config.setSecretUpdateCallback(
+      [&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+  server_context_config.setSecretUpdateCallback([]() {});
 }
 
 // TlsCertificate messages must have a cert for servers.

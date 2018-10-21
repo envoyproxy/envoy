@@ -579,7 +579,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
       config_tracker_entry_(server.admin().getConfigTracker().add(
           "listeners", [this] { return dumpListenerConfigs(); })) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
-    workers_.emplace_back(worker_factory.createWorker());
+    workers_.emplace_back(worker_factory.createWorker(server.overloadManager()));
   }
 }
 

@@ -24,8 +24,8 @@
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
 #include "common/http/utility.h"
-#include "common/request_info/request_info_impl.h"
 #include "common/router/config_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -147,7 +147,7 @@ class Filter : Logger::Loggable<Logger::Id::router>,
 public:
   Filter(FilterConfig& config)
       : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
-        do_shadowing_(false) {}
+        do_shadowing_(false), is_retry_(false) {}
 
   ~Filter();
 
@@ -166,7 +166,7 @@ public:
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
         return hash_policy->generateHash(
-            callbacks_->requestInfo().downstreamRemoteAddress().get(), *downstream_headers_,
+            callbacks_->streamInfo().downstreamRemoteAddress().get(), *downstream_headers_,
             [this](const std::string& key, const std::string& path, std::chrono::seconds max_age) {
               return addDownstreamSetCookie(key, path, max_age);
             });
@@ -184,7 +184,7 @@ public:
       }
 
       // The request's metadata, if present, takes precedence over the route's.
-      const auto& request_metadata = callbacks_->requestInfo().dynamicMetadata().filter_metadata();
+      const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
       const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
       if (filter_it != request_metadata.end()) {
         if (route_entry_->metadataMatchCriteria() != nullptr) {
@@ -203,6 +203,36 @@ public:
     return callbacks_->connection();
   }
   const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_; }
+
+  bool shouldSelectAnotherHost(const Upstream::Host& host) override {
+    // We only care about host selection when performing a retry, at which point we consult the
+    // RetryState to see if we're configured to avoid certain hosts during retries.
+    if (!is_retry_) {
+      return false;
+    }
+
+    ASSERT(retry_state_);
+    return retry_state_->shouldSelectAnotherHost(host);
+  }
+
+  const Upstream::PriorityLoad&
+  determinePriorityLoad(const Upstream::PrioritySet& priority_set,
+                        const Upstream::PriorityLoad& original_priority_load) override {
+    // We only modify the priority load on retries.
+    if (!is_retry_) {
+      return original_priority_load;
+    }
+
+    return retry_state_->priorityLoadForRetry(priority_set, original_priority_load);
+  }
+
+  uint32_t hostSelectionRetryCount() const override {
+    if (!is_retry_) {
+      return 1;
+    }
+
+    return retry_state_->hostSelectionMaxAttempts();
+  }
 
   /**
    * Set a computed cookie to be sent with the downstream headers.
@@ -248,9 +278,9 @@ private:
     void maybeEndDecode(bool end_stream);
 
     void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
-      request_info_.onUpstreamHostSelected(host);
+      stream_info_.onUpstreamHostSelected(host);
       upstream_host_ = host;
-      parent_.callbacks_->requestInfo().onUpstreamHostSelected(host);
+      parent_.callbacks_->streamInfo().onUpstreamHostSelected(host);
     }
 
     // Http::StreamDecoder
@@ -305,7 +335,7 @@ private:
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
     DownstreamWatermarkManager downstream_watermark_manager_{*this};
     Tracing::SpanPtr span_;
-    RequestInfo::RequestInfoImpl request_info_;
+    StreamInfo::StreamInfoImpl stream_info_;
     Http::HeaderMap* upstream_headers_{};
     Http::HeaderMap* upstream_trailers_{};
 
@@ -319,7 +349,7 @@ private:
 
   enum class UpstreamResetType { Reset, GlobalTimeout, PerTryTimeout };
 
-  RequestInfo::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
+  StreamInfo::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
   static const std::string upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
   void chargeUpstreamCode(uint64_t response_status_code, const Http::HeaderMap& response_headers,
@@ -377,6 +407,9 @@ private:
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool do_shadowing_ : 1;
+  bool is_retry_ : 1;
+  bool include_attempt_count_ : 1;
+  uint32_t attempt_count_{1};
 };
 
 class ProdFilter : public Filter {

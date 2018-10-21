@@ -43,7 +43,8 @@ message Bootstrap {
     // IP or DNS-based).
     repeated envoy.api.v2.Cluster clusters = 2 [(gogoproto.nullable) = false];
 
-    // [#not-implemented-hide:]
+    // These static secrets can be used by :ref:`SdsSecretConfig
+    // <envoy_api_msg_auth.SdsSecretConfig>`
     repeated envoy.api.v2.auth.Secret secrets = 3 [(gogoproto.nullable) = false];
   }
   // Statically specified resources.
@@ -123,7 +124,7 @@ message Bootstrap {
   Runtime runtime = 11;
 
   // Configuration for the local administration HTTP server.
-  Admin admin = 12 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  Admin admin = 12;
 
   // Optional overload manager configuration.
   envoy.config.overload.v2alpha.OverloadManager overload_manager = 15;
@@ -133,16 +134,17 @@ message Bootstrap {
 // <operations_admin_interface>`.
 message Admin {
   // The path to write the access log for the administration server. If no
-  // access log is desired specify ‘/dev/null’.
-  string access_log_path = 1 [(validate.rules).string.min_bytes = 1];
+  // access log is desired specify ‘/dev/null’. This is only required if
+  // :ref:`address <envoy_api_field_config.bootstrap.v2.Admin.address>` is set.
+  string access_log_path = 1;
 
   // The cpu profiler output path for the administration server. If no profile
   // path is specified, the default is ‘/var/log/envoy/envoy.prof’.
   string profile_path = 2;
 
   // The TCP address that the administration server will listen on.
-  envoy.api.v2.core.Address address = 3
-      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  // If not specified, Envoy will not start an administration server.
+  envoy.api.v2.core.Address address = 3;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
@@ -151,7 +153,7 @@ message ClusterManager {
   // this configuration). In order to enable :ref:`zone aware routing
   // <arch_overview_load_balancing_zone_aware_routing>` this option must be set.
   // If *local_cluster_name* is defined then :ref:`clusters
-  // <config_cluster_manager_clusters>` must be defined in the :ref:`Bootstrap
+  // <envoy_api_msg_Cluster>` must be defined in the :ref:`Bootstrap
   // static cluster resources
   // <envoy_api_field_config.bootstrap.v2.Bootstrap.StaticResources.clusters>`. This is unrelated to
   // the :option:`--service-cluster` option which does not `affect zone aware

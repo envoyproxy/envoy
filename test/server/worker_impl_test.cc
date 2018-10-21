@@ -31,12 +31,13 @@ public:
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(test_time.timeSource());
+  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(test_time.timeSystem());
   Network::MockConnectionHandler* handler_ = new Network::MockConnectionHandler();
   NiceMock<MockGuardDog> guard_dog_;
+  NiceMock<MockOverloadManager> overload_manager_;
   DefaultTestHooks hooks_;
   WorkerImpl worker_{tls_, hooks_, Event::DispatcherPtr{dispatcher_},
-                     Network::ConnectionHandlerPtr{handler_}};
+                     Network::ConnectionHandlerPtr{handler_}, overload_manager_};
   Event::TimerPtr no_exit_timer_ = dispatcher_->createTimer([]() -> void {});
 };
 

@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <list>
 #include <stdexcept>
@@ -11,6 +12,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/platform.h"
 #include "envoy/http/codec.h"
 
 #include "common/common/empty_string.h"
@@ -25,6 +27,7 @@
 
 #include "test/test_common/printers.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
@@ -32,12 +35,17 @@ using testing::GTEST_FLAG(random_seed);
 
 namespace Envoy {
 
-static const int32_t SEED = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                std::chrono::system_clock::now().time_since_epoch())
-                                .count();
+// The purpose of using the static seed here is to use --test_arg=--gtest_random_seed=[seed]
+// to specify the seed of the problem to replay.
+int32_t getSeed() {
+  static const int32_t seed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                  std::chrono::system_clock::now().time_since_epoch())
+                                  .count();
+  return seed;
+}
 
 TestRandomGenerator::TestRandomGenerator()
-    : seed_(GTEST_FLAG(random_seed) == 0 ? SEED : GTEST_FLAG(random_seed)), generator_(seed_) {
+    : seed_(GTEST_FLAG(random_seed) == 0 ? getSeed() : GTEST_FLAG(random_seed)), generator_(seed_) {
   std::cerr << "TestRandomGenerator running with seed " << seed_ << "\n";
 }
 
@@ -82,9 +90,9 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
     return false;
   }
 
-  Buffer::RawSlice lhs_slices[lhs_num_slices];
+  STACK_ALLOC_ARRAY(lhs_slices, Buffer::RawSlice, lhs_num_slices);
   lhs.getRawSlices(lhs_slices, lhs_num_slices);
-  Buffer::RawSlice rhs_slices[rhs_num_slices];
+  STACK_ALLOC_ARRAY(rhs_slices, Buffer::RawSlice, rhs_num_slices);
   rhs.getRawSlices(rhs_slices, rhs_num_slices);
   for (size_t i = 0; i < lhs_num_slices; i++) {
     if (lhs_slices[i].len_ != rhs_slices[i].len_) {
@@ -112,21 +120,11 @@ void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint6
 }
 
 Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, const std::string& name) {
-  for (auto counter : store.counters()) {
-    if (counter->name() == name) {
-      return counter;
-    }
-  }
-  return nullptr;
+  return findByName(store.counters(), name);
 }
 
 Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::string& name) {
-  for (auto gauge : store.gauges()) {
-    if (gauge->name() == name) {
-      return gauge;
-    }
-  }
-  return nullptr;
+  return findByName(store.gauges(), name);
 }
 
 std::list<Network::Address::InstanceConstSharedPtr>
@@ -211,6 +209,29 @@ void ConditionalInitializer::waitReady() {
 
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
 ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
+
+AtomicFileUpdater::AtomicFileUpdater(const std::string& filename)
+    : link_(filename), new_link_(absl::StrCat(filename, ".new")),
+      target1_(absl::StrCat(filename, ".target1")), target2_(absl::StrCat(filename, ".target2")),
+      use_target1_(true) {
+  unlink(link_.c_str());
+  unlink(new_link_.c_str());
+  unlink(target1_.c_str());
+  unlink(target2_.c_str());
+}
+
+void AtomicFileUpdater::update(const std::string& contents) {
+  const std::string target = use_target1_ ? target1_ : target2_;
+  use_target1_ = !use_target1_;
+  {
+    std::ofstream file(target);
+    file << contents;
+  }
+  int rc = symlink(target.c_str(), new_link_.c_str());
+  ASSERT_EQ(0, rc) << strerror(errno);
+  rc = rename(new_link_.c_str(), link_.c_str());
+  ASSERT_EQ(0, rc) << strerror(errno);
+}
 
 constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
 

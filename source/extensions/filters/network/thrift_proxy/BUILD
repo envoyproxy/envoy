@@ -54,6 +54,7 @@ envoy_cc_library(
     name = "conn_manager_lib",
     srcs = ["conn_manager.cc"],
     hdrs = ["conn_manager.h"],
+    external_deps = ["abseil_any"],
     deps = [
         ":app_exception_lib",
         ":decoder_lib",
@@ -72,6 +73,7 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:logger_lib",
         "//source/common/network:filter_lib",
+        "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/network/thrift_proxy/router:router_interface",
     ],
 )
@@ -105,8 +107,18 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":thrift_lib",
+        ":tracing_interface",
+        "//include/envoy/buffer:buffer_interface",
         "//source/common/common:macros",
+        "//source/common/http:header_map_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "tracing_interface",
+    hdrs = ["tracing.h"],
+    external_deps = ["abseil_optional"],
+    deps = [],
 )
 
 envoy_cc_library(
@@ -128,9 +140,12 @@ envoy_cc_library(
     ],
     external_deps = ["abseil_optional"],
     deps = [
+        ":conn_state_lib",
         ":decoder_events_lib",
         ":metadata_lib",
         ":thrift_lib",
+        ":thrift_object_interface",
+        ":transport_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
@@ -152,6 +167,7 @@ envoy_cc_library(
         ":buffer_helper_lib",
         ":compact_protocol_lib",
         ":protocol_interface",
+        ":twitter_protocol_lib",
         "//source/common/common:macros",
     ],
 )
@@ -188,11 +204,29 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "twitter_protocol_lib",
+    srcs = [
+        "twitter_protocol_impl.cc",
+    ],
+    hdrs = [
+        "twitter_protocol_impl.h",
+    ],
+    deps = [
+        ":binary_protocol_lib",
+        ":buffer_helper_lib",
+        ":protocol_interface",
+        ":thrift_object_lib",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
     name = "protocol_lib",
     deps = [
         ":auto_protocol_lib",
         ":binary_protocol_lib",
         ":compact_protocol_lib",
+        ":twitter_protocol_lib",
     ],
 )
 
@@ -222,11 +256,40 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "conn_state_lib",
+    hdrs = ["conn_state.h"],
+    deps = [
+        "//include/envoy/tcp:conn_pool_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "thrift_lib",
     hdrs = ["thrift.h"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "thrift_object_interface",
+    hdrs = ["thrift_object.h"],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "thrift_object_lib",
+    srcs = ["thrift_object_impl.cc"],
+    hdrs = ["thrift_object_impl.h"],
+    deps = [
+        ":decoder_lib",
+        ":thrift_lib",
+        ":thrift_object_interface",
+        ":unframed_transport_lib",
+        "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
     ],
 )
 

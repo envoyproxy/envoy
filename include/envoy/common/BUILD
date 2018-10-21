@@ -13,6 +13,7 @@ envoy_basic_cc_library(
     name = "base_includes",
     hdrs = [
         "exception.h",
+        "platform.h",
         "pure.h",
     ],
     include_prefix = "envoy/common",

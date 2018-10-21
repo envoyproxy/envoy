@@ -38,7 +38,7 @@ public:
 
 private:
   const int32_t thread_id_;
-  TimeSource time_source_;
+  TimeSource& time_source_;
   std::atomic<std::chrono::steady_clock::duration> latest_touch_time_since_epoch_;
   Event::TimerPtr timer_;
   const std::chrono::milliseconds timer_interval_;

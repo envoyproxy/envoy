@@ -19,7 +19,7 @@ namespace Http {
  */
 class ValidationAsyncClient : public AsyncClient {
 public:
-  ValidationAsyncClient(TimeSource& time_source);
+  ValidationAsyncClient(Event::TimeSystem& time_system);
 
   // Http::AsyncClient
   AsyncClient::Request* send(MessagePtr&& request, Callbacks& callbacks,

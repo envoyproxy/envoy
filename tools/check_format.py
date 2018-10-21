@@ -23,16 +23,25 @@ PROTO_SUFFIX = (".proto")
 GOOGLE_PROTOBUF_WHITELIST = ("ci/prebuilt", "source/common/protobuf", "api/test")
 REPOSITORIES_BZL = "bazel/repositories.bzl"
 
-# Files matching these exact names can reference prod time. These include the class
-# definitions for prod time, the construction of them in main(), and perf annotation.
+# Files matching these exact names can reference real-world time. These include the class
+# definitions for real-world time, the construction of them in main(), and perf annotation.
 # For now it includes the validation server but that really should be injected too.
-PROD_TIME_WHITELIST = ('./source/common/common/utility.h',
+REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
+                       './source/common/event/real_time_system.cc',
+                       './source/common/event/real_time_system.h',
                        './source/exe/main_common.cc',
                        './source/exe/main_common.h',
                        './source/server/config_validation/server.cc',
-                       './source/common/common/perf_annotation.h')
+                       './source/common/common/perf_annotation.h',
+                       './test/test_common/simulated_time_system.cc',
+                       './test/test_common/simulated_time_system.h',
+                       './test/test_common/test_time.cc',
+                       './test/test_common/test_time.h',
+                       './test/test_common/utility.cc',
+                       './test/test_common/utility.h',
+                       './test/integration/integration.h')
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-6.0")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-7")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
@@ -74,11 +83,11 @@ def whitelistedForProtobufDeps(file_path):
   return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL) or \
           any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_WHITELIST))
 
-# Production time sources should not be instantiated in the source, except for a few
+# Real-world time sources should not be instantiated in the source, except for a few
 # specific cases. They should be passed down from where they are instantied to where
 # they need to be used, e.g. through the ServerInstance, Dispatcher, or ClusterManager.
-def whitelistedForProdTime(file_path):
-  return file_path in PROD_TIME_WHITELIST or file_path.startswith('./test/')
+def whitelistedForRealTime(file_path):
+  return file_path in REAL_TIME_WHITELIST
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
@@ -137,6 +146,21 @@ def fixSourceLine(line):
 
   return line
 
+# We want to look for a call to condvar.waitFor, but there's no strong pattern
+# to the variable name of the condvar. If we just look for ".waitFor" we'll also
+# pick up time_system_.waitFor(...), and we don't want to return true for that
+# pattern. But in that case there is a strong pattern of using time_system in
+# various spellings as the variable name.
+def hasCondVarWaitFor(line):
+  wait_for = line.find('.waitFor(')
+  if wait_for == -1:
+    return False
+  preceding = line[0:wait_for]
+  if preceding.endswith('time_system') or preceding.endswith('timeSystem()') or \
+     preceding.endswith('time_system_'):
+    return False
+  return True
+
 def checkSourceLine(line, file_path, reportError):
   # Check fixable errors. These may have been fixed already.
   if line.find(".  ") != -1:
@@ -160,9 +184,33 @@ def checkSourceLine(line, file_path, reportError):
     # comments, for example this one.
     reportError("Don't use <mutex> or <condition_variable*>, switch to "
                 "Thread::MutexBasicLockable in source/common/common/thread.h")
-  if not whitelistedForProdTime(file_path):
-    if 'ProdSystemTimeSource' in line or 'ProdMonotonicTimeSource' in line:
-      reportError("Don't reference real-time sources from production code; use injection")
+  if line.startswith('#include <shared_mutex>'):
+    # We don't check here for std::shared_timed_mutex because that may
+    # legitimately show up in comments, for example this one.
+    reportError("Don't use <shared_mutex>, use absl::Mutex for reader/writer locks.")
+  if not whitelistedForRealTime(file_path) and not 'NO_CHECK_FORMAT(real_time)' in line:
+    if 'RealTimeSource' in line or 'RealTimeSystem' in line or \
+       'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line or \
+       'std::this_thread::sleep_for' in line or hasCondVarWaitFor(line):
+      reportError("Don't reference real-world time sources from production code; use injection")
+  if 'std::atomic_' in line:
+    # The std::atomic_* free functions are functionally equivalent to calling
+    # operations on std::atomic<T> objects, so prefer to use that instead.
+    reportError("Don't use free std::atomic_* functions, use std::atomic<T> members instead.")
+  if '__attribute__((packed))' in line and file_path != './include/envoy/common/platform.h':
+    # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
+    # can be used instead
+    reportError("Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
+                "in include/envoy/common/platform.h instead")
+  if re.search("\{\s*\.\w+\s*\=", line):
+    # Designated initializers are not part of the C++14 standard and are not supported
+    # by MSVC
+    reportError("Don't use designated initializers in struct initialization, "
+                "they are not part of C++14")
+  if ' ?: ' in line:
+    # The ?: operator is non-standard, it is a GCC extension
+    reportError("Don't use the '?:' operator, it is a non-standard GCC extension")
+
 
 def checkBuildLine(line, file_path, reportError):
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:

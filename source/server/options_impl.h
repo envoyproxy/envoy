@@ -38,7 +38,6 @@ public:
   void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
   void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
-  void setV2ConfigOnly(bool v2_config_only) { v2_config_only_ = v2_config_only; }
   void setAdminAddressPath(const std::string& admin_address_path) {
     admin_address_path_ = admin_address_path;
   }
@@ -73,13 +72,17 @@ public:
   uint32_t concurrency() const override { return concurrency_; }
   const std::string& configPath() const override { return config_path_; }
   const std::string& configYaml() const override { return config_yaml_; }
-  bool v2ConfigOnly() const override { return v2_config_only_; }
+  bool v2ConfigOnly() const override { return true; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
   }
   std::chrono::seconds drainTime() const override { return drain_time_; }
   spdlog::level::level_enum logLevel() const override { return log_level_; }
+  const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
+  componentLogLevels() const override {
+    return component_log_levels_;
+  }
   const std::string& logFormat() const override { return log_format_; }
   const std::string& logPath() const override { return log_path_; }
   std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
@@ -96,14 +99,17 @@ public:
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
 
 private:
+  void parseComponentLogLevels(const std::string& component_log_levels);
+  void logError(const std::string& error) const;
+
   uint64_t base_id_;
   uint32_t concurrency_;
   std::string config_path_;
   std::string config_yaml_;
-  bool v2_config_only_;
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;
+  std::vector<std::pair<std::string, spdlog::level::level_enum>> component_log_levels_;
   std::string log_format_;
   std::string log_path_;
   uint64_t restart_epoch_;
@@ -117,6 +123,8 @@ private:
   uint64_t max_stats_;
   Stats::StatsOptionsImpl stats_options_;
   bool hot_restart_disabled_;
+
+  friend class OptionsImplTest;
 };
 
 /**

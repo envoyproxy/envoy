@@ -25,6 +25,7 @@ envoy_cc_library(
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/ssl:connection_interface",
+        "//include/envoy/stream_info:stream_info_interface",
     ],
 )
 

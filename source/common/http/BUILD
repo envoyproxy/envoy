@@ -24,8 +24,8 @@ envoy_cc_library(
         "//include/envoy/ssl:connection_interface",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
-        "//source/common/request_info:request_info_lib",
         "//source/common/router:router_lib",
+        "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
     ],
 )
@@ -110,9 +110,9 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
@@ -123,6 +123,7 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/router:rds_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/server:overload_manager_interface",
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
@@ -139,8 +140,8 @@ envoy_cc_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/network:utility_lib",
-        "//source/common/request_info:request_info_lib",
         "//source/common/runtime:uuid_util_lib",
+        "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
     ],
 )
@@ -257,16 +258,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/core:http_uri_cc",
         "@envoy_api//envoy/api/v2/core:protocol_cc",
-    ],
-)
-
-envoy_cc_library(
-    name = "filter_utility_lib",
-    srcs = ["filter_utility.cc"],
-    hdrs = ["filter_utility.h"],
-    deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
     ],
 )
 

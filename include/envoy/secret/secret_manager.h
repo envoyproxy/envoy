@@ -75,6 +75,22 @@ public:
   virtual TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
+
+  /**
+   * Finds and returns a dynamic secret provider associated to SDS config. Create
+   * a new one if such provider does not exist.
+   *
+   * @param config_source a protobuf message object containing a SDS config source.
+   * @param config_name a name that uniquely refers to the SDS config source.
+   * @param secret_provider_context context that provides components for creating and initializing
+   * secret provider.
+   * @return CertificateValidationContextConfigProviderSharedPtr the dynamic certificate validation
+   * context secret provider.
+   */
+  virtual CertificateValidationContextConfigProviderSharedPtr
+  findOrCreateCertificateValidationContextProvider(
+      const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 };
 
 } // namespace Secret

@@ -6,7 +6,6 @@ Administration interface
 Envoy exposes a local administration interface that can be used to query and
 modify different aspects of the server:
 
-* :ref:`v1 API reference <config_admin_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.bootstrap.v2.Admin>`
 
 .. _operations_admin_interface_security:
@@ -43,10 +42,12 @@ modify different aspects of the server:
 
   Print a textual table of all available options.
 
+.. _operations_admin_interface_certs:
+
 .. http:get:: /certs
 
-  List out all loaded TLS certificates, including file name, serial number, and days until
-  expiration.
+  List out all loaded TLS certificates, including file name, serial number, subject alternate names and days until
+  expiration in JSON format conforming to the :ref:`certificate proto definition <envoy_api_msg_admin.v2alpha.Certificates>`.
 
 .. _operations_admin_interface_clusters:
 
@@ -69,7 +70,7 @@ modify different aspects of the server:
       :ref:`success rate average<arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_average>`,
       and :ref:`ejection threshold<arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_ejection_threshold>`
       are presented. Both of these values could be ``-1`` if there was not enough data to calculate them in the last
-      :ref:`interval<config_cluster_manager_cluster_outlier_detection_interval_ms>`.
+      :ref:`interval<envoy_api_field_cluster.OutlierDetection.interval>`.
 
     - ``added_via_api`` flag -- ``false`` if the cluster was added via static configuration, ``true``
       if it was added via the :ref:`CDS<config_cluster_manager_cds>` api.
@@ -92,8 +93,8 @@ modify different aspects of the server:
       zone, String, Service zone
       canary, Boolean, Whether the host is a canary
       success_rate, Double, "Request success rate (0-100). -1 if there was not enough
-      :ref:`request volume<config_cluster_manager_cluster_outlier_detection_success_rate_request_volume>`
-      in the :ref:`interval<config_cluster_manager_cluster_outlier_detection_interval_ms>`
+      :ref:`request volume<envoy_api_field_cluster.OutlierDetection.success_rate_request_volume>`
+      in the :ref:`interval<envoy_api_field_cluster.OutlierDetection.interval>`
       to calculate it"
 
   Host health status
@@ -158,6 +159,10 @@ modify different aspects of the server:
   Enable/disable different logging levels on different subcomponents. Generally only used during
   development.
 
+.. http:post:: /memory
+
+  Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all `/stats` and filtering to get the memory-related statistics.
+
 .. http:post:: /quitquitquit
 
   Cleanly exit the server.
@@ -202,6 +207,10 @@ The fields are:
   Outputs statistics that Envoy has updated (counters incremented at least once, gauges changed at
   least once, and histograms added to at least once).
 
+  .. http:get:: /stats?filter=regex
+
+  Filters the returned stats to those with names matching the regular expression `regex`. Compatible with `usedonly`. Performs partial matching by default, so `/stats?filter=server` will return all stats containing the word `server`. Full-string matching can be specified with begin- and end-line anchors. (i.e. `/stats?filter=^server.concurrency$`)
+
 .. http:get:: /stats?format=json
 
   Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
@@ -209,7 +218,7 @@ The fields are:
   that contains "supported_quantiles" which lists the quantiles supported and an array of computed_quantiles
   that has the computed quantile for each histogram.
 
-  If a histogram is not updated during an interval, the ouput will have null for all the quantiles.
+  If a histogram is not updated during an interval, the output will have null for all the quantiles.
   
   Example histogram output:
 
@@ -330,7 +339,7 @@ The fields are:
   `text/event-stream <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_ 
   format, as expected by the Hystrix dashboard. 
   
-  If invoked from a browser or a terminal, the response will be shown as a continous stream, 
+  If invoked from a browser or a terminal, the response will be shown as a continuous stream, 
   sent in intervals defined by the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` 
   :ref:`stats_flush_interval <envoy_api_field_config.bootstrap.v2.Bootstrap.stats_flush_interval>`
 

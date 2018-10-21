@@ -68,6 +68,7 @@ added, so one could, for example, modify the default `HttpConnectionManager`, du
 config, and then change the first `HttpConnectionManager` to be different from the second.
 
 An example of modifying the bootstrap proto to overwrite runtime defaults:
+
 ```c++
 TestEnvironment::writeStringToFileForTest("runtime/ssl.alt_alpn", "100");
 config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
@@ -76,6 +77,7 @@ config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bo
 ```
 
 An example of modifying `HttpConnectionManager` to change Envoy’s HTTP/1.1 processing:
+
 ```c++
 config_helper_.addConfigModifier([&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) -> void {
   envoy::api::v2::core::Http1ProtocolOptions options;
@@ -83,8 +85,10 @@ config_helper_.addConfigModifier([&](envoy::config::filter::network::http_connec
   hcm.mutable_http_protocol_options()->CopyFrom(options);
 };);
 ```
+
 An example of modifying `HttpConnectionManager` to add an additional upstream
 cluster:
+
 ```c++
    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       bootstrap.mutable_rate_limit_service()->set_cluster_name("ratelimit");
@@ -145,7 +149,7 @@ The full command might look something like
 ```
 bazel test //test/integration:http2_upstream_integration_test \
 --test_arg=--gtest_filter="IpVersions/Http2UpstreamIntegrationTest.RouterRequestAndResponseWithBodyNoBuffer/IPv6" \
---jobs 60 --local_resources 100000000000,100000000000,10000000 --test_arg="-l trace"
+--jobs 60 --local_resources 100000000000,100000000000,10000000 --runs_per_test=1000 --test_arg="-l trace"
 ```
 
 ## Debugging test flakes

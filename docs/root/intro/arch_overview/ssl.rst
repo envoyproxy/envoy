@@ -3,8 +3,8 @@
 TLS
 ===
 
-Envoy supports both :ref:`TLS termination <config_listener_ssl_context>` in listeners as well as
-:ref:`TLS origination <config_cluster_manager_cluster_ssl>` when making connections to upstream
+Envoy supports both :ref:`TLS termination <envoy_api_field_listener.FilterChain.tls_context>` in listeners as well as
+:ref:`TLS origination <envoy_api_field_Cluster.tls_context>` when making connections to upstream
 clusters. Support is sufficient for Envoy to perform standard edge proxy duties for modern web
 services as well as to initiate connections with external services that have advanced TLS
 requirements (TLS1.2, SNI, etc.). Envoy supports the following TLS features:
@@ -64,6 +64,9 @@ Example configuration
       hosts: [{ socket_address: { address: 127.0.0.2, port_value: 1234 }}]
       tls_context:
         common_tls_context:
+          tls_certificates:
+            certificate_chain: { "filename": "/cert.crt" }
+            private_key: { "filename": "/cert.key" }
           validation_context:
             trusted_ca:
               filename: /etc/ssl/certs/ca-certificates.crt
@@ -81,6 +84,11 @@ standard Debian installations. Common paths for system CA bundles on Linux and B
 
 See the reference for :ref:`UpstreamTlsContexts <envoy_api_msg_auth.UpstreamTlsContext>` and
 :ref:`DownstreamTlsContexts <envoy_api_msg_auth.DownstreamTlsContext>` for other TLS options.
+
+Secret discovery service (SDS)
+------------------------------
+
+TLS certificates can be specified in the static resource or can be fetched remotely. Please see :ref:`SDS <config_secret_discovery_service>` for details.
 
 .. _arch_overview_ssl_auth_filter:
 

@@ -15,10 +15,14 @@
 #include "common/event/libevent.h"
 #include "common/network/filter_manager_impl.h"
 #include "common/ssl/ssl_socket.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "absl/types/optional.h"
 
 namespace Envoy {
+class RandomPauseFilter;
+class TestPauseFilter;
+
 namespace Network {
 
 /**
@@ -33,7 +37,7 @@ public:
    * @param previous_total supplies the previous final total buffer size. previous_total will be
    *        updated to new_total when the call is complete.
    * @param stat_total supplies the counter to increment with the delta.
-   * @param stat_current supplies the guage that should be updated with the delta of previous_total
+   * @param stat_current supplies the gauge that should be updated with the delta of previous_total
    *        and new_total.
    */
   static void updateBufferStats(uint64_t delta, uint64_t new_total, uint64_t& previous_total,
@@ -89,6 +93,8 @@ public:
     return socket_->options();
   }
   absl::string_view requestedServerName() const override { return socket_->requestedServerName(); }
+  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
 
   // Network::BufferSource
   BufferSource::StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
@@ -114,6 +120,11 @@ public:
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
 
+  void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override {
+    delayed_close_timeout_ = timeout;
+  }
+  std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
+
 protected:
   void closeSocket(ConnectionEvent close_type);
 
@@ -123,11 +134,14 @@ protected:
   TransportSocketPtr transport_socket_;
   FilterManagerImpl filter_manager_;
   ConnectionSocketPtr socket_;
+  StreamInfo::StreamInfoImpl stream_info_;
+
   Buffer::OwnedImpl read_buffer_;
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
   // a generic pointer.
   Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
+  std::chrono::milliseconds delayed_close_timeout_{0};
 
 protected:
   bool connecting_{false};
@@ -136,6 +150,9 @@ protected:
   Event::FileEventPtr file_event_;
 
 private:
+  friend class ::Envoy::RandomPauseFilter;
+  friend class ::Envoy::TestPauseFilter;
+
   void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);
   void onReadReady();
@@ -146,14 +163,19 @@ private:
   // Returns true iff end of stream has been both written and read.
   bool bothSidesHalfClosed();
 
+  // Callback issued when a delayed close timeout triggers.
+  void onDelayedCloseTimeout();
+
   static std::atomic<uint64_t> next_global_id_;
 
   Event::Dispatcher& dispatcher_;
   const uint64_t id_;
+  Event::TimerPtr delayed_close_timer_;
   std::list<ConnectionCallbacks*> callbacks_;
   std::list<BytesSentCb> bytes_sent_callbacks_;
   bool read_enabled_{true};
-  bool close_with_flush_{false};
+  bool close_after_flush_{false};
+  bool delayed_close_{false};
   bool above_high_watermark_{false};
   bool detect_early_close_{true};
   bool enable_half_close_{false};

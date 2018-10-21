@@ -42,22 +42,22 @@
 namespace Envoy {
 namespace Server {
 
-InstanceImpl::InstanceImpl(Options& options, TimeSource& time_source,
+InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
                            Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
                            HotRestart& restarter, Stats::StoreRoot& store,
                            Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
                            ThreadLocal::Instance& tls)
-    : options_(options), time_source_(time_source), restarter_(restarter),
+    : options_(options), time_system_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
       thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec())),
-      dispatcher_(api_->allocateDispatcher(time_source)),
+      dispatcher_(api_->allocateDispatcher(time_system)),
       singleton_manager_(new Singleton::ManagerImpl()),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       random_generator_(std::move(random_generator)),
       secret_manager_(std::make_unique<Secret::SecretManagerImpl>()),
-      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks, time_source),
+      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks, time_system),
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false) {
 
@@ -226,11 +226,12 @@ void InstanceImpl::initialize(Options& options,
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options);
-  bootstrap_config_update_time_ = time_source_.systemTime();
+  bootstrap_config_update_time_ = time_system_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
+  stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
 
   server_stats_.reset(
       new ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});
@@ -253,33 +254,42 @@ void InstanceImpl::initialize(Options& options,
                                    options.serviceClusterName(), options.serviceNodeName()));
 
   Configuration::InitialImpl initial_config(bootstrap_);
-  ENVOY_LOG(debug, "admin address: {}", initial_config.admin().address()->asString());
 
   HotRestart::ShutdownParentAdminInfo info;
   info.original_start_time_ = original_start_time_;
   restarter_.shutdownParentAdmin(info);
   original_start_time_ = info.original_start_time_;
-  admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
-                             initial_config.admin().profilePath(), options.adminAddressPath(),
-                             initial_config.admin().address(), *this,
-                             stats_store_.createScope("listener.admin.")));
+  admin_.reset(new AdminImpl(initial_config.admin().profilePath(), *this));
+  if (initial_config.admin().address()) {
+    if (initial_config.admin().accessLogPath().empty()) {
+      throw EnvoyException("An admin access log path is required for a listening server.");
+    }
+    ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
+    admin_->startHttpListener(initial_config.admin().accessLogPath(), options.adminAddressPath(),
+                              initial_config.admin().address(),
+                              stats_store_.createScope("listener.admin."));
+  } else {
+    ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
+  }
   config_tracker_entry_ =
       admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
-  handler_->addListener(admin_->listener());
+  if (initial_config.admin().address()) {
+    admin_->addListenerToHandler(handler_.get());
+  }
 
   loadServerFlags(initial_config.flagsPath());
-
-  // Workers get created first so they register for thread local updates.
-  listener_manager_.reset(
-      new ListenerManagerImpl(*this, listener_component_factory_, worker_factory_, time_source_));
-
-  // The main thread is also registered for thread local updates so that code that does not care
-  // whether it runs on the main thread or on workers can still use TLS.
-  thread_local_.registerThread(*dispatcher_, true);
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_.reset(
       new OverloadManagerImpl(dispatcher(), stats(), threadLocal(), bootstrap_.overload_manager()));
+
+  // Workers get created first so they register for thread local updates.
+  listener_manager_.reset(
+      new ListenerManagerImpl(*this, listener_component_factory_, worker_factory_, time_system_));
+
+  // The main thread is also registered for thread local updates so that code that does not care
+  // whether it runs on the main thread or on workers can still use TLS.
+  thread_local_.registerThread(*dispatcher_, true);
 
   // We can now initialize stats for threading.
   stats_store_.initializeThreading(*dispatcher_, thread_local_);
@@ -310,7 +320,7 @@ void InstanceImpl::initialize(Options& options,
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        clusterManager(), thread_local_, time_source_);
+        clusterManager(), thread_local_, time_system_);
     hds_delegate_.reset(new Upstream::HdsDelegate(
         bootstrap_.node(), stats(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
@@ -330,7 +340,7 @@ void InstanceImpl::initialize(Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_.reset(new Server::GuardDogImpl(stats_store_, *config_, time_source_));
+  guard_dog_.reset(new Server::GuardDogImpl(stats_store_, *config_, time_system_));
 }
 
 void InstanceImpl::startWorkers() {
@@ -467,6 +477,10 @@ void InstanceImpl::terminate() {
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
 
+  if (overload_manager_) {
+    overload_manager_->stop();
+  }
+
   // Shutdown all the workers now that the main dispatch loop is done.
   if (listener_manager_.get() != nullptr) {
     listener_manager_->stopWorkers();
@@ -501,7 +515,7 @@ void InstanceImpl::shutdownAdmin() {
   //                     somehow keep flushing histograms from the old process.
   stat_flush_timer_.reset();
   handler_->stopListeners();
-  admin_->mutable_socket().close();
+  admin_->closeSocket();
 
   ENVOY_LOG(warn, "terminating parent process");
   restarter_.terminateParent();

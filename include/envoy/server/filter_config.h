@@ -12,6 +12,7 @@
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/overload_manager.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -131,16 +132,14 @@ public:
   virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
 
   /**
-   * @return SystemTimeSource& a reference to the system time source.
-   * TODO(#4160): This method should be eliminated, and call-sites and mocks should
-   * be converted to work with timeSource() below.
-   */
-  virtual SystemTimeSource& systemTimeSource() PURE;
-
-  /**
    * @return TimeSource& a reference to the time source.
    */
   virtual TimeSource& timeSource() PURE;
+
+  /**
+   * @return OverloadManager& the overload manager for the server.
+   */
+  virtual OverloadManager& overloadManager() PURE;
 };
 
 class ListenerFactoryContext : public FactoryContext {

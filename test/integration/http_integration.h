@@ -34,8 +34,9 @@ public:
   void sendReset(Http::StreamEncoder& encoder);
   std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr>
   startRequest(const Http::HeaderMap& headers);
-  void waitForDisconnect();
+  bool waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::milliseconds(0));
   Network::ClientConnection* connection() const { return connection_.get(); }
+  Network::ConnectionEvent last_connection_event() const { return last_connection_event_; }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -66,6 +67,7 @@ private:
   bool connected_{};
   bool disconnected_{};
   bool saw_goaway_{};
+  Network::ConnectionEvent last_connection_event_;
 };
 
 typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
@@ -76,7 +78,7 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                      Network::Address::IpVersion version,
+                      Network::Address::IpVersion version, TestTimeSystemPtr time_system,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~HttpIntegrationTest();
 
@@ -101,8 +103,11 @@ protected:
       const Http::TestHeaderMapImpl& request_headers, uint32_t request_body_size,
       const Http::TestHeaderMapImpl& response_headers, uint32_t response_body_size);
 
-  // Wait for the end of stream on the next upstream stream on fake_upstreams_
+  // Wait for the end of stream on the next upstream stream on any of the provided fake upstreams.
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
+  // In cases where the upstream that will receive the request is not deterministic, a second
+  // upstream index may be provided, in which case both upstreams will be checked for requests.
+  uint64_t waitForNextUpstreamRequest(const std::vector<uint64_t>& upstream_indices);
   void waitForNextUpstreamRequest(uint64_t upstream_index = 0);
 
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
@@ -129,7 +134,7 @@ protected:
   void testRouterDownstreamDisconnectBeforeResponseComplete(
       ConnectionCreationFunction* creator = nullptr);
   void testRouterUpstreamResponseBeforeRequestComplete();
-  void testTwoRequests();
+  void testTwoRequests(bool force_network_backup = false);
   void testOverlyLongHeaders();
   void testIdleTimeoutBasic();
   void testIdleTimeoutWithTwoRequests();
@@ -165,8 +170,11 @@ protected:
   void testDrainClose();
   void testRetry();
   void testRetryHittingBufferLimit();
+  void testRetryAttemptCountHeader();
   void testGrpcRouterNotFound();
   void testGrpcRetry();
+  void testRetryPriority();
+  void testRetryHostPredicateFilter();
   void testHittingDecoderFilterLimit();
   void testHittingEncoderFilterLimit();
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,

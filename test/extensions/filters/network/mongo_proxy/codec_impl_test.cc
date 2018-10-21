@@ -331,11 +331,10 @@ TEST_F(MongoCodecImplTest, QueryToStringWithEscape) {
   query.numberToReturn(-1);
   query.query(Bson::DocumentImpl::create()->addString("string_need_esc", "{\"foo\": \"bar\n\"}"));
 
-  EXPECT_EQ(
-      R"EOF({"opcode": "OP_QUERY", "id": 1, "response_to": 1, "flags": "0x4", )EOF"
-      R"EOF("collection": "test", "skip": 20, "return": -1, "query": )EOF"
-      R"EOF({"string_need_esc": "{\"foo\": \"bar\n\"}"}, "fields": {}})EOF",
-      query.toString(true));
+  EXPECT_EQ(R"EOF({"opcode": "OP_QUERY", "id": 1, "response_to": 1, "flags": "0x4", )EOF"
+            R"EOF("collection": "test", "skip": 20, "return": -1, "query": )EOF"
+            R"EOF({"string_need_esc": "{\"foo\": \"bar\n\"}"}, "fields": {}})EOF",
+            query.toString(true));
 
   EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(true)));
   EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(false)));

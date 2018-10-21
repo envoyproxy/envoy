@@ -23,7 +23,7 @@ public:
     Event::Libevent::Global::initialize();
 
     validation_ = std::make_unique<Api::ValidationImpl>(std::chrono::milliseconds(1000));
-    dispatcher_ = validation_->allocateDispatcher(test_time_.timeSource());
+    dispatcher_ = validation_->allocateDispatcher(test_time_.timeSystem());
   }
 
   DangerousDeprecatedTestTime test_time_;
