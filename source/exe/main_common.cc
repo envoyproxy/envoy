@@ -151,7 +151,8 @@ int main_common(OptionsImpl& options) {
     Event::RealTimeSystem real_time_system_;
     DefaultTestHooks default_test_hooks_;
     ProdComponentFactory prod_component_factory_;
-    MainCommonBase main_common(options, real_time_system_, default_test_hooks_, prod_component_factory_,
+    MainCommonBase main_common(options, real_time_system_, default_test_hooks_,
+                               prod_component_factory_,
                                absl::make_unique<Runtime::RandomGeneratorImpl>());
     return main_common.run() ? EXIT_SUCCESS : EXIT_FAILURE;
   } catch (EnvoyException& e) {
