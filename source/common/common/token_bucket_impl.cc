@@ -30,7 +30,8 @@ uint64_t TokenBucketImpl::nextTokenAvailableMs() {
   if (tokens_ >= 1) {
     return 0;
   }
-  return (60 / fill_rate_) * 1000;
+  // TODO(ramaraochavali): implement a more precise way that works for very low rate limits.
+  return (1 / fill_rate_) * 1000;
 }
 
 } // namespace Envoy

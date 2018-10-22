@@ -23,7 +23,8 @@ public:
   virtual bool consume(uint64_t tokens = 1) PURE;
 
   /**
-   * @return returns the time in milli seconds indicating when the next token would be available.
+   * @return returns the approximate time until a next token is available. Currently it
+   * returns the upper bound on the amount of time until a next token is available.
    */
   virtual uint64_t nextTokenAvailableMs() PURE;
 };

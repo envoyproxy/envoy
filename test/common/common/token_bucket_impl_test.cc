@@ -70,7 +70,7 @@ TEST_F(TokenBucketImplTest, NextTokenAvailable) {
   EXPECT_EQ(0, token_bucket.nextTokenAvailableMs());
   EXPECT_TRUE(token_bucket.consume());
   EXPECT_FALSE(token_bucket.consume());
-  EXPECT_EQ(12000, token_bucket.nextTokenAvailableMs());
+  EXPECT_EQ(200, token_bucket.nextTokenAvailableMs());
 }
 
 } // namespace Envoy
