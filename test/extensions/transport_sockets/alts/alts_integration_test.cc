@@ -115,11 +115,7 @@ public:
     return wrongHandshakerServerAddress();
   }
 
-  std::string wrongHandshakerServerAddress() {
-    return " ";
-    // return absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
-    //                     std::to_string(fake_handshaker_server_port_ + 1));
-  }
+  std::string wrongHandshakerServerAddress() { return " "; }
 
   Network::Address::InstanceConstSharedPtr getAddress(const Network::Address::IpVersion& version,
                                                       int port) {
@@ -249,27 +245,6 @@ TEST_P(AltsIntegrationTestClientWrongHandshaker, ConnectToWrongHandshakerAddress
   initialize();
   codec_client_ = makeRawHttpConnection(makeAltsConnection());
   EXPECT_FALSE(codec_client_->connected());
-}
-
-class AltsIntegrationTestServerWrongHandshaker : public AltsIntegrationTestBase {
-public:
-  AltsIntegrationTestServerWrongHandshaker()
-      : AltsIntegrationTestBase("", "",
-                                /* server_connect_handshaker */ false,
-                                /* client_connect_handshaker */ true) {}
-};
-
-INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestServerWrongHandshaker,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
-
-// Verifies that when server connects to a wrong handshakerserver, handshake fails
-// and connection closes.
-TEST_P(AltsIntegrationTestServerWrongHandshaker, ConnectToWrongHandshakerAddress) {
-  ConnectionCreationFunction creator = [this]() -> Network::ClientConnectionPtr {
-    return makeAltsConnection();
-  };
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
 }
 
 } // namespace Alts
