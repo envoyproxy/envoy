@@ -60,9 +60,6 @@ private:
   // The METADATA payload to be sent.
   Buffer::OwnedImpl payload_;
 
-  // Max payload size for METADATA frame. The same as NGHTTP2_MAX_PAYLOADLEN in nghttp2.
-  uint64_t max_frame_size_ = 16384;
-
   // Max payload size bound.
   const uint64_t max_payload_size_bound_ = 1024 * 1024;
 
