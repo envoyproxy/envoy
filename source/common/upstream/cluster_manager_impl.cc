@@ -28,6 +28,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
+#include "common/stream_info/original_requested_server_name.h"
 #include "common/tcp/conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -38,6 +39,8 @@
 
 namespace Envoy {
 namespace Upstream {
+
+typedef ::Envoy::StreamInfo::OriginalRequestedServerName OriginalRequestedServerName;
 
 void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
   // See comments in ClusterManagerImpl::addOrUpdateCluster() for why this is only called during
@@ -715,11 +718,26 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
 
   HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(context);
   if (logical_host) {
+
     absl::optional<std::string> overrideServerName;
+
+    absl::optional<std::string> requestedServerName;
+    if (context->downstreamConnection() &&
+        context->downstreamConnection()
+            ->streamInfo()
+            .filterState()
+            .hasData<OriginalRequestedServerName>(OriginalRequestedServerName::Key)) {
+      const OriginalRequestedServerName& server_name =
+          context->downstreamConnection()
+              ->streamInfo()
+              .filterState()
+              .getData<OriginalRequestedServerName>(OriginalRequestedServerName::Key);
+      requestedServerName = server_name.value();
+    }
+
     if (entry->second->cluster_info_->forwardOriginalServerNameIndication() && context &&
-        context->downstreamConnection() &&
-        !context->downstreamConnection()->requestedServerName().empty()) {
-      overrideServerName = std::string(context->downstreamConnection()->requestedServerName());
+        requestedServerName.has_value()) {
+      overrideServerName = requestedServerName.value();
     }
     auto conn_info = logical_host->createConnection(cluster_manager.thread_local_dispatcher_,
                                                     nullptr, overrideServerName);
@@ -1163,14 +1181,26 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
       }
     }
 
-    // in case of connections that have a requested server name, and in case this requested
-    // server name is forwarded, add the it to the hash key,
-    // so the pool will contain connections with the identical requested server name
-    std::string requestedServerName =
-        std::string(context->downstreamConnection()->requestedServerName());
-    if (!requestedServerName.empty() && cluster_info_->forwardOriginalServerNameIndication()) {
+    // in case of connections that have an original requested server name set in their
+    // filter state, and in case this requested server name is forwarded, add the it to
+    // the hash key, so the pool will contain connections with the identical requested
+    // server name
+    absl::optional<std::string> requestedServerName;
+    if (context->downstreamConnection()
+            ->streamInfo()
+            .filterState()
+            .hasData<OriginalRequestedServerName>(OriginalRequestedServerName::Key)) {
+      const OriginalRequestedServerName& server_name =
+          context->downstreamConnection()
+              ->streamInfo()
+              .filterState()
+              .getData<OriginalRequestedServerName>(OriginalRequestedServerName::Key);
+      requestedServerName = server_name.value();
+    }
+
+    if (requestedServerName.has_value() && cluster_info_->forwardOriginalServerNameIndication()) {
       std::hash<std::string> hash_function;
-      hash_key.push_back(hash_function(requestedServerName));
+      hash_key.push_back(hash_function(requestedServerName.value()));
       overrideServerName = requestedServerName;
     }
   }

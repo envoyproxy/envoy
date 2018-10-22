@@ -28,6 +28,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "original_requested_server_name_lib",
+    srcs = ["original_requested_server_name.cc"],
+    hdrs = ["original_requested_server_name.h"],
+    deps = [
+        "//include/envoy/stream_info:filter_state_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
