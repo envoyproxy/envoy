@@ -21,11 +21,14 @@
   - Configuration ingestion error handling. Invalid configurations (dynamic and
     static) should throw meaningful `EnvoyException`s, the configuration
     ingestion code will catch these.
-  - To indicate constructor failure.
-* Do not use exceptions on the data path for general purpose error handling.
-  There are some specific places we use them today, for example when wrapping
-  codecs, and legacy sites but it makes filter behavior far easier to reason
-  about if exceptions do not occur.
+  - Constructor failure.
+  - Error handling in deep call stacks, where exceptions provide material
+    improvements to code complexity and readability.
+* Apply caution when using exceptions on the data path for general purpose error
+  handling.  Exceptions are not caught on the data path and they should not be
+  used for simple error handling, e.g. with shallow call stacks, where explicit
+  error handling provides a more readable and easier to reason about
+  implementation.
 * References are always preferred over pointers when the reference cannot be null. This
   includes both const and non-const references.
 * Function names should all use camel case starting with a lower case letter (e.g., `doFoo()`).
