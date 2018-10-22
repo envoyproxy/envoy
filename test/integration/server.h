@@ -248,8 +248,7 @@ protected:
   // functions server(), stat_store(), and admin_address() may be called, but before the server
   // has been started.
   // The subclass is also responsible for tearing down this server in its destructor.
-  virtual void createAndRunEnvoyServer(Server::TestOptionsImpl& options,
-                                       Event::TimeSystem& time_system,
+  virtual void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
                                        Network::Address::InstanceConstSharedPtr local_address,
                                        TestHooks& hooks, Thread::BasicLockable& access_log_lock,
                                        Server::ComponentFactory& component_factory,
@@ -297,7 +296,7 @@ public:
   Network::Address::InstanceConstSharedPtr admin_address() override { return admin_address_; }
 
 private:
-  void createAndRunEnvoyServer(Server::TestOptionsImpl& options, Event::TimeSystem& time_system,
+  void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
                                Network::Address::InstanceConstSharedPtr local_address,
                                TestHooks& hooks, Thread::BasicLockable& access_log_lock,
                                Server::ComponentFactory& component_factory,
