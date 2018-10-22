@@ -70,8 +70,8 @@ envoy_cc_library(
     ],
     deps = [
         ":buffer_helper_lib",
-        ":hessian_utils_lib",
         ":deserializer_interface",
+        ":hessian_utils_lib",
         "//source/common/singleton:const_singleton",
     ],
 )

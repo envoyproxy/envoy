@@ -1,7 +1,7 @@
 #pragma once
 
-#include "extensions/filters/network/dubbo_proxy/protocol.h"
 #include "extensions/filters/network/dubbo_proxy/deserializer.h"
+#include "extensions/filters/network/dubbo_proxy/protocol.h"
 
 #include "test/test_common/printers.h"
 

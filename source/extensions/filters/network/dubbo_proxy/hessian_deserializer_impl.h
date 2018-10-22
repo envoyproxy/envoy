@@ -6,7 +6,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
-
 class HessianDeserializerImpl : public Deserializer {
 public:
   HessianDeserializerImpl(DeserializationCallbacks& callbacks) : callbacks_(callbacks) {}

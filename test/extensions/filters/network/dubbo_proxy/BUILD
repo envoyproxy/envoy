@@ -18,8 +18,8 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//source/extensions/filters/network/dubbo_proxy:protocol_interface",
         "//source/extensions/filters/network/dubbo_proxy:deserializer_interface",
+        "//source/extensions/filters/network/dubbo_proxy:protocol_interface",
         "//test/test_common:printers_lib",
     ],
 )
