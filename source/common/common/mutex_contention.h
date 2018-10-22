@@ -5,9 +5,11 @@
 namespace Envoy {
 namespace Thread {
 
+namespace {
 std::atomic<int64_t> num_contentions(0);
 std::atomic<int64_t> current_wait_cycles(0);
 std::atomic<int64_t> lifetime_wait_cycles(0);
+} // namespace
 
 void mutexContentionCallback(const char*, const void*, int64_t wait_cycles) {
   num_contentions += 1;
