@@ -11,7 +11,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/ssl/connection.h"
-#include "envoy/stream_info/filter_state.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace Event {
@@ -240,13 +240,16 @@ public:
   virtual const ConnectionSocket::OptionsSharedPtr& socketOptions() const PURE;
 
   /**
-   * Object on which filters can share data on a per-connection basis.
-   * Only one filter can produce a named data object, but it may be
-   * consumed by many other objects.
-   * @return the per-connection state associated with this connection.
+   * The StreamInfo object associated with this connection. This is typically
+   * used for logging purposes. Individual filters may add specific information
+   * via the FilterState object within the StreamInfo object. The StreamInfo
+   * object in this context is one per connection i.e. different than the one in
+   * the http ConnectionManager implementation which is one per request.
+   *
+   * @return StreamInfo object associated with this connection.
    */
-  virtual StreamInfo::FilterState& perConnectionState() PURE;
-  virtual const StreamInfo::FilterState& perConnectionState() const PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 
   /**
    * Set the timeout for delayed connection close()s.
