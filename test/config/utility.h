@@ -33,6 +33,8 @@ public:
   ConfigHelper(const Network::Address::IpVersion version,
                const std::string& config = HTTP_PROXY_CONFIG);
 
+  static void initializeTls(envoy::api::v2::auth::CommonTlsContext& common_context);
+
   typedef std::function<void(envoy::config::bootstrap::v2::Bootstrap&)> ConfigModifierFunction;
   typedef std::function<void(
       envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&)>
