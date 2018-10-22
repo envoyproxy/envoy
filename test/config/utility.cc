@@ -10,6 +10,7 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
@@ -480,7 +481,7 @@ void EdsHelper::setEds(
   // FilesystemSubscriptionImpl is subscribed to.
   std::string path =
       TestEnvironment::writeStringToFileForTest("eds.update.pb_text", eds_response.DebugString());
-  RELEASE_ASSERT(::rename(path.c_str(), eds_path_.c_str()) == 0, "");
+  TestUtility::renameFile(path, eds_path_);
   // Make sure Envoy has consumed the update now that it is running.
   server_stats.waitForCounterGe("cluster.cluster_0.update_success", ++update_successes_);
   RELEASE_ASSERT(
