@@ -1,10 +1,5 @@
-load(
-    "@bazel_tools//tools/build_defs/repo:git.bzl",
-    "git_repository",
-    "new_git_repository",
-)
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":genrule_repository.bzl", "genrule_repository")
-load(":patched_http_archive.bzl", "patched_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
 load(":target_recipes.bzl", "TARGET_RECIPES")
 load(
@@ -42,40 +37,14 @@ def _repository_impl(name, **kwargs):
             (location["tag"], name),
         )
 
-    if "commit" in location:
-        # Git repository at given commit ID. Add a BUILD file if requested.
-        if "build_file" in kwargs:
-            new_git_repository(
-                name = name,
-                remote = location["remote"],
-                commit = location["commit"],
-                **kwargs
-            )
-        else:
-            git_repository(
-                name = name,
-                remote = location["remote"],
-                commit = location["commit"],
-                **kwargs
-            )
-    else:  # HTTP
-        # HTTP tarball at a given URL. Add a BUILD file if requested.
-        if "build_file" in kwargs:
-            native.new_http_archive(
-                name = name,
-                urls = location["urls"],
-                sha256 = location["sha256"],
-                strip_prefix = location["strip_prefix"],
-                **kwargs
-            )
-        else:
-            native.http_archive(
-                name = name,
-                urls = location["urls"],
-                sha256 = location["sha256"],
-                strip_prefix = location["strip_prefix"],
-                **kwargs
-            )
+    # HTTP tarball at a given URL. Add a BUILD file if requested.
+    http_archive(
+        name = name,
+        urls = location["urls"],
+        sha256 = location["sha256"],
+        strip_prefix = location["strip_prefix"],
+        **kwargs
+    )
 
 def _build_recipe_repository_impl(ctxt):
     # modify the recipes list based on the build context

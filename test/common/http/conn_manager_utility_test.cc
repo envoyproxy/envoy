@@ -49,6 +49,7 @@ public:
   MOCK_METHOD0(dateProvider, DateProvider&());
   MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
+  MOCK_METHOD0(reverseEncodeOrder, bool());
   MOCK_METHOD0(generateRequestId, bool());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
