@@ -471,7 +471,7 @@ public:
 /**
  * Base class for all route typed metadata factories.
  */
-class RouteTypedMetadataFactory : public ::Envoy::Config::TypedMetadataFactory {};
+class HttpRouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
 /**
  * An individual resolved route entry.
@@ -613,7 +613,7 @@ public:
    * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
    * for this route.
    */
-  virtual const ::Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 
   /**
    * @return const envoy::api::v2::core::Metadata& return the metadata provided in the config for

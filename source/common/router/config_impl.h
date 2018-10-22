@@ -350,7 +350,7 @@ public:
   }
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
   const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
-  const ::Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
   bool includeAttemptCount() const override { return vhost_.includeAttemptCount(); }
 
@@ -457,7 +457,7 @@ private:
       return parent_->includeVirtualHostRateLimits();
     }
     const envoy::api::v2::core::Metadata& metadata() const override { return parent_->metadata(); }
-    const ::Envoy::Config::TypedMetadata& typedMetadata() const override {
+    const Envoy::Config::TypedMetadata& typedMetadata() const override {
       return parent_->typedMetadata();
     }
     const PathMatchCriterion& pathMatchCriterion() const override {
@@ -575,7 +575,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   envoy::api::v2::core::Metadata metadata_;
-  ::Envoy::Config::TypedMetadataImpl<RouteTypedMetadataFactory> typed_metadata_;
+  Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory> typed_metadata_;
   const bool match_grpc_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.

@@ -2993,16 +2993,17 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrDirectResponseEntry) {
   }
 }
 
-struct Foo : public StreamInfo::FilterState::Object {};
-struct Baz : public StreamInfo::FilterState::Object {
+struct Foo : public Envoy::Config::TypedMetadata::Object {};
+struct Baz : public Envoy::Config::TypedMetadata::Object {
   Baz(std::string n) : name(n) {}
   std::string name;
 };
-class BazFactory : public RouteTypedMetadataFactory {
+class BazFactory : public HttpRouteTypedMetadataFactory {
 public:
   const std::string name() const { return "baz"; }
   // Returns nullptr (conversion failure) if d is empty.
-  std::unique_ptr<const StreamInfo::FilterState::Object> parse(const ProtobufWkt::Struct& d) const {
+  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
+  parse(const ProtobufWkt::Struct& d) const {
     if (d.fields().find("name") != d.fields().end()) {
       return std::make_unique<Baz>(d.fields().at("name").string_value());
     }
@@ -3075,7 +3076,7 @@ virtual_hosts:
   )EOF";
 
   BazFactory baz_factory;
-  Registry::InjectFactory<RouteTypedMetadataFactory> registered_factory(baz_factory);
+  Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   auto& runtime = factory_context.runtime_loader_;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
@@ -4386,7 +4387,7 @@ virtual_hosts:
                                        baz: {} } }
   )EOF";
   BazFactory baz_factory;
-  Registry::InjectFactory<RouteTypedMetadataFactory> registered_factory(baz_factory);
+  Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true),
@@ -4409,7 +4410,7 @@ virtual_hosts:
         metadata: { filter_metadata: { com.bar.foo: { baz: test_value }, baz: {name: bluh} } }
   )EOF";
   BazFactory baz_factory;
-  Registry::InjectFactory<RouteTypedMetadataFactory> registered_factory(baz_factory);
+  Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   const TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
 

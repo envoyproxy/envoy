@@ -1,8 +1,9 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
-#include "envoy/stream_info/filter_state.h"
+#include "envoy/common/pure.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -14,14 +15,19 @@ namespace Config {
  */
 class TypedMetadata {
 public:
+  class Object {
+  public:
+    virtual ~Object() {}
+  };
+
   virtual ~TypedMetadata() {}
 
   // Returns a T instance by key. If the conversion is not able to complete, or
   // if the data is not in the store, returns a nullptr.
   template <typename T> const T* get(const std::string& key) const {
-    static_assert(std::is_base_of<StreamInfo::FilterState::Object, T>::value,
-                  "Data type must be subclass of StreamInfo::FilterState::Object");
-    const StreamInfo::FilterState::Object* p = getData(key);
+    static_assert(std::is_base_of<Object, T>::value,
+                  "Data type must be subclass of TypedMetadata::Object");
+    const Object* p = getData(key);
     if (p != nullptr) {
       return dynamic_cast<const T*>(p);
     }
@@ -30,7 +36,8 @@ public:
 
 protected:
   // Returns data associated with given 'key'.
-  virtual const StreamInfo::FilterState::Object* getData(const std::string& key) const PURE;
+  // If there is no data associated with this key, a nullptr is returned.
+  virtual const Object* getData(const std::string& key) const PURE;
 };
 
 /*
@@ -47,11 +54,10 @@ public:
   // parse will not be called and the corresponding typedMetadata entry will be set to nullptr.
   virtual const std::string name() const PURE;
 
-  // Convert the google.protobuf.Struct into an instance of StreamInfo::FilterState::Object.
+  // Convert the google.protobuf.Struct into an instance of TypedMetadata::Object.
   // It should throw an EnvoyException in case the conversion can't be completed.
   // Returns a derived class object pointer of TypedMetadata.
-  virtual std::unique_ptr<const StreamInfo::FilterState::Object>
-  parse(const ProtobufWkt::Struct&) const PURE;
+  virtual std::unique_ptr<const TypedMetadata::Object> parse(const ProtobufWkt::Struct&) const PURE;
 };
 
 } // namespace Config

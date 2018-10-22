@@ -54,20 +54,19 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(retry_policy.retry_on());
 
   for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
-    auto& factory =
-        ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
-            host_predicate.name());
-    auto config = ::Envoy::Config::Utility::translateToFactoryConfig(host_predicate, factory);
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
+        host_predicate.name());
+    auto config = Envoy::Config::Utility::translateToFactoryConfig(host_predicate, factory);
     retry_host_predicate_configs_.emplace_back(host_predicate.name(), std::move(config));
   }
 
   const auto retry_priority = retry_policy.retry_priority();
   if (!retry_priority.name().empty()) {
-    auto& factory = ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
         retry_priority.name());
     retry_priority_config_ =
         std::make_pair(retry_priority.name(),
-                       ::Envoy::Config::Utility::translateToFactoryConfig(retry_priority, factory));
+                       Envoy::Config::Utility::translateToFactoryConfig(retry_priority, factory));
   }
 
   auto host_selection_attempts = retry_policy.host_selection_retry_max_attempts();
@@ -84,9 +83,8 @@ std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPre
   std::vector<Upstream::RetryHostPredicateSharedPtr> predicates;
 
   for (const auto& config : retry_host_predicate_configs_) {
-    auto& factory =
-        ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
-            config.first);
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
+        config.first);
     predicates.emplace_back(factory.createHostPredicate(*config.second, num_retries_));
   }
 
@@ -98,7 +96,7 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
     return nullptr;
   }
 
-  auto& factory = ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
+  auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
       retry_priority_config_.first);
 
   return factory.createRetryPriority(*retry_priority_config_.second, num_retries_);

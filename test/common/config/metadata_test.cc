@@ -1,5 +1,4 @@
 #include "envoy/common/exception.h"
-#include "envoy/server/filter_config.h"
 
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
@@ -53,17 +52,16 @@ class TypedMetadataTest : public testing::Test {
 public:
   TypedMetadataTest() : foo_factory_(), registered_factory_(foo_factory_) {}
 
-  struct Foo : public StreamInfo::FilterState::Object {
+  struct Foo : public TypedMetadata::Object {
     Foo(std::string name) : name_(name) {}
     std::string name_;
   };
-  struct Bar : public StreamInfo::FilterState::Object {};
+  struct Bar : public TypedMetadata::Object {};
   class FooFactory : public TypedMetadataFactory::TypedMetadataFactory {
   public:
     const std::string name() const { return "foo"; }
     // Returns nullptr (conversion failure) if d is empty.
-    std::unique_ptr<const StreamInfo::FilterState::Object>
-    parse(const ProtobufWkt::Struct& d) const {
+    std::unique_ptr<const TypedMetadata::Object> parse(const ProtobufWkt::Struct& d) const {
       if (d.fields().find("name") != d.fields().end()) {
         return std::make_unique<Foo>(d.fields().at("name").string_value());
       }

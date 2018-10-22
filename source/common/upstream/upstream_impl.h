@@ -410,7 +410,7 @@ public:
   };
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
   const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
-  const ::Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
 
   const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const override {
     return cluster_socket_options_;
@@ -455,7 +455,7 @@ private:
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::api::v2::core::Metadata metadata_;
-  ::Envoy::Config::TypedMetadataImpl<ClusterTypedMetadataFactory> typed_metadata_;
+  Envoy::Config::TypedMetadataImpl<ClusterTypedMetadataFactory> typed_metadata_;
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;

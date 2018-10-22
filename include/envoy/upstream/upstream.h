@@ -599,7 +599,7 @@ public:
   /**
    * @return const Envoy::Config::TypedMetadata&& the typed metadata for this cluster.
    */
-  virtual const ::Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 
   /**
    *

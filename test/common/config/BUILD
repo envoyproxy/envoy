@@ -158,7 +158,6 @@ envoy_cc_test(
     srcs = ["metadata_test.cc"],
     deps = [
         "//include/envoy/common:base_includes",
-        "//include/envoy/server:filter_config_interface",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
         "//source/common/protobuf:utility_lib",

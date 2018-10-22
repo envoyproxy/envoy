@@ -1532,8 +1532,8 @@ public:
   std::unique_ptr<Server::Configuration::TransportSocketFactoryContextImpl> factory_context_;
 };
 
-struct Foo : public StreamInfo::FilterState::Object {};
-struct Baz : public StreamInfo::FilterState::Object {
+struct Foo : public Envoy::Config::TypedMetadata::Object {};
+struct Baz : public Envoy::Config::TypedMetadata::Object {
   Baz(std::string n) : name(n) {}
   std::string name;
 };
@@ -1541,7 +1541,8 @@ class BazFactory : public ClusterTypedMetadataFactory {
 public:
   const std::string name() const { return "baz"; }
   // Returns nullptr (conversion failure) if d is empty.
-  std::unique_ptr<const StreamInfo::FilterState::Object> parse(const ProtobufWkt::Struct& d) const {
+  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
+  parse(const ProtobufWkt::Struct& d) const {
     if (d.fields().find("name") != d.fields().end()) {
       return std::make_unique<Baz>(d.fields().at("name").string_value());
     }
