@@ -14,6 +14,7 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -75,7 +76,8 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(runtime, time_system);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_MESSAGE(manager.createSslClientContext(store, cfg), EnvoyException,
                             "Failed to initialize cipher suites "
@@ -98,7 +100,8 @@ TEST_F(SslContextImplTest, TestExpiringCert) {
 
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(runtime, time_system);
   Stats::IsolatedStoreImpl store;
   ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
 
@@ -124,7 +127,8 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(runtime, time_system);
   Stats::IsolatedStoreImpl store;
   ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
   EXPECT_EQ(0U, context->daysUntilFirstCertExpires());
@@ -147,7 +151,8 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(runtime, time_system);
   Stats::IsolatedStoreImpl store;
 
   ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
@@ -198,7 +203,8 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(runtime, time_system);
   Stats::IsolatedStoreImpl store;
 
   ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
@@ -240,7 +246,8 @@ TEST_F(SslContextImplTest, TestNoCert) {
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
   ClientContextConfigImpl cfg(*loader, factory_context_);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(runtime, time_system);
   Stats::IsolatedStoreImpl store;
   ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
   EXPECT_EQ(nullptr, context->getCaCertInformation());
@@ -251,7 +258,8 @@ class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
   static void loadConfig(ServerContextConfigImpl& cfg) {
     Runtime::MockLoader runtime;
-    ContextManagerImpl manager(runtime);
+    Event::SimulatedTimeSystem time_system;
+    ContextManagerImpl manager(runtime, time_system);
     Stats::IsolatedStoreImpl store;
     ServerContextSharedPtr server_ctx(
         manager.createSslServerContext(store, cfg, std::vector<std::string>{}));
@@ -471,7 +479,8 @@ TEST(ClientContextConfigImplTest, InvalidCertificateHash) {
                                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   ClientContextConfigImpl client_context_config(tls_context, factory_context);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(runtime, time_system);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
                           EnvoyException, "Invalid hex-encoded SHA-256 .*");
@@ -487,7 +496,8 @@ TEST(ClientContextConfigImplTest, InvalidCertificateSpki) {
       ->add_verify_certificate_spki("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   ClientContextConfigImpl client_context_config(tls_context, factory_context);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(runtime, time_system);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
                           EnvoyException, "Invalid base64-encoded SHA-256 .*");
@@ -832,7 +842,8 @@ TEST(ServerContextImplTest, TlsCertificateNonEmpty) {
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   ServerContextConfigImpl client_context_config(tls_context, factory_context);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(runtime, time_system);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_MESSAGE(ServerContextSharedPtr server_ctx(manager.createSslServerContext(
                                 store, client_context_config, std::vector<std::string>{})),
