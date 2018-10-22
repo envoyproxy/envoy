@@ -77,7 +77,7 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
 * **Retry conditions**: Envoy can retry on different types of conditions depending on application
   requirements. For example, network failure, all 5xx response codes, idempotent 4xx response codes,
   etc.
-  **Host selection retry plugins**: Envoy can be configured to apply additional logic to the host
+* **Host selection retry plugins**: Envoy can be configured to apply additional logic to the host
   selection logic when selecting hosts for retries. Specifying a
   :ref:`retry host predicate <envoy_api_field_route.RouteAction.RetryPolicy.retry_host_predicate>`
   allows for reattempting host selection when certain hosts are selected (e.g. when an already
