@@ -111,9 +111,11 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
 
 const std::string& Config::getRegularRouteFromEntries(Network::Connection& connection) {
   // First check if the per-connection state to see if we need to route to a pre-selected cluster
-  if (connection.perConnectionState().hasData<PerConnectionCluster>(PerConnectionCluster::Key)) {
+  if (connection.streamInfo().filterState().hasData<PerConnectionCluster>(
+          PerConnectionCluster::Key)) {
     const PerConnectionCluster& per_connection_cluster =
-        connection.perConnectionState().getData<PerConnectionCluster>(PerConnectionCluster::Key);
+        connection.streamInfo().filterState().getData<PerConnectionCluster>(
+            PerConnectionCluster::Key);
     return per_connection_cluster.value();
   }
 
