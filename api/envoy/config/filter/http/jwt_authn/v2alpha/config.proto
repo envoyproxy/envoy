@@ -163,7 +163,7 @@ message JwtProvider {
   // The value is the *protobuf::Struct*. The value of this field will be the key for its *fields*
   // and the value is the *protobuf::Struct* converted from JWT JSON payload.
   //
-  // For example, if palyload_in_metadata is *my_payload*:
+  // For example, if payload_in_metadata is *my_payload*:
   //
   // .. code-block:: yaml
   //

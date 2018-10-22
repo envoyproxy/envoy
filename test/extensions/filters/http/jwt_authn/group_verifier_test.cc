@@ -101,7 +101,7 @@ public:
   // which set an empty payload struct for each issuer.
   static ProtobufWkt::Struct getExpectedPayload(const std::vector<std::string>& issuers) {
     ProtobufWkt::Struct struct_obj;
-    auto fields = struct_obj.mutable_fields();
+    auto* fields = struct_obj.mutable_fields();
     for (const auto& issuer : issuers) {
       ProtobufWkt::Struct empty_struct;
       *(*fields)[issuer].mutable_struct_value() = empty_struct;

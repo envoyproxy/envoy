@@ -234,7 +234,7 @@ void AuthenticatorImpl::verifyKey() {
     const auto status =
         Protobuf::util::JsonStringToMessage(jwt_->payload_str_, &payload_pb, options);
     // payload_str_ have been verified as valid JSON already.
-    // All valid JSON should be able to parse into a portobuf Struct.
+    // All valid JSON should be able to parse into a protobuf Struct.
     RELEASE_ASSERT(status.ok(), "Failed to parse JWT payload json into protobuf Struct");
     set_payload_cb_(provider.payload_in_metadata(), payload_pb);
   }
