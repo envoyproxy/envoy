@@ -139,6 +139,32 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   HttpTracerUtility::finalizeSpan(*span, &request_headers, stream_info, config);
 }
 
+TEST(HttpConnManFinalizerImpl, NoGeneratedId) {
+  const std::string path(300, 'a');
+  const std::string path_prefix = "http://";
+  const std::string expected_path(128, 'a');
+  std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
+
+  Http::TestHeaderMapImpl request_headers{
+      {"x-envoy-original-path", path}, {":method", "GET"}, {"x-forwarded-proto", "http"}};
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
+  EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
+  EXPECT_CALL(stream_info, protocol()).WillOnce(ReturnPointee(&protocol));
+  absl::optional<uint32_t> response_code;
+  EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
+
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(Tracing::Tags::get().HTTP_URL, path_prefix + expected_path));
+  EXPECT_CALL(*span, setTag(Tracing::Tags::get().HTTP_METHOD, "GET"));
+  EXPECT_CALL(*span, setTag(Tracing::Tags::get().HTTP_PROTOCOL, "HTTP/2"));
+
+  NiceMock<MockConfig> config;
+  HttpTracerUtility::finalizeSpan(*span, &request_headers, stream_info, config);
+}
+
 TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
