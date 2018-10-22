@@ -548,7 +548,9 @@ private:
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
   Runtime::Loader& loader_;
   const absl::optional<RuntimeData> runtime_;
+  const std::string scheme_redirect_;
   const std::string host_redirect_;
+  const std::string port_redirect_;
   const std::string path_redirect_;
   const bool https_redirect_;
   const std::string prefix_rewrite_redirect_;

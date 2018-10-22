@@ -15,6 +15,7 @@
 #include "common/common/thread.h"
 #include "common/stats/source_impl.h"
 
+#include "server/options_impl.h"
 #include "server/server.h"
 #include "server/test_hooks.h"
 
@@ -25,66 +26,9 @@
 namespace Envoy {
 namespace Server {
 
-/**
- * Integration test options.
- */
-class TestOptionsImpl : public Options {
-public:
-  TestOptionsImpl(const std::string& config_path, Network::Address::IpVersion ip_version)
-      : config_path_(config_path), local_address_ip_version_(ip_version),
-        service_cluster_name_("cluster_name"), service_node_name_("node_name"),
-        service_zone_("zone_name") {}
-  TestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
-                  Network::Address::IpVersion ip_version)
-      : config_path_(config_path), config_yaml_(config_yaml), local_address_ip_version_(ip_version),
-        service_cluster_name_("cluster_name"), service_node_name_("node_name"),
-        service_zone_("zone_name") {}
-
-  // Server::Options
-  uint64_t baseId() const override { return 0; }
-  uint32_t concurrency() const override { return 1; }
-  const std::string& configPath() const override { return config_path_; }
-  const std::string& configYaml() const override { return config_yaml_; }
-  bool v2ConfigOnly() const override { return false; }
-  const std::string& adminAddressPath() const override { return admin_address_path_; }
-  Network::Address::IpVersion localAddressIpVersion() const override {
-    return local_address_ip_version_;
-  }
-  std::chrono::seconds drainTime() const override { return std::chrono::seconds(1); }
-  spdlog::level::level_enum logLevel() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
-  componentLogLevels() const override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-  const std::string& logFormat() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  std::chrono::seconds parentShutdownTime() const override { return std::chrono::seconds(2); }
-  const std::string& logPath() const override { return log_path_; }
-  uint64_t restartEpoch() const override { return 0; }
-  std::chrono::milliseconds fileFlushIntervalMsec() const override {
-    return std::chrono::milliseconds(50);
-  }
-  Mode mode() const override { return Mode::Serve; }
-  const std::string& serviceClusterName() const override { return service_cluster_name_; }
-  const std::string& serviceNodeName() const override { return service_node_name_; }
-  const std::string& serviceZone() const override { return service_zone_; }
-  uint64_t maxStats() const override { return 16384; }
-  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
-  bool hotRestartDisabled() const override { return false; }
-
-  // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
-  Server::TestOptionsImpl asConfigYaml();
-
-private:
-  const std::string config_path_;
-  const std::string config_yaml_;
-  const std::string admin_address_path_;
-  const Network::Address::IpVersion local_address_ip_version_;
-  const std::string service_cluster_name_;
-  const std::string service_node_name_;
-  const std::string service_zone_;
-  Stats::StatsOptionsImpl stats_options_;
-  const std::string log_path_;
-};
+// Create OptionsImpl structures suitable for tests.
+OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
+                                  Network::Address::IpVersion ip_version);
 
 class TestDrainManager : public DrainManager {
 public:

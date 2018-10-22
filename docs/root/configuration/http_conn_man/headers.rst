@@ -493,7 +493,7 @@ Supported variable names are:
     parameters **do not** need to be escaped by doubling them.
 
 %PER_REQUEST_STATE(reverse.dns.data.name)%
-    Populates the header with values set on the stream info perRequestState() object. To be
+    Populates the header with values set on the stream info filterState() object. To be
     usable in custom request/response headers, these values must be of type
     Envoy::Router::StringAccessor. These values should be named in standard reverse DNS style,
     identifying the organization that created the value and ending in a unique name for the data. 
