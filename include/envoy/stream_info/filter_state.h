@@ -14,8 +14,9 @@ namespace Envoy {
 namespace StreamInfo {
 
 /**
- * FilterState represents dynamically generated information regarding a stream
- * (TCP or HTTP level) by various filters in Envoy.
+ * FilterState represents dynamically generated information regarding a
+ * stream (TCP or HTTP level) by various filters in Envoy. FilterState can
+ * be write-once or write-many.
  */
 class FilterState {
 public:
@@ -29,20 +30,43 @@ public:
   /**
    * @param data_name the name of the data being set.
    * @param data an owning pointer to the data to be stored.
-   * Note that it is an error to call setData() twice with the same data_name; this is to
-   * enforce a single authoritative source for each piece of data stored in FilterState.
+   * @param mutable indicates whether the object is mutable or not.
+   * Defaults to false.
+   *
+   * Note that it is an error to call setData() twice with the same
+   * data_name, if the existing object is immutable. This is to enforce a
+   * single authoritative source for each piece of immutable data stored in
+   * FilterState.
    */
-  virtual void setData(absl::string_view data_name, std::unique_ptr<Object>&& data) PURE;
+  virtual void setData(absl::string_view data_name, std::unique_ptr<Object>&& data,
+                       bool is_mutable = false) PURE;
 
   /**
    * @param data_name the name of the data being looked up.
    * @return a const reference to the stored data.
-   * Note that it is an error to access data that has not previously been set.
-   * This function will fail if the data stored under |data_name| cannot be
-   * dynamically cast to the type specified.
+   * An exception will be thrown if the data does not exist. This function
+   * will fail if the data stored under |data_name| cannot be dynamically
+   * cast to the type specified.
    */
   template <typename T> const T& getData(absl::string_view data_name) const {
     const T* result = dynamic_cast<const T*>(getDataGeneric(data_name));
+    if (!result) {
+      throw EnvoyException(
+          fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
+    }
+    return *result;
+  }
+
+  /**
+   * @param data_name the name of the data being looked up.
+   * @return a non-const reference to the stored data if and only if the
+   * underlying data is mutable.
+   * An exception will be thrown if the data does not exist or if it is
+   * immutable. This function will fail if the data stored under
+   * |data_name| cannot be dynamically cast to the type specified.
+   */
+  template <typename T> T& getData(absl::string_view data_name) {
+    T* result = dynamic_cast<T*>(getDataGeneric(data_name));
     if (!result) {
       throw EnvoyException(
           fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
@@ -69,6 +93,7 @@ public:
 
 protected:
   virtual const Object* getDataGeneric(absl::string_view data_name) const PURE;
+  virtual Object* getDataGeneric(absl::string_view data_name) PURE;
 };
 
 } // namespace StreamInfo
