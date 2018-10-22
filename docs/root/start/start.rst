@@ -152,7 +152,7 @@ features. The following sandboxes are available:
     sandboxes/jaeger_native_tracing
     sandboxes/grpc_bridge
     Lua <https://github.com/envoyproxy/envoy/tree/master/examples/lua>
-    Fault Injection <https://github.com/envoyproxy/envoy/tree/master/examples/fault_injection>
+    Fault Injection <https://github.com/envoyproxy/envoy/tree/master/examples/fault-injection>
 
 Other use cases
 ---------------
