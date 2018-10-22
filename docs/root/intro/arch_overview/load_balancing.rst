@@ -161,12 +161,13 @@ priority level are healthy, that level is still considered fully healthy because
 So, level 0 endpoints will continue to receive all traffic until less than ~71.4% of them are
 healthy.
 
-The priority level logic works with integer 'health' scores. The health score of a level is
+The priority level logic works with integer health scores. The health score of a level is
 (level's percent of healthy endpoints) * (overprovisioning factor), capped at 100. When the system
 is relatively healthy, P=0 endpoints receive (level 0's health score) percent of the traffic, with
 the rest flowing to P=1 (assuming P=1 is healthy - more on that later). For instance, when
-50% of P=0 endpoints are healthy, they will receive 50 * 1.4 = 70% of the traffic. More examples
-(with 2 priority levels, P=1 100% healthy):
+50% of P=0 endpoints are healthy, they will receive 50 * 1.4 = 70% of the traffic.
+The integer percents of traffic that each level receives are collectively called the system's
+"priority load". More examples (with 2 priority levels, P=1 100% healthy):
 
 +----------------------------+----------------+-----------------+
 | P=0 healthy endpoints      | Traffic to P=0 |  Traffic to P=1 |
@@ -187,18 +188,17 @@ the rest flowing to P=1 (assuming P=1 is healthy - more on that later). For inst
 .. attention::
 
   In order for the load distribution algorithm and normalized total health calculation to work
-  properly, the number of hosts in each priority level should be close. Envoy assumes that for
-  example 100% healthy priority level P=1 is able to take the entire traffic from P=0 should
-  all its hosts become unhealthy. If P=0 has 10 hosts and P=1 has only 2 hosts, P=1 may be unable
-  to take the entire load from P=0, even though P=1 health is 100%.
+  properly, each priority level must be able to handle (100% * overprovision factor) of the
+  traffic: Envoy assumes a healthy P=1 can take over entirely for an unhealthy P=0, etc.
+  If P=0 has 10 hosts but P=1 only has 2 hosts, that assumption probably will not hold.
 
 The health score represents a level's current ability to handle traffic, after factoring in how
 overprovisioned the level originally was, and how many endpoints are currently unhealthy.
 Therefore, if the sum across all levels' health scores is < 100, then Envoy believes there are not
 enough healthy endpoints to fully handle the traffic. This sum is called the "normalized total
 health." When normalized total health drops below 100, traffic is distributed after normalizing
-the levels' health scores to that sub-100 total. E.g. healths of 20 and 30 (yielding a normalized
-total health of 50) would be normalized to receive 40% and 60% of the traffic.
+the levels' health scores to that sub-100 total. E.g. healths of {20, 30} (yielding a normalized
+total health of 50) would be normalized, and result in a priority load of {40%, 60%} of traffic.
 
 +------------------------+-------------------------+-----------------+----------------+
 | P=0 healthy endpoints  | P=1 healthy endpoints   | Traffic to  P=0 | Traffic to P=1 |
@@ -241,11 +241,11 @@ To sum this up in pseudo algorithms:
 
 ::
 
-  health(P_X) = 1.4 * 100 * healthy_P_X_backends / total_P_X_backends
-  normalized_total_health = min(100, Σ(health(P_0)...health(P_X))
-  percent_load(P_0) = min(100, health(P_0) / normalized_total_health)
-  percent_load(P_X) = min(100 - Σ(percent_load(P_0)..percent_load(P_X-1)),
-                          health(P_X) / normalized_total_health)
+  health(P_X) = min(100, 1.4 * 100 * healthy_P_X_backends / total_P_X_backends)
+  normalized_total_health = min(100, Σ(health(P_0)...health(P_X)))
+  priority_load(P_0) = min(100, health(P_0) / normalized_total_health)
+  priority_load(P_X) = min(100 - Σ(priority_load(P_0)..priority_load(P_X-1)),
+                           health(P_X) / normalized_total_health)
 
 .. _arch_overview_load_balancing_panic_threshold:
 
