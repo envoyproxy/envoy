@@ -2993,6 +2993,24 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrDirectResponseEntry) {
   }
 }
 
+struct Foo : public Envoy::Config::TypedMetadata::Object {};
+struct Baz : public Envoy::Config::TypedMetadata::Object {
+  Baz(std::string n) : name(n) {}
+  std::string name;
+};
+class BazFactory : public HttpRouteTypedMetadataFactory {
+public:
+  const std::string name() const { return "baz"; }
+  // Returns nullptr (conversion failure) if d is empty.
+  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
+  parse(const ProtobufWkt::Struct& d) const {
+    if (d.fields().find("name") != d.fields().end()) {
+      return std::make_unique<Baz>(d.fields().at("name").string_value());
+    }
+    throw EnvoyException("Cannot create a Baz when metadata is empty.");
+  }
+};
+
 TEST(RouteMatcherTest, WeightedClusters) {
   std::string yaml = R"EOF(
 virtual_hosts:
@@ -3000,7 +3018,7 @@ virtual_hosts:
     domains: ["www1.lyft.com"]
     routes:
       - match: { prefix: "/" }
-        metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+        metadata: { filter_metadata: { com.bar.foo: { baz: test_value }, baz: {name: meh} } }
         decorator:
           operation: hello
         route:
@@ -3057,6 +3075,8 @@ virtual_hosts:
             total_weight: 10000
   )EOF";
 
+  BazFactory baz_factory;
+  Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   auto& runtime = factory_context.runtime_loader_;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
@@ -3089,6 +3109,8 @@ virtual_hosts:
     EXPECT_EQ("test_value",
               Envoy::Config::Metadata::metadataValue(route_entry->metadata(), "com.bar.foo", "baz")
                   .string_value());
+    EXPECT_EQ(nullptr, route_entry->typedMetadata().get<Foo>(baz_factory.name()));
+    EXPECT_EQ("meh", route_entry->typedMetadata().get<Baz>(baz_factory.name())->name);
     EXPECT_EQ("hello", route->decorator()->getOperation());
 
     Http::TestHeaderMapImpl response_headers;
@@ -4352,6 +4374,26 @@ void checkPathMatchCriterion(const Route* route, const std::string& expected_mat
   EXPECT_EQ(expected_type, match_criterion.matchType());
 }
 
+TEST(RouteConfigurationV2, BrokenTypedMetadata) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/"}
+        route: { cluster: www2 }
+        metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
+                                       baz: {} } }
+  )EOF";
+  BazFactory baz_factory;
+  Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true),
+      Envoy::EnvoyException, "Cannot create a Baz when metadata is empty.");
+}
+
 TEST(RouteConfigurationV2, RouteConfigGetters) {
   std::string yaml = R"EOF(
 name: foo
@@ -4365,9 +4407,10 @@ virtual_hosts:
         route: { cluster: ww2 }
       - match: { prefix: "/"}
         route: { cluster: www2 }
-        metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+        metadata: { filter_metadata: { com.bar.foo: { baz: test_value }, baz: {name: bluh} } }
   )EOF";
-
+  BazFactory baz_factory;
+  Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   const TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
 
@@ -4380,9 +4423,13 @@ virtual_hosts:
 
   const auto route_entry = route->routeEntry();
   const auto& metadata = route_entry->metadata();
+  const auto& typed_metadata = route_entry->typedMetadata();
 
   EXPECT_EQ("test_value",
             Envoy::Config::Metadata::metadataValue(metadata, "com.bar.foo", "baz").string_value());
+  EXPECT_NE(nullptr, typed_metadata.get<Baz>(baz_factory.name()));
+  EXPECT_EQ("bluh", typed_metadata.get<Baz>(baz_factory.name())->name);
+
   EXPECT_EQ("bar", route_entry->virtualHost().name());
   EXPECT_EQ("foo", route_entry->virtualHost().routeConfig().name());
 }

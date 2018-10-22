@@ -12,6 +12,7 @@ Architecture overview
   http_connection_management
   http_filters
   http_routing
+  auxiliary_config_containers
   grpc
   websocket
   cluster_manager
