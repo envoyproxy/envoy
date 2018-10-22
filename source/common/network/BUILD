@@ -59,7 +59,7 @@ envoy_cc_library(
         "//source/common/event:libevent_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/ssl:ssl_socket_lib",
-        "//source/common/stream_info:filter_state_lib",
+        "//source/common/stream_info:stream_info_lib",
     ],
 )
 

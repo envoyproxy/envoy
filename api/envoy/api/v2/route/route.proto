@@ -771,8 +771,16 @@ message RouteAction {
 }
 
 message RedirectAction {
+  oneof scheme_rewrite_specifier {
+    // The scheme portion of the URL will be swapped with "https".
+    bool https_redirect = 4;
+    // The scheme portion of the URL will be swapped with this value.
+    string scheme_redirect = 7;
+  }
   // The host portion of the URL will be swapped with this value.
   string host_redirect = 1;
+  // The port value of the URL will be swapped with this value.
+  uint32 port_redirect = 8;
 
   oneof path_rewrite_specifier {
     // The path portion of the URL will be swapped with this value.
@@ -809,9 +817,6 @@ message RedirectAction {
   // The HTTP status code to use in the redirect response. The default response
   // code is MOVED_PERMANENTLY (301).
   RedirectResponseCode response_code = 3 [(validate.rules).enum.defined_only = true];
-
-  // The scheme portion of the URL will be swapped with "https".
-  bool https_redirect = 4;
 
   // Indicates that during redirection, the query portion of the URL will
   // be removed. Default value is false.

@@ -18,7 +18,9 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {
   ENVOY_LOG(
-      debug, "checking connection: remoteAddress: {}, localAddress: {}, ssl: {}",
+      debug,
+      "checking connection: requestedServerName: {}, remoteAddress: {}, localAddress: {}, ssl: {}",
+      callbacks_->connection().requestedServerName(),
       callbacks_->connection().remoteAddress()->asString(),
       callbacks_->connection().localAddress()->asString(),
       callbacks_->connection().ssl()

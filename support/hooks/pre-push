@@ -64,6 +64,12 @@ do
         exit 1
       fi
     done
+
+    # Check correctness of repositories definitions.
+    echo "  Checking repositories definitions"
+    if ! "$SCRIPT_DIR"/check_repositories.sh; then
+      exit 1
+    fi
   fi
 done
 
