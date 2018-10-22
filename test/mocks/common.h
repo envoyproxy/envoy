@@ -38,15 +38,7 @@ public:
   MOCK_METHOD0(ready, void());
 };
 
-class MockTimeSource : public TimeSource {
-public:
-  MockTimeSource();
-  ~MockTimeSource();
-
-  MOCK_METHOD0(systemTime, SystemTime());
-  MOCK_METHOD0(monotonicTime, MonotonicTime());
-};
-
+// TODO(jmarantz): get rid of this and use SimulatedTimeSystem in its place.
 class MockTimeSystem : public Event::TestTimeSystem {
 public:
   MockTimeSystem();
@@ -57,18 +49,18 @@ public:
   // matches recent behavior, where real-time timers were created directly in libevent
   // by dispatcher_impl.cc.
   Event::SchedulerPtr createScheduler(Event::Libevent::BasePtr& base) override {
-    return real_time_system_.createScheduler(base);
+    return test_time_.timeSystem().createScheduler(base);
   }
-  void sleep(const Duration& duration) override { real_time_system_.sleep(duration); }
+  void sleep(const Duration& duration) override { test_time_.timeSystem().sleep(duration); }
   Thread::CondVar::WaitStatus
   waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
           const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return real_time_system_.waitFor(mutex, condvar, duration);
+    return test_time_.timeSystem().waitFor(mutex, condvar, duration);
   }
   MOCK_METHOD0(systemTime, SystemTime());
   MOCK_METHOD0(monotonicTime, MonotonicTime());
 
-  Event::TestRealTimeSystem real_time_system_;
+  DangerousDeprecatedTestTime test_time_;
 };
 
 class MockTokenBucket : public TokenBucket {

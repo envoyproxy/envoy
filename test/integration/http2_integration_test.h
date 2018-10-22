@@ -8,7 +8,8 @@ namespace Envoy {
 class Http2IntegrationTest : public HttpIntegrationTest,
                              public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  Http2IntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+  Http2IntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(), realTime()) {}
 
   void SetUp() override { setDownstreamProtocol(Http::CodecClient::Type::HTTP2); }
 

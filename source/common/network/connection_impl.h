@@ -14,12 +14,15 @@
 #include "common/common/logger.h"
 #include "common/event/libevent.h"
 #include "common/network/filter_manager_impl.h"
-#include "common/request_info/filter_state_impl.h"
 #include "common/ssl/ssl_socket.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "absl/types/optional.h"
 
 namespace Envoy {
+class RandomPauseFilter;
+class TestPauseFilter;
+
 namespace Network {
 
 /**
@@ -34,7 +37,7 @@ public:
    * @param previous_total supplies the previous final total buffer size. previous_total will be
    *        updated to new_total when the call is complete.
    * @param stat_total supplies the counter to increment with the delta.
-   * @param stat_current supplies the guage that should be updated with the delta of previous_total
+   * @param stat_current supplies the gauge that should be updated with the delta of previous_total
    *        and new_total.
    */
   static void updateBufferStats(uint64_t delta, uint64_t new_total, uint64_t& previous_total,
@@ -90,10 +93,8 @@ public:
     return socket_->options();
   }
   absl::string_view requestedServerName() const override { return socket_->requestedServerName(); }
-  RequestInfo::FilterState& perConnectionState() override { return per_connection_state_; }
-  const RequestInfo::FilterState& perConnectionState() const override {
-    return per_connection_state_;
-  }
+  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
 
   // Network::BufferSource
   BufferSource::StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
@@ -133,7 +134,7 @@ protected:
   TransportSocketPtr transport_socket_;
   FilterManagerImpl filter_manager_;
   ConnectionSocketPtr socket_;
-  RequestInfo::FilterStateImpl per_connection_state_;
+  StreamInfo::StreamInfoImpl stream_info_;
 
   Buffer::OwnedImpl read_buffer_;
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
@@ -149,6 +150,9 @@ protected:
   Event::FileEventPtr file_event_;
 
 private:
+  friend class ::Envoy::RandomPauseFilter;
+  friend class ::Envoy::TestPauseFilter;
+
   void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);
   void onReadReady();

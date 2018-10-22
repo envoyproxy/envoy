@@ -82,7 +82,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
 
     // Build a new formatted format string at current time.
     CachedTime::Formatted formatted;
-    const std::string seconds_str = fmt::FormatInt(epoch_time_seconds.count()).str();
+    const std::string seconds_str = fmt::format_int(epoch_time_seconds.count()).str();
     formatted.str =
         fromTimeAndPrepareSpecifierOffsets(current_time, formatted.specifier_offsets, seconds_str);
     cached_time.seconds_length = seconds_str.size();
@@ -98,7 +98,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
   // Copy the current cached formatted format string, then replace its subseconds part (when it has
   // non-zero width) by correcting its position using prepared subseconds offsets.
   std::string formatted_str = formatted.str;
-  std::string nanoseconds = fmt::FormatInt(epoch_time_ns.count()).str();
+  std::string nanoseconds = fmt::format_int(epoch_time_ns.count()).str();
   // Special case handling for beginning of time, we should never need to do this outside of
   // tests or a time machine.
   if (nanoseconds.size() < 10) {

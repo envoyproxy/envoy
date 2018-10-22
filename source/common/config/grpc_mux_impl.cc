@@ -12,9 +12,10 @@ namespace Config {
 GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
-                         Runtime::RandomGenerator& random)
+                         Runtime::RandomGenerator& random, Stats::Scope& scope)
     : local_info_(local_info), async_client_(std::move(async_client)),
-      service_method_(service_method), random_(random), time_source_(dispatcher.timeSystem()) {
+      service_method_(service_method), random_(random), time_source_(dispatcher.timeSystem()),
+      control_plane_stats_(generateControlPlaneStats(scope)) {
   Config::Utility::checkLocalInfo("ads", local_info);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
@@ -44,6 +45,7 @@ void GrpcMuxImpl::establishNewStream() {
     return;
   }
 
+  control_plane_stats_.connected_state_.set(1);
   for (const auto type_url : subscriptions_) {
     sendDiscoveryRequest(type_url);
   }
@@ -221,7 +223,6 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     // that tracking here.
     api_state_[type_url].request_.set_version_info(message->version_info());
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(warn, "gRPC config for {} update rejected: {}", message->type_url(), e.what());
     for (auto watch : api_state_[type_url].watches_) {
       watch->callbacks_.onConfigUpdateFailed(&e);
     }
@@ -240,6 +241,7 @@ void GrpcMuxImpl::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
 void GrpcMuxImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
   ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
   stream_ = nullptr;
+  control_plane_stats_.connected_state_.set(0);
   setRetryTimer();
 }
 

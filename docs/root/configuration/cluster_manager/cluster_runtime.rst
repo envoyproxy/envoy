@@ -10,13 +10,13 @@ Active health checking
 
 health_check.min_interval
   Min value for the health checking :ref:`interval <envoy_api_field_core.HealthCheck.interval>`.
-  Default value is 0. The health checking interval will be between *min_interval* and
-  *max_interval*.
+  Default value is 1 ms. The effective health check interval will be no less than 1ms. The health
+  checking interval will be between *min_interval* and *max_interval*.
 
 health_check.max_interval
   Max value for the health checking :ref:`interval <envoy_api_field_core.HealthCheck.interval>`.
-  Default value is MAX_INT. The health checking interval will be between *min_interval* and
-  *max_interval*.
+  Default value is MAX_INT. The effective health check interval will be no less than 1ms. The health
+  checking interval will be between *min_interval* and *max_interval*.
 
 health_check.verify_cluster
   What % of health check requests will be verified against the :ref:`expected upstream service

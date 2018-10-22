@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
@@ -288,9 +289,10 @@ ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
+  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
   data.getRawSlices(slices, num_slices);
-  for (Buffer::RawSlice& slice : slices) {
+  for (uint64_t i = 0; i < num_slices; i++) {
+    Buffer::RawSlice& slice = slices[i];
     dispatching_ = true;
     ssize_t rc =
         nghttp2_session_mem_recv(session_, static_cast<const uint8_t*>(slice.mem_), slice.len_);
@@ -787,7 +789,7 @@ Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
 }
 
 int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
-  // The client code explicitly does not currently suport push promise.
+  // The client code explicitly does not currently support push promise.
   RELEASE_ASSERT(frame->hd.type == NGHTTP2_HEADERS, "");
   RELEASE_ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE ||
                      frame->headers.cat == NGHTTP2_HCAT_HEADERS,
@@ -803,7 +805,7 @@ int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
 
 int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& name,
                                    HeaderString&& value) {
-  // The client code explicitly does not currently suport push promise.
+  // The client code explicitly does not currently support push promise.
   ASSERT(frame->hd.type == NGHTTP2_HEADERS);
   ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE || frame->headers.cat == NGHTTP2_HCAT_HEADERS);
   return saveHeader(frame, std::move(name), std::move(value));

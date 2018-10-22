@@ -10,12 +10,13 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
+#include "envoy/registry/registry.h"
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/fmt.h"
+#include "common/common/thread_annotations.h"
 #include "common/http/headers.h"
-#include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -213,8 +214,9 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                                          Network::Address::IpVersion version,
-                                         const std::string& config)
-    : BaseIntegrationTest(version, config), downstream_protocol_(downstream_protocol) {
+                                         TestTimeSystemPtr time_system, const std::string& config)
+    : BaseIntegrationTest(version, std::move(time_system), config),
+      downstream_protocol_(downstream_protocol) {
   // Legacy integration tests expect the default listener to be named "http" for lookupPort calls.
   config_helper_.renameListener("http");
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
@@ -244,7 +246,7 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     response = codec_client_->makeHeaderOnlyRequest(request_headers);
   }
   waitForNextUpstreamRequest();
-  // Send response headers, and end_stream if there is no respone body.
+  // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(response_headers, response_size == 0);
   // Send any response data, with end_stream true.
   if (response_size) {
@@ -733,6 +735,47 @@ void HttpIntegrationTest::testRetry() {
   EXPECT_EQ(512U, response->body().size());
 }
 
+// Tests that the x-envoy-attempt-count header is properly set on the upstream request
+// and updated after the request is retried.
+void HttpIntegrationTest::testRetryAttemptCountHeader() {
+  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
+                          envoy::api::v2::route::RouteAction::NOT_FOUND,
+                          envoy::api::v2::route::VirtualHost::NONE, {}, true);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test_retry"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                                 {"x-envoy-retry-on", "5xx"}},
+                                         1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+
+  EXPECT_EQ(atoi(upstream_request_->headers().EnvoyAttemptCount()->value().c_str()), 1);
+
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(atoi(upstream_request_->headers().EnvoyAttemptCount()->value().c_str()), 2);
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(512, true);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ(512U, response->body().size());
+}
+
 // Change the default route to be restrictive, and send a request to an alternate route.
 void HttpIntegrationTest::testGrpcRouterNotFound() {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
@@ -797,8 +840,8 @@ void HttpIntegrationTest::testGrpcRetry() {
 // healthy.
 void HttpIntegrationTest::testRetryPriority() {
   const Upstream::PriorityLoad priority_load{0, 100};
-  Upstream::MockRetryPriorityFactory factory(
-      std::make_shared<NiceMock<Upstream::MockRetryPriority>>(priority_load));
+  NiceMock<Upstream::MockRetryPriority> retry_priority(priority_load);
+  Upstream::MockRetryPriorityFactory factory(retry_priority);
 
   Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_factory(factory);
 
@@ -1006,7 +1049,7 @@ void HttpIntegrationTest::testHittingEncoderFilterLimit() {
   codec_client_->sendData(*downstream_request, data, true);
   waitForNextUpstreamRequest();
 
-  // Send the respone headers.
+  // Send the response headers.
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
 
   // Now send an overly large response body. At some point, too much data will
@@ -1274,7 +1317,20 @@ void HttpIntegrationTest::testUpstreamDisconnectWithTwoRequests() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
 }
 
-void HttpIntegrationTest::testTwoRequests() {
+void HttpIntegrationTest::testTwoRequests(bool network_backup) {
+  // if network_backup is false, this simply tests that Envoy can handle multiple
+  // requests on a connection.
+  //
+  // If network_backup is true, the first request will explicitly set the TCP level flow control
+  // as blocked as it finishes the encode and set a timer to unblock. The second stream should be
+  // created while the socket appears to be in the high watermark state, and regression tests that
+  // flow control will be corrected as the socket "becomes unblocked"
+  if (network_backup) {
+    config_helper_.addFilter(R"EOF(
+  name: pause-filter
+  config: {}
+  )EOF");
+  }
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

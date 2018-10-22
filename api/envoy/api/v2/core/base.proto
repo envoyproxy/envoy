@@ -9,6 +9,8 @@ import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
+import "envoy/type/percent.proto";
+
 option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: Common types]
@@ -134,14 +136,14 @@ enum RequestMethod {
 // Header name/value pair.
 message HeaderValue {
   // Header name.
-  string key = 1 [(validate.rules).string.min_bytes = 1];
+  string key = 1 [(validate.rules).string = {min_bytes: 1, max_bytes: 16384}];
 
   // Header value.
   //
   // The same :ref:`format specifier <config_access_log_format>` as used for
   // :ref:`HTTP access logging <config_access_log>` applies here, however
   // unknown header values are replaced with the empty string instead of `-`.
-  string value = 2;
+  string value = 2 [(validate.rules).string.max_bytes = 16384];
 }
 
 // Header name/value pair plus option to control append behavior.
@@ -215,4 +217,14 @@ message SocketOption {
   // STATE_PREBIND is currently the only valid value.
   SocketState state = 6
       [(validate.rules).message.required = true, (validate.rules).enum.defined_only = true];
+}
+
+// Runtime derived FractionalPercent with defaults for when the numerator or denominator is not
+// specified via a runtime key.
+message RuntimeFractionalPercent {
+  // Default value if the runtime value's for the numerator/denominator keys are not available.
+  envoy.type.FractionalPercent default_value = 1 [(validate.rules).message.required = true];
+
+  // Runtime key for a YAML representation of a FractionalPercent.
+  string runtime_key = 2;
 }

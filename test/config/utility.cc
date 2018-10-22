@@ -10,6 +10,7 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
@@ -328,7 +329,8 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
                             const std::string& cluster, bool validate_clusters,
                             envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
                             envoy::api::v2::route::VirtualHost::TlsRequirementType type,
-                            envoy::api::v2::route::RouteAction::RetryPolicy retry_policy) {
+                            envoy::api::v2::route::RouteAction::RetryPolicy retry_policy,
+                            bool include_attempt_count_header) {
   RELEASE_ASSERT(!finalized_, "");
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
@@ -337,6 +339,7 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
   route_config->mutable_validate_clusters()->set_value(validate_clusters);
   auto* virtual_host = route_config->add_virtual_hosts();
   virtual_host->set_name(domains);
+  virtual_host->set_include_request_attempt_count(include_attempt_count_header);
   virtual_host->add_domains(domains);
   virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
   virtual_host->mutable_routes(0)->mutable_route()->set_cluster(cluster);
@@ -478,7 +481,7 @@ void EdsHelper::setEds(
   // FilesystemSubscriptionImpl is subscribed to.
   std::string path =
       TestEnvironment::writeStringToFileForTest("eds.update.pb_text", eds_response.DebugString());
-  RELEASE_ASSERT(::rename(path.c_str(), eds_path_.c_str()) == 0, "");
+  TestUtility::renameFile(path, eds_path_);
   // Make sure Envoy has consumed the update now that it is running.
   server_stats.waitForCounterGe("cluster.cluster_0.update_success", ++update_successes_);
   RELEASE_ASSERT(

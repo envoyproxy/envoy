@@ -31,7 +31,7 @@
 #include "common/http/conn_manager_config.h"
 #include "common/http/user_agent.h"
 #include "common/http/utility.h"
-#include "common/request_info/request_info_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -120,9 +120,10 @@ private:
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;
+    Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     void clearRouteCache() override;
     uint64_t streamId() override;
-    RequestInfo::RequestInfo& requestInfo() override;
+    StreamInfo::StreamInfo& streamInfo() override;
     Tracing::Span& activeSpan() override;
     Tracing::Config& tracingConfig() override;
 
@@ -401,8 +402,9 @@ private:
     Event::TimerPtr idle_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
-    RequestInfo::RequestInfoImpl request_info_;
+    StreamInfo::StreamInfoImpl stream_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
+    absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
@@ -460,7 +462,10 @@ private:
   WebSocketProxyPtr ws_connection_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
-  const Server::OverloadActionState& overload_stop_accepting_requests_;
+  // References into the overload manager thread local state map. Using these lets us avoid a map
+  // lookup in the hot path of processing each request.
+  const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
+  const Server::OverloadActionState& overload_disable_keepalive_ref_;
   Event::TimeSystem& time_system_;
 };
 

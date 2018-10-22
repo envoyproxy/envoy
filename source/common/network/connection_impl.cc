@@ -46,9 +46,10 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                TransportSocketPtr&& transport_socket, bool connected)
     : transport_socket_(std::move(transport_socket)), filter_manager_(*this, *this),
-      socket_(std::move(socket)), write_buffer_(dispatcher.getWatermarkFactory().create(
-                                      [this]() -> void { this->onLowWatermark(); },
-                                      [this]() -> void { this->onHighWatermark(); })),
+      socket_(std::move(socket)), stream_info_(dispatcher.timeSystem()),
+      write_buffer_(
+          dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
+                                                  [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), id_(next_global_id_++) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -68,12 +69,8 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 }
 
 ConnectionImpl::~ConnectionImpl() {
-  ASSERT(fd() == -1, "ConnectionImpl was unexpectedly torn down without being closed.");
-
-  if (delayed_close_timer_) {
-    // It's ok to disable even if the timer has already fired.
-    delayed_close_timer_->disableTimer();
-  }
+  ASSERT(fd() == -1 && delayed_close_timer_ == nullptr,
+         "ConnectionImpl was unexpectedly torn down without being closed.");
 
   // In general we assume that owning code has called close() previously to the destructor being
   // run. This generally must be done so that callbacks run in the correct context (vs. deferred
@@ -174,6 +171,12 @@ Connection::State ConnectionImpl::state() const {
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   if (fd() == -1) {
     return;
+  }
+
+  // No need for a delayed close (if pending) now that the socket is being closed.
+  if (delayed_close_timer_) {
+    delayed_close_timer_->disableTimer();
+    delayed_close_timer_ = nullptr;
   }
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
@@ -280,7 +283,7 @@ void ConnectionImpl::readDisable(bool disable) {
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
   // back pressure at the kernel layer, but still get timely notification of a FIN. Note that
-  // we are not gaurenteed to get notified, so even if the remote has closed, we may not know
+  // we are not guaranteed to get notified, so even if the remote has closed, we may not know
   // until we try to write. Further note that currently we optionally don't correctly handle half
   // closed TCP connections in the sense that we assume that a remote FIN means the remote intends a
   // full close.
@@ -293,7 +296,7 @@ void ConnectionImpl::readDisable(bool disable) {
     read_enabled_ = false;
 
     // If half-close semantics are enabled, we never want early close notifications; we
-    // always want to read all avaiable data, even if the other side has closed.
+    // always want to read all available data, even if the other side has closed.
     if (detect_early_close_ && !enable_half_close_) {
       file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
     } else {
@@ -583,7 +586,7 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 
 void ConnectionImpl::onDelayedCloseTimeout() {
   ENVOY_CONN_LOG(debug, "triggered delayed close", *this);
-  if (connection_stats_->delayed_close_timeouts_ != nullptr) {
+  if (connection_stats_ != nullptr && connection_stats_->delayed_close_timeouts_ != nullptr) {
     connection_stats_->delayed_close_timeouts_->inc();
   }
   closeSocket(ConnectionEvent::LocalClose);

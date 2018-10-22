@@ -273,7 +273,7 @@ public:
 
   /**
    * Crop characters from a string view starting at the first character of the matched
-   * delimiter string view until the begining of the source string view.
+   * delimiter string view until the beginning of the source string view.
    * @param source supplies the string view to be processed.
    * @param delimiter supplies the string view that delimits the starting point for deletion.
    * @return sub-string of the string view if any.
@@ -290,7 +290,7 @@ public:
    * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
    * @param keep_empty_string result contains empty strings if the string starts or ends with
    * 'split', or if instances of 'split' are adjacent; default = false.
-   * @return true if found and false otherwise.
+   * @return vector containing views of the split strings
    */
   static std::vector<absl::string_view> splitToken(absl::string_view source,
                                                    absl::string_view delimiters,

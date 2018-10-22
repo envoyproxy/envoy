@@ -71,7 +71,8 @@ public:
                                                            config.api_config_source(), scope)
                 ->create(),
             dispatcher, random,
-            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), stats));
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), stats,
+            scope));
         break;
       }
       default:

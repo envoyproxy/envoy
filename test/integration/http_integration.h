@@ -78,7 +78,7 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                      Network::Address::IpVersion version,
+                      Network::Address::IpVersion version, TestTimeSystemPtr time_system,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~HttpIntegrationTest();
 
@@ -134,7 +134,7 @@ protected:
   void testRouterDownstreamDisconnectBeforeResponseComplete(
       ConnectionCreationFunction* creator = nullptr);
   void testRouterUpstreamResponseBeforeRequestComplete();
-  void testTwoRequests();
+  void testTwoRequests(bool force_network_backup = false);
   void testOverlyLongHeaders();
   void testIdleTimeoutBasic();
   void testIdleTimeoutWithTwoRequests();
@@ -170,6 +170,7 @@ protected:
   void testDrainClose();
   void testRetry();
   void testRetryHittingBufferLimit();
+  void testRetryAttemptCountHeader();
   void testGrpcRouterNotFound();
   void testGrpcRetry();
   void testRetryPriority();

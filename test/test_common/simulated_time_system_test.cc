@@ -13,30 +13,31 @@ namespace Test {
 class SimulatedTimeSystemTest : public testing::Test {
 protected:
   SimulatedTimeSystemTest()
-      : event_system_(event_base_new()), scheduler_(sim_.createScheduler(event_system_)),
-        start_monotonic_time_(sim_.monotonicTime()), start_system_time_(sim_.systemTime()) {}
+      : event_system_(event_base_new()), scheduler_(time_system_.createScheduler(event_system_)),
+        start_monotonic_time_(time_system_.monotonicTime()),
+        start_system_time_(time_system_.systemTime()) {}
 
   void addTask(int64_t delay_ms, char marker) {
     std::chrono::milliseconds delay(delay_ms);
     TimerPtr timer = scheduler_->createTimer([this, marker, delay]() {
       output_.append(1, marker);
-      EXPECT_GE(sim_.monotonicTime(), start_monotonic_time_ + delay);
+      EXPECT_GE(time_system_.monotonicTime(), start_monotonic_time_ + delay);
     });
     timer->enableTimer(delay);
     timers_.push_back(std::move(timer));
   }
 
   void sleepMsAndLoop(int64_t delay_ms) {
-    sim_.sleep(std::chrono::milliseconds(delay_ms));
+    time_system_.sleep(std::chrono::milliseconds(delay_ms));
     event_base_loop(event_system_.get(), EVLOOP_NONBLOCK);
   }
 
   void advanceSystemMsAndLoop(int64_t delay_ms) {
-    sim_.setSystemTime(sim_.systemTime() + std::chrono::milliseconds(delay_ms));
+    time_system_.setSystemTime(time_system_.systemTime() + std::chrono::milliseconds(delay_ms));
     event_base_loop(event_system_.get(), EVLOOP_NONBLOCK);
   }
 
-  SimulatedTimeSystem sim_;
+  SimulatedTimeSystem time_system_;
   Libevent::BasePtr event_system_;
   SchedulerPtr scheduler_;
   std::string output_;
@@ -46,16 +47,16 @@ protected:
 };
 
 TEST_F(SimulatedTimeSystemTest, Sleep) {
-  EXPECT_EQ(start_monotonic_time_, sim_.monotonicTime());
-  EXPECT_EQ(start_system_time_, sim_.systemTime());
+  EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
+  EXPECT_EQ(start_system_time_, time_system_.systemTime());
   sleepMsAndLoop(5);
-  EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), sim_.monotonicTime());
-  EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), sim_.systemTime());
+  EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), time_system_.monotonicTime());
+  EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), time_system_.systemTime());
 }
 
 TEST_F(SimulatedTimeSystemTest, WaitFor) {
-  EXPECT_EQ(start_monotonic_time_, sim_.monotonicTime());
-  EXPECT_EQ(start_system_time_, sim_.systemTime());
+  EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
+  EXPECT_EQ(start_system_time_, time_system_.systemTime());
 
   // Run an event loop in the background to activate timers.
   std::atomic<bool> done(false);
@@ -79,51 +80,51 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
   {
     Thread::LockGuard lock(mutex);
     EXPECT_EQ(Thread::CondVar::WaitStatus::Timeout,
-              sim_.waitFor(mutex, condvar, std::chrono::seconds(50)));
+              time_system_.waitFor(mutex, condvar, std::chrono::seconds(50)));
   }
   EXPECT_FALSE(done);
-  EXPECT_EQ(MonotonicTime(std::chrono::seconds(50)), sim_.monotonicTime());
+  EXPECT_EQ(MonotonicTime(std::chrono::seconds(50)), time_system_.monotonicTime());
 
   // Waiting another 20 simulated seconds will activate the alarm after 10,
   // and the event-loop thread will call the corresponding callback quickly.
   {
     Thread::LockGuard lock(mutex);
     EXPECT_EQ(Thread::CondVar::WaitStatus::NoTimeout,
-              sim_.waitFor(mutex, condvar, std::chrono::seconds(10)));
+              time_system_.waitFor(mutex, condvar, std::chrono::seconds(10)));
   }
   EXPECT_TRUE(done);
-  EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), sim_.monotonicTime());
+  EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), time_system_.monotonicTime());
 
   // Waiting a third time, with no pending timeouts, will just sleep out for
   // the max duration and return a timeout.
   {
     Thread::LockGuard lock(mutex);
     EXPECT_EQ(Thread::CondVar::WaitStatus::Timeout,
-              sim_.waitFor(mutex, condvar, std::chrono::seconds(20)));
+              time_system_.waitFor(mutex, condvar, std::chrono::seconds(20)));
   }
-  EXPECT_EQ(MonotonicTime(std::chrono::seconds(80)), sim_.monotonicTime());
+  EXPECT_EQ(MonotonicTime(std::chrono::seconds(80)), time_system_.monotonicTime());
 
   thread->join();
 }
 
 TEST_F(SimulatedTimeSystemTest, Monotonic) {
   // Setting time forward works.
-  sim_.setMonotonicTime(start_monotonic_time_ + std::chrono::milliseconds(5));
-  EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), sim_.monotonicTime());
+  time_system_.setMonotonicTime(start_monotonic_time_ + std::chrono::milliseconds(5));
+  EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), time_system_.monotonicTime());
 
   // But going backward does not.
-  sim_.setMonotonicTime(start_monotonic_time_ + std::chrono::milliseconds(3));
-  EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), sim_.monotonicTime());
+  time_system_.setMonotonicTime(start_monotonic_time_ + std::chrono::milliseconds(3));
+  EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), time_system_.monotonicTime());
 }
 
 TEST_F(SimulatedTimeSystemTest, System) {
   // Setting time forward works.
-  sim_.setSystemTime(start_system_time_ + std::chrono::milliseconds(5));
-  EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), sim_.systemTime());
+  time_system_.setSystemTime(start_system_time_ + std::chrono::milliseconds(5));
+  EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), time_system_.systemTime());
 
   // And going backward works too.
-  sim_.setSystemTime(start_system_time_ + std::chrono::milliseconds(3));
-  EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(3), sim_.systemTime());
+  time_system_.setSystemTime(start_system_time_ + std::chrono::milliseconds(3));
+  EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(3), time_system_.systemTime());
 }
 
 TEST_F(SimulatedTimeSystemTest, Ordering) {
@@ -146,8 +147,8 @@ TEST_F(SimulatedTimeSystemTest, SystemTimeOrdering) {
   EXPECT_EQ("35", output_);
   advanceSystemMsAndLoop(1);
   EXPECT_EQ("356", output_);
-  sim_.setSystemTime(start_system_time_ + std::chrono::milliseconds(1));
-  sim_.setSystemTime(start_system_time_ + std::chrono::milliseconds(100));
+  time_system_.setSystemTime(start_system_time_ + std::chrono::milliseconds(1));
+  time_system_.setSystemTime(start_system_time_ + std::chrono::milliseconds(100));
   EXPECT_EQ("356", output_); // callbacks don't get replayed.
 }
 

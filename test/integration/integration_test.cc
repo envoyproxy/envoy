@@ -109,6 +109,8 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 
 TEST_P(IntegrationTest, Retry) { testRetry(); }
 
+TEST_P(IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
+
 TEST_P(IntegrationTest, RetryHostPredicateFilter) { testRetryHostPredicateFilter(); }
 
 TEST_P(IntegrationTest, RetryPriority) { testRetryPriority(); }
@@ -130,6 +132,8 @@ TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
 }
 
 TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(); }
+
+TEST_P(IntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(true); }
 
 TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   testUpstreamDisconnectWithTwoRequests();

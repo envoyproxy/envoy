@@ -49,7 +49,14 @@ void StderrSinkDelegate::flush() {
 }
 
 void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
-  sink_->log(msg.formatted.str());
+  if (!formatter_) {
+    sink_->log(fmt::to_string(msg.raw));
+    return;
+  }
+
+  fmt::memory_buffer formatted;
+  formatter_->format(msg, formatted);
+  sink_->log(fmt::to_string(formatted));
 }
 
 DelegatingLogSinkPtr DelegatingLogSink::init() {
@@ -100,6 +107,17 @@ void Registry::setLogFormat(const std::string& log_format) {
   for (Logger& logger : allLoggers()) {
     logger.logger_->set_pattern(log_format);
   }
+}
+
+Logger* Registry::logger(const std::string& log_name) {
+  Logger* logger_to_return = nullptr;
+  for (Logger& logger : loggers()) {
+    if (logger.name() == log_name) {
+      logger_to_return = &logger;
+      break;
+    }
+  }
+  return logger_to_return;
 }
 
 } // namespace Logger

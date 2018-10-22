@@ -10,6 +10,7 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "fmt/format.h"
@@ -108,7 +109,7 @@ TEST(SoloFilterConfigTest, ParsesEnvironment) {
 }
 
 TEST(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
-  ::setenv("ESCAPE_ENV", "\"", 1);
+  TestEnvironment::setEnvVar("ESCAPE_ENV", "\"", 1);
 
   std::string json = R"EOF(
     {
@@ -126,8 +127,8 @@ TEST(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 TEST(SoloFilterConfigTest, TwoEnvironmentVariables) {
-  ::setenv("ENV1", "1", 1);
-  ::setenv("ENV2", "2", 1);
+  TestEnvironment::setEnvVar("ENV1", "1", 1);
+  TestEnvironment::setEnvVar("ENV2", "2", 1);
 
   std::string json = R"EOF(
     {
@@ -145,7 +146,7 @@ TEST(SoloFilterConfigTest, TwoEnvironmentVariables) {
 }
 
 TEST(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
-  ::setenv("CONF_ENV", "some-config-value", 1);
+  TestEnvironment::setEnvVar("CONF_ENV", "some-config-value", 1);
 
   std::string json = R"EOF(
     {

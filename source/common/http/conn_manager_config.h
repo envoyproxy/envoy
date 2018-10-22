@@ -38,6 +38,7 @@ namespace Http {
   GAUGE    (downstream_cx_tx_bytes_buffered)                                                       \
   COUNTER  (downstream_cx_drain_close)                                                             \
   COUNTER  (downstream_cx_idle_timeout)                                                            \
+  COUNTER  (downstream_cx_overload_disable_keepalive)                                              \
   COUNTER  (downstream_cx_delayed_close_timeout)                                                   \
   COUNTER  (downstream_flow_control_paused_reading_total)                                          \
   COUNTER  (downstream_flow_control_resumed_reading_total)                                         \
@@ -197,7 +198,7 @@ public:
   virtual DateProvider& dateProvider() PURE;
 
   /**
-   * @return the time in milliseconds the connection manager will wait betwen issuing a "shutdown
+   * @return the time in milliseconds the connection manager will wait between issuing a "shutdown
    *         notice" to the time it will issue a full GOAWAY and not accept any new streams.
    */
   virtual std::chrono::milliseconds drainTimeout() PURE;
@@ -207,6 +208,12 @@ public:
    *         chain.
    */
   virtual FilterChainFactory& filterFactory() PURE;
+
+  /**
+   * @return whether the connection manager will reverse the order of encoder
+   * filters in the HTTP filter chain.
+   */
+  virtual bool reverseEncodeOrder() PURE;
 
   /**
    * @return whether the connection manager will generate a fresh x-request-id if the request does

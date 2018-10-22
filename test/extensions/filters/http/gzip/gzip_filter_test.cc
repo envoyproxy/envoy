@@ -175,14 +175,14 @@ TEST_F(GzipFilterTest, hasCacheControlNoTransform) {
   }
 }
 
-// Verifies that compression is skipped when cache-control header has no-tranform value.
+// Verifies that compression is skipped when cache-control header has no-transform value.
 TEST_F(GzipFilterTest, hasCacheControlNoTransformNoCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip;q=0, deflate"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"cache-control", "no-transform"}});
 }
 
-// Verifies that compression is NOT skipped when cache-control header does NOT have no-tranform
+// Verifies that compression is NOT skipped when cache-control header does NOT have no-transform
 // value.
 TEST_F(GzipFilterTest, hasCacheControlNoTransformCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip, deflate"}}, true);

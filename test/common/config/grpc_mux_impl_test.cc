@@ -5,6 +5,7 @@
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
@@ -13,6 +14,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -35,7 +37,7 @@ namespace {
 class GrpcMuxImplTest : public testing::Test {
 public:
   GrpcMuxImplTest() : async_client_(new Grpc::MockAsyncClient()) {
-    dispatcher_.setTimeSystem(mock_time_system_);
+    dispatcher_.setTimeSystem(time_system_);
   }
 
   void setup() {
@@ -43,7 +45,7 @@ public:
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_));
+        random_, stats_));
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -75,8 +77,9 @@ public:
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
   NiceMock<MockGrpcMuxCallbacks> callbacks_;
-  NiceMock<MockTimeSystem> mock_time_system_;
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Stats::IsolatedStoreImpl stats_;
 };
 
 // Validate behavior when multiple type URL watches are maintained, watches are created/destroyed
@@ -90,6 +93,7 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
   grpc_mux_->start();
+  EXPECT_EQ(1, stats_.gauge("control_plane.connected_state").value());
   expectSendMessage("bar", {"z"}, "");
   auto bar_z_sub = grpc_mux_->subscribe("bar", {"z"}, callbacks_);
   expectSendMessage("bar", {"zz", "z"}, "");
@@ -124,6 +128,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   ASSERT_TRUE(timer != nullptr); // initialized from dispatcher mock.
   EXPECT_CALL(*timer, enableTimer(_));
   grpc_mux_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
+  EXPECT_EQ(0, stats_.gauge("control_plane.connected_state").value());
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
@@ -306,8 +311,17 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   expectSendMessage(type_url, {}, "2");
 }
 
+// Exactly one test requires a mock time system to provoke behavior that cannot
+// easily be achieved with a SimulatedTimeSystem.
+class GrpcMuxImplTestWithMockTimeSystem : public GrpcMuxImplTest {
+protected:
+  GrpcMuxImplTestWithMockTimeSystem() { dispatcher_.setTimeSystem(mock_time_system_); }
+
+  MockTimeSystem mock_time_system_;
+};
+
 //  Verifies that warning messages get logged when Envoy detects too many requests.
-TEST_F(GrpcMuxImplTest, TooManyRequests) {
+TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequests) {
   setup();
 
   EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(100));
@@ -427,7 +441,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_),
+          random_, stats_),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
@@ -440,7 +454,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_),
+          random_, stats_),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");

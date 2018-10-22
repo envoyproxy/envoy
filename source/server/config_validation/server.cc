@@ -43,8 +43,7 @@ ValidationInstance::ValidationInstance(Options& options, Event::TimeSystem& time
       api_(new Api::ValidationImpl(options.fileFlushIntervalMsec())),
       dispatcher_(api_->allocateDispatcher(time_system)),
       singleton_manager_(new Singleton::ManagerImpl()),
-      access_log_manager_(*api_, *dispatcher_, access_log_lock, store),
-      listener_manager_(*this, *this, *this, time_system_) {
+      access_log_manager_(*api_, *dispatcher_, access_log_lock, store) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
@@ -80,6 +79,9 @@ void ValidationInstance::initialize(Options& options,
                                    options.serviceClusterName(), options.serviceNodeName()));
 
   Configuration::InitialImpl initial_config(bootstrap);
+  overload_manager_.reset(
+      new OverloadManagerImpl(dispatcher(), stats(), threadLocal(), bootstrap.overload_manager()));
+  listener_manager_.reset(new ListenerManagerImpl(*this, *this, *this, time_system_));
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   secret_manager_.reset(new Secret::SecretManagerImpl());
