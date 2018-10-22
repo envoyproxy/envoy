@@ -28,11 +28,10 @@ public:
 
 class MainCommonBase {
 public:
-  MainCommonBase(OptionsImpl& options);
-  // For testing. Passed arguments will be used if not null. Reasonable
-  // (production) defaults will be created if they are null.
-  MainCommonBase(OptionsImpl& options, Event::TimeSystem* time_system, TestHooks* test_hooks,
-                 Server::ComponentFactory* component_factory,
+  // Consumer must guarantee that all passed references are alive until this object is
+  // destructed.
+  MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_system, TestHooks& test_hooks,
+                 Server::ComponentFactory& component_factory,
                  std::unique_ptr<Runtime::RandomGenerator>&& random_generator);
   ~MainCommonBase();
 
@@ -62,13 +61,7 @@ public:
 protected:
   Envoy::OptionsImpl& options_;
 
-  // Storage for variables that may be set by tests (through constructor)
-  // for defaults if they are not set.
-  std::unique_ptr<Event::RealTimeSystem> default_time_system_;
-  std::unique_ptr<ProdComponentFactory> default_component_factory_;
-  std::unique_ptr<DefaultTestHooks> default_test_hooks_;
-
-  Server::ComponentFactory* component_factory_{};
+  Server::ComponentFactory& component_factory_;
 
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
@@ -111,6 +104,9 @@ private:
 #endif
 
   Envoy::OptionsImpl options_;
+  Event::RealTimeSystem real_time_system_;
+  DefaultTestHooks default_test_hooks_;
+  ProdComponentFactory prod_component_factory_;
   MainCommonBase base_;
 };
 
