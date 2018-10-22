@@ -25,7 +25,7 @@
   - Error handling in deep call stacks, where exceptions provide material
     improvements to code complexity and readability.
 * Apply caution when using exceptions on the data path for general purpose error
-  handling.  Exceptions are not caught on the data path and they should not be
+  handling. Exceptions are not caught on the data path and they should not be
   used for simple error handling, e.g. with shallow call stacks, where explicit
   error handling provides a more readable and easier to reason about
   implementation.
