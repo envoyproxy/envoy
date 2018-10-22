@@ -50,11 +50,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "serialization_interface",
-    srcs = ["serialization_impl.cc"],
+    name = "deserializer_interface",
+    srcs = ["deserializer_impl.cc"],
     hdrs = [
-        "serialization.h",
-        "serialization_impl.h",
+        "deserializer.h",
+        "deserializer_impl.h",
     ],
     deps = [
         "//include/envoy/buffer:buffer_interface",
@@ -63,15 +63,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "hessian_serializer_impl_lib",
-    srcs = ["hessian_serializer_impl.cc"],
+    name = "hessian_deserializer_impl_lib",
+    srcs = ["hessian_deserializer_impl.cc"],
     hdrs = [
-        "hessian_serializer_impl.h",
+        "hessian_deserializer_impl.h",
     ],
     deps = [
         ":buffer_helper_lib",
         ":hessian_utils_lib",
-        ":serialization_interface",
+        ":deserializer_interface",
         "//source/common/singleton:const_singleton",
     ],
 )

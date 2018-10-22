@@ -1,4 +1,4 @@
-#include "extensions/filters/network/dubbo_proxy/hessian_serializer_impl.h"
+#include "extensions/filters/network/dubbo_proxy/hessian_deserializer_impl.h"
 
 #include "envoy/common/exception.h"
 
@@ -6,42 +6,33 @@
 #include "common/common/macros.h"
 
 #include "extensions/filters/network/dubbo_proxy/hessian_utils.h"
-#include "extensions/filters/network/dubbo_proxy/serialization.h"
-#include "extensions/filters/network/dubbo_proxy/serialization_impl.h"
+#include "extensions/filters/network/dubbo_proxy/deserializer.h"
+#include "extensions/filters/network/dubbo_proxy/deserializer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-enum class RpcResponseType : unsigned char {
+enum class RpcResponseType : uint8_t {
   ResponseWithException = 0,
   ResponseWithValue = 1,
   ResponseWithNullValue = 2,
   ResponseWithExceptionWithAttachments = 3,
   ResponseValueWithAttachments = 4,
   ResponseNullValueWithAttachments = 5,
-
-  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST RpcResponseType TYPE
-  LastResponseType = ResponseNullValueWithAttachments,
 };
 
-void HessianSerializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer, size_t body_size) {
+void HessianDeserializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer, size_t body_size) {
   ASSERT(buffer.length() >= body_size);
   size_t total_size = 0, size;
-  // TODO(zyfjeff:) Add dubbo version format checker
+  // TODO(zyfjeff:) Add format checker
   std::string dubbo_version = HessianUtils::peekString(buffer, &size);
   total_size = total_size + size;
-
-  // TODO(zyfjeff:) Add service name format checker
   std::string service_name = HessianUtils::peekString(buffer, &size, total_size);
   total_size = total_size + size;
-
-  // TODO(zyfjeff:) Add version format checker
   std::string service_version = HessianUtils::peekString(buffer, &size, total_size);
   total_size = total_size + size;
-
-  // TODO(zyfjeff:) Add method name format checker
   std::string method_name = HessianUtils::peekString(buffer, &size, total_size);
   total_size = total_size + size;
 
@@ -56,7 +47,7 @@ void HessianSerializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer, s
   return;
 }
 
-void HessianSerializerImpl::deserializeRpcResult(Buffer::Instance& buffer, size_t body_size) {
+void HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buffer, size_t body_size) {
   ASSERT(buffer.length() >= body_size);
   size_t total_size = 0;
   bool has_value = true;

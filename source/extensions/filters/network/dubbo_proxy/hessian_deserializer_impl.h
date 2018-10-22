@@ -1,22 +1,22 @@
 #pragma once
 
-#include "extensions/filters/network/dubbo_proxy/serialization.h"
+#include "extensions/filters/network/dubbo_proxy/deserializer.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-class HessianSerializerImpl : public Serialization {
+class HessianDeserializerImpl : public Deserializer {
 public:
-  HessianSerializerImpl(SerializationCallbacks& callbacks) : callbacks_(callbacks) {}
-  ~HessianSerializerImpl() {}
-  virtual const std::string& name() const override { return SerializerNames::get().HESSIAN; }
+  HessianDeserializerImpl(DeserializationCallbacks& callbacks) : callbacks_(callbacks) {}
+  ~HessianDeserializerImpl() {}
+  virtual const std::string& name() const override { return DeserializerNames::get().Hessian; }
   virtual void deserializeRpcInvocation(Buffer::Instance& buffer, size_t body_size) override;
   virtual void deserializeRpcResult(Buffer::Instance& buffer, size_t body_size) override;
 
 private:
-  SerializationCallbacks& callbacks_;
+  DeserializationCallbacks& callbacks_;
 };
 
 } // namespace DubboProxy

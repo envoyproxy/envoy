@@ -1,4 +1,4 @@
-#include "extensions/filters/network/dubbo_proxy/serialization_impl.h"
+#include "extensions/filters/network/dubbo_proxy/deserializer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

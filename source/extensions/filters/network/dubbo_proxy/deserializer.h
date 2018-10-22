@@ -10,17 +10,17 @@ namespace NetworkFilters {
 namespace DubboProxy {
 
 /**
- * Names of available serialization implementations.
+ * Names of available deserializer implementations.
  */
-class SerializerNameValues {
+class DeserializerNameValues {
 public:
-  // hessian serialization
-  const std::string HESSIAN = "hessian";
-  // json serialization
-  const std::string JSON = "json";
+  // hessian deserializer
+  const std::string Hessian = "hessian";
+  // json deserializer
+  const std::string Json = "json";
 };
 
-typedef ConstSingleton<SerializerNameValues> SerializerNames;
+typedef ConstSingleton<DeserializerNameValues> DeserializerNames;
 
 /**
  * RpcInvocation represent an rpc call
@@ -50,18 +50,18 @@ public:
 
 typedef std::unique_ptr<RpcResult> RpcResultPtr;
 
-class SerializationCallbacks {
+class DeserializationCallbacks {
 public:
-  virtual ~SerializationCallbacks() {}
+  virtual ~DeserializationCallbacks() {}
   virtual void onRpcInvocation(RpcInvocationPtr&& invo) PURE;
   virtual void onRpcResult(RpcResultPtr&& res) PURE;
 };
 
-class Serialization {
+class Deserializer {
 public:
-  virtual ~Serialization() {}
+  virtual ~Deserializer() {}
   /**
-   * Return this serialization's name
+   * Return this Deserializer's name
    *
    * @return std::string containing the serialization name.
    */
@@ -86,7 +86,7 @@ public:
   virtual void deserializeRpcResult(Buffer::Instance& buffer, size_t body_size) PURE;
 };
 
-typedef std::unique_ptr<Serialization> SerializationPtr;
+typedef std::unique_ptr<Deserializer> DeserializerPtr;
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "extensions/filters/network/dubbo_proxy/serialization.h"
+#include "extensions/filters/network/dubbo_proxy/deserializer.h"
 
 namespace Envoy {
 namespace Extensions {
