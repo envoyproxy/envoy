@@ -242,6 +242,20 @@ TEST_F(RouterRetryStateImplTest, PolicyGrpcUnavilable) {
   EXPECT_EQ(RetryStatus::No, state_->shouldRetry(&response_headers, no_reset_, callback_));
 }
 
+TEST_F(RouterRetryStateImplTest, PolicyGrpcInternal) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-grpc-on", "internal"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"grpc-status", "13"}};
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(&response_headers, no_reset_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetry(&response_headers, no_reset_, callback_));
+}
+
 TEST_F(RouterRetryStateImplTest, Policy5xxRemote200RemoteReset) {
   // Don't retry after reply start.
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
@@ -319,6 +333,14 @@ TEST_F(RouterRetryStateImplTest, RetriableStatusCodes) {
 
   Http::TestHeaderMapImpl response_headers{{":status", "409"}};
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(&response_headers, no_reset_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, RetriableStatusCodesUpstreamReset) {
+  policy_.retriable_status_codes_.push_back(409);
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "retriable-status-codes"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetry(nullptr, remote_reset_, callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, RetriableStatusCodesHeader) {

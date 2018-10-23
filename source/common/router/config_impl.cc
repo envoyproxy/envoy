@@ -57,18 +57,17 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
     auto& factory =
         ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
             host_predicate.name());
-
     auto config = ::Envoy::Config::Utility::translateToFactoryConfig(host_predicate, factory);
-    factory.createHostPredicate(*this, *config, num_retries_);
+    retry_host_predicate_configs_.emplace_back(host_predicate.name(), std::move(config));
   }
 
   const auto retry_priority = retry_policy.retry_priority();
   if (!retry_priority.name().empty()) {
     auto& factory = ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
         retry_priority.name());
-
-    auto config = ::Envoy::Config::Utility::translateToFactoryConfig(retry_priority, factory);
-    factory.createRetryPriority(*this, *config, num_retries_);
+    retry_priority_config_ =
+        std::make_pair(retry_priority.name(),
+                       ::Envoy::Config::Utility::translateToFactoryConfig(retry_priority, factory));
   }
 
   auto host_selection_attempts = retry_policy.host_selection_retry_max_attempts();
@@ -79,6 +78,30 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
   for (auto code : retry_policy.retriable_status_codes()) {
     retriable_status_codes_.emplace_back(code);
   }
+}
+
+std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPredicates() const {
+  std::vector<Upstream::RetryHostPredicateSharedPtr> predicates;
+
+  for (const auto& config : retry_host_predicate_configs_) {
+    auto& factory =
+        ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
+            config.first);
+    predicates.emplace_back(factory.createHostPredicate(*config.second, num_retries_));
+  }
+
+  return predicates;
+}
+
+Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
+  if (retry_priority_config_.first.empty()) {
+    return nullptr;
+  }
+
+  auto& factory = ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
+      retry_priority_config_.first);
+
+  return factory.createRetryPriority(*retry_priority_config_.second, num_retries_);
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) {
@@ -273,7 +296,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), idle_timeout)),
       max_grpc_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), max_grpc_timeout)),
       loader_(factory_context.runtime()), runtime_(loadRuntimeData(route.match())),
+      scheme_redirect_(route.redirect().scheme_redirect()),
       host_redirect_(route.redirect().host_redirect()),
+      port_redirect_(route.redirect().port_redirect()
+                         ? ":" + std::to_string(route.redirect().port_redirect())
+                         : ""),
       path_redirect_(route.redirect().path_redirect()),
       https_redirect_(route.redirect().https_redirect()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
@@ -356,15 +383,20 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 }
 
+bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
+  return !runtime_ ? true
+                   : loader_.snapshot().featureEnabled(runtime_->fractional_runtime_key_,
+                                                       runtime_->fractional_runtime_default_,
+                                                       random_value);
+}
+
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
   bool matches = true;
 
-  if (runtime_) {
-    matches &= random_value % runtime_->denominator_val_ < runtime_->numerator_val_;
-    if (!matches) {
-      // No need to waste further cycles calculating a route match.
-      return false;
-    }
+  matches &= evaluateRuntimeMatch(random_value);
+  if (!matches) {
+    // No need to waste further cycles calculating a route match.
+    return false;
   }
 
   if (match_grpc_) {
@@ -428,34 +460,13 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
   absl::optional<RuntimeData> runtime;
   RuntimeData runtime_data;
 
-  if (route_match.runtime_specifier_case() == envoy::api::v2::route::RouteMatch::kRuntimeFraction) {
-    envoy::type::FractionalPercent fractional_percent;
-    const std::string& fraction_yaml =
-        loader_.snapshot().get(route_match.runtime_fraction().runtime_key());
-
-    try {
-      MessageUtil::loadFromYamlAndValidate(fraction_yaml, fractional_percent);
-    } catch (const EnvoyException& ex) {
-      ENVOY_LOG(error, "failed to parse string value for runtime key {}: {}",
-                route_match.runtime_fraction().runtime_key(), ex.what());
-      fractional_percent = route_match.runtime_fraction().default_value();
-    }
-
-    runtime_data.numerator_val_ = fractional_percent.numerator();
-    runtime_data.denominator_val_ =
-        ProtobufPercentHelper::fractionalPercentDenominatorToInt(fractional_percent.denominator());
-  } else if (route_match.runtime_specifier_case() == envoy::api::v2::route::RouteMatch::kRuntime) {
-    // For backwards compatibility, the deprecated 'runtime' field must be converted to a
-    // RuntimeData format with a variable denominator type. The 'runtime' field assumes a percentage
-    // (0-100), so the hard-coded denominator value reflects this.
-    runtime_data.denominator_val_ = 100;
-    runtime_data.numerator_val_ = loader_.snapshot().getInteger(
-        route_match.runtime().runtime_key(), route_match.runtime().default_value());
-  } else {
-    return runtime;
+  if (route_match.has_runtime_fraction()) {
+    runtime_data.fractional_runtime_default_ = route_match.runtime_fraction().default_value();
+    runtime_data.fractional_runtime_key_ = route_match.runtime_fraction().runtime_key();
+    return runtime_data;
   }
 
-  return runtime_data;
+  return runtime;
 }
 
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
@@ -477,14 +488,46 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
 std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
   ASSERT(isDirectResponse());
 
-  const char* final_host;
-  absl::string_view final_path;
   const char* final_scheme;
+  absl::string_view final_host;
+  absl::string_view final_port;
+  absl::string_view final_path;
+
+  if (!scheme_redirect_.empty()) {
+    final_scheme = scheme_redirect_.c_str();
+  } else if (https_redirect_) {
+    final_scheme = Http::Headers::get().SchemeValues.Https.c_str();
+  } else {
+    ASSERT(headers.ForwardedProto());
+    final_scheme = headers.ForwardedProto()->value().c_str();
+  }
+
+  if (!port_redirect_.empty()) {
+    final_port = port_redirect_.c_str();
+  } else {
+    final_port = "";
+  }
+
   if (!host_redirect_.empty()) {
     final_host = host_redirect_.c_str();
   } else {
     ASSERT(headers.Host());
     final_host = headers.Host()->value().c_str();
+    if (!final_port.empty()) {
+      size_t host_end;
+      // Detect if IPv6 URI
+      if (final_host[0] == '[') {
+        host_end = final_host.rfind("]:");
+        if (host_end != absl::string_view::npos) {
+          host_end += 1; // advance to :
+        }
+      } else {
+        host_end = final_host.rfind(":");
+      }
+      if (host_end != absl::string_view::npos) {
+        final_host = final_host.substr(0, host_end);
+      }
+    }
   }
 
   if (!path_redirect_.empty()) {
@@ -500,14 +543,7 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
     }
   }
 
-  if (https_redirect_) {
-    final_scheme = Http::Headers::get().SchemeValues.Https.c_str();
-  } else {
-    ASSERT(headers.ForwardedProto());
-    final_scheme = headers.ForwardedProto()->value().c_str();
-  }
-
-  return fmt::format("{}://{}{}", final_scheme, final_host, final_path);
+  return fmt::format("{}://{}{}{}", final_scheme, final_host, final_port, final_path);
 }
 
 std::multimap<std::string, std::string>

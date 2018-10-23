@@ -80,10 +80,10 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
     const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Fault;
     const auto* route_entry = callbacks_->route()->routeEntry();
 
-    const FaultSettings* per_route_settings_ =
-        route_entry->perFilterConfigTyped<FaultSettings>(name)
-            ?: route_entry->virtualHost().perFilterConfigTyped<FaultSettings>(name);
-    fault_settings_ = per_route_settings_ ?: fault_settings_;
+    const FaultSettings* tmp = route_entry->perFilterConfigTyped<FaultSettings>(name);
+    const FaultSettings* per_route_settings =
+        tmp ? tmp : route_entry->virtualHost().perFilterConfigTyped<FaultSettings>(name);
+    fault_settings_ = per_route_settings ? per_route_settings : fault_settings_;
   }
 
   if (!matchesTargetUpstreamCluster()) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
@@ -12,6 +13,10 @@
 namespace Envoy {
 namespace StreamInfo {
 
+/**
+ * FilterState represents dynamically generated information regarding a stream
+ * (TCP or HTTP level) by various filters in Envoy.
+ */
 class FilterState {
 public:
   class Object {
@@ -30,8 +35,8 @@ public:
   virtual void setData(absl::string_view data_name, std::unique_ptr<Object>&& data) PURE;
 
   /**
-   * @param data_name the name of the data being set.
-   * @return a reference to the stored data.
+   * @param data_name the name of the data being looked up.
+   * @return a const reference to the stored data.
    * Note that it is an error to access data that has not previously been set.
    * This function will fail if the data stored under |data_name| cannot be
    * dynamically cast to the type specified.

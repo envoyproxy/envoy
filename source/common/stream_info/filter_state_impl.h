@@ -1,6 +1,8 @@
 #pragma once
 
 #include <map>
+#include <memory>
+#include <vector>
 
 #include "envoy/stream_info/filter_state.h"
 

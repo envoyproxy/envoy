@@ -96,7 +96,6 @@ multiple spans are stitched together using common information such as the global
 request ID :ref:`config_http_conn_man_headers_x-request-id` (LightStep) or
 the trace ID configuration (Zipkin). See
 
-* :ref:`v1 API reference <config_tracing_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.trace.v2.Tracing>`
 
 for more information on how to setup tracing in Envoy.

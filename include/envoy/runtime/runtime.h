@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/type/percent.pb.h"
 
 #include "absl/types/optional.h"
 
@@ -41,20 +42,13 @@ class Snapshot {
 public:
   virtual ~Snapshot() {}
 
-  /**
-   * The raw data from a single snapshot key.
-   */
   struct Entry {
-    /**
-     * The raw runtime data.
-     */
-    std::string string_value_;
-
-    /**
-     * The possibly parsed integer value from the runtime data.
-     */
+    std::string raw_string_value_;
     absl::optional<uint64_t> uint_value_;
+    absl::optional<envoy::type::FractionalPercent> fractional_percent_value_;
   };
+
+  typedef std::unordered_map<std::string, Entry> EntryMap;
 
   /**
    * A provider of runtime values. One or more of these compose the snapshot's source of values,
@@ -63,10 +57,12 @@ public:
   class OverrideLayer {
   public:
     virtual ~OverrideLayer() {}
+
     /**
      * @return const std::unordered_map<std::string, Entry>& the values in this layer.
      */
-    virtual const std::unordered_map<std::string, Entry>& values() const PURE;
+    virtual const std::unordered_map<std::string, Snapshot::Entry>& values() const PURE;
+
     /**
      * @return const std::string& a user-friendly alias for this layer, e.g. "admin" or "disk".
      */
@@ -118,6 +114,36 @@ public:
    */
   virtual bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
                               uint64_t num_buckets) const PURE;
+
+  /**
+   * Test if a feature is enabled using the built in random generator. This is done by generating a
+   * random number between 0 and the fractional percent denominator and seeing if this number is <
+   * the numerator value stored in the runtime key. The default_value's numerator/denominator is
+   * used if the runtime key is invalid.
+   * NOTE: In the current implementation, this routine may return different results each time it is
+   *       called because a new random number is used each time. Callers should understand this
+   *       behavior and not assume that subsequent calls using the same snapshot will be consistent.
+   * @param key supplies the feature key to lookup.
+   * @param default_value supplies the default value that will be used if either the feature key
+   *        does not exist or it is not a fractional percent.
+   * @return true if the feature is enabled.
+   */
+  virtual bool featureEnabled(const std::string& key,
+                              const envoy::type::FractionalPercent& default_value) const PURE;
+
+  /**
+   * Test if a feature is enabled using a supplied stable random value. This variant is used if
+   * the caller wants a stable result over multiple calls.
+   * @param key supplies the feature key to lookup.
+   * @param default_value supplies the default value that will be used if either the feature key
+   *        does not exist or it is not a fractional percent.
+   * @param random_value supplies the stable random value to use for determining whether the feature
+   *        is enabled.
+   * @return true if the feature is enabled.
+   */
+  virtual bool featureEnabled(const std::string& key,
+                              const envoy::type::FractionalPercent& default_value,
+                              uint64_t random_value) const PURE;
 
   /**
    * Fetch raw runtime data based on key.

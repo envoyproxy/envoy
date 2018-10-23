@@ -1,7 +1,7 @@
 # C++ coding style
 
 * The Envoy source code is formatted using clang-format. Thus all white spaces, etc.
-  issues are taken care of automatically. The Travis tests will automatically check
+  issues are taken care of automatically. The CircleCI tests will automatically check
   the code format and fail. There are make targets that can both check the format
   (check_format) as well as fix the code format for you (fix_format).
 * Beyond code formatting, for the most part Envoy uses the
@@ -17,6 +17,18 @@
 
 * Exceptions are allowed and encouraged where appropriate. When using exceptions, do not add
   additional error handing that cannot possibly happen in the case an exception is thrown.
+* Do use exceptions for:
+  - Configuration ingestion error handling. Invalid configurations (dynamic and
+    static) should throw meaningful `EnvoyException`s, the configuration
+    ingestion code will catch these.
+  - Constructor failure.
+  - Error handling in deep call stacks, where exceptions provide material
+    improvements to code complexity and readability.
+* Apply caution when using exceptions on the data path for general purpose error
+  handling. Exceptions are not caught on the data path and they should not be
+  used for simple error handling, e.g. with shallow call stacks, where explicit
+  error handling provides a more readable and easier to reason about
+  implementation.
 * References are always preferred over pointers when the reference cannot be null. This
   includes both const and non-const references.
 * Function names should all use camel case starting with a lower case letter (e.g., `doFoo()`).
@@ -65,8 +77,6 @@
   In most cases tests can and should be structured so this is not necessary.
 * Tests default to StrictMock so will fail if hitting unexpected warnings. Feel free to use
   NiceMock for mocks whose behavior is not the focus of a test.
-* There are probably a few other things missing from this list. We will add them as they
-  are brought to our attention.
 * [Thread
   annotations](https://github.com/abseil/abseil-cpp/blob/master/absl/base/thread_annotations.h),
   such as `GUARDED_BY`, should be used for shared state guarded by
@@ -75,6 +85,7 @@
   rather than using the 'static' keyword. Note that the
   [Google C++ style guide](https://google.github.io/styleguide/cppguide.html#Unnamed_Namespaces_and_Static_Variables)
    allows either, but in Envoy we prefer annonymous namespaces.
+* Braces are required for all control statements include single line if, while, etc. statements.
 
 # Error handling
 

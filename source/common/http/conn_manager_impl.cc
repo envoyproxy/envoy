@@ -472,7 +472,11 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
     StreamEncoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
-  wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
+  if (connection_manager_.config_.reverseEncodeOrder()) {
+    wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
+  } else {
+    wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
@@ -518,6 +522,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     is_head_request_ = true;
   }
 
+  maybeEndDecode(end_stream);
+
   // Drop new requests when overloaded as soon as we have decoded the headers.
   if (connection_manager_.overload_stop_accepting_requests_ref_ ==
       Server::OverloadActionState::Active) {
@@ -528,8 +534,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   const bool upgrade_rejected = createFilterChain() == false;
-
-  maybeEndDecode(end_stream);
 
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
                    *request_headers_);
@@ -601,10 +605,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   // Currently we only support relative paths at the application layer. We expect the codec to have
-  // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec does not do this
-  // so we only support relative paths in all cases. https://tools.ietf.org/html/rfc7230#section-5.3
-  // We also need to check for the existence of :path because CONNECT does not have a path, and we
-  // don't support that currently.
+  // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does this
+  // when the allow_absolute_url flag is enabled on the HCM.
+  // https://tools.ietf.org/html/rfc7230#section-5.3 We also need to check for the existence of
+  // :path because CONNECT does not have a path, and we don't support that currently.
   if (!request_headers_->Path() || request_headers_->Path()->value().c_str()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
