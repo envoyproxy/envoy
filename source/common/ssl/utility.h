@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/time.h"
+
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -44,14 +46,14 @@ int32_t getDaysUntilExpiration(X509* cert);
  * @param cert the certificate.
  * @return time from when this certificate is valid.
  */
-time_t getValidFrom(X509* cert);
+SystemTime getValidFrom(X509* cert);
 
 /**
  * Returns the time when this certificate expires.
  * @param cert the certificate.
  * @return time after which the certificate expires.
  */
-time_t getExpirationTime(X509* cert);
+SystemTime getExpirationTime(X509* cert);
 
 } // namespace Utility
 } // namespace Ssl

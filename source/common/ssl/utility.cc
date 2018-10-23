@@ -77,16 +77,16 @@ int32_t Utility::getDaysUntilExpiration(X509* cert) {
   return 0;
 }
 
-time_t Utility::getValidFrom(X509* cert) {
+SystemTime Utility::getValidFrom(X509* cert) {
   int days, seconds;
   ASN1_TIME_diff(&days, &seconds, epochASN1_Time().get(), X509_get_notBefore(cert));
-  return time_t(days * 24 * 60 * 60 + seconds);
+  return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
 }
 
-time_t Utility::getExpirationTime(X509* cert) {
+SystemTime Utility::getExpirationTime(X509* cert) {
   int days, seconds;
   ASN1_TIME_diff(&days, &seconds, epochASN1_Time().get(), X509_get_notAfter(cert));
-  return time_t(days * 24 * 60 * 60 + seconds);
+  return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
 }
 
 } // namespace Ssl
