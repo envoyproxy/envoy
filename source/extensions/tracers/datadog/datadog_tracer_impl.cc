@@ -114,12 +114,12 @@ void TraceReporter::onSuccess(Http::MessagePtr&& http_response) {
   if (responseStatus != enumToInt(Http::Code::OK)) {
     ENVOY_LOG(debug, "unexpected HTTP response code from datadog agent: {}", responseStatus);
     driver_.tracerStats().reports_dropped_.inc();
-    if (driver_.tracerOptions().priority_sampling) {
-      encoder_->handleResponse(http_response->body()->toString());
-    }
   } else {
     ENVOY_LOG(debug, "traces successfully submitted to datadog agent");
     driver_.tracerStats().reports_sent_.inc();
+    if (driver_.tracerOptions().priority_sampling) {
+      encoder_->handleResponse(http_response->body()->toString());
+    }
   }
 }
 

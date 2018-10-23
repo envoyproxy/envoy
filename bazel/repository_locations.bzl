@@ -83,7 +83,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/googleapis",
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        commit = "16934caf138afe19a954d1224e467469bb645b74",  # v0.3.3
+        commit = "816a010c222959e4b8dcbb57329373626f710a3c",  # v0.3.4
         remote = "https://github.com/DataDog/dd-opentracing-cpp",
     ),
     com_github_msgpack_msgpack_c = dict(
