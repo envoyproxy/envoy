@@ -73,7 +73,7 @@ public:
   virtual CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   absl::optional<std::string> overrideServerName) const PURE;
+                   absl::optional<std::string> override_server_name) const PURE;
 
   /**
    * Create a health check connection for this host.

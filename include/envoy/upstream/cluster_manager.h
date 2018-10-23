@@ -272,7 +272,7 @@ public:
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                      absl::optional<std::string> overrideServerName) PURE;
+                      absl::optional<std::string> override_server_name) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

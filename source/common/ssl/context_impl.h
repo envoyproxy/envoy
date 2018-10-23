@@ -42,7 +42,7 @@ struct SslStats {
 
 class ContextImpl : public virtual Context {
 public:
-  virtual bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> overrideServerName) const;
+  virtual bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name) const;
 
   /**
    * Logs successful TLS handshake and updates stats.
@@ -141,7 +141,7 @@ class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
   ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config);
 
-  bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> overrideServerName) const override;
+  bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name) const override;
 
 private:
   const std::string server_name_indication_;

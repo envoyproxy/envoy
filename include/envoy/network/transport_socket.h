@@ -151,12 +151,12 @@ public:
   virtual bool implementsSecureTransport() const PURE;
 
   /**
-   * @param overrideServerName set server name, disregard the value the factory was
+   * @param override_server_name set server name, disregard the value the factory was
    * configured with
    * @return Network::TransportSocketPtr a transport socket to be passed to connection.
    */
   virtual TransportSocketPtr
-  createTransportSocket(absl::optional<std::string> overrideServerName) const PURE;
+  createTransportSocket(absl::optional<std::string> override_server_name) const PURE;
 };
 
 typedef std::unique_ptr<TransportSocketFactory> TransportSocketFactoryPtr;

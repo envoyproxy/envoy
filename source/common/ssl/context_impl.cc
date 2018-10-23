@@ -492,11 +492,11 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
 }
 
 bssl::UniquePtr<SSL>
-ClientContextImpl::newSsl(absl::optional<std::string> overrideServerName) const {
+ClientContextImpl::newSsl(absl::optional<std::string> override_server_name) const {
   bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(absl::nullopt));
 
   std::string server_name_indication =
-      overrideServerName.has_value() ? overrideServerName.value() : server_name_indication_;
+      override_server_name.has_value() ? override_server_name.value() : server_name_indication_;
 
   if (!server_name_indication.empty()) {
     int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication.c_str());

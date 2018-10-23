@@ -36,8 +36,8 @@ public:
 } // namespace
 
 SslSocket::SslSocket(ContextSharedPtr ctx, InitialState state,
-                     absl::optional<std::string> overrideServerName)
-    : ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), ssl_(ctx_->newSsl(overrideServerName)) {
+                     absl::optional<std::string> override_server_name)
+    : ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), ssl_(ctx_->newSsl(override_server_name)) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_.get());
   } else {
@@ -372,7 +372,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(ClientContextConfigPtr config,
 }
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
-    absl::optional<std::string> overrideServerName) const {
+    absl::optional<std::string> override_server_name) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
@@ -383,7 +383,7 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
   }
   if (ssl_ctx) {
     return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Client,
-                                            overrideServerName);
+                                            override_server_name);
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.upstream_context_secrets_not_ready_.inc();
