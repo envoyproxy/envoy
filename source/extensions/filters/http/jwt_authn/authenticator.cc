@@ -7,6 +7,7 @@
 #include "common/common/logger.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/protobuf/protobuf.h"
 
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
@@ -41,7 +42,7 @@ public:
   void onJwksError(Failure reason) override;
   // Following functions are for Authenticator interface
   void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
-              AuthenticatorCallback callback) override;
+              SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) override;
   void onDestroy() override;
 
   TimeSource& timeSource() { return time_source_; }
@@ -78,6 +79,8 @@ private:
 
   // The HTTP request headers
   Http::HeaderMap* headers_{};
+  // the callback function to set payload
+  SetPayloadCallback set_payload_cb_;
   // The on_done function.
   AuthenticatorCallback callback_;
   // check audience object.
@@ -89,10 +92,11 @@ private:
 };
 
 void AuthenticatorImpl::verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
-                               AuthenticatorCallback callback) {
+                               SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
   ASSERT(!callback_);
   headers_ = &headers;
   tokens_ = std::move(tokens);
+  set_payload_cb_ = std::move(set_payload_cb);
   callback_ = std::move(callback);
 
   ENVOY_LOG(debug, "Jwt authentication starts");
@@ -223,6 +227,16 @@ void AuthenticatorImpl::verifyKey() {
     // TODO(potatop) remove JWT from queries.
     // Remove JWT from headers.
     curr_token_->removeJwt(*headers_);
+  }
+  if (set_payload_cb_ && !provider.payload_in_metadata().empty()) {
+    Protobuf::util::JsonParseOptions options;
+    ProtobufWkt::Struct payload_pb;
+    const auto status =
+        Protobuf::util::JsonStringToMessage(jwt_->payload_str_, &payload_pb, options);
+    // payload_str_ have been verified as valid JSON already.
+    // All valid JSON should be able to parse into a protobuf Struct.
+    RELEASE_ASSERT(status.ok(), "Failed to parse JWT payload json into protobuf Struct");
+    set_payload_cb_(provider.payload_in_metadata(), payload_pb);
   }
 
   doneWithStatus(Status::Ok);

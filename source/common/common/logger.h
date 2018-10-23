@@ -276,7 +276,7 @@ protected:
 #define DO_STRINGIZE(x) STRINGIZE(x)
 #define STRINGIZE(x) #x
 #define LINE_STRING DO_STRINGIZE(__LINE__)
-#define LOG_PREFIX __FILE__ ":" LINE_STRING "] "
+#define LOG_PREFIX "[" __FILE__ ":" LINE_STRING "] "
 
 /**
  * Base logging macros. It is expected that users will use the convenience macros below rather than
