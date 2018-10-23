@@ -722,7 +722,7 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
     absl::optional<std::string> overrideServerName;
 
     absl::optional<std::string> requestedServerName;
-    if (context->downstreamConnection() &&
+    if (context && context->downstreamConnection() &&
         context->downstreamConnection()
             ->streamInfo()
             .filterState()
