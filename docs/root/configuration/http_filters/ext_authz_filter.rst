@@ -11,10 +11,6 @@ If the request is deemed unauthorized then the request will be denied normally w
 Note that sending additional custom metadata from the authorization service to the upstream, to the downstream or to the authorization service is 
 also possible. This is explained in more details at :ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2alpha.ExtAuthz>`.
 
-.. tip::
-  It is recommended that this filter is configured first in the filter chain so that requests are
-  authorized prior to the rest of filters processing the request.
-
 The content of the requests that are passed to an authorization service is specified by 
 :ref:`CheckRequest <envoy_api_msg_service.auth.v2alpha.CheckRequest>`.
 

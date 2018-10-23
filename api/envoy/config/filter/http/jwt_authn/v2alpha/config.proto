@@ -157,6 +157,24 @@ message JwtProvider {
   //
   // If it is not specified, the payload will not be forwarded.
   string forward_payload_header = 8;
+
+  // If non empty, successfully verified JWT payloads will be written to StreamInfo DynamicMetadata
+  // in the format as: *namespace* is the jwt_authn filter name as **envoy.filters.http.jwt_authn**
+  // The value is the *protobuf::Struct*. The value of this field will be the key for its *fields*
+  // and the value is the *protobuf::Struct* converted from JWT JSON payload.
+  //
+  // For example, if payload_in_metadata is *my_payload*:
+  //
+  // .. code-block:: yaml
+  //
+  //   envoy.filters.http.jwt_authn:
+  //     my_payload:
+  //       iss: https://example.com
+  //       sub: test@example.com
+  //       aud: https://example.com
+  //       exp: 1501281058
+  //
+  string payload_in_metadata = 9;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.

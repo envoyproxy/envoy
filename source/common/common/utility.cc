@@ -66,7 +66,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
   const std::chrono::seconds epoch_time_seconds =
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ns);
 
-  const auto& item = cached_time.formatted.find(format_string_);
+  const auto& item = cached_time.formatted.find(raw_format_string_);
   if (item == cached_time.formatted.end() ||
       item->second.epoch_time_seconds != epoch_time_seconds) {
     // Remove all the expired cached items.
@@ -89,10 +89,10 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
 
     // Stamp the formatted string using the current epoch time in seconds, and then cache it in.
     formatted.epoch_time_seconds = epoch_time_seconds;
-    cached_time.formatted.emplace(std::make_pair(format_string_, formatted));
+    cached_time.formatted.emplace(std::make_pair(raw_format_string_, formatted));
   }
 
-  const auto& formatted = cached_time.formatted.at(format_string_);
+  const auto& formatted = cached_time.formatted.at(raw_format_string_);
   ASSERT(specifiers_.size() == formatted.specifier_offsets.size());
 
   // Copy the current cached formatted format string, then replace its subseconds part (when it has
@@ -122,7 +122,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
   return formatted_str;
 }
 
-std::string DateFormatter::parse(const std::string& format_string) {
+void DateFormatter::parse(const std::string& format_string) {
   std::string new_format_string = format_string;
   std::smatch matched;
   size_t step = 0;
@@ -158,17 +158,6 @@ std::string DateFormatter::parse(const std::string& format_string) {
     Specifier specifier(step, 0, new_format_string.substr(step));
     specifiers_.emplace_back(specifier);
   }
-
-  return new_format_string;
-}
-
-std::string DateFormatter::fromTime(time_t time) const {
-  tm current_tm;
-  gmtime_r(&time, &current_tm);
-
-  std::array<char, 1024> buf;
-  const size_t len = strftime(&buf[0], buf.size(), format_string_.c_str(), &current_tm);
-  return std::string(&buf[0], len);
 }
 
 std::string
@@ -201,10 +190,8 @@ DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets&
   return formatted;
 }
 
-std::string DateFormatter::now() {
-  time_t current_time_t;
-  time(&current_time_t);
-  return fromTime(current_time_t);
+std::string DateFormatter::now(TimeSource& time_source) {
+  return fromTime(time_source.systemTime());
 }
 
 ConstMemoryStreamBuffer::ConstMemoryStreamBuffer(const char* data, size_t size) {

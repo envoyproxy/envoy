@@ -32,8 +32,9 @@ int ContextImpl::sslContextIndex() {
   }());
 }
 
-ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
-    : ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)) {
+ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source)
+    : ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)),
+      time_source_(time_source) {
   RELEASE_ASSERT(ctx_, "");
 
   int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
@@ -438,9 +439,9 @@ SslStats ContextImpl::generateStats(Stats::Scope& store) {
 }
 
 size_t ContextImpl::daysUntilFirstCertExpires() const {
-  int daysUntilExpiration = Utility::getDaysUntilExpiration(ca_cert_.get());
-  daysUntilExpiration =
-      std::min<int>(Utility::getDaysUntilExpiration(cert_chain_.get()), daysUntilExpiration);
+  int daysUntilExpiration = Utility::getDaysUntilExpiration(ca_cert_.get(), time_source_);
+  daysUntilExpiration = std::min<int>(
+      Utility::getDaysUntilExpiration(cert_chain_.get(), time_source_), daysUntilExpiration);
   if (daysUntilExpiration < 0) { // Ensure that the return value is unsigned
     return 0;
   }
@@ -466,7 +467,8 @@ CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::str
       std::make_unique<envoy::admin::v2alpha::CertificateDetails>();
   certificate_details->set_path(path);
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
-  certificate_details->set_days_until_expiration(Utility::getDaysUntilExpiration(cert));
+  certificate_details->set_days_until_expiration(
+      Utility::getDaysUntilExpiration(cert, time_source_));
 
   for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
     envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
@@ -481,8 +483,10 @@ CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::str
   return certificate_details;
 }
 
-ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config)
-    : ContextImpl(scope, config), server_name_indication_(config.serverNameIndication()),
+ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config,
+                                     TimeSource& time_source)
+    : ContextImpl(scope, config, time_source),
+      server_name_indication_(config.serverNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
@@ -508,8 +512,8 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
-                                     Runtime::Loader& runtime)
-    : ContextImpl(scope, config), runtime_(runtime),
+                                     Runtime::Loader& runtime, TimeSource& time_source)
+    : ContextImpl(scope, config, time_source), runtime_(runtime),
       session_ticket_keys_(config.sessionTicketKeys()) {
   if (config.tlsCertificate() == nullptr) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
