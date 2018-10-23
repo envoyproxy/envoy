@@ -215,10 +215,7 @@ message CertificateValidationContext {
   // (in PEM format). If specified, Envoy will verify that the presented peer
   // certificate has not been revoked by this CRL. If this DataSource contains
   // multiple CRLs, all of them will be used.
-  oneof crl_type {
-    core.DataSource crl = 7;
-    SdsSecretConfig crl_sds_secret_config = 10;
-  }
+  core.DataSource crl = 7;
 
   // If specified, Envoy will not reject expired certificates.
   bool allow_expired_certificate = 8;
@@ -322,15 +319,10 @@ message Secret {
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   string name = 1;
 
-  message TrustedCaAndCrl {
-    core.DataSource trusted_ca = 1;
-    core.DataSource crl = 2;
-  }
-
   oneof type {
     TlsCertificate tls_certificate = 2;
     TlsSessionTicketKeys session_ticket_keys = 3;
     CertificateValidationContext validation_context = 4;
-    TrustedCaAndCrl trusted_ca_and_crl = 5;
+    core.DataSource trusted_ca = 5;
   }
 }
