@@ -62,7 +62,7 @@ private:
 
   MutexData data_;
 
-  // It is preferable to use SpinLock instead of absl::Mutex inside a function whith absl::Mutex
+  // It is preferable to use SpinLock instead of absl::Mutex inside a function which absl::Mutex
   // itself depends on.
   absl::base_internal::SpinLock lock_;
 };
