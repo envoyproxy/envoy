@@ -1533,10 +1533,12 @@ public:
 };
 
 struct Foo : public Envoy::Config::TypedMetadata::Object {};
+
 struct Baz : public Envoy::Config::TypedMetadata::Object {
   Baz(std::string n) : name(n) {}
   std::string name;
 };
+
 class BazFactory : public ClusterTypedMetadataFactory {
 public:
   const std::string name() const { return "baz"; }

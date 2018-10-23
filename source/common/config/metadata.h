@@ -54,7 +54,7 @@ template <typename factoryClass> class TypedMetadataImpl : public TypedMetadata 
 public:
   static_assert(std::is_base_of<Config::TypedMetadataFactory, factoryClass>::value,
                 "Factory type must be inherited from Envoy::Config::TypedMetadataFactory.");
-  TypedMetadataImpl(const ::envoy::api::v2::core::Metadata& metadata) : data_() {
+  TypedMetadataImpl(const envoy::api::v2::core::Metadata& metadata) : data_() {
     auto& data_by_key = metadata.filter_metadata();
     for (const auto& it : Registry::FactoryRegistry<factoryClass>::factories()) {
       const auto& meta_iter = data_by_key.find(it.first);

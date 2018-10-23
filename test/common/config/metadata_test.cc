@@ -50,17 +50,19 @@ TEST(MetadataTest, MetadataValuePath) {
 
 class TypedMetadataTest : public testing::Test {
 public:
-  TypedMetadataTest() : foo_factory_(), registered_factory_(foo_factory_) {}
+  TypedMetadataTest() : registered_factory_(foo_factory_) {}
 
   struct Foo : public TypedMetadata::Object {
     Foo(std::string name) : name_(name) {}
     std::string name_;
   };
+
   struct Bar : public TypedMetadata::Object {};
+
   class FooFactory : public TypedMetadataFactory::TypedMetadataFactory {
   public:
     const std::string name() const { return "foo"; }
-    // Returns nullptr (conversion failure) if d is empty.
+    // Throws EnvoyException (conversion failure) if d is empty.
     std::unique_ptr<const TypedMetadata::Object> parse(const ProtobufWkt::Struct& d) const {
       if (d.fields().find("name") != d.fields().end()) {
         return std::make_unique<Foo>(d.fields().at("name").string_value());

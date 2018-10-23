@@ -37,6 +37,7 @@ public:
 protected:
   // Returns data associated with given 'key'.
   // If there is no data associated with this key, a nullptr is returned.
+  // @param key the key (usually a reversed DNS) associated with the typed metadata.
   virtual const Object* getData(const std::string& key) const PURE;
 };
 
@@ -48,16 +49,20 @@ class TypedMetadataFactory {
 public:
   virtual ~TypedMetadataFactory() {}
 
-  // Name of the factory.
+  // Name of the factory, a reversed DNS name is encouraged to avoid cross-org conflict.
   // It's used as key in the metadata map, as well as key in the factory registry.
   // When building a TypedMetadata from envoy::api::v2::core::Metadata, if the key is not found, the
   // parse will not be called and the corresponding typedMetadata entry will be set to nullptr.
+  // @return the name of the factory.
   virtual const std::string name() const PURE;
 
   // Convert the google.protobuf.Struct into an instance of TypedMetadata::Object.
   // It should throw an EnvoyException in case the conversion can't be completed.
-  // Returns a derived class object pointer of TypedMetadata.
-  virtual std::unique_ptr<const TypedMetadata::Object> parse(const ProtobufWkt::Struct&) const PURE;
+  // @param data config data stored as a protobuf Struct.
+  // @return a derived class object pointer of TypedMetadata.
+  // @throw EvnoyException if the parsing can't be done.
+  virtual std::unique_ptr<const TypedMetadata::Object>
+  parse(const ProtobufWkt::Struct& data) const PURE;
 };
 
 } // namespace Config
