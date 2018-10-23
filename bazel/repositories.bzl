@@ -73,6 +73,9 @@ def _build_recipe_repository_impl(ctxt):
         vc_path = find_vc_path(ctxt)
         current_path = get_env_var(ctxt, "PATH", None, False)
         env = setup_vc_env_vars(ctxt, vc_path)
+        if env == None:
+            fail("couldn't set up VC env vars")
+
         env["PATH"] += (";%s" % current_path)
         env["CC"] = "cl"
         env["CXX"] = "cl"

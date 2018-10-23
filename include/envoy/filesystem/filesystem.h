@@ -61,5 +61,30 @@ public:
 
 typedef std::unique_ptr<Watcher> WatcherPtr;
 
+/**
+ * Abstraction for listing a directory.
+ * TODO(sesmith177): replace with std::filesystem::directory_iterator once we move to C++17
+ */
+
+class DirectoryIterator {
+public:
+  enum class FileType { Regular, Directory, Other };
+
+  typedef struct {
+    std::string path_;
+    FileType type_;
+  } DirectoryEntry;
+
+  DirectoryIterator(const std::string& directory_path) : directory_path_(directory_path) {}
+  virtual ~DirectoryIterator() {}
+
+  virtual DirectoryEntry nextEntry() PURE;
+
+protected:
+  std::string directory_path_;
+};
+
+typedef std::unique_ptr<DirectoryIterator> DirectoryIteratorPtr;
+
 } // namespace Filesystem
 } // namespace Envoy

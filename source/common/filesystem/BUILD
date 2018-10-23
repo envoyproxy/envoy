@@ -9,6 +9,38 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "directory_iterator_lib",
+    srcs = select({
+        "//bazel:windows_x86_64": [
+            "win32/directory_iterator_impl.cc",
+        ],
+        "//conditions:default": [
+            "posix/directory_iterator_impl.cc",
+        ],
+    }),
+    hdrs = select({
+        "//bazel:windows_x86_64": [
+            "win32/directory_iterator_impl.h",
+        ],
+        "//conditions:default": [
+            "posix/directory_iterator_impl.h",
+        ],
+    }),
+    strip_include_prefix = select({
+        "//bazel:windows_x86_64": "win32",
+        "//conditions:default": "posix",
+    }),
+    deps = [
+        "//include/envoy/filesystem:filesystem_interface",
+    ] + select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "//source/common/api:os_sys_calls_lib",
+        ],
+    }),
+)
+
+envoy_cc_library(
     name = "filesystem_lib",
     srcs = ["filesystem_impl.cc"],
     hdrs = ["filesystem_impl.h"],
