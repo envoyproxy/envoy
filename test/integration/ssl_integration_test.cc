@@ -177,20 +177,6 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
-TEST_P(SslIntegrationTest, AltAlpn) {
-  // Write the runtime file to turn alt_alpn on.
-  TestEnvironment::writeStringToFileForTest("runtime/ssl.alt_alpn", "100");
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-    // Configure the runtime directory.
-    bootstrap.mutable_runtime()->set_symlink_root(TestEnvironment::temporaryPath("runtime"));
-  });
-  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
-    return makeSslClientConnection(true, false);
-  };
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
-  checkStats();
-}
-
 class SslCaptureIntegrationTest : public SslIntegrationTest {
 public:
   void initialize() override {

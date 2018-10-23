@@ -115,7 +115,6 @@ TLS :ref:`architecture overview <arch_overview_ssl>`.
     "cert_chain_file": "...",
     "private_key_file": "...",
     "alpn_protocols": "...",
-    "alt_alpn_protocols": "...",
     "ca_cert_file": "...",
     "verify_certificate_hash": "...",
     "verify_subject_alt_name": [],
@@ -139,12 +138,6 @@ alpn_protocols
 
   * "h2,http/1.1" If the listener is going to support both HTTP/2 and HTTP/1.1.
   * "http/1.1" If the listener is only going to support HTTP/1.1
-
-.. _config_listener_ssl_context_alt_alpn:
-
-alt_alpn_protocols
-  *(optional, string)* An alternate ALPN protocol string that can be switched to via runtime. This
-  is useful for example to disable HTTP/2 without having to deploy a new configuration.
 
 ca_cert_file
   *(optional, string)* A file containing certificate authority certificates to use in verifying

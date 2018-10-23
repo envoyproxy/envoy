@@ -234,11 +234,6 @@ int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned ch
   // Currently this uses the standard selection algorithm in priority order.
   const uint8_t* alpn_data = &parsed_alpn_protocols_[0];
   size_t alpn_data_size = parsed_alpn_protocols_.size();
-  if (!parsed_alt_alpn_protocols_.empty() &&
-      runtime_.snapshot().featureEnabled("ssl.alt_alpn", 0)) {
-    alpn_data = &parsed_alt_alpn_protocols_[0];
-    alpn_data_size = parsed_alt_alpn_protocols_.size();
-  }
 
   if (SSL_select_next_proto(const_cast<unsigned char**>(out), outlen, alpn_data, alpn_data_size, in,
                             inlen) != OPENSSL_NPN_NEGOTIATED) {
@@ -559,8 +554,6 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
       SSL_CTX_set_verify(ctx_.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
     }
   }
-
-  parsed_alt_alpn_protocols_ = parseAlpnProtocols(config.altAlpnProtocols());
 
   if (!parsed_alpn_protocols_.empty()) {
     SSL_CTX_set_alpn_select_cb(ctx_.get(),

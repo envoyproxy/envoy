@@ -160,7 +160,6 @@ private:
                            HMAC_CTX* hmac_ctx, int encrypt);
 
   Runtime::Loader& runtime_;
-  std::vector<uint8_t> parsed_alt_alpn_protocols_;
   const std::vector<ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };
 

@@ -71,7 +71,6 @@ Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& cont
   auto* common_tls_context = tls_context.mutable_common_tls_context();
   common_tls_context->add_alpn_protocols("h2");
   common_tls_context->add_alpn_protocols("http/1.1");
-  common_tls_context->mutable_deprecated_v1()->set_alt_alpn_protocols("http/1.1");
 
   auto* validation_context = common_tls_context->mutable_validation_context();
   validation_context->mutable_trusted_ca()->set_filename(
