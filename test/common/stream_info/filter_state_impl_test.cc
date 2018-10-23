@@ -60,11 +60,12 @@ TEST_F(FilterStateImplTest, Simple) {
   size_t access_count = 0u;
   size_t destruction_count = 0u;
   filter_state().setData(
-      "test_name", std::make_unique<TestStoredTypeTracking>(5, &access_count, &destruction_count));
+      "test_name", std::make_unique<TestStoredTypeTracking>(5, &access_count, &destruction_count),
+      FilterState::StateType::ReadOnly);
   EXPECT_EQ(0u, access_count);
   EXPECT_EQ(0u, destruction_count);
 
-  EXPECT_EQ(5, filter_state().getData<TestStoredTypeTracking>("test_name").access());
+  EXPECT_EQ(5, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_name").access());
   EXPECT_EQ(1u, access_count);
   EXPECT_EQ(0u, destruction_count);
 
@@ -80,18 +81,22 @@ TEST_F(FilterStateImplTest, SameTypes) {
   static const int ValueOne = 5;
   static const int ValueTwo = 6;
 
-  filter_state().setData("test_1", std::make_unique<TestStoredTypeTracking>(
-                                       ValueOne, &access_count_1, &destruction_count));
-  filter_state().setData("test_2", std::make_unique<TestStoredTypeTracking>(
-                                       ValueTwo, &access_count_2, &destruction_count));
+  filter_state().setData(
+      "test_1",
+      std::make_unique<TestStoredTypeTracking>(ValueOne, &access_count_1, &destruction_count),
+      FilterState::StateType::ReadOnly);
+  filter_state().setData(
+      "test_2",
+      std::make_unique<TestStoredTypeTracking>(ValueTwo, &access_count_2, &destruction_count),
+      FilterState::StateType::ReadOnly);
   EXPECT_EQ(0u, access_count_1);
   EXPECT_EQ(0u, access_count_2);
   EXPECT_EQ(0u, destruction_count);
 
-  EXPECT_EQ(ValueOne, filter_state().getData<TestStoredTypeTracking>("test_1").access());
+  EXPECT_EQ(ValueOne, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_1").access());
   EXPECT_EQ(1u, access_count_1);
   EXPECT_EQ(0u, access_count_2);
-  EXPECT_EQ(ValueTwo, filter_state().getData<TestStoredTypeTracking>("test_2").access());
+  EXPECT_EQ(ValueTwo, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_2").access());
   EXPECT_EQ(1u, access_count_1);
   EXPECT_EQ(1u, access_count_2);
   resetFilterState();
@@ -99,38 +104,45 @@ TEST_F(FilterStateImplTest, SameTypes) {
 }
 
 TEST_F(FilterStateImplTest, SimpleType) {
-  filter_state().setData("test_1", std::make_unique<SimpleType>(1));
-  filter_state().setData("test_2", std::make_unique<SimpleType>(2));
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1),
+                         FilterState::StateType::ReadOnly);
+  filter_state().setData("test_2", std::make_unique<SimpleType>(2),
+                         FilterState::StateType::ReadOnly);
 
-  EXPECT_EQ(1, filter_state().getData<SimpleType>("test_1").access());
-  EXPECT_EQ(2, filter_state().getData<SimpleType>("test_2").access());
+  EXPECT_EQ(1, filter_state().getDataReadOnly<SimpleType>("test_1").access());
+  EXPECT_EQ(2, filter_state().getDataReadOnly<SimpleType>("test_2").access());
 }
 
 TEST_F(FilterStateImplTest, NameConflict) {
-  filter_state().setData("test_1", std::make_unique<SimpleType>(1));
-  EXPECT_THROW_WITH_MESSAGE(filter_state().setData("test_1", std::make_unique<SimpleType>(2)),
-                            EnvoyException, "FilterState::setData<T> called twice with same name.");
-  EXPECT_EQ(1, filter_state().getData<SimpleType>("test_1").access());
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1),
+                         FilterState::StateType::ReadOnly);
+  EXPECT_THROW_WITH_MESSAGE(filter_state().setData("test_1", std::make_unique<SimpleType>(2),
+                                                   FilterState::StateType::ReadOnly),
+                            EnvoyException,
+                            "FilterState::setData<T> called twice on same ReadOnly state.");
+  EXPECT_EQ(1, filter_state().getDataReadOnly<SimpleType>("test_1").access());
 }
 
 TEST_F(FilterStateImplTest, NameConflictDifferentTypes) {
-  filter_state().setData("test_1", std::make_unique<SimpleType>(1));
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1),
+                         FilterState::StateType::ReadOnly);
   EXPECT_THROW_WITH_MESSAGE(
       filter_state().setData("test_1",
-                             std::make_unique<TestStoredTypeTracking>(2, nullptr, nullptr)),
-      EnvoyException, "FilterState::setData<T> called twice with same name.");
+                             std::make_unique<TestStoredTypeTracking>(2, nullptr, nullptr),
+                             FilterState::StateType::ReadOnly),
+      EnvoyException, "FilterState::setData<T> called twice on same ReadOnly state.");
 }
 
 TEST_F(FilterStateImplTest, UnknownName) {
-  EXPECT_THROW_WITH_MESSAGE(filter_state().getData<SimpleType>("test_1"), EnvoyException,
-                            "FilterState::getData<T> called for unknown data name.");
+  EXPECT_THROW_WITH_MESSAGE(filter_state().getDataReadOnly<SimpleType>("test_1"), EnvoyException,
+                            "FilterState::getDataReadOnly<T> called for unknown data name.");
 }
 
 TEST_F(FilterStateImplTest, WrongTypeGet) {
-  filter_state().setData("test_name",
-                         std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr));
-  EXPECT_EQ(5, filter_state().getData<TestStoredTypeTracking>("test_name").access());
-  EXPECT_THROW_WITH_MESSAGE(filter_state().getData<SimpleType>("test_name"), EnvoyException,
+  filter_state().setData("test_name", std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr),
+                         FilterState::StateType::ReadOnly);
+  EXPECT_EQ(5, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_name").access());
+  EXPECT_THROW_WITH_MESSAGE(filter_state().getDataReadOnly<SimpleType>("test_name"), EnvoyException,
                             "Data stored under test_name cannot be coerced to specified type");
 }
 
@@ -145,19 +157,20 @@ class C : public B {};
 } // namespace
 
 TEST_F(FilterStateImplTest, FungibleInheritance) {
-  filter_state().setData("testB", std::make_unique<B>());
+  filter_state().setData("testB", std::make_unique<B>(), FilterState::StateType::ReadOnly);
   EXPECT_TRUE(filter_state().hasData<B>("testB"));
   EXPECT_TRUE(filter_state().hasData<A>("testB"));
   EXPECT_FALSE(filter_state().hasData<C>("testB"));
 
-  filter_state().setData("testC", std::make_unique<C>());
+  filter_state().setData("testC", std::make_unique<C>(), FilterState::StateType::ReadOnly);
   EXPECT_TRUE(filter_state().hasData<B>("testC"));
   EXPECT_TRUE(filter_state().hasData<A>("testC"));
   EXPECT_TRUE(filter_state().hasData<C>("testC"));
 }
 
 TEST_F(FilterStateImplTest, HasData) {
-  filter_state().setData("test_1", std::make_unique<SimpleType>(1));
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1),
+                         FilterState::StateType::ReadOnly);
   EXPECT_TRUE(filter_state().hasData<SimpleType>("test_1"));
   EXPECT_FALSE(filter_state().hasData<SimpleType>("test_2"));
   EXPECT_FALSE(filter_state().hasData<TestStoredTypeTracking>("test_1"));

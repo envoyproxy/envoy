@@ -158,7 +158,7 @@ parsePerRequestStateField(absl::string_view param_str) {
       return std::string();
     }
 
-    return std::string(filter_state.getData<StringAccessor>(param).asString());
+    return std::string(filter_state.getDataReadOnly<StringAccessor>(param).asString());
   };
 }
 

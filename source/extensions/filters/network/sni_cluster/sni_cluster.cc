@@ -16,9 +16,11 @@ Network::FilterStatus SniClusterFilter::onNewConnection() {
                  read_callbacks_->connection(), sni);
 
   if (!sni.empty()) {
-    // Set the tcp_proxy cluster to the same value as SNI
+    // Set the tcp_proxy cluster to the same value as SNI. The data is mutable to allow
+    // other filters to change it.
     read_callbacks_->connection().streamInfo().filterState().setData(
-        TcpProxy::PerConnectionCluster::Key, std::make_unique<TcpProxy::PerConnectionCluster>(sni));
+        TcpProxy::PerConnectionCluster::Key, std::make_unique<TcpProxy::PerConnectionCluster>(sni),
+        StreamInfo::FilterState::StateType::Mutable);
   }
 
   return Network::FilterStatus::Continue;
