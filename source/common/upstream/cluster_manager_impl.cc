@@ -735,7 +735,7 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
       requestedServerName = server_name.value();
     }
 
-    if (entry->second->cluster_info_->forwardOriginalServerNameIndication() && context &&
+    if (entry->second->cluster_info_->forwardOriginalServerNameIndication() &&
         requestedServerName.has_value()) {
       overrideServerName = requestedServerName.value();
     }
