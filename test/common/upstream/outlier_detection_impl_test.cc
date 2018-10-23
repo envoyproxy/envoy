@@ -350,7 +350,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowConnectFailure) {
   addHosts({"tcp://127.0.0.1:80"}, true);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
-      cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_source_, event_logger_));
+      cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
 
   ON_CALL(runtime_.snapshot_,
           featureEnabled("outlier_detection.enforcing_consecutive_connect_failure", 100))
@@ -362,8 +362,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowConnectFailure) {
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, EjectionType::ConsecutiveConnectFailure, true));
-  EXPECT_CALL(time_source_, monotonicTime())
-      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(0))));
+  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
   // Get the configured number of failures and simulate than number of connect failures.
   uint32_t n = runtime_.snapshot_.getInteger("outlier_detection.consecutive_connect_failure",
@@ -375,15 +374,13 @@ TEST_F(OutlierDetectorImplTest, BasicFlowConnectFailure) {
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
   // Wait short time - not enough to be unejected
-  EXPECT_CALL(time_source_, monotonicTime())
-      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(9999))));
+  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Interval that does bring the host back in.
-  EXPECT_CALL(time_source_, monotonicTime())
-      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(30001))));
+  time_system_.setMonotonicTime(std::chrono::milliseconds(30001));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
