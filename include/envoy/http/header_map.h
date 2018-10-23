@@ -236,7 +236,6 @@ private:
   HEADER_FUNC(AccessControlExposeHeaders)                                                          \
   HEADER_FUNC(AccessControlMaxAge)                                                                 \
   HEADER_FUNC(Authorization)                                                                       \
-  HEADER_FUNC(B3)                                                                                  \
   HEADER_FUNC(CacheControl)                                                                        \
   HEADER_FUNC(ClientTraceId)                                                                       \
   HEADER_FUNC(Connection)                                                                          \
@@ -296,12 +295,7 @@ private:
   HEADER_FUNC(Upgrade)                                                                             \
   HEADER_FUNC(UserAgent)                                                                           \
   HEADER_FUNC(Vary)                                                                                \
-  HEADER_FUNC(Via)                                                                                 \
-  HEADER_FUNC(XB3TraceId)                                                                          \
-  HEADER_FUNC(XB3SpanId)                                                                           \
-  HEADER_FUNC(XB3ParentSpanId)                                                                     \
-  HEADER_FUNC(XB3Sampled)                                                                          \
-  HEADER_FUNC(XB3Flags)
+  HEADER_FUNC(Via)
 
 /**
  * The following functions are defined for each inline header above. E.g., for ContentLength we

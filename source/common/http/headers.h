@@ -25,7 +25,6 @@ public:
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
   const LowerCaseString Authorization{"authorization"};
-  const LowerCaseString B3{"b3"};
   const LowerCaseString CacheControl{"cache-control"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
@@ -93,11 +92,6 @@ public:
   const LowerCaseString UserAgent{"user-agent"};
   const LowerCaseString Vary{"vary"};
   const LowerCaseString Via{"via"};
-  const LowerCaseString XB3TraceId{"x-b3-traceid"};
-  const LowerCaseString XB3SpanId{"x-b3-spanid"};
-  const LowerCaseString XB3ParentSpanId{"x-b3-parentspanid"};
-  const LowerCaseString XB3Sampled{"x-b3-sampled"};
-  const LowerCaseString XB3Flags{"x-b3-flags"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
   const LowerCaseString XSquashDebug{"x-squash-debug"};
 

@@ -191,7 +191,7 @@ TEST(ZipkinSpanContextExtractorTest, WithoutSampled) {
   EXPECT_EQ(1, context.first.trace_id());
   EXPECT_EQ(0, context.first.trace_id_high());
   EXPECT_FALSE(context.first.sampled());
-  EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
+  EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
 }
 
 TEST(ZipkinSpanContextExtractorTest, TooBig) {
