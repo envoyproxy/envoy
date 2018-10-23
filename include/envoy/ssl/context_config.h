@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/ssl/trusted_ca_config.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -49,6 +50,11 @@ public:
    * @return CertificateValidationContextConfig the certificate validation context config.
    */
   virtual const CertificateValidationContextConfig* certificateValidationContext() const PURE;
+
+  /**
+   * @return TrustedCaConfig the trusted certificate certificates config.
+   */
+  virtual const TrustedCaConfig* trustedCa() const PURE;
 
   /**
    * @return The minimum TLS protocol version to negotiate.

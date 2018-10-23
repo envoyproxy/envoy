@@ -73,6 +73,16 @@ getCertificateValidationContextConfigProvider(
   return nullptr;
 }
 
+Secret::TrustedCaConfigProviderSharedPtr
+getTrustedCaConfigProvider(const envoy::api::v2::auth::CommonTlsContext& config,
+                           Server::Configuration::TransportSocketFactoryContext& factory_context) {
+  if (config.has_validation_context() && config.validation_context().has_trusted_ca()) {
+    return factory_context.secretManager().createInlineTrustedCaProvider(
+        config.validation_context().trusted_ca());
+  }
+  return nullptr;
+}
+
 } // namespace
 
 const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
@@ -103,6 +113,7 @@ ContextConfigImpl::ContextConfigImpl(
       tls_certficate_provider_(getTlsCertificateConfigProvider(config, factory_context)),
       certficate_validation_context_provider_(
           getCertificateValidationContextConfigProvider(config, factory_context)),
+      trusted_ca_provider_(getTrustedCaConfigProvider(config, factory_context)),
       min_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),

@@ -13,17 +13,6 @@ public:
   virtual ~CertificateValidationContextConfig() {}
 
   /**
-   * @return The CA certificate to use for peer validation.
-   */
-  virtual const std::string& caCert() const PURE;
-
-  /**
-   * @return Path of the CA certificate to use for peer validation or "<inline>"
-   * if the CA certificate was inlined.
-   */
-  virtual const std::string& caCertPath() const PURE;
-
-  /**
    * @return The CRL to check if a cert is revoked.
    */
   virtual const std::string& certificateRevocationList() const PURE;

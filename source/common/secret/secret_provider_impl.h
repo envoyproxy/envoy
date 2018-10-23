@@ -3,9 +3,11 @@
 #include <functional>
 
 #include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/ssl/trusted_ca_config.h"
 
 namespace Envoy {
 namespace Secret {
@@ -36,6 +38,18 @@ public:
 
 private:
   Ssl::CertificateValidationContextConfigPtr certificate_validation_context_;
+};
+
+class TrustedCaConfigProviderImpl : public TrustedCaConfigProvider {
+public:
+  TrustedCaConfigProviderImpl(const envoy::api::v2::core::DataSource& trusted_ca);
+
+  const Ssl::TrustedCaConfig* secret() const override { return trusted_ca_.get(); }
+
+  Common::CallbackHandle* addUpdateCallback(std::function<void()>) override { return nullptr; }
+
+private:
+  Ssl::TrustedCaConfigPtr trusted_ca_;
 };
 
 } // namespace Secret

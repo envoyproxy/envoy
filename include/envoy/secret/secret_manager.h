@@ -45,6 +45,14 @@ public:
   findStaticCertificateValidationContextProvider(const std::string& name) const PURE;
 
   /**
+   * @param name a name of the static TrustedCaConfigProviderSharedPtr.
+   * @return the TrustedCaConfigProviderSharedPtr. Returns nullptr if the static trusted CA config
+   * is not found.
+   */
+  virtual TrustedCaConfigProviderSharedPtr
+  findStaticTrustedCaConfigProvider(const std::string& name) const PURE;
+
+  /**
    * @param tls_certificate the protobuf config of the TLS certificate.
    * @return a TlsCertificateConfigProviderSharedPtr created from tls_certificate.
    */
@@ -61,6 +69,13 @@ public:
   createInlineCertificateValidationContextProvider(
       const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context)
       PURE;
+
+  /**
+   * @param trusted_ca the protobuf config of the trusted CA certificates.
+   * @return a TrustedCaConfigProviderSharedPtr created from trusted_ca.
+   */
+  virtual TrustedCaConfigProviderSharedPtr
+  createInlineTrustedCaProvider(const envoy::api::v2::core::DataSource& trusted_ca) PURE;
 
   /**
    * Finds and returns a dynamic secret provider associated to SDS config. Create

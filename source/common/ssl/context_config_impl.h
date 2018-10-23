@@ -34,6 +34,9 @@ public:
                ? nullptr
                : certficate_validation_context_provider_->secret();
   }
+  const TrustedCaConfig* trustedCa() const override {
+    return trusted_ca_provider_ == nullptr ? nullptr : trusted_ca_provider_->secret();
+  }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
 
@@ -86,6 +89,7 @@ private:
       certficate_validation_context_provider_;
   // Handle for certificate validation context dyanmic secret callback.
   Common::CallbackHandle* cvc_update_callback_handle_{};
+  Secret::TrustedCaConfigProviderSharedPtr trusted_ca_provider_;
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
 };

@@ -34,6 +34,14 @@ void SecretManagerImpl::addStaticSecret(const envoy::api::v2::auth::Secret& secr
     }
     break;
   }
+  case envoy::api::v2::auth::Secret::TypeCase::kTrustedCa: {
+    auto secret_provider = std::make_shared<TrustedCaConfigProviderImpl>(secret.trusted_ca());
+    if (!static_trusted_ca_providers_.insert(std::make_pair(secret.name(), secret_provider))
+             .second) {
+      throw EnvoyException(fmt::format("Duplicate static TrustedCa secret name {}", secret.name()));
+    }
+    break;
+  }
   default:
     throw EnvoyException("Secret type not implemented");
   }
@@ -52,6 +60,12 @@ SecretManagerImpl::findStaticCertificateValidationContextProvider(const std::str
                                                                             : nullptr;
 }
 
+TrustedCaConfigProviderSharedPtr
+SecretManagerImpl::findStaticTrustedCaConfigProvider(const std::string& name) const {
+  auto secret = static_trusted_ca_providers_.find(name);
+  return (secret != static_trusted_ca_providers_.end()) ? secret->second : nullptr;
+}
+
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::createInlineTlsCertificateProvider(
     const envoy::api::v2::auth::TlsCertificate& tls_certificate) {
   return std::make_shared<TlsCertificateConfigProviderImpl>(tls_certificate);
@@ -62,6 +76,11 @@ SecretManagerImpl::createInlineCertificateValidationContextProvider(
     const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context) {
   return std::make_shared<CertificateValidationContextConfigProviderImpl>(
       certificate_validation_context);
+}
+
+TrustedCaConfigProviderSharedPtr SecretManagerImpl::createInlineTrustedCaProvider(
+    const envoy::api::v2::core::DataSource& trusted_ca) {
+  return std::make_shared<TrustedCaConfigProviderImpl>(trusted_ca);
 }
 
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(

@@ -65,19 +65,34 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
   }
 
   int verify_mode = SSL_VERIFY_NONE;
-  if (config.certificateValidationContext() != nullptr &&
-      !config.certificateValidationContext()->caCert().empty()) {
-    ca_file_path_ = config.certificateValidationContext()->caCertPath();
-    bssl::UniquePtr<BIO> bio(
-        BIO_new_mem_buf(const_cast<char*>(config.certificateValidationContext()->caCert().data()),
-                        config.certificateValidationContext()->caCert().size()));
+  if (config.trustedCa() != nullptr && config.trustedCa()->caCert().empty() &&
+      config.certificateValidationContext() != nullptr) {
+    if (!config.certificateValidationContext()->certificateRevocationList().empty()) {
+      throw EnvoyException(
+          fmt::format("Failed to load CRL from {} without trusted CA",
+                      config.certificateValidationContext()->certificateRevocationList()));
+    }
+    if (!config.certificateValidationContext()->verifySubjectAltNameList().empty()) {
+      throw EnvoyException(fmt::format("SAN-based verification of peer certificates without "
+                                       "trusted CA is insecure and not allowed"));
+    }
+    if (config.certificateValidationContext()->allowExpiredCertificate()) {
+      throw EnvoyException(
+          fmt::format("Certificate validity period is always ignored without trusted CA"));
+    }
+  }
+
+  if (config.trustedCa() != nullptr && !config.trustedCa()->caCert().empty()) {
+    ca_file_path_ = config.trustedCa()->caCertPath();
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(config.trustedCa()->caCert().data()),
+                                             config.trustedCa()->caCert().size()));
     RELEASE_ASSERT(bio != nullptr, "");
     // Based on BoringSSL's X509_load_cert_crl_file().
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(
         PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
     if (list == nullptr) {
       throw EnvoyException(fmt::format("Failed to load trusted CA certificates from {}",
-                                       config.certificateValidationContext()->caCertPath()));
+                                       config.trustedCa()->caCertPath()));
     }
 
     X509_STORE* store = SSL_CTX_get_cert_store(ctx_.get());
@@ -95,7 +110,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
     }
     if (ca_cert_ == nullptr) {
       throw EnvoyException(fmt::format("Failed to load trusted CA certificates from {}",
-                                       config.certificateValidationContext()->caCertPath()));
+                                       config.trustedCa()->caCertPath()));
     }
     verify_mode = SSL_VERIFY_PEER;
     verify_trusted_ca_ = true;
@@ -104,7 +119,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
     // directly. However, our new callback is still calling X509_verify_cert() under
     // the hood. Therefore, to ignore cert expiration, we need to set the callback
     // for X509_verify_cert to ignore that error.
-    if (config.certificateValidationContext()->allowExpiredCertificate()) {
+    if (config.certificateValidationContext() != nullptr &&
+        config.certificateValidationContext()->allowExpiredCertificate()) {
       X509_STORE_set_verify_cb(store, ContextImpl::ignoreCertificateExpirationCallback);
     }
   }
@@ -514,11 +530,10 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
   if (config.tlsCertificate() == nullptr) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
-  if (config.certificateValidationContext() != nullptr &&
-      !config.certificateValidationContext()->caCert().empty()) {
-    bssl::UniquePtr<BIO> bio(
-        BIO_new_mem_buf(const_cast<char*>(config.certificateValidationContext()->caCert().data()),
-                        config.certificateValidationContext()->caCert().size()));
+
+  if (config.trustedCa() != nullptr && !config.trustedCa()->caCert().empty()) {
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(config.trustedCa()->caCert().data()),
+                                             config.trustedCa()->caCert().size()));
     RELEASE_ASSERT(bio != nullptr, "");
     // Based on BoringSSL's SSL_add_file_cert_subjects_to_stack().
     bssl::UniquePtr<STACK_OF(X509_NAME)> list(sk_X509_NAME_new(
@@ -532,7 +547,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
       X509_NAME* name = X509_get_subject_name(cert.get());
       if (name == nullptr) {
         throw EnvoyException(fmt::format("Failed to load trusted client CA certificates from {}",
-                                         config.certificateValidationContext()->caCertPath()));
+                                         config.trustedCa()->caCertPath()));
       }
       // Check for duplicates.
       if (sk_X509_NAME_find(list.get(), nullptr, name)) {
@@ -541,7 +556,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
       bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
       if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
         throw EnvoyException(fmt::format("Failed to load trusted client CA certificates from {}",
-                                         config.certificateValidationContext()->caCertPath()));
+                                         config.trustedCa()->caCertPath()));
       }
     }
     // Check for EOF.
@@ -550,7 +565,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
       ERR_clear_error();
     } else {
       throw EnvoyException(fmt::format("Failed to load trusted client CA certificates from {}",
-                                       config.certificateValidationContext()->caCertPath()));
+                                       config.trustedCa()->caCertPath()));
     }
     SSL_CTX_set_client_CA_list(ctx_.get(), list.release());
 

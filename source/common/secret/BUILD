@@ -31,6 +31,7 @@ envoy_cc_library(
         "//include/envoy/secret:secret_provider_interface",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
+        "//source/common/ssl:trusted_ca_config_impl_lib",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )

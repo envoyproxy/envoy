@@ -128,7 +128,11 @@ message CertificateValidationContext {
   // See :ref:`the TLS overview <arch_overview_ssl_enabling_verification>` for a list of common
   // system CA locations.
   oneof trusted_ca_type {
+    // Trusted CA.
     core.DataSource trusted_ca = 1;
+
+    // Config for fetching trusted CA via SDS API.
+    // [#not-implemented-hide:]
     SdsSecretConfig trusted_ca_sds_secret_config = 9;
   }
 
@@ -239,7 +243,9 @@ message CommonTlsContext {
   repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6;
 
   oneof validation_context_type {
-    // How to validate peer certificates.
+    // validation_context holds inline certificate validation context for Envoy
+    // to validate peer certificates. This inline certificate validation context
+    // could specify config for fetching trusted CA via SDS API.
     CertificateValidationContext validation_context = 3;
 
     // Config for fetching validation context via SDS API.
