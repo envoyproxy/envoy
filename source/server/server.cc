@@ -299,7 +299,7 @@ void InstanceImpl::initialize(Options& options,
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_loader_));
+  ssl_context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_loader_, time_system_));
 
   cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
