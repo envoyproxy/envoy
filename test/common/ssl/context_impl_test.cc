@@ -28,7 +28,7 @@ namespace Envoy {
 namespace Ssl {
 
 class SslContextImplTest : public SslCertsTest {
-public:
+protected:
   Event::SimulatedTimeSystem time_system_;
 };
 
