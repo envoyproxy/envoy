@@ -39,7 +39,7 @@ bool SpanContextExtractor::extractSampled(const Tracing::Decision tracing_decisi
   if (b3_header_entry) {
     absl::string_view b3 = b3_header_entry->value().getStringView();
     int sampled_pos = 0;
-    switch(b3.length()) {
+    switch (b3.length()) {
     case 1:
       break;
     case 35: // 16 + 1 + 16 + 2
