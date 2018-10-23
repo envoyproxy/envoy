@@ -24,9 +24,6 @@ public:
   CertificateValidationContextConfigProviderSharedPtr
   findStaticCertificateValidationContextProvider(const std::string& name) const override;
 
-  TrustedCaConfigProviderSharedPtr
-  findStaticTrustedCaConfigProvider(const std::string& name) const override;
-
   TlsCertificateConfigProviderSharedPtr createInlineTlsCertificateProvider(
       const envoy::api::v2::auth::TlsCertificate& tls_certificate) override;
 

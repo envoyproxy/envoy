@@ -443,6 +443,21 @@ TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
                             "is insecure and not allowed");
 }
 
+TEST_F(SslServerContextImplTicketTest, InvalidIgnoreCertsNoCA) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+    validation_context:
+      allow_expired_certificate: true
+)EOF";
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException,
+                            "Certificate validity period is always ignored without trusted CA");
+}
+
 class ClientContextConfigImplTest : public SslCertsTest {};
 
 // Validate that empty SNI (according to C string rules) fails config validation.
@@ -852,7 +867,7 @@ TEST(ServerContextConfigImplTest, InvalidIgnoreCertsNoCA) {
 
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl server_context_config(tls_context, factory_context), EnvoyException,
-      "Certificate validity period is always ignored without trusted CA");
+      "No TLS certificates found for server context");
 
   envoy::api::v2::auth::TlsCertificate* server_cert =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -860,22 +875,6 @@ TEST(ServerContextConfigImplTest, InvalidIgnoreCertsNoCA) {
       TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
   server_cert->mutable_private_key()->set_filename(
       TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
-
-  server_validation_ctx->set_allow_expired_certificate(false);
-
-  EXPECT_NO_THROW(ServerContextConfigImpl server_context_config(tls_context, factory_context));
-
-  server_validation_ctx->set_allow_expired_certificate(true);
-
-  EXPECT_THROW_WITH_MESSAGE(
-      ServerContextConfigImpl server_context_config(tls_context, factory_context), EnvoyException,
-      "Certificate validity period is always ignored without trusted CA");
-
-  // But once you add a trusted CA, you should be able to create the context.
-  server_validation_ctx->mutable_trusted_ca()->set_filename(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
-
-  EXPECT_NO_THROW(ServerContextConfigImpl server_context_config(tls_context, factory_context));
 }
 
 } // namespace Ssl

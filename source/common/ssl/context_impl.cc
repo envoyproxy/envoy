@@ -65,7 +65,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
   }
 
   int verify_mode = SSL_VERIFY_NONE;
-  if (config.trustedCa() != nullptr && config.trustedCa()->caCert().empty() &&
+  if ((config.trustedCa() == nullptr || config.trustedCa()->caCert().empty()) &&
       config.certificateValidationContext() != nullptr) {
     if (!config.certificateValidationContext()->certificateRevocationList().empty()) {
       throw EnvoyException(

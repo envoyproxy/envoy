@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/common/exception.h"
 
@@ -95,6 +96,22 @@ TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
                 ->secret()
                 ->trustedCa()
                 ->caCert());
+}
+
+// Validate that secret manager adds inline trusted CA secret successfully.
+TEST_F(SecretManagerImplTest, InlineTrustedCaLoadSuccess) {
+  envoy::api::v2::core::DataSource trusted_ca;
+  const std::string yaml =
+      R"EOF(
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+      )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), trusted_ca);
+  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
+  auto trusted_ca_provider = secret_manager->createInlineTrustedCaProvider(trusted_ca);
+
+  const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
+            trusted_ca_provider->secret()->caCert());
 }
 
 // Validate that secret manager throws an exception when adding duplicated static certificate

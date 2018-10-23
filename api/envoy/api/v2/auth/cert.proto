@@ -325,10 +325,14 @@ message Secret {
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   string name = 1;
 
+  message TrustedCa {
+    core.DataSource trusted_ca = 1;
+  };
+
   oneof type {
     TlsCertificate tls_certificate = 2;
     TlsSessionTicketKeys session_ticket_keys = 3;
     CertificateValidationContext validation_context = 4;
-    core.DataSource trusted_ca = 5;
+    TrustedCa trusted_ca = 5;
   }
 }

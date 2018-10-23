@@ -19,6 +19,11 @@ MockSecretManager::MockSecretManager() {
         return std::make_shared<Secret::CertificateValidationContextConfigProviderImpl>(
             certificate_validation_context);
       }));
+  ON_CALL(*this, createInlineTrustedCaProvider(_))
+      .WillByDefault(Invoke([](const envoy::api::v2::core::DataSource& trusted_ca) {
+        return std::make_shared<Secret::TrustedCaConfigProviderImpl>(
+            trusted_ca);
+      }));
 }
 
 MockSecretManager::~MockSecretManager() {}
