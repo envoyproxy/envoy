@@ -1097,6 +1097,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     // Do not do this for H2 (which drains via GOAWAY) or Upgrade (as the upgrade
     // payload is no longer HTTP/1.1)
     if (!Utility::isUpgrade(headers)) {
+      // TODO(alyssawilk) stats.
       headers.insertConnection().value().setReference(Headers::get().ConnectionValues.Close);
     }
   }

@@ -411,7 +411,7 @@ void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
   // nghttp2 rejects upgrade requests/responses with content length, so strip
   // any unnecessary content length header.
   if (headers.ContentLength() != nullptr &&
-      headers.ContentLength()->value().c_str() == std::string("0")) {
+      absl::string_view("0") == headers.ContentLength()->value().c_str()) {
     headers.removeContentLength();
   }
 }
@@ -423,7 +423,7 @@ void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
   headers.removeUpgrade();
   headers.removeConnection();
   if (headers.ContentLength() != nullptr &&
-      headers.ContentLength()->value().c_str() == std::string("0")) {
+      absl::string_view("0") == headers.ContentLength()->value().c_str()) {
     headers.removeContentLength();
   }
 }
