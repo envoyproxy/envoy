@@ -325,12 +325,13 @@ protected:
 
 //  Verifies that warning messages get logged when Envoy detects too many requests.
 TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequests) {
-  EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(99));
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(mock_time_system_, monotonicTime())
       .WillRepeatedly(Return(std::chrono::steady_clock::time_point{}));
 
   setup();
+
+  EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(99));
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
@@ -347,14 +348,62 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequests) {
 
   expectSendMessage("foo", {"x"}, "");
   grpc_mux_->start();
-  std::cout << "after on start..."
-            << "\n";
 
   // Exhausts the limit.
   onReceiveMessage(99);
 
   // API calls go over the limit should log the message.
   EXPECT_LOG_CONTAINS("warning", "Too many sendDiscoveryRequest calls", onReceiveMessage(1));
+}
+
+// Verifies that drain request timer is enabled when there are no tokens.
+TEST_F(GrpcMuxImplTestWithMockTimeSystem, DrainRequestTimerEnabled) {
+
+  Event::MockTimer* timer = nullptr;
+  Event::MockTimer* drain_request_timer = nullptr;
+
+  Event::TimerCb timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
+        timer_cb = cb;
+        EXPECT_EQ(nullptr, timer);
+        timer = new Event::MockTimer();
+        return timer;
+      }))
+      .WillOnce(Invoke([&drain_request_timer, &timer_cb](Event::TimerCb cb) {
+        timer_cb = cb;
+        EXPECT_EQ(nullptr, drain_request_timer);
+        drain_request_timer = new Event::MockTimer();
+        return drain_request_timer;
+      }));
+
+  EXPECT_CALL(mock_time_system_, monotonicTime())
+      .WillRepeatedly(Return(std::chrono::steady_clock::time_point{}));
+
+  setup();
+
+  EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(99));
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+
+  const auto onReceiveMessage = [&](uint64_t burst) {
+    for (uint64_t i = 0; i < burst; i++) {
+      std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+          new envoy::api::v2::DiscoveryResponse());
+      response->set_version_info("baz");
+      response->set_nonce("bar");
+      response->set_type_url("foo");
+      grpc_mux_->onReceiveMessage(std::move(response));
+    }
+  };
+
+  auto foo_sub = grpc_mux_->subscribe("foo", {"x"}, callbacks_);
+
+  expectSendMessage("foo", {"x"}, "");
+  grpc_mux_->start();
+
+  // Validate that drain_request_timer is enabled when there are no tokens.
+  EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(100)));
+  EXPECT_LOG_CONTAINS("warning", "Too many sendDiscoveryRequest calls", onReceiveMessage(99));
 }
 
 //  Verifies that a messsage with no resources is accepted.

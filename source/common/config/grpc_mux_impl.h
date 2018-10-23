@@ -47,6 +47,10 @@ public:
   const uint32_t RETRY_INITIAL_DELAY_MS = 500;
   const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
 
+  // TODO(ramaraochavali): Make this configurable in ApiConfigSource.
+  const uint32_t MAX_TOKENS = 100;
+  const uint32_t TOKEN_REFILL_RATE = 10;
+
 private:
   void setRetryTimer();
   void establishNewStream();
