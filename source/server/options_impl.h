@@ -33,11 +33,16 @@ public:
   OptionsImpl(int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
               spdlog::level::level_enum default_log_level);
 
+  // Test constructor; creates "reasonable" defaults, but desired values should be set explicitly.
+  OptionsImpl(const std::string& service_cluster, const std::string& service_node,
+              const std::string& service_zone, spdlog::level::level_enum log_level);
+
   // Setters for option fields. These are not part of the Options interface.
   void setBaseId(uint64_t base_id) { base_id_ = base_id; };
   void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
   void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
+  void setV2ConfigOnly(bool v2_config_only) { v2_config_only_ = v2_config_only; }
   void setAdminAddressPath(const std::string& admin_address_path) {
     admin_address_path_ = admin_address_path;
   }
@@ -72,7 +77,7 @@ public:
   uint32_t concurrency() const override { return concurrency_; }
   const std::string& configPath() const override { return config_path_; }
   const std::string& configYaml() const override { return config_yaml_; }
-  bool v2ConfigOnly() const override { return true; }
+  bool v2ConfigOnly() const override { return v2_config_only_; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
@@ -106,6 +111,7 @@ private:
   uint32_t concurrency_;
   std::string config_path_;
   std::string config_yaml_;
+  bool v2_config_only_;
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;

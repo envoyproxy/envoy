@@ -47,7 +47,7 @@ public:
     // Write JSON contents to file, rename to path_ and run dispatcher to catch
     // inotify.
     const std::string temp_path = TestEnvironment::writeStringToFileForTest("eds.json.tmp", json);
-    EXPECT_EQ(0, ::rename(temp_path.c_str(), path_.c_str()));
+    TestUtility::renameFile(temp_path, path_);
     if (run_dispatcher) {
       dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
     }
