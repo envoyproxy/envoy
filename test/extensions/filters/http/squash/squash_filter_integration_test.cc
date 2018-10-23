@@ -8,6 +8,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
+#include "test/test_common/environment.h"
 
 #define ENV_VAR_VALUE "somerandomevalue"
 
@@ -80,7 +81,7 @@ public:
    * Initializer for an individual integration test.
    */
   void initialize() override {
-    ::setenv("SQUASH_ENV_TEST", ENV_VAR_VALUE, 1);
+    TestEnvironment::setEnvVar("SQUASH_ENV_TEST", ENV_VAR_VALUE, 1);
 
     autonomous_upstream_ = true;
 

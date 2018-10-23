@@ -15,6 +15,7 @@ exports_files([
     "check_format.py",
     "header_order.py",
     "envoy_build_fixer.py",
+    "check_repositories.sh",
 ])
 
 envoy_py_test_binary(
