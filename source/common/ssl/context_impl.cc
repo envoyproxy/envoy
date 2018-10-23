@@ -81,6 +81,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
     }
 
     X509_STORE* store = SSL_CTX_get_cert_store(ctx_.get());
+    bool has_crl = false;
     for (const X509_INFO* item : list.get()) {
       if (item->x509) {
         X509_STORE_add_cert(store, item->x509);
@@ -91,11 +92,15 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
       }
       if (item->crl) {
         X509_STORE_add_crl(store, item->crl);
+        has_crl = true;
       }
     }
     if (ca_cert_ == nullptr) {
       throw EnvoyException(fmt::format("Failed to load trusted CA certificates from {}",
                                        config.certificateValidationContext()->caCertPath()));
+    }
+    if (has_crl) {
+      X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
     }
     verify_mode = SSL_VERIFY_PEER;
     verify_trusted_ca_ = true;

@@ -80,6 +80,7 @@ echo 00 > crl_number
 # Revoke the certificate and generate a CRL
 openssl ca -revoke san_dns_cert.pem -keyfile ca_key.pem -cert ca_cert.pem -config ca_cert.cfg
 openssl ca -gencrl -keyfile ca_key.pem -cert ca_cert.pem -out ca_cert.crl -config ca_cert.cfg
+cat ca_cert.pem ca_cert.crl > ca_cert_with_crl.pem
 
 # Write session ticket key files
 openssl rand 80 > ticket_key_a
