@@ -77,7 +77,7 @@ protected:
 };
 
 TEST_F(TypedMetadataTest, OkTest) {
-  ::envoy::api::v2::core::Metadata metadata;
+  envoy::api::v2::core::Metadata metadata;
   (*metadata.mutable_filter_metadata())[foo_factory_.name()] =
       MessageUtil::keyValueStruct("name", "foo");
   TypedMetadataImpl<TypedMetadataFactory> typed(metadata);
@@ -88,13 +88,13 @@ TEST_F(TypedMetadataTest, OkTest) {
 }
 
 TEST_F(TypedMetadataTest, NoMetadataTest) {
-  ::envoy::api::v2::core::Metadata metadata;
+  envoy::api::v2::core::Metadata metadata;
   TypedMetadataImpl<TypedMetadataFactory> typed(metadata);
   EXPECT_EQ(nullptr, typed.get<Foo>(foo_factory_.name()));
 }
 
 TEST_F(TypedMetadataTest, MetadataRefreshTest) {
-  ::envoy::api::v2::core::Metadata metadata;
+  envoy::api::v2::core::Metadata metadata;
   (*metadata.mutable_filter_metadata())[foo_factory_.name()] =
       MessageUtil::keyValueStruct("name", "foo");
   TypedMetadataImpl<TypedMetadataFactory> typed(metadata);
@@ -115,7 +115,7 @@ TEST_F(TypedMetadataTest, MetadataRefreshTest) {
 }
 
 TEST_F(TypedMetadataTest, InvalidMetadataTest) {
-  ::envoy::api::v2::core::Metadata metadata;
+  envoy::api::v2::core::Metadata metadata;
   (*metadata.mutable_filter_metadata())[foo_factory_.name()] = ProtobufWkt::Struct();
   EXPECT_THROW_WITH_MESSAGE(TypedMetadataImpl<TypedMetadataFactory> typed(metadata),
                             Envoy::EnvoyException, "Cannot create a Foo when metadata is empty.");
