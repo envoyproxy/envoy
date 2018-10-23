@@ -162,12 +162,12 @@ So, level 0 endpoints will continue to receive all traffic until less than ~71.4
 healthy.
 
 The priority level logic works with integer health scores. The health score of a level is
-(level's percent of healthy endpoints) * (overprovisioning factor), capped at 100. When the system
-is relatively healthy, P=0 endpoints receive (level 0's health score) percent of the traffic, with
-the rest flowing to P=1 (assuming P=1 is healthy - more on that later). For instance, when
-50% of P=0 endpoints are healthy, they will receive 50 * 1.4 = 70% of the traffic.
-The integer percents of traffic that each level receives are collectively called the system's
-"priority load". More examples (with 2 priority levels, P=1 100% healthy):
+(level's percent of healthy endpoints) * (overprovisioning factor), capped at 100%. P=0
+endpoints receive (level 0's health score) percent of the traffic, with the rest flowing
+to P=1 (assuming P=1 is healthy - more on that later). For instance, when 50% of P=0
+endpoints are healthy, they will receive 50 * 1.4 = 70% of the traffic.
+The integer percents of traffic that each priority level receives are collectively called the
+system's "priority load". More examples (with 2 priority levels, P=1 100% healthy):
 
 +----------------------------+----------------+-----------------+
 | P=0 healthy endpoints      | Traffic to P=0 |  Traffic to P=1 |
@@ -217,7 +217,7 @@ total health of 50) would be normalized, and result in a priority load of {40%, 
 +------------------------+-------------------------+-----------------+----------------+
 
 As more priorities are added, each level consumes load equal to its normalized effective health,
-unless the healths of the levels above it sum to 100, in which case it receives no load.
+unless the healths of the levels above it sum to 100%, in which case it receives no load.
 
 +-----------------------+-----------------------+-----------------------+----------------+----------------+----------------+
 | P=0 healthy endpoints | P=1 healthy endpoints | P=2 healthy endpoints | Traffic to P=0 | Traffic to P=1 | Traffic to P=2 |
