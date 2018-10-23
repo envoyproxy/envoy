@@ -2,6 +2,8 @@
 
 #include "common/http/utility.h"
 
+#include "extensions/filters/http/well_known_names.h"
+
 using ::google::jwt_verify::Status;
 
 namespace Envoy {
@@ -38,6 +40,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   ENVOY_LOG(debug, "Called Filter : {} Stop", __func__);
   stopped_ = true;
   return Http::FilterHeadersStatus::StopIteration;
+}
+
+void Filter::setPayload(const ProtobufWkt::Struct& payload) {
+  decoder_callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().JwtAuthn, payload);
 }
 
 void Filter::onComplete(const Status& status) {
