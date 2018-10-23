@@ -6,7 +6,11 @@
 namespace Envoy {
 namespace Filesystem {
 
-DirectoryIteratorImpl::~DirectoryIteratorImpl() { ::closedir(dir_); }
+DirectoryIteratorImpl::~DirectoryIteratorImpl() {
+  if (dir_ != nullptr) {
+    ::closedir(dir_);
+  }
+}
 
 DirectoryIterator::DirectoryEntry DirectoryIteratorImpl::nextEntry() {
   if (dir_ == nullptr) {

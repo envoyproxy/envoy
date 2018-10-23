@@ -6,7 +6,11 @@
 namespace Envoy {
 namespace Filesystem {
 
-DirectoryIteratorImpl::~DirectoryIteratorImpl() { ::FindClose(find_handle_); }
+DirectoryIteratorImpl::~DirectoryIteratorImpl() {
+  if (find_handle_ != INVALID_HANDLE_VALUE) {
+    ::FindClose(find_handle_);
+  }
+}
 
 DirectoryIterator::DirectoryEntry DirectoryIteratorImpl::nextEntry() {
   if (find_handle_ == INVALID_HANDLE_VALUE) {
