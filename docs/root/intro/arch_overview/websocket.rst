@@ -1,11 +1,13 @@
 .. _arch_overview_websocket:
 
+WebSocket and HTTP upgrades
+===========================
+
 Envoy currently supports two modes of Upgrade behavior, the new generic upgrade mode, and
 the old WebSocket-only TCP proxy mode.
 
-
 New style Upgrade support
-=========================
+-------------------------
 
 The new style Upgrade support is intended mainly for WebSocket but may be used for non-WebSocket
 upgrades as well. The new style of upgrades pass both the HTTP headers and the upgrade payload
@@ -21,7 +23,7 @@ for the given upgrade type, up to and including only using the router filter to 
 data upstream.
 
 Handling H2 hops
-----------------
+^^^^^^^^^^^^^^^^
 
 Envoy currently has an alpha implementation of tunneling websockets over H2 streams for deployments
 that prefer a uniform H2 mesh throughout, for example, for a deployment of the form:
@@ -45,7 +47,7 @@ Note that the H2 upgrade path has very strict HTTP/1.1 compliance, so will not p
 upgrade requests or responses with bodies.
 
 Old style WebSocket support
-===========================
+---------------------------
 
 Envoy supports upgrading a HTTP/1.1 connection to a WebSocket connection.
 Connection upgrade will be allowed only if the downstream client
@@ -63,7 +65,7 @@ However, prefix rewriting, explicit and automatic host rewriting, traffic
 shifting and splitting are supported.
 
 Old style Connection semantics
-------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Even though WebSocket upgrades occur over HTTP/1.1 connections, WebSockets
 proxying works similarly to plain TCP proxy, i.e., Envoy does not interpret
