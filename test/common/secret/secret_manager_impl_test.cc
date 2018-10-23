@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/exception.h"
 
 #include "common/secret/sds_api.h"
