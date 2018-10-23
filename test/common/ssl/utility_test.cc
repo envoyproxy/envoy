@@ -59,8 +59,10 @@ TEST(UtilityTest, TestGetSerialNumber) {
 TEST(UtilityTest, TestDaysUntilExpiration) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  // Set a known date (10/21/2018 00:00:00) so that we get fixed output from this test.
+  const long known_date_time = 1540080000;
   Event::SimulatedTimeSystem time_source;
-  time_source.setSystemTime(std::chrono::system_clock::from_time_t(1540080000));
+  time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
   EXPECT_EQ(261, Utility::getDaysUntilExpiration(cert.get(), time_source));
 }
 
