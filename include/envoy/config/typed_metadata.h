@@ -66,9 +66,9 @@ public:
   /**
    * Convert the google.protobuf.Struct into an instance of TypedMetadata::Object.
    * It should throw an EnvoyException in case the conversion can't be completed.
-   * @param data config data stored as a protobuf sTRUCT.
+   * @param data config data stored as a protobuf struct.
    * @return a derived class object pointer of TypedMetadata.
-   * @throw EvnoyException if the parsing can't be done.
+   * @throw EnvoyException if the parsing can't be done.
    */
   virtual std::unique_ptr<const TypedMetadata::Object>
   parse(const ProtobufWkt::Struct& data) const PURE;
