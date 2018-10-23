@@ -15,6 +15,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -22,12 +23,13 @@ namespace Upstream {
 
 TEST(ValidationClusterManagerTest, MockedMethods) {
   NiceMock<Runtime::MockLoader> runtime;
+  Event::SimulatedTimeSystem time_system;
   Stats::IsolatedStoreImpl stats;
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Runtime::MockRandomGenerator> random;
   testing::NiceMock<Secret::MockSecretManager> secret_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
-  Ssl::ContextManagerImpl ssl_context_manager{runtime};
+  Ssl::ContextManagerImpl ssl_context_manager{runtime, time_system};
   NiceMock<Event::MockDispatcher> dispatcher;
   LocalInfo::MockLocalInfo local_info;
   NiceMock<Server::MockAdmin> admin;
