@@ -1687,11 +1687,10 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteTrailers) {
       .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
         callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
       }));
-  EXPECT_CALL(*filter, decodeTrailers(_))
-      .WillOnce(Invoke([&](HeaderMap&) -> FilterTrailersStatus {
-        filter->callbacks_->upstreamRequestComplete();
-        return FilterTrailersStatus::Continue;
-      }));
+  EXPECT_CALL(*filter, decodeTrailers(_)).WillOnce(Invoke([&](HeaderMap&) -> FilterTrailersStatus {
+    filter->callbacks_->upstreamRequestComplete();
+    return FilterTrailersStatus::Continue;
+  }));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     Event::MockTimer* request_timer =
