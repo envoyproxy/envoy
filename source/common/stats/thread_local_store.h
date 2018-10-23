@@ -162,10 +162,6 @@ public:
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
 
-  // If called, TLS will register a callback with absl::Mutex to record mutex contention occurrences
-  // in a stat.
-  void RegisterMutexContentionGauge();
-
   void mergeHistograms(PostMergeCb mergeCb) override;
 
   Source& source() override { return source_; }

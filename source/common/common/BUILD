@@ -106,8 +106,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "mutex_contention",
-    hdrs = ["mutex_contention.h"],
+    name = "mutex_tracer",
+    srcs = ["mutex_tracer.cc"],
+    hdrs = ["mutex_tracer.h"],
     deps = [
     ],
 )

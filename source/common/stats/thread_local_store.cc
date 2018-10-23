@@ -22,9 +22,6 @@
 namespace Envoy {
 namespace Stats {
 
-Counter* mutex_contention_instances;
-Gauge* mutex_contention_wait_cycles;
-
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(const StatsOptions& stats_options,
                                            StatDataAllocator& alloc)
     : stats_options_(stats_options), alloc_(alloc), default_scope_(createScope("")),
@@ -107,18 +104,6 @@ void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_di
 void ThreadLocalStoreImpl::shutdownThreading() {
   // This will block both future cache fills as well as cache flushes.
   shutting_down_ = true;
-}
-
-void ThreadLocalStoreImpl::RegisterMutexContentionGauge() {
-  mutex_contention_instances = &default_scope_->counter("mutex.contention.instances");
-  mutex_contention_wait_cycles = &default_scope_->gauge("mutex.contention.wait_cycles");
-
-  absl::RegisterMutexTracer([](const char* msg, const void* obj, int64_t wait_cycles) -> void {
-    UNREFERENCED_PARAMETER(msg);
-    UNREFERENCED_PARAMETER(obj);
-    mutex_contention_instances->inc();
-    mutex_contention_wait_cycles->set(wait_cycles);
-  });
 }
 
 void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
