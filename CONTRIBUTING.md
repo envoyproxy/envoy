@@ -21,10 +21,12 @@ maximize the chances of your PR being merged.
 
 # Breaking change policy
 
-* As of the 1.3.0 release, the Envoy user-facing configuration is locked and we will not make
-  breaking changes between official numbered releases. This includes JSON configuration, REST/gRPC
-  APIs (SDS, CDS, RDS, etc.), and CLI switches. We will also try to not change behavioral semantics
-  (e.g., HTTP header processing order), though this is harder to outright guarantee.
+* As of the 1.3.0 release, the Envoy user-facing configuration and APIs are
+  locked and we will not make breaking changes between official numbered
+  releases. This includes bootstrap configuration, REST/gRPC APIs (SDS, CDS, RDS,
+  etc.), and CLI switches. We will also try to not change behavioral semantics
+  (e.g., HTTP header processing order), though this is harder to outright
+  guarantee.
 * We reserve the right to deprecate configuration, and at the beginning of the following release
   cycle remove the deprecated configuration. For example, all deprecations between 1.3.0 and
   1.4.0 will be deleted soon AFTER 1.4.0 is tagged and released (at the beginning of the 1.5.0
@@ -39,6 +41,28 @@ maximize the chances of your PR being merged.
 * All deprecations/breaking changes will be clearly listed in [DEPRECATED.md](DEPRECATED.md).
 * All deprecations/breaking changes will be announced to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
+* Protobuf configuration in an alpha namespace, e.g. `v2alpha`, do not have any
+  restrictions on breaking changes. They may be freely modified, together with
+  their respective features.
+* Configuration in the `v2` namespace are considered stable and subject to the
+  above policy. They are
+  [frozen](https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/v2_overview#status).
+  There will be no changes leading to wire incompatibility (as describe in the
+  [API style guide](api/STYLE.md)), however fields may be deprecated over time.
+  When a field is deprecated, it will follow the deprecation release cycle
+  described above.
+* No configuration field or message in the `v2` namespace may be deprecated
+  unless there is a corresponding semantic equivalent available to replace it.
+  The litmus test is to imagine that a stateless translation tool exists that
+  could convert from the earlier API to the new API. A field may be deprecated
+  if this tool would be able to perform the conversion. For example, removing a
+  field to describe HTTP/2 window settings is valid if a more comprehensive
+  HTTP/2 protocol options field is being introduced to replace it.
+* For configuration deprecations that are not covered by the above semantic
+  replacement policy, any deprecation will only take place after
+  community consultation on mailing lists, Slack and GitHub, over the period of
+  a minimum of two Envoy release cycles (~6 months). This includes where a
+  feature is outright deleted with no replacement.
 
 # Release cadence
 

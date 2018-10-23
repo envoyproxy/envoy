@@ -25,6 +25,14 @@ public:
     virtual ~Callbacks() {}
 
     /**
+     * Successfully verified JWT payload are stored in the struct with its
+     * *fields* containing **issuer** as keys and **payload** as string values
+     * This function is called before onComplete() function.
+     * It will not be called if no payload to write.
+     */
+    virtual void setPayload(const ProtobufWkt::Struct& payload) PURE;
+
+    /**
      * Called on completion of request.
      *
      * @param status the status of the request.

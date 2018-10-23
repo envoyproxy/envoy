@@ -5,7 +5,7 @@
 set -e
 
 build_setup_args=""
-if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_spelling" || "$1" == "fix_spelling" ]]; then
+if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || "$1" == "check_spelling" || "$1" == "fix_spelling" ]]; then
   build_setup_args="-nofetch"
 fi
 
@@ -201,6 +201,11 @@ elif [[ "$1" == "check_format" ]]; then
   ./tools/check_format_test_helper.py --log=WARN
   echo "check_format..."
   ./tools/check_format.py check
+  exit 0
+elif [[ "$1" == "check_repositories" ]]; then
+  cd "${ENVOY_SRCDIR}"
+  echo "check_repositories..."
+  ./tools/check_repositories.sh
   exit 0
 elif [[ "$1" == "check_spelling" ]]; then
   cd "${ENVOY_SRCDIR}"

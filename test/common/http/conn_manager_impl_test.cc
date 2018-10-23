@@ -320,7 +320,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::unique_ptr<Ssl::MockConnection> ssl_connection_;
   TracingConnectionManagerConfigPtr tracing_config_;
-  SlowDateProviderImpl date_provider_;
+  SlowDateProviderImpl date_provider_{test_time_.timeSystem()};
   MockStream stream_;
   Http::StreamCallbacks* stream_callbacks_{nullptr};
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
