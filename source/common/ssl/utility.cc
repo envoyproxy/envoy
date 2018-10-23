@@ -8,10 +8,10 @@
 namespace Envoy {
 namespace Ssl {
 
-inline bssl::UniquePtr<ASN1_TIME> epochASN1_Time() {
-  bssl::UniquePtr<ASN1_TIME> epoch(ASN1_TIME_new());
+inline ASN1_TIME* epochASN1_Time() {
+  ASN1_TIME* epoch = ASN1_TIME_new();
   time_t epoch_time = 0;
-  ASN1_TIME_set(epoch.get(), epoch_time);
+  ASN1_TIME_set(epoch, epoch_time);
   return epoch;
 }
 
@@ -79,13 +79,13 @@ int32_t Utility::getDaysUntilExpiration(X509* cert) {
 
 SystemTime Utility::getValidFrom(X509* cert) {
   int days, seconds;
-  ASN1_TIME_diff(&days, &seconds, epochASN1_Time().get(), X509_get_notBefore(cert));
+  ASN1_TIME_diff(&days, &seconds, epochASN1_Time(), X509_get_notBefore(cert));
   return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
 }
 
 SystemTime Utility::getExpirationTime(X509* cert) {
   int days, seconds;
-  ASN1_TIME_diff(&days, &seconds, epochASN1_Time().get(), X509_get_notAfter(cert));
+  ASN1_TIME_diff(&days, &seconds, epochASN1_Time(), X509_get_notAfter(cert));
   return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
 }
 
