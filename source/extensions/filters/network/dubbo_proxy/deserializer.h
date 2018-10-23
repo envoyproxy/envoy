@@ -50,13 +50,6 @@ public:
 
 typedef std::unique_ptr<RpcResult> RpcResultPtr;
 
-class DeserializationCallbacks {
-public:
-  virtual ~DeserializationCallbacks() {}
-  virtual void onRpcInvocation(RpcInvocationPtr&& invo) PURE;
-  virtual void onRpcResult(RpcResultPtr&& res) PURE;
-};
-
 class Deserializer {
 public:
   virtual ~Deserializer() {}
@@ -67,23 +60,24 @@ public:
    */
   virtual const std::string& name() const PURE;
   /**
-   * deserialize an rpc call, potentially invoking callbacks
+   * deserialize an rpc call
    * If successful, the RpcInvocation removed from the buffer
    *
    * @param buffer the currently buffered dubbo data
    * @body_size the complete RpcInvocation size
    * @throws EnvoyException if the data is not valid for this serialization
    */
-  virtual void deserializeRpcInvocation(Buffer::Instance& buffer, size_t body_size) PURE;
+  virtual RpcInvocationPtr deserializeRpcInvocation(Buffer::Instance& buffer,
+                                                    size_t body_size) PURE;
   /**
-   * deserialize result of an rpc call, potentially invoking callbacks
+   * deserialize result of an rpc call
    * If successful, the RpcResult removed from the buffer
    *
    * @param buffer the currently buffered dubbo data
    * @body_size the complete RpcResult size
    * @throws EnvoyException if the data is not valid for this serialization
    */
-  virtual void deserializeRpcResult(Buffer::Instance& buffer, size_t body_size) PURE;
+  virtual RpcResultPtr deserializeRpcResult(Buffer::Instance& buffer, size_t body_size) PURE;
 };
 
 typedef std::unique_ptr<Deserializer> DeserializerPtr;

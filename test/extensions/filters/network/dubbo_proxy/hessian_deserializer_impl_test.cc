@@ -16,14 +16,12 @@ namespace NetworkFilters {
 namespace DubboProxy {
 
 TEST(HessianProtocolTest, Name) {
-  MockDeserializationCallbacks cb;
-  HessianDeserializerImpl deserializer(cb);
+  HessianDeserializerImpl deserializer;
   EXPECT_EQ(deserializer.name(), "hessian");
 }
 
 TEST(HessianProtocolTest, deserializeRpcInvocation) {
-  MockDeserializationCallbacks cb;
-  HessianDeserializerImpl deserializer(cb);
+  HessianDeserializerImpl deserializer;
 
   {
     Buffer::OwnedImpl buffer;
@@ -33,8 +31,10 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
         0x05, '0', '.', '0', '.', '0', // Service version
         0x04, 't', 'e', 's', 't',      // method name
     }));
-    EXPECT_CALL(cb, onRpcInvocationRvr);
-    deserializer.deserializeRpcInvocation(buffer, buffer.length());
+    auto invo = deserializer.deserializeRpcInvocation(buffer, buffer.length());
+    EXPECT_STREQ("test", invo->getMethodName().c_str());
+    EXPECT_STREQ("test", invo->getServiceName().c_str());
+    EXPECT_STREQ("0.0.0", invo->getServiceVersion().c_str());
   }
 
   // incorrect body size
@@ -54,8 +54,7 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
 }
 
 TEST(HessianProtocolTest, deserializeRpcResult) {
-  MockDeserializationCallbacks cb;
-  HessianDeserializerImpl deserializer(cb);
+  HessianDeserializerImpl deserializer;
 
   {
     Buffer::OwnedImpl buffer;
@@ -63,8 +62,8 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
         '\x94',                   // return type
         0x04, 't', 'e', 's', 't', // return body
     }));
-    EXPECT_CALL(cb, onRpcResultRvr);
-    deserializer.deserializeRpcResult(buffer, 4);
+    auto result = deserializer.deserializeRpcResult(buffer, 4);
+    EXPECT_FALSE(result->hasException());
   }
   // incorrect body size
   {
@@ -102,7 +101,6 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
                               EnvoyException, exception_string);
   }
 }
-
 } // namespace DubboProxy
 } // namespace NetworkFilters
 } // namespace Extensions

@@ -23,7 +23,8 @@ enum class RpcResponseType : uint8_t {
   ResponseNullValueWithAttachments = 5,
 };
 
-void HessianDeserializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer, size_t body_size) {
+RpcInvocationPtr HessianDeserializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
+                                                                   size_t body_size) {
   ASSERT(buffer.length() >= body_size);
   size_t total_size = 0, size;
   // TODO(zyfjeff:) Add format checker
@@ -40,14 +41,12 @@ void HessianDeserializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
     throw EnvoyException(
         fmt::format("RpcInvocation size({}) large than body size({})", total_size, body_size));
   }
-
-  callbacks_.onRpcInvocation(
-      std::make_unique<RpcInvocationImpl>(method_name, service_name, service_version));
   buffer.drain(body_size);
-  return;
+  return std::make_unique<RpcInvocationImpl>(method_name, service_name, service_version);
 }
 
-void HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buffer, size_t body_size) {
+RpcResultPtr HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buffer,
+                                                           size_t body_size) {
   ASSERT(buffer.length() >= body_size);
   size_t total_size = 0;
   bool has_value = true;
@@ -81,10 +80,8 @@ void HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buffer, siz
         fmt::format("RpcResult is no value, but the rest of the body size({}) not equal 0",
                     (body_size - total_size)));
   }
-
-  callbacks_.onRpcResult(std::move(result));
   buffer.drain(body_size);
-  return;
+  return result;
 }
 
 } // namespace DubboProxy
