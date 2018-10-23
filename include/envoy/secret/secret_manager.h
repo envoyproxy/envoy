@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/secret/secret_provider.h"
 
 namespace Envoy {

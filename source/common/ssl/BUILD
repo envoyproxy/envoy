@@ -98,6 +98,7 @@ envoy_cc_library(
     srcs = ["certificate_validation_context_config_impl.cc"],
     hdrs = ["certificate_validation_context_config_impl.h"],
     deps = [
+        ":trusted_ca_config_impl_lib",
         "//include/envoy/ssl:certificate_validation_context_config_interface",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
@@ -113,6 +114,7 @@ envoy_cc_library(
         "//include/envoy/ssl:trusted_ca_config_interface",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 

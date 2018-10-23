@@ -657,7 +657,7 @@ TEST(ClientContextConfigImplTest, StaticCertificateValidationContext) {
 
   const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            client_context_config.certificateValidationContext()->caCert());
+            client_context_config.certificateValidationContext()->trustedCa()->caCert());
 }
 
 // Validate that constructor of client context config throws an exception when static TLS

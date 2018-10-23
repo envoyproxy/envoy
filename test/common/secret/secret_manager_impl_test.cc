@@ -93,6 +93,7 @@ TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             secret_manager->findStaticCertificateValidationContextProvider("abc.com")
                 ->secret()
+                ->trustedCa()
                 ->caCert());
 }
 

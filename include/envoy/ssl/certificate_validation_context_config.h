@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/ssl/trusted_ca_config.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -12,6 +13,10 @@ class CertificateValidationContextConfig {
 public:
   virtual ~CertificateValidationContextConfig() {}
 
+  /**
+   * @return TrustedCaConfig which has CA certificate to use for peer validation.
+   */
+  virtual const TrustedCaConfig* trustedCa() const PURE;
   /**
    * @return The CRL to check if a cert is revoked.
    */

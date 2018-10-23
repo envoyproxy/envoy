@@ -5,6 +5,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/datasource.h"
+#include "common/ssl/trusted_ca_config_impl.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -23,7 +24,11 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
                                     config.verify_certificate_hash().end()),
       verify_certificate_spki_list_(config.verify_certificate_spki().begin(),
                                     config.verify_certificate_spki().end()),
-      allow_expired_certificate_(config.allow_expired_certificate()) {}
+      allow_expired_certificate_(config.allow_expired_certificate()) {
+  if (config.has_trusted_ca()) {
+    trusted_ca_ = std::make_unique<Ssl::TrustedCaConfigImpl>(config.trusted_ca());
+  }
+}
 
 } // namespace Ssl
 } // namespace Envoy

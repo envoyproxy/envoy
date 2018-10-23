@@ -21,6 +21,8 @@ public:
                      TlsCertificateConfigProviderSharedPtr(const std::string& name));
   MOCK_CONST_METHOD1(findStaticCertificateValidationContextProvider,
                      CertificateValidationContextConfigProviderSharedPtr(const std::string& name));
+  MOCK_CONST_METHOD1(findStaticTrustedCaConfigProvider,
+                     TrustedCaConfigProviderSharedPtr(const std::string& name));
   MOCK_METHOD1(createInlineTlsCertificateProvider,
                TlsCertificateConfigProviderSharedPtr(
                    const envoy::api::v2::auth::TlsCertificate& tls_certificate));
@@ -28,6 +30,9 @@ public:
                CertificateValidationContextConfigProviderSharedPtr(
                    const envoy::api::v2::auth::CertificateValidationContext&
                        certificate_validation_context));
+  MOCK_METHOD1(createInlineTrustedCaProvider,
+               TrustedCaConfigProviderSharedPtr(
+                   const envoy::api::v2::core::DataSource& trusted_ca));
   MOCK_METHOD3(findOrCreateTlsCertificateProvider,
                TlsCertificateConfigProviderSharedPtr(
                    const envoy::api::v2::core::ConfigSource&, const std::string&,

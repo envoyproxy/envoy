@@ -27,7 +27,6 @@ envoy_cc_library(
     deps = [
         ":certificate_validation_context_config_interface",
         ":tls_certificate_config_interface",
-        ":trusted_ca_config_interface",
     ],
 )
 
@@ -49,6 +48,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "certificate_validation_context_config_interface",
     hdrs = ["certificate_validation_context_config.h"],
+    deps = [
+        ":trusted_ca_config_interface",
+    ],
 )
 
 envoy_cc_library(

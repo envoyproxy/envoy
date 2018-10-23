@@ -35,7 +35,13 @@ public:
                : certficate_validation_context_provider_->secret();
   }
   const TrustedCaConfig* trustedCa() const override {
-    return trusted_ca_provider_ == nullptr ? nullptr : trusted_ca_provider_->secret();
+    if (trusted_ca_provider_ != nullptr) {
+      return trusted_ca_provider_->secret();
+    } else if (certficate_validation_context_provider_ != nullptr &&
+               certficate_validation_context_provider_->secret() != nullptr) {
+      return certficate_validation_context_provider_->secret()->trustedCa();
+    }
+    return nullptr;
   }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
@@ -89,6 +95,8 @@ private:
       certficate_validation_context_provider_;
   // Handle for certificate validation context dyanmic secret callback.
   Common::CallbackHandle* cvc_update_callback_handle_{};
+  // Provides trusted CA when inline certificate validation context is configured.
+  // This will be nullptr if Envoy fetches certificate validation context via SDS.
   Secret::TrustedCaConfigProviderSharedPtr trusted_ca_provider_;
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;

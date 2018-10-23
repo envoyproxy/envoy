@@ -4,6 +4,7 @@
 
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
+#include "envoy/ssl/trusted_ca_config.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -12,6 +13,10 @@ class CertificateValidationContextConfigImpl : public CertificateValidationConte
 public:
   CertificateValidationContextConfigImpl(
       const envoy::api::v2::auth::CertificateValidationContext& config);
+
+  const TrustedCaConfig* trustedCa() const override {
+    return trusted_ca_ == nullptr ? nullptr : trusted_ca_.get();
+  }
 
   const std::string& certificateRevocationList() const override {
     return certificate_revocation_list_;
@@ -31,6 +36,7 @@ public:
   bool allowExpiredCertificate() const override { return allow_expired_certificate_; }
 
 private:
+  TrustedCaConfigPtr trusted_ca_;
   const std::string certificate_revocation_list_;
   const std::string certificate_revocation_list_path_;
   const std::vector<std::string> verify_subject_alt_name_list_;
