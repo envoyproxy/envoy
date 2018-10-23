@@ -2331,7 +2331,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server2_ctx_yaml), tls_context2);
   auto server2_cfg = std::make_unique<ServerContextConfigImpl>(tls_context2, factory_context_);
   Event::SimulatedTimeSystem time_system;
-  ContextManagerImpl manager(runtime,time_system);
+  ContextManagerImpl manager(runtime, time_system);
   Stats::IsolatedStoreImpl server_stats_store;
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(
       std::move(server_cfg), manager, server_stats_store, std::vector<std::string>{});
