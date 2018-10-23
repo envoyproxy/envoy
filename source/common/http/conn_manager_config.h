@@ -61,7 +61,7 @@ namespace Http {
   HISTOGRAM(downstream_rq_time)                                                                    \
   COUNTER  (downstream_rq_idle_timeout)                                                            \
   COUNTER  (downstream_rq_overload_close)                                                          \
-  COUNTER  (downstream_rq_path_timeout)                                                            \
+  COUNTER  (downstream_rq_timeout)                                                            \
   COUNTER  (rs_too_large)
 // clang-format on
 

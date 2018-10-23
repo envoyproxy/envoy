@@ -266,7 +266,6 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
 TEST_F(RouterTest, DisarmRequestTimeoutOnCompleteHeaders) {
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
-  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -289,7 +288,6 @@ TEST_F(RouterTest, DisarmRequestTimeoutOnCompleteHeaders) {
 TEST_F(RouterTest, DisarmRequestTimeoutOnCompleteData) {
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
-  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -308,15 +306,12 @@ TEST_F(RouterTest, DisarmRequestTimeoutOnCompleteData) {
   Buffer::OwnedImpl data("1234");
   router_.decodeData(data, true);
 
-  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
-  response_decoder->decodeHeaders(std::move(response_headers), true);
   router_.onDestroy();
 }
 
 TEST_F(RouterTest, DisarmRequestTimeoutOnCompleteTrailers) {
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
-  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;

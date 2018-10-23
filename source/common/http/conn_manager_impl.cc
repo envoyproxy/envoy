@@ -397,7 +397,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   }
 
   if (connection_manager_.config_.requestTimeout().count()) {
-    request_timeout_ms_ = connection_manager_.config_.requestTimeout();
+    std::chrono::milliseconds request_timeout_ms_ = connection_manager_.config_.requestTimeout();
     request_timer_ = connection_manager.read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onRequestTimeout(); });
     request_timer_->enableTimer(request_timeout_ms_);
@@ -456,7 +456,7 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
-  connection_manager_.stats_.named_.downstream_rq_path_timeout_.inc();
+  connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
   sendLocalReply(request_headers_ != nullptr && Grpc::Common::hasGrpcContentType(*request_headers_),
                  Http::Code::RequestTimeout, "request timeout", nullptr, is_head_request_);
 }

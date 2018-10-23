@@ -71,9 +71,9 @@ public:
   // TODO(htuch): This might require scaling for TSAN/ASAN/Valgrind/etc. Bump if
   // this is the cause of flakes.
   static constexpr uint64_t TimeoutMs = 200;
-  bool enable_global_idle_timeout_{};
-  bool enable_per_stream_idle_timeout_{true};
-  bool enable_request_timeout_{};
+  bool enable_global_idle_timeout_{false};
+  bool enable_per_stream_idle_timeout_{false};
+  bool enable_request_timeout_{false};
   DangerousDeprecatedTestTime test_time_;
 };
 
@@ -83,6 +83,7 @@ INSTANTIATE_TEST_CASE_P(Protocols, IdleTimeoutIntegrationTest,
 
 // Per-stream idle timeout after having sent downstream headers.
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
+  enable_per_stream_idle_timeout_ = true;
   auto response = setupPerStreamIdleTimeoutTest();
 
   waitForTimeout(*response, "downstream_rq_idle_timeout");
@@ -95,6 +96,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
 
 // Per-stream idle timeout after having sent downstream head request.
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutHeadRequestAfterDownstreamHeadRequest) {
+  enable_per_stream_idle_timeout_ = true;
   auto response = setupPerStreamIdleTimeoutTest("HEAD");
 
   waitForTimeout(*response, "downstream_rq_idle_timeout");
@@ -109,8 +111,8 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutHeadRequestAfterDownstrea
 
 // Global per-stream idle timeout applies if there is no per-stream idle timeout.
 TEST_P(IdleTimeoutIntegrationTest, GlobalPerStreamIdleTimeoutAfterDownstreamHeaders) {
+  enable_per_stream_idle_timeout_ = true;
   enable_global_idle_timeout_ = true;
-  enable_per_stream_idle_timeout_ = false;
   auto response = setupPerStreamIdleTimeoutTest();
 
   waitForTimeout(*response, "downstream_rq_idle_timeout");
@@ -124,6 +126,7 @@ TEST_P(IdleTimeoutIntegrationTest, GlobalPerStreamIdleTimeoutAfterDownstreamHead
 
 // Per-stream idle timeout after having sent downstream headers+body.
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeadersAndBody) {
+  enable_per_stream_idle_timeout_ = true;
   auto response = setupPerStreamIdleTimeoutTest();
 
   sleep();
@@ -140,6 +143,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeadersAnd
 
 // Per-stream idle timeout after upstream headers have been sent.
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterUpstreamHeaders) {
+  enable_per_stream_idle_timeout_ = true;
   auto response = setupPerStreamIdleTimeoutTest();
 
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
@@ -155,6 +159,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterUpstreamHeaders) {
 
 // Per-stream idle timeout after a sequence of header/data events.
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterBidiData) {
+  enable_per_stream_idle_timeout_ = true;
   auto response = setupPerStreamIdleTimeoutTest();
 
   sleep();
@@ -187,19 +192,17 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterBidiData) {
 
 // Successful request/response when per-stream idle timeout is configured.
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutRequestAndResponse) {
+  enable_per_stream_idle_timeout_ = true;
   testRouterRequestAndResponseWithBody(1024, 1024, false, nullptr);
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDisarmsOnRequestResponse) {
   enable_request_timeout_ = true;
-  enable_per_stream_idle_timeout_ = false;
-
   testRouterHeaderOnlyRequestAndResponse(true, nullptr);
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDisarmsOnRequestResponseWithBody) {
   enable_request_timeout_ = true;
-  enable_per_stream_idle_timeout_ = false;
 
   testRouterRequestAndResponseWithBody(1024, 1024, false, nullptr);
 }
@@ -209,7 +212,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnBodilessPost) {
 
   auto response = setupPerStreamIdleTimeoutTest("POST");
 
-  waitForTimeout(*response, "downstream_rq_path_timeout");
+  waitForTimeout(*response, "downstream_rq_timeout");
 
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
@@ -220,7 +223,6 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnBodilessPost) {
 
 TEST_P(IdleTimeoutIntegrationTest, UnconfiguredRequestTimeoutDoesNotTrigger) {
   enable_per_stream_idle_timeout_ = true;
-  enable_request_timeout_ = false;
 
   auto response = setupPerStreamIdleTimeoutTest("POST");
 
@@ -249,7 +251,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnIncompleteHeaders) {
   EXPECT_THAT(raw_response, testing::HasSubstr("request timeout"));
 }
 
-// TODO create a test filter that hangs and does not send data upstream, which would
+// TODO(auni53) create a test filter that hangs and does not send data upstream, which would
 // trigger a configured request_timer
 
 } // namespace

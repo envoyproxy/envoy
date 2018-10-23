@@ -8,6 +8,8 @@ Version history
 * config: removed support for the v1 API.
 * fault: removed integer percentage support.
 * http: added limits to the number and length of header modifications in all fields request_headers_to_add and response_headers_to_add. These limits are very high and should only be used as a last-resort safeguard.
+* http: added support for a :ref:`request timeout <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_timeout>`.
+  The timeout is disabled by default.
 * http: no longer adding whitespace when appending X-Forwarded-For headers. **Warning**: this is not
   compatible with 1.7.0 builds prior to `9d3a4eb4ac44be9f0651fcc7f87ad98c538b01ee <https://github.com/envoyproxy/envoy/pull/3610>`_.
   See `#3611 <https://github.com/envoyproxy/envoy/issues/3611>`_ for details.
@@ -25,9 +27,6 @@ Version history
 * stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
-* http: added support for a :ref:`request timeout
-  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_timeout>`.
-  The timeout is disabled by default.
 * stream: renamed `perRequestState` to `filterState` in `StreamInfo`.
 * thrift_proxy: introduced thrift rate limiter filter
 * upstream: changed how load calculation for :ref:`priority levels<arch_overview_load_balancing_priority_levels>` and :ref:`panic thresholds<arch_overview_load_balancing_panic_threshold>` interact. As long as normalized total health is 100% panic thresholds are disregarded. 

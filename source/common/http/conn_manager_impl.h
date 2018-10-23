@@ -407,7 +407,6 @@ private:
     // Per-stream request timeout.
     Event::TimerPtr request_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
-    std::chrono::milliseconds request_timeout_ms_{};
     State state_;
     StreamInfo::StreamInfoImpl stream_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
