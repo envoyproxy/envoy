@@ -64,7 +64,7 @@ public:
 
     process(descriptor_set);
 
-    mkdir(TestEnvironment::temporaryPath("envoy_test").c_str(), S_IRWXU);
+    TestUtility::createDirectory(TestEnvironment::temporaryPath("envoy_test"));
     std::string path = TestEnvironment::temporaryPath("envoy_test/proto.descriptor");
     std::ofstream file(path);
     descriptor_set.SerializeToOstream(&file);

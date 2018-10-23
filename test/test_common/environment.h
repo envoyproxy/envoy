@@ -193,5 +193,10 @@ public:
    * @param path.
    */
   static void removePath(const std::string& path);
+
+  static void setEnvVar(const std::string& name, const std::string& value, int overwrite);
+
+  static std::string makeTempDir(char* nameTemplate);
 };
+
 } // namespace Envoy
