@@ -118,12 +118,12 @@ public:
   const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager config_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   MockServerConnection* codec_{};
-  SlowDateProviderImpl date_provider_;
   MockStreamDecoderFilter* decoder_filter_{};
   MockStreamEncoderFilter* encoder_filter_{};
   NiceMock<MockFilterChainFactory> filter_factory_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   Event::SimulatedTimeSystem time_system_;
+  SlowDateProviderImpl date_provider_{time_system_};
   RouteConfigProvider route_config_provider_;
   std::string server_name_;
   Stats::IsolatedStoreImpl fake_stats_;

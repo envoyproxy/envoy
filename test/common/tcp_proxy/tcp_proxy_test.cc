@@ -18,6 +18,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
@@ -1146,12 +1147,11 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
 TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
   setup();
 
-  StreamInfo::FilterStateImpl per_connection_state;
-  per_connection_state.setData("envoy.tcp_proxy.cluster",
-                               std::make_unique<PerConnectionCluster>("filter_state_cluster"));
-  ON_CALL(connection_, perConnectionState()).WillByDefault(ReturnRef(per_connection_state));
-  EXPECT_CALL(Const(connection_), perConnectionState())
-      .WillRepeatedly(ReturnRef(per_connection_state));
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filterState().setData("envoy.tcp_proxy.cluster",
+                                    std::make_unique<PerConnectionCluster>("filter_state_cluster"));
+  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_,

@@ -65,3 +65,33 @@ to point to a local copy. The option can used multiple times to override multipl
 The name of the dependency can be found in
 [the repository locations file.](https://github.com/envoyproxy/envoy/blob/master/bazel/repository_locations.bzl)
 The path of the local copy has to be absolute path.
+
+# Distdir - prefetching dependencies
+
+Usually Bazel downloads all dependencies during build time. But there is a
+possibility to prefetch dependencies and point Bazel to them by using `--distdir`
+option and providing a path to directory which contains tarballs with exactly
+the same name and the same SHA256 sum that are defined in repositories
+definitions.
+
+For example, let's assume that your distdir location is `$HOME/envoy_distdir`.
+To prefetch `boringssl` which is defined in `bazel/repository_locations.bzl` as:
+
+```
+boringssl = dict(
+    # Use commits from branch "chromium-stable-with-bazel"
+    sha256 = "d1700e0455f5f918f8a85ff3ce6cd684d05c766200ba6bdb18c77d5dcadc05a1",
+    strip_prefix = "boringssl-060e9a583976e73d1ea8b2bfe8b9cab33c62fa17",
+    # chromium-70.0.3538.67
+    urls = ["https://github.com/google/boringssl/archive/060e9a583976e73d1ea8b2bfe8b9cab33c62fa17.tar.gz"],
+),
+```
+
+`$HOME/envoy_distdir` needs to contain `060e9a583976e73d1ea8b2bfe8b9cab33c62fa17.tar.gz`
+file.
+
+Then Envoy needs to be built with the following command:
+
+```
+bazel build --distdir=$HOME/envoy_distdir //source/exe:envoy
+```

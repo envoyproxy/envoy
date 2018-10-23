@@ -109,15 +109,18 @@ mkdir -p "${ENVOY_COVERAGE_DIR}"
 export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci
 
 # Hack due to https://github.com/envoyproxy/envoy/issues/838 and the need to have
-# tools and bazel.rc available for build linkstamping.
-mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools
-mkdir -p "${ENVOY_CI_DIR}"/tools
-ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools/
-ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CI_DIR}"/tools/
+# .bazelrc available for build linkstamping.
 mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
 mkdir -p "${ENVOY_CI_DIR}"/bazel
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CI_DIR}"/bazel/
+ln -sf "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
+ln -sf "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_CI_DIR}"/
+# TODO(PiotrSikora): remove once we deprecate tools/bazel.rc in favor of .bazelrc.
+mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools
+mkdir -p "${ENVOY_CI_DIR}"/tools
+ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools/
+ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CI_DIR}"/tools/
 
 export BUILDIFIER_BIN="/usr/local/bin/buildifier"
 

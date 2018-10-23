@@ -6,12 +6,16 @@ REPOSITORY_LOCATIONS = dict(
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        commit = "060e9a583976e73d1ea8b2bfe8b9cab33c62fa17",  # chromium-70.0.3538.67
-        remote = "https://github.com/google/boringssl",
+        sha256 = "d1700e0455f5f918f8a85ff3ce6cd684d05c766200ba6bdb18c77d5dcadc05a1",
+        strip_prefix = "boringssl-060e9a583976e73d1ea8b2bfe8b9cab33c62fa17",
+        # chromium-70.0.3538.67
+        urls = ["https://github.com/google/boringssl/archive/060e9a583976e73d1ea8b2bfe8b9cab33c62fa17.tar.gz"],
     ),
     com_google_absl = dict(
-        commit = "92e07e5590752d6b8e67f7f2f86c6286561e8cea",  # 2018-08-01
-        remote = "https://github.com/abseil/abseil-cpp",
+        sha256 = "3f24d99cfa1b719ed51e12dae7741e4500a703e2c34bede452b457492d1fe36e",
+        strip_prefix = "abseil-cpp-92e07e5590752d6b8e67f7f2f86c6286561e8cea",
+        # 2018-08-01
+        urls = ["https://github.com/abseil/abseil-cpp/archive/92e07e5590752d6b8e67f7f2f86c6286561e8cea.tar.gz"],
     ),
     com_github_apache_thrift = dict(
         sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",
@@ -24,8 +28,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bombela/backward-cpp/archive/v1.4.tar.gz"],
     ),
     com_github_circonus_labs_libcircllhist = dict(
-        commit = "050da53a44dede7bda136b93a9aeef47bd91fa12",  # 2018-07-02
-        remote = "https://github.com/circonus-labs/libcircllhist",
+        sha256 = "9949e2864b8ad00ee5c3e9c1c3c01e51b6b68bb442a919652fc66b9776477987",
+        strip_prefix = "libcircllhist-fd8a14463739d247b414825cc56ca3946792a3b9",
+        # 2018-07-02
+        urls = ["https://github.com/circonus-labs/libcircllhist/archive/fd8a14463739d247b414825cc56ca3946792a3b9.tar.gz"],
     ),
     com_github_cyan4973_xxhash = dict(
         sha256 = "19030315f4fc1b4b2cdb9d7a317069a109f90e39d1fe4c9159b7aaa39030eb95",
@@ -53,8 +59,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gcovr/gcovr/archive/3.3.tar.gz"],
     ),
     com_github_google_libprotobuf_mutator = dict(
-        commit = "c3d2faf04a1070b0b852b0efdef81e1a81ba925e",  # 2018-03-06
-        remote = "https://github.com/google/libprotobuf-mutator",
+        sha256 = "97b3639630040f41c45f45838ab00b78909e6b4cb69c8028e01302bea5b79495",
+        strip_prefix = "libprotobuf-mutator-c3d2faf04a1070b0b852b0efdef81e1a81ba925e",
+        # 2018-03-06
+        urls = ["https://github.com/google/libprotobuf-mutator/archive/c3d2faf04a1070b0b852b0efdef81e1a81ba925e.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
         sha256 = "013cc34f3c51c0f87e059a12ea203087a7a15dca2e453295345e1d02e2b9634b",
@@ -78,21 +86,25 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.8.0.tar.gz"],
     ),
     lightstep_vendored_googleapis = dict(
+        sha256 = "d1ef4f790eeaa805e7b364de05b91f9eed66bd6ae46f1483bbf49c33d86998e5",
+        strip_prefix = "googleapis-d6f78d948c53f3b400bb46996eb3084359914f9b",
         # From: https://github.com/lightstep/lightstep-tracer-cpp/blob/v0.8.0/lightstep-tracer-common/third_party/googleapis/README.lightstep-tracer-common#L6
-        commit = "d6f78d948c53f3b400bb46996eb3084359914f9b",
-        remote = "https://github.com/google/googleapis",
+        urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        commit = "66792a057ec54e4b75c6a2eeda4e98220bd12a9a",  # 2018-08-17
-        remote = "https://github.com/google/jwt_verify_lib",
+        sha256 = "499f1e145c19f33031eb8fc6452d5d391b4cecfdeda23e2055386a3b33be4d41",
+        strip_prefix = "jwt_verify_lib-66792a057ec54e4b75c6a2eeda4e98220bd12a9a",
+        # 2018-08-17
+        urls = ["https://github.com/google/jwt_verify_lib/archive/66792a057ec54e4b75c6a2eeda4e98220bd12a9a.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
+        sha256 = "f742dc5a206958c4d0a6b2c35e3e102afb5683f55f7a7cb1eae024a03f081347",
+        strip_prefix = "http-parser-77310eeb839c4251c07184a5db8885a572a08352",
         # 2018-07-20 snapshot to pick up:
         # A performance fix, nodejs/http-parser PR 422.
         # A bug fix, nodejs/http-parser PR 432.
         # TODO(brian-pane): Upgrade to the next http-parser release once it's available
-        commit = "77310eeb839c4251c07184a5db8885a572a08352",
-        remote = "https://github.com/nodejs/http-parser",
+        urls = ["https://github.com/nodejs/http-parser/archive/77310eeb839c4251c07184a5db8885a572a08352.tar.gz"],
     ),
     com_github_pallets_jinja = dict(
         sha256 = "0d31d3466c313a9ca014a2d904fed18cdac873a5ba1f7b70b8fd8b206cd860d6",
@@ -130,29 +142,35 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/googletest/archive/release-1.8.1.tar.gz"],
     ),
     com_google_protobuf = dict(
+        sha256 = "3d610ac90f8fa16e12490088605c248b85fdaf23114ce4b3605cdf81f7823604",
+        strip_prefix = "protobuf-fa252ec2a54acb24ddc87d48fed1ecfd458445fd",
         # TODO(htuch): Switch back to released versions for protobuf when a release > 3.6.0 happens
         # that includes:
         # - https://github.com/google/protobuf/commit/f35669b8d3f46f7f1236bd21f14d744bba251e60
         # - https://github.com/google/protobuf/commit/6a4fec616ec4b20f54d5fb530808b855cb664390
         # - https://github.com/google/protobuf/commit/fa252ec2a54acb24ddc87d48fed1ecfd458445fd
-        commit = "fa252ec2a54acb24ddc87d48fed1ecfd458445fd",
-        remote = "https://github.com/google/protobuf",
+        urls = ["https://github.com/protocolbuffers/protobuf/archive/fa252ec2a54acb24ddc87d48fed1ecfd458445fd.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
-        commit = "05a15e4ecd0244a981fdf0348a76658def62fa9c",  # 2018-05-30
-        remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
+        sha256 = "9765764644d74af9a9654f7fb90cf2bc7228014664668719a589a4677967ca09",
+        strip_prefix = "grpc-httpjson-transcoding-05a15e4ecd0244a981fdf0348a76658def62fa9c",
+        # 2018-05-30
+        urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/05a15e4ecd0244a981fdf0348a76658def62fa9c.tar.gz"],
     ),
     com_github_golang_protobuf = dict(
         # TODO(sesmith177): Remove this dependency when both:
         #   1. There's a release of golang/protobuf that includes
         #      https://github.com/golang/protobuf/commit/31e0d063dd98c052257e5b69eeb006818133f45c
         #   2. That release is included in rules_go
-        commit = "31e0d063dd98c052257e5b69eeb006818133f45c",  # 2018-10-03
-        remote = "https://github.com/golang/protobuf",
+        sha256 = "4cbd5303a5cf85791b3c310a50a479027c035d75091bb90c482ba67b0a2cf5b4",
+        strip_prefix = "protobuf-31e0d063dd98c052257e5b69eeb006818133f45c",
+        urls = ["https://github.com/golang/protobuf/archive/31e0d063dd98c052257e5b69eeb006818133f45c.tar.gz"],
     ),
     io_bazel_rules_go = dict(
-        commit = "3d966375ff7971d43b863f785f495c7dcd6923da",  # 2018-10-02
-        remote = "https://github.com/bazelbuild/rules_go",
+        sha256 = "d1ad521fbd0997df53161e29df0964468157fc9c6ee16265db37cc6daaf334ef",
+        strip_prefix = "rules_go-3d966375ff7971d43b863f785f495c7dcd6923da",
+        # 2018-10-02
+        urls = ["https://github.com/bazelbuild/rules_go/archive/3d966375ff7971d43b863f785f495c7dcd6923da.tar.gz"],
     ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",

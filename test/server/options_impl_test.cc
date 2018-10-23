@@ -217,4 +217,45 @@ TEST_F(OptionsImplTest, IncompleteComponentLogLevel) {
                           "component log level not correctly specified 'upstream'");
 }
 
+// Test that the test constructor comes up with the same default values as the main constructor.
+TEST_F(OptionsImplTest, SaneTestConstructor) {
+  std::unique_ptr<OptionsImpl> regular_options_impl(createOptionsImpl("envoy"));
+  OptionsImpl test_options_impl("service_cluster", "service_node", "service_zone",
+                                spdlog::level::level_enum::info);
+
+  // Specified by constructor
+  EXPECT_EQ("service_cluster", test_options_impl.serviceClusterName());
+  EXPECT_EQ("service_node", test_options_impl.serviceNodeName());
+  EXPECT_EQ("service_zone", test_options_impl.serviceZone());
+  EXPECT_EQ(spdlog::level::level_enum::info, test_options_impl.logLevel());
+
+  // Special (simplified) for tests
+  EXPECT_EQ(1u, test_options_impl.concurrency());
+
+  EXPECT_EQ(regular_options_impl->baseId(), test_options_impl.baseId());
+  EXPECT_EQ(regular_options_impl->configPath(), test_options_impl.configPath());
+  EXPECT_EQ(regular_options_impl->configYaml(), test_options_impl.configYaml());
+  EXPECT_EQ(regular_options_impl->v2ConfigOnly(), test_options_impl.v2ConfigOnly());
+  EXPECT_EQ(regular_options_impl->adminAddressPath(), test_options_impl.adminAddressPath());
+  EXPECT_EQ(regular_options_impl->localAddressIpVersion(),
+            test_options_impl.localAddressIpVersion());
+  EXPECT_EQ(regular_options_impl->drainTime(), test_options_impl.drainTime());
+  EXPECT_EQ(spdlog::level::level_enum::info, test_options_impl.logLevel());
+  EXPECT_EQ(regular_options_impl->componentLogLevels(), test_options_impl.componentLogLevels());
+  EXPECT_EQ(regular_options_impl->logPath(), test_options_impl.logPath());
+  EXPECT_EQ(regular_options_impl->parentShutdownTime(), test_options_impl.parentShutdownTime());
+  EXPECT_EQ(regular_options_impl->restartEpoch(), test_options_impl.restartEpoch());
+  EXPECT_EQ(regular_options_impl->mode(), test_options_impl.mode());
+  EXPECT_EQ(regular_options_impl->fileFlushIntervalMsec(),
+            test_options_impl.fileFlushIntervalMsec());
+  EXPECT_EQ(regular_options_impl->maxStats(), test_options_impl.maxStats());
+  EXPECT_EQ(regular_options_impl->statsOptions().maxNameLength(),
+            test_options_impl.statsOptions().maxNameLength());
+  EXPECT_EQ(regular_options_impl->statsOptions().maxObjNameLength(),
+            test_options_impl.statsOptions().maxObjNameLength());
+  EXPECT_EQ(regular_options_impl->statsOptions().maxStatSuffixLength(),
+            test_options_impl.statsOptions().maxStatSuffixLength());
+  EXPECT_EQ(regular_options_impl->hotRestartDisabled(), test_options_impl.hotRestartDisabled());
+}
+
 } // namespace Envoy
