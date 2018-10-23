@@ -4,31 +4,39 @@ BAZEL_SKYLIB_SHA256 = "b5f6abe419da897b7901f90cbab08af958b97a8f3575b0d3dd062ac7c
 GOGOPROTO_RELEASE = "1.1.1"
 GOGOPROTO_SHA256 = "9f8c2ad49849ab063cd9fef67e77d49606640044227ecf7f3617ea2c92ef147c"
 
-GOOGLEAPIS_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411"  # May 23, 2018
-PROMETHEUS_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
-OPENCENSUS_SHA = "ab82e5fdec8267dc2a726544b10af97675970847"  # May 23, 2018
+GOOGLEAPIS_GIT_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411"  # May 23, 2018
+GOOGLEAPIS_SHA = "16f5b2e8bf1e747a32f9a62e211f8f33c94645492e9bbd72458061d9a9de1f63"
+
+PROMETHEUS_GIT_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
+PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf3911b"
+
+OPENCENSUS_GIT_SHA = "ab82e5fdec8267dc2a726544b10af97675970847"  # May 23, 2018
+OPENCENSUS_SHA = "1950f844d9f338ba731897a9bb526f9074c0487b3f274ce2ec3b4feaf0bef7e2"
 
 PGV_GIT_SHA = "30da78c4bcdd477b3c24d13e43cf39361ae3859f"  # Sep 27, 2018
+PGV_SHA = "2bc9a34b1c485e73540dc5093d6715ef437294020fa6580f21306aa5e884f511"
 
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 def api_dependencies():
-    native.http_archive(
+    http_archive(
         name = "bazel_skylib",
         sha256 = BAZEL_SKYLIB_SHA256,
         strip_prefix = "bazel-skylib-" + BAZEL_SKYLIB_RELEASE,
         url = "https://github.com/bazelbuild/bazel-skylib/archive/" + BAZEL_SKYLIB_RELEASE + ".tar.gz",
     )
-    git_repository(
+    http_archive(
         name = "com_lyft_protoc_gen_validate",
-        remote = "https://github.com/lyft/protoc-gen-validate.git",
-        commit = PGV_GIT_SHA,
+        url = "https://github.com/lyft/protoc-gen-validate/archive/" + PGV_GIT_SHA + ".tar.gz",
+        sha256 = PGV_SHA,
+        strip_prefix = "protoc-gen-validate-" + PGV_GIT_SHA,
     )
-    native.new_http_archive(
+    http_archive(
         name = "googleapis",
-        strip_prefix = "googleapis-" + GOOGLEAPIS_SHA,
-        url = "https://github.com/googleapis/googleapis/archive/" + GOOGLEAPIS_SHA + ".tar.gz",
+        strip_prefix = "googleapis-" + GOOGLEAPIS_GIT_SHA,
+        url = "https://github.com/googleapis/googleapis/archive/" + GOOGLEAPIS_GIT_SHA + ".tar.gz",
         # TODO(dio): Consider writing a Skylark macro for importing Google API proto.
+        sha256 = GOOGLEAPIS_SHA,
         build_file_content = """
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
@@ -189,7 +197,7 @@ py_proto_library(
 """,
     )
 
-    native.new_http_archive(
+    http_archive(
         name = "com_github_gogo_protobuf",
         sha256 = GOGOPROTO_SHA256,
         strip_prefix = "protobuf-" + GOGOPROTO_RELEASE,
@@ -250,10 +258,11 @@ py_proto_library(
         """,
     )
 
-    native.new_http_archive(
+    http_archive(
         name = "prometheus_metrics_model",
-        strip_prefix = "client_model-" + PROMETHEUS_SHA,
-        url = "https://github.com/prometheus/client_model/archive/" + PROMETHEUS_SHA + ".tar.gz",
+        strip_prefix = "client_model-" + PROMETHEUS_GIT_SHA,
+        url = "https://github.com/prometheus/client_model/archive/" + PROMETHEUS_GIT_SHA + ".tar.gz",
+        sha256 = PROMETHEUS_SHA,
         build_file_content = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
@@ -275,10 +284,11 @@ go_proto_library(
         """,
     )
 
-    native.new_http_archive(
+    http_archive(
         name = "io_opencensus_trace",
-        strip_prefix = "opencensus-proto-" + OPENCENSUS_SHA + "/opencensus/proto/trace",
-        url = "https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_SHA + ".tar.gz",
+        strip_prefix = "opencensus-proto-" + OPENCENSUS_GIT_SHA + "/opencensus/proto/trace",
+        url = "https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_GIT_SHA + ".tar.gz",
+        sha256 = OPENCENSUS_SHA,
         build_file_content = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")

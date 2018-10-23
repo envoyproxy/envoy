@@ -1,7 +1,18 @@
 #include "utility.h"
 
+#if !defined(WIN32)
 #include <dirent.h>
 #include <unistd.h>
+#else
+#include <windows.h>
+// <windows.h> uses macros to #define a ton of symbols, two of which (DELETE and GetMessage)
+// interfere with our code. DELETE shows up in the base.pb.h header generated from
+// api/envoy/api/core/base.proto. Since it's a generated header, we can't #undef DELETE at
+// the top of that header to avoid the collision. Similarly, GetMessage shows up in generated
+// protobuf code so we can't #undef the symbol there.
+#undef DELETE
+#undef GetMessage
+#endif
 
 #include <cstdint>
 #include <fstream>
@@ -188,6 +199,42 @@ std::vector<std::string> TestUtility::split(const std::string& source, const std
   return ret;
 }
 
+void TestUtility::renameFile(const std::string& old_name, const std::string& new_name) {
+#if !defined(WIN32)
+  const int rc = ::rename(old_name.c_str(), new_name.c_str());
+  ASSERT_EQ(0, rc);
+#else
+  // use MoveFileEx, since ::rename will not overwrite an existing file. See
+  // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/rename-wrename?view=vs-2017
+  const BOOL rc = ::MoveFileEx(old_name.c_str(), new_name.c_str(), MOVEFILE_REPLACE_EXISTING);
+  ASSERT_NE(0, rc);
+#endif
+};
+
+void TestUtility::createDirectory(const std::string& name) {
+#if !defined(WIN32)
+  ::mkdir(name.c_str(), S_IRWXU);
+#else
+  ::_mkdir(name.c_str());
+#endif
+}
+
+void TestUtility::createSymlink(const std::string& target, const std::string& link) {
+#if !defined(WIN32)
+  const int rc = ::symlink(target.c_str(), link.c_str());
+  ASSERT_EQ(rc, 0);
+#else
+  const DWORD attributes = ::GetFileAttributes(target.c_str());
+  ASSERT_NE(attributes, INVALID_FILE_ATTRIBUTES);
+  int flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
+  if (attributes & FILE_ATTRIBUTE_DIRECTORY) {
+    flags |= SYMBOLIC_LINK_FLAG_DIRECTORY;
+  }
+
+  const BOOLEAN rc = ::CreateSymbolicLink(link.c_str(), target.c_str(), flags);
+  ASSERT_NE(rc, 0);
+#endif
+}
 void ConditionalInitializer::setReady() {
   Thread::LockGuard lock(mutex_);
   EXPECT_FALSE(ready_);
@@ -227,10 +274,8 @@ void AtomicFileUpdater::update(const std::string& contents) {
     std::ofstream file(target);
     file << contents;
   }
-  int rc = symlink(target.c_str(), new_link_.c_str());
-  ASSERT_EQ(0, rc) << strerror(errno);
-  rc = rename(new_link_.c_str(), link_.c_str());
-  ASSERT_EQ(0, rc) << strerror(errno);
+  TestUtility::createSymlink(target, new_link_);
+  TestUtility::renameFile(new_link_, link_);
 }
 
 constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;

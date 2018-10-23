@@ -32,29 +32,5 @@ const FilterState::Object* FilterStateImpl::getDataGeneric(absl::string_view dat
   return it->second.get();
 }
 
-void FilterStateImpl::addToListGeneric(absl::string_view data_name,
-                                       std::unique_ptr<Object>&& data) {
-  const std::string name(data_name);
-  if (list_storage_.find(name) == list_storage_.end()) {
-    list_storage_[name] = std::vector<std::unique_ptr<FilterState::Object>>();
-  }
-
-  list_storage_[name].push_back(std::move(data));
-}
-
-const std::vector<std::unique_ptr<FilterState::Object>>*
-FilterStateImpl::getList(absl::string_view data_name) const {
-  const auto& it = list_storage_.find(std::string(data_name));
-
-  if (it == list_storage_.end()) {
-    return nullptr;
-  }
-  return &it->second;
-}
-
-bool FilterStateImpl::hasListWithName(absl::string_view data_name) const {
-  return list_storage_.count(std::string(data_name)) > 0;
-}
-
 } // namespace StreamInfo
 } // namespace Envoy
