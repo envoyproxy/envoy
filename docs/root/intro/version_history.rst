@@ -4,7 +4,6 @@ Version history
 1.9.0 (pending)
 ===============
 * access log: added a :ref:`JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format.
-* tracing: added support for Zipkin tracer of b3 single header format.
 * admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * config: removed support for the v1 API.
 * fault: removed integer percentage support.
@@ -29,6 +28,7 @@ Version history
   its behaviour within TCP and HTTP implementations.
 * stream: renamed `perRequestState` to `filterState` in `StreamInfo`.
 * thrift_proxy: introduced thrift rate limiter filter
+* tracing: added support for Zipkin tracer of b3 single header format.
 * upstream: changed how load calculation for :ref:`priority levels<arch_overview_load_balancing_priority_levels>` and :ref:`panic thresholds<arch_overview_load_balancing_panic_threshold>` interact. As long as normalized total health is 100% panic thresholds are disregarded.
 
 1.8.0 (Oct 4, 2018)

@@ -221,10 +221,69 @@ TEST(ZipkinSpanContextExtractorTest, Empty) {
 }
 
 TEST(ZipkinSpanContextExtractorTest, InvalidInput) {
-  Http::TestHeaderMapImpl request_headers{{"b3", "-"}};
-  SpanContextExtractor extractor(request_headers);
-  EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
-                            "Invalid input: invalid sampling flag -");
+  {
+    Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}!{}-{}", trace_id.substr(0, 15), trace_id, span_id)}};
+    SpanContextExtractor extractor(request_headers);
+    EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
+                              fmt::format("Invalid input: invalid trace id high {}!", trace_id.substr(0, 15)));
+  }
+
+  {
+    Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}!-{}", trace_id.substr(0, 15), span_id)}};
+    SpanContextExtractor extractor(request_headers);
+    EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
+                              fmt::format("Invalid input: invalid trace id {}!", trace_id.substr(0, 15)));
+  }
+
+  {
+    Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}!{}", trace_id, span_id)}};
+    SpanContextExtractor extractor(request_headers);
+    EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
+                              "Invalid input: not exists span id");
+  }
+
+  {
+    Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}-{}!", trace_id, span_id.substr(0, 15))}};
+    SpanContextExtractor extractor(request_headers);
+    EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
+                              fmt::format("Invalid input: invalid span id {}!", span_id.substr(0, 15)));
+  }
+
+  {
+    Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}-{}!0", trace_id, span_id)}};
+    SpanContextExtractor extractor(request_headers);
+    EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
+                              "Invalid input: not exists sampling field");
+  }
+
+  {
+    Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}-{}-c", trace_id, span_id)}};
+    SpanContextExtractor extractor(request_headers);
+    EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
+                              "Invalid input: invalid sampling flag c");
+  }
+
+  {
+    Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}-{}-d!{}", trace_id, span_id, parent_id)}};
+    SpanContextExtractor extractor(request_headers);
+    EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
+                              "Invalid input: truncated");
+  }
+
+  {
+    Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}-{}-d-{}!", trace_id, span_id, parent_id.substr(0, 15))}};
+    SpanContextExtractor extractor(request_headers);
+    EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
+                              fmt::format("Invalid input: invalid parent id {}!", parent_id.substr(0, 15)));
+  }
+
+  {
+    Http::TestHeaderMapImpl request_headers{{"b3", "-"}};
+    SpanContextExtractor extractor(request_headers);
+    EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
+    EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
+                              "Invalid input: invalid sampling flag -");
+  }
 }
 
 TEST(ZipkinSpanContextExtractorTest, Truncated) {

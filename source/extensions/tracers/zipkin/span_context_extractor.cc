@@ -13,8 +13,9 @@ namespace Zipkin {
 namespace {
 constexpr int FormatMaxLength = 32 + 1 + 16 + 3 + 16; // traceid128-spanid-1-parentid
 bool validSamplingFlags(char c) {
-  if (c == '1' || c == '0' || c == 'd')
+  if (c == '1' || c == '0' || c == 'd') {
     return true;
+  }
   return false;
 }
 
@@ -197,17 +198,19 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
         throw ExtractorException(fmt::format("Invalid input: invalid sampling flag {}", b3[pos]));
       }
       pos++; // consume the sampled status
+    } else {
+      throw ExtractorException("Invalid input: truncated");
     }
 
     if (b3.length() > pos) {
+      std::cout << "pos:" << pos << "len: " << b3.length() << std::endl;
       // If we are at this point, we should have a parent ID, encoded as "-[0-9a-f]{16}"
       if (b3.length() != pos + 17) {
         throw ExtractorException("Invalid input: truncated");
       }
 
-      if (!(b3[pos++] == '-')) {
-        throw ExtractorException("Invalid input: not exists parent id");
-      }
+      ASSERT(b3[pos] == '-');
+      pos++;
 
       const std::string parent_id_str = b3.substr(pos, b3.length() - pos);
       if (!StringUtil::atoul(parent_id_str.c_str(), parent_id, 16)) {

@@ -38,7 +38,7 @@ public:
   const Http::LowerCaseString X_B3_SAMPLED{"X-B3-Sampled"};
   const Http::LowerCaseString X_B3_FLAGS{"X-B3-Flags"};
 
-  // Zipkin b3 siggle header
+  // Zipkin b3 single header
   const Http::LowerCaseString B3{"b3"};
 
   const std::string SAMPLED = "1";
