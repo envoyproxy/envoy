@@ -44,9 +44,8 @@ public:
   ~MockClusterInfo();
 
   void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry) {
-    resource_manager_.reset(new ResourceManagerImpl(
-        runtime_, name_, cx, stats_.upstream_cx_open_, rq_pending, stats_.upstream_rq_pending_open_,
-        rq, stats_.upstream_rq_open_, rq_retry, stats_.upstream_rq_retry_open_));
+    resource_manager_.reset(new ResourceManagerImpl(runtime_, name_, cx, rq_pending, rq, rq_retry,
+                                                    circuit_breakers_stats_));
   }
 
   // Upstream::ClusterInfo
@@ -88,6 +87,7 @@ public:
   Network::TransportSocketFactoryPtr transport_socket_factory_;
   NiceMock<Stats::MockIsolatedStatsStore> load_report_stats_store_;
   ClusterLoadReportStats load_report_stats_;
+  ClusterCircuitBreakersStats circuit_breakers_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;

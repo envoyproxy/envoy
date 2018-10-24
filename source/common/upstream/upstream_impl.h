@@ -367,6 +367,8 @@ public:
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
+  static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
+                                                                  const std::string& stat_prefix);
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }

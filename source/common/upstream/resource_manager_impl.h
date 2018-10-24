@@ -25,15 +25,14 @@ namespace Upstream {
 class ResourceManagerImpl : public ResourceManager {
 public:
   ResourceManagerImpl(Runtime::Loader& runtime, const std::string& runtime_key,
-                      uint64_t max_connections, Stats::Gauge& connections_gauge,
-                      uint64_t max_pending_requests, Stats::Gauge& pending_requests_gauge,
-                      uint64_t max_requests, Stats::Gauge& requests_gauge, uint64_t max_retries,
-                      Stats::Gauge& retries_gauge)
-      : connections_(max_connections, runtime, runtime_key + "max_connections", connections_gauge),
+                      uint64_t max_connections, uint64_t max_pending_requests,
+                      uint64_t max_requests, uint64_t max_retries,
+                      ClusterCircuitBreakersStats cb_stats)
+      : connections_(max_connections, runtime, runtime_key + "max_connections", cb_stats.cx_open_),
         pending_requests_(max_pending_requests, runtime, runtime_key + "max_pending_requests",
-                          pending_requests_gauge),
-        requests_(max_requests, runtime, runtime_key + "max_requests", requests_gauge),
-        retries_(max_retries, runtime, runtime_key + "max_retries", retries_gauge) {}
+                          cb_stats.rq_pending_open_),
+        requests_(max_requests, runtime, runtime_key + "max_requests", cb_stats.rq_open_),
+        retries_(max_retries, runtime, runtime_key + "max_retries", cb_stats.rq_retry_open_) {}
 
   // Upstream::ResourceManager
   Resource& connections() override { return connections_; }

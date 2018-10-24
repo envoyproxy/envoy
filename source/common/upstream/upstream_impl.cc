@@ -687,6 +687,12 @@ ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::Cluste
       load(config, runtime, cluster_name, stats_scope, envoy::api::v2::core::RoutingPriority::HIGH);
 }
 
+ClusterCircuitBreakersStats
+ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, const std::string& stat_prefix) {
+  std::string prefix(fmt::format("circuit_breakers.{}.", stat_prefix));
+  return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix))};
+}
+
 ResourceManagerImplPtr
 ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
                                         Runtime::Loader& runtime, const std::string& cluster_name,
@@ -726,10 +732,8 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
     max_retries = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_retries, max_retries);
   }
   return ResourceManagerImplPtr{new ResourceManagerImpl(
-      runtime, runtime_prefix, max_connections, stats_scope.gauge("upstream_cx_open"),
-      max_pending_requests, stats_scope.gauge("upstream_rq_pending_open"), max_requests,
-      stats_scope.gauge("upstream_rq_open"), max_retries,
-      stats_scope.gauge("upstream_rq_retry_open"))};
+      runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
+      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name))};
 }
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
