@@ -9,12 +9,13 @@ namespace Envoy {
 namespace Ssl {
 
 const ASN1_TIME& epochASN1_Time() {
-  CONSTRUCT_ON_FIRST_USE(ASN1_TIME, []() -> ASN1_TIME {
+  static ASN1_TIME* e = []() -> ASN1_TIME* {
     ASN1_TIME* epoch = ASN1_TIME_new();
     time_t epoch_time = 0;
     ASN1_TIME_set(epoch, epoch_time);
-    return *epoch;
-  }());
+    return epoch;
+  }();
+  return *e;
 }
 
 inline bssl::UniquePtr<ASN1_TIME> currentASN1_Time(TimeSource& time_source) {
