@@ -184,9 +184,8 @@ typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
 /**
  * Implementation of RetryPolicy that reads from the proto route config.
  */
-class RetryPolicyImpl : public RetryPolicy,
-                        Upstream::RetryHostPredicateFactoryCallbacks,
-                        Upstream::RetryPriorityFactoryCallbacks {
+class RetryPolicyImpl : public RetryPolicy {
+
 public:
   RetryPolicyImpl(const envoy::api::v2::route::RouteAction& config);
 
@@ -194,32 +193,24 @@ public:
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
-  std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override {
-    return retry_host_predicates_;
-  }
-  Upstream::RetryPrioritySharedPtr retryPriority() const override { return retry_priority_; }
+  std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override;
+  Upstream::RetryPrioritySharedPtr retryPriority() const override;
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_attempts_; }
   const std::vector<uint32_t>& retriableStatusCodes() const override {
     return retriable_status_codes_;
-  }
-
-  // Upstream::RetryHostPredicateFactoryCallbacks
-  void addHostPredicate(Upstream::RetryHostPredicateSharedPtr predicate) override {
-    retry_host_predicates_.emplace_back(predicate);
-  }
-
-  // Upstream::RetryHostPredicateFactoryCallbacks
-  void addRetryPriority(Upstream::RetryPrioritySharedPtr retry_priority) override {
-    ASSERT(!retry_priority_);
-    retry_priority_ = retry_priority;
   }
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
-  std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
+  // Each pair contains the name and config proto to be used to create the RetryHostPredicates
+  // that should be used when with this policy.
+  std::vector<std::pair<std::string, ProtobufTypes::MessagePtr>> retry_host_predicate_configs_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
+  // Name and config proto to use to create the RetryPriority to use with this policy. Default
+  // initialized when no RetryPriority should be used.
+  std::pair<std::string, ProtobufTypes::MessagePtr> retry_priority_config_;
   uint32_t host_selection_attempts_{1};
   std::vector<uint32_t> retriable_status_codes_;
 };
@@ -388,13 +379,6 @@ private:
   struct RuntimeData {
     std::string fractional_runtime_key_{};
     envoy::type::FractionalPercent fractional_runtime_default_{};
-
-    // Relating to the deprecated 'runtime' field.
-    std::string runtime_key_{};
-    uint64_t runtime_default_{};
-
-    // Indicates whether to use the deprecated 'runtime' field or 'fractional_percent'.
-    bool legacy_runtime_data_{};
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {
@@ -540,7 +524,9 @@ private:
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
   Runtime::Loader& loader_;
   const absl::optional<RuntimeData> runtime_;
+  const std::string scheme_redirect_;
   const std::string host_redirect_;
+  const std::string port_redirect_;
   const std::string path_redirect_;
   const bool https_redirect_;
   const std::string prefix_rewrite_redirect_;

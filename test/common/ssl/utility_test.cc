@@ -5,6 +5,7 @@
 
 #include "test/common/ssl/ssl_test_utility.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -58,11 +59,16 @@ TEST(UtilityTest, TestGetSerialNumber) {
 TEST(UtilityTest, TestDaysUntilExpiration) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
-  EXPECT_LE(0, Utility::getDaysUntilExpiration(cert.get()));
+  // Set a known date (10/21/2018 00:00:00) so that we get fixed output from this test.
+  const long known_date_time = 1540080000;
+  Event::SimulatedTimeSystem time_source;
+  time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
+  EXPECT_EQ(261, Utility::getDaysUntilExpiration(cert.get(), time_source));
 }
 
 TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
-  EXPECT_EQ(std::numeric_limits<int>::max(), Utility::getDaysUntilExpiration(nullptr));
+  Event::SimulatedTimeSystem time_source;
+  EXPECT_EQ(std::numeric_limits<int>::max(), Utility::getDaysUntilExpiration(nullptr, time_source));
 }
 
 } // namespace Ssl

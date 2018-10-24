@@ -5,8 +5,7 @@
 #include "common/network/connection_impl.h"
 
 #include "extensions/filters/http/common/empty_http_filter_config.h"
-
-#include "test/integration/filters/pass_through_filter.h"
+#include "extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 
@@ -14,7 +13,7 @@ namespace Envoy {
 // connection back-up when an encode is finished, and unblocking it when the
 // next stream starts to decode headers.
 // Allows regression tests for https://github.com/envoyproxy/envoy/issues/4541
-class TestPauseFilter : public PassThroughFilter {
+class TestPauseFilter : public Http::PassThroughFilter {
 public:
   // Pass in a some global filter state to ensure the Network::Connection is
   // blocked and unblocked exactly once.

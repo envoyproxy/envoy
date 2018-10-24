@@ -225,7 +225,8 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::rou
   JSON_UTIL_SET_BOOL(json_route, *match, case_sensitive);
 
   if (json_route.hasObject("runtime")) {
-    BaseJson::translateRuntimeUInt32(*json_route.getObject("runtime"), *match->mutable_runtime());
+    BaseJson::translateRuntimeFraction(*json_route.getObject("runtime"),
+                                       *match->mutable_runtime_fraction());
   }
 
   for (const auto json_header_matcher : json_route.getObjectArray("headers", true)) {

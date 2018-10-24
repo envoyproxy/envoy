@@ -103,6 +103,7 @@ public:
 class MockRetryPriority : public RetryPriority {
 public:
   MockRetryPriority(const PriorityLoad& priority_load) : priority_load_(priority_load) {}
+  MockRetryPriority(const MockRetryPriority& other) : priority_load_(other.priority_load_) {}
   ~MockRetryPriority();
 
   const PriorityLoad& determinePriorityLoad(const PrioritySet&, const PriorityLoad&) {
@@ -117,20 +118,19 @@ private:
 
 class MockRetryPriorityFactory : public RetryPriorityFactory {
 public:
-  MockRetryPriorityFactory(RetryPrioritySharedPtr retry_priority)
+  MockRetryPriorityFactory(const MockRetryPriority& retry_priority)
       : retry_priority_(retry_priority) {}
-  void createRetryPriority(RetryPriorityFactoryCallbacks& callbacks, const Protobuf::Message&,
-                           uint32_t) override {
-    callbacks.addRetryPriority(retry_priority_);
+  RetryPrioritySharedPtr createRetryPriority(const Protobuf::Message&, uint32_t) override {
+    return std::make_shared<NiceMock<MockRetryPriority>>(retry_priority_);
   }
 
-  std::string name() const override { return "envoy.mock_retry_priority"; }
+  std::string name() const override { return "envoy.test_retry_priority"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
 
 private:
-  RetryPrioritySharedPtr retry_priority_;
+  const MockRetryPriority& retry_priority_;
 };
 
 class MockCluster : public Cluster {
@@ -355,5 +355,16 @@ public:
   MOCK_METHOD1(onHostAttempted, void(HostDescriptionConstSharedPtr));
 };
 
+class TestRetryHostPredicateFactory : public RetryHostPredicateFactory {
+public:
+  RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message&, uint32_t) override {
+    return std::make_shared<NiceMock<MockRetryHostPredicate>>();
+  }
+
+  std::string name() override { return "envoy.test_host_predicate"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  }
+};
 } // namespace Upstream
 } // namespace Envoy

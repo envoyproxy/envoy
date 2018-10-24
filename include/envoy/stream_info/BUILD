@@ -16,7 +16,8 @@ envoy_cc_library(
         ":filter_state_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/http:protocol_interface",
-        "//include/envoy/upstream:upstream_interface",
+        "//include/envoy/upstream:host_description_interface",
+        "//source/common/protobuf",
     ],
 )
 

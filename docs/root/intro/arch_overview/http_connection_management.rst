@@ -50,21 +50,21 @@ Normally during retries, hosts selected for retry attempts will be selected the 
 initial request is selected. To modify this behavior retry plugins can be used, which fall into
 two categories:
 
-* :ref:`**Retry host predicate** <envoy_api_field_route.RouteAction.RetryPolicy.retry_host_predicate>`.
+* :ref:`Retry host predicate <envoy_api_field_route.RouteAction.RetryPolicy.retry_host_predicate>`.
   These can be used to "reject" a host, which will cause host selection to be reattempted. If one or
   more predicates have been configured, host selection will continue until either the host predicates
   accept the host or a configurable
   :ref:`max attempts <envoy_api_field_route.RouteAction.RetryPolicy.host_selection_retry_max_attempts>`
   has been reached. Any number of these predicates can be specified, and the host will be rejected if
   any of the predicates reject the host.
-* :ref:`**Retry priority** <envoy_api_field_route.RouteAction.RetryPolicy.retry_priority>`. These can
+* :ref:`Retry priority <envoy_api_field_route.RouteAction.RetryPolicy.retry_priority>`. These can
   be used to adjust the priority load used when selecting a priority for a retry attempt. Only one such
   plugin may be specified.
 
 These plugins can be combined to affect both host selection and priority load.
 
 For example, to configure retries to prefer hosts that haven't been attempted already, the builtin
-`envoy.retry_host_predicates.other_hosts` predicate can be used:
+``envoy.retry_host_predicates.other_hosts`` predicate can be used:
 
 .. code-block:: yaml
 
@@ -79,7 +79,7 @@ impossible (no hosts satisfy the predicate) or very unlikely (the only suitable 
 relative weight).
 
 To configure retries to attempt other priorities during retries, the built in
-`envoy.retry_priority.other_priorities` can be used.
+``envoy.retry_priority.other_priorities`` can be used.
 
 .. code-block:: yaml
 
@@ -90,7 +90,7 @@ To configure retries to attempt other priorities during retries, the built in
         update_frequency: 2
 
 This will keep track of previously attempted priorities, and adjust the priority load such that other
-priorites will be targeted in subsequent retry attempts. The `update_frequency` parameter decides how
+priorites will be targeted in subsequent retry attempts. The ``update_frequency`` parameter decides how
 often the priority load should be recalculated.
 
 These plugins can be combined, which will exclude both previously attempted hosts as well as

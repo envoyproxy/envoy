@@ -198,27 +198,27 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMiss
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
-  Envoy::StreamInfo::FilterStateImpl per_request_state;
-  per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  EXPECT_EQ("test_value", per_request_state.getData<StringAccessor>("testing").asString());
+  Envoy::StreamInfo::FilterStateImpl filter_state;
+  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  EXPECT_EQ("test_value", filter_state.getData<StringAccessor>("testing").asString());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  ON_CALL(stream_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
-  ON_CALL(Const(stream_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 
   testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "test_value");
   testFormatting(stream_info, "PER_REQUEST_STATE(testing2)", "");
-  EXPECT_EQ("test_value", per_request_state.getData<StringAccessor>("testing").asString());
+  EXPECT_EQ("test_value", filter_state.getData<StringAccessor>("testing").asString());
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
-  Envoy::StreamInfo::FilterStateImpl per_request_state;
-  per_request_state.setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1));
-  EXPECT_EQ(1, per_request_state.getData<StreamInfo::TestIntAccessor>("testing").access());
+  Envoy::StreamInfo::FilterStateImpl filter_state;
+  filter_state.setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1));
+  EXPECT_EQ(1, filter_state.getData<StreamInfo::TestIntAccessor>("testing").access());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  ON_CALL(stream_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
-  ON_CALL(Const(stream_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 
   testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "");
 }
@@ -425,10 +425,10 @@ TEST(HeaderParserTest, TestParseInternal) {
   const SystemTime start_time(std::chrono::milliseconds(1522796769123));
   ON_CALL(stream_info, startTime()).WillByDefault(Return(start_time));
 
-  Envoy::StreamInfo::FilterStateImpl per_request_state;
-  per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  ON_CALL(stream_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
-  ON_CALL(Const(stream_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  Envoy::StreamInfo::FilterStateImpl filter_state;
+  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 
   for (const auto& test_case : test_cases) {
     Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
@@ -586,10 +586,10 @@ request_headers_to_remove: ["x-nope"]
       )EOF"));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  Envoy::StreamInfo::FilterStateImpl per_request_state;
-  per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  ON_CALL(stream_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
-  ON_CALL(Const(stream_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  Envoy::StreamInfo::FilterStateImpl filter_state;
+  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 
   req_header_parser->evaluateHeaders(header_map, stream_info);
 

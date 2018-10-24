@@ -1,7 +1,7 @@
 .. _arch_overview_websocket:
 
 Upgrade support
-=========================
+---------------
 
 Envoy Upgrade support is intended mainly for WebSocket but may be used for non-WebSocket
 upgrades as well. Upgrades pass both the HTTP headers and the upgrade payload
@@ -17,7 +17,7 @@ for the given upgrade type, up to and including only using the router filter to 
 data upstream.
 
 Handling H2 hops (implementation in progress)
----------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Envoy currently has an alpha implementation of tunneling websockets over H2 streams for deployments
 that prefer a uniform H2 mesh throughout, for example, for a deployment of the form:
