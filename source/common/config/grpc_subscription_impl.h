@@ -14,11 +14,8 @@ namespace Config {
 template <class ResourceType>
 class GrpcSubscriptionImpl : public Config::Subscription<ResourceType> {
 public:
-  GrpcSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
-                       Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                       const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats,
-                       Stats::Scope& scope)
-      : grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random, scope),
+  GrpcSubscriptionImpl(GrpcMux& grpc_mux, SubscriptionStats stats)
+      : grpc_mux_(grpc_mux),
         grpc_mux_subscription_(grpc_mux_, stats) {}
 
   // Config::Subscription
@@ -36,7 +33,7 @@ public:
   GrpcMuxImpl& grpcMux() { return grpc_mux_; }
 
 private:
-  GrpcMuxImpl grpc_mux_;
+  GrpcMux& grpc_mux_;
   GrpcMuxSubscriptionImpl<ResourceType> grpc_mux_subscription_;
 };
 

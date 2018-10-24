@@ -73,7 +73,7 @@ public:
                                                *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method),
                                                random, config.api_config_source(), scope,
                                                Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name()));
-        result.reset(new GrpcMuxSubscriptionImpl<ResourceType>(*mux, stats));
+        result.reset(new GrpcSubscriptionImpl<ResourceType>(*mux, stats));
         break;
       }
       default:
