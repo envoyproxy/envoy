@@ -194,7 +194,7 @@ bool SnapshotImpl::featureEnabled(const std::string& key,
         entry->second.fractional_percent_value_->denominator());
   } else if (entry != values_.end() && entry->second.uint_value_.has_value()) {
     // The runtime value must have been specified as an integer rather than a fractional percent
-    // proto. In this case, we'll just assume a percentage.
+    // proto. To preserve legacy semantics, we'll assume this represents a percentage.
     numerator = entry->second.uint_value_.value();
     denominator = 100;
   } else {
