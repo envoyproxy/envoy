@@ -222,17 +222,21 @@ TEST(ZipkinSpanContextExtractorTest, Empty) {
 
 TEST(ZipkinSpanContextExtractorTest, InvalidInput) {
   {
-    Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}!{}-{}", trace_id.substr(0, 15), trace_id, span_id)}};
+    Http::TestHeaderMapImpl request_headers{
+        {"b3", fmt::format("{}!{}-{}", trace_id.substr(0, 15), trace_id, span_id)}};
     SpanContextExtractor extractor(request_headers);
-    EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
-                              fmt::format("Invalid input: invalid trace id high {}!", trace_id.substr(0, 15)));
+    EXPECT_THROW_WITH_MESSAGE(
+        extractor.extractSpanContext(true), ExtractorException,
+        fmt::format("Invalid input: invalid trace id high {}!", trace_id.substr(0, 15)));
   }
 
   {
-    Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}!-{}", trace_id.substr(0, 15), span_id)}};
+    Http::TestHeaderMapImpl request_headers{
+        {"b3", fmt::format("{}!-{}", trace_id.substr(0, 15), span_id)}};
     SpanContextExtractor extractor(request_headers);
-    EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
-                              fmt::format("Invalid input: invalid trace id {}!", trace_id.substr(0, 15)));
+    EXPECT_THROW_WITH_MESSAGE(
+        extractor.extractSpanContext(true), ExtractorException,
+        fmt::format("Invalid input: invalid trace id {}!", trace_id.substr(0, 15)));
   }
 
   {
@@ -243,10 +247,12 @@ TEST(ZipkinSpanContextExtractorTest, InvalidInput) {
   }
 
   {
-    Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}-{}!", trace_id, span_id.substr(0, 15))}};
+    Http::TestHeaderMapImpl request_headers{
+        {"b3", fmt::format("{}-{}!", trace_id, span_id.substr(0, 15))}};
     SpanContextExtractor extractor(request_headers);
-    EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
-                              fmt::format("Invalid input: invalid span id {}!", span_id.substr(0, 15)));
+    EXPECT_THROW_WITH_MESSAGE(
+        extractor.extractSpanContext(true), ExtractorException,
+        fmt::format("Invalid input: invalid span id {}!", span_id.substr(0, 15)));
   }
 
   {
@@ -264,17 +270,20 @@ TEST(ZipkinSpanContextExtractorTest, InvalidInput) {
   }
 
   {
-    Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}-{}-d!{}", trace_id, span_id, parent_id)}};
+    Http::TestHeaderMapImpl request_headers{
+        {"b3", fmt::format("{}-{}-d!{}", trace_id, span_id, parent_id)}};
     SpanContextExtractor extractor(request_headers);
     EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
                               "Invalid input: truncated");
   }
 
   {
-    Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}-{}-d-{}!", trace_id, span_id, parent_id.substr(0, 15))}};
+    Http::TestHeaderMapImpl request_headers{
+        {"b3", fmt::format("{}-{}-d-{}!", trace_id, span_id, parent_id.substr(0, 15))}};
     SpanContextExtractor extractor(request_headers);
-    EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
-                              fmt::format("Invalid input: invalid parent id {}!", parent_id.substr(0, 15)));
+    EXPECT_THROW_WITH_MESSAGE(
+        extractor.extractSpanContext(true), ExtractorException,
+        fmt::format("Invalid input: invalid parent id {}!", parent_id.substr(0, 15)));
   }
 
   {
