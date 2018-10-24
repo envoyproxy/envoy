@@ -35,7 +35,9 @@ public:
    * @param state_type indicates whether the object is mutable or not.
    *
    * Note that it is an error to call setData() twice with the same
-   * data_name, if the existing object is immutable. This is to enforce a
+   * data_name, if the existing object is immutable. Similarly, it is an
+   * error to call setData() with same data_name but different state_types
+   * (mutable and readOnly, or readOnly and mutable). This is to enforce a
    * single authoritative source for each piece of immutable data stored in
    * FilterState.
    */

@@ -15,10 +15,16 @@ void FilterStateImpl::setData(absl::string_view data_name, std::unique_ptr<Objec
   const auto& it = data_storage_.find(name);
 
   if (it != data_storage_.end()) {
-    // We have another object with same data_name. Check for mutability violations
+    // We have another object with same data_name. Check for mutability
+    // violations namely: readonly data cannot be overwritten. mutable data
+    // cannot be overwritten by readonly data.
     const FilterStateImpl::FilterObject* current = it->second.get();
     if (current->state_type_ == FilterState::StateType::ReadOnly) {
       throw EnvoyException("FilterState::setData<T> called twice on same ReadOnly state.");
+    }
+
+    if (current->state_type_ != state_type) {
+      throw EnvoyException("FilterState::setData<T> called twice with different state types.");
     }
   }
 

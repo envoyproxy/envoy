@@ -38,6 +38,7 @@ public:
   SimpleType(int value) : value_(value) {}
 
   int access() const { return value_; }
+  void set(int value) { value_ = value; }
 
 private:
   int value_;
@@ -103,7 +104,7 @@ TEST_F(FilterStateImplTest, SameTypes) {
   EXPECT_EQ(2u, destruction_count);
 }
 
-TEST_F(FilterStateImplTest, SimpleType) {
+TEST_F(FilterStateImplTest, SimpleTypeReadOnly) {
   filter_state().setData("test_1", std::make_unique<SimpleType>(1),
                          FilterState::StateType::ReadOnly);
   filter_state().setData("test_2", std::make_unique<SimpleType>(2),
@@ -113,11 +114,31 @@ TEST_F(FilterStateImplTest, SimpleType) {
   EXPECT_EQ(2, filter_state().getDataReadOnly<SimpleType>("test_2").access());
 }
 
+TEST_F(FilterStateImplTest, SimpleTypeMutable) {
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1),
+                         FilterState::StateType::Mutable);
+  filter_state().setData("test_2", std::make_unique<SimpleType>(2),
+                         FilterState::StateType::Mutable);
+
+  EXPECT_EQ(1, filter_state().getDataReadOnly<SimpleType>("test_1").access());
+  EXPECT_EQ(2, filter_state().getDataReadOnly<SimpleType>("test_2").access());
+
+  filter_state().getDataMutable<SimpleType>("test_1").set(100);
+  filter_state().getDataMutable<SimpleType>("test_2").set(200);
+  EXPECT_EQ(100, filter_state().getDataReadOnly<SimpleType>("test_1").access());
+  EXPECT_EQ(200, filter_state().getDataReadOnly<SimpleType>("test_2").access());
+}
+
 TEST_F(FilterStateImplTest, NameConflictReadOnly) {
+  // read only data cannot be overwritten (by any state type)
   filter_state().setData("test_1", std::make_unique<SimpleType>(1),
                          FilterState::StateType::ReadOnly);
   EXPECT_THROW_WITH_MESSAGE(filter_state().setData("test_1", std::make_unique<SimpleType>(2),
                                                    FilterState::StateType::ReadOnly),
+                            EnvoyException,
+                            "FilterState::setData<T> called twice on same ReadOnly state.");
+  EXPECT_THROW_WITH_MESSAGE(filter_state().setData("test_1", std::make_unique<SimpleType>(2),
+                                                   FilterState::StateType::Mutable),
                             EnvoyException,
                             "FilterState::setData<T> called twice on same ReadOnly state.");
   EXPECT_EQ(1, filter_state().getDataReadOnly<SimpleType>("test_1").access());
@@ -133,15 +154,18 @@ TEST_F(FilterStateImplTest, NameConflictDifferentTypesReadOnly) {
       EnvoyException, "FilterState::setData<T> called twice on same ReadOnly state.");
 }
 
-TEST_F(FilterStateImplTest, NoNameConflictMutableFirst) {
-  // Mutable data can be overwritten by immutable or mutable data of same or different type.
-
-  // mutable + read only - same type
+TEST_F(FilterStateImplTest, NameConflictMutableAndReadOnly) {
+  // Mutable data cannot be overwritten by read only data.
   filter_state().setData("test_1", std::make_unique<SimpleType>(1),
                          FilterState::StateType::Mutable);
-  filter_state().setData("test_1", std::make_unique<SimpleType>(2),
-                         FilterState::StateType::ReadOnly);
-  EXPECT_EQ(2, filter_state().getDataReadOnly<SimpleType>("test_1").access());
+  EXPECT_THROW_WITH_MESSAGE(filter_state().setData("test_1", std::make_unique<SimpleType>(2),
+                                                   FilterState::StateType::ReadOnly),
+                            EnvoyException,
+                            "FilterState::setData<T> called twice with different state types.");
+}
+
+TEST_F(FilterStateImplTest, NoNameConflictMutableAndMutable) {
+  // Mutable data can be overwritten by another mutable data of same or different type.
 
   // mutable + mutable - same type
   filter_state().setData("test_2", std::make_unique<SimpleType>(3),
@@ -149,13 +173,6 @@ TEST_F(FilterStateImplTest, NoNameConflictMutableFirst) {
   filter_state().setData("test_2", std::make_unique<SimpleType>(4),
                          FilterState::StateType::Mutable);
   EXPECT_EQ(4, filter_state().getDataMutable<SimpleType>("test_2").access());
-
-  // mutable + read only - different types
-  filter_state().setData("test_3", std::make_unique<SimpleType>(5),
-                         FilterState::StateType::Mutable);
-  filter_state().setData("test_3", std::make_unique<TestStoredTypeTracking>(6, nullptr, nullptr),
-                         FilterState::StateType::ReadOnly);
-  EXPECT_EQ(6, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_3").access());
 
   // mutable + mutable - different types
   filter_state().setData("test_4", std::make_unique<SimpleType>(7),
@@ -168,6 +185,8 @@ TEST_F(FilterStateImplTest, NoNameConflictMutableFirst) {
 TEST_F(FilterStateImplTest, UnknownName) {
   EXPECT_THROW_WITH_MESSAGE(filter_state().getDataReadOnly<SimpleType>("test_1"), EnvoyException,
                             "FilterState::getDataReadOnly<T> called for unknown data name.");
+  EXPECT_THROW_WITH_MESSAGE(filter_state().getDataMutable<SimpleType>("test_1"), EnvoyException,
+                            "FilterState::getDataMutable<T> called for unknown data name.");
 }
 
 TEST_F(FilterStateImplTest, WrongTypeGet) {
