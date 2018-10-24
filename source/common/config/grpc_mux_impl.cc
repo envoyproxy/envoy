@@ -12,14 +12,14 @@ namespace Config {
 GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
-                         Runtime::RandomGenerator& random, Stats::Scope& scope)
+                         Runtime::RandomGenerator& random, Stats::Scope& scope,const uint32_t max_tokens, const double fill_rate)
     : local_info_(local_info), async_client_(std::move(async_client)),
       service_method_(service_method), random_(random), time_source_(dispatcher.timeSystem()),
       control_plane_stats_(generateControlPlaneStats(scope)) {
   Config::Utility::checkLocalInfo("ads", local_info);
 
   // Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
-  limit_request_ = std::make_unique<TokenBucketImpl>(MAX_TOKENS, time_source_, TOKEN_REFILL_RATE);
+  limit_request_ = std::make_unique<TokenBucketImpl>(max_tokens, time_source_, fill_rate);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   drain_request_timer_ = dispatcher.createTimer([this]() -> void { drainRequests(); });
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
@@ -63,7 +63,7 @@ void GrpcMuxImpl::drainRequests() {
       sendDiscoveryRequest(request_queue_.front());
       request_queue_.pop();
     } else {
-      ENVOY_LOG(warn, "Too many sendDiscoveryRequest calls");
+      ENVOY_LOG(warn, "Too many sendDiscoveryRequest calls :");
       // Enable the drain request timer.
       drain_request_timer_->enableTimer(
           std::chrono::milliseconds(limit_request_->nextTokenAvailableMs()));

@@ -27,7 +27,7 @@ class GrpcMuxImpl : public GrpcMux,
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              Runtime::RandomGenerator& random, Stats::Scope& scope);
+              Runtime::RandomGenerator& random, Stats::Scope& scope, const uint32_t max_tokens, const double fill_rate);
   ~GrpcMuxImpl();
 
   void start() override;
@@ -46,10 +46,6 @@ public:
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_INITIAL_DELAY_MS = 500;
   const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
-
-  // TODO(ramaraochavali): Make this configurable in ApiConfigSource.
-  const uint32_t MAX_TOKENS = 100;
-  const uint32_t TOKEN_REFILL_RATE = 10;
 
 private:
   void setRetryTimer();

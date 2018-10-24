@@ -36,6 +36,16 @@ public:
   const std::string Grpc{"GRPC"};
 };
 
+/**
+ * Default Rate Limits for discovery requests.
+ */
+struct DefaultRateLimits {
+  // Max Tokens
+  static const uint32_t MAX_TOKENS = 100;
+  // Fill Rate
+  static const uint32_t FILL_RATE = 10;
+};
+
 typedef ConstSingleton<ApiTypeValues> ApiType;
 
 /**
