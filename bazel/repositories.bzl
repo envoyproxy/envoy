@@ -42,7 +42,7 @@ def _repository_impl(name, **kwargs):
         name = name,
         urls = location["urls"],
         sha256 = location["sha256"],
-        strip_prefix = location["strip_prefix"],
+        strip_prefix = location.get("strip_prefix", ""),
         **kwargs
     )
 
