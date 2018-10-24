@@ -162,9 +162,9 @@ So, level 0 endpoints will continue to receive all traffic until less than ~71.4
 healthy.
 
 The priority level logic works with integer health scores. The health score of a level is
-(level's percent of healthy endpoints) * (overprovisioning factor), capped at 100%. P=0
+(percent of healthy hosts in the level) * (overprovisioning factor), capped at 100%. P=0
 endpoints receive (level 0's health score) percent of the traffic, with the rest flowing
-to P=1 (assuming P=1 is healthy - more on that later). For instance, when 50% of P=0
+to P=1 (assuming P=1 is 100% healthy - more on that later). For instance, when 50% of P=0
 endpoints are healthy, they will receive 50 * 1.4 = 70% of the traffic.
 The integer percents of traffic that each priority level receives are collectively called the
 system's "priority load". More examples (with 2 priority levels, P=1 100% healthy):
@@ -189,7 +189,7 @@ system's "priority load". More examples (with 2 priority levels, P=1 100% health
 
   In order for the load distribution algorithm and normalized total health calculation to work
   properly, each priority level must be able to handle (100% * overprovision factor) of the
-  traffic: Envoy assumes a healthy P=1 can take over entirely for an unhealthy P=0, etc.
+  traffic: Envoy assumes a 100% healthy P=1 can take over entirely for an unhealthy P=0, etc.
   If P=0 has 10 hosts but P=1 only has 2 hosts, that assumption probably will not hold.
 
 The health score represents a level's current ability to handle traffic, after factoring in how
@@ -269,8 +269,8 @@ panic thresholds and continues to distribute traffic load across priorities acco
 algorithm described :ref:`here <arch_overview_load_balancing_priority_levels>`.
 However, when normalized total health drops below 100%, Envoy assumes that there are not enough
 healthy hosts across all priority levels. It continues to distribute traffic load across priorities,
-but if a specific priority level's health is below the panic threshold, traffic will go to all hosts
-in that priority regardless of their health.
+but if a given priority level's health is below the panic threshold, traffic will go to all hosts
+in that priority level regardless of their health.
 
 The following examples explain the relationship between normalized total health and panic threshold.
 It is assumed that the default value of 50% is used for the panic threshold.
