@@ -22,8 +22,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::unique_ptr<Objec
     }
   }
 
-  std::unique_ptr<FilterStateImpl::FilterObject> filter_object;
-  filter_object.reset(new FilterStateImpl::FilterObject());
+  std::unique_ptr<FilterStateImpl::FilterObject> filter_object(new FilterStateImpl::FilterObject());
   filter_object->data_ = std::move(data);
   filter_object->state_type_ = state_type;
   data_storage_[name] = std::move(filter_object);
