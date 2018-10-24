@@ -20,7 +20,7 @@ namespace StreamInfo {
  */
 class FilterState {
 public:
-  enum StateType { ReadOnly, Mutable };
+  enum class StateType { ReadOnly, Mutable };
 
   class Object {
   public:
