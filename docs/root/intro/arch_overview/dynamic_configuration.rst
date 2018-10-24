@@ -84,7 +84,7 @@ rotation, or binary updates.
 EDS, CDS, RDS, LDS, and SDS
 --------------------------
 
-The :ref:`secret discovery service (LDS) <config_overview_lds>` layers on a mechanism by which Envoy
-can discover cryptographic secrets (certificate plus private key, TLS session ticket keys) for its
-listeners, as well as configuration of peer certificate validation logic (trusted root certs,
-revocations, etc). 
+The :ref:`secret discovery service (SDS) <_config_secret_discovery_service>` layers on a mechanism
+by which Envoy can discover cryptographic secrets (certificate plus private key, TLS session
+ticket keys) for its listeners, as well as configuration of peer certificate validation logic
+(trusted root certs, revocations, etc).
