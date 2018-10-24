@@ -317,6 +317,11 @@ message RouteMatch {
   // route configuration can be used to roll out route changes in a gradual manner without full
   // code/config deploys. Refer to the :ref:`traffic shifting
   // <config_http_conn_man_route_table_traffic_splitting_shift>` docs for additional documentation.
+  //
+  // .. note::
+  //
+  //    Currently, this feature is implemented such that the fractional runtime value may also be
+  //    represented as an integer with the assumption that the value is a percentage.
   core.RuntimeFractionalPercent runtime_fraction = 9;
 
   // Specifies a set of headers that the route should match on. The router will
