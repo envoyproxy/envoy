@@ -1563,7 +1563,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketNoThreadLocalCluster) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketNoConnInPool) {
   setup(false, "");
 
-  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster(_, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster(_, _, _, _)).WillOnce(Return(nullptr));
 
   expectOnUpstreamInitFailure();
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
@@ -1578,7 +1578,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketNoConnInPool) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketDataAfterConnectFail) {
   setup(false, "");
 
-  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster(_, _, _)).WillOnce(Return(&conn_pool_));
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster(_, _, _, _)).WillOnce(Return(&conn_pool_));
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
@@ -1628,7 +1628,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketMetadataMatch) {
       .WillByDefault(Return(
           &route_config_provider_.route_config_->route_->route_entry_.metadata_matches_criteria_));
 
-  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster(_, _, _))
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster(_, _, _, _))
       .WillOnce(Invoke([&](const std::string&, Upstream::ResourcePriority,
                            Upstream::LoadBalancerContext* context)
                            -> Tcp::ConnectionPool::MockInstance* {
@@ -1646,7 +1646,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketMetadataMatch) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
   setup(false, "");
 
-  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
       .WillOnce(Return(&conn_pool_));
 
   StreamDecoder* decoder = nullptr;
@@ -1681,7 +1681,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketConnectionFailure) {
   setup(false, "");
 
-  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
       .WillOnce(Return(&conn_pool_));
 
   StreamDecoder* decoder = nullptr;
@@ -1726,7 +1726,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
                                              {"upgrade", "websocket"}}};
   auto raw_header_ptr = headers.get();
 
-  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
       .WillOnce(Return(&conn_pool_));
 
   configureRouteForWebsocket(route_config_provider_.route_config_->route_->route_entry_);
@@ -1767,7 +1767,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyData) {
   setup(false, "");
 
-  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
       .WillOnce(Return(&conn_pool_));
 
   StreamDecoder* decoder = nullptr;
@@ -1812,7 +1812,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyData) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyDataConnectionFail) {
   setup(false, "");
 
-  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
       .WillOnce(Return(&conn_pool_));
 
   StreamDecoder* decoder = nullptr;
@@ -1853,7 +1853,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyDataConnectionFail) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyEndStream) {
   setup(false, "");
 
-  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
       .WillOnce(Return(&conn_pool_));
 
   StreamDecoder* decoder = nullptr;

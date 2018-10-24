@@ -28,7 +28,6 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
-#include "common/stream_info/original_requested_server_name.h"
 #include "common/tcp/conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -39,8 +38,6 @@
 
 namespace Envoy {
 namespace Upstream {
-
-typedef ::Envoy::StreamInfo::OriginalRequestedServerName OriginalRequestedServerName;
 
 void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
   // See comments in ClusterManagerImpl::addOrUpdateCluster() for why this is only called during
@@ -668,7 +665,8 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
 
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                                          LoadBalancerContext* context) {
+                                          LoadBalancerContext* context,
+                                          absl::optional<std::string> override_server_name) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -677,7 +675,7 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
   }
 
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->tcpConnPool(priority, context);
+  return entry->second->tcpConnPool(priority, context, override_server_name);
 }
 
 void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
@@ -707,8 +705,9 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
       [this, host] { ThreadLocalClusterManagerImpl::onHostHealthFailure(host, *tls_); });
 }
 
-Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster,
-                                                                 LoadBalancerContext* context) {
+Host::CreateConnectionData
+ClusterManagerImpl::tcpConnForCluster(const std::string& cluster, LoadBalancerContext* context,
+                                      absl::optional<std::string> override_server_name) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -718,27 +717,6 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
 
   HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(context);
   if (logical_host) {
-
-    absl::optional<std::string> override_server_name;
-
-    absl::optional<std::string> requested_server_name;
-    if (context && context->downstreamConnection() &&
-        context->downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .hasData<OriginalRequestedServerName>(OriginalRequestedServerName::Key)) {
-      const OriginalRequestedServerName& server_name =
-          context->downstreamConnection()
-              ->streamInfo()
-              .filterState()
-              .getData<OriginalRequestedServerName>(OriginalRequestedServerName::Key);
-      requested_server_name = server_name.value();
-    }
-
-    if (entry->second->cluster_info_->forwardOriginalServerNameIndication() &&
-        requested_server_name.has_value()) {
-      override_server_name = requested_server_name.value();
-    }
     auto conn_info = logical_host->createConnection(cluster_manager.thread_local_dispatcher_,
                                                     nullptr, override_server_name);
     if ((entry->second->cluster_info_->features() &
@@ -1154,7 +1132,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
-    ResourcePriority priority, LoadBalancerContext* context) {
+    ResourcePriority priority, LoadBalancerContext* context,
+    absl::optional<std::string> override_server_name) {
   HostConstSharedPtr host = lb_->chooseHost(context);
   if (!host) {
     ENVOY_LOG(debug, "no healthy host for TCP connection pool");
@@ -1164,8 +1143,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
 
   // Inherit socket options from downstream connection, if set.
   std::vector<uint8_t> hash_key = {uint8_t(priority)};
-
-  absl::optional<std::string> override_server_name;
 
   // Use downstream connection socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with
@@ -1181,27 +1158,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
       }
     }
 
-    // in case of connections that have an original requested server name set in their
-    // filter state, and in case this requested server name is forwarded, add the it to
-    // the hash key, so the pool will contain connections with the identical requested
-    // server name
-    absl::optional<std::string> requested_server_name;
-    if (context->downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .hasData<OriginalRequestedServerName>(OriginalRequestedServerName::Key)) {
-      const OriginalRequestedServerName& server_name =
-          context->downstreamConnection()
-              ->streamInfo()
-              .filterState()
-              .getData<OriginalRequestedServerName>(OriginalRequestedServerName::Key);
-      requested_server_name = server_name.value();
-    }
-
-    if (requested_server_name.has_value() && cluster_info_->forwardOriginalServerNameIndication()) {
+    // add the server-name-to-override to the hash key, so the pool will contain
+    // connections with the identical requested server name
+    if (override_server_name.has_value()) {
       std::hash<std::string> hash_function;
-      hash_key.push_back(hash_function(requested_server_name.value()));
-      override_server_name = requested_server_name;
+      hash_key.push_back(hash_function(override_server_name.value()));
     }
   }
 

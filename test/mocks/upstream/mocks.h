@@ -240,7 +240,8 @@ public:
   ~MockClusterManager();
 
   Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
-                                               LoadBalancerContext* context) override {
+                                               LoadBalancerContext* context,
+                                               absl::optional<std::string>) override {
     MockHost::MockCreateConnectionData data = tcpConnForCluster_(cluster, context);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
@@ -259,7 +260,8 @@ public:
                                                LoadBalancerContext* context));
   MOCK_METHOD3(tcpConnPoolForCluster,
                Tcp::ConnectionPool::Instance*(const std::string& cluster, ResourcePriority priority,
-                                              LoadBalancerContext* context));
+                                              LoadBalancerContext* context,
+                                              absl::optional<std::string> override_server_name));
   MOCK_METHOD2(tcpConnForCluster_,
                MockHost::MockCreateConnectionData(const std::string& cluster,
                                                   LoadBalancerContext* context));

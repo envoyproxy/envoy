@@ -188,11 +188,13 @@ public:
                                                          ResourcePriority priority,
                                                          Http::Protocol protocol,
                                                          LoadBalancerContext* context) override;
-  Tcp::ConnectionPool::Instance* tcpConnPoolForCluster(const std::string& cluster,
-                                                       ResourcePriority priority,
-                                                       LoadBalancerContext* context) override;
-  Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
-                                               LoadBalancerContext* context) override;
+  Tcp::ConnectionPool::Instance*
+  tcpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
+                        LoadBalancerContext* context,
+                        absl::optional<std::string> override_server_name) override;
+  Host::CreateConnectionData
+  tcpConnForCluster(const std::string& cluster, LoadBalancerContext* context,
+                    absl::optional<std::string> override_server_name) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
   bool removeCluster(const std::string& cluster) override;
   void shutdown() override {
@@ -275,7 +277,8 @@ private:
                                                LoadBalancerContext* context);
 
       Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
-                                                 LoadBalancerContext* context);
+                                                 LoadBalancerContext* context,
+                                                 absl::optional<std::string> override_server_name);
 
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }

@@ -413,7 +413,8 @@ public:
     {
       testing::InSequence sequence;
       for (uint32_t i = 0; i < connections; i++) {
-        EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+        EXPECT_CALL(factory_context_.cluster_manager_,
+                    tcpConnPoolForCluster("fake_cluster", _, _, _))
             .WillOnce(Return(&conn_pool_))
             .RetiresOnSaturation();
         EXPECT_CALL(conn_pool_, newConnection(_))
@@ -424,7 +425,7 @@ public:
                 }))
             .RetiresOnSaturation();
       }
-      EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
           .WillRepeatedly(Return(nullptr));
     }
 
@@ -1134,7 +1135,7 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
@@ -1155,7 +1156,7 @@ TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_,
-              tcpConnPoolForCluster("filter_state_cluster", _, _))
+              tcpConnPoolForCluster("filter_state_cluster", _, _, _))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
