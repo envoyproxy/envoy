@@ -27,7 +27,7 @@ via the built in :ref:`hot restart <arch_overview_hot_restart>` mechanism.
 Though simplistic, fairly complicated deployments can be created using static configurations and
 graceful hot restarts.
 
-.. _arch_overview_dynamic_config_sds:
+.. _arch_overview_dynamic_config_eds:
 
 SDS/EDS only
 ------------
@@ -36,7 +36,7 @@ The :ref:`service discovery service (SDS) API <config_cluster_manager_sds>` prov
 mechanism by which Envoy can discover members of an upstream cluster. SDS has been renamed to :ref:`Endpoint
 Discovery Service (EDS)<envoy_api_file_envoy/api/v2/eds.proto>` in the
 :ref:`v2 API <config_overview_v2_management_server>`. Layered on top of a static
-configuration, SDS allows an Envoy deployment to circumvent the limitations of DNS (maximum records
+configuration, SDS/EDS allows an Envoy deployment to circumvent the limitations of DNS (maximum records
 in a response, etc.) as well as consume more information used in load balancing and routing (e.g.,
 canary status, zone, etc.).
 
