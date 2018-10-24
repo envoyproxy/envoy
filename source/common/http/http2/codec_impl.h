@@ -156,7 +156,7 @@ protected:
     virtual void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                nghttp2_data_provider* provider) PURE;
     void submitTrailers(const HeaderMap& trailers);
-    void submitMetadata();
+    int submitMetadata();
 
     // Http::StreamEncoder
     void encode100ContinueHeaders(const HeaderMap& headers) override;
@@ -201,7 +201,7 @@ protected:
     // Get MetadataDecoder for this stream.
     MetadataDecoder& getMetadataDecoder();
     // Callback function for MetadataDecoder.
-    void onMetadataDecoded();
+    void onMetadataDecoded(MetadataMap& metadata_map);
 
     virtual void transformUpgradeFromH1toH2(HeaderMap& headers) PURE;
     virtual void maybeTransformUpgradeFromH2ToH1() PURE;
@@ -221,8 +221,6 @@ protected:
         [this]() -> void { this->pendingSendBufferLowWatermark(); },
         [this]() -> void { this->pendingSendBufferHighWatermark(); }};
     HeaderMapPtr pending_trailers_;
-    // Metadata received on the stream.
-    MetadataMapPtr metadata_map_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_{nullptr};
     std::unique_ptr<MetadataEncoder> metadata_encoder_{nullptr};
     absl::optional<StreamResetReason> deferred_reset_;

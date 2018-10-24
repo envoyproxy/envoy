@@ -48,8 +48,8 @@ template <typename T> static T* remove_const(const void* object) {
 }
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-    : parent_(parent), headers_(new HeaderMapImpl()), metadata_map_(new MetadataMap()),
-      local_end_stream_sent_(false), remote_end_stream_(false), data_deferred_(false),
+    : parent_(parent), headers_(new HeaderMapImpl()), local_end_stream_sent_(false),
+      remote_end_stream_(false), data_deferred_(false),
       waiting_for_non_informational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false) {
@@ -132,8 +132,16 @@ void ConnectionImpl::StreamImpl::encodeTrailers(const HeaderMap& trailers) {
 void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMap& metadata_map) {
   getMetadataEncoder().createPayload(metadata_map);
 
-  submitMetadata();
-  parent_.sendPendingFrames();
+  // Estimates the number of frames to generate, and breaks the while loop when the size is reached
+  // in case submitting succeeds and packing fails, and we don't get error from packing.
+  const size_t frame_count = metadata_encoder_->payload().length() / METADATA_MAX_PAYLOAD_SIZE + 1;
+  size_t count = 0;
+  // Keep submitting extension frames if there is payload left in the encoder.
+  while (metadata_encoder_->hasNextFrame() && count++ <= frame_count) {
+    int result = submitMetadata();
+    ASSERT(result == 0);
+    parent_.sendPendingFrames();
+  }
 }
 
 void ConnectionImpl::StreamImpl::readDisable(bool disable) {
@@ -200,13 +208,11 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   ASSERT(rc == 0);
 }
 
-void ConnectionImpl::StreamImpl::submitMetadata() {
+int ConnectionImpl::StreamImpl::submitMetadata() {
   ASSERT(stream_id_ > -1);
   uint64_t payload_size = metadata_encoder_->payload().length();
   const uint8_t flag = payload_size > METADATA_MAX_PAYLOAD_SIZE ? 0 : END_METADATA_FLAG;
-  int result =
-      nghttp2_submit_extension(parent_.session_, METADATA_FRAME_TYPE, flag, stream_id_, nullptr);
-  ASSERT(result == 0);
+  return nghttp2_submit_extension(parent_.session_, METADATA_FRAME_TYPE, flag, stream_id_, nullptr);
 }
 
 ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* data_flags) {
@@ -310,13 +316,16 @@ MetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
 
 MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
   if (metadata_decoder_ == nullptr) {
-    auto cb = std::bind(&ConnectionImpl::StreamImpl::onMetadataDecoded, this);
-    metadata_decoder_ = std::make_unique<MetadataDecoder>(cb, *metadata_map_);
+    auto cb =
+        std::bind(&ConnectionImpl::StreamImpl::onMetadataDecoded, this, std::placeholders::_1);
+    metadata_decoder_ = std::make_unique<MetadataDecoder>(cb);
   }
   return *metadata_decoder_;
 }
 
-void ConnectionImpl::StreamImpl::onMetadataDecoded() { decoder_->decodeMetadata(*metadata_map_); }
+void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMap& metadata_map) {
+  decoder_->decodeMetadata(metadata_map);
+}
 
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 
@@ -594,9 +603,8 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
                  stream_id, end_metadata);
 
   StreamImpl* stream = getStream(stream_id);
-  if (!stream) {
-    return 0;
-  }
+  ASSERT(stream != nullptr);
+
   bool result = stream->getMetadataDecoder().onMetadataFrameComplete(end_metadata);
   return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
@@ -605,13 +613,12 @@ ssize_t ConnectionImpl::packMetadata(int32_t stream_id, uint8_t* buf, size_t len
   ENVOY_CONN_LOG(trace, "pack METADATA frame on stream {}", connection_, stream_id);
 
   StreamImpl* stream = getStream(stream_id);
-  if (!stream) {
-    return 0;
-  }
+  ASSERT(stream != nullptr);
 
   MetadataEncoder& encoder = stream->getMetadataEncoder();
   const uint64_t size_to_copy = std::min(METADATA_MAX_PAYLOAD_SIZE, encoder.payload().length());
-  // nghttp2 guarantees len is at least 16KiB.
+  // nghttp2 guarantees len is at least 16KiB. If the check fails, please verify
+  // NGHTTP2_MAX_PAYLOADLEN is consistent with METADATA_MAX_PAYLOAD_SIZE.
   ASSERT(len >= size_to_copy);
 
   Buffer::OwnedImpl& p = reinterpret_cast<Buffer::OwnedImpl&>(encoder.payload());
@@ -619,11 +626,6 @@ ssize_t ConnectionImpl::packMetadata(int32_t stream_id, uint8_t* buf, size_t len
 
   // Releases the payload that has been copied to nghttp2.
   encoder.releasePayload(size_to_copy);
-
-  // Keep submitting extension frames if there is payload left in the encoder.
-  if (encoder.hasNextFrame()) {
-    stream->submitMetadata();
-  }
 
   return static_cast<ssize_t>(size_to_copy);
 }

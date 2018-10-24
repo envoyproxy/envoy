@@ -6,8 +6,7 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-MetadataDecoder::MetadataDecoder(MetadataCallback cb, MetadataMap& metadata_map)
-    : metadata_map_(metadata_map) {
+MetadataDecoder::MetadataDecoder(MetadataCallback cb) {
   nghttp2_hd_inflater* inflater;
   int rv = nghttp2_hd_inflate_new(&inflater);
   ASSERT(rv == 0);
@@ -15,7 +14,6 @@ MetadataDecoder::MetadataDecoder(MetadataCallback cb, MetadataMap& metadata_map)
 
   ASSERT(cb != nullptr);
   callback_ = std::move(cb);
-  metadata_map_ = metadata_map;
 }
 
 bool MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len) {
@@ -32,7 +30,8 @@ bool MetadataDecoder::onMetadataFrameComplete(bool end_metadata) {
   }
 
   if (end_metadata) {
-    callback_();
+    callback_(metadata_map_);
+    metadata_map_.clear();
   }
   return true;
 }

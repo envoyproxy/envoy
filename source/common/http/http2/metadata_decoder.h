@@ -23,7 +23,7 @@ public:
   /**
    * @param metadata_map is where to save the decoded metadata.
    */
-  MetadataDecoder(MetadataCallback cb, MetadataMap& metadata_map);
+  MetadataDecoder(MetadataCallback cb);
 
   /**
    * Calls this function when METADATA frame payload is received. The payload doesn't need to be
@@ -48,6 +48,8 @@ public:
    */
   Buffer::OwnedImpl& payload() { return payload_; }
 
+  MetadataMap& getMetadataMap() { return metadata_map_; }
+
 private:
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
   /**
@@ -64,7 +66,7 @@ private:
   Buffer::OwnedImpl payload_;
 
   // Metadata that is currently under decoding.
-  MetadataMap& metadata_map_;
+  MetadataMap metadata_map_;
 
   // Payload size limit. If the payload received exceeds the limit, fails the connection.
   const uint64_t max_payload_size_bound_ = 1024 * 1024;

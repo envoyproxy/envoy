@@ -103,7 +103,7 @@ public:
   MetadataEncoderDecoderTest() : encoder_() {}
 
   void initialize(MetadataCallback cb) {
-    decoder_ = std::make_unique<MetadataDecoder>(cb, metadata_map_);
+    decoder_ = std::make_unique<MetadataDecoder>(cb);
 
     // Enables extension frame.
     nghttp2_option_new(&option_);
@@ -135,8 +135,9 @@ public:
   }
 
   void verifyMetadata(MetadataMap& expect) {
-    EXPECT_EQ(metadata_map_.size(), expect.size());
-    for (const auto& metadata : metadata_map_) {
+    MetadataMap& metadata_map = decoder_->getMetadataMap();
+    EXPECT_EQ(metadata_map.size(), expect.size());
+    for (const auto& metadata : metadata_map) {
       EXPECT_EQ(expect.find(metadata.first)->second, metadata.second);
     }
   }
@@ -146,7 +147,6 @@ public:
   MetadataEncoder encoder_;
   std::unique_ptr<MetadataDecoder> decoder_;
   nghttp2_option* option_;
-  MetadataMap metadata_map_;
 
   // Stores data received by peer.
   TestBuffer output_buffer_;
@@ -245,7 +245,6 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
   // Cleans up the output buffer.
   memset(output_buffer_.buf, 0, output_buffer_.length);
   output_buffer_.length = 0;
-  metadata_map_.clear();
 
   MetadataMap metadata_map_2 = {
       {"header_key4", "header_value4"},

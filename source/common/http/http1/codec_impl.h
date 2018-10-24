@@ -37,7 +37,9 @@ public:
   void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(const HeaderMap& trailers) override;
-  void encodeMetadata(const MetadataMap&) override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  void encodeMetadata(const MetadataMap&) override {
+    ENVOY_LOG(error, "HTTP/1.1 doesn't support METADATA. METADATA is ignored.");
+  }
   Stream& getStream() override { return *this; }
 
   // Http::Stream
