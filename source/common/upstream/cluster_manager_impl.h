@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "xxhash.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
@@ -338,20 +339,21 @@ private:
                                     const ::envoy::api::v2::core::ApiConfigSource& config_source,
                                     Stats::Scope& scope, const std::string type_url) override {
 
-      std::string mux_key; // config_source_name + type_url
+      uint64_t proto_hash; // config_source_name + type_url
       switch(config_source.grpc_services(0).target_specifier_case()) {
         case envoy::api::v2::core::GrpcService::kEnvoyGrpc: {
-          mux_key = config_source.grpc_services(0).envoy_grpc().cluster_name() + type_url;
+          proto_hash = MessageUtil::hash(config_source.grpc_services(0).envoy_grpc());
           break;
         }
         case envoy::api::v2::core::GrpcService::kGoogleGrpc: {
-          mux_key = config_source.grpc_services(0).google_grpc().target_uri() + type_url;
+          proto_hash = MessageUtil::hash(config_source.grpc_services(0).google_grpc());
           break;
         }
         default:
           NOT_REACHED_GCOVR_EXCL_LINE;
       }
 
+      const uint64_t mux_key = proto_hash + XXH64(type_url.c_str(), type_url.length() + 1, 0);
       if (muxes_.find(mux_key) == muxes_.end()) {
         auto mux = new Config::GrpcMuxImpl(local_info, std::move(async_client), dispatcher, service_method, random,
                                            scope);
@@ -361,7 +363,7 @@ private:
     }
 
   private:
-    std::unordered_map<std::string, Config::GrpcMux*> muxes_;
+    std::unordered_map<uint64_t, Config::GrpcMux*> muxes_;
   };
 
   struct ClusterData {
