@@ -4,8 +4,8 @@ Version history
 1.9.0 (pending)
 ===============
 * admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
-* circuit-breaker: added upstream_cx_open, upstream_rq_pending_open, upstream_rq_open and upstream_rq_retry_open
-  gauges to expose live circuit breaker state via :ref:`cluster statistics <config_cluster_manager_cluster_stats>`.
+* circuit-breaker: added cx_open, rq_pending_open, rq_open and rq_retry_open gauges to expose live
+  state via :ref:`circuit breakers statistics <config_cluster_manager_cluster_stats_circuit_breakers>`.
 * config: removed support for the v1 API.
 * fault: removed integer percentage support.
 * http: added limits to the number and length of header modifications in all fields request_headers_to_add and response_headers_to_add. These limits are very high and should only be used as a last-resort safeguard.
