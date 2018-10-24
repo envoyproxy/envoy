@@ -384,18 +384,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
-  if (!runtime_) {
-    return true;
-  }
-
-  if (runtime_->legacy_runtime_data_) {
-    // Use the deprecated 'runtime' field from the route.
-    return loader_.snapshot().featureEnabled(runtime_->runtime_key_, runtime_->runtime_default_,
-                                             random_value);
-  }
-
-  return loader_.snapshot().featureEnabled(runtime_->fractional_runtime_key_,
-                                           runtime_->fractional_runtime_default_, random_value);
+  return !runtime_ ? true
+                   : loader_.snapshot().featureEnabled(runtime_->fractional_runtime_key_,
+                                                       runtime_->fractional_runtime_default_,
+                                                       random_value);
 }
 
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
@@ -468,19 +460,13 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
   absl::optional<RuntimeData> runtime;
   RuntimeData runtime_data;
 
-  if (route_match.runtime_specifier_case() == envoy::api::v2::route::RouteMatch::kRuntimeFraction) {
+  if (route_match.has_runtime_fraction()) {
     runtime_data.fractional_runtime_default_ = route_match.runtime_fraction().default_value();
     runtime_data.fractional_runtime_key_ = route_match.runtime_fraction().runtime_key();
-    runtime_data.legacy_runtime_data_ = false;
-  } else if (route_match.runtime_specifier_case() == envoy::api::v2::route::RouteMatch::kRuntime) {
-    runtime_data.runtime_default_ = route_match.runtime().default_value();
-    runtime_data.runtime_key_ = route_match.runtime().runtime_key();
-    runtime_data.legacy_runtime_data_ = true;
-  } else {
-    return runtime;
+    return runtime_data;
   }
 
-  return runtime_data;
+  return runtime;
 }
 
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
