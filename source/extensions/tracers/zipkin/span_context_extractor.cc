@@ -203,7 +203,6 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
     }
 
     if (b3.length() > pos) {
-      std::cout << "pos:" << pos << "len: " << b3.length() << std::endl;
       // If we are at this point, we should have a parent ID, encoded as "-[0-9a-f]{16}"
       if (b3.length() != pos + 17) {
         throw ExtractorException("Invalid input: truncated");
