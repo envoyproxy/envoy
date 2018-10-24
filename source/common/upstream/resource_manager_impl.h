@@ -25,12 +25,15 @@ namespace Upstream {
 class ResourceManagerImpl : public ResourceManager {
 public:
   ResourceManagerImpl(Runtime::Loader& runtime, const std::string& runtime_key,
-                      uint64_t max_connections, uint64_t max_pending_requests,
-                      uint64_t max_requests, uint64_t max_retries)
-      : connections_(max_connections, runtime, runtime_key + "max_connections"),
-        pending_requests_(max_pending_requests, runtime, runtime_key + "max_pending_requests"),
-        requests_(max_requests, runtime, runtime_key + "max_requests"),
-        retries_(max_retries, runtime, runtime_key + "max_retries") {}
+                      uint64_t max_connections, Stats::Gauge& connections_gauge,
+                      uint64_t max_pending_requests, Stats::Gauge& pending_requests_gauge,
+                      uint64_t max_requests, Stats::Gauge& requests_gauge, uint64_t max_retries,
+                      Stats::Gauge& retries_gauge)
+      : connections_(max_connections, runtime, runtime_key + "max_connections", connections_gauge),
+        pending_requests_(max_pending_requests, runtime, runtime_key + "max_pending_requests",
+                          pending_requests_gauge),
+        requests_(max_requests, runtime, runtime_key + "max_requests", requests_gauge),
+        retries_(max_retries, runtime, runtime_key + "max_retries", retries_gauge) {}
 
   // Upstream::ResourceManager
   Resource& connections() override { return connections_; }
@@ -40,16 +43,21 @@ public:
 
 private:
   struct ResourceImpl : public Resource {
-    ResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key)
-        : max_(max), runtime_(runtime), runtime_key_(runtime_key) {}
+    ResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key,
+                 Stats::Gauge& open_gauge)
+        : max_(max), runtime_(runtime), runtime_key_(runtime_key), open_gauge_(open_gauge) {}
     ~ResourceImpl() { ASSERT(current_ == 0); }
 
     // Upstream::Resource
     bool canCreate() override { return current_ < max(); }
-    void inc() override { current_++; }
+    void inc() override {
+      current_++;
+      open_gauge_.set(canCreate() ? 0 : 1);
+    }
     void dec() override {
       ASSERT(current_ > 0);
       current_--;
+      open_gauge_.set(canCreate() ? 0 : 1);
     }
     uint64_t max() override { return runtime_.snapshot().getInteger(runtime_key_, max_); }
 
@@ -57,6 +65,13 @@ private:
     std::atomic<uint64_t> current_{};
     Runtime::Loader& runtime_;
     const std::string runtime_key_;
+
+    /**
+     * A gauge to notify the live circuit breaker state. The gauge is set to 0
+     * to notify that the circuit breaker is closed, or to 1 to notify that it
+     * is open.
+     */
+    Stats::Gauge& open_gauge_;
   };
 
   ResourceImpl connections_;

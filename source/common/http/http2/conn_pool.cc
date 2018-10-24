@@ -101,8 +101,6 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
     host_->cluster().stats().upstream_rq_total_.inc();
     host_->cluster().stats().upstream_rq_active_.inc();
     host_->cluster().resourceManager(priority_).requests().inc();
-    SET_CIRCUIT_BREAKER_STATE(host_->cluster().stats().upstream_rq_open_,
-                              host_->cluster().resourceManager(priority_).requests());
     callbacks.onPoolReady(primary_client_->client_->newStream(response_decoder),
                           primary_client_->real_host_description_);
   }
@@ -192,8 +190,6 @@ void ConnPoolImpl::onStreamDestroy(ActiveClient& client) {
   host_->stats().rq_active_.dec();
   host_->cluster().stats().upstream_rq_active_.dec();
   host_->cluster().resourceManager(priority_).requests().dec();
-  SET_CIRCUIT_BREAKER_STATE(host_->cluster().stats().upstream_rq_open_,
-                            host_->cluster().resourceManager(priority_).requests());
   if (&client == draining_client_.get() && client.client_->numActiveRequests() == 0) {
     // Close out the draining client if we no long have active requests.
     client.client_->close();

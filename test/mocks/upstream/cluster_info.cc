@@ -32,7 +32,11 @@ MockClusterInfo::MockClusterInfo()
     : stats_(ClusterInfoImpl::generateStats(stats_store_)),
       transport_socket_factory_(new Network::RawBufferSocketFactory),
       load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
-      resource_manager_(new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1024, 1024, 1)) {
+      resource_manager_(new Upstream::ResourceManagerImpl(
+          runtime_, "fake_key", 1, stats_store_.gauge("upstream_cx_open"), 1024,
+          stats_store_.gauge("upstream_rq_pending_open"), 1024,
+          stats_store_.gauge("upstream_rq_open"), 1,
+          stats_store_.gauge("upstream_rq_retry_open"))) {
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));

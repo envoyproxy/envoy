@@ -407,9 +407,8 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
 }
 
 TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
+  cluster_->resetResourceManager(1024, 1024, 1, 1);
   InSequence s;
-  cluster_->resource_manager_.reset(
-      new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1024, 1024, 1, 1));
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0);

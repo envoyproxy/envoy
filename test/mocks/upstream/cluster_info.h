@@ -9,6 +9,8 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/upstream/upstream_impl.h"
+
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 
@@ -40,6 +42,12 @@ class MockClusterInfo : public ClusterInfo {
 public:
   MockClusterInfo();
   ~MockClusterInfo();
+
+  void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry) {
+    resource_manager_.reset(new ResourceManagerImpl(
+        runtime_, name_, cx, stats_.upstream_cx_open_, rq_pending, stats_.upstream_rq_pending_open_,
+        rq, stats_.upstream_rq_open_, rq_retry, stats_.upstream_rq_retry_open_));
+  }
 
   // Upstream::ClusterInfo
   MOCK_CONST_METHOD0(addedViaApi, bool());

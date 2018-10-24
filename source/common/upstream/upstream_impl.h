@@ -419,9 +419,9 @@ public:
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
-                     const std::string& cluster_name);
+                     const std::string& cluster_name, Stats::Scope& stats_scope);
     ResourceManagerImplPtr load(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
-                                const std::string& cluster_name,
+                                const std::string& cluster_name, Stats::Scope& stats_scope,
                                 const envoy::api::v2::core::RoutingPriority& priority);
 
     typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;

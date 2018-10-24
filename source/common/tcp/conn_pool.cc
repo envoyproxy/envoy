@@ -339,17 +339,11 @@ ConnPoolImpl::PendingRequest::PendingRequest(ConnPoolImpl& parent,
   parent_.host_->cluster().stats().upstream_rq_pending_total_.inc();
   parent_.host_->cluster().stats().upstream_rq_pending_active_.inc();
   parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().inc();
-  SET_CIRCUIT_BREAKER_STATE(
-      parent_.host_->cluster().stats().upstream_rq_pending_open_,
-      parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests());
 }
 
 ConnPoolImpl::PendingRequest::~PendingRequest() {
   parent_.host_->cluster().stats().upstream_rq_pending_active_.dec();
   parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().dec();
-  SET_CIRCUIT_BREAKER_STATE(
-      parent_.host_->cluster().stats().upstream_rq_pending_open_,
-      parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests());
 }
 
 ConnPoolImpl::ActiveConn::ActiveConn(ConnPoolImpl& parent)
@@ -381,9 +375,6 @@ ConnPoolImpl::ActiveConn::ActiveConn(ConnPoolImpl& parent)
                                          parent_.dispatcher_.timeSystem()));
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
-  SET_CIRCUIT_BREAKER_STATE(
-      parent_.host_->cluster().stats().upstream_cx_open_,
-      parent_.host_->cluster().resourceManager(parent_.priority_).connections());
 
   conn_->setConnectionStats({parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
                              parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
@@ -405,9 +396,6 @@ ConnPoolImpl::ActiveConn::~ActiveConn() {
   parent_.host_->stats().cx_active_.dec();
   conn_length_->complete();
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().dec();
-  SET_CIRCUIT_BREAKER_STATE(
-      parent_.host_->cluster().stats().upstream_cx_open_,
-      parent_.host_->cluster().resourceManager(parent_.priority_).connections());
 
   parent_.onConnDestroyed(*this);
 }

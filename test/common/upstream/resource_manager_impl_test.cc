@@ -1,6 +1,9 @@
+#include "envoy/stats/stats.h"
+
 #include "common/upstream/resource_manager_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/stats/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -13,8 +16,10 @@ namespace Upstream {
 
 TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   NiceMock<Runtime::MockLoader> runtime;
-  ResourceManagerImpl resource_manager(
-      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1);
+  NiceMock<Stats::MockGauge> gauge;
+  ResourceManagerImpl resource_manager(runtime,
+                                       "circuit_breakers.runtime_resource_manager_test.default.", 0,
+                                       gauge, 0, gauge, 0, gauge, 1, gauge);
 
   EXPECT_CALL(
       runtime.snapshot_,

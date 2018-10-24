@@ -1,11 +1,14 @@
 #include <chrono>
 
+#include "envoy/stats/stats.h"
+
 #include "common/http/header_map_impl.h"
 #include "common/router/retry_state_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -395,8 +398,7 @@ TEST_F(RouterRetryStateImplTest, RouteConfigNoHeaderConfig) {
 }
 
 TEST_F(RouterRetryStateImplTest, NoAvailableRetries) {
-  cluster_.resource_manager_.reset(
-      new Upstream::ResourceManagerImpl(runtime_, "fake_key", 0, 0, 0, 0));
+  cluster_.resetResourceManager(0, 0, 0, 0);
 
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-failure"}};
   setup(request_headers);
