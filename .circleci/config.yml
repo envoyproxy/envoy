@@ -83,7 +83,7 @@ jobs:
        - store_artifacts:
            path: /build/envoy/generated/coverage
 
-   clang-tidy:
+   clang_tidy:
      executor: ubuntu-build
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
@@ -148,6 +148,7 @@ workflows:
       - ipv6_tests
       - coverage
       - format
+      - clang_tidy
       - build_image
       - docs:
           filters:
