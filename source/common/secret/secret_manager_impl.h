@@ -90,9 +90,6 @@ private:
   std::unordered_map<std::string, CertificateValidationContextConfigProviderSharedPtr>
       static_certificate_validation_context_providers_;
 
-  // Manages pairs of secret name and TrustedCaConfigProviderSharedPtr.
-  std::unordered_map<std::string, TrustedCaConfigProviderSharedPtr> static_trusted_ca_providers_;
-
   // map hash code of SDS config source and SdsApi object.
   DynamicSecretProviders<TlsCertificateSdsApi> certificate_providers_;
   DynamicSecretProviders<CertificateValidationContextSdsApi> validation_context_providers_;
