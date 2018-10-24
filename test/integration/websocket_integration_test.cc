@@ -204,6 +204,9 @@ void WebsocketIntegrationTest::performUpgrade(
   response_ = std::move(encoder_decoder.second);
   if (old_style_websockets_) {
     test_server_->waitForCounterGe("tcp.websocket.downstream_cx_total", 1);
+  } else {
+    test_server_->waitForCounterGe("http.config_test.downstream_cx_upgrades_total", 1);
+    test_server_->waitForGaugeGe("http.config_test.downstream_cx_upgrades_active", 1);
   }
 
   // Verify the upgrade was received upstream.
@@ -248,6 +251,9 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hellobye!"));
 
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
+  if (!old_style_websockets_) {
+    test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 0);
+  }
 }
 
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionUpstreamDisconnect) {
