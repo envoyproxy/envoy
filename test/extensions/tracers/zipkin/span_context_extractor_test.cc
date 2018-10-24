@@ -223,11 +223,30 @@ TEST(ZipkinSpanContextExtractorTest, Empty) {
 TEST(ZipkinSpanContextExtractorTest, InvalidInput) {
   {
     Http::TestHeaderMapImpl request_headers{
+        {"X-B3-TraceId", trace_id_high + trace_id.substr(0, 15) + "!"},
+        {"X-B3-SpanId", span_id}};
+    SpanContextExtractor extractor(request_headers);
+    EXPECT_THROW_WITH_MESSAGE(
+        extractor.extractSpanContext(true), ExtractorException,
+        fmt::format("Invalid traceid_high {} or tracid {}", trace_id_high, trace_id.substr(0, 15) + "!"));
+  }
+
+  {
+    Http::TestHeaderMapImpl request_headers{
         {"b3", fmt::format("{}!{}-{}", trace_id.substr(0, 15), trace_id, span_id)}};
     SpanContextExtractor extractor(request_headers);
     EXPECT_THROW_WITH_MESSAGE(
         extractor.extractSpanContext(true), ExtractorException,
         fmt::format("Invalid input: invalid trace id high {}!", trace_id.substr(0, 15)));
+  }
+
+  {
+    Http::TestHeaderMapImpl request_headers{
+        {"b3", fmt::format("{}{}!-{}", trace_id, trace_id.substr(0, 15), span_id)}};
+    SpanContextExtractor extractor(request_headers);
+    EXPECT_THROW_WITH_MESSAGE(
+        extractor.extractSpanContext(true), ExtractorException,
+        fmt::format("Invalid input: invalid trace id {}!", trace_id.substr(0, 15)));
   }
 
   {
