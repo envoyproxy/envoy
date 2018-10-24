@@ -8,13 +8,20 @@
 namespace Envoy {
 namespace Ssl {
 
-inline ASN1_TIME epochASN1_Time() {
+const ASN1_TIME& epochASN1_Time() {
   CONSTRUCT_ON_FIRST_USE(ASN1_TIME, []() -> ASN1_TIME {
     ASN1_TIME* epoch = ASN1_TIME_new();
     time_t epoch_time = 0;
     ASN1_TIME_set(epoch, epoch_time);
     return *epoch;
   }());
+}
+
+inline bssl::UniquePtr<ASN1_TIME> currentASN1_Time(TimeSource& time_source) {
+  bssl::UniquePtr<ASN1_TIME> current_asn_time(ASN1_TIME_new());
+  time_t current_time = std::chrono::system_clock::to_time_t(time_source.systemTime());
+  ASN1_TIME_set(current_asn_time.get(), current_time);
+  return current_asn_time;
 }
 
 std::string Utility::getSerialNumberFromCertificate(X509& cert) {
@@ -67,13 +74,13 @@ std::string Utility::getSubjectFromCertificate(X509& cert) {
   return std::string(reinterpret_cast<const char*>(data), data_len);
 }
 
-int32_t Utility::getDaysUntilExpiration(X509* cert) {
-  // TODO(lizan): Plumbing TimeSource to here.
+int32_t Utility::getDaysUntilExpiration(X509* cert, TimeSource& time_source) {
   if (cert == nullptr) {
     return std::numeric_limits<int>::max();
   }
   int days, seconds;
-  if (ASN1_TIME_diff(&days, &seconds, nullptr, X509_get_notAfter(cert))) {
+  if (ASN1_TIME_diff(&days, &seconds, currentASN1_Time(time_source).get(),
+                     X509_get_notAfter(cert))) {
     return days;
   }
   return 0;
@@ -81,15 +88,13 @@ int32_t Utility::getDaysUntilExpiration(X509* cert) {
 
 SystemTime Utility::getValidFrom(X509* cert) {
   int days, seconds;
-  const ASN1_TIME& epoch = epochASN1_Time();
-  ASN1_TIME_diff(&days, &seconds, &epoch, X509_get_notBefore(cert));
+  ASN1_TIME_diff(&days, &seconds, &epochASN1_Time(), X509_get_notBefore(cert));
   return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
 }
 
 SystemTime Utility::getExpirationTime(X509* cert) {
   int days, seconds;
-  const ASN1_TIME& epoch = epochASN1_Time();
-  ASN1_TIME_diff(&days, &seconds, &epoch, X509_get_notAfter(cert));
+  ASN1_TIME_diff(&days, &seconds, &epochASN1_Time(), X509_get_notAfter(cert));
   return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
 }
 
