@@ -45,6 +45,13 @@ public:
 
     return absl::StrJoin(ret, ",");
   }
+  /**
+   * Gets the current map of factory implementations. This is an ordered map for sorting reasons.
+   */
+  static std::map<std::string, Base*>& factories() {
+    static std::map<std::string, Base*>* factories = new std::map<std::string, Base*>;
+    return *factories;
+  }
 
   static void registerFactory(Base& factory) {
     auto result = factories().emplace(std::make_pair(factory.name(), &factory));
@@ -93,14 +100,6 @@ private:
   static void removeFactoryForTest(const std::string& name) {
     auto result = factories().erase(name);
     RELEASE_ASSERT(result == 1, "");
-  }
-
-  /**
-   * Gets the current map of factory implementations. This is an ordered map for sorting reasons.
-   */
-  static std::map<std::string, Base*>& factories() {
-    static std::map<std::string, Base*>* factories = new std::map<std::string, Base*>;
-    return *factories;
   }
 };
 

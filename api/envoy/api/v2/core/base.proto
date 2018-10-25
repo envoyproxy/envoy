@@ -75,14 +75,17 @@ message Node {
 }
 
 // Metadata provides additional inputs to filters based on matched listeners,
-// filter chains, routes and endpoints. It is structured as a map from filter
-// name (in reverse DNS format) to metadata specific to the filter. Metadata
+// filter chains, routes and endpoints. It is structured as a map, usually from
+// filter name (in reverse DNS format) to metadata specific to the filter. Metadata
 // key-values for a filter are merged as connection and request handling occurs,
 // with later values for the same key overriding earlier values.
 //
 // An example use of metadata is providing additional values to
 // http_connection_manager in the envoy.http_connection_manager.access_log
 // namespace.
+//
+// Another example use of metadata is to per service config info in cluster metadata, which may get
+// consumed by multiple filters.
 //
 // For load balancing, Metadata provides a means to subset cluster endpoints.
 // Endpoints have a Metadata object associated and routes contain a Metadata
