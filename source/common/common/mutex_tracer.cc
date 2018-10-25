@@ -4,13 +4,17 @@
 
 namespace Envoy {
 
-MutexTracer* MutexTracer::GetTracer() {
-  static MutexTracer global_tracer;
-  return &global_tracer;
+MutexTracer* MutexTracer::singleton_ = nullptr;
+
+MutexTracer* MutexTracer::getOrCreateTracer() {
+  if (singleton_ == nullptr) {
+    singleton_ = new MutexTracer;
+  }
+  return singleton_;
 }
 
-void MutexTracer::ContentionHook(const char* msg, const void* obj, int64_t wait_cycles) {
-  GetTracer()->RecordContention(msg, obj, wait_cycles);
+void MutexTracer::contentionHook(const char* msg, const void* obj, int64_t wait_cycles) {
+  singleton_->RecordContention(msg, obj, wait_cycles);
 }
 
 void MutexTracer::Reset() {

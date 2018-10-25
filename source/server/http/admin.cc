@@ -14,6 +14,7 @@
 #include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/admin/v2alpha/memory.pb.h"
+#include "envoy/admin/v2alpha/mutex_stats.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
@@ -427,17 +428,18 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& resp
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap& response_headers,
                                         Buffer::Instance& response, AdminStream&) {
 
   if (server_.options().mutexTracingEnabled()) {
-    response.add("Mutex Contention Stats\n");
-    response.add(
-        fmt::format("  num_contentions: {}\n", MutexTracer::GetTracer()->GetNumContentions()));
-    response.add(fmt::format("  current_wait_cycles: {}\n",
-                             MutexTracer::GetTracer()->GetCurrentWaitCycles()));
-    response.add(fmt::format("  lifetime_wait_cycles: {}\n",
-                             MutexTracer::GetTracer()->GetLifetimeWaitCycles()));
+    response_headers.insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.Json);
+
+    envoy::admin::v2alpha::MutexStats mutex_stats;
+    mutex_stats.set_num_contentions(MutexTracer::getOrCreateTracer()->numContentions());
+    mutex_stats.set_current_wait_cycles(MutexTracer::getOrCreateTracer()->currentWaitCycles());
+    mutex_stats.set_lifetime_wait_cycles(MutexTracer::getOrCreateTracer()->lifetimeWaitCycles());
+    response.add(MessageUtil::getJsonStringFromMessage(mutex_stats, true));
   } else {
     response.add("Mutex contention tracing is not enabled. To enable, run Envoy with flag "
                  "--enable-mutex-tracing.");
@@ -516,8 +518,10 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
 }
 
 // TODO(ambuc): Add more tcmalloc stats, export proto details based on allocator.
-Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
-                                    AdminStream&) {
+Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response_headers,
+                                    Buffer::Instance& response, AdminStream&) {
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
   envoy::admin::v2alpha::Memory memory;
   memory.set_allocated(Memory::Stats::totalCurrentlyAllocated());
   memory.set_heap_size(Memory::Stats::totalCurrentlyReserved());

@@ -39,6 +39,12 @@ api_proto_library_internal(
 )
 
 api_proto_library_internal(
+    name = "mutex_stats",
+    srcs = ["mutex_stats.proto"],
+    visibility = ["//visibility:public"],
+)
+
+api_proto_library_internal(
     name = "certs",
     srcs = ["certs.proto"],
     visibility = ["//visibility:public"],
