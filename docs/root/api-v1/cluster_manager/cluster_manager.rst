@@ -32,8 +32,8 @@ Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
   :ref:`load balancing <arch_overview_load_balancing>` on.
 
 :ref:`sds <config_cluster_manager_sds>`
-  *(sometimes required, object)* If any defined clusters use the sds cluster type,
-  a global SDS configuration must be specified.
+  *(sometimes required, object)* If any defined clusters use the :ref:`sds
+  <config_cluster_manager_sds>` cluster type, a global SDS configuration must be specified.
 
 .. _config_cluster_manager_local_cluster_name:
 

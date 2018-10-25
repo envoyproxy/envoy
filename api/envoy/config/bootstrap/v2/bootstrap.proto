@@ -71,10 +71,7 @@ message Bootstrap {
 
     // [#not-implemented-hide:] Hide from docs.
     message DeprecatedV1 {
-      // This is the global :ref:`SDS <arch_overview_dynamic_config_eds>` config
-      // when using v1 REST for :ref:`CDS
-      // <arch_overview_dynamic_config_cds>`/:ref:`EDS
-      // <arch_overview_dynamic_config_eds>`.
+      // Deprecated service discovery service config for when using API v1 REST.
       envoy.api.v2.core.ConfigSource sds_config = 1;
     }
 
