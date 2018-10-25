@@ -14,6 +14,7 @@
 
 #include "common/common/backoff_strategy.h"
 #include "common/common/logger.h"
+#include "common/config/utility.h"
 
 namespace Envoy {
 namespace Config {
@@ -27,7 +28,8 @@ class GrpcMuxImpl : public GrpcMux,
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              Runtime::RandomGenerator& random, Stats::Scope& scope, const uint32_t max_tokens, const double fill_rate);
+              Runtime::RandomGenerator& random, Stats::Scope& scope,
+              const RateLimitSettings& rate_limit_settings);
   ~GrpcMuxImpl();
 
   void start() override;
@@ -111,9 +113,9 @@ private:
   ControlPlaneStats control_plane_stats_;
   // Detects when Envoy is making too many requests.
   TokenBucketPtr limit_request_;
-
   std::queue<std::string> request_queue_;
   Event::TimerPtr drain_request_timer_;
+  const bool rate_limiting_enabled_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {

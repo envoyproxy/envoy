@@ -218,8 +218,9 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
         main_thread_dispatcher,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_,PROTOBUF_GET_WRAPPED_OR_DEFAULT(bootstrap.dynamic_resources().ads_config(),max_tokens, Envoy::Config::DefaultRateLimits::MAX_TOKENS),
-        bootstrap.dynamic_resources().ads_config().fill_rate() == 0 ? Envoy::Config::DefaultRateLimits::FILL_RATE : bootstrap.dynamic_resources().ads_config().fill_rate()));
+        random_, stats_,
+        Envoy::Config::Utility::parseRateLimitSettings(
+            bootstrap.dynamic_resources().ads_config())));
   } else {
     ads_mux_.reset(new Config::NullGrpcMuxImpl());
   }

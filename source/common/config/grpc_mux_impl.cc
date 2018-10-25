@@ -12,16 +12,20 @@ namespace Config {
 GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
-                         Runtime::RandomGenerator& random, Stats::Scope& scope,const uint32_t max_tokens, const double fill_rate)
+                         Runtime::RandomGenerator& random, Stats::Scope& scope,
+                         const RateLimitSettings& rate_limit_settings)
     : local_info_(local_info), async_client_(std::move(async_client)),
       service_method_(service_method), random_(random), time_source_(dispatcher.timeSystem()),
-      control_plane_stats_(generateControlPlaneStats(scope)) {
+      control_plane_stats_(generateControlPlaneStats(scope)),
+      rate_limiting_enabled_(rate_limit_settings.enabled_) {
   Config::Utility::checkLocalInfo("ads", local_info);
-
-  // Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
-  limit_request_ = std::make_unique<TokenBucketImpl>(max_tokens, time_source_, fill_rate);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
-  drain_request_timer_ = dispatcher.createTimer([this]() -> void { drainRequests(); });
+  if (rate_limiting_enabled_) {
+    // Default Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
+    limit_request_ = std::make_unique<TokenBucketImpl>(
+        rate_limit_settings.max_tokens_, time_source_, rate_limit_settings.fill_rate_);
+    drain_request_timer_ = dispatcher.createTimer([this]() -> void { drainRequests(); });
+  }
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
                                                                 RETRY_MAX_DELAY_MS, random_);
 }
@@ -58,11 +62,13 @@ void GrpcMuxImpl::establishNewStream() {
 void GrpcMuxImpl::drainRequests() {
   ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
   while (!request_queue_.empty()) {
-    // Process the request if it is under rate limit.
-    if (limit_request_->consume()) {
+    // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
+    if (!rate_limiting_enabled_ || limit_request_->consume()) {
       sendDiscoveryRequest(request_queue_.front());
       request_queue_.pop();
     } else {
+      ASSERT(rate_limiting_enabled_);
+      ASSERT(drain_request_timer_ != nullptr);
       ENVOY_LOG(warn, "Too many sendDiscoveryRequest calls :");
       // Enable the drain request timer.
       drain_request_timer_->enableTimer(

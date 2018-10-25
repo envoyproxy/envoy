@@ -7,6 +7,7 @@
 
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/grpc_mux_subscription_impl.h"
+#include "common/config/utility.h"
 
 namespace Envoy {
 namespace Config {
@@ -17,8 +18,9 @@ public:
   GrpcSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                        const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats,
-                       Stats::Scope& scope, const uint32_t max_tokens, const double fill_rate)
-      : grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random, scope, max_tokens, fill_rate),
+                       Stats::Scope& scope, const RateLimitSettings& rate_limit_settings)
+      : grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random, scope,
+                  rate_limit_settings),
         grpc_mux_subscription_(grpc_mux_, stats) {}
 
   // Config::Subscription

@@ -6,7 +6,7 @@ Version history
 * access log: added a :ref:`JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format.
 * admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * config: removed support for the v1 API.
-* config: implemented rate limiting for discovery request calls.
+* config: added support for :ref:`rate limiting<envoy_api_msg_core.RateLimitSettings>` discovery request calls.
 * fault: removed integer percentage support.
 * http: added limits to the number and length of header modifications in all fields request_headers_to_add and response_headers_to_add. These limits are very high and should only be used as a last-resort safeguard.
 * http: no longer adding whitespace when appending X-Forwarded-For headers. **Warning**: this is not
@@ -303,7 +303,7 @@ Version history
   in :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>`.
 * config: added support for :ref:`inline delivery <envoy_api_msg_core.DataSource>` of TLS
   certificates and private keys.
-* config: added restrictions for the backing :ref:`config sources <envoy_api_msg_core.ConfigSource>`
+* config: added restrictions for the backing :ref:`config sources <envoy_api_msg_core.ApiConfigSource>`
   of xDS resources. For filesystem based xDS the file must exist at configuration time. For cluster
   based xDS the backing cluster must be statically defined and be of non-EDS type.
 * grpc: the Google gRPC C++ library client is now supported as specified in the :ref:`gRPC services

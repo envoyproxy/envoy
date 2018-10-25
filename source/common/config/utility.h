@@ -37,13 +37,17 @@ public:
 };
 
 /**
- * Default Rate Limits for discovery requests.
+ * RateLimitSettings for discovery requests.
  */
-struct DefaultRateLimits {
-  // Max Tokens
-  static const uint32_t MAX_TOKENS = 100;
-  // Fill Rate
-  static const uint32_t FILL_RATE = 10;
+struct RateLimitSettings {
+  // Default Max Tokens.
+  static const uint32_t DEFAULT_MAX_TOKENS = 100;
+  // Default Fill Rate.
+  static constexpr double DEFAULT_FILL_RATE = 10;
+
+  uint32_t max_tokens_{DEFAULT_MAX_TOKENS};
+  double fill_rate_{DEFAULT_FILL_RATE};
+  bool enabled_;
 };
 
 typedef ConstSingleton<ApiTypeValues> ApiType;
@@ -208,6 +212,14 @@ public:
    */
   static void translateLdsConfig(const Json::Object& json_lds,
                                  envoy::api::v2::core::ConfigSource& lds_config);
+
+  /**
+   * Parses RateLimit configuration from envoy::api::v2::core::ApiConfigSource to RateLimitSettings.
+   * @param api_config_source ApiConfigSource.
+   * @return RateLimitSettings.
+   */
+  static RateLimitSettings
+  parseRateLimitSettings(const envoy::api::v2::core::ApiConfigSource& api_config_source);
 
   /**
    * Generate a SubscriptionStats object from stats scope.

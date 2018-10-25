@@ -33,22 +33,16 @@ public:
   GrpcSubscriptionTestHarness()
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
-        async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()),
-        request_timer_(new Event::MockTimer()) {
+        async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
-    EXPECT_CALL(dispatcher_, createTimer_(_))
-        .WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-          timer_cb_ = timer_cb;
-          return timer_;
-        }))
-        .WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-          request_timer_cb_ = timer_cb;
-          return request_timer_;
-        }));
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+      timer_cb_ = timer_cb;
+      return timer_;
+    }));
     subscription_.reset(new GrpcEdsSubscriptionImpl(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
-        *method_descriptor_, stats_, stats_store_));
+        *method_descriptor_, stats_, stats_store_, rate_limit_settings_));
   }
 
   ~GrpcSubscriptionTestHarness() { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
@@ -140,8 +134,6 @@ public:
   Runtime::MockRandomGenerator random_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
-  Event::MockTimer* request_timer_;
-  Event::TimerCb request_timer_cb_;
   envoy::api::v2::core::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
   Grpc::MockAsyncStream async_stream_;
@@ -149,6 +141,7 @@ public:
   std::string last_response_nonce_;
   std::vector<std::string> last_cluster_names_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Envoy::Config::RateLimitSettings rate_limit_settings_;
 };
 
 // TODO(danielhochman): test with RDS and ensure version_info is same as what API returned

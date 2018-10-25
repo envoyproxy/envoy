@@ -72,8 +72,7 @@ public:
                 ->create(),
             dispatcher, random,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), stats,
-            scope, PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.api_config_source(),max_tokens, Envoy::Config::DefaultRateLimits::MAX_TOKENS),
-            config.api_config_source().fill_rate() == 0 ? Envoy::Config::DefaultRateLimits::FILL_RATE : config.api_config_source().fill_rate()));
+            scope, Utility::parseRateLimitSettings(api_config_source)));
         break;
       }
       default:

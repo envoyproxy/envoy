@@ -128,7 +128,7 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterSingleton) {
       }));
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(false));
   EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::STATIC));
-  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
+  EXPECT_CALL(dispatcher_, createTimer_(_));
 
   subscriptionFromConfigSource(config);
 }
@@ -302,7 +302,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
         return async_client_factory;
       }));
   EXPECT_CALL(random_, random());
-  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
+  EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_);
 }
