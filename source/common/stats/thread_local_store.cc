@@ -240,10 +240,12 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // Determine the final name based on the prefix and the passed name.
   //
   // Note that we can do map.find(final_name.c_str()), but we cannot do
-  // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
-  // a temporary, and address sanitization errors would follow. Instead we must
-  // do a find() first, using tha if it succeeds. If it fails, then after we
-  // construct the stat we can insert it into the required maps.
+  // map[final_name.c_str()] as the char*-keyed maps would then save the pointer
+  // to a temporary, and address sanitization errors would follow. Instead we
+  // must do a find() first, using the value if it succeeds. If it fails, then
+  // after we construct the stat we can insert it into the required maps. This
+  // strategy costs an extra hash lookup for each miss, but saves time
+  // re-copying the string and significant memory overhead.
   std::string final_name = prefix_ + name;
 
   // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the hot path) could

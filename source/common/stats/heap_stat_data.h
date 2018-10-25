@@ -55,7 +55,7 @@ public:
   ~HeapStatDataAllocator();
 
   // StatDataAllocatorImpl
-  HeapStatData* alloc(absl::string_view name) override;
+  HeapStatData* alloc(absl::string_view name) noexcept override;
   void free(HeapStatData& data) override;
 
   // StatDataAllocator

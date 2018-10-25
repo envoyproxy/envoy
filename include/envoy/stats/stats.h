@@ -26,7 +26,8 @@ public:
    * against it in a test. Independent of the evolution of the data
    * representation for the name, this method will be available. For storing the
    * name as a map key, however, nameCStr() is a better choice, albeit one that
-   * might change in the future to return a StatName.
+   * might change in the future to return a symbolized representation of the
+   * elaborated string.
    */
   virtual std::string name() const PURE;
 
@@ -38,8 +39,8 @@ public:
    * containe the name as a std::string.
    *
    * Note that in the future, the plan is to replace this method with one that
-   * returns a reference to a StatName (see
-   * source/common/stats/symbol_table_impl.h).
+   * returns a reference to a symbolized representation of the elaborated string
+   * (see source/common/stats/symbol_table_impl.h).
    */
   virtual const char* nameCStr() const PURE;
 

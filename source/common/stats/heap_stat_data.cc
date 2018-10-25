@@ -15,9 +15,11 @@ HeapStatDataAllocator::HeapStatDataAllocator() {}
 
 HeapStatDataAllocator::~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 
-HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {
+HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) noexcept {
   // Any expected truncation of name is done at the callsite. No truncation is
-  // required to use this allocator.
+  // required to use this allocator. Note that data must be freed by calling
+  // its free() method, and not by destructing or unique_ptr. So this method
+  // cannot call anything that might throw, and thus it cannot through itself.
   HeapStatData* data = HeapStatData::alloc(name);
   Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data);
