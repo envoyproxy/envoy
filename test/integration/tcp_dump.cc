@@ -1,5 +1,6 @@
 #include "test/integration/tcp_dump.h"
 
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -14,7 +15,7 @@ namespace Envoy {
 TcpDump::TcpDump(const std::string& path, const std::string& iface,
                  const std::vector<uint32_t>& ports) {
   // Remove any extant pcap file.
-  unlink(path.c_str());
+  ::unlink(path.c_str());
   // Derive the port filter expression.
   std::string port_expr;
   for (uint32_t port : ports) {
@@ -26,14 +27,14 @@ TcpDump::TcpDump(const std::string& path, const std::string& iface,
   ENVOY_LOG_MISC(debug, "tcpdumping iface {} to {} with filter \"{}\"", iface, path, port_expr);
   // Fork a child process. We use explicit fork/wait over popen/pclose to gain
   // the ability to send signals to the pid.
-  tcpdump_pid_ = fork();
+  tcpdump_pid_ = ::fork();
   RELEASE_ASSERT(tcpdump_pid_ >= 0, "");
   // execlp in the child process.
   if (tcpdump_pid_ == 0) {
-    const int rc = execlp("tcpdump", "tcpdump", "-i", iface.c_str(), "-w", path.c_str(),
-                          "--immediate-mode", port_expr.c_str(), nullptr);
+    const int rc = ::execlp("tcpdump", "tcpdump", "-i", iface.c_str(), "-w", path.c_str(),
+                            "--immediate-mode", port_expr.c_str(), nullptr);
     if (rc == -1) {
-      perror("tcpdump");
+      ::perror("tcpdump");
       exit(1);
     }
   }
@@ -46,7 +47,7 @@ TcpDump::TcpDump(const std::string& path, const std::string& iface,
     }
     // If the child died unexpectedly, handle this.
     int status;
-    int rc = waitpid(tcpdump_pid_, &status, WNOHANG);
+    int rc = ::waitpid(tcpdump_pid_, &status, WNOHANG);
     RELEASE_ASSERT(rc != -1, "");
     if (rc > 0) {
       RELEASE_ASSERT(rc == tcpdump_pid_, "");
@@ -63,9 +64,9 @@ TcpDump::TcpDump(const std::string& path, const std::string& iface,
 
 TcpDump::~TcpDump() {
   if (tcpdump_pid_ > 0) {
-    RELEASE_ASSERT(kill(tcpdump_pid_, SIGINT) == 0, "");
+    RELEASE_ASSERT(::kill(tcpdump_pid_, SIGINT) == 0, "");
     int status;
-    RELEASE_ASSERT(waitpid(tcpdump_pid_, &status, 0) != -1, "");
+    RELEASE_ASSERT(::waitpid(tcpdump_pid_, &status, 0) != -1, "");
     RELEASE_ASSERT(WIFEXITED(status), "");
     RELEASE_ASSERT(WEXITSTATUS(status) == 0, "");
     ENVOY_LOG_MISC(debug, "tcpdump terminated");
