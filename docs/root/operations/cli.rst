@@ -232,6 +232,10 @@ following are the command line options that Envoy supports.
   *(optional)* This flag disables Envoy hot restart for builds that have it enabled. By default, hot
   restart is enabled.
 
+.. option:: --enable-mutex-tracing
+
+  *(optional)* This flag enables the collection of statistics about mutex contention, and the `/contention` endpoint where those statistics can be found. By default, mutex tracing is not enabled, since it does incur a slight performance penalty for Envoys which already experience mutex contention.
+
 .. option:: --allow-unknown-fields
 
   *(optional)* This flag disables validation of protobuf configurations for unknown fields. By default, the 

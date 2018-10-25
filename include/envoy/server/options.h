@@ -166,6 +166,12 @@ public:
    * @return bool indicating whether the hot restart functionality has been disabled via cli flags.
    */
   virtual bool hotRestartDisabled() const PURE;
+
+  /**
+   * @return bool indicating whether or not mutex tracing functionality has been enabled via cli
+   * flags.
+   */
+  virtual bool mutexTracingEnabled() const PURE;
 };
 
 } // namespace Server

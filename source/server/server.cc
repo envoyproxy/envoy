@@ -19,7 +19,6 @@
 
 #include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
-#include "common/common/mutex_tracer.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/config/bootstrap_json.h"
@@ -152,21 +151,12 @@ void InstanceImpl::flushStats() {
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
 
-    Envoy::MutexData mutex_data = Envoy::MutexTracer::GetTracer()->GetData();
-    server_stats_->mutex_contention_count_.set(mutex_data.num_contentions);
-    server_stats_->mutex_contention_wait_cycles_.set(mutex_data.current_wait_cycles);
-    server_stats_->mutex_contention_lifetime_wait_cycles_.set(mutex_data.lifetime_wait_cycles);
-
     InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_.source());
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
     if (stat_flush_timer_ != nullptr) {
       stat_flush_timer_->enableTimer(config_->statsFlushInterval());
     }
   });
-}
-
-void InstanceImpl::RegisterMutexContentionStats() {
-  absl::RegisterMutexTracer(&Envoy::MutexTracer::ContentionHook);
 }
 
 void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {

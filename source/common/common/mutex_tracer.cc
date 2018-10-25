@@ -10,31 +10,19 @@ MutexTracer* MutexTracer::GetTracer() {
 }
 
 void MutexTracer::ContentionHook(const char* msg, const void* obj, int64_t wait_cycles) {
-  MutexTracer* tracer = MutexTracer::GetTracer();
-  tracer->RecordContention(msg, obj, wait_cycles);
+  GetTracer()->RecordContention(msg, obj, wait_cycles);
 }
 
 void MutexTracer::Reset() {
-  lock_.Lock();
-  data_.reset();
-  lock_.Unlock();
-}
-
-MutexData MutexTracer::GetData() {
-  lock_.Lock();
-  MutexData data = data_;
-  lock_.Unlock();
-  return data;
+  num_contentions_.store(0, order_);
+  current_wait_cycles_.store(0, order_);
+  lifetime_wait_cycles_.store(0, order_);
 }
 
 void MutexTracer::RecordContention(const char*, const void*, int64_t wait_cycles) {
-  // The mutex contention hook cannot be blocking. We use TryLock() and prefer to discard failing
-  // writes than to block on contention stats recording.
-  if (!lock_.TryLock()) {
-    return;
-  }
-  data_.flushWaitCycles(wait_cycles);
-  lock_.Unlock();
+  num_contentions_.fetch_add(1, order_);
+  current_wait_cycles_.store(wait_cycles, order_);
+  lifetime_wait_cycles_.fetch_add(wait_cycles, order_);
 }
 
 } // namespace Envoy

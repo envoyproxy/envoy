@@ -16,36 +16,31 @@ protected:
   }
 
   absl::Mutex mu_;
-  MutexData data_;
 };
 
 // Call the contention hook manually.
 TEST_F(MutexTracerTest, AddN) {
-  data_ = MutexTracer::GetTracer()->GetData();
-  EXPECT_EQ(data_.num_contentions, 0);
-  EXPECT_EQ(data_.current_wait_cycles, 0);
-  EXPECT_EQ(data_.lifetime_wait_cycles, 0);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetNumContentions(), 0);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetCurrentWaitCycles(), 0);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetLifetimeWaitCycles(), 0);
 
   MutexTracer::GetTracer()->ContentionHook(nullptr, nullptr, 2);
 
-  data_ = MutexTracer::GetTracer()->GetData();
-  EXPECT_EQ(data_.num_contentions, 1);
-  EXPECT_EQ(data_.current_wait_cycles, 2);
-  EXPECT_EQ(data_.lifetime_wait_cycles, 2);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetNumContentions(), 1);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetCurrentWaitCycles(), 2);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetLifetimeWaitCycles(), 2);
 
   MutexTracer::GetTracer()->ContentionHook(nullptr, nullptr, 3);
 
-  data_ = MutexTracer::GetTracer()->GetData();
-  EXPECT_EQ(data_.num_contentions, 2);
-  EXPECT_EQ(data_.current_wait_cycles, 3);
-  EXPECT_EQ(data_.lifetime_wait_cycles, 5);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetNumContentions(), 2);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetCurrentWaitCycles(), 3);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetLifetimeWaitCycles(), 5);
 
   MutexTracer::GetTracer()->ContentionHook(nullptr, nullptr, 0);
 
-  data_ = MutexTracer::GetTracer()->GetData();
-  EXPECT_EQ(data_.num_contentions, 3);
-  EXPECT_EQ(data_.current_wait_cycles, 0);
-  EXPECT_EQ(data_.lifetime_wait_cycles, 5);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetNumContentions(), 3);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetCurrentWaitCycles(), 0);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetLifetimeWaitCycles(), 5);
 }
 
 void holdMutexForNMilliseconds(absl::Mutex* mu, int64_t duration) {
@@ -60,10 +55,9 @@ TEST_F(MutexTracerTest, OneThreadNoContention) {
   mu_.Lock();
   mu_.Unlock();
 
-  data_ = MutexTracer::GetTracer()->GetData();
-  EXPECT_EQ(data_.num_contentions, 0);
-  EXPECT_EQ(data_.current_wait_cycles, 0);
-  EXPECT_EQ(data_.lifetime_wait_cycles, 0);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetNumContentions(), 0);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetCurrentWaitCycles(), 0);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetLifetimeWaitCycles(), 0);
 }
 
 TEST_F(MutexTracerTest, TryLockNoContention) {
@@ -72,10 +66,9 @@ TEST_F(MutexTracerTest, TryLockNoContention) {
   EXPECT_FALSE(mu_.TryLock());
   mu_.Unlock();
 
-  data_ = MutexTracer::GetTracer()->GetData();
-  EXPECT_EQ(data_.num_contentions, 0);
-  EXPECT_EQ(data_.current_wait_cycles, 0);
-  EXPECT_EQ(data_.lifetime_wait_cycles, 0);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetNumContentions(), 0);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetCurrentWaitCycles(), 0);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetLifetimeWaitCycles(), 0);
 }
 
 TEST_F(MutexTracerTest, TwoThreadsWithContention) {
@@ -85,13 +78,13 @@ TEST_F(MutexTracerTest, TwoThreadsWithContention) {
   t1.join();
   t2.join();
 
-  data_ = MutexTracer::GetTracer()->GetData();
-  EXPECT_EQ(data_.num_contentions, 1);
-  EXPECT_GT(data_.current_wait_cycles, 0); // These shouldn't be hardcoded.
-  EXPECT_GT(data_.lifetime_wait_cycles, 0);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetNumContentions(), 1);
+  EXPECT_GT(MutexTracer::GetTracer()->GetCurrentWaitCycles(),
+            0); // These shouldn't be hardcoded.
+  EXPECT_GT(MutexTracer::GetTracer()->GetLifetimeWaitCycles(), 0);
 
   // If we store this for later,
-  int64_t prev_lifetime_wait_cycles = data_.lifetime_wait_cycles;
+  int64_t prev_lifetime_wait_cycles = MutexTracer::GetTracer()->GetLifetimeWaitCycles();
 
   // Then on our next call...
   std::thread t3(holdMutexForNMilliseconds, &mu_, 10);
@@ -99,12 +92,11 @@ TEST_F(MutexTracerTest, TwoThreadsWithContention) {
   t3.join();
   t4.join();
 
-  data_ = MutexTracer::GetTracer()->GetData();
-  EXPECT_EQ(data_.num_contentions, 2);
-  EXPECT_GT(data_.current_wait_cycles, 0);
-  EXPECT_GT(data_.lifetime_wait_cycles, 0);
+  EXPECT_EQ(MutexTracer::GetTracer()->GetNumContentions(), 2);
+  EXPECT_GT(MutexTracer::GetTracer()->GetCurrentWaitCycles(), 0);
+  EXPECT_GT(MutexTracer::GetTracer()->GetLifetimeWaitCycles(), 0);
   // ...we can confirm that this lifetime value went up.
-  EXPECT_GT(data_.lifetime_wait_cycles, prev_lifetime_wait_cycles);
+  EXPECT_GT(MutexTracer::GetTracer()->GetLifetimeWaitCycles(), prev_lifetime_wait_cycles);
 }
 
 } // namespace Envoy

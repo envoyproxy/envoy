@@ -30,6 +30,7 @@
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/mutex_tracer.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/html/utility.h"
@@ -423,6 +424,24 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& resp
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Json);
   response.add(MessageUtil::getJsonStringFromMessage(dump, true)); // pretty-print
+  return Http::Code::OK;
+}
+
+Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap&,
+                                        Buffer::Instance& response, AdminStream&) {
+
+  if (server_.options().mutexTracingEnabled()) {
+    response.add("Mutex Contention Stats\n");
+    response.add(
+        fmt::format("  num_contentions: {}\n", MutexTracer::GetTracer()->GetNumContentions()));
+    response.add(fmt::format("  current_wait_cycles: {}\n",
+                             MutexTracer::GetTracer()->GetCurrentWaitCycles()));
+    response.add(fmt::format("  lifetime_wait_cycles: {}\n",
+                             MutexTracer::GetTracer()->GetLifetimeWaitCycles()));
+  } else {
+    response.add("Mutex contention tracing is not enabled. To enable, run Envoy with flag "
+                 "--enable-mutex-tracing.");
+  }
   return Http::Code::OK;
 }
 
@@ -935,6 +954,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            false},
           {"/config_dump", "dump current Envoy configs (experimental)",
            MAKE_ADMIN_HANDLER(handlerConfigDump), false, false},
+          {"/contention", "dump current Envoy mutex contention stats (if enabled)",
+           MAKE_ADMIN_HANDLER(handlerContention), false, false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
            MAKE_ADMIN_HANDLER(handlerCpuProfiler), false, true},
           {"/healthcheck/fail", "cause the server to fail health checks",
