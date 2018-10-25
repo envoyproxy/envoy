@@ -5,6 +5,7 @@ executors:
     description: "A regular build executor based on ubuntu image"
     docker:
       - image: envoyproxy/envoy-build:f60886c04253d9a096503b949696cbdc8f82fa4d
+      - privileged: true
     resource_class: xlarge
     working_directory: /source
 
