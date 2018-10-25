@@ -52,7 +52,7 @@ bool OtherPriorityRetryPriority::adjustForAttemptedPriorities(
   const auto& adjusted_per_priority_health = adjustedHealthAndSum.first;
   auto total_health = adjustedHealthAndSum.second;
 
-  // If total health is still zero at this point, it must mean that the original cluster is
+  // If total health is still zero at this point, it must mean that the all clusters is
   // completely unhealthy. If so, fall back to using the original priority set. This mantains
   // whatever handling the default LB uses when all priorities are unhealthy.
   if (total_health == 0) {
