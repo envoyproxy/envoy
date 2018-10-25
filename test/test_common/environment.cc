@@ -66,9 +66,6 @@ std::string getTemporaryDirectory() {
     return TestEnvironment::getCheckedEnvVar("TMPDIR");
   }
   char test_tmpdir[] = "/tmp/envoy_test_tmp.XXXXXX";
-  char* dirname = ::mkdtemp(test_tmpdir);
-  RELEASE_ASSERT(dirname != nullptr,
-                 fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
   return TestEnvironment::makeTempDir(test_tmpdir);
 }
 
