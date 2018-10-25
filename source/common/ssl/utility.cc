@@ -8,6 +8,13 @@
 namespace Envoy {
 namespace Ssl {
 
+inline bssl::UniquePtr<ASN1_TIME> currentASN1_Time(TimeSource& time_source) {
+  bssl::UniquePtr<ASN1_TIME> current_asn_time(ASN1_TIME_new());
+  time_t current_time = std::chrono::system_clock::to_time_t(time_source.systemTime());
+  ASN1_TIME_set(current_asn_time.get(), current_time);
+  return current_asn_time;
+}
+
 std::string Utility::getSerialNumberFromCertificate(X509& cert) {
   ASN1_INTEGER* serial_number = X509_get_serialNumber(&cert);
   BIGNUM num_bn;
@@ -58,13 +65,13 @@ std::string Utility::getSubjectFromCertificate(X509& cert) {
   return std::string(reinterpret_cast<const char*>(data), data_len);
 }
 
-int32_t Utility::getDaysUntilExpiration(X509* cert) {
-  // TODO(lizan): Plumbing TimeSource to here.
+int32_t Utility::getDaysUntilExpiration(X509* cert, TimeSource& time_source) {
   if (cert == nullptr) {
     return std::numeric_limits<int>::max();
   }
   int days, seconds;
-  if (ASN1_TIME_diff(&days, &seconds, nullptr, X509_get_notAfter(cert))) {
+  if (ASN1_TIME_diff(&days, &seconds, currentASN1_Time(time_source).get(),
+                     X509_get_notAfter(cert))) {
     return days;
   }
   return 0;

@@ -1532,6 +1532,26 @@ public:
   std::unique_ptr<Server::Configuration::TransportSocketFactoryContextImpl> factory_context_;
 };
 
+struct Foo : public Envoy::Config::TypedMetadata::Object {};
+
+struct Baz : public Envoy::Config::TypedMetadata::Object {
+  Baz(std::string n) : name(n) {}
+  std::string name;
+};
+
+class BazFactory : public ClusterTypedMetadataFactory {
+public:
+  const std::string name() const { return "baz"; }
+  // Returns nullptr (conversion failure) if d is empty.
+  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
+  parse(const ProtobufWkt::Struct& d) const {
+    if (d.fields().find("name") != d.fields().end()) {
+      return std::make_unique<Baz>(d.fields().at("name").string_value());
+    }
+    throw EnvoyException("Cannot create a Baz when metadata is empty.");
+  }
+};
+
 // Cluster metadata and common config retrieval.
 TEST_F(ClusterInfoImplTest, Metadata) {
   const std::string yaml = R"EOF(
@@ -1540,19 +1560,45 @@ TEST_F(ClusterInfoImplTest, Metadata) {
     type: STRICT_DNS
     lb_policy: MAGLEV
     hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
-    metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
+                                   baz: {name: meh } } }
     common_lb_config:
       healthy_panic_threshold:
         value: 0.3
   )EOF";
 
+  BazFactory baz_factory;
+  Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
   auto cluster = makeCluster(yaml);
 
+  EXPECT_EQ("meh", cluster->info()->typedMetadata().get<Baz>(baz_factory.name())->name);
+  EXPECT_EQ(nullptr, cluster->info()->typedMetadata().get<Foo>(baz_factory.name()));
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(cluster->info()->metadata(), "com.bar.foo", "baz")
                 .string_value());
   EXPECT_EQ(0.3, cluster->info()->lbConfig().healthy_panic_threshold().value());
   EXPECT_EQ(LoadBalancerType::Maglev, cluster->info()->lbType());
+}
+
+// Typed metadata loading throws exception.
+TEST_F(ClusterInfoImplTest, BrokenTypedMetadata) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
+                                   baz: {boom: meh} } }
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 0.3
+  )EOF";
+
+  BazFactory baz_factory;
+  Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Cannot create a Baz when metadata is empty.");
 }
 
 // Cluster extension protocol options fails validation when configured for an unregistered filter.

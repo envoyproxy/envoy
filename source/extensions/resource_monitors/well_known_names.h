@@ -7,7 +7,7 @@ namespace Extensions {
 namespace ResourceMonitors {
 
 /**
- * Well-known resource monior names.
+ * Well-known resource monitor names.
  * NOTE: New resource monitors should use the well known name: envoy.resource_monitors.name.
  */
 class ResourceMonitorNameValues {
