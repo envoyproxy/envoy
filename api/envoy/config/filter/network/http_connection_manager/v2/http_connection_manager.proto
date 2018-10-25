@@ -397,13 +397,5 @@ message HttpFilter {
   // instantiated. See the supported filters for further documentation.
   google.protobuf.Struct config = 2;
 
-  // [#not-implemented-hide:]
-  // This is hidden as type has been deprecated and is no longer required.
-  message DeprecatedV1 {
-    string type = 1;
-  }
-
-  // [#not-implemented-hide:]
-  // This is hidden as type has been deprecated and is no longer required.
-  DeprecatedV1 deprecated_v1 = 3 [deprecated = true];
+  reserved 3;
 }

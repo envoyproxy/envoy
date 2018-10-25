@@ -199,8 +199,9 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMiss
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
   Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  EXPECT_EQ("test_value", filter_state.getData<StringAccessor>("testing").asString());
+  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_EQ("test_value", filter_state.getDataReadOnly<StringAccessor>("testing").asString());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
@@ -208,13 +209,14 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
 
   testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "test_value");
   testFormatting(stream_info, "PER_REQUEST_STATE(testing2)", "");
-  EXPECT_EQ("test_value", filter_state.getData<StringAccessor>("testing").asString());
+  EXPECT_EQ("test_value", filter_state.getDataReadOnly<StringAccessor>("testing").asString());
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
   Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1));
-  EXPECT_EQ(1, filter_state.getData<StreamInfo::TestIntAccessor>("testing").access());
+  filter_state.setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_EQ(1, filter_state.getDataReadOnly<StreamInfo::TestIntAccessor>("testing").access());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
@@ -426,7 +428,8 @@ TEST(HeaderParserTest, TestParseInternal) {
   ON_CALL(stream_info, startTime()).WillByDefault(Return(start_time));
 
   Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                       StreamInfo::FilterState::StateType::ReadOnly);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 
@@ -587,7 +590,8 @@ request_headers_to_remove: ["x-nope"]
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
   Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                       StreamInfo::FilterState::StateType::ReadOnly);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 

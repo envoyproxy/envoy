@@ -420,6 +420,9 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_headers_.get(), stream_info_,
                                              *this);
   }
+  if (state_.successful_upgrade_) {
+    connection_manager_.stats_.named_.downstream_cx_upgrades_active_.dec();
+  }
 
   ASSERT(state_.filter_call_state_ == 0);
 }
@@ -1321,6 +1324,9 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
   if (upgrade != nullptr) {
     if (connection_manager_.config_.filterFactory().createUpgradeFilterChain(
             upgrade->value().c_str(), *this)) {
+      state_.successful_upgrade_ = true;
+      connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
+      connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
       return true;
     } else {
       upgrade_rejected = true;

@@ -23,10 +23,13 @@ namespace {
 
 Http::TestHeaderMapImpl upgradeRequestHeaders(const char* upgrade_type = "websocket",
                                               uint32_t content_length = 0) {
-  return Http::TestHeaderMapImpl{
-      {":authority", "host"},       {"content-length", fmt::format("{}", content_length)},
-      {":path", "/websocket/test"}, {":method", "GET"},
-      {"upgrade", upgrade_type},    {"connection", "keep-alive, upgrade"}};
+  return Http::TestHeaderMapImpl{{":authority", "host"},
+                                 {"content-length", fmt::format("{}", content_length)},
+                                 {":path", "/websocket/test"},
+                                 {":method", "GET"},
+                                 {":scheme", "http"},
+                                 {"upgrade", upgrade_type},
+                                 {"connection", "keep-alive, upgrade"}};
 }
 
 Http::TestHeaderMapImpl upgradeResponseHeaders(const char* upgrade_type = "websocket") {
@@ -79,10 +82,6 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
     ASSERT_STREQ(proxied_request_headers.ForwardedProto()->value().c_str(), "http");
     proxied_request_headers.removeForwardedProto();
   }
-  if (proxied_request_headers.Scheme()) {
-    ASSERT_STREQ(proxied_request_headers.Scheme()->value().c_str(), "http");
-    proxied_request_headers.removeScheme();
-  }
 
   if (!old_style_websockets_) {
     // Check for and remove headers added by default for HTTP requests.
@@ -96,10 +95,15 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
     ASSERT_STREQ(proxied_request_headers.EnvoyOriginalPath()->value().c_str(), "/websocket/test");
     proxied_request_headers.removeEnvoyOriginalPath();
   }
+  if (proxied_request_headers.Scheme()) {
+    ASSERT_STREQ(proxied_request_headers.Scheme()->value().c_str(), "http");
+  } else {
+    proxied_request_headers.insertScheme().value().append("http", 4);
+  }
   commonValidate(proxied_request_headers, original_request_headers);
   proxied_request_headers.removeRequestId();
 
-  EXPECT_EQ(proxied_request_headers, original_request_headers);
+  EXPECT_THAT(&proxied_request_headers, HeaderMapEqualIgnoreOrder(&original_request_headers));
 }
 
 void WebsocketIntegrationTest::validateUpgradeResponseHeaders(
@@ -121,6 +125,11 @@ void WebsocketIntegrationTest::validateUpgradeResponseHeaders(
 
 void WebsocketIntegrationTest::commonValidate(Http::HeaderMap& proxied_headers,
                                               const Http::HeaderMap& original_headers) {
+  // 0 byte content lengths may be stripped on the H2 path - ignore that as a difference by adding
+  // it back to the proxied headers.
+  if (original_headers.ContentLength() && proxied_headers.ContentLength() == nullptr) {
+    proxied_headers.insertContentLength().value(size_t(0));
+  }
   // If no content length is specified, the HTTP1 codec will add a chunked encoding header.
   if (original_headers.ContentLength() == nullptr &&
       proxied_headers.TransferEncoding() != nullptr) {
@@ -195,6 +204,9 @@ void WebsocketIntegrationTest::performUpgrade(
   response_ = std::move(encoder_decoder.second);
   if (old_style_websockets_) {
     test_server_->waitForCounterGe("tcp.websocket.downstream_cx_total", 1);
+  } else {
+    test_server_->waitForCounterGe("http.config_test.downstream_cx_upgrades_total", 1);
+    test_server_->waitForGaugeGe("http.config_test.downstream_cx_upgrades_active", 1);
   }
 
   // Verify the upgrade was received upstream.
@@ -239,6 +251,9 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hellobye!"));
 
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
+  if (!old_style_websockets_) {
+    test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 0);
+  }
 }
 
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionUpstreamDisconnect) {
@@ -263,6 +278,10 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionUpstreamDisconnect) {
 }
 
 TEST_P(WebsocketIntegrationTest, EarlyData) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP2 ||
+      upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+    return;
+  }
   config_helper_.addConfigModifier(setRouteUsingWebsocket(nullptr, old_style_websockets_));
   initialize();
 
@@ -453,13 +472,12 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
   initialize();
 
   // Websocket upgrades are configured to disallow large payload.
-  const std::string early_data_req_str(2048, 'a');
+  const std::string large_req_str(2048, 'a');
   {
     codec_client_ = makeHttpConnection(lookupPort("http"));
-    auto encoder_decoder = codec_client_->startRequest(
-        upgradeRequestHeaders("websocket", early_data_req_str.length()));
+    auto encoder_decoder = codec_client_->startRequest(upgradeRequestHeaders("websocket"));
     response_ = std::move(encoder_decoder.second);
-    codec_client_->sendData(encoder_decoder.first, early_data_req_str, false);
+    codec_client_->sendData(encoder_decoder.first, large_req_str, false);
     response_->waitForEndStream();
     EXPECT_STREQ("413", response_->headers().Status()->value().c_str());
     waitForClientDisconnectOrReset();
@@ -468,12 +486,15 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
 
   // HTTP requests are configured to disallow large bodies.
   {
-    Http::TestHeaderMapImpl request_headers{
-        {":method", "GET"}, {":path", "/"}, {"content-length", "2048"}, {":authority", "host"}};
+    Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                            {":path", "/"},
+                                            {"content-length", "2048"},
+                                            {":authority", "host"},
+                                            {":scheme", "https"}};
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     response_ = std::move(encoder_decoder.second);
-    codec_client_->sendData(encoder_decoder.first, early_data_req_str, false);
+    codec_client_->sendData(encoder_decoder.first, large_req_str, false);
     response_->waitForEndStream();
     EXPECT_STREQ("413", response_->headers().Status()->value().c_str());
     waitForClientDisconnectOrReset();
@@ -482,11 +503,10 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
 
   // Foo upgrades are configured without the buffer filter, so should explicitly
   // allow large payload.
-  {
-    performUpgrade(upgradeRequestHeaders("foo", early_data_req_str.length()),
-                   upgradeResponseHeaders("foo"));
-    codec_client_->sendData(*request_encoder_, early_data_req_str, false);
-    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, early_data_req_str));
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP2) {
+    performUpgrade(upgradeRequestHeaders("foo"), upgradeResponseHeaders("foo"));
+    codec_client_->sendData(*request_encoder_, large_req_str, false);
+    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, large_req_str));
 
     // Tear down all the connections cleanly.
     codec_client_->close();
@@ -495,6 +515,11 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
 }
 
 TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP2 ||
+      upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+    return;
+  }
+
   config_helper_.addConfigModifier(setRouteUsingWebsocket(nullptr, old_style_websockets_));
   initialize();
 

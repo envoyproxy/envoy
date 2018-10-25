@@ -10,6 +10,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
@@ -468,6 +469,11 @@ public:
 };
 
 /**
+ * Base class for all route typed metadata factories.
+ */
+class HttpRouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
+
+/**
  * An individual resolved route entry.
  */
 class RouteEntry : public ResponseEntry {
@@ -602,6 +608,12 @@ public:
    * @return bool true if the virtual host rate limits should be included.
    */
   virtual bool includeVirtualHostRateLimits() const PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
+   * for this route.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 
   /**
    * @return const envoy::api::v2::core::Metadata& return the metadata provided in the config for

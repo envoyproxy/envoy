@@ -77,7 +77,7 @@ parseUpstreamMetadataField(absl::string_view params_str) {
     }
 
     const ProtobufWkt::Value* value =
-        &Config::Metadata::metadataValue(*host->metadata(), params[0], params[1]);
+        &::Envoy::Config::Metadata::metadataValue(*host->metadata(), params[0], params[1]);
     if (value->kind_case() == ProtobufWkt::Value::KIND_NOT_SET) {
       // No kind indicates default ProtobufWkt::Value which means namespace or key not
       // found.
@@ -158,7 +158,7 @@ parsePerRequestStateField(absl::string_view param_str) {
       return std::string();
     }
 
-    return std::string(filter_state.getData<StringAccessor>(param).asString());
+    return std::string(filter_state.getDataReadOnly<StringAccessor>(param).asString());
   };
 }
 
