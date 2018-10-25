@@ -333,7 +333,7 @@ private:
   public:
     GrpcMuxFactoryImpl() : muxes_() {}
 
-    Config::GrpcMux* getOrCreateMux(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
+    Config::GrpcMux& getOrCreateMux(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                                     Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
                                     Runtime::RandomGenerator& random,
                                     const ::envoy::api::v2::core::ApiConfigSource& config_source,
@@ -355,15 +355,15 @@ private:
 
       const uint64_t mux_key = proto_hash + XXH64(type_url.c_str(), type_url.length() + 1, 0);
       if (muxes_.find(mux_key) == muxes_.end()) {
-        auto mux = new Config::GrpcMuxImpl(local_info, std::move(async_client), dispatcher, service_method, random,
-                                           scope);
-        muxes_.insert({mux_key, mux});
+        muxes_.insert({mux_key,
+                       std::make_unique<Config::GrpcMuxImpl>(local_info, std::move(async_client), dispatcher,
+                               service_method, random, scope)});
       }
-      return muxes_.at(mux_key);
+      return *(muxes_.at(mux_key));
     }
 
   private:
-    std::unordered_map<uint64_t, Config::GrpcMux*> muxes_;
+    std::unordered_map<uint64_t, Config::GrpcMuxPtr> muxes_;
   };
 
   struct ClusterData {

@@ -27,7 +27,7 @@ public:
     * @param config envoy::api::v2::core::ConfigSource to construct from.
     * @param scope stats scope.
     */
-    virtual Config::GrpcMux*
+    virtual Config::GrpcMux&
     getOrCreateMux(const LocalInfo::LocalInfo &local_info, Grpc::AsyncClientPtr async_client,
                    Event::Dispatcher &dispatcher, const Protobuf::MethodDescriptor &service_method,
                    Runtime::RandomGenerator &random, const ::envoy::api::v2::core::ApiConfigSource& config_source,

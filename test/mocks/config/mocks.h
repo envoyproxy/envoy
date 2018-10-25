@@ -80,7 +80,7 @@ public:
     MockGrpcMuxFactory() {};
     virtual ~MockGrpcMuxFactory() {};
 
-    MOCK_METHOD8(getOrCreateMux, GrpcMux*(const LocalInfo::LocalInfo &local_info, Grpc::AsyncClientPtr async_client,
+    MOCK_METHOD8(getOrCreateMux, GrpcMux&(const LocalInfo::LocalInfo &local_info, Grpc::AsyncClientPtr async_client,
             Event::Dispatcher &dispatcher, const Protobuf::MethodDescriptor &service_method,
             Runtime::RandomGenerator &random, const ::envoy::api::v2::core::ApiConfigSource& config_source,
             Stats::Scope& scope, std::string type_url));
