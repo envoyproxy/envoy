@@ -27,13 +27,17 @@ public:
     envoy::config::filter::http::rbac::v2::RBAC config;
 
     envoy::config::rbac::v2alpha::Policy policy;
-    policy.add_permissions()->set_destination_port(123);
+    auto policy_rules = policy.add_permissions()->mutable_or_rules();
+    policy_rules->add_rules()->mutable_requested_server_name()->set_regex(".*cncf.io");
+    policy_rules->add_rules()->set_destination_port(123);
     policy.add_principals()->set_any(true);
     config.mutable_rules()->set_action(envoy::config::rbac::v2alpha::RBAC::ALLOW);
     (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
     envoy::config::rbac::v2alpha::Policy shadow_policy;
-    shadow_policy.add_permissions()->set_destination_port(456);
+    auto shadow_policy_rules = shadow_policy.add_permissions()->mutable_or_rules();
+    shadow_policy_rules->add_rules()->mutable_requested_server_name()->set_exact("xyz.cncf.io");
+    shadow_policy_rules->add_rules()->set_destination_port(456);
     shadow_policy.add_principals()->set_any(true);
     config.mutable_shadow_rules()->set_action(envoy::config::rbac::v2alpha::RBAC::ALLOW);
     (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
@@ -54,6 +58,11 @@ public:
     ON_CALL(connection_, localAddress()).WillByDefault(ReturnRef(address_));
   }
 
+  void setRequestedServerName(std::string server_name) {
+    requested_server_name_ = server_name;
+    ON_CALL(connection_, requestedServerName()).WillByDefault(Return(requested_server_name_));
+  }
+
   void setMetadata() {
     ON_CALL(req_info_, setDynamicMetadata(HttpFilterNames::get().Rbac, _))
         .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
@@ -71,6 +80,7 @@ public:
 
   RoleBasedAccessControlFilter filter_;
   Network::Address::InstanceConstSharedPtr address_;
+  std::string requested_server_name_;
   Http::TestHeaderMapImpl headers_;
 };
 
@@ -79,6 +89,21 @@ TEST_F(RoleBasedAccessControlFilterTest, Allowed) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+
+  Buffer::OwnedImpl data("");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(headers_));
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, RequestedServerName) {
+  setDestinationPort(999);
+  setRequestedServerName("www.cncf.io");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
 
   Buffer::OwnedImpl data("");

@@ -6,6 +6,7 @@
 #include "common/ssl/context_manager_impl.h"
 #include "common/ssl/ssl_socket.h"
 
+#include "test/config/utility.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
@@ -68,23 +69,8 @@ createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& conte
 
 Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
-  auto* common_tls_context = tls_context.mutable_common_tls_context();
-  common_tls_context->add_alpn_protocols("h2");
-  common_tls_context->add_alpn_protocols("http/1.1");
-  common_tls_context->mutable_deprecated_v1()->set_alt_alpn_protocols("http/1.1");
 
-  auto* validation_context = common_tls_context->mutable_validation_context();
-  validation_context->mutable_trusted_ca()->set_filename(
-      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-  validation_context->add_verify_certificate_hash(
-      "E0:F3:C8:CE:5E:2E:A3:05:F0:70:1F:F5:12:E3:6E:2E:"
-      "97:92:82:84:A2:28:BC:F7:73:32:D3:39:30:A1:B6:FD");
-
-  auto* tls_certificate = common_tls_context->add_tls_certificates();
-  tls_certificate->mutable_certificate_chain()->set_filename(
-      TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"));
-  tls_certificate->mutable_private_key()->set_filename(
-      TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+  ConfigHelper::initializeTls(*tls_context.mutable_common_tls_context());
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, mock_factory_ctx);

@@ -1,5 +1,7 @@
 #include "extensions/access_loggers/http_grpc/grpc_access_log_impl.h"
 
+#include "envoy/upstream/upstream.h"
+
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/utility.h"

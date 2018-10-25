@@ -268,16 +268,18 @@ TEST_F(StatNameTest, Sort) {
   EXPECT_EQ(names, sorted_names);
 }
 
-#ifdef ENABLE_MEMORY_USAGE_TESTS
-
 // Tests the memory savings realized from using symbol tables with 1k clusters. This
 // test shows the memory drops from almost 8M to less than 2M.
 TEST(SymbolTableTest, Memory) {
+  if (!TestUtil::hasDeterministicMallocStats()) {
+    return;
+  }
+
   // Tests a stat-name allocation strategy.
   auto test_memory_usage = [](std::function<void(absl::string_view)> fn) -> size_t {
-    size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
-    TestUtil::foreachStat(1000, fn);
-    size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+    TestUtil::forEachSampleStat(1000, fn);
+    const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
     if (end_mem != 0) { // See warning below for asan, tsan, and mac.
       EXPECT_GT(end_mem, start_mem);
     }
@@ -316,8 +318,6 @@ TEST(SymbolTableTest, Memory) {
     EXPECT_LT(symbol_table_mem_used, string_mem_used / 4);
   }
 }
-
-#endif // ENABLE_MEMORY_USAGE_TESTS
 
 } // namespace Stats
 } // namespace Envoy
