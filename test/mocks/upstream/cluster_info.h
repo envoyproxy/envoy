@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/typed_metadata.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -68,6 +69,7 @@ public:
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(lbSubsetInfo, const LoadBalancerSubsetInfo&());
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
+  MOCK_CONST_METHOD0(typedMetadata, const Envoy::Config::TypedMetadata&());
   MOCK_CONST_METHOD0(clusterSocketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(drainConnectionsOnHostRemoval, bool());
 
