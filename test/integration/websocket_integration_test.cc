@@ -55,6 +55,12 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
   ASSERT_TRUE(proxied_request_headers.EnvoyExpectedRequestTimeoutMs() != nullptr);
   proxied_request_headers.removeEnvoyExpectedRequestTimeoutMs();
 
+  if (proxied_request_headers.Scheme()) {		
+    ASSERT_STREQ(proxied_request_headers.Scheme()->value().c_str(), "http");		
+  } else {		
+    proxied_request_headers.insertScheme().value().append("http", 4);		
+  }
+
   commonValidate(proxied_request_headers, original_request_headers);
   proxied_request_headers.removeRequestId();
 
@@ -183,9 +189,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hellobye!"));
 
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
-  if (!old_style_websockets_) {
-    test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 0);
-  }
+  test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 0);
 }
 
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionUpstreamDisconnect) {
