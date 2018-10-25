@@ -339,21 +339,9 @@ private:
                                     const ::envoy::api::v2::core::ApiConfigSource& config_source,
                                     Stats::Scope& scope, const std::string type_url) override {
 
-      uint64_t proto_hash; // config_source_name + type_url
-      switch(config_source.grpc_services(0).target_specifier_case()) {
-        case envoy::api::v2::core::GrpcService::kEnvoyGrpc: {
-          proto_hash = MessageUtil::hash(config_source.grpc_services(0).envoy_grpc());
-          break;
-        }
-        case envoy::api::v2::core::GrpcService::kGoogleGrpc: {
-          proto_hash = MessageUtil::hash(config_source.grpc_services(0).google_grpc());
-          break;
-        }
-        default:
-          NOT_REACHED_GCOVR_EXCL_LINE;
-      }
-
-      const uint64_t mux_key = proto_hash + XXH64(type_url.c_str(), type_url.length() + 1, 0);
+      const uint64_t proto_hash = MessageUtil::hash(config_source.grpc_services(0));
+      const uint64_t mux_key = XXH64(type_url.c_str(), type_url.length() + 1, proto_hash);
+      
       if (muxes_.find(mux_key) == muxes_.end()) {
         muxes_.insert({mux_key,
                        std::make_unique<Config::GrpcMuxImpl>(local_info, std::move(async_client), dispatcher,
