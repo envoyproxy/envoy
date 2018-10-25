@@ -22,8 +22,8 @@ one can set up custom
 for the given upgrade type, up to and including only using the router filter to send the WebSocket
 data upstream.
 
-Handling H2 hops (implementation in progress)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Handling H2 hops
+^^^^^^^^^^^^^^^^
 
 Envoy currently has an alpha implementation of tunneling websockets over H2 streams for deployments
 that prefer a uniform H2 mesh throughout, for example, for a deployment of the form:
@@ -32,8 +32,6 @@ that prefer a uniform H2 mesh throughout, for example, for a deployment of the f
 
 In this case, if a client is for example using WebSocket, we want the Websocket to arive at the
 upstream server functionally intact, which means it needs to traverse the HTTP/2 hop.
-
-TODO(alyssawilk) copy the warnings from the config here, or just land the docs when we unhide.
 
 This is accomplished via
 `extended CONNECT <https://tools.ietf.org/html/draft-mcmanus-httpbis-h2-websockets>`_ support. The
@@ -44,6 +42,9 @@ HTTP/2 hop, with the documented flaw that the HTTP/1.1 method is always assumed 
 Non-WebSocket upgrades are allowed to use any valid HTTP method (i.e. POST) and the current
 upgrade/downgrade mechanism will drop the original method and transform the Upgrade request to
 a GET method on the final Envoy-Upstream hop.
+
+Note that the H2 upgrade path has very strict HTTP/1.1 compliance, so will not proxy WebSocket
+upgrade requests or responses with bodies.
 
 Old style WebSocket support
 ---------------------------
