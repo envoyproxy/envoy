@@ -32,6 +32,20 @@
 namespace Envoy {
 namespace {
 
+std::string TestEnvironment::makeTempDir(char* name_template) {
+#if !defined(WIN32)
+  char* dirname = ::mkdtemp(name_template);
+  RELEASE_ASSERT(dirname != nullptr,
+                 fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
+#else
+  char* dirname = ::_mktemp(name_template);
+  RELEASE_ASSERT(dirname != nullptr,
+                 fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
+  std::experimental::filesystem::create_directories(dirname);
+#endif
+  return std::string(dirname);
+}
+
 std::string getOrCreateUnixDomainSocketDirectory() {
   const char* path = std::getenv("TEST_UDSDIR");
   if (path != nullptr) {
@@ -52,8 +66,9 @@ std::string getTemporaryDirectory() {
     return TestEnvironment::getCheckedEnvVar("TMPDIR");
   }
   char test_tmpdir[] = "/tmp/envoy_test_tmp.XXXXXX";
-  RELEASE_ASSERT(::mkdtemp(test_tmpdir) != nullptr,
-                 fmt::format("Failed to create tmpdir {} {}", test_tmpdir, strerror(errno)));
+  char* dirname = ::mkdtemp(test_tmpdir);
+  RELEASE_ASSERT(dirname != nullptr,
+                 fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
   return TestEnvironment::makeTempDir(test_tmpdir);
 }
 
@@ -305,20 +320,6 @@ void TestEnvironment::setEnvVar(const std::string& name, const std::string& valu
   const int rc = ::_putenv_s(name.c_str(), value.c_str());
   ASSERT_EQ(0, rc);
 #endif
-}
-
-std::string TestEnvironment::makeTempDir(char* nameTemplate) {
-#if !defined(WIN32)
-  char* dirname = ::mkdtemp(nameTemplate);
-  RELEASE_ASSERT(dirname != nullptr,
-                 fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
-#else
-  char* dirname = ::_mktemp(nameTemplate);
-  RELEASE_ASSERT(dirname != nullptr,
-                 fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
-  std::experimental::filesystem::create_directories(dirname);
-#endif
-  return std::string(dirname);
 }
 
 } // namespace Envoy
