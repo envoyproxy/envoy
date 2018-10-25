@@ -14,7 +14,7 @@ Static state is any immutable state specified at configuration load time
 Metadata
 --------
 
-Several parts of Envoy configuration (e.g. listeners, routes, clusters )
+Several parts of Envoy configuration (e.g. listeners, routes, clusters)
 contain a :ref:`metadata <envoy_api_msg_core.Metadata>` where arbitrary
 key-value pairs can be encoded. The typical pattern is to use the filter
 names in reverse DNS format as the key and encode filter specific
@@ -61,8 +61,8 @@ to have virtualhost/route-specific configuration in addition to a global
 filter config common to all virtual hosts. This configuration is converted
 and embedded into the route table. It is up to the HTTP filter
 implementation to treat the route-specific filter config as a replacement
-to global config or an enhancement. The HTTP fault filter uses this
-technique to provide per-route fault configuration.
+to global config or an enhancement. For example, the HTTP fault filter uses
+this technique to provide per-route fault configuration.
 
 `per_filter_config` is a `map<string, ProtobufWkt::Struct>`. The Connection
 manager iterates over this map and invokes the filter factory interface

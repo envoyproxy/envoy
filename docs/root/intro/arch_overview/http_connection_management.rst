@@ -43,6 +43,8 @@ table <arch_overview_http_routing>`. The route table can be specified in one of 
 * Statically.
 * Dynamically via the :ref:`RDS API <config_http_conn_man_rds>`.
 
+.. _arch_overview_http_retry_plugins:
+
 Retry plugin configuration
 --------------------------
 
