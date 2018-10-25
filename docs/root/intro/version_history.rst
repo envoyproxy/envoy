@@ -4,6 +4,7 @@ Version history
 1.9.0 (pending)
 ===============
 * access log: added a :ref:`JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format.
+* access log: added dynamic metadata to access log messages streamed over gRPC.
 * admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * config: removed support for the v1 API.
 * fault: removed integer percentage support.
