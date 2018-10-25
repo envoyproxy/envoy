@@ -47,7 +47,7 @@ struct RateLimitSettings {
 
   uint32_t max_tokens_{DEFAULT_MAX_TOKENS};
   double fill_rate_{DEFAULT_FILL_RATE};
-  bool enabled_;
+  bool enabled_{false};
 };
 
 typedef ConstSingleton<ApiTypeValues> ApiType;
