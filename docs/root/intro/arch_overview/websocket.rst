@@ -16,6 +16,10 @@ one can set up custom
 for the given upgrade type, up to and including only using the router filter to send the WebSocket
 data upstream.
 
+Note that the statistics for upgrades are all bundled together so websocket
+:ref:`statistics <config_http_conn_man_stats>` are tracked by stats such as
+downstream_cx_upgrades_total and downstream_cx_upgrades_active
+
 Handling H2 hops
 ^^^^^^^^^^^^^^^^
 
