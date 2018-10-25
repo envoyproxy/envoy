@@ -22,8 +22,9 @@ bool hasDeterministicMallocStats() {
 #endif
 }
 
-void forEachStat(int num_clusters, std::function<void(absl::string_view)> fn) {
-  // These are stats that are repeated for each cluster as of Oct 2018.
+void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> fn) {
+  // These are stats that are repeated for each cluster as of Oct 2018, with a
+  // very basic configuration with no traffic.
   static const char* cluster_stats[] = {"bind_errors",
                                         "lb_healthy_panic",
                                         "lb_local_cluster_not_ok",
@@ -95,8 +96,8 @@ void forEachStat(int num_clusters, std::function<void(absl::string_view)> fn) {
                                         "upstream_rq_tx_reset",
                                         "version"};
 
-  // These are the other stats that appear in the admin /stats request when made prior
-  // to any requests.
+  // These are the other stats that appear in the admin /stats request when made
+  // prior to any requests.
   static const char* other_stats[] = {"http.admin.downstream_cx_length_ms",
                                       "http.admin.downstream_rq_time",
                                       "http.ingress_http.downstream_cx_length_ms",

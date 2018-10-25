@@ -386,13 +386,6 @@ private:
   struct RuntimeData {
     std::string fractional_runtime_key_{};
     envoy::type::FractionalPercent fractional_runtime_default_{};
-
-    // Relating to the deprecated 'runtime' field.
-    std::string runtime_key_{};
-    uint64_t runtime_default_{};
-
-    // Indicates whether to use the deprecated 'runtime' field or 'fractional_percent'.
-    bool legacy_runtime_data_{};
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {
@@ -548,7 +541,9 @@ private:
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
   Runtime::Loader& loader_;
   const absl::optional<RuntimeData> runtime_;
+  const std::string scheme_redirect_;
   const std::string host_redirect_;
+  const std::string port_redirect_;
   const std::string path_redirect_;
   const bool https_redirect_;
   const std::string prefix_rewrite_redirect_;

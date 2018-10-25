@@ -25,7 +25,7 @@ ContextManagerImpl::createSslClientContext(Stats::Scope& scope, const ClientCont
     return nullptr;
   }
 
-  ClientContextSharedPtr context = std::make_shared<ClientContextImpl>(scope, config);
+  ClientContextSharedPtr context = std::make_shared<ClientContextImpl>(scope, config, time_source_);
   removeEmptyContexts();
   contexts_.emplace_back(context);
   return context;
@@ -39,7 +39,7 @@ ContextManagerImpl::createSslServerContext(Stats::Scope& scope, const ServerCont
   }
 
   ServerContextSharedPtr context =
-      std::make_shared<ServerContextImpl>(scope, config, server_names, runtime_);
+      std::make_shared<ServerContextImpl>(scope, config, server_names, runtime_, time_source_);
   removeEmptyContexts();
   contexts_.emplace_back(context);
   return context;

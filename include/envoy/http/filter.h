@@ -505,7 +505,7 @@ typedef std::shared_ptr<StreamEncoderFilter> StreamEncoderFilterSharedPtr;
 /**
  * A filter that handles both encoding and decoding.
  */
-class StreamFilter : public StreamDecoderFilter, public StreamEncoderFilter {};
+class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEncoderFilter {};
 
 typedef std::shared_ptr<StreamFilter> StreamFilterSharedPtr;
 
