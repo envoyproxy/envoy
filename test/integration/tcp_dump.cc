@@ -34,7 +34,7 @@ TcpDump::TcpDump(const std::string& path, const std::string& iface,
                           "--immediate-mode", port_expr.c_str(), nullptr);
     if (rc == -1) {
       perror("tcpdump");
-      RELEASE_ASSERT(rc != -1, "Unable to start tcpdump");
+      exit(1);
     }
   }
   // Wait in parent process until tcpdump is running and has created the pcap
@@ -44,17 +44,32 @@ TcpDump::TcpDump(const std::string& path, const std::string& iface,
     if (test_file.good()) {
       break;
     }
+    // If the child died unexpectedly, handle this.
+    int status;
+    int rc = waitpid(tcpdump_pid_, &status, WNOHANG);
+    RELEASE_ASSERT(rc != -1, "");
+    if (rc > 0) {
+      RELEASE_ASSERT(rc == tcpdump_pid_, "");
+      RELEASE_ASSERT(WIFEXITED(status), "");
+      RELEASE_ASSERT(WEXITSTATUS(status) == 1, "");
+      ENVOY_LOG_MISC(debug, "tcpdump exited abnormally");
+      tcpdump_pid_ = 0;
+      break;
+    }
     // Give 50ms sleep.
     ::usleep(50000);
   }
 }
 
 TcpDump::~TcpDump() {
-  RELEASE_ASSERT(kill(tcpdump_pid_, SIGINT) == 0, "");
-  int status;
-  RELEASE_ASSERT(waitpid(tcpdump_pid_, &status, 0) != -1, "");
-  RELEASE_ASSERT(WEXITSTATUS(status) == 0, "");
-  ENVOY_LOG_MISC(debug, "tcpdump terminated");
+  if (tcpdump_pid_ > 0) {
+    RELEASE_ASSERT(kill(tcpdump_pid_, SIGINT) == 0, "");
+    int status;
+    RELEASE_ASSERT(waitpid(tcpdump_pid_, &status, 0) != -1, "");
+    RELEASE_ASSERT(WIFEXITED(status), "");
+    RELEASE_ASSERT(WEXITSTATUS(status) == 0, "");
+    ENVOY_LOG_MISC(debug, "tcpdump terminated");
+  }
 }
 
 } // namespace Envoy
