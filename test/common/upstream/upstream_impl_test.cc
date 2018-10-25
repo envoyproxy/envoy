@@ -1838,6 +1838,7 @@ TEST_F(HostSetImplLocalityTest, EmptyLocality) {
   auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
   host_set_.updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, locality_weights, {},
                         {}, absl::nullopt);
+  // Verify that we are not RRing between localities.
   EXPECT_EQ(0, host_set_.chooseLocality().value());
   EXPECT_EQ(0, host_set_.chooseLocality().value());
 }
