@@ -192,7 +192,7 @@ TEST(SymbolTableTest, Memory) {
   // Tests a stat-name allocation strategy.
   auto test_memory_usage = [](std::function<void(absl::string_view)> fn) -> size_t {
     const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
-    TestUtil::forEachStat(1000, fn);
+    TestUtil::forEachSampleStat(1000, fn);
     const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
     if (end_mem != 0) { // See warning below for asan, tsan, and mac.
       EXPECT_GT(end_mem, start_mem);
