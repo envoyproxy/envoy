@@ -172,6 +172,11 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   cd "${ENVOY_BUILD_DIR}"
   SRCDIR="${GCOVR_DIR}" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
   exit 0
+elif [[ "$1" == "bazel.clang_tidy" ]]; then
+  setup_clang_toolchain
+  cd "${ENVOY_CI_DIR}"
+  ./run_clang_tidy.sh
+  exit 0
 elif [[ "$1" == "bazel.coverity" ]]; then
   # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy
   # build when compiled with Clang 5. Revisit when Coverity Scan explicitly

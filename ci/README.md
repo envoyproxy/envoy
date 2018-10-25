@@ -82,7 +82,8 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with gcc.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `bazel.coverity` &mdash; build Envoy static binary and run Coverity Scan static analysis.
-* `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang-6.0.
+* `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
+* `bazel.clang_tidy` &mdash; build and run clang-tidy over all source files.
 * `check_format`&mdash; run `clang-format-6.0` and `buildifier` on entire source tree.
 * `fix_format`&mdash; run and enforce `clang-format-6.0` and `buildifier` on entire source tree.
 * `check_spelling`&mdash; run `misspell` on entire project.
