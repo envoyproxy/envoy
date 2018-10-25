@@ -359,7 +359,9 @@ private:
 
     // All state for the stream. Put here for readability.
     struct State {
-      State() : remote_complete_(false), local_complete_(false), saw_connection_close_(false) {}
+      State()
+          : remote_complete_(false), local_complete_(false), saw_connection_close_(false),
+            successful_upgrade_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -371,6 +373,7 @@ private:
       bool remote_complete_ : 1;
       bool local_complete_ : 1;
       bool saw_connection_close_ : 1;
+      bool successful_upgrade_ : 1;
     };
 
     // Possibly increases buffer_limit_ to the value of limit.
