@@ -9,6 +9,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -108,7 +109,8 @@ public:
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
   Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
+  Event::SimulatedTimeSystem time_system_;
+  Ssl::ContextManagerImpl ssl_context_manager_{runtime_, time_system_};
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;

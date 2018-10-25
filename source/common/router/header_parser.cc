@@ -243,8 +243,8 @@ HeaderParserPtr HeaderParser::configure(
     // We reject :-prefix (e.g. :path) removal here. This is dangerous, since other aspects of
     // request finalization assume their existence and they are needed for well-formedness in most
     // cases.
-    if (header[0] == ':') {
-      throw EnvoyException(":-prefixed headers may not be removed");
+    if (header[0] == ':' || Http::LowerCaseString(header).get() == "host") {
+      throw EnvoyException(":-prefixed or host headers may not be removed");
     }
     header_parser->headers_to_remove_.emplace_back(header);
   }

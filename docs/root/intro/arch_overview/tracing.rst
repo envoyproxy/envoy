@@ -68,7 +68,8 @@ Alternatively the trace context can be manually propagated by the service:
   :ref:`config_http_conn_man_headers_x-b3-sampled`, and
   :ref:`config_http_conn_man_headers_x-b3-flags`). The :ref:`config_http_conn_man_headers_x-b3-sampled`
   header can also be supplied by an external client to either enable or disable tracing for a particular
-  request.
+  request. In addition, the single :ref:`config_http_conn_man_headers_b3` header propagation format is
+  supported, which is a more compressed format.
 
 What data each trace contains
 -----------------------------
@@ -96,7 +97,6 @@ multiple spans are stitched together using common information such as the global
 request ID :ref:`config_http_conn_man_headers_x-request-id` (LightStep) or
 the trace ID configuration (Zipkin). See
 
-* :ref:`v1 API reference <config_tracing_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.trace.v2.Tracing>`
 
 for more information on how to setup tracing in Envoy.
