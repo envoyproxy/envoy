@@ -19,7 +19,7 @@ message ApiConfigSource {
   // APIs may be fetched via either REST or gRPC.
   enum ApiType {
     // REST-JSON legacy corresponds to the v1 API.
-    REST_LEGACY = 0;
+    REST_LEGACY = 0 [deprecated = true];
     // REST-JSON v2 API. The `canonical JSON encoding
     // <https://developers.google.com/protocol-buffers/docs/proto3#json>`_ for
     // the v2 protos is used.

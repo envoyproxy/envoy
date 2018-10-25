@@ -3,8 +3,6 @@
 #include <iostream>
 #include <memory>
 
-#include "test/test_common/printers.h"
-
 namespace Envoy {
 namespace Http {
 /**

@@ -29,6 +29,7 @@ envoy_cc_library(
         ":metadatamatchcriteria_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
+        "//include/envoy/config:typed_metadata_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/runtime:runtime_interface",

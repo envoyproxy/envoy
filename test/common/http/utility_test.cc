@@ -77,7 +77,7 @@ TEST(HttpUtility, isUpgrade) {
 // Start with H1 style websocket request headers. Transform to H2 and back.
 TEST(HttpUtility, H1H2H1Request) {
   TestHeaderMapImpl converted_headers = {
-      {":method", "GET"}, {"content-length", "0"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+      {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
   const TestHeaderMapImpl original_headers(converted_headers);
 
   ASSERT_TRUE(Utility::isUpgrade(converted_headers));
@@ -95,8 +95,7 @@ TEST(HttpUtility, H1H2H1Request) {
 
 // Start with H2 style websocket request headers. Transform to H1 and back.
 TEST(HttpUtility, H2H1H2Request) {
-  TestHeaderMapImpl converted_headers = {
-      {":method", "CONNECT"}, {"content-length", "0"}, {":protocol", "websocket"}};
+  TestHeaderMapImpl converted_headers = {{":method", "CONNECT"}, {":protocol", "websocket"}};
   const TestHeaderMapImpl original_headers(converted_headers);
 
   ASSERT_FALSE(Utility::isUpgrade(converted_headers));
@@ -109,15 +108,14 @@ TEST(HttpUtility, H2H1H2Request) {
 
   ASSERT_FALSE(Utility::isUpgrade(converted_headers));
   ASSERT_TRUE(Utility::isH2UpgradeRequest(converted_headers));
+  converted_headers.removeContentLength();
   ASSERT_EQ(converted_headers, original_headers);
 }
 
 // Start with H1 style websocket response headers. Transform to H2 and back.
 TEST(HttpUtility, H1H2H1Response) {
-  TestHeaderMapImpl converted_headers = {{":status", "101"},
-                                         {"content-length", "0"},
-                                         {"upgrade", "websocket"},
-                                         {"connection", "upgrade"}};
+  TestHeaderMapImpl converted_headers = {
+      {":status", "101"}, {"upgrade", "websocket"}, {"connection", "upgrade"}};
   const TestHeaderMapImpl original_headers(converted_headers);
 
   ASSERT_TRUE(Utility::isUpgrade(converted_headers));
@@ -135,10 +133,10 @@ TEST(HttpUtility, H1H2H1Response) {
 // header order may not be preserved.
 TEST(HttpUtility, OrderNotPreserved) {
   TestHeaderMapImpl expected_headers = {
-      {":method", "GET"}, {"content-length", "0"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+      {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
 
   TestHeaderMapImpl converted_headers = {
-      {":method", "GET"}, {"content-length", "0"}, {"Connection", "upgrade"}, {"Upgrade", "foo"}};
+      {":method", "GET"}, {"Connection", "upgrade"}, {"Upgrade", "foo"}};
 
   Utility::transformUpgradeRequestFromH1toH2(converted_headers);
   Utility::transformUpgradeRequestFromH2toH1(converted_headers);
@@ -151,14 +149,52 @@ TEST(HttpUtility, OrderNotPreserved) {
 // a custom x-envoy-original-method header if it is ever needed.
 TEST(HttpUtility, MethodNotPreserved) {
   TestHeaderMapImpl expected_headers = {
-      {":method", "GET"}, {"content-length", "0"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+      {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
 
   TestHeaderMapImpl converted_headers = {
-      {":method", "POST"}, {"content-length", "0"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+      {":method", "POST"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
 
   Utility::transformUpgradeRequestFromH1toH2(converted_headers);
   Utility::transformUpgradeRequestFromH2toH1(converted_headers);
   EXPECT_EQ(converted_headers, expected_headers);
+}
+
+TEST(HttpUtility, ContentLengthMangling) {
+  // Content-Length of 0 is removed on the request path.
+  {
+    TestHeaderMapImpl request_headers = {
+        {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}, {"content-length", "0"}};
+    Utility::transformUpgradeRequestFromH1toH2(request_headers);
+    EXPECT_TRUE(request_headers.ContentLength() == nullptr);
+  }
+
+  // Non-zero Content-Length is not removed on the request path.
+  {
+    TestHeaderMapImpl request_headers = {
+        {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}, {"content-length", "1"}};
+    Utility::transformUpgradeRequestFromH1toH2(request_headers);
+    EXPECT_FALSE(request_headers.ContentLength() == nullptr);
+  }
+
+  // Content-Length of 0 is removed on the response path.
+  {
+    TestHeaderMapImpl response_headers = {{":status", "101"},
+                                          {"upgrade", "websocket"},
+                                          {"connection", "upgrade"},
+                                          {"content-length", "0"}};
+    Utility::transformUpgradeResponseFromH1toH2(response_headers);
+    EXPECT_TRUE(response_headers.ContentLength() == nullptr);
+  }
+
+  // Non-zero Content-Length is not removed on the response path.
+  {
+    TestHeaderMapImpl response_headers = {{":status", "101"},
+                                          {"upgrade", "websocket"},
+                                          {"connection", "upgrade"},
+                                          {"content-length", "1"}};
+    Utility::transformUpgradeResponseFromH1toH2(response_headers);
+    EXPECT_FALSE(response_headers.ContentLength() == nullptr);
+  }
 }
 
 TEST(HttpUtility, appendXff) {
