@@ -303,7 +303,7 @@ Version history
   in :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>`.
 * config: added support for :ref:`inline delivery <envoy_api_msg_core.DataSource>` of TLS
   certificates and private keys.
-* config: added restrictions for the backing :ref:`config sources <envoy_api_msg_core.ApiConfigSource>`
+* config: added restrictions for the backing :ref:`config sources <envoy_api_msg_core.ConfigSource>`
   of xDS resources. For filesystem based xDS the file must exist at configuration time. For cluster
   based xDS the backing cluster must be statically defined and be of non-EDS type.
 * grpc: the Google gRPC C++ library client is now supported as specified in the :ref:`gRPC services
