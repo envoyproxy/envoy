@@ -514,7 +514,8 @@ message RouteAction {
     }
 
     // Specifies an implementation of a RetryPriority which is used to determine the
-    // distribution of load across priorities used for retries.
+    // distribution of load across priorities used for retries. Refer to
+    // :ref:`retry plugin configuration <arch_overview_http_retry_plugins>` for more details.
     RetryPriority retry_priority = 4;
 
     message RetryHostPredicate {
@@ -524,6 +525,8 @@ message RouteAction {
 
     // Specifies a collection of RetryHostPredicates that will be consulted when selecting a host
     // for retries. If any of the predicates reject the host, host selection will be reattempted.
+    // Refer to :ref:`retry plugin configuration <arch_overview_http_retry_plugins>` for more
+    // details.
     repeated RetryHostPredicate retry_host_predicate = 5;
 
     // The maximum number of times host selection will be reattempted before giving up, at which
