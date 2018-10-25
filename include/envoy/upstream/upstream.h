@@ -10,6 +10,7 @@
 
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/callback.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
@@ -435,6 +436,11 @@ public:
 typedef std::shared_ptr<const ProtocolOptionsConfig> ProtocolOptionsConfigConstSharedPtr;
 
 /**
+ *  Base class for all cluster typed metadata factory.
+ */
+class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
+
+/**
  * Information about a given upstream cluster.
  */
 class ClusterInfo {
@@ -589,6 +595,11 @@ public:
    * @return const envoy::api::v2::core::Metadata& the configuration metadata for this cluster.
    */
   virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata&& the typed metadata for this cluster.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 
   /**
    *

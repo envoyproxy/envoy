@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["async_client_impl.cc"],
     hdrs = ["async_client_impl.h"],
     deps = [
+        "//include/envoy/config:typed_metadata_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:async_client_interface",
         "//include/envoy/http:codec_interface",

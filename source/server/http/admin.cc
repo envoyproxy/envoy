@@ -964,6 +964,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
       },
+      date_provider_(server.dispatcher().timeSystem()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,

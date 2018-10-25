@@ -272,10 +272,6 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
       "filters" : {
         "type" : "object",
         "properties" : {
-          "type": {
-            "type" : "string",
-            "enum" : ["encoder", "decoder", "both"]
-          },
           "name" : {"type": "string"},
           "config": {"type" : "object"}
         },
