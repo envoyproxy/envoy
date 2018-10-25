@@ -341,7 +341,7 @@ private:
 
       const uint64_t proto_hash = MessageUtil::hash(config_source.grpc_services(0));
       const uint64_t mux_key = XXH64(type_url.c_str(), type_url.length() + 1, proto_hash);
-      
+
       if (muxes_.find(mux_key) == muxes_.end()) {
         muxes_.insert({mux_key,
                        std::make_unique<Config::GrpcMuxImpl>(local_info, std::move(async_client), dispatcher,

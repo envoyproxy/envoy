@@ -17,11 +17,12 @@ public:
     virtual ~GrpcMuxFactory() {}
 
     /**
-    * Returns an existing or creates a new GrpcMux.
+    * Returns an existing instance of GrpcMux if one exists for a combination of protocol and type_url,
+    *  otherwise returns a new instance of GrpcMux.
     * @param local_info LocalInfo::LocalInfo local info.
     * @param async_client Grpc::AsyncClientPtr async client to use for the grpc connection
     * @param dispatcher event dispatcher.
-    * @param _method fully qualified name of v2 gRPC API bidi streaming method (as per protobuf
+    * @param service_method fully qualified name of v2 gRPC API bidi streaming method (as per protobuf
     *        service description).
     * @param random random generator for jittering polling delays (when REST).
     * @param config envoy::api::v2::core::ConfigSource to construct from.
