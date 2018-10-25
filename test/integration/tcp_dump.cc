@@ -12,7 +12,7 @@
 namespace Envoy {
 
 TcpDump::TcpDump(const std::string& path, const std::string& iface,
-                 const std::vector<uint32_t> ports) {
+                 const std::vector<uint32_t>& ports) {
   // Remove any extant pcap file.
   unlink(path.c_str());
   // Derive the port filter expression.
