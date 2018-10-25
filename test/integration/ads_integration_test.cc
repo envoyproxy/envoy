@@ -23,6 +23,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -301,7 +302,7 @@ public:
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl context_manager_{runtime_};
+  Ssl::ContextManagerImpl context_manager_{runtime_, timeSystem()};
   FakeStreamPtr ads_stream_;
 };
 

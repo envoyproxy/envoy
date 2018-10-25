@@ -3,9 +3,10 @@
 #include "envoy/http/filter.h"
 
 namespace Envoy {
+namespace Http {
 
-// A filter which passes all data through with Continue status.
-class PassThroughFilter : public Http::StreamFilter {
+// A decoder filter which passes all data through with Continue status.
+class PassThroughDecoderFilter : public virtual StreamDecoderFilter {
 public:
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -25,6 +26,16 @@ public:
     decoder_callbacks_ = &callbacks;
   }
 
+protected:
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+};
+
+// An encoder filter which passes all data through with Continue status.
+class PassThroughEncoderFilter : public virtual StreamEncoderFilter {
+public:
+  // Http::StreamFilterBase
+  void onDestroy() override {}
+
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
@@ -43,7 +54,12 @@ public:
   }
 
 protected:
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
 };
+
+// A filter which passes all data through with Continue status.
+class PassThroughFilter : public StreamFilter,
+                          public PassThroughDecoderFilter,
+                          public PassThroughEncoderFilter {};
+} // namespace Http
 } // namespace Envoy

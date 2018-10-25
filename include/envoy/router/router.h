@@ -173,13 +173,15 @@ public:
   virtual uint32_t retryOn() const PURE;
 
   /**
-   * Initializes the RetryHostPredicates to be used with this retry attempt.
+   * Initializes a new set of RetryHostPredicates to be used when retrying with this retry policy.
    * @return list of RetryHostPredicates to use
    */
   virtual std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const PURE;
 
   /**
-   * @return the RetryPriority to use when determining priority load for retries.
+   * Initializes a RetryPriority to be used when retrying with this retry policy.
+   * @return the RetryPriority to use when determining priority load for retries, or nullptr
+   * if none should be used.
    */
   virtual Upstream::RetryPrioritySharedPtr retryPriority() const PURE;
 

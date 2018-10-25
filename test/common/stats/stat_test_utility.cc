@@ -1,11 +1,30 @@
 #include "test/common/stats/stat_test_utility.h"
 
+#include "common/memory/stats.h"
+
 namespace Envoy {
 namespace Stats {
 namespace TestUtil {
 
-void foreachStat(int num_clusters, std::function<void(absl::string_view)> fn) {
-  // These are stats that are repeated for each cluster as of Oct 2018.
+bool hasDeterministicMallocStats() {
+  // We can only test absolute memory usage if the malloc library is a known
+  // quantity. This decision is centralized here. As the preferred malloc
+  // library for Envoy is TCMALLOC that's what we test for here. If we switch
+  // to a different malloc library than we'd have to re-evaluate all the
+  // thresholds in the tests referencing hasDeterministicMallocStats().
+#ifdef TCMALLOC
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+  std::unique_ptr<char[]> data(new char[10000]);
+  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+  return end_mem - start_mem >= 10000; // actually 10240
+#else
+  return false;
+#endif
+}
+
+void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> fn) {
+  // These are stats that are repeated for each cluster as of Oct 2018, with a
+  // very basic configuration with no traffic.
   static const char* cluster_stats[] = {"bind_errors",
                                         "lb_healthy_panic",
                                         "lb_local_cluster_not_ok",
@@ -77,8 +96,8 @@ void foreachStat(int num_clusters, std::function<void(absl::string_view)> fn) {
                                         "upstream_rq_tx_reset",
                                         "version"};
 
-  // These are the other stats that appear in the admin /stats request when made prior
-  // to any requests.
+  // These are the other stats that appear in the admin /stats request when made
+  // prior to any requests.
   static const char* other_stats[] = {"http.admin.downstream_cx_length_ms",
                                       "http.admin.downstream_rq_time",
                                       "http.ingress_http.downstream_cx_length_ms",

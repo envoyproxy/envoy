@@ -9,9 +9,9 @@ class TestHostPredicateFactory : public Upstream::RetryHostPredicateFactory {
 public:
   std::string name() override { return "envoy.test_host_predicate"; }
 
-  void createHostPredicate(Upstream::RetryHostPredicateFactoryCallbacks& callbacks,
-                           const Protobuf::Message&, uint32_t) override {
-    callbacks.addHostPredicate(std::make_shared<TestHostPredicate>());
+  Upstream::RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message&,
+                                                            uint32_t) override {
+    return std::make_shared<testing::NiceMock<TestHostPredicate>>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};

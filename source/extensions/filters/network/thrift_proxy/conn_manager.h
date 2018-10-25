@@ -10,6 +10,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/decoder.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
@@ -138,6 +139,7 @@ private:
       return parent_.upstreamData(buffer);
     }
     void resetDownstreamConnection() override { parent_.resetDownstreamConnection(); }
+    StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); }
 
     ActiveRpc& parent_;
     ThriftFilters::DecoderFilterSharedPtr handle_;
@@ -153,9 +155,14 @@ private:
     ActiveRpc(ConnectionManager& parent)
         : parent_(parent), request_timer_(new Stats::Timespan(parent_.stats_.request_time_ms_,
                                                               parent_.time_system_)),
-          stream_id_(parent_.random_generator_.random()), local_response_sent_{false},
-          pending_transport_end_{false} {
+          stream_id_(parent_.random_generator_.random()),
+          stream_info_(parent_.time_system_), local_response_sent_{false}, pending_transport_end_{
+                                                                               false} {
       parent_.stats_.request_active_.inc();
+
+      stream_info_.setDownstreamLocalAddress(parent_.read_callbacks_->connection().localAddress());
+      stream_info_.setDownstreamRemoteAddress(
+          parent_.read_callbacks_->connection().remoteAddress());
     }
     ~ActiveRpc() {
       request_timer_->complete();
@@ -205,6 +212,7 @@ private:
     void startUpstreamResponse(Transport& transport, Protocol& protocol) override;
     ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override;
     void resetDownstreamConnection() override;
+    StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
 
     // Thrift::FilterChainFactoryCallbacks
     void addDecoderFilter(ThriftFilters::DecoderFilterSharedPtr filter) override {
@@ -223,6 +231,7 @@ private:
     ConnectionManager& parent_;
     Stats::TimespanPtr request_timer_;
     uint64_t stream_id_;
+    StreamInfo::StreamInfoImpl stream_info_;
     MessageMetadataSharedPtr metadata_;
     std::list<ActiveRpcDecoderFilterPtr> decoder_filters_;
     DecoderEventHandlerSharedPtr upgrade_handler_;
