@@ -330,7 +330,8 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       lb_ring_hash_config_(config.ring_hash_lb_config()),
       lb_original_dst_config_(config.original_dst_lb_config()), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
-      metadata_(config.metadata()), common_lb_config_(config.common_lb_config()),
+      metadata_(config.metadata()), typed_metadata_(config.metadata()),
+      common_lb_config_(config.common_lb_config()),
       cluster_socket_options_(parseClusterSocketOptions(config, bind_config)),
       drain_connections_on_host_removal_(config.drain_connections_on_host_removal()) {
 
