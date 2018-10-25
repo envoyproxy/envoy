@@ -916,7 +916,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   // new host list and raise a change notification. This uses an N^2 search given that this does not
   // happen very often and the list sizes should be small (see
   // https://github.com/envoyproxy/envoy/issues/2874). We also check for duplicates here. It's
-  // possible for DNS to return the same address multiple times, and a bad SDS implementation could
+  // possible for DNS to return the same address multiple times, and a bad EDS implementation could
   // do the same thing.
 
   // Keep track of hosts we see in new_hosts that we are able to match up with an existing host.

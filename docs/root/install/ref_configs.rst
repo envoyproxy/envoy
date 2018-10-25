@@ -42,7 +42,7 @@ information on how the different expansions work.
 
 A few notes about the example configurations:
 
-* An instance of :ref:`service discovery service <arch_overview_service_discovery_types_sds>` is assumed
+* An instance of :ref:`endpoint discovery service <arch_overview_service_discovery_types_eds>` is assumed
   to be running at `discovery.yourcompany.net`.
 * DNS for `yourcompany.net` is assumed to be setup for various things. Search the configuration
   templates for different instances of this.
