@@ -189,6 +189,8 @@ def envoy_cc_library(
             repository + "//source/common/common:fmt_lib",
             envoy_external_dep_path("abseil_flat_hash_map"),
             envoy_external_dep_path("abseil_flat_hash_set"),
+            envoy_external_dep_path("abseil_node_hash_map"),
+            envoy_external_dep_path("abseil_node_hash_set"),
             envoy_external_dep_path("abseil_strings"),
             envoy_external_dep_path("spdlog"),
             envoy_external_dep_path("fmtlib"),

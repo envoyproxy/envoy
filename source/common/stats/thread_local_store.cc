@@ -193,7 +193,7 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     const std::string& name,
-    std::unordered_map<std::string, std::shared_ptr<StatType>>& central_cache_map,
+    absl::node_hash_map<std::string, std::shared_ptr<StatType>>& central_cache_map,
     MakeStatFn<StatType> make_stat, std::shared_ptr<StatType>* tls_ref) {
 
   // If we have a valid cache entry, return it.

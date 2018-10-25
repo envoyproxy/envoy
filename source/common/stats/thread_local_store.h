@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <list>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/thread_local/thread_local.h"
 
@@ -15,6 +14,8 @@
 #include "common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/node_hash_map.h"
 #include "circllhist.h"
 
 namespace Envoy {
@@ -170,16 +171,16 @@ public:
 
 private:
   struct TlsCacheEntry {
-    std::unordered_map<std::string, CounterSharedPtr> counters_;
-    std::unordered_map<std::string, GaugeSharedPtr> gauges_;
-    std::unordered_map<std::string, TlsHistogramSharedPtr> histograms_;
-    std::unordered_map<std::string, ParentHistogramSharedPtr> parent_histograms_;
+    absl::node_hash_map<std::string, CounterSharedPtr> counters_;
+    absl::node_hash_map<std::string, GaugeSharedPtr> gauges_;
+    absl::node_hash_map<std::string, TlsHistogramSharedPtr> histograms_;
+    absl::node_hash_map<std::string, ParentHistogramSharedPtr> parent_histograms_;
   };
 
   struct CentralCacheEntry {
-    std::unordered_map<std::string, CounterSharedPtr> counters_;
-    std::unordered_map<std::string, GaugeSharedPtr> gauges_;
-    std::unordered_map<std::string, ParentHistogramImplSharedPtr> histograms_;
+    absl::node_hash_map<std::string, CounterSharedPtr> counters_;
+    absl::node_hash_map<std::string, GaugeSharedPtr> gauges_;
+    absl::node_hash_map<std::string, ParentHistogramImplSharedPtr> histograms_;
   };
 
   struct ScopeImpl : public TlsScope {
@@ -219,7 +220,7 @@ private:
     template <class StatType>
     StatType&
     safeMakeStat(const std::string& name,
-                 std::unordered_map<std::string, std::shared_ptr<StatType>>& central_cache_map,
+                 absl::node_hash_map<std::string, std::shared_ptr<StatType>>& central_cache_map,
                  MakeStatFn<StatType> make_stat, std::shared_ptr<StatType>* tls_ref);
 
     static std::atomic<uint64_t> next_scope_id_;
