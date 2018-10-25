@@ -56,13 +56,13 @@ HTTP Per-Route Filter Configuration
 -----------------------------------
 
 In HTTP routes, :ref:`per_filter_config
-<envoy_api_field_route.VirtualHost.per_filter_config>` is a special case of
-typed metadata where HTTP filters can have virtualhost/route-specific
-configuration in addition to a global filter config common to all virtual
-hosts. This configuration is converted and embedded into the route
-table. Its up to the HTTP filter implementation to treat the route-specific
-filter config as a replacement to global config or an enhancement. The HTTP
-fault filter uses this technique to provide per-route fault configuration.
+<envoy_api_field_route.VirtualHost.per_filter_config>` allows HTTP filters
+to have virtualhost/route-specific configuration in addition to a global
+filter config common to all virtual hosts. This configuration is converted
+and embedded into the route table. It is up to the HTTP filter
+implementation to treat the route-specific filter config as a replacement
+to global config or an enhancement. The HTTP fault filter uses this
+technique to provide per-route fault configuration.
 
 `per_filter_config` is a `map<string, ProtobufWkt::Struct>`. The Connection
 manager iterates over this map and invokes the filter factory interface
@@ -70,11 +70,6 @@ manager iterates over this map and invokes the filter factory interface
 convert it into a typed class object that’s stored with the route
 itself. HTTP filters can then query the route-specific filter config during
 request processing.
-
-`per_filter_config` shares same traits and design goals as the typed
-metadata. Its a specialized implementation focussing on per-route filter
-configuration (whether the filter implementation treats it as metadata or
-actual configuration is upto the filter author).
 
 
 Dynamic State
@@ -89,6 +84,6 @@ the state.
 connection and HTTP stream (i.e., HTTP request/response pair)
 respectively. `StreamInfo` contains a set of fixed attributes as part of
 the class definition (e.g., HTTP protocol, requested server name, etc.). In
-addition, it provides a facility to store typed/untyped objects
-(`map<string, FilterState::Object>`). FilterState objects can be either
-write-once, or write-many.
+addition, it provides a facility to store typed objects in a map
+(`map<string, FilterState::Object>`). The state stored per filter can be
+either write-once (immutable), or write-many (mutable).
