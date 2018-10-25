@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -507,9 +506,8 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
-                                     Runtime::Loader& runtime, TimeSource& time_source)
-    : ContextImpl(scope, config, time_source), runtime_(runtime),
-      session_ticket_keys_(config.sessionTicketKeys()) {
+                                     TimeSource& time_source)
+    : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()) {
   if (config.tlsCertificate() == nullptr) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }

@@ -35,7 +35,6 @@ void XfccIntegrationTest::TearDown() {
   HttpIntegrationTest::cleanupUpstreamAndDownstream();
   codec_client_.reset();
   context_manager_.reset();
-  runtime_.reset();
 }
 
 Network::TransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(bool mtls) {
@@ -124,8 +123,7 @@ void XfccIntegrationTest::initialize() {
     config_helper_.addSslConfig();
   }
 
-  runtime_.reset(new NiceMock<Runtime::MockLoader>());
-  context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_, timeSystem()));
+  context_manager_.reset(new Ssl::ContextManagerImpl(timeSystem()));
   client_tls_ssl_ctx_ = createClientSslContext(false);
   client_mtls_ssl_ctx_ = createClientSslContext(true);
   HttpIntegrationTest::initialize();
