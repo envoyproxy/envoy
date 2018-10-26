@@ -347,10 +347,10 @@ private:
 /**
  * Weighted Least Request load balancer.
  *
- * In a normal setup when all hosts have the same weight of 1 it randomly picks up two healthy hosts
- * and compares number of active requests. Technique is based on
- * http://www.eecs.harvard.edu/~michaelm/postscripts/mythesis.pdf and is known as P2C (power of
- * two choices).
+ * In a normal setup when all hosts have the same weight of 1 it randomly picks up N healthy hosts
+ * (where N is specified in the LB configuration) and compares number of active requests. Technique
+ * is based on http://www.eecs.harvard.edu/~michaelm/postscripts/mythesis.pdf and is known as P2C
+ * (power of two choices).
  *
  * When any hosts have a weight that is not 1, an RR EDF schedule is used. Host weight is scaled
  * by the number of active requests at pick/insert time. Thus, hosts will never fully drain as

@@ -1027,10 +1027,9 @@ TEST_P(LeastRequestLoadBalancerTest, Normal) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, PNC) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
-                              makeTestHost(info_, "tcp://127.0.0.1:81"),
-                              makeTestHost(info_, "tcp://127.0.0.1:82"),
-                              makeTestHost(info_, "tcp://127.0.0.1:83")};
+  hostSet().healthy_hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83")};
   stats_.max_host_weight_.set(1UL);
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
@@ -1043,11 +1042,11 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   // Creating various load balancer objects with different choice configs.
   envoy::api::v2::Cluster::LeastRequestLbConfig lr_lb_config;
   lr_lb_config.mutable_choice_count()->set_value(2);
-  LeastRequestLoadBalancer lb_2{
-      priority_set_, nullptr, stats_, runtime_, random_, common_config_, lr_lb_config};
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,      runtime_,
+                                random_,       common_config_, lr_lb_config};
   lr_lb_config.mutable_choice_count()->set_value(5);
-  LeastRequestLoadBalancer lb_5{
-      priority_set_, nullptr, stats_, runtime_, random_, common_config_, lr_lb_config};
+  LeastRequestLoadBalancer lb_5{priority_set_, nullptr,        stats_,      runtime_,
+                                random_,       common_config_, lr_lb_config};
 
   // Verify correct number of choices.
 
@@ -1064,12 +1063,14 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_5.chooseHost(nullptr));
 
   // Verify correct host chosen in P5C scenario.
-  EXPECT_CALL(random_, random()).Times(6).WillOnce(Return(0))
-                                         .WillOnce(Return(0))
-                                         .WillOnce(Return(1))
-                                         .WillOnce(Return(2))
-                                         .WillOnce(Return(3))
-                                         .WillOnce(Return(3));
+  EXPECT_CALL(random_, random())
+      .Times(6)
+      .WillOnce(Return(0))
+      .WillOnce(Return(0))
+      .WillOnce(Return(1))
+      .WillOnce(Return(2))
+      .WillOnce(Return(3))
+      .WillOnce(Return(3));
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_5.chooseHost(nullptr));
 }
 
