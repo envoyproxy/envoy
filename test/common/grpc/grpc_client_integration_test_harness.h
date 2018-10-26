@@ -417,7 +417,7 @@ public:
   Upstream::MockThreadLocalCluster thread_local_cluster_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl context_manager_{runtime_, test_time_.timeSystem()};
+  Ssl::ContextManagerImpl context_manager_{test_time_.timeSystem()};
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
