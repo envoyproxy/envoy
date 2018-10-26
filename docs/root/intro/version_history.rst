@@ -31,6 +31,7 @@ Version history
   its behaviour within TCP and HTTP implementations.
 * stream: renamed `perRequestState` to `filterState` in `StreamInfo`.
 * thrift_proxy: introduced thrift rate limiter filter
+* tls: add support for CRLs in :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
 * tracing: added support to the Zipkin tracer for the :ref:`b3 <config_http_conn_man_headers_b3>` single header format.
 * upstream: changed how load calculation for :ref:`priority levels<arch_overview_load_balancing_priority_levels>` and :ref:`panic thresholds<arch_overview_load_balancing_panic_threshold>` interact. As long as normalized total health is 100% panic thresholds are disregarded.
 
