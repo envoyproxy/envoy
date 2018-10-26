@@ -31,8 +31,7 @@ void SslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
   HttpIntegrationTest::initialize();
 
-  runtime_.reset(new NiceMock<Runtime::MockLoader>());
-  context_manager_.reset(new ContextManagerImpl(*runtime_, timeSystem()));
+  context_manager_.reset(new ContextManagerImpl(timeSystem()));
 
   registerTestServerPorts({"http"});
   client_ssl_ctx_plain_ = createClientSslTransportSocketFactory(false, false, *context_manager_);
@@ -49,7 +48,6 @@ void SslIntegrationTest::TearDown() {
   HttpIntegrationTest::cleanupUpstreamAndDownstream();
   codec_client_.reset();
   context_manager_.reset();
-  runtime_.reset();
 }
 
 Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn, bool san) {
@@ -175,20 +173,6 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
       lookupPort("admin"), "GET", "/certs", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-}
-
-TEST_P(SslIntegrationTest, AltAlpn) {
-  // Write the runtime file to turn alt_alpn on.
-  TestEnvironment::writeStringToFileForTest("runtime/ssl.alt_alpn", "100");
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-    // Configure the runtime directory.
-    bootstrap.mutable_runtime()->set_symlink_root(TestEnvironment::temporaryPath("runtime"));
-  });
-  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
-    return makeSslClientConnection(true, false);
-  };
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
-  checkStats();
 }
 
 class SslCaptureIntegrationTest : public SslIntegrationTest {

@@ -3,9 +3,15 @@
 import argparse
 import os
 import json
+import subprocess
 
-def generateCompilationDatabase():
-  os.system("bazel/gen_compilation_database.sh //source/... //test/... //tools/...")
+def generateCompilationDatabase(args):
+  if args.run_bazel_build:
+    subprocess.check_call(["bazel", "build"] + args.bazel_targets)
+
+  gen_compilation_database_sh = os.path.join(os.path.realpath(os.path.dirname(__file__)),
+      "../bazel/gen_compilation_database.sh")
+  subprocess.check_call([gen_compilation_database_sh] + args.bazel_targets)
 
 def isCompileTarget(target, args):
   filename = target["file"]
@@ -40,14 +46,19 @@ def fixCompilationDatabase(args):
     db = json.load(db_file)
 
   db = [modifyCompileCommand(target) for target in db if isCompileTarget(target, args)]
+
+  # Remove to avoid writing into symlink
+  os.remove("compile_commands.json")
   with open("compile_commands.json", "w") as db_file:
     json.dump(db, db_file, indent=2)
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Generate JSON compilation database')
-  parser.add_argument('--include_external', type=bool, default=False)
-  parser.add_argument('--include_genfiles', type=bool, default=False)
-  parser.add_argument('--include_headers', type=bool, default=False)
+  parser.add_argument('--run_bazel_build', action='store_true')
+  parser.add_argument('--include_external', action='store_true')
+  parser.add_argument('--include_genfiles', action='store_true')
+  parser.add_argument('--include_headers', action='store_true')
+  parser.add_argument('bazel_targets', nargs='*', default=["//source/...", "//test/...", "//tools/..."])
   args = parser.parse_args()
-  generateCompilationDatabase()
+  generateCompilationDatabase(args)
   fixCompilationDatabase(args)

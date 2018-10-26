@@ -150,8 +150,8 @@ protected:
   Event::FileEventPtr file_event_;
 
 private:
-  friend class ::Envoy::RandomPauseFilter;
-  friend class ::Envoy::TestPauseFilter;
+  friend class Envoy::RandomPauseFilter;
+  friend class Envoy::TestPauseFilter;
 
   void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);

@@ -20,7 +20,6 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
@@ -301,8 +300,7 @@ public:
   }
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
-  Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl context_manager_{runtime_, timeSystem()};
+  Ssl::ContextManagerImpl context_manager_{timeSystem()};
   FakeStreamPtr ads_stream_;
 };
 

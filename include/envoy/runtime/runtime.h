@@ -120,6 +120,10 @@ public:
    * random number between 0 and the fractional percent denominator and seeing if this number is <
    * the numerator value stored in the runtime key. The default_value's numerator/denominator is
    * used if the runtime key is invalid.
+   *
+   * If the runtime value for the provided runtime key is provided as an integer, it is assumed that
+   * the value is the numerator and the denominator is 100.
+   *
    * NOTE: In the current implementation, this routine may return different results each time it is
    *       called because a new random number is used each time. Callers should understand this
    *       behavior and not assume that subsequent calls using the same snapshot will be consistent.
@@ -134,6 +138,10 @@ public:
   /**
    * Test if a feature is enabled using a supplied stable random value. This variant is used if
    * the caller wants a stable result over multiple calls.
+   *
+   * If the runtime value for the provided runtime key is provided as an integer, it is assumed that
+   * the value is the numerator and the denominator is 100.
+   *
    * @param key supplies the feature key to lookup.
    * @param default_value supplies the default value that will be used if either the feature key
    *        does not exist or it is not a fractional percent.
