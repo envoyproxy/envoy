@@ -44,6 +44,59 @@ bool doValidate(const tsi_peer& peer, const std::unordered_set<std::string>& pee
   return false;
 }
 
+HandshakeValidator createHandshakeValidator(const envoy::config::transport_socket::alts::v2alpha::Alts& config) {
+  const auto& peer_service_accounts = config.peer_service_accounts();
+  const std::unordered_set<std::string> peers(peer_service_accounts.cbegin(),
+                                              peer_service_accounts.cend());
+  HandshakeValidator validator;
+  // Skip validation if peers is empty.
+  if (!peers.empty()) {
+    validator = [peers](const tsi_peer& peer, std::string& err) {
+      return doValidate(peer, peers, err);
+    };
+  }
+  return validator;
+}
+
+Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(const Protobuf::Message& message, bool is_upstream) {
+  auto config =
+      MessageUtil::downcastAndValidate<const envoy::config::transport_socket::alts::v2alpha::Alts&>(
+          message);
+  HandshakeValidator validator = createHandshakeValidator(config);
+
+  const std::string handshaker_service = config.handshaker_service();
+  HandshakerFactory factory =
+      [handshaker_service, is_upstream](Event::Dispatcher& dispatcher,
+                           const Network::Address::InstanceConstSharedPtr& local_address,
+                           const Network::Address::InstanceConstSharedPtr&) -> TsiHandshakerPtr {
+    ASSERT(local_address != nullptr);
+
+    GrpcAltsCredentialsOptionsPtr options;
+    if (is_upstream) {
+      options = GrpcAltsCredentialsOptionsPtr(grpc_alts_credentials_client_options_create());
+    } else {
+      options = GrpcAltsCredentialsOptionsPtr(grpc_alts_credentials_server_options_create());
+    }
+    const char* target_name = is_upstream ? "" : nullptr;
+    tsi_handshaker* handshaker = nullptr;
+    // Specifying target name as empty since TSI won't take care of validating peer identity
+    // in this use case. The validation will be performed by TsiSocket with the validator.
+    tsi_result status = alts_tsi_handshaker_create(options.get(), target_name, handshaker_service.c_str(),
+                                                   is_upstream, &handshaker);
+    CHandshakerPtr handshaker_ptr{handshaker};
+
+    if (status != TSI_OK) {
+      const std::string handshaker_name = is_upstream ? "client" : "server";
+      ENVOY_LOG_MISC(warn, "Cannot create ATLS {} handshaker, status: {}", handshaker_name, status);
+      return nullptr;
+    }
+
+    return std::make_unique<TsiHandshaker>(std::move(handshaker_ptr), dispatcher);
+  };
+
+  return std::make_unique<TsiSocketFactory>(factory, validator);
+}
+
 } // namespace
 
 ProtobufTypes::MessagePtr AltsTransportSocketConfigFactory::createEmptyConfigProto() {
@@ -53,89 +106,14 @@ ProtobufTypes::MessagePtr AltsTransportSocketConfigFactory::createEmptyConfigPro
 Network::TransportSocketFactoryPtr
 UpstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext&) {
-  auto config =
-      MessageUtil::downcastAndValidate<const envoy::config::transport_socket::alts::v2alpha::Alts&>(
-          message);
-
-  std::string handshaker_service = config.handshaker_service();
-  const auto& peer_service_accounts = config.peer_service_accounts();
-  std::unordered_set<std::string> peers(peer_service_accounts.cbegin(),
-                                        peer_service_accounts.cend());
-
-  HandshakeValidator validator;
-  // Skip validation if peers is empty.
-  if (!peers.empty()) {
-    validator = [peers](const tsi_peer& peer, std::string& err) {
-      return doValidate(peer, peers, err);
-    };
-  }
-
-  HandshakerFactory factory =
-      [handshaker_service](Event::Dispatcher& dispatcher,
-                           const Network::Address::InstanceConstSharedPtr& local_address,
-                           const Network::Address::InstanceConstSharedPtr&) -> TsiHandshakerPtr {
-    ASSERT(local_address != nullptr);
-    GrpcAltsCredentialsOptionsPtr options{grpc_alts_credentials_client_options_create()};
-
-    tsi_handshaker* handshaker = nullptr;
-    // Specifying target name as empty since TSI won't take care of validating peer identity
-    // in this use case. The validation will be performed by TsiSocket with the validator.
-    tsi_result status = alts_tsi_handshaker_create(options.get(), "", handshaker_service.c_str(),
-                                                   true /* is_client */, &handshaker);
-    CHandshakerPtr handshaker_ptr{handshaker};
-
-    if (status != TSI_OK) {
-      ENVOY_LOG_MISC(warn, "Cannot create ATLS client handshaker, status: {}", status);
-      return nullptr;
-    }
-
-    return std::make_unique<TsiHandshaker>(std::move(handshaker_ptr), dispatcher);
-  };
-
-  return std::make_unique<TsiSocketFactory>(factory, validator);
+  return createTransportSocketFactoryHelper(message, /* is_upstream */ true);
 }
 
 Network::TransportSocketFactoryPtr
 DownstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext&,
     const std::vector<std::string>&) {
-  auto config =
-      MessageUtil::downcastAndValidate<const envoy::config::transport_socket::alts::v2alpha::Alts&>(
-          message);
-
-  const std::string handshaker_service = config.handshaker_service();
-  const auto& peer_service_accounts = config.peer_service_accounts();
-  std::unordered_set<std::string> peers(peer_service_accounts.cbegin(),
-                                        peer_service_accounts.cend());
-
-  HandshakeValidator validator;
-  // Skip validation if peers is empty.
-  if (!peers.empty()) {
-    validator = [peers](const tsi_peer& peer, std::string& err) {
-      return doValidate(peer, peers, err);
-    };
-  }
-
-  HandshakerFactory factory =
-      [handshaker_service](Event::Dispatcher& dispatcher,
-                           const Network::Address::InstanceConstSharedPtr&,
-                           const Network::Address::InstanceConstSharedPtr&) -> TsiHandshakerPtr {
-    GrpcAltsCredentialsOptionsPtr options{grpc_alts_credentials_server_options_create()};
-
-    tsi_handshaker* handshaker = nullptr;
-    tsi_result status = alts_tsi_handshaker_create(
-        options.get(), nullptr, handshaker_service.c_str(), false /* is_client */, &handshaker);
-    CHandshakerPtr handshaker_ptr{handshaker};
-
-    if (status != TSI_OK) {
-      ENVOY_LOG_MISC(warn, "Cannot create ATLS server handshaker, status: {}", status);
-      return nullptr;
-    }
-
-    return std::make_unique<TsiHandshaker>(std::move(handshaker_ptr), dispatcher);
-  };
-
-  return std::make_unique<TsiSocketFactory>(factory, validator);
+  return createTransportSocketFactoryHelper(message, /* is_upstream */ false);
 }
 
 static Registry::RegisterFactory<UpstreamAltsTransportSocketConfigFactory,

@@ -82,10 +82,12 @@ envoy_extension_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
+        "//source/common/common:utility_lib",
         "//source/extensions/transport_sockets/alts:config",
         "//test/integration:http_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/transport_socket/alts/v2alpha:alts_cc",
     ],
 )

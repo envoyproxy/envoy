@@ -1,7 +1,7 @@
 #include "common/common/thread.h"
 
+#include "envoy/config/transport_socket/alts/v2alpha/alts.pb.h"
 #include "extensions/transport_sockets/alts/config.h"
-
 #include "test/core/tsi/alts/fake_handshaker/fake_handshaker_server.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
@@ -40,17 +40,13 @@ public:
                                   ->mutable_listeners(0)
                                   ->mutable_filter_chains(0)
                                   ->mutable_transport_socket();
-      std::string yaml = R"EOF(
-    name: envoy.transport_sockets.alts
-    config:
-      peer_service_accounts: []
-      handshaker_service: ")EOF" +
-                         fakeHandshakerServerAddress(server_connect_handshaker_) + "\"";
+      transport_socket->set_name("envoy.transport_sockets.alts");
+      envoy::config::transport_socket::alts::v2alpha::Alts alts_config;
       if (!server_peer_identity_.empty()) {
-        yaml.replace(yaml.find("[]"), std::string::size_type(2), server_peer_identity_);
+        alts_config.add_peer_service_accounts(server_peer_identity_);
       }
-
-      MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *transport_socket);
+      alts_config.set_handshaker_service(fakeHandshakerServerAddress(server_connect_handshaker_));
+      MessageUtil::jsonConvert(alts_config, *transport_socket->mutable_config());
     });
     HttpIntegrationTest::initialize();
     registerTestServerPorts({"http"});
@@ -73,20 +69,16 @@ public:
 
     fake_handshaker_server_ci_.waitReady();
 
-    std::string client_yaml = R"EOF(
-      peer_service_accounts: []
-      handshaker_service: ")EOF" +
-                              fakeHandshakerServerAddress(client_connect_handshaker_) + "\"";
-    if (!client_peer_identity_.empty()) {
-      client_yaml.replace(client_yaml.find("[]"), std::string::size_type(2), client_peer_identity_);
-    }
-
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
     UpstreamAltsTransportSocketConfigFactory factory;
 
+    envoy::config::transport_socket::alts::v2alpha::Alts alts_config;
+    alts_config.set_handshaker_service(fakeHandshakerServerAddress(client_connect_handshaker_));
+    if (!client_peer_identity_.empty()) {
+      alts_config.add_peer_service_accounts(client_peer_identity_);
+    }
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
-    MessageUtil::loadFromYaml(TestEnvironment::substitute(client_yaml), *config);
-
+    MessageUtil::jsonConvert(alts_config, *config);
     ENVOY_LOG_MISC(info, "{}", config->DebugString());
 
     client_alts_ = factory.createTransportSocketFactory(*config, mock_factory_ctx);
@@ -140,7 +132,7 @@ public:
   // FakeHandshake server sends "peer_identity" as peer service account. Set this
   // information into config to pass validation.
   AltsIntegrationTestValidPeer()
-      : AltsIntegrationTestBase("[peer_identity]", "",
+      : AltsIntegrationTestBase("peer_identity", "",
                                 /* server_connect_handshaker */ true,
                                 /* client_connect_handshaker */ true) {}
 };

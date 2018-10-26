@@ -11,7 +11,7 @@ import "validate/validate.proto";
 // https://cloud.google.com/security/encryption-in-transit/application-layer-transport-security/
 message Alts {
   // The location of a handshaker service, this is usually 169.254.169.254:8080
-  // on GCE
+  // on GCE.
   string handshaker_service = 1 [(validate.rules).string.min_bytes = 1];
 
   // The acceptable service accounts from peer, peers not in the list will be rejected in the
