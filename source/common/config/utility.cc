@@ -224,10 +224,10 @@ Utility::parseRateLimitSettings(const envoy::api::v2::core::ApiConfigSource& api
     rate_limit_settings.enabled_ = true;
     rate_limit_settings.max_tokens_ =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(api_config_source.rate_limit_settings(), max_tokens,
-                                        Envoy::Config::RateLimitSettings::DEFAULT_MAX_TOKENS);
-    if (api_config_source.rate_limit_settings().fill_rate() > 0) {
-      rate_limit_settings.fill_rate_ = api_config_source.rate_limit_settings().fill_rate();
-    }
+                                        Envoy::Config::RateLimitSettings::DefaultMaxTokens);
+    rate_limit_settings.fill_rate_ =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(api_config_source.rate_limit_settings(), fill_rate,
+                                        Envoy::Config::RateLimitSettings::DefaultFillRate);
   }
   return rate_limit_settings;
 }

@@ -50,7 +50,8 @@ message ApiConfigSource {
   google.protobuf.Duration request_timeout = 5
       [(validate.rules).duration.gt.seconds = 0, (gogoproto.stdduration) = true];
 
-  // If present, discovery requests made by Envoy will be rate limited.
+  // For GRPC APIs, the rate limit settings. If present, discovery requests made by Envoy will be
+  // rate limited.
   RateLimitSettings rate_limit_settings = 6;
 }
 
@@ -68,7 +69,7 @@ message RateLimitSettings {
 
   // Rate at which tokens will be filled per second. If not set, a default fill rate of 10 tokens
   // per second will be used.
-  double fill_rate = 2;
+  google.protobuf.DoubleValue fill_rate = 2;
 }
 
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters

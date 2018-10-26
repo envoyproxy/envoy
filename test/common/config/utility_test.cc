@@ -236,7 +236,7 @@ TEST(UtilityTest, ParseRateLimitSettings) {
   ::envoy::api::v2::core::RateLimitSettings* rate_limits =
       api_config_source.mutable_rate_limit_settings();
   rate_limits->mutable_max_tokens()->set_value(500);
-  rate_limits->set_fill_rate(4);
+  rate_limits->mutable_fill_rate()->set_value(4);
   const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
   EXPECT_EQ(true, rate_limit_settings.enabled_);
   EXPECT_EQ(500, rate_limit_settings.max_tokens_);

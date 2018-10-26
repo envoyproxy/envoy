@@ -41,12 +41,12 @@ public:
  */
 struct RateLimitSettings {
   // Default Max Tokens.
-  static const uint32_t DEFAULT_MAX_TOKENS = 100;
+  static const uint32_t DefaultMaxTokens = 100;
   // Default Fill Rate.
-  static constexpr double DEFAULT_FILL_RATE = 10;
+  static constexpr double DefaultFillRate = 10;
 
-  uint32_t max_tokens_{DEFAULT_MAX_TOKENS};
-  double fill_rate_{DEFAULT_FILL_RATE};
+  uint32_t max_tokens_{DefaultMaxTokens};
+  double fill_rate_{DefaultFillRate};
   bool enabled_{false};
 };
 
