@@ -669,8 +669,8 @@ public:
 
   /**
    * @return the phase in which the cluster is initialized at boot. This mechanism is used such that
-   *         clusters that depend on other clusters can correctly initialize. (E.g., an SDS cluster
-   *         that depends on resolution of the SDS server itself).
+   *         clusters that depend on other clusters can correctly initialize. (E.g., an EDS cluster
+   *         that depends on resolution of the EDS server itself).
    */
   virtual InitializePhase initializePhase() const PURE;
 
