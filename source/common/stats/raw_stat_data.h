@@ -46,7 +46,7 @@ struct RawStatData {
   static uint64_t structSize(uint64_t name_size);
 
   /**
-   * Wrapper for structSize, taking a StatsOptions struct.  Required by
+   * Wrapper for structSize, taking a StatsOptions struct. Required by
    * BlockMemoryHashSet, which has the context to supply StatsOptions.
    */
   static uint64_t structSizeWithOptions(const StatsOptions& stats_options);

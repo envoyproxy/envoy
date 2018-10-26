@@ -20,7 +20,7 @@ HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {
   // required to use this allocator. Note that data must be freed by calling
   // its free() method, and not by destruction, thus the more complex use of
   // unique_ptr.
-  std::unique_ptr<HeapStatData, std::function<void(HeapStatData* d)>> data(
+  std::unique_ptr<HeapStatData, std::function<void(HeapStatData * d)>> data(
       HeapStatData::alloc(name), [](HeapStatData* d) { d->free(); });
   Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data.get());

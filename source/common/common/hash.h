@@ -10,7 +10,6 @@
 #include "absl/strings/string_view.h"
 #include "xxhash.h"
 
-
 namespace Envoy {
 
 class HashUtil {
