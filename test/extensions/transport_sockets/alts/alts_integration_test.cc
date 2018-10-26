@@ -1,7 +1,9 @@
+#include "envoy/config/transport_socket/alts/v2alpha/alts.pb.h"
+
 #include "common/common/thread.h"
 
-#include "envoy/config/transport_socket/alts/v2alpha/alts.pb.h"
 #include "extensions/transport_sockets/alts/config.h"
+
 #include "test/core/tsi/alts/fake_handshaker/fake_handshaker_server.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"

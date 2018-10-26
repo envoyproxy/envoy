@@ -78,11 +78,11 @@ envoy_extension_cc_test(
         "grpc_alts_fake_handshaker_server",
     ],
     deps = [
+        "//source/common/common:utility_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
-        "//source/common/common:utility_lib",
         "//source/extensions/transport_sockets/alts:config",
         "//test/integration:http_integration_lib",
         "//test/mocks/runtime:runtime_mocks",

@@ -44,7 +44,8 @@ bool doValidate(const tsi_peer& peer, const std::unordered_set<std::string>& pee
   return false;
 }
 
-HandshakeValidator createHandshakeValidator(const envoy::config::transport_socket::alts::v2alpha::Alts& config) {
+HandshakeValidator
+createHandshakeValidator(const envoy::config::transport_socket::alts::v2alpha::Alts& config) {
   const auto& peer_service_accounts = config.peer_service_accounts();
   const std::unordered_set<std::string> peers(peer_service_accounts.cbegin(),
                                               peer_service_accounts.cend());
@@ -58,7 +59,8 @@ HandshakeValidator createHandshakeValidator(const envoy::config::transport_socke
   return validator;
 }
 
-Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(const Protobuf::Message& message, bool is_upstream) {
+Network::TransportSocketFactoryPtr
+createTransportSocketFactoryHelper(const Protobuf::Message& message, bool is_upstream) {
   auto config =
       MessageUtil::downcastAndValidate<const envoy::config::transport_socket::alts::v2alpha::Alts&>(
           message);
@@ -66,9 +68,10 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(const Prot
 
   const std::string handshaker_service = config.handshaker_service();
   HandshakerFactory factory =
-      [handshaker_service, is_upstream](Event::Dispatcher& dispatcher,
-                           const Network::Address::InstanceConstSharedPtr& local_address,
-                           const Network::Address::InstanceConstSharedPtr&) -> TsiHandshakerPtr {
+      [handshaker_service,
+       is_upstream](Event::Dispatcher& dispatcher,
+                    const Network::Address::InstanceConstSharedPtr& local_address,
+                    const Network::Address::InstanceConstSharedPtr&) -> TsiHandshakerPtr {
     ASSERT(local_address != nullptr);
 
     GrpcAltsCredentialsOptionsPtr options;
@@ -81,8 +84,8 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(const Prot
     tsi_handshaker* handshaker = nullptr;
     // Specifying target name as empty since TSI won't take care of validating peer identity
     // in this use case. The validation will be performed by TsiSocket with the validator.
-    tsi_result status = alts_tsi_handshaker_create(options.get(), target_name, handshaker_service.c_str(),
-                                                   is_upstream, &handshaker);
+    tsi_result status = alts_tsi_handshaker_create(
+        options.get(), target_name, handshaker_service.c_str(), is_upstream, &handshaker);
     CHandshakerPtr handshaker_ptr{handshaker};
 
     if (status != TSI_OK) {
