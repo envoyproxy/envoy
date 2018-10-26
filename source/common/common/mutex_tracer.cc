@@ -1,6 +1,9 @@
 #include "common/common/mutex_tracer.h"
 
+#include <iostream>
 #include <memory>
+
+#include "common/common/assert.h"
 
 namespace Envoy {
 
@@ -14,6 +17,7 @@ MutexTracer* MutexTracer::getOrCreateTracer() {
 }
 
 void MutexTracer::contentionHook(const char* msg, const void* obj, int64_t wait_cycles) {
+  ASSERT(singleton_ != nullptr);
   singleton_->RecordContention(msg, obj, wait_cycles);
 }
 

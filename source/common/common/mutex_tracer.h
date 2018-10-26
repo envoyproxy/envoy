@@ -40,11 +40,11 @@ private:
   void RecordContention(const char*, const void*, int64_t wait_cycles);
 
   // Number of mutex contention occurrences since last reset.
-  std::atomic<int64_t> num_contentions_;
+  std::atomic<int64_t> num_contentions_{0};
   // Length of the current contention wait cycle.
-  std::atomic<int64_t> current_wait_cycles_;
+  std::atomic<int64_t> current_wait_cycles_{0};
   // Total sum of all wait cycles.
-  std::atomic<int64_t> lifetime_wait_cycles_;
+  std::atomic<int64_t> lifetime_wait_cycles_{0};
   // TODO(ambuc): Build running averages here?
 
   // We utilize std::memory_order_relaxed for all operations for the least possible contention.

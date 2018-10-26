@@ -110,6 +110,7 @@ envoy_cc_library(
     srcs = ["mutex_tracer.cc"],
     hdrs = ["mutex_tracer.h"],
     deps = [
+        ":assert_lib",
     ],
 )
 

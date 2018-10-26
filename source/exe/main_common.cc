@@ -78,6 +78,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
         access_log_lock, component_factory, std::move(random_generator), *tls_);
 
     if (options.mutexTracingEnabled()) {
+      Envoy::MutexTracer::getOrCreateTracer();
       absl::RegisterMutexTracer(&Envoy::MutexTracer::contentionHook);
     }
 

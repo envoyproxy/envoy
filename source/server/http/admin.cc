@@ -439,7 +439,7 @@ Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap& resp
     mutex_stats.set_num_contentions(MutexTracer::getOrCreateTracer()->numContentions());
     mutex_stats.set_current_wait_cycles(MutexTracer::getOrCreateTracer()->currentWaitCycles());
     mutex_stats.set_lifetime_wait_cycles(MutexTracer::getOrCreateTracer()->lifetimeWaitCycles());
-    response.add(MessageUtil::getJsonStringFromMessage(mutex_stats, true));
+    response.add(MessageUtil::getJsonStringFromMessage(mutex_stats, true, true));
   } else {
     response.add("Mutex contention tracing is not enabled. To enable, run Envoy with flag "
                  "--enable-mutex-tracing.");
