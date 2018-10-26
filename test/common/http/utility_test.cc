@@ -17,6 +17,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::Return;
 
 namespace Envoy {
 namespace Http {
@@ -548,6 +549,29 @@ TEST(HttpUtility, QueryParamsToString) {
   EXPECT_EQ("?a=1", Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}})));
   EXPECT_EQ("?a=1&b=2",
             Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}, {"b", "2"}})));
+}
+
+TEST(HttpUtility, resolvePerFilterConfigGeneric) {
+  const std::string filter_name = "envoy.filter";
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+
+  const Router::RouteSpecificFilterConfig* nullconfig = nullptr;
+  const Router::RouteSpecificFilterConfig* one = nullconfig + 1;
+  const Router::RouteSpecificFilterConfig* two = nullconfig + 2;
+  const Router::RouteSpecificFilterConfig* three = nullconfig + 3;
+
+  // Testing in reverse order, so that the method always returns the last object.
+
+  ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
+      .WillByDefault(Return(one));
+  EXPECT_EQ(one, Utility::resolvePerFilterConfigGeneric(filter_name, filter_callbacks.route()));
+
+  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name)).WillByDefault(Return(two));
+  EXPECT_EQ(two, Utility::resolvePerFilterConfigGeneric(filter_name, filter_callbacks.route()));
+
+  ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
+      .WillByDefault(Return(three));
+  EXPECT_EQ(three, Utility::resolvePerFilterConfigGeneric(filter_name, filter_callbacks.route()));
 }
 
 } // namespace Http

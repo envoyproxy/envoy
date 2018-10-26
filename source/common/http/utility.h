@@ -233,6 +233,46 @@ void transformUpgradeRequestFromH2toH1(HeaderMap& headers);
  */
 void transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade);
 
+/**
+ * The non template implementation of resolvePerFilterConfig. see
+ * resolvePerFilterConfig for docs.
+ */
+const Router::RouteSpecificFilterConfig*
+resolvePerFilterConfigGeneric(const std::string& filter_name,
+                              const Router::RouteConstSharedPtr& route);
+
+/**
+ * Retreives the route specific config. Route specific config can be in a few
+ * places, that are checked in order. The first config found is returned. The
+ * order is:
+ * - the routeEntry() (for config that's applied on weighted clusters)
+ * - the route
+ * - and finally from the virtual host object (routeEntry()->virtualhost()).
+ *
+ * To use, simply:
+ *
+ *     const auto* config =
+ *         Utility::resolvePerFilterConfig<ConcreteType>(FILTER_NAME, stream_callbacks_.route());
+ *
+ * See notes about config's lifetime below.
+ *
+ * @param filter_name The name of the filter who's route config should be
+ * fetched.
+ *
+ * @param route The route to check for route configs. nullptr routes will
+ * result in nullptr being reutrned.
+ *
+ * @return The route config if found. nullptr if not found. The returned
+ * pointer's lifetime is the same as the route parameter.
+ */
+template <class ConfigType>
+const ConfigType* resolvePerFilterConfig(const std::string& filter_name,
+                                         const Router::RouteConstSharedPtr& route) {
+  static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
+                "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
+  return dynamic_cast<const ConfigType*>(resolvePerFilterConfigGeneric(filter_name, route));
+}
+
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy

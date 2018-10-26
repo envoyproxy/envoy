@@ -14,7 +14,8 @@ namespace ExtAuthz {
  * Config registration for the external authorization filter. @see NamedHttpFilterConfigFactory.
  */
 class ExtAuthzFilterConfig
-    : public Common::FactoryBase<envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz> {
+    : public Common::FactoryBase<envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz,
+                                 envoy::config::filter::http::ext_authz::v2alpha::CheckSettings> {
 public:
   ExtAuthzFilterConfig() : FactoryBase(HttpFilterNames::get().ExtAuthorization) {}
 
@@ -23,6 +24,10 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+
+  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+      const envoy::config::filter::http::ext_authz::v2alpha::CheckSettings& proto_config,
+      Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace ExtAuthz

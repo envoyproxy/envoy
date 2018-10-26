@@ -5,6 +5,8 @@
 #include "common/http/codes.h"
 #include "common/router/config_impl.h"
 
+#include "extensions/filters/http/well_known_names.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -20,8 +22,13 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
     return;
   }
 
-  Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(callbacks_, headers,
-                                                                check_request_);
+  const FilterConfigPerRoute* per_route_config =
+      Http::Utility::resolvePerFilterConfig<FilterConfigPerRoute>(
+          HttpFilterNames::get().ExtAuthorization, route);
+
+  Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
+      callbacks_, headers, per_route_config ? &per_route_config->contextExtensions() : nullptr,
+      check_request_);
 
   state_ = State::Calling;
   // Don't let the filter chain continue as we are going to invoke check call.

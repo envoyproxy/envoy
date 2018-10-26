@@ -112,6 +112,26 @@ private:
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
 
 /**
+ *  Per route settings for ExtAuth. Allows customizing the CheckRequest on a
+ * virtualhost\route\weighted cluster level.
+ */
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  FilterConfigPerRoute(const envoy::config::filter::http::ext_authz::v2alpha::CheckSettings& config)
+      : context_extensions_(config.context_extensions()) {}
+
+  /**
+   * @return Context extensions to add to the CheckRequest.
+   */
+  const Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>& contextExtensions() const {
+    return context_extensions_;
+  }
+
+private:
+  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> context_extensions_;
+};
+
+/**
  * HTTP ext_authz filter. Depending on the route configuration, this filter calls the global
  * ext_authz service before allowing further filter iteration.
  */
