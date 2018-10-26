@@ -1876,6 +1876,19 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
   EXPECT_FALSE(host_set_.chooseLocality().has_value());
 }
 
+// When a locality has zero hosts, it should be treated as if it has zero healthy.
+TEST_F(HostSetImplLocalityTest, EmptyLocality) {
+  HostsPerLocalitySharedPtr hosts_per_locality =
+      makeHostsPerLocality({{hosts_[0], hosts_[1], hosts_[2]}, {}});
+  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
+  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
+  host_set_.updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, locality_weights, {},
+                        {}, absl::nullopt);
+  // Verify that we are not RRing between localities.
+  EXPECT_EQ(0, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseLocality().value());
+}
+
 // When all locality weights are zero we should fail to select a locality.
 TEST_F(HostSetImplLocalityTest, AllZeroWeights) {
   HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}});
