@@ -238,7 +238,7 @@ void ConfigHelper::setCaptureTransportSocket(
     RELEASE_ASSERT(!tls_config, "");
     inner_transport_socket.MergeFrom(transport_socket);
   } else if (tls_config.has_value()) {
-    inner_transport_socket.set_name("ssl");
+    inner_transport_socket.set_name("tls");
     inner_transport_socket.mutable_config()->MergeFrom(tls_config.value());
   } else {
     inner_transport_socket.set_name("raw_buffer");

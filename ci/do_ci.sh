@@ -95,6 +95,19 @@ elif [[ "$1" == "bazel.asan" ]]; then
   echo "Building and testing..."
   bazel test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/... \
     //:echo2_integration_test //:envoy_binary_test
+  # Also validate that integration test traffic capture (useful when debugging etc.)
+  # works. This requires that we set CAPTURE_ENV. We do this under bazel.asan to
+  # ensure a debug build in CI.
+  CAPTURE_TMP=/tmp/capture/
+  rm -rf "${CAPTURE_TMP}"
+  mkdir -p "${CAPTURE_TMP}"
+  bazel test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
+    @envoy//test/integration:ssl_integration_test \
+    --test_env=CAPTURE_PATH="${CAPTURE_TMP}/capture"
+  # Verify that some pb_text files have been created. We can't check for pcap,
+  # since tcpdump is not available in general due to CircleCI lack of support
+  # for privileged Docker executors.
+  ls -l "${CAPTURE_TMP}"/*.pb_text > /dev/null
   exit 0
 elif [[ "$1" == "bazel.tsan" ]]; then
   setup_clang_toolchain
