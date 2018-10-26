@@ -88,7 +88,16 @@ jobs:
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
+       - restore_cache:
+           keys:
+             - clang_tidy-v1-{{ .Branch }}-{{ .Revision }}
+             - clang_tidy-v1-{{ .Branch }}-
+             - clang_tidy-v1-master-
        - run: ci/do_circle_ci.sh bazel.clang_tidy
+       - save_cache:
+           key: clang_tidy-v1-{{ .Branch }}-{{ .Revision }}
+           paths:
+             - /build/tmp
 
    format:
      executor: ubuntu-build
