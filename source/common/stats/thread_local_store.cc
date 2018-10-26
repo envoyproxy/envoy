@@ -16,8 +16,7 @@
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/flat_hash_set.h"
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -39,7 +38,7 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
-  absl::flat_hash_set<std::string> names;
+  absl::node_hash_set<std::string> names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& counter : scope->central_cache_.counters_) {
@@ -62,7 +61,7 @@ ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
-  absl::flat_hash_set<std::string> names;
+  absl::node_hash_set<std::string> names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& gauge : scope->central_cache_.gauges_) {
