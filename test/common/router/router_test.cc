@@ -124,9 +124,8 @@ public:
     fields_map["version"] = val;
     val.set_string_value("devel");
     fields_map["stage"] = val;
-    (*callbacks_.stream_info_.metadata_
-          .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
-        request_struct;
+    callbacks_.stream_info_.setDynamicMetadata(Envoy::Config::MetadataFilters::get().ENVOY_LB,
+                                                 request_struct);
 
     // Populate route entry's metadata which will be overridden.
     val.set_string_value("v3.0");

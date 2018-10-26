@@ -12,13 +12,26 @@
 namespace Envoy {
 namespace StreamInfo {
 
+// Mutable filter state wrapping metadata object. State within this
+// metadata should still be namespaced per usual reverse dns naming
+// conventions.
+struct DynamicMetadataWrapper: public FilterState::Object {    
+    envoy::api::v2::core::Metadata metadata_{};
+    static constexpr const char* filter_state_name_ = "envoy.streaminfo.dynamicmetadata";
+};
+
 struct StreamInfoImpl : public StreamInfo {
   explicit StreamInfoImpl(TimeSource& time_source)
       : time_source_(time_source), start_time_(time_source.systemTime()),
-        start_time_monotonic_(time_source.monotonicTime()) {}
+        start_time_monotonic_(time_source.monotonicTime()) {
+        // initialize well-known mutable filter state
+        filter_state_.setData(DynamicMetadataWrapper::filter_state_name_, std::make_unique<DynamicMetadataWrapper>(), FilterState::StateType::Mutable);
+  }
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source) : StreamInfoImpl(time_source) {
     protocol_ = protocol;
+    // initialize well-known mutable filter state
+    filter_state_.setData(DynamicMetadataWrapper::filter_state_name_, std::make_unique<DynamicMetadataWrapper>(), FilterState::StateType::Mutable);
   }
 
   SystemTime startTime() const override { return start_time_; }
@@ -176,11 +189,14 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
-  const envoy::api::v2::core::Metadata& dynamicMetadata() const override { return metadata_; };
+  const envoy::api::v2::core::Metadata& dynamicMetadata() const override {
+      return filter_state_.getDataReadOnly<DynamicMetadataWrapper>(DynamicMetadataWrapper::filter_state_name_).metadata_;
+  }
 
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
-    (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
-  };
+    envoy::api::v2::core::Metadata& metadata = filter_state_.getDataMutable<DynamicMetadataWrapper>(DynamicMetadataWrapper::filter_state_name_).metadata_;
+    (*metadata.mutable_filter_metadata())[name].MergeFrom(value);
+  }
 
   FilterState& filterState() override { return filter_state_; }
   const FilterState& filterState() const override { return filter_state_; }
@@ -210,7 +226,6 @@ struct StreamInfoImpl : public StreamInfo {
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool hc_request_{};
   const Router::RouteEntry* route_entry_{};
-  envoy::api::v2::core::Metadata metadata_{};
   FilterStateImpl filter_state_{};
 
 private:

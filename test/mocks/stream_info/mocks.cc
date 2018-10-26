@@ -17,6 +17,8 @@ namespace StreamInfo {
 MockStreamInfo::MockStreamInfo()
     : downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
       downstream_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")) {
+  filter_state_.setData(DynamicMetadataWrapper::filter_state_name_, std::make_unique<DynamicMetadataWrapper>(), FilterState::StateType::Mutable);
+
   ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
@@ -63,13 +65,17 @@ MockStreamInfo::MockStreamInfo()
     bytes_sent_ += bytes_sent;
   }));
   ON_CALL(*this, bytesSent()).WillByDefault(ReturnPointee(&bytes_sent_));
-  ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
   ON_CALL(*this, setRequestedServerName(_))
       .WillByDefault(Invoke([this](const absl::string_view requested_server_name) {
         requested_server_name_ = std::string(requested_server_name);
       }));
   ON_CALL(*this, requestedServerName()).WillByDefault(ReturnRef(requested_server_name_));
+
+  ON_CALL(*this, dynamicMetadata).WillByDefault(
+                                                Invoke([this](){
+                                                    ReturnRef(filter_state_.getDataReadOnly<DynamicMetadataWrapper>(DynamicMetadataWrapper::filter_state_name_).metadata_);
+                                                  }));
 }
 
 MockStreamInfo::~MockStreamInfo() {}

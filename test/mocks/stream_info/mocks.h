@@ -2,6 +2,7 @@
 
 #include "envoy/stream_info/stream_info.h"
 
+#include "common/stream_info/stream_info_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 #include "test/mocks/upstream/host.h"
@@ -81,7 +82,6 @@ public:
   absl::optional<std::chrono::nanoseconds> end_time_;
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
-  envoy::api::v2::core::Metadata metadata_;
   FilterStateImpl filter_state_;
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
