@@ -13,7 +13,6 @@
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
 #include "test/mocks/init/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -91,8 +90,7 @@ public:
   }
 
 private:
-  Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl context_manager_{runtime_, timeSystem()};
+  Ssl::ContextManagerImpl context_manager_{timeSystem()};
 
   Network::TransportSocketFactoryPtr client_ssl_ctx_;
 };
@@ -154,9 +152,7 @@ public:
   }
 
 private:
-  Runtime::MockLoader runtime_;
-
-  Ssl::ContextManagerImpl context_manager_{runtime_, timeSystem()};
+  Ssl::ContextManagerImpl context_manager_{timeSystem()};
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SdsStaticUpstreamIntegrationTest,

@@ -48,8 +48,7 @@
       "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
       "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/servercert.pem",
       "private_key_file": "{{ test_rundir }}/test/config/integration/certs/serverkey.pem",
-      "alpn_protocols": "h2,http/1.1",
-      "alt_alpn_protocols": "http/1.1"
+      "alpn_protocols": "h2,http/1.1"
     },
     "filters": [
       { "type": "read", "name": "tcp_proxy",

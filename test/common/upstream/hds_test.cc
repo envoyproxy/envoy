@@ -110,7 +110,7 @@ public:
   Grpc::MockAsyncClient* async_client_;
   Runtime::MockLoader runtime_;
   Event::SimulatedTimeSystem time_system_;
-  Ssl::ContextManagerImpl ssl_context_manager_{runtime_, time_system_};
+  Ssl::ContextManagerImpl ssl_context_manager_{time_system_};
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
