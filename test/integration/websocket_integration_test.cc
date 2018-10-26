@@ -55,10 +55,10 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
   ASSERT_TRUE(proxied_request_headers.EnvoyExpectedRequestTimeoutMs() != nullptr);
   proxied_request_headers.removeEnvoyExpectedRequestTimeoutMs();
 
-  if (proxied_request_headers.Scheme()) {		
-    ASSERT_STREQ(proxied_request_headers.Scheme()->value().c_str(), "http");		
-  } else {		
-    proxied_request_headers.insertScheme().value().append("http", 4);		
+  if (proxied_request_headers.Scheme()) {
+    ASSERT_STREQ(proxied_request_headers.Scheme()->value().c_str(), "http");
+  } else {
+    proxied_request_headers.insertScheme().value().append("http", 4);
   }
 
   commonValidate(proxied_request_headers, original_request_headers);
