@@ -4,9 +4,12 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/string_view.h"
 #include "xxhash.h"
+
 
 namespace Envoy {
 
@@ -48,7 +51,7 @@ struct CharStarEqual {
 };
 
 template <class Value>
-using CharStarHashMap = std::unordered_map<const char*, Value, CharStarHash, CharStarEqual>;
-using CharStarHashSet = std::unordered_set<const char*, CharStarHash, CharStarEqual>;
+using CharStarHashMap = absl::flat_hash_map<const char*, Value, CharStarHash, CharStarEqual>;
+using CharStarHashSet = absl::flat_hash_set<const char*, CharStarHash, CharStarEqual>;
 
 } // namespace Envoy

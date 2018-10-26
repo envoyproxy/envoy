@@ -76,7 +76,7 @@ private:
   // TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/3927 and
   //  https://github.com/envoyproxy/envoy/issues/3585, which can help reorganize
   // the heap stats using a ref-counted symbol table to compress the stat strings.
-  using StatSet = std::flat_hash_set<HeapStatData*, HeapStatHash, HeapStatCompare>;
+  using StatSet = absl::flat_hash_set<HeapStatData*, HeapStatHash, HeapStatCompare>;
 
   // An unordered set of HeapStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher.
