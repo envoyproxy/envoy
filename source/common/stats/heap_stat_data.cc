@@ -15,22 +15,22 @@ HeapStatDataAllocator::HeapStatDataAllocator() {}
 
 HeapStatDataAllocator::~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 
-HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) noexcept {
+HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {
   // Any expected truncation of name is done at the callsite. No truncation is
   // required to use this allocator. Note that data must be freed by calling
-  // its free() method, and not by destructing or unique_ptr. So this method
-  // cannot call anything that might throw, and thus it cannot through itself.
-  HeapStatData* data = HeapStatData::alloc(name);
+  // its free() method, and not by destruction, thus the more complex use of
+  // unique_ptr.
+  std::unique_ptr<HeapStatData, std::function<void(HeapStatData* d)>> data(
+      HeapStatData::alloc(name), [](HeapStatData* d) { d->free(); });
   Thread::ReleasableLockGuard lock(mutex_);
-  auto ret = stats_.insert(data);
+  auto ret = stats_.insert(data.get());
   HeapStatData* existing_data = *ret.first;
   lock.release();
 
   if (ret.second) {
-    return data;
+    return data.release();
   }
   ++existing_data->ref_count_;
-  data->free();
   return existing_data;
 }
 
