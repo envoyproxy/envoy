@@ -1026,31 +1026,31 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
   // benefit given the healthy panic, locality, and priority calculations that take place.
   if (cluster->lbSubsetInfo().isEnabled()) {
-    lb_.reset(new SubsetLoadBalancer(
+    lb_ = make_unique<SubsetLoadBalancer>(
         cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
         parent.parent_.runtime_, parent.parent_.random_, cluster->lbSubsetInfo(),
-        cluster->lbRingHashConfig(), cluster->lbLeastRequestConfig().value(), cluster->lbConfig()));
+        cluster->lbRingHashConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig());
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
       ASSERT(lb_factory_ == nullptr);
-      lb_.reset(new LeastRequestLoadBalancer(
+      lb_ = make_unique<LeastRequestLoadBalancer>(
           priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
-          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig()));
+          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig());
       break;
     }
     case LoadBalancerType::Random: {
       ASSERT(lb_factory_ == nullptr);
-      lb_.reset(new RandomLoadBalancer(priority_set_, parent_.local_priority_set_, cluster->stats(),
-                                       parent.parent_.runtime_, parent.parent_.random_,
-                                       cluster->lbConfig()));
+      lb_ = make_unique<RandomLoadBalancer>(priority_set_, parent_.local_priority_set_,
+                                            cluster->stats(), parent.parent_.runtime_,
+                                            parent.parent_.random_, cluster->lbConfig());
       break;
     }
     case LoadBalancerType::RoundRobin: {
       ASSERT(lb_factory_ == nullptr);
-      lb_.reset(new RoundRobinLoadBalancer(priority_set_, parent_.local_priority_set_,
-                                           cluster->stats(), parent.parent_.runtime_,
-                                           parent.parent_.random_, cluster->lbConfig()));
+      lb_ = make_unique<RoundRobinLoadBalancer>(priority_set_, parent_.local_priority_set_,
+                                                cluster->stats(), parent.parent_.runtime_,
+                                                parent.parent_.random_, cluster->lbConfig());
       break;
     }
     case LoadBalancerType::RingHash:
@@ -1061,9 +1061,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     }
     case LoadBalancerType::OriginalDst: {
       ASSERT(lb_factory_ == nullptr);
-      lb_.reset(new OriginalDstCluster::LoadBalancer(
+      lb_ = make_unique<OriginalDstCluster::LoadBalancer>(
           priority_set_, parent.parent_.active_clusters_.at(cluster->name())->cluster_,
-          cluster->lbOriginalDstConfig()));
+          cluster->lbOriginalDstConfig());
       break;
     }
     }

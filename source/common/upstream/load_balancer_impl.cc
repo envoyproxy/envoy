@@ -595,7 +595,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
   // A user is not allowed to specify less than two choices.
   uint64_t choice_count = 2;
   if (least_request_config_.has_value()) {
-    choice_count = std::max(2UL, least_request_config_.value().choice_count().value());
+    choice_count = std::max<uint64_t>(2UL, least_request_config_.value().choice_count().value());
   }
 
   HostSharedPtr candidate_host = nullptr;
