@@ -10,6 +10,7 @@
 
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/callback.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
@@ -410,6 +411,17 @@ public:
 // clang-format on
 
 /**
+ * Cluster circuit breakers stats.
+ */
+// clang-format off
+#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GAUGE)                                                  \
+  GAUGE (cx_open)                                                                                  \
+  GAUGE (rq_pending_open)                                                                          \
+  GAUGE (rq_open)                                                                                  \
+  GAUGE (rq_retry_open)
+// clang-format on
+
+/**
  * Struct definition for all cluster stats. @see stats_macros.h
  */
 struct ClusterStats {
@@ -424,6 +436,13 @@ struct ClusterLoadReportStats {
 };
 
 /**
+ * Struct definition for cluster circuit breakers stats. @see stats_macros.h
+ */
+struct ClusterCircuitBreakersStats {
+  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT)
+};
+
+/**
  * All extension protocol specific options returned by the method at
  *   NamedNetworkFilterConfigFactory::createProtocolOptions
  * must be derived from this class.
@@ -433,6 +452,11 @@ public:
   virtual ~ProtocolOptionsConfig() {}
 };
 typedef std::shared_ptr<const ProtocolOptionsConfig> ProtocolOptionsConfigConstSharedPtr;
+
+/**
+ *  Base class for all cluster typed metadata factory.
+ */
+class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
 /**
  * Information about a given upstream cluster.
@@ -597,6 +621,11 @@ public:
   virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
 
   /**
+   * @return const Envoy::Config::TypedMetadata&& the typed metadata for this cluster.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
    *
    * @return const Network::ConnectionSocket::OptionsSharedPtr& socket options for all
    *         connections for this cluster.
@@ -664,8 +693,8 @@ public:
 
   /**
    * @return the phase in which the cluster is initialized at boot. This mechanism is used such that
-   *         clusters that depend on other clusters can correctly initialize. (E.g., an SDS cluster
-   *         that depends on resolution of the SDS server itself).
+   *         clusters that depend on other clusters can correctly initialize. (E.g., an EDS cluster
+   *         that depends on resolution of the EDS server itself).
    */
   virtual InitializePhase initializePhase() const PURE;
 

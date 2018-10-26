@@ -75,6 +75,8 @@ private:
   void resetRetry();
   bool wouldRetry(const Http::HeaderMap* response_headers,
                   const absl::optional<Http::StreamResetReason>& reset_reason);
+  bool wouldRetryFromReset(const Http::StreamResetReason& reset_reason);
+  bool wouldRetryFromHeaders(const Http::HeaderMap& response_headers);
 
   const Upstream::ClusterInfo& cluster_;
   Runtime::Loader& runtime_;
@@ -89,6 +91,7 @@ private:
   std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
   uint32_t host_selection_max_attempts_;
+  std::vector<uint32_t> retriable_status_codes_;
 };
 
 } // namespace Router

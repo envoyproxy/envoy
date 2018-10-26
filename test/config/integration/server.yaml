@@ -42,17 +42,14 @@ static_resources:
             codec_type: http1
             stat_prefix: router
             filters:
-            - type: both
-              name: health_check
+            - name: health_check
               config:
                 endpoint: "/healthcheck"
                 pass_through_mode: false
-            - type: decoder
-              name: rate_limit
+            - name: rate_limit
               config:
                 domain: foo
-            - type: decoder
-              name: router
+            - name: router
               config: {}
             access_log:
             - format: '[%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%
@@ -84,17 +81,14 @@ static_resources:
         config:
           value:
             filters:
-            - type: both
-              name: health_check
+            - name: health_check
               config:
                 endpoint: "/healthcheck"
                 pass_through_mode: false
             - name: rate_limit
               config:
                 domain: foo
-              type: decoder
-            - type: decoder
-              name: router
+            - name: router
               config: {}
             access_log:
             - filter:
@@ -177,7 +171,6 @@ static_resources:
             filters:
             - name: router
               config: {}
-              type: decoder
             codec_type: http1
             stat_prefix: router
           deprecated_v1: true
@@ -194,12 +187,10 @@ static_resources:
         config:
           value:
             filters:
-            - type: both
-              name: http_dynamo_filter
+            - name: http_dynamo_filter
               config: {}
             - name: router
               config: {}
-              type: decoder
             codec_type: http1
             stat_prefix: router
             route_config:
@@ -232,11 +223,9 @@ static_resources:
                 - prefix: "/test/long/url"
                   cluster: cluster_3
             filters:
-            - type: both
-              name: grpc_http1_bridge
+            - name: grpc_http1_bridge
               config: {}
-            - type: decoder
-              name: router
+            - name: router
               config: {}
             codec_type: http1
             stat_prefix: router
@@ -286,22 +275,18 @@ static_resources:
             codec_type: http1
             stat_prefix: router
             filters:
-            - type: both
-              name: health_check
+            - name: health_check
               config:
                 endpoint: "/healthcheck"
                 pass_through_mode: false
             - name: rate_limit
               config:
                 domain: foo
-              type: decoder
             - name: buffer
               config:
                 max_request_time_s: 120
                 max_request_bytes: 5242880
-              type: decoder
             - config: {}
-              type: decoder
               name: router
             access_log:
             - filter:
@@ -333,8 +318,7 @@ static_resources:
         config:
           value:
             filters:
-            - type: decoder
-              name: router
+            - name: router
               config: {}
             codec_type: http1
             stat_prefix: rds_dummy

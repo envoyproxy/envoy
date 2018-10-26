@@ -12,6 +12,7 @@
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace Http {
@@ -112,6 +113,14 @@ public:
   virtual Router::RouteConstSharedPtr route() PURE;
 
   /**
+   * Returns the clusterInfo for the cached route.
+   * This method is to avoid multiple look ups in the filter chain, it also provides a consistent
+   * view of clusterInfo after a route is picked/repicked.
+   * NOTE: Cached clusterInfo and route will be updated the same time.
+   */
+  virtual Upstream::ClusterInfoConstSharedPtr clusterInfo() PURE;
+
+  /**
    * Clears the route cache for the current request. This must be called when a filter has modified
    * the headers in a way that would affect routing.
    */
@@ -123,10 +132,10 @@ public:
   virtual uint64_t streamId() PURE;
 
   /**
-   * @return requestInfo for logging purposes. Individual filter may add specific information to be
+   * @return streamInfo for logging purposes. Individual filter may add specific information to be
    * put into the access log.
    */
-  virtual RequestInfo::RequestInfo& requestInfo() PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   /**
    * @return span context used for tracing purposes. Individual filters may add or modify
@@ -496,7 +505,7 @@ typedef std::shared_ptr<StreamEncoderFilter> StreamEncoderFilterSharedPtr;
 /**
  * A filter that handles both encoding and decoding.
  */
-class StreamFilter : public StreamDecoderFilter, public StreamEncoderFilter {};
+class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEncoderFilter {};
 
 typedef std::shared_ptr<StreamFilter> StreamFilterSharedPtr;
 

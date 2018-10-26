@@ -3,7 +3,7 @@
 Two flavors of Envoy Docker images, based on Ubuntu and Alpine Linux, are built.
 
 ## Ubuntu envoy image
-The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for Travis CI checks,
+The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CircleCI checks,
 where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/master/ci/envoy_build_sha.sh). Developers
 may work with `envoyproxy/envoy-build:latest` to provide a self-contained environment for building Envoy binaries and
 running tests that reflects the latest built Ubuntu Envoy image. Moreover, the Docker image
@@ -24,7 +24,6 @@ Currently there are three build images:
 
 * `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
 * `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 16.04 (Xenial) which uses the GCC 5.4 compiler.
-* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 which uses the GCC 5.3.1 compiler (devtoolset-4).
 
 We also install and use the clang-7 compiler for some sanitizing runs.
 
@@ -36,17 +35,13 @@ An example basic invocation to build a developer version of the Envoy static bin
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
-The build image defaults to `envoyproxy/envoy-build-ubuntu`, but you can choose build image by setting `IMAGE_NAME` in the environment,
-e.g. to use the `envoyproxy/envoy-build-centos` image you can run:
-
-```bash
-IMAGE_NAME=envoyproxy/envoy-build-centos ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+The build image defaults to `envoyproxy/envoy-build-ubuntu`, but you can choose build image by setting `IMAGE_NAME` in the environment.
 ```
 
 In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the proxy servers before invoking the build.
 
 ```bash
-IMAGE_NAME=envoyproxy/envoy-build-centos http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+IMAGE_NAME=envoyproxy/envoy-build-ubuntu http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
 The Envoy binary can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-fastbuild` on the Docker host. You
@@ -87,7 +82,8 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with gcc.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `bazel.coverity` &mdash; build Envoy static binary and run Coverity Scan static analysis.
-* `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang-6.0.
+* `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
+* `bazel.clang_tidy` &mdash; build and run clang-tidy over all source files.
 * `check_format`&mdash; run `clang-format-6.0` and `buildifier` on entire source tree.
 * `fix_format`&mdash; run and enforce `clang-format-6.0` and `buildifier` on entire source tree.
 * `check_spelling`&mdash; run `misspell` on entire project.
@@ -110,7 +106,6 @@ IMAGE_NAME="envoyproxy/envoy-build-${DISTRO}" IMAGE_ID=my_tag ./ci/run_envoy_doc
 ```
 
 This build the Ubuntu based `envoyproxy/envoy-build-ubuntu` image, and the final call will run against your local copy of the build image.
-To build the CentOS based `envoyproxy/envoy-build-ubuntu-centos` image, change `DISTRO` above to *centos*.
 
 # MacOS Build Flow
 

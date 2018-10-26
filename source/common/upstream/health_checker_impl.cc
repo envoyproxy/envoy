@@ -154,11 +154,11 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
   Router::FilterUtility::setUpstreamScheme(request_headers, *parent_.cluster_.info());
-  RequestInfo::RequestInfoImpl request_info(protocol_, parent_.dispatcher_.timeSystem());
-  request_info.setDownstreamLocalAddress(local_address_);
-  request_info.setDownstreamRemoteAddress(local_address_);
-  request_info.onUpstreamHostSelected(host_);
-  parent_.request_headers_parser_->evaluateHeaders(request_headers, request_info);
+  StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSystem());
+  stream_info.setDownstreamLocalAddress(local_address_);
+  stream_info.setDownstreamRemoteAddress(local_address_);
+  stream_info.onUpstreamHostSelected(host_);
+  parent_.request_headers_parser_->evaluateHeaders(request_headers, stream_info);
   request_encoder_->encodeHeaders(request_headers, true);
   request_encoder_ = nullptr;
 }

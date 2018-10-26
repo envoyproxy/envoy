@@ -61,6 +61,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.network.client_ssl_auth":            "//source/extensions/filters/network/client_ssl_auth:config",
+    "envoy.filters.network.dubbo_proxy":                "//source/extensions/filters/network/dubbo_proxy:hessian_utils_lib",
     "envoy.filters.network.echo":                       "//source/extensions/filters/network/echo:config",
     "envoy.filters.network.ext_authz":                  "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.http_connection_manager":    "//source/extensions/filters/network/http_connection_manager:config",
@@ -93,6 +94,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.thrift.router":                      "//source/extensions/filters/network/thrift_proxy/router:config",
+    "envoy.filters.thrift.ratelimit":                   "//source/extensions/filters/network/thrift_proxy/filters/ratelimit:config",
 
     #
     # Tracers
@@ -112,6 +114,9 @@ EXTENSIONS = {
 
     # Retry host predicates
     "envoy.retry_host_predicates.other_hosts":          "//source/extensions/retry/host/other_hosts:config",
+
+    # Retry priorities
+    "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/other_priority:config",
 }
 
 WINDOWS_EXTENSIONS = {

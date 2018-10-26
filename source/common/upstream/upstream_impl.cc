@@ -273,7 +273,9 @@ double HostSetImpl::effectiveLocalityWeight(uint32_t index) const {
   ASSERT(hosts_per_locality_ != nullptr);
   const auto& locality_hosts = hosts_per_locality_->get()[index];
   const auto& locality_healthy_hosts = healthy_hosts_per_locality_->get()[index];
-  ASSERT(!locality_hosts.empty());
+  if (locality_hosts.empty()) {
+    return 0.0;
+  }
   const double locality_healthy_ratio = 1.0 * locality_healthy_hosts.size() / locality_hosts.size();
   const uint32_t weight = (*locality_weights_)[index];
   // Health ranges from 0-1.0, and is the ratio of healthy hosts to total hosts, modified by the
@@ -324,14 +326,15 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       features_(parseFeatures(config)),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       extension_protocol_options_(parseExtensionProtocolOptions(config)),
-      resource_managers_(config, runtime, name_),
+      resource_managers_(config, runtime, name_, *stats_scope_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
       source_address_(getSourceAddress(config, bind_config)),
       lb_least_request_config_(config.least_request_lb_config()),
       lb_ring_hash_config_(config.ring_hash_lb_config()),
       lb_original_dst_config_(config.original_dst_lb_config()), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
-      metadata_(config.metadata()), common_lb_config_(config.common_lb_config()),
+      metadata_(config.metadata()), typed_metadata_(config.metadata()),
+      common_lb_config_(config.common_lb_config()),
       cluster_socket_options_(parseClusterSocketOptions(config, bind_config)),
       drain_connections_on_host_removal_(config.drain_connections_on_host_removal()) {
 
@@ -680,16 +683,24 @@ ClusterImplBase::resolveProtoAddress(const envoy::api::v2::core::Address& addres
 
 ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::Cluster& config,
                                                     Runtime::Loader& runtime,
-                                                    const std::string& cluster_name) {
-  managers_[enumToInt(ResourcePriority::Default)] =
-      load(config, runtime, cluster_name, envoy::api::v2::core::RoutingPriority::DEFAULT);
+                                                    const std::string& cluster_name,
+                                                    Stats::Scope& stats_scope) {
+  managers_[enumToInt(ResourcePriority::Default)] = load(
+      config, runtime, cluster_name, stats_scope, envoy::api::v2::core::RoutingPriority::DEFAULT);
   managers_[enumToInt(ResourcePriority::High)] =
-      load(config, runtime, cluster_name, envoy::api::v2::core::RoutingPriority::HIGH);
+      load(config, runtime, cluster_name, stats_scope, envoy::api::v2::core::RoutingPriority::HIGH);
+}
+
+ClusterCircuitBreakersStats
+ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, const std::string& stat_prefix) {
+  std::string prefix(fmt::format("circuit_breakers.{}.", stat_prefix));
+  return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix))};
 }
 
 ResourceManagerImplPtr
 ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
                                         Runtime::Loader& runtime, const std::string& cluster_name,
+                                        Stats::Scope& stats_scope,
                                         const envoy::api::v2::core::RoutingPriority& priority) {
   uint64_t max_connections = 1024;
   uint64_t max_pending_requests = 1024;
@@ -725,7 +736,8 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
     max_retries = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_retries, max_retries);
   }
   return ResourceManagerImplPtr{new ResourceManagerImpl(
-      runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries)};
+      runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
+      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name))};
 }
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
@@ -916,7 +928,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   // new host list and raise a change notification. This uses an N^2 search given that this does not
   // happen very often and the list sizes should be small (see
   // https://github.com/envoyproxy/envoy/issues/2874). We also check for duplicates here. It's
-  // possible for DNS to return the same address multiple times, and a bad SDS implementation could
+  // possible for DNS to return the same address multiple times, and a bad EDS implementation could
   // do the same thing.
 
   // Keep track of hosts we see in new_hosts that we are able to match up with an existing host.
@@ -1126,6 +1138,11 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
                                           uint32_t current_priority) {
   PriorityStateManager priority_state_manager(*this, local_info_);
   // At this point we know that we are different so make a new host list and notify.
+  //
+  // TODO(dio): The uniqueness of a host address resolved in STRICT_DNS cluster per priority is not
+  // guaranteed. Need a clear agreement on the behavior here, whether it is allowable to have
+  // duplicated hosts inside a priority. And if we want to enforce this behavior, it should be done
+  // inside the priority state manager.
   for (const ResolveTargetPtr& target : resolve_targets_) {
     priority_state_manager.initializePriorityFor(target->locality_lb_endpoint_);
     for (const HostSharedPtr& host : target->hosts_) {
@@ -1192,8 +1209,27 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
             return host->priority() == locality_lb_endpoint_.priority();
           }));
           parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
+        } else {
+          parent_.info_->stats().update_no_rebuild_.inc();
         }
 
+        // TODO(dio): As reported in https://github.com/envoyproxy/envoy/issues/4548, we leaked
+        // cluster members. This happened since whenever a target resolved, it would set its hosts
+        // as all_hosts_, so that when another target resolved it wouldn't see its own hosts in
+        // all_hosts_. It would think that they're new hosts, so it would add them to its host list
+        // over and over again. To completely fix this issue, we need to think through on
+        // reconciling the differences in behavior between STRICT_DNS and EDS, especially on
+        // handling host sets updates. This is tracked in
+        // https://github.com/envoyproxy/envoy/issues/4590.
+        //
+        // The following block is acceptable for now as a patch to make sure parent_.all_hosts_ is
+        // updated with all resolved hosts from all priorities. This reconciliation is required
+        // since we check each new host against this list.
+        for (const auto& set : parent_.prioritySet().hostSetsPerPriority()) {
+          for (const auto& host : set->hosts()) {
+            updated_hosts.insert({host->address()->asString(), host});
+          }
+        }
         parent_.updateHostMap(std::move(updated_hosts));
 
         // If there is an initialize callback, fire it now. Note that if the cluster refers to

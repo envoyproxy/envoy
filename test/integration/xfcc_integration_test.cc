@@ -125,7 +125,7 @@ void XfccIntegrationTest::initialize() {
   }
 
   runtime_.reset(new NiceMock<Runtime::MockLoader>());
-  context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_));
+  context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_, timeSystem()));
   client_tls_ssl_ctx_ = createClientSslContext(false);
   client_mtls_ssl_ctx_ = createClientSslContext(true);
   HttpIntegrationTest::initialize();

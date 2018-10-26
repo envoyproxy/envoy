@@ -31,7 +31,7 @@
 #include "common/http/conn_manager_config.h"
 #include "common/http/user_agent.h"
 #include "common/http/utility.h"
-#include "common/request_info/request_info_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -120,9 +120,10 @@ private:
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;
+    Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     void clearRouteCache() override;
     uint64_t streamId() override;
-    RequestInfo::RequestInfo& requestInfo() override;
+    StreamInfo::StreamInfo& streamInfo() override;
     Tracing::Span& activeSpan() override;
     Tracing::Config& tracingConfig() override;
 
@@ -358,7 +359,9 @@ private:
 
     // All state for the stream. Put here for readability.
     struct State {
-      State() : remote_complete_(false), local_complete_(false), saw_connection_close_(false) {}
+      State()
+          : remote_complete_(false), local_complete_(false), saw_connection_close_(false),
+            successful_upgrade_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -370,6 +373,7 @@ private:
       bool remote_complete_ : 1;
       bool local_complete_ : 1;
       bool saw_connection_close_ : 1;
+      bool successful_upgrade_ : 1;
     };
 
     // Possibly increases buffer_limit_ to the value of limit.
@@ -401,8 +405,9 @@ private:
     Event::TimerPtr idle_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
-    RequestInfo::RequestInfoImpl request_info_;
+    StreamInfo::StreamInfoImpl stream_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
+    absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};

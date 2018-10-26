@@ -71,11 +71,11 @@ public:
 
   // Ssl::Context
   size_t daysUntilFirstCertExpires() const override;
-  std::string getCaCertInformation() const override;
-  std::string getCertChainInformation() const override;
+  CertificateDetailsPtr getCaCertInformation() const override;
+  CertificateDetailsPtr getCertChainInformation() const override;
 
 protected:
-  ContextImpl(Stats::Scope& scope, const ContextConfig& config);
+  ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source);
 
   /**
    * The global SSL-library index used for storing a pointer to the context
@@ -116,11 +116,10 @@ protected:
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
   static SslStats generateStats(Stats::Scope& scope);
 
-  // TODO: Move helper function to the `Ssl::Utility` namespace.
-  int32_t getDaysUntilExpiration(const X509* cert) const;
-
   std::string getCaFileName() const { return ca_file_path_; };
   std::string getCertChainFileName() const { return cert_chain_file_path_; };
+
+  CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path) const;
 
   bssl::UniquePtr<SSL_CTX> ctx_;
   bool verify_trusted_ca_{false};
@@ -134,13 +133,15 @@ protected:
   bssl::UniquePtr<X509> cert_chain_;
   std::string ca_file_path_;
   std::string cert_chain_file_path_;
+  TimeSource& time_source_;
 };
 
 typedef std::shared_ptr<ContextImpl> ContextImplSharedPtr;
 
 class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
-  ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config);
+  ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config,
+                    TimeSource& time_source);
 
   bssl::UniquePtr<SSL> newSsl() const override;
 
@@ -152,7 +153,8 @@ private:
 class ServerContextImpl : public ContextImpl, public ServerContext {
 public:
   ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
-                    const std::vector<std::string>& server_names, Runtime::Loader& runtime);
+                    const std::vector<std::string>& server_names, Runtime::Loader& runtime,
+                    TimeSource& time_source);
 
 private:
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,

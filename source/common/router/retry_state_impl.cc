@@ -21,6 +21,7 @@ const uint32_t RetryPolicy::RETRY_ON_5XX;
 const uint32_t RetryPolicy::RETRY_ON_GATEWAY_ERROR;
 const uint32_t RetryPolicy::RETRY_ON_CONNECT_FAILURE;
 const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
+const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_CANCELLED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
@@ -53,7 +54,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
                                Upstream::ResourcePriority priority)
     : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
       priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
-      retry_priority_(route_policy.retryPriority()) {
+      retry_priority_(route_policy.retryPriority()),
+      retriable_status_codes_(route_policy.retriableStatusCodes()) {
 
   if (request_headers.EnvoyRetryOn()) {
     retry_on_ = parseRetryOn(request_headers.EnvoyRetryOn()->value().c_str());
@@ -66,6 +68,15 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
     uint64_t temp;
     if (StringUtil::atoul(max_retries, temp)) {
       retries_remaining_ = temp;
+    }
+  }
+  if (request_headers.EnvoyRetriableStatusCodes()) {
+    for (const auto code : StringUtil::splitToken(
+             request_headers.EnvoyRetriableStatusCodes()->value().getStringView(), ",")) {
+      uint64_t out;
+      if (StringUtil::atoul(std::string(code).c_str(), out)) {
+        retriable_status_codes_.emplace_back(out);
+      }
     }
   }
 
@@ -102,6 +113,8 @@ uint32_t RetryStateImpl::parseRetryOn(absl::string_view config) {
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_4XX;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RefusedStream) {
       ret |= RetryPolicy::RETRY_ON_REFUSED_STREAM;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RetriableStatusCodes) {
+      ret |= RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
     }
   }
 
@@ -119,6 +132,8 @@ uint32_t RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header
       ret |= RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Unavailable) {
       ret |= RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Internal) {
+      ret |= RetryPolicy::RETRY_ON_GRPC_INTERNAL;
     }
   }
 
@@ -170,59 +185,39 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
   return RetryStatus::Yes;
 }
 
-bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
-                                const absl::optional<Http::StreamResetReason>& reset_reason) {
-  // We never retry if the overloaded header is set.
-  if (response_headers != nullptr && response_headers->EnvoyOverloaded() != nullptr) {
-    return false;
-  }
-
-  // we never retry if the reset reason is overflow.
-  if (reset_reason && reset_reason.value() == Http::StreamResetReason::Overflow) {
-    return false;
-  }
-
+bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_headers) {
   if (retry_on_ & RetryPolicy::RETRY_ON_5XX) {
-    // wouldRetry() is passed null headers when there was an upstream reset. Currently we count an
-    // upstream reset as a "5xx" (since it will result in one). We may eventually split this out
-    // into its own type. I.e., RETRY_ON_RESET.
-    if (!response_headers ||
-        Http::CodeUtility::is5xx(Http::Utility::getResponseStatus(*response_headers))) {
+    if (Http::CodeUtility::is5xx(Http::Utility::getResponseStatus(response_headers))) {
       return true;
     }
   }
 
   if (retry_on_ & RetryPolicy::RETRY_ON_GATEWAY_ERROR) {
-    if (!response_headers ||
-        Http::CodeUtility::isGatewayError(Http::Utility::getResponseStatus(*response_headers))) {
+    if (Http::CodeUtility::isGatewayError(Http::Utility::getResponseStatus(response_headers))) {
       return true;
     }
   }
 
-  if ((retry_on_ & RetryPolicy::RETRY_ON_REFUSED_STREAM) && reset_reason &&
-      reset_reason.value() == Http::StreamResetReason::RemoteRefusedStreamReset) {
-    return true;
-  }
-
-  if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE) && reset_reason &&
-      reset_reason.value() == Http::StreamResetReason::ConnectionFailure) {
-    return true;
-  }
-
-  if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_4XX) && response_headers) {
-    Http::Code code = static_cast<Http::Code>(Http::Utility::getResponseStatus(*response_headers));
+  if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_4XX)) {
+    Http::Code code = static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers));
     if (code == Http::Code::Conflict) {
       return true;
     }
   }
 
+  if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES)) {
+    for (auto code : retriable_status_codes_) {
+      if (Http::Utility::getResponseStatus(response_headers) == code) {
+        return true;
+      }
+    }
+  }
+
   if (retry_on_ &
-          (RetryPolicy::RETRY_ON_GRPC_CANCELLED | RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
-           RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED |
-           RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE) &&
-      response_headers) {
-    absl::optional<Grpc::Status::GrpcStatus> status =
-        Grpc::Common::getGrpcStatus(*response_headers);
+      (RetryPolicy::RETRY_ON_GRPC_CANCELLED | RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
+       RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED | RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE |
+       RetryPolicy::RETRY_ON_GRPC_INTERNAL)) {
+    absl::optional<Grpc::Status::GrpcStatus> status = Grpc::Common::getGrpcStatus(response_headers);
     if (status) {
       if ((status.value() == Grpc::Status::Canceled &&
            (retry_on_ & RetryPolicy::RETRY_ON_GRPC_CANCELLED)) ||
@@ -231,13 +226,58 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
           (status.value() == Grpc::Status::ResourceExhausted &&
            (retry_on_ & RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED)) ||
           (status.value() == Grpc::Status::Unavailable &&
-           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE))) {
+           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE)) ||
+          (status.value() == Grpc::Status::Internal &&
+           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_INTERNAL))) {
         return true;
       }
     }
   }
 
   return false;
+}
+
+bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason& reset_reason) {
+  if ((retry_on_ & RetryPolicy::RETRY_ON_REFUSED_STREAM) &&
+      reset_reason == Http::StreamResetReason::RemoteRefusedStreamReset) {
+    return true;
+  }
+
+  if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE) &&
+      reset_reason == Http::StreamResetReason::ConnectionFailure) {
+    return true;
+  }
+
+  return false;
+}
+
+bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
+                                const absl::optional<Http::StreamResetReason>& reset_reason) {
+  // First check "never retry" conditions so we can short circuit, then delegate to
+  // helper methods for checks dependant on retry policy.
+
+  // we never retry if the reset reason is overflow.
+  if (reset_reason && reset_reason.value() == Http::StreamResetReason::Overflow) {
+    return false;
+  }
+
+  if (response_headers != nullptr) {
+    // We never retry if the overloaded header is set.
+    if (response_headers->EnvoyOverloaded() != nullptr) {
+      return false;
+    }
+
+    if (wouldRetryFromHeaders(*response_headers)) {
+      return true;
+    }
+  } else if (retry_on_ & (RetryPolicy::RETRY_ON_5XX | RetryPolicy::RETRY_ON_GATEWAY_ERROR)) {
+    // wouldRetry() is passed null headers when there was an upstream reset. Currently we count an
+    // upstream reset as a "5xx" (since it will result in one). We may eventually split this out
+    // into its own type. I.e., RETRY_ON_RESET.
+    return true;
+  }
+
+  return reset_reason && wouldRetryFromReset(*reset_reason);
 }
 
 } // namespace Router

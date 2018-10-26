@@ -14,6 +14,7 @@
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/ssl/utility.h"
 
 #include "openssl/hmac.h"
@@ -31,8 +32,9 @@ int ContextImpl::sslContextIndex() {
   }());
 }
 
-ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
-    : ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)) {
+ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source)
+    : ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)),
+      time_source_(time_source) {
   RELEASE_ASSERT(ctx_, "");
 
   int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
@@ -80,6 +82,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
     }
 
     X509_STORE* store = SSL_CTX_get_cert_store(ctx_.get());
+    bool has_crl = false;
     for (const X509_INFO* item : list.get()) {
       if (item->x509) {
         X509_STORE_add_cert(store, item->x509);
@@ -90,11 +93,15 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
       }
       if (item->crl) {
         X509_STORE_add_crl(store, item->crl);
+        has_crl = true;
       }
     }
     if (ca_cert_ == nullptr) {
       throw EnvoyException(fmt::format("Failed to load trusted CA certificates from {}",
                                        config.certificateValidationContext()->caCertPath()));
+    }
+    if (has_crl) {
+      X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
     }
     verify_mode = SSL_VERIFY_PEER;
     verify_trusted_ca_ = true;
@@ -437,47 +444,54 @@ SslStats ContextImpl::generateStats(Stats::Scope& store) {
 }
 
 size_t ContextImpl::daysUntilFirstCertExpires() const {
-  int daysUntilExpiration = getDaysUntilExpiration(ca_cert_.get());
-  daysUntilExpiration =
-      std::min<int>(getDaysUntilExpiration(cert_chain_.get()), daysUntilExpiration);
+  int daysUntilExpiration = Utility::getDaysUntilExpiration(ca_cert_.get(), time_source_);
+  daysUntilExpiration = std::min<int>(
+      Utility::getDaysUntilExpiration(cert_chain_.get(), time_source_), daysUntilExpiration);
   if (daysUntilExpiration < 0) { // Ensure that the return value is unsigned
     return 0;
   }
   return daysUntilExpiration;
 }
 
-int32_t ContextImpl::getDaysUntilExpiration(const X509* cert) const {
-  if (cert == nullptr) {
-    return std::numeric_limits<int>::max();
-  }
-  int days, seconds;
-  if (ASN1_TIME_diff(&days, &seconds, nullptr, X509_get_notAfter(cert))) {
-    return days;
-  }
-  return 0;
-}
-
-std::string ContextImpl::getCaCertInformation() const {
+CertificateDetailsPtr ContextImpl::getCaCertInformation() const {
   if (ca_cert_ == nullptr) {
-    return "";
+    return nullptr;
   }
-  return fmt::format("Certificate Path: {}, Serial Number: {}, Days until Expiration: {}",
-                     getCaFileName(), Utility::getSerialNumberFromCertificate(*ca_cert_.get()),
-                     getDaysUntilExpiration(ca_cert_.get()));
+  return certificateDetails(ca_cert_.get(), getCaFileName());
 }
 
-std::string ContextImpl::getCertChainInformation() const {
+CertificateDetailsPtr ContextImpl::getCertChainInformation() const {
   if (cert_chain_ == nullptr) {
-    return "";
+    return nullptr;
   }
-  return fmt::format("Certificate Path: {}, Serial Number: {}, Days until Expiration: {}",
-                     getCertChainFileName(),
-                     Utility::getSerialNumberFromCertificate(*cert_chain_.get()),
-                     getDaysUntilExpiration(cert_chain_.get()));
+  return certificateDetails(cert_chain_.get(), getCertChainFileName());
 }
 
-ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config)
-    : ContextImpl(scope, config), server_name_indication_(config.serverNameIndication()),
+CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::string& path) const {
+  CertificateDetailsPtr certificate_details =
+      std::make_unique<envoy::admin::v2alpha::CertificateDetails>();
+  certificate_details->set_path(path);
+  certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
+  certificate_details->set_days_until_expiration(
+      Utility::getDaysUntilExpiration(cert, time_source_));
+
+  for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
+    envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
+        *certificate_details->add_subject_alt_names();
+    subject_alt_name.set_dns(dns_san);
+  }
+  for (auto& uri_san : Utility::getSubjectAltNames(*cert, GEN_URI)) {
+    envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
+        *certificate_details->add_subject_alt_names();
+    subject_alt_name.set_uri(uri_san);
+  }
+  return certificate_details;
+}
+
+ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config,
+                                     TimeSource& time_source)
+    : ContextImpl(scope, config, time_source),
+      server_name_indication_(config.serverNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
@@ -503,8 +517,8 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
-                                     Runtime::Loader& runtime)
-    : ContextImpl(scope, config), runtime_(runtime),
+                                     Runtime::Loader& runtime, TimeSource& time_source)
+    : ContextImpl(scope, config, time_source), runtime_(runtime),
       session_ticket_keys_(config.sessionTicketKeys()) {
   if (config.tlsCertificate() == nullptr) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");

@@ -13,10 +13,10 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
-#include "common/request_info/filter_state_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -51,7 +51,7 @@ public:
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
   bool read_enabled_{true};
-  RequestInfo::FilterStateImpl per_connection_state_;
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   Connection::State state_{Connection::State::Open};
 };
 
@@ -88,8 +88,8 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
-  MOCK_METHOD0(perConnectionState, RequestInfo::FilterState&());
-  MOCK_CONST_METHOD0(perConnectionState, const RequestInfo::FilterState&());
+  MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
+  MOCK_CONST_METHOD0(streamInfo, const StreamInfo::StreamInfo&());
   MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
 };
@@ -131,8 +131,8 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
-  MOCK_METHOD0(perConnectionState, RequestInfo::FilterState&());
-  MOCK_CONST_METHOD0(perConnectionState, const RequestInfo::FilterState&());
+  MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
+  MOCK_CONST_METHOD0(streamInfo, const StreamInfo::StreamInfo&());
   MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
 
@@ -382,6 +382,8 @@ public:
   ~MockListener();
 
   MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD0(enable, void());
+  MOCK_METHOD0(disable, void());
 };
 
 class MockConnectionHandler : public ConnectionHandler {
@@ -396,6 +398,8 @@ public:
   MOCK_METHOD1(removeListeners, void(uint64_t listener_tag));
   MOCK_METHOD1(stopListeners, void(uint64_t listener_tag));
   MOCK_METHOD0(stopListeners, void());
+  MOCK_METHOD0(disableListeners, void());
+  MOCK_METHOD0(enableListeners, void());
 };
 
 class MockIp : public Address::Ip {

@@ -10,7 +10,6 @@
 #include "envoy/stats/sink.h"
 #include "envoy/stats/source.h"
 #include "envoy/stats/stats.h"
-#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -20,13 +19,11 @@ namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
 
-// TODO: Move the common code to a base class so that Accesslog and Metrics Service can reuse.
-
 /**
- * Interface for metrics streamer. The streamer deals with threading and sends
- * metrics on the correct stream.
+ * Interface for metrics streamer.
  */
-class GrpcMetricsStreamer {
+class GrpcMetricsStreamer
+    : public Grpc::TypedAsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse> {
 public:
   virtual ~GrpcMetricsStreamer() {}
 
@@ -35,78 +32,41 @@ public:
    * @param message supplies the metrics to send.
    */
   virtual void send(envoy::service::metrics::v2::StreamMetricsMessage& message) PURE;
+
+  // Grpc::TypedAsyncStreamCallbacks
+  void onCreateInitialMetadata(Http::HeaderMap&) override {}
+  void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
+  void
+  onReceiveMessage(std::unique_ptr<envoy::service::metrics::v2::StreamMetricsResponse>&&) override {
+  }
+  void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
+  void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override{};
 };
 
 typedef std::shared_ptr<GrpcMetricsStreamer> GrpcMetricsStreamerSharedPtr;
 
 /**
- * Production implementation of GrpcAccessLogStreamer that supports per-thread
- * streams
+ * Production implementation of GrpcMetricsStreamer
  */
 class GrpcMetricsStreamerImpl : public Singleton::Instance, public GrpcMetricsStreamer {
 public:
-  GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory, ThreadLocal::SlotAllocator& tls,
+  GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
                           const LocalInfo::LocalInfo& local_info);
 
   // GrpcMetricsStreamer
-  void send(envoy::service::metrics::v2::StreamMetricsMessage& message) override {
-    tls_slot_->getTyped<ThreadLocalStreamer>().send(message);
-  }
+  void send(envoy::service::metrics::v2::StreamMetricsMessage& message) override;
+
+  // Grpc::TypedAsyncStreamCallbacks
+  void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override { stream_ = nullptr; }
 
 private:
-  /**
-   * Shared state that is owned by the per-thread streamers. This allows the
-   * main streamer/TLS slot to be destroyed while the streamers hold onto the shared state.
-   */
-  struct SharedState {
-    SharedState(Grpc::AsyncClientFactoryPtr&& factory, const LocalInfo::LocalInfo& local_info)
-        : factory_(std::move(factory)), local_info_(local_info) {}
-
-    Grpc::AsyncClientFactoryPtr factory_;
-    const LocalInfo::LocalInfo& local_info_;
-  };
-
-  typedef std::shared_ptr<SharedState> SharedStateSharedPtr;
-
-  struct ThreadLocalStreamer;
-
-  /**
-   * Per-thread stream state.
-   */
-  struct ThreadLocalStream
-      : public Grpc::TypedAsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse> {
-    ThreadLocalStream(ThreadLocalStreamer& parent) : parent_(parent) {}
-
-    // Grpc::TypedAsyncStreamCallbacks
-    void onCreateInitialMetadata(Http::HeaderMap&) override {}
-    void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
-    void onReceiveMessage(
-        std::unique_ptr<envoy::service::metrics::v2::StreamMetricsResponse>&&) override {}
-    void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
-    void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
-
-    ThreadLocalStreamer& parent_;
-    Grpc::AsyncStream* stream_{};
-  };
-
-  typedef std::shared_ptr<ThreadLocalStream> ThreadLocalStreamSharedPtr;
-
-  /**
-   * Per-thread multi-stream state.
-   */
-  struct ThreadLocalStreamer : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalStreamer(const SharedStateSharedPtr& shared_state);
-    void send(envoy::service::metrics::v2::StreamMetricsMessage& message);
-
-    Grpc::AsyncClientPtr client_;
-    ThreadLocalStreamSharedPtr thread_local_stream_ = nullptr;
-    SharedStateSharedPtr shared_state_;
-  };
-
-  ThreadLocal::SlotPtr tls_slot_;
+  Grpc::AsyncStream* stream_{};
+  Grpc::AsyncClientPtr client_;
+  const LocalInfo::LocalInfo& local_info_;
 };
+
 /**
- * Per thread implementation of a Metric Service flusher.
+ * Stat Sink implementation of Metrics Service.
  */
 class MetricsServiceSink : public Stats::Sink {
 public:

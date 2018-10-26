@@ -24,13 +24,7 @@ message FaultDelay {
   // supported.
   FaultDelayType type = 1 [(validate.rules).enum.defined_only = true];
 
-  // An integer between 0-100 indicating the percentage of operations/connection requests
-  // on which the delay will be injected.
-  //
-  // .. attention::
-  //
-  //   Use of integer `percent` value is deprecated. Use fractional `percentage` field instead.
-  uint32 percent = 2 [(validate.rules).uint32.lte = 100, deprecated = true];
+  reserved 2;
 
   oneof fault_delay_secifier {
     option (validate.required) = true;

@@ -1,8 +1,42 @@
 Version history
 ---------------
 
-1.8.0 (Pending)
+1.9.0 (pending)
 ===============
+* access log: added a :ref:`JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format.
+* admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
+* circuit-breaker: added cx_open, rq_pending_open, rq_open and rq_retry_open gauges to expose live
+  state via :ref:`circuit breakers statistics <config_cluster_manager_cluster_stats_circuit_breakers>`.
+* config: removed support for the v1 API.
+* fault: removed integer percentage support.
+* http: Added HTTP/2 WebSocket proxying via :ref:`extended CONNECT <envoy_api_field_core.Http2ProtocolOptions.allow_connect>`
+* http: added limits to the number and length of header modifications in all fields request_headers_to_add and response_headers_to_add. These limits are very high and should only be used as a last-resort safeguard.
+* http: no longer adding whitespace when appending X-Forwarded-For headers. **Warning**: this is not
+  compatible with 1.7.0 builds prior to `9d3a4eb4ac44be9f0651fcc7f87ad98c538b01ee <https://github.com/envoyproxy/envoy/pull/3610>`_.
+  See `#3611 <https://github.com/envoyproxy/envoy/issues/3611>`_ for details.
+* network: removed the reference to `FilterState` in `Connection` in favor of `StreamInfo`.
+* logging: added missing [ in log prefix.
+* rbac: added support for permission matching by :ref:`requested server name <envoy_api_field_config.rbac.v2alpha.Permission.requested_server_name>`.
+* router: added ability to configure arbitrary :ref:`retriable status codes. <envoy_api_field_route.RouteAction.RetryPolicy.retriable_status_codes>`
+* router: added ability to set attempt count in upstream requests, see :ref:`virtual host's include request
+  attempt count flag <envoy_api_field_route.VirtualHost.include_request_attempt_count>`.
+* router: added internal :ref:`grpc-retry-on <config_http_filters_router_x-envoy-retry-grpc-on>` policy.
+* router: added :ref:`scheme_redirect <envoy_api_field_route.RedirectAction.scheme_redirect>` and
+  :ref:`port_redirect <envoy_api_field_route.RedirectAction.port_redirect>` to define the respective
+  scheme and port rewriting RedirectAction
+* router: when :ref:`max_grpc_timeout <envoy_api_field_route.RouteAction.max_grpc_timeout>`
+  is set, Envoy will now add or update the grpc-timeout header to reflect Envoy's expected timeout.
+* stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
+* stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
+  its behaviour within TCP and HTTP implementations.
+* stream: renamed `perRequestState` to `filterState` in `StreamInfo`.
+* thrift_proxy: introduced thrift rate limiter filter
+* tls: add support for CRLs in :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
+* tracing: added support to the Zipkin tracer for the :ref:`b3 <config_http_conn_man_headers_b3>` single header format.
+* upstream: changed how load calculation for :ref:`priority levels<arch_overview_load_balancing_priority_levels>` and :ref:`panic thresholds<arch_overview_load_balancing_panic_threshold>` interact. As long as normalized total health is 100% panic thresholds are disregarded.
+
+1.8.0 (Oct 4, 2018)
+===================
 * access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>`
   to filter based on the presence of Envoy response flags.
 * access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.
@@ -14,12 +48,12 @@ Version history
   health check/weight/metadata updates within the given duration.
 * config: regex validation added to limit to a maximum of 1024 characters.
 * config: v1 disabled by default. v1 support remains available until October via flipping --v2-config-only=false.
-* config: v1 disabled by default. v1 support remains available until October via setting :option:`--allow-deprecated-v1-api`.
-* config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`  
-  stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented 
+* config: v1 disabled by default. v1 support remains available until October via deprecated flag --allow-deprecated-v1-api.
+* config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`
+  stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented
   in case of schema/validation error.
-* config: Added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with 
-  management server. 
+* config: Added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with
+  management server.
 * ext_authz: added support for configuring additional :ref:`authorization headers <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_headers_to_add>`
   to be sent from Envoy to the authorization service.
 * fault: added support for fractional percentages in :ref:`FaultDelay <envoy_api_field_config.filter.fault.v2.FaultDelay.percentage>`
@@ -66,8 +100,8 @@ Version history
   :ref:`destination_port <envoy_api_field_listener.FilterChainMatch.destination_port>` and
   :ref:`prefix_ranges <envoy_api_field_listener.FilterChainMatch.prefix_ranges>`.
 * lua: added :ref:`connection() <config_http_filters_lua_connection_wrapper>` wrapper and *ssl()* API.
-* lua: added :ref:`requestInfo() <config_http_filters_lua_request_info_wrapper>` wrapper and *protocol()* API.
-* lua: added :ref:`requestInfo():dynamicMetadata() <config_http_filters_lua_request_info_dynamic_metadata_wrapper>` API.
+* lua: added :ref:`streamInfo() <config_http_filters_lua_stream_info_wrapper>` wrapper and *protocol()* API.
+* lua: added :ref:`streamInfo():dynamicMetadata() <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>` API.
 * network: introduced :ref:`sni_cluster <config_network_filters_sni_cluster>` network filter that forwards connections to the
   upstream cluster specified by the SNI value presented by the client during a TLS handshake.
 * proxy_protocol: added support for HAProxy Proxy Protocol v2 (AF_INET/AF_INET6 only).
@@ -77,7 +111,7 @@ Version history
   :ref:`use_data_plane_proto<envoy_api_field_config.ratelimit.v2.RateLimitServiceConfig.use_data_plane_proto>`
   boolean flag in the ratelimit configuration.
   Support for the legacy proto :repo:`source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
-* ratelimit: added :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in 
+* ratelimit: added :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in
   case of rate limit service error.
 * rbac config: added a :ref:`principal_name <envoy_api_field_config.rbac.v2alpha.Principal.Authenticated.principal_name>` field and
   removed the old `name` field to give more flexibility for matching certificate identity.
@@ -85,6 +119,7 @@ Version history
 * rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.
 * route checker: Added v2 config support and removed support for v1 configs.
 * router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
+* stats: added :ref:`option to configure the DogStatsD metric name prefix<envoy_api_field_config.metrics.v2.DogStatsdSink.prefix>` to DogStatsdSink.
 * tcp_proxy: added support for :ref:`weighted clusters <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.weighted_clusters>`.
 * thrift_proxy: introduced thrift routing, moved configuration to correct location
 * thrift_proxy: introduced thrift configurable decoder filters
@@ -97,8 +132,8 @@ Version history
   for overriding destination address when using the :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   load balancing policy.
 
-1.7.0
-===============
+1.7.0 (Jun 21, 2018)
+====================
 * access log: added ability to log response trailers.
 * access log: added ability to format START_TIME.
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.

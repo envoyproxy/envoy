@@ -3,9 +3,14 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/config/metrics/v2/stats.pb.h"
+
 #include "common/common/c_smart_ptr.h"
+#include "common/memory/stats.h"
+#include "common/stats/stats_matcher_impl.h"
 #include "common/stats/thread_local_store.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -460,6 +465,154 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   EXPECT_CALL(*alloc_, free(_)).Times(2);
 }
 
+class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
+public:
+  StatsMatcherTLSTest() : StatsThreadLocalStoreTest() {}
+  envoy::config::metrics::v2::StatsConfig stats_config_;
+};
+
+TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
+  InSequence s;
+
+  EXPECT_CALL(*alloc_, alloc(_)).Times(0);
+
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "noop");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+
+  // Testing No-op counters, gauges, histograms which match the prefix "noop".
+
+  // Counter
+  Counter& noop_counter = store_->counter("noop_counter");
+  EXPECT_EQ(noop_counter.name(), "");
+  EXPECT_EQ(noop_counter.value(), 0);
+  noop_counter.add(1);
+  EXPECT_EQ(noop_counter.value(), 0);
+  noop_counter.inc();
+  EXPECT_EQ(noop_counter.value(), 0);
+  noop_counter.reset();
+  EXPECT_EQ(noop_counter.value(), 0);
+  Counter& noop_counter_2 = store_->counter("noop_counter_2");
+  EXPECT_EQ(&noop_counter, &noop_counter_2);
+
+  // Gauge
+  Gauge& noop_gauge = store_->gauge("noop_gauge");
+  EXPECT_EQ(noop_gauge.name(), "");
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.add(1);
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.inc();
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.dec();
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.set(2);
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.sub(2);
+  EXPECT_EQ(noop_gauge.value(), 0);
+  Gauge& noop_gauge_2 = store_->gauge("noop_gauge_2");
+  EXPECT_EQ(&noop_gauge, &noop_gauge_2);
+
+  // Histogram
+  Histogram& noop_histogram = store_->histogram("noop_histogram");
+  EXPECT_EQ(noop_histogram.name(), "");
+  Histogram& noop_histogram_2 = store_->histogram("noop_histogram_2");
+  EXPECT_EQ(&noop_histogram, &noop_histogram_2);
+
+  // Includes overflow stat.
+  EXPECT_CALL(*alloc_, free(_)).Times(1);
+
+  store_->shutdownThreading();
+}
+
+// We only test the exclusion list -- the inclusion list is the inverse, and both are tested in
+// test/common/stats:stats_matcher_test.
+TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
+  InSequence s;
+
+  // Expected to alloc lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
+  EXPECT_CALL(*alloc_, alloc(_)).Times(4);
+
+  // Will block all stats containing any capital alphanumeric letter.
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_regex(
+      ".*[A-Z].*");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+
+  // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
+  Counter& lowercase_counter = store_->counter("lowercase_counter");
+  EXPECT_EQ(lowercase_counter.name(), "lowercase_counter");
+  Gauge& lowercase_gauge = store_->gauge("lowercase_gauge");
+  EXPECT_EQ(lowercase_gauge.name(), "lowercase_gauge");
+  Histogram& lowercase_histogram = store_->histogram("lowercase_histogram");
+  EXPECT_EQ(lowercase_histogram.name(), "lowercase_histogram");
+
+  // And the creation of counters/gauges/histograms which have uppercase letters should fail.
+  Counter& uppercase_counter = store_->counter("UPPERCASE_counter");
+  EXPECT_EQ(uppercase_counter.name(), "");
+  uppercase_counter.inc();
+  EXPECT_EQ(uppercase_counter.value(), 0);
+  uppercase_counter.inc();
+  EXPECT_EQ(uppercase_counter.value(), 0);
+
+  Gauge& uppercase_gauge = store_->gauge("uppercase_GAUGE");
+  EXPECT_EQ(uppercase_gauge.name(), "");
+  uppercase_gauge.inc();
+  EXPECT_EQ(uppercase_gauge.value(), 0);
+  uppercase_gauge.inc();
+  EXPECT_EQ(uppercase_gauge.value(), 0);
+
+  // Histograms are harder to query and test, so we resort to testing that name() returns the empty
+  // string.
+  Histogram& uppercase_histogram = store_->histogram("upperCASE_histogram");
+  EXPECT_EQ(uppercase_histogram.name(), "");
+
+  // Adding another exclusion rule -- now we reject not just uppercase stats but those starting with
+  // the string "invalid".
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "invalid");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+
+  Counter& valid_counter = store_->counter("valid_counter");
+  valid_counter.inc();
+  EXPECT_EQ(valid_counter.value(), 1);
+
+  Counter& invalid_counter = store_->counter("invalid_counter");
+  invalid_counter.inc();
+  EXPECT_EQ(invalid_counter.value(), 0);
+
+  // But the old exclusion rule still holds.
+  Counter& invalid_counter_2 = store_->counter("also_INVALID_counter");
+  invalid_counter_2.inc();
+  EXPECT_EQ(invalid_counter_2.value(), 0);
+
+  // And we expect the same behavior from gauges and histograms.
+  Gauge& valid_gauge = store_->gauge("valid_gauge");
+  valid_gauge.set(2);
+  EXPECT_EQ(valid_gauge.value(), 2);
+
+  Gauge& invalid_gauge_1 = store_->gauge("invalid_gauge");
+  invalid_gauge_1.inc();
+  EXPECT_EQ(invalid_gauge_1.value(), 0);
+
+  Gauge& invalid_gauge_2 = store_->gauge("also_INVALID_gauge");
+  invalid_gauge_2.inc();
+  EXPECT_EQ(invalid_gauge_2.value(), 0);
+
+  Histogram& valid_histogram = store_->histogram("valid_histogram");
+  EXPECT_EQ(valid_histogram.name(), "valid_histogram");
+
+  Histogram& invalid_histogram_1 = store_->histogram("invalid_histogram");
+  EXPECT_EQ(invalid_histogram_1.name(), "");
+
+  Histogram& invalid_histogram_2 = store_->histogram("also_INVALID_histogram");
+  EXPECT_EQ(invalid_histogram_2.name(), "");
+
+  // Expected to free lowercase_counter, lowercase_gauge, valid_counter,
+  // valid_gauge, overflow.stats
+  EXPECT_CALL(*alloc_, free(_)).Times(5);
+
+  store_->shutdownThreading();
+}
+
 class HeapStatsThreadLocalStoreTest : public StatsThreadLocalStoreTest {
 public:
   void SetUp() override {
@@ -468,6 +621,8 @@ public:
     // sets up a thread_local_store with raw stat alloc.
   }
   void TearDown() override {
+    store_->shutdownThreading();
+    tls_.shutdownThread();
     store_.reset(); // delete before the allocator.
   }
 
@@ -487,9 +642,44 @@ TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   // This works fine, and we can find it by its long name because heap-stats do not
   // get truncsated.
   EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
+}
 
-  store_->shutdownThreading();
-  tls_.shutdownThread();
+// Tests how much memory is consumed allocating 100k stats.
+TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
+  if (!TestUtil::hasDeterministicMallocStats()) {
+    return;
+  }
+
+  const size_t million = 1000 * 1000;
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+  if (start_mem == 0) {
+    // Skip this test for platforms where we can't measure memory.
+    return;
+  }
+  TestUtil::forEachSampleStat(
+      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
+  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+  EXPECT_LT(start_mem, end_mem);
+  EXPECT_LT(end_mem - start_mem, 32 * million); // actual value: 31492864 as of Oct 15, 2018
+}
+
+TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
+  if (!TestUtil::hasDeterministicMallocStats()) {
+    return;
+  }
+
+  const size_t million = 1000 * 1000;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+  if (start_mem == 0) {
+    // Skip this test for platforms where we can't measure memory.
+    return;
+  }
+  TestUtil::forEachSampleStat(
+      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
+  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+  EXPECT_LT(start_mem, end_mem);
+  EXPECT_LT(end_mem - start_mem, 41 * million); // actual value: 40411536 as of Oct 15, 2018
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {

@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/admin/v2alpha/certs.pb.h"
 #include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/admin/v2alpha/memory.pb.h"
@@ -751,22 +752,25 @@ Http::Code AdminImpl::handlerListenerInfo(absl::string_view, Http::HeaderMap& re
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
-                                   AdminStream&) {
+Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap& response_headers,
+                                   Buffer::Instance& response, AdminStream&) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
-  std::unordered_set<std::string> context_info_set;
-  std::string context_format = "{{\n\t\"ca_cert\": \"{}\",\n\t\"cert_chain\": \"{}\"\n}}\n";
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
+  envoy::admin::v2alpha::Certificates certificates;
   server_.sslContextManager().iterateContexts([&](const Ssl::Context& context) -> void {
-    context_info_set.insert(fmt::format(context_format, context.getCaCertInformation(),
-                                        context.getCertChainInformation()));
+    envoy::admin::v2alpha::Certificate& certificate = *certificates.add_certificates();
+    if (context.getCaCertInformation() != nullptr) {
+      envoy::admin::v2alpha::CertificateDetails* ca_certificate = certificate.add_ca_cert();
+      *ca_certificate = *context.getCaCertInformation();
+    }
+    if (context.getCertChainInformation() != nullptr) {
+      envoy::admin::v2alpha::CertificateDetails* cert_chain = certificate.add_cert_chain();
+      *cert_chain = *context.getCertChainInformation();
+    }
   });
-
-  std::string cert_result_string;
-  for (const std::string& context_info : context_info_set) {
-    cert_result_string += context_info;
-  }
-  response.add(cert_result_string);
+  response.add(MessageUtil::getJsonStringFromMessage(certificates, true, true));
   return Http::Code::OK;
 }
 
@@ -804,7 +808,7 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
   for (const auto& layer : layers) {
     for (auto& kv : entry_objects) {
       const auto it = layer->values().find(kv.first);
-      const auto& entry_value = it == layer->values().end() ? "" : it->second.string_value_;
+      const auto& entry_value = it == layer->values().end() ? "" : it->second.raw_string_value_;
       rapidjson::Value entry_value_object;
       entry_value_object.SetString(entry_value.c_str(), allocator);
       if (!entry_value.empty()) {
@@ -845,7 +849,7 @@ std::string AdminImpl::runtimeAsJson(
     if (entry.second.uint_value_) {
       entry_value.SetUint64(entry.second.uint_value_.value());
     } else {
-      entry_value.SetString(entry.second.string_value_.c_str(), allocator);
+      entry_value.SetString(entry.second.raw_string_value_.c_str(), allocator);
     }
     entry_obj.AddMember("value", entry_value, allocator);
 
@@ -895,9 +899,15 @@ void AdminFilter::onComplete() {
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
-void AdminImpl::startHttpListener(const std::string& address_out_path,
+void AdminImpl::startHttpListener(const std::string& access_log_path,
+                                  const std::string& address_out_path,
                                   Network::Address::InstanceConstSharedPtr address,
                                   Stats::ScopePtr&& listener_scope) {
+  // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
+  // hard dependency here.
+  access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
+      access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
+      server_.accessLogManager()));
   socket_ = std::make_unique<Network::TcpListenSocket>(address, nullptr, true);
   listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
   if (!address_out_path.empty()) {
@@ -911,8 +921,7 @@ void AdminImpl::startHttpListener(const std::string& address_out_path,
   }
 }
 
-AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profile_path,
-                     Server::Instance& server)
+AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
     : server_(server), profile_path_(profile_path),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(
@@ -955,13 +964,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
       },
-      admin_filter_chain_(std::make_shared<AdminFilterChain>()) {
-  // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
-  // hard dependency here.
-  access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
-      server.accessLogManager()));
-}
+      date_provider_(server.dispatcher().timeSystem()),
+      admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance&,

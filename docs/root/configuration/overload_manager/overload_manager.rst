@@ -50,6 +50,7 @@ The following overload actions are supported:
 
   envoy.overload_actions.stop_accepting_requests, Envoy will immediately respond with a 503 response code to new requests
   envoy.overload_actions.disable_http_keepalive, Envoy will disable keepalive on HTTP/1.x responses
+  envoy.overload_actions.stop_accepting_connections, Envoy will stop accepting new network connections on its configured listeners
 
 Statistics
 ----------

@@ -30,14 +30,9 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
     return;
   }
 
-  // TODO(alyssawilk) move over to the append utility.
   HeaderString& header = headers.insertForwardedFor().value();
-  if (!header.empty()) {
-    header.append(", ", 2);
-  }
-
   const std::string& address_as_string = remote_address.ip()->addressAsString();
-  header.append(address_as_string.c_str(), address_as_string.size());
+  HeaderMapImpl::appendToHeader(header, address_as_string.c_str());
 }
 
 void Utility::appendVia(HeaderMap& headers, const std::string& via) {
@@ -413,6 +408,12 @@ void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
   headers.insertProtocol().value().setCopy(upgrade.c_str(), upgrade.size());
   headers.removeUpgrade();
   headers.removeConnection();
+  // nghttp2 rejects upgrade requests/responses with content length, so strip
+  // any unnecessary content length header.
+  if (headers.ContentLength() != nullptr &&
+      absl::string_view("0") == headers.ContentLength()->value().c_str()) {
+    headers.removeContentLength();
+  }
 }
 
 void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
@@ -421,6 +422,10 @@ void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
   }
   headers.removeUpgrade();
   headers.removeConnection();
+  if (headers.ContentLength() != nullptr &&
+      absl::string_view("0") == headers.ContentLength()->value().c_str()) {
+    headers.removeContentLength();
+  }
 }
 
 void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
@@ -431,20 +436,12 @@ void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
   headers.insertUpgrade().value().setCopy(protocol.c_str(), protocol.size());
   headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
   headers.removeProtocol();
-  if (headers.ContentLength() == nullptr) {
-    headers.insertTransferEncoding().value().setReference(
-        Http::Headers::get().TransferEncodingValues.Chunked);
-  }
 }
 
 void Utility::transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade) {
   if (getResponseStatus(headers) == 200) {
     headers.insertUpgrade().value().setCopy(upgrade.data(), upgrade.size());
     headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
-    if (headers.ContentLength() == nullptr) {
-      headers.insertTransferEncoding().value().setReference(
-          Http::Headers::get().TransferEncodingValues.Chunked);
-    }
     headers.insertStatus().value().setInteger(101);
   }
 }

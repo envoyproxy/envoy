@@ -64,7 +64,7 @@ TEST_F(IpTaggingFilterTest, InternalRequest) {
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.5");
-  EXPECT_CALL(filter_callbacks_.request_info_, downstreamRemoteAddress())
+  EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
 
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit")).Times(1);
@@ -99,7 +99,7 @@ ip_tags:
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.4");
-  EXPECT_CALL(filter_callbacks_.request_info_, downstreamRemoteAddress())
+  EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
@@ -136,7 +136,7 @@ ip_tags:
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.5");
-  EXPECT_CALL(filter_callbacks_.request_info_, downstreamRemoteAddress())
+  EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
@@ -144,7 +144,7 @@ ip_tags:
 
   request_headers = {};
   remote_address = Network::Utility::parseInternetAddress("1.2.3.4");
-  EXPECT_CALL(filter_callbacks_.request_info_, downstreamRemoteAddress())
+  EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
@@ -157,7 +157,7 @@ TEST_F(IpTaggingFilterTest, NoHits) {
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("10.2.3.5");
-  EXPECT_CALL(filter_callbacks_.request_info_, downstreamRemoteAddress())
+  EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.no_hit")).Times(1);
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.total")).Times(1);
@@ -176,7 +176,7 @@ TEST_F(IpTaggingFilterTest, AppendEntry) {
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.5");
-  EXPECT_CALL(filter_callbacks_.request_info_, downstreamRemoteAddress())
+  EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
@@ -204,7 +204,7 @@ ip_tags:
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.4");
-  EXPECT_CALL(filter_callbacks_.request_info_, downstreamRemoteAddress())
+  EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
 
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.total")).Times(1);
@@ -235,7 +235,7 @@ ip_tags:
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("2001:abcd:ef01:2345::1");
-  EXPECT_CALL(filter_callbacks_.request_info_, downstreamRemoteAddress())
+  EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
@@ -251,7 +251,7 @@ TEST_F(IpTaggingFilterTest, RuntimeDisabled) {
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("ip_tagging.http_filter_enabled", 100))
       .WillOnce(Return(false));
-  EXPECT_CALL(filter_callbacks_.request_info_, downstreamRemoteAddress()).Times(0);
+  EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -264,7 +264,7 @@ TEST_F(IpTaggingFilterTest, ClearRouteCache) {
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.5");
-  EXPECT_CALL(filter_callbacks_.request_info_, downstreamRemoteAddress())
+  EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
 
   EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(1);

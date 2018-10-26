@@ -7,8 +7,8 @@
 #include "common/common/logger.h"
 #include "common/grpc/codec.h"
 #include "common/http/codec_client.h"
-#include "common/request_info/request_info_impl.h"
 #include "common/router/header_parser.h"
+#include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/health_checker_base_impl.h"
 
 #include "src/proto/grpc/health/v1/health.pb.h"

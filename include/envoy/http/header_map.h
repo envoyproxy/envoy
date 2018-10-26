@@ -243,6 +243,7 @@ private:
   HEADER_FUNC(ContentLength)                                                                       \
   HEADER_FUNC(ContentType)                                                                         \
   HEADER_FUNC(Date)                                                                                \
+  HEADER_FUNC(EnvoyAttemptCount)                                                                   \
   HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(EnvoyDownstreamServiceCluster)                                                       \
   HEADER_FUNC(EnvoyDownstreamServiceNode)                                                          \
@@ -257,6 +258,7 @@ private:
   HEADER_FUNC(EnvoyOverloaded)                                                                     \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
+  HEADER_FUNC(EnvoyRetriableStatusCodes)                                                           \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
   HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
   HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
@@ -293,12 +295,7 @@ private:
   HEADER_FUNC(Upgrade)                                                                             \
   HEADER_FUNC(UserAgent)                                                                           \
   HEADER_FUNC(Vary)                                                                                \
-  HEADER_FUNC(Via)                                                                                 \
-  HEADER_FUNC(XB3TraceId)                                                                          \
-  HEADER_FUNC(XB3SpanId)                                                                           \
-  HEADER_FUNC(XB3ParentSpanId)                                                                     \
-  HEADER_FUNC(XB3Sampled)                                                                          \
-  HEADER_FUNC(XB3Flags)
+  HEADER_FUNC(Via)
 
 /**
  * The following functions are defined for each inline header above. E.g., for ContentLength we

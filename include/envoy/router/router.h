@@ -10,6 +10,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
@@ -43,10 +44,10 @@ public:
    * example, adding or removing headers. This should only be called ONCE immediately after
    * obtaining the initial response headers.
    * @param headers supplies the response headers, which may be modified during this call.
-   * @param request_info holds additional information about the request.
+   * @param stream_info holds additional information about the request.
    */
   virtual void finalizeResponseHeaders(Http::HeaderMap& headers,
-                                       const RequestInfo::RequestInfo& request_info) const PURE;
+                                       const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 /**
@@ -151,6 +152,8 @@ public:
   static const uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x40;
   static const uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x80;
   static const uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
+  static const uint32_t RETRY_ON_GRPC_INTERNAL           = 0x200;
+  static const uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
   // clang-format on
 
   virtual ~RetryPolicy() {}
@@ -171,13 +174,15 @@ public:
   virtual uint32_t retryOn() const PURE;
 
   /**
-   * Initializes the RetryHostPredicates to be used with this retry attempt.
+   * Initializes a new set of RetryHostPredicates to be used when retrying with this retry policy.
    * @return list of RetryHostPredicates to use
    */
   virtual std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const PURE;
 
   /**
-   * @return the RetryPriority to use when determining priority load for retries.
+   * Initializes a RetryPriority to be used when retrying with this retry policy.
+   * @return the RetryPriority to use when determining priority load for retries, or nullptr
+   * if none should be used.
    */
   virtual Upstream::RetryPrioritySharedPtr retryPriority() const PURE;
 
@@ -186,6 +191,12 @@ public:
    * for a retry attempt.
    */
   virtual uint32_t hostSelectionMaxAttempts() const PURE;
+
+  /**
+   * List of status codes that should trigger a retry when the retriable-status-codes retry
+   * policy is enabled.
+   */
+  virtual const std::vector<uint32_t>& retriableStatusCodes() const PURE;
 };
 
 /**
@@ -345,6 +356,11 @@ public:
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
     return dynamic_cast<const Derived*>(perFilterConfig(name));
   }
+
+  /**
+   * @return bool whether to include the request count header in upstream requests.
+   */
+  virtual bool includeAttemptCount() const PURE;
 };
 
 /**
@@ -453,6 +469,11 @@ public:
 };
 
 /**
+ * Base class for all route typed metadata factories.
+ */
+class HttpRouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
+
+/**
  * An individual resolved route entry.
  */
 class RouteEntry : public ResponseEntry {
@@ -480,11 +501,11 @@ public:
    * example URL prefix rewriting, adding headers, etc. This should only be called ONCE
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
    * @param headers supplies the request headers, which may be modified during this call.
-   * @param request_info holds additional information about the request.
+   * @param stream_info holds additional information about the request.
    * @param insert_envoy_original_path insert x-envoy-original-path header if path rewritten?
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                      const RequestInfo::RequestInfo& request_info,
+                                      const StreamInfo::StreamInfo& stream_info,
                                       bool insert_envoy_original_path) const PURE;
 
   /**
@@ -566,7 +587,7 @@ public:
    *         in this route.
    */
   virtual Http::WebSocketProxyPtr
-  createWebSocketProxy(Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+  createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
                        Http::WebSocketProxyCallbacks& callbacks,
                        Upstream::ClusterManager& cluster_manager,
                        Network::ReadFilterCallbacks* read_callbacks) const PURE;
@@ -587,6 +608,12 @@ public:
    * @return bool true if the virtual host rate limits should be included.
    */
   virtual bool includeVirtualHostRateLimits() const PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
+   * for this route.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 
   /**
    * @return const envoy::api::v2::core::Metadata& return the metadata provided in the config for
@@ -612,7 +639,14 @@ public:
    */
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
     return dynamic_cast<const Derived*>(perFilterConfig(name));
-  }
+  };
+
+  /**
+   * True if the virtual host this RouteEntry belongs to is configured to include the attempt
+   * count header.
+   * @return bool whether x-envoy-attempt-count should be included on the upstream request.
+   */
+  virtual bool includeAttemptCount() const PURE;
 };
 
 /**

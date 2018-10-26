@@ -6,7 +6,12 @@ As of release 1.3.0, Envoy will follow a
 The following features have been DEPRECATED and will be removed in the specified release cycle.
 A logged warning is expected for each deprecated item that is in deprecation window.
 
-## Version 1.8.0 (pending)
+## Version 1.9.0 (pending)
+
+* Order of execution of the encoder filter chain has been reversed. Prior to this release cycle it was incorrect, see [#4599](https://github.com/envoyproxy/envoy/issues/4599). In the 1.9.0 release cycle we introduced `bugfix_reverse_encode_order` in [http_connection_manager.proto] (https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto) to temporarily support both old and new behaviors. Note this boolean field is deprecated.
+* Use of the v1 REST_LEGACY ApiConfigSource is deprecated.
+
+## Version 1.8.0 (Oct 4, 2018)
 
 * Use of the v1 API (including `*.deprecated_v1` fields in the v2 API) is deprecated.
   See envoy-announce [email](https://groups.google.com/forum/#!topic/envoy-announce/oPnYMZw8H4U).
@@ -35,7 +40,7 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * Use of the string `user` field in `Authenticated` in [rbac.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/rbac/v2alpha/rbac.proto)
   is deprecated in favor of the new `StringMatcher` based `principal_name` field.
 
-## Version 1.7.0
+## Version 1.7.0 (Jun 21, 2018)
 
 * Admin mutations should be sent as POSTs rather than GETs. HTTP GETs will result in an error
   status code and will not have their intended effect. Prior to 1.7, GETs can be used for
