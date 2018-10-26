@@ -39,9 +39,9 @@ public:
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* transport_socket = bootstrap.mutable_static_resources()
-                                  ->mutable_listeners(0)
-                                  ->mutable_filter_chains(0)
-                                  ->mutable_transport_socket();
+                                   ->mutable_listeners(0)
+                                   ->mutable_filter_chains(0)
+                                   ->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.alts");
       envoy::config::transport_socket::alts::v2alpha::Alts alts_config;
       if (!server_peer_identity_.empty()) {
