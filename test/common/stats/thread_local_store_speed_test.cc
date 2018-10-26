@@ -22,7 +22,7 @@ public:
 
   ~ThreadLocalStorePerf() {
     store_.shutdownThreading();
-    if (tls_.get() != nullptr) {
+    if (tls_) {
       tls_->shutdownGlobalThreading();
     }
   }
