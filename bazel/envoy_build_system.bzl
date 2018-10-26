@@ -13,6 +13,7 @@ def envoy_copts(repository, test = False):
         "-Wnon-virtual-dtor",
         "-Woverloaded-virtual",
         "-Wold-style-cast",
+        "-Wvla",
         "-std=c++14",
     ]
 
