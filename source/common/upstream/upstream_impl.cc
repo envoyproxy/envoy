@@ -324,7 +324,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       features_(parseFeatures(config)),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       extension_protocol_options_(parseExtensionProtocolOptions(config)),
-      resource_managers_(config, runtime, name_),
+      resource_managers_(config, runtime, name_, *stats_scope_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
       source_address_(getSourceAddress(config, bind_config)),
       lb_ring_hash_config_(config.ring_hash_lb_config()),
@@ -680,16 +680,24 @@ ClusterImplBase::resolveProtoAddress(const envoy::api::v2::core::Address& addres
 
 ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::Cluster& config,
                                                     Runtime::Loader& runtime,
-                                                    const std::string& cluster_name) {
-  managers_[enumToInt(ResourcePriority::Default)] =
-      load(config, runtime, cluster_name, envoy::api::v2::core::RoutingPriority::DEFAULT);
+                                                    const std::string& cluster_name,
+                                                    Stats::Scope& stats_scope) {
+  managers_[enumToInt(ResourcePriority::Default)] = load(
+      config, runtime, cluster_name, stats_scope, envoy::api::v2::core::RoutingPriority::DEFAULT);
   managers_[enumToInt(ResourcePriority::High)] =
-      load(config, runtime, cluster_name, envoy::api::v2::core::RoutingPriority::HIGH);
+      load(config, runtime, cluster_name, stats_scope, envoy::api::v2::core::RoutingPriority::HIGH);
+}
+
+ClusterCircuitBreakersStats
+ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, const std::string& stat_prefix) {
+  std::string prefix(fmt::format("circuit_breakers.{}.", stat_prefix));
+  return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix))};
 }
 
 ResourceManagerImplPtr
 ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
                                         Runtime::Loader& runtime, const std::string& cluster_name,
+                                        Stats::Scope& stats_scope,
                                         const envoy::api::v2::core::RoutingPriority& priority) {
   uint64_t max_connections = 1024;
   uint64_t max_pending_requests = 1024;
@@ -725,7 +733,8 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
     max_retries = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_retries, max_retries);
   }
   return ResourceManagerImplPtr{new ResourceManagerImpl(
-      runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries)};
+      runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
+      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name))};
 }
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,

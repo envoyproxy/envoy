@@ -132,6 +132,22 @@ statistics will be rooted at *cluster.<name>.outlier_detection.* and contain the
   ejections_total, Counter, Deprecated. Number of ejections due to any outlier type (even if unenforced)
   ejections_consecutive_5xx, Counter, Deprecated. Number of consecutive 5xx ejections (even if unenforced)
 
+.. _config_cluster_manager_cluster_stats_circuit_breakers:
+
+Circuit breakers statistics
+---------------------------
+
+Circuit breakers statistics will be rooted at *cluster.<name>.circuit_breakers.<priority>.* and contain the following:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  cx_open, Gauge, Whether the connection circuit breaker is closed (0) or open (1)
+  rq_pending_open, Gauge, Whether the pending requests circuit breaker is closed (0) or open (1)
+  rq_open, Gauge, Whether the requests circuit breaker is closed (0) or open (1)
+  rq_retry_open, Gauge, Whether the retry circuit breaker is closed (0) or open (1)
+
 .. _config_cluster_manager_cluster_stats_dynamic_http:
 
 Dynamic HTTP statistics

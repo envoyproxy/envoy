@@ -31,7 +31,8 @@ configure and code each application independently. Envoy supports various types 
 
 Each circuit breaking limit is :ref:`configurable <config_cluster_manager_cluster_circuit_breakers>`
 and tracked on a per upstream cluster and per priority basis. This allows different components of
-the distributed system to be tuned independently and have different limits.
+the distributed system to be tuned independently and have different limits. The live state of these
+circuit breakers can be observed via :ref:`statistics <config_cluster_manager_cluster_stats_circuit_breakers>`.
 
 Note that circuit breaking will cause the :ref:`x-envoy-overloaded
 <config_http_filters_router_x-envoy-overloaded_set>` header to be set by the router filter in the
