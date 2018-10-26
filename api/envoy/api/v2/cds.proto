@@ -81,7 +81,7 @@ message Cluster {
     // for an explanation.
     LOGICAL_DNS = 2;
 
-    // Refer to the :ref:`service discovery type<arch_overview_service_discovery_types_sds>`
+    // Refer to the :ref:`service discovery type<arch_overview_service_discovery_types_eds>`
     // for an explanation.
     EDS = 3;
 
