@@ -3,6 +3,7 @@
 #include "extensions/filters/network/kafka/kafka_types.h"
 
 #include "common/common/fmt.h"
+#include "common/common/byte_order.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/exception.h"
 
@@ -81,28 +82,28 @@ public:
 class Int16Buffer : public IntBuffer<INT16> {
 public:
   INT16 get() const {
-    return ntohs(*reinterpret_cast<const INT16*>(buf_));
+    return be16toh(*reinterpret_cast<const INT16*>(buf_));
   }
 };
 
 class Int32Buffer : public IntBuffer<INT32> {
 public:
   INT32 get() const {
-    return ntohl(*reinterpret_cast<const INT32*>(buf_));
+    return be32toh(*reinterpret_cast<const INT32*>(buf_));
   }
 };
 
 class UInt32Buffer : public IntBuffer<UINT32> {
 public:
   UINT32 get() const {
-    return ntohl(*reinterpret_cast<const UINT32*>(buf_));
+    return be32toh(*reinterpret_cast<const UINT32*>(buf_));
   }
 };
 
 class Int64Buffer : public IntBuffer<INT64> {
 public:
   INT64 get() const {
-    return ntohll(*reinterpret_cast<const INT64*>(buf_));
+    return be64toh(*reinterpret_cast<const INT64*>(buf_));
   }
 };
 
@@ -685,10 +686,10 @@ size_t Encoder::encode(const TYPE& arg, char* dst) { \
   return sizeof(TYPE); \
 }
 
-ENCODE_NUMERIC_TYPE(INT16, htons);
-ENCODE_NUMERIC_TYPE(INT32, htonl);
-ENCODE_NUMERIC_TYPE(INT64, htonll);
-ENCODE_NUMERIC_TYPE(UINT32, htonl);
+ENCODE_NUMERIC_TYPE(INT16, htobe16);
+ENCODE_NUMERIC_TYPE(INT32, htobe32);
+ENCODE_NUMERIC_TYPE(UINT32, htobe32);
+ENCODE_NUMERIC_TYPE(INT64, htobe64);
 
 template <> inline
 size_t Encoder::encode(const BOOLEAN& arg, char* dst) {
