@@ -23,7 +23,6 @@ public:
 
   // Ssl::ContextConfig
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
-  const std::string& altAlpnProtocols() const override { return alt_alpn_protocols_; }
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
   const TlsCertificateConfig* tlsCertificate() const override {
@@ -76,7 +75,6 @@ private:
   static const std::string DEFAULT_ECDH_CURVES;
 
   const std::string alpn_protocols_;
-  const std::string alt_alpn_protocols_;
   const std::string cipher_suites_;
   const std::string ecdh_curves_;
   Secret::TlsCertificateConfigProviderSharedPtr tls_certficate_provider_;

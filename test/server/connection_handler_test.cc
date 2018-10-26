@@ -116,6 +116,48 @@ TEST_F(ConnectionHandlerTest, RemoveListener) {
   handler_->removeListeners(0);
 }
 
+TEST_F(ConnectionHandlerTest, DisableListener) {
+  InSequence s;
+
+  Network::MockListener* listener = new NiceMock<Network::MockListener>();
+  Network::ListenerCallbacks* listener_callbacks;
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks = &cb;
+            return listener;
+          }));
+  TestListener* test_listener = addListener(1, false, false, "test_listener");
+  EXPECT_CALL(test_listener->socket_, localAddress());
+  handler_->addListener(*test_listener);
+
+  EXPECT_CALL(*listener, disable());
+  EXPECT_CALL(*listener, onDestroy());
+
+  handler_->disableListeners();
+}
+
+TEST_F(ConnectionHandlerTest, AddDisabledListener) {
+  InSequence s;
+
+  Network::MockListener* listener = new NiceMock<Network::MockListener>();
+  Network::ListenerCallbacks* listener_callbacks;
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks = &cb;
+            return listener;
+          }));
+  TestListener* test_listener = addListener(1, false, false, "test_listener");
+
+  EXPECT_CALL(*listener, disable());
+  EXPECT_CALL(test_listener->socket_, localAddress());
+  EXPECT_CALL(*listener, onDestroy());
+
+  handler_->disableListeners();
+  handler_->addListener(*test_listener);
+}
+
 TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {
   InSequence s;
 

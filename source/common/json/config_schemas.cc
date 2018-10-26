@@ -139,7 +139,6 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
           "cert_chain_file" : {"type" : "string"},
           "private_key_file": {"type" : "string"},
           "alpn_protocols" : {"type" : "string"},
-          "alt_alpn_protocols": {"type" : "string"},
           "ca_cert_file" : {"type" : "string"},
           "require_client_certificate" : {"type" : "boolean"},
           "verify_certificate_hash" : {"type" : "string"},
