@@ -18,6 +18,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        "//source/extensions/filters/network/dubbo_proxy:deserializer_interface",
         "//source/extensions/filters/network/dubbo_proxy:protocol_interface",
         "//test/test_common:printers_lib",
     ],
@@ -53,6 +54,18 @@ envoy_extension_cc_test(
         ":mocks_lib",
         ":utility_lib",
         "//source/extensions/filters/network/dubbo_proxy:dubbo_protocol_impl_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "hessian_deserializer_impl_test",
+    srcs = ["hessian_deserializer_impl_test.cc"],
+    extension_name = "envoy.filters.network.dubbo_proxy",
+    deps = [
+        ":mocks_lib",
+        ":utility_lib",
+        "//source/extensions/filters/network/dubbo_proxy:hessian_deserializer_impl_lib",
         "//test/mocks/server:server_mocks",
     ],
 )
