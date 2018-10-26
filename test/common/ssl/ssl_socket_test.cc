@@ -2787,6 +2787,47 @@ TEST_P(SslSocketTest, RevokedCertificate) {
            "ssl.handshake", true, GetParam());
 }
 
+TEST_P(SslSocketTest, RevokedCertificateCRLInTrustedCA) {
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert_with_crl.pem"
+)EOF";
+
+  // This should fail, since the certificate has been revoked.
+  const std::string revoked_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+)EOF";
+
+  testUtil(revoked_client_ctx_yaml, server_ctx_yaml, "", "", "", "db6c9a4af16d9091", "", "", "",
+           "ssl.fail_verify_error", false, GetParam());
+
+  // This should succeed, since the cert isn't revoked.
+  const std::string successful_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert2.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key2.pem"
+)EOF";
+
+  testUtil(successful_client_ctx_yaml, server_ctx_yaml, "", "", "", "db6c9a4af16d9091", "", "", "",
+           "ssl.handshake", true, GetParam());
+}
+
 TEST_P(SslSocketTest, GetRequestedServerName) {
   envoy::api::v2::Listener listener;
   envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
