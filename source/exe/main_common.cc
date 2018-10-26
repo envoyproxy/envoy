@@ -79,7 +79,6 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
 
     if (options.mutexTracingEnabled()) {
       Envoy::MutexTracer::getOrCreateTracer();
-      absl::RegisterMutexTracer(&Envoy::MutexTracer::contentionHook);
     }
 
     break;

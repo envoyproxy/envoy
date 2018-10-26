@@ -109,6 +109,7 @@ envoy_cc_library(
     name = "mutex_tracer",
     srcs = ["mutex_tracer.cc"],
     hdrs = ["mutex_tracer.h"],
+    external_deps = ["abseil_synchronization"],
     deps = [
         ":assert_lib",
     ],

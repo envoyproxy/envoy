@@ -22,22 +22,24 @@ class MutexTracer final {
 public:
   static MutexTracer* getOrCreateTracer();
 
-  // Returns the callback which can be registered via
-  // absl::RegisterMutexTracer(&Envoy::MutexTracer::contentionHook).
-  static void contentionHook(const char* msg, const void* obj, int64_t wait_cycles);
-
   // Resets the recorded statistics.
-  void Reset();
+  void reset();
 
   int64_t numContentions() const { return num_contentions_.load(order_); }
   int64_t currentWaitCycles() const { return current_wait_cycles_.load(order_); }
   int64_t lifetimeWaitCycles() const { return lifetime_wait_cycles_.load(order_); }
 
 private:
-  static MutexTracer* singleton_;
+  friend class MutexTracerTest;
+
+  // Returns the callback which can be registered via
+  // absl::RegisterMutexTracer(&Envoy::MutexTracer::contentionHook).
+  static void contentionHook(const char* msg, const void* obj, int64_t wait_cycles);
 
   // Utility function for contentionHook.
-  void RecordContention(const char*, const void*, int64_t wait_cycles);
+  void recordContention(const char*, const void*, int64_t wait_cycles);
+
+  static MutexTracer* singleton_;
 
   // Number of mutex contention occurrences since last reset.
   std::atomic<int64_t> num_contentions_{0};

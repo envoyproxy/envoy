@@ -109,7 +109,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "mutex_tracer_test",
     srcs = ["mutex_tracer_test.cc"],
-    external_deps = ["abseil_synchronization"],
     deps = ["//source/common/common:mutex_tracer"],
 )
 
