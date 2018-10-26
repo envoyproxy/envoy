@@ -8,9 +8,9 @@
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/stats_options_impl.h"
 #include "common/stats/thread_local_store.h"
-#include "exe/main_common.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/exe/main_common_test_base.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "testing/base/public/benchmark.h"
@@ -86,6 +86,10 @@ static void BM_StatsNoTls(benchmark::State& state) {
 BENCHMARK(BM_StatsNoTls);
 
 static void BM_StatsWithTls(benchmark::State& state) {
+  MainCommonTestBase test_base;
+  test_base.addArg("--disable-hot-restart");
+
+
   constexpr char bootstrap[] = R"(
 node {
   id: "test_id"
@@ -147,7 +151,45 @@ BENCHMARK(BM_StatsWithTls);
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {
   benchmark::Initialize(&argc, argv);
+
   Envoy::Event::Libevent::Global::initialize();
+echo "admin:
+  access_log_path: /dev/null
+  address:
+    socket_address: { address: 127.0.0.1, port_value: 9901 }
+
+static_resources:
+  listeners:
+  - name: listener
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 40000 }
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        config:
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: \*
+              routes:
+              - match: { prefix: / }
+                route: { cluster: service_0000 }
+          http_filters:
+          - name: envoy.router
+  clusters:"
+
+for i in `seq -f "%04g" 0 $(($1-1))`; do
+  echo "
+  - name: service_$i
+    connect_timeout: 0.25s
+    type: STATIC
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: 127.0.0.1, port_value: 60000 }}]"
+done
+
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
     return 1;
   }
