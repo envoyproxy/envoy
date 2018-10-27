@@ -43,11 +43,17 @@ public:
   const Runtime::Loader& runtime() { return runtime_; }
   const std::string& cluster() { return cluster_name_; }
 
-  const Http::LowerCaseStrUnorderedSet& allowedAuthorizationHeaders() {
-    return allowed_authorization_headers_;
+  const Http::LowerCaseStrUnorderedSet& allowedUpstreamHeaders() {
+    return allowed_upstream_headers_;
   }
 
+  const Http::LowerCaseStrUnorderedSet& allowedClientHeaders() { return allowed_client_headers_; }
+
   const Http::LowerCaseStrUnorderedSet& allowedRequestHeaders() { return allowed_request_headers_; }
+
+  const Http::LowerCaseStrUnorderedSet& allowedRequestHeaderPrefixes() {
+    return allowed_request_headers_prefix_;
+  }
 
   const Http::LowerCaseStringPairVec& authorizationHeadersToAdd() {
     return authorization_headers_to_add_;
@@ -60,23 +66,29 @@ public:
 
 private:
   static Http::LowerCaseStrUnorderedSet
-  toRequestHeaders(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& request_headers);
-  static Http::LowerCaseStrUnorderedSet toAuthorizationHeaders(
-      const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& response_headers);
-  static Http::LowerCaseStringPairVec toAuthorizationHeadersToAdd(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& to_add_headers);
+  toResquestHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys);
+  static Http::LowerCaseStrUnorderedSet
+  toHeaderPrefix(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys);
+  static Http::LowerCaseStringPairVec toAuthorizationHeaderToAdd(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& headers);
+  static Http::LowerCaseStrUnorderedSet
+  toClientHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::MessagePtr>& message);
+  static Http::LowerCaseStrUnorderedSet
+  toUpstreamHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::MessagePtr>& message);
+
+  const Http::LowerCaseStrUnorderedSet allowed_request_headers_;
+  const Http::LowerCaseStrUnorderedSet allowed_request_headers_prefix_;
+  const Http::LowerCaseStringPairVec authorization_headers_to_add_;
+  const Http::LowerCaseStrUnorderedSet allowed_client_headers_;
+  const Http::LowerCaseStrUnorderedSet allowed_upstream_headers_;
 
   const LocalInfo::LocalInfo& local_info_;
   const Runtime::Loader& runtime_;
-  const Http::LowerCaseStrUnorderedSet allowed_authorization_headers_;
-  const Http::LowerCaseStrUnorderedSet allowed_request_headers_;
-  const Http::LowerCaseStringPairVec authorization_headers_to_add_;
   const std::string cluster_name_;
 
   Stats::Scope& scope_;
   Upstream::ClusterManager& cm_;
-
-  bool failure_mode_allow_;
+  bool failure_mode_allow_{};
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;

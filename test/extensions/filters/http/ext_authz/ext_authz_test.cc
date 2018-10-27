@@ -130,7 +130,7 @@ TEST_F(HttpExtAuthzFilterTest, TestAllowedRequestHeaders) {
   )EOF";
 
   initialize(config);
-  
+
   // Check allowed request headers.
   EXPECT_EQ(config_->allowedRequestHeaders().size(), 11);
   EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Path), 1);
@@ -144,11 +144,12 @@ TEST_F(HttpExtAuthzFilterTest, TestAllowedRequestHeaders) {
   EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().ForwardedProto), 1);
   EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().ProxyAuthorization), 1);
   EXPECT_EQ(config_->allowedRequestHeaders().count(Http::LowerCaseString{"bar_header_key"}), 1);
-  
+
   // Check allowed authorization headers.
   EXPECT_EQ(config_->allowedAuthorizationHeaders().size(), 4);
   EXPECT_EQ(config_->allowedAuthorizationHeaders().count(Http::Headers::get().WWWAuthenticate), 1);
-  EXPECT_EQ(config_->allowedAuthorizationHeaders().count(Http::Headers::get().ProxyAuthenticate), 1);
+  EXPECT_EQ(config_->allowedAuthorizationHeaders().count(Http::Headers::get().ProxyAuthenticate),
+            1);
   EXPECT_EQ(config_->allowedAuthorizationHeaders().count(Http::Headers::get().Location), 1);
   EXPECT_EQ(config_->allowedAuthorizationHeaders().count(Http::LowerCaseString{"foo_header_key"}),
             1);
