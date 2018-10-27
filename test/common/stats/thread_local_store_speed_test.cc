@@ -76,6 +76,9 @@ BENCHMARK(BM_StatsWithTls);
 // TODO(jmarantz): add multi-threaded variant of this test, that aggressively
 // looks up stats in multiple threads to try to trigger contention issues.
 
+// TODO(jmarantz): add version using the RawStatDataAllocator, or better yet,
+// the full hot-restart mechanism so that actual shared-memory is used.
+
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {
   benchmark::Initialize(&argc, argv);
