@@ -929,7 +929,8 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     bool is_grpc_request, Code code, const std::string& body,
-    std::function<void(HeaderMap& headers)> modify_headers, bool is_head_request) {
+    std::function<void(HeaderMap& headers)> modify_headers, bool is_head_request,
+    bool rate_limited_as_resource_exhausted) {
   Utility::sendLocalReply(is_grpc_request,
                           [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
                             if (modify_headers != nullptr) {
@@ -945,7 +946,8 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
                             // request instead.
                             encodeData(nullptr, data, end_stream);
                           },
-                          state_.destroyed_, code, body, is_head_request);
+                          state_.destroyed_, code, body, is_head_request,
+                          rate_limited_as_resource_exhausted);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
@@ -1623,7 +1625,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
             parent_.state_.local_complete_ = end_stream;
           },
           parent_.state_.destroyed_, Http::Code::InternalServerError,
-          CodeUtility::toString(Http::Code::InternalServerError), parent_.is_head_request_);
+          CodeUtility::toString(Http::Code::InternalServerError), parent_.is_head_request_, false);
       parent_.maybeEndEncode(parent_.state_.local_complete_);
     } else {
       resetStream();

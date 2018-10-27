@@ -13,13 +13,23 @@ namespace Grpc {
 class Utility {
 public:
   /**
-   * Returns the gRPC status code from a given HTTP response status code. Ordinarily, it is expected
-   * that a 200 response is provided, but gRPC defines a mapping for intermediaries that are not
-   * gRPC aware, see https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
+   * Returns the gRPC status code from a given HTTP response status code.
+   * Ordinarily, it is expected that a 200 response is provided, but gRPC
+   * defines a mapping for intermediaries that are not gRPC aware,
+   * see https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
+   *
+   * Google defines a mapping where a code of 429 (rate limited) is mapped to
+   * RESOURCE_EXHAUSTED instead of UNAVAILABLE as defined by gRPC. This function
+   * allows the user to specify the GrpcStatus that should map to a 429 response.
+   * See https://cloud.google.com/apis/design/errors#generating_errors.
+   *
    * @param http_response_status HTTP status code.
+   * @param rate_limited_as_resource_exhausted whether a 429 response code
+   * should be mapped to RESOURCE_EXHAUSTED instead of UNAVAILABLE.
    * @return Status::GrpcStatus corresponding gRPC status code.
    */
-  static Status::GrpcStatus httpToGrpcStatus(uint64_t http_response_status);
+  static Status::GrpcStatus httpToGrpcStatus(uint64_t http_response_status,
+                                             bool rate_limited_as_resource_exhausted);
 
   /**
    * @param grpc_status gRPC status from grpc-status header.

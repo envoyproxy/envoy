@@ -259,8 +259,13 @@ TEST(GrpcCommonTest, HttpToGrpcStatus) {
       {500, Status::GrpcStatus::Unknown},
   };
   for (const auto& test_case : test_set) {
-    EXPECT_EQ(test_case.second, Grpc::Utility::httpToGrpcStatus(test_case.first));
+    EXPECT_EQ(test_case.second, Grpc::Utility::httpToGrpcStatus(test_case.first, false));
   }
+}
+
+TEST(GrpcCommonTest, HttpToGrpcStatusRateLimited) {
+  EXPECT_EQ(Status::GrpcStatus::Unavailable, Grpc::Utility::httpToGrpcStatus(429, false));
+  EXPECT_EQ(Status::GrpcStatus::ResourceExhausted, Grpc::Utility::httpToGrpcStatus(429, true));
 }
 
 TEST(GrpcCommonTest, HasGrpcContentType) {

@@ -173,9 +173,10 @@ private:
       return parent_.buffered_request_data_.get();
     }
     void sendLocalReply(Code code, const std::string& body,
-                        std::function<void(HeaderMap& headers)> modify_headers) override {
-      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers,
-                             parent_.is_head_request_);
+                        std::function<void(HeaderMap& headers)> modify_headers,
+                        bool rate_limited_as_resource_exhausted = false) override {
+      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, parent_.is_head_request_,
+                             rate_limited_as_resource_exhausted);
     }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -283,7 +284,7 @@ private:
     HeaderMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, const std::string& body,
                         std::function<void(HeaderMap& headers)> modify_headers,
-                        bool is_head_request);
+                        bool is_head_request, bool rate_limited_as_resource_exhausted = false);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);

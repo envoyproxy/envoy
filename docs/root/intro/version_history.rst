@@ -17,6 +17,9 @@ Version history
   See `#3611 <https://github.com/envoyproxy/envoy/issues/3611>`_ for details.
 * network: removed the reference to `FilterState` in `Connection` in favor of `StreamInfo`.
 * logging: added missing [ in log prefix.
+* rate-limit: added :ref:`configuration <envoy_api_field_config.filter.http.rate_limit.v2.RateLimit.rate_limited_as_resource_exhausted>`
+  to specify whether the `GrpcStatus` status returned should be `RESOURCE_EXHAUSTED` or
+  `UNAVAILABLE` when a gRPC call is rate limited.
 * rbac: added support for permission matching by :ref:`requested server name <envoy_api_field_config.rbac.v2alpha.Permission.requested_server_name>`.
 * router: added ability to configure arbitrary :ref:`retriable status codes. <envoy_api_field_route.RouteAction.RetryPolicy.retriable_status_codes>`
 * router: added ability to set attempt count in upstream requests, see :ref:`virtual host's include request

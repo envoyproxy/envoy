@@ -221,9 +221,18 @@ public:
    *                  type, or encoded in the grpc-message header.
    * @param modify_headers supplies an optional callback function that can modify the
    *                       response headers.
+   * @param rate_limited_as_resource_exhausted specifies whether a RESOURCE_EXHAUSTED code
+   *                                           should be returned instead of the default
+   *                                           UNAVAILABLE code for rate limited gRPC calls.
    */
   virtual void sendLocalReply(Code response_code, const std::string& body_text,
-                              std::function<void(HeaderMap& headers)> modify_headers) PURE;
+                              std::function<void(HeaderMap& headers)> modify_headers,
+                              bool rate_limited_as_resource_exhausted) PURE;
+
+  void sendLocalReply(Code response_code, const std::string& body_text,
+                      std::function<void(HeaderMap& headers)> modify_headers) {
+    sendLocalReply(response_code, body_text, modify_headers, false);
+  }
 
   /**
    * Called with 100-Continue headers to be encoded.

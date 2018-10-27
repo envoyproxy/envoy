@@ -40,4 +40,8 @@ message RateLimit {
   // communication failure between rate limiting service and the proxy.
   // Defaults to false.
   bool failure_mode_deny = 5;
+
+  // Specifies whether a `RESOURCE_EXHAUSTED` code must be returned instead of
+  // the default `UNAVAILABLE` code for a rate limited gRPC call.
+  bool rate_limited_as_resource_exhausted = 6;
 }

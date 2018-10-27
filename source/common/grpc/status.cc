@@ -3,9 +3,11 @@
 namespace Envoy {
 namespace Grpc {
 
-Status::GrpcStatus Utility::httpToGrpcStatus(uint64_t http_response_status) {
-  // From
-  // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
+Status::GrpcStatus Utility::httpToGrpcStatus(uint64_t http_response_status,
+                                             bool rate_limited_as_resource_exhausted) {
+  // See:
+  // * https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
+  // * https://cloud.google.com/apis/design/errors#generating_errors
   switch (http_response_status) {
   case 400:
     return Status::GrpcStatus::Internal;
@@ -16,6 +18,10 @@ Status::GrpcStatus Utility::httpToGrpcStatus(uint64_t http_response_status) {
   case 404:
     return Status::GrpcStatus::Unimplemented;
   case 429:
+    if (rate_limited_as_resource_exhausted) {
+      return Status::GrpcStatus::ResourceExhausted;
+    }
+    return Status::GrpcStatus::Unavailable;
   case 502:
   case 503:
   case 504:

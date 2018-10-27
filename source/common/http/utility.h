@@ -139,7 +139,8 @@ Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOption
  * @param is_head_request tells if this is a response to a HEAD request
  */
 void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
-                    Code response_code, const std::string& body_text, bool is_head_request);
+                    Code response_code, const std::string& body_text, bool is_head_request,
+                    bool rate_limited_as_resource_exhausted);
 
 /**
  * Create a locally generated response using the provided lambdas.
@@ -157,7 +158,7 @@ void sendLocalReply(bool is_grpc,
                     std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
                     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
                     const bool& is_reset, Code response_code, const std::string& body_text,
-                    bool is_head_request = false);
+                    bool is_head_request = false, bool rate_limited_as_resource_exhausted = false);
 
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
