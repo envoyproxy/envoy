@@ -26,9 +26,16 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
       Http::Utility::resolvePerFilterConfig<FilterConfigPerRoute>(
           HttpFilterNames::get().ExtAuthorization, route);
 
-  Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
-      callbacks_, headers, per_route_config ? &per_route_config->contextExtensions() : nullptr,
-      check_request_);
+  const Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>* context_extensions{};
+  if (per_route_config) {
+    if (per_route_config->disabled()) {
+      return;
+    }
+    context_extensions = &per_route_config->contextExtensions();
+  }
+
+  Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(callbacks_, headers,
+                                                                context_extensions, check_request_);
 
   state_ = State::Calling;
   // Don't let the filter chain continue as we are going to invoke check call.

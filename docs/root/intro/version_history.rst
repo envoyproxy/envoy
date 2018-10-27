@@ -8,7 +8,7 @@ Version history
 * circuit-breaker: added cx_open, rq_pending_open, rq_open and rq_retry_open gauges to expose live
   state via :ref:`circuit breakers statistics <config_cluster_manager_cluster_stats_circuit_breakers>`.
 * config: removed support for the v1 API.
-* ext_authz: added support for providing context extensions on a per route basis.
+* ext_authz: added support for providing per route config - optionally disable the filter and provide context extensions.
 * fault: removed integer percentage support.
 * http: Added HTTP/2 WebSocket proxying via :ref:`extended CONNECT <envoy_api_field_core.Http2ProtocolOptions.allow_connect>`
 * http: added limits to the number and length of header modifications in all fields request_headers_to_add and response_headers_to_add. These limits are very high and should only be used as a last-resort safeguard.

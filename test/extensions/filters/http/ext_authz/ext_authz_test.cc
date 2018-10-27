@@ -182,6 +182,41 @@ TEST_F(HttpExtAuthzFilterTest, ContextExtensions) {
   EXPECT_EQ(value, check_request_value);
 }
 
+// Test that context extensions make it into the check request.
+TEST_F(HttpExtAuthzFilterTest, DisabledOnRoute) {
+  envoy::config::filter::http::ext_authz::v2alpha::CheckSettings settings;
+  FilterConfigPerRoute auth_per_route(settings);
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(addr_));
+  ON_CALL(connection_, localAddress()).WillByDefault(ReturnRef(addr_));
+
+  ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+      .WillByDefault(Return(&auth_per_route));
+
+  auto test_disable = [&](bool disabled) {
+    initialize(filter_config_);
+    // Set disabled
+    settings.set_disabled(disabled);
+    // Initialize the route's per filter config.
+    auth_per_route = FilterConfigPerRoute(settings);
+  };
+
+  // baseline: make sure that when not disabled, check is called
+  test_disable(false);
+  EXPECT_CALL(*client_, check(_, _, _)).Times(1);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  // test that disabling works
+  test_disable(true);
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
 // Test that the request continues when the filter_callbacks has no route.
 TEST_P(HttpExtAuthzFilterParamTest, NoRoute) {
 
