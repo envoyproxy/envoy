@@ -42,18 +42,10 @@ class RateLimitGrpcClientTest : public testing::TestWithParam<bool> {
 public:
   RateLimitGrpcClientTest() : async_client_(new Grpc::MockAsyncClient()) {}
 
-  void setClient(const bool use_data_plane_proto) {
-    if (use_data_plane_proto) {
-      client_ = std::make_unique<GrpcClientImpl>(
-          Grpc::AsyncClientPtr{async_client_}, absl::optional<std::chrono::milliseconds>(),
-          "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit");
-    } else {
-      // Force link time dependency on deprecated message type.
-      pb::lyft::ratelimit::RateLimit _ignore;
-      client_ = std::make_unique<GrpcClientImpl>(
-          Grpc::AsyncClientPtr{async_client_}, absl::optional<std::chrono::milliseconds>(),
-          "pb.lyft.ratelimit.RateLimitService.ShouldRateLimit");
-    }
+  void setClient() {
+    client_ = std::make_unique<GrpcClientImpl>(
+        Grpc::AsyncClientPtr{async_client_}, absl::optional<std::chrono::milliseconds>(),
+        "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit");
   }
 
   Grpc::MockAsyncClient* async_client_;
@@ -63,28 +55,20 @@ public:
   Tracing::MockSpan span_;
 };
 
-INSTANTIATE_TEST_CASE_P(RateLimitGrpcClientTest, RateLimitGrpcClientTest,
-                        ::testing::Values(true, false));
-
-TEST_P(RateLimitGrpcClientTest, Basic) {
+TEST_F(RateLimitGrpcClientTest, Basic) {
   std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse> response;
 
   {
-    const bool use_data_plane_proto = GetParam();
-    setClient(use_data_plane_proto);
+    setClient();
     envoy::service::ratelimit::v2::RateLimitRequest request;
     Http::HeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}});
     EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(*client_), _, _))
         .WillOnce(
-            Invoke([this, use_data_plane_proto](
-                       const Protobuf::MethodDescriptor& service_method, const Protobuf::Message&,
-                       Grpc::AsyncRequestCallbacks&, Tracing::Span&,
-                       const absl::optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
+            Invoke([this](const Protobuf::MethodDescriptor& service_method,
+                          const Protobuf::Message&, Grpc::AsyncRequestCallbacks&, Tracing::Span&,
+                          const absl::optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
               std::string service_name = "envoy.service.ratelimit.v2.RateLimitService";
-              if (!use_data_plane_proto) {
-                service_name = "pb.lyft.ratelimit.RateLimitService";
-              }
               EXPECT_EQ(service_name, service_method.service()->full_name());
               EXPECT_EQ("ShouldRateLimit", service_method.name());
               return &async_request_;
@@ -139,8 +123,8 @@ TEST_P(RateLimitGrpcClientTest, Basic) {
   }
 }
 
-TEST_P(RateLimitGrpcClientTest, Cancel) {
-  setClient(GetParam());
+TEST_F(RateLimitGrpcClientTest, Cancel) {
+  setClient();
   std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse> response;
 
   EXPECT_CALL(*async_client_, send(_, _, _, _, _)).WillOnce(Return(&async_request_));

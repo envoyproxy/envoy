@@ -90,8 +90,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
 
 GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitServiceConfig& config,
                                  Grpc::AsyncClientManager& async_client_manager,
-                                 Stats::Scope& scope)
-    : use_data_plane_proto_(config.use_data_plane_proto()) {
+                                 Stats::Scope& scope) {
   envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.MergeFrom(config.grpc_service());
   // TODO(htuch): cluster_name is deprecated, remove after 1.6.0.
@@ -100,25 +99,12 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitSe
     grpc_service.mutable_envoy_grpc()->set_cluster_name(config.cluster_name());
   }
   async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope, false);
-
-  // TODO(junr03): legacy rate limit is deprecated. Remove this warning after 1.8.0.
-  if (!use_data_plane_proto_) {
-    // Force link time dependency on deprecated message type.
-    pb::lyft::ratelimit::RateLimit _ignore;
-    ENVOY_LOG_MISC(warn, "legacy rate limit client is deprecated, update your service to support "
-                         "the data-plane-api defined rate limit service");
-  }
 }
 
 ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout) {
-  // TODO(junr03): legacy rate limit is deprecated. Remove support for the lyft proto after 1.8.0.
-  if (use_data_plane_proto_) {
-    return std::make_unique<GrpcClientImpl>(
-        async_client_factory_->create(), timeout,
-        "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit");
-  }
-  return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout,
-                                          "pb.lyft.ratelimit.RateLimitService.ShouldRateLimit");
+  return std::make_unique<GrpcClientImpl>(
+      async_client_factory_->create(), timeout,
+      "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit");
 }
 
 } // namespace RateLimit

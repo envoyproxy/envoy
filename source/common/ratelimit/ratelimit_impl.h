@@ -17,8 +17,6 @@
 #include "common/common/logger.h"
 #include "common/singleton/const_singleton.h"
 
-#include "source/common/ratelimit/ratelimit.pb.h"
-
 namespace Envoy {
 namespace RateLimit {
 
@@ -78,7 +76,6 @@ public:
 
 private:
   Grpc::AsyncClientFactoryPtr async_client_factory_;
-  const bool use_data_plane_proto_;
 };
 
 class NullClientImpl : public Client {

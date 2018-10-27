@@ -4,8 +4,6 @@
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 
-#include "source/common/ratelimit/ratelimit.pb.h"
-
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 
@@ -21,14 +19,8 @@ class RatelimitGrpcClientIntegrationParamTest
       public testing::TestWithParam<
           std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>> {
 public:
-  ~RatelimitGrpcClientIntegrationParamTest() {}
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
-  bool useDataPlaneProto() const {
-    // Force link time dependency on deprecated message type.
-    pb::lyft::ratelimit::RateLimit _ignore;
-    return std::get<2>(GetParam());
-  }
 };
 
 class RatelimitIntegrationTest : public HttpIntegrationTest,
@@ -72,9 +64,6 @@ public:
                                  ->add_rate_limits();
           rate_limit->add_actions()->mutable_destination_cluster();
         });
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      bootstrap.mutable_rate_limit_service()->set_use_data_plane_proto(useDataPlaneProto());
-    });
     HttpIntegrationTest::initialize();
   }
 
@@ -99,13 +88,8 @@ public:
     result = ratelimit_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
     EXPECT_STREQ("POST", ratelimit_request_->headers().Method()->value().c_str());
-    if (useDataPlaneProto()) {
-      EXPECT_STREQ("/envoy.service.ratelimit.v2.RateLimitService/ShouldRateLimit",
-                   ratelimit_request_->headers().Path()->value().c_str());
-    } else {
-      EXPECT_STREQ("/pb.lyft.ratelimit.RateLimitService/ShouldRateLimit",
-                   ratelimit_request_->headers().Path()->value().c_str());
-    }
+    EXPECT_STREQ("/envoy.service.ratelimit.v2.RateLimitService/ShouldRateLimit",
+                 ratelimit_request_->headers().Path()->value().c_str());
     EXPECT_STREQ("application/grpc", ratelimit_request_->headers().ContentType()->value().c_str());
 
     envoy::service::ratelimit::v2::RateLimitRequest expected_request_msg;
