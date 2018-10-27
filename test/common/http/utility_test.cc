@@ -551,6 +551,10 @@ TEST(HttpUtility, QueryParamsToString) {
             Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}, {"b", "2"}})));
 }
 
+TEST(HttpUtility, resolvePerFilterConfigNilRoute) {
+  EXPECT_EQ(nullptr, Utility::resolvePerFilterConfigGeneric("envoy.filter", nullptr));
+}
+
 TEST(HttpUtility, resolvePerFilterConfig) {
   class TestConfig : public Router::RouteSpecificFilterConfig {
   } testConfig;
@@ -577,8 +581,10 @@ TEST(HttpUtility, resolvePerFilterConfigGeneric) {
   const Router::RouteSpecificFilterConfig* two = nullconfig + 2;
   const Router::RouteSpecificFilterConfig* three = nullconfig + 3;
 
-  // Testing in reverse order, so that the method always returns the last object.
+  // Test when there's nothing on the route
+  EXPECT_EQ(nullptr, Utility::resolvePerFilterConfigGeneric(filter_name, filter_callbacks.route()));
 
+  // Testing in reverse order, so that the method always returns the last object.
   ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
       .WillByDefault(Return(one));
   EXPECT_EQ(one, Utility::resolvePerFilterConfigGeneric(filter_name, filter_callbacks.route()));
@@ -589,6 +595,10 @@ TEST(HttpUtility, resolvePerFilterConfigGeneric) {
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
       .WillByDefault(Return(three));
   EXPECT_EQ(three, Utility::resolvePerFilterConfigGeneric(filter_name, filter_callbacks.route()));
+
+  // Cover the case of no route entry
+  ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
+  EXPECT_EQ(two, Utility::resolvePerFilterConfigGeneric(filter_name, filter_callbacks.route()));
 }
 
 } // namespace Http
