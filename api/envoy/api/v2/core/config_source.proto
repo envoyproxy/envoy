@@ -69,7 +69,7 @@ message RateLimitSettings {
 
   // Rate at which tokens will be filled per second. If not set, a default fill rate of 10 tokens
   // per second will be used.
-  google.protobuf.DoubleValue fill_rate = 2;
+  google.protobuf.DoubleValue fill_rate = 2 [(validate.rules).double.gt = 0.0];
 }
 
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters
