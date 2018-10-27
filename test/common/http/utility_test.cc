@@ -551,6 +551,23 @@ TEST(HttpUtility, QueryParamsToString) {
             Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}, {"b", "2"}})));
 }
 
+TEST(HttpUtility, resolvePerFilterConfig) {
+  class TestConfig : public Router::RouteSpecificFilterConfig {
+  } testConfig;
+
+  const std::string filter_name = "envoy.filter";
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+
+  // make the file callbacks return our test config
+  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
+      .WillByDefault(Return(&testConfig));
+
+  // test the we get the same object back (as this goes through the dynamic_cast)
+  auto resolved_filter_config =
+      Utility::resolvePerFilterConfig<TestConfig>(filter_name, filter_callbacks.route());
+  EXPECT_EQ(&testConfig, resolved_filter_config);
+}
+
 TEST(HttpUtility, resolvePerFilterConfigGeneric) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
