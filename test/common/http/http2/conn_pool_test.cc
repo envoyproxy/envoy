@@ -234,6 +234,7 @@ TEST_F(Http2ConnPoolImplTest, LocalReset) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_tx_reset_.value());
+  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, RemoteReset) {
@@ -250,6 +251,7 @@ TEST_F(Http2ConnPoolImplTest, RemoteReset) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_rx_reset_.value());
+  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
@@ -373,6 +375,8 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
 TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   InSequence s;
 
+  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
+
   expectClientCreate();
   ActiveTestRequest r1(*this, 0);
   EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
@@ -381,6 +385,8 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
 
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
 
   expectClientCreate();
   ActiveTestRequest r2(*this, 1);
@@ -401,9 +407,8 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
 }
 
 TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
+  cluster_->resetResourceManager(1024, 1024, 1, 1);
   InSequence s;
-  cluster_->resource_manager_.reset(
-      new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1024, 1024, 1, 1));
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0);

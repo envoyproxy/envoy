@@ -17,13 +17,13 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/config/metadata.h"
 #include "common/http/header_utility.h"
 #include "common/router/config_utility.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/router/router_ratelimit.h"
-#include "common/tcp_proxy/tcp_proxy.h"
 
 #include "absl/types/optional.h"
 
@@ -338,17 +338,12 @@ public:
   }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
-  bool useOldStyleWebSocket() const override { return websocket_config_ != nullptr; }
-  Http::WebSocketProxyPtr
-  createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-                       Http::WebSocketProxyCallbacks& callbacks,
-                       Upstream::ClusterManager& cluster_manager,
-                       Network::ReadFilterCallbacks* read_callbacks) const override;
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
   const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
   bool includeAttemptCount() const override { return vhost_.includeAttemptCount(); }
 
@@ -386,13 +381,6 @@ private:
   struct RuntimeData {
     std::string fractional_runtime_key_{};
     envoy::type::FractionalPercent fractional_runtime_default_{};
-
-    // Relating to the deprecated 'runtime' field.
-    std::string runtime_key_{};
-    uint64_t runtime_default_{};
-
-    // Indicates whether to use the deprecated 'runtime' field or 'fractional_percent'.
-    bool legacy_runtime_data_{};
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {
@@ -442,19 +430,13 @@ private:
 
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
-    bool useOldStyleWebSocket() const override { return parent_->useOldStyleWebSocket(); }
-    Http::WebSocketProxyPtr
-    createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-                         Http::WebSocketProxyCallbacks& callbacks,
-                         Upstream::ClusterManager& cluster_manager,
-                         Network::ReadFilterCallbacks* read_callbacks) const override {
-      return parent_->createWebSocketProxy(request_headers, stream_info, callbacks, cluster_manager,
-                                           read_callbacks);
-    }
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
     }
     const envoy::api::v2::core::Metadata& metadata() const override { return parent_->metadata(); }
+    const Envoy::Config::TypedMetadata& typedMetadata() const override {
+      return parent_->typedMetadata();
+    }
     const PathMatchCriterion& pathMatchCriterion() const override {
       return parent_->pathMatchCriterion();
     }
@@ -539,7 +521,6 @@ private:
   const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
                                  // to virtual host is currently safe.
   const bool auto_host_rewrite_;
-  const TcpProxy::ConfigSharedPtr websocket_config_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
   const Http::Code cluster_not_found_response_code_;
@@ -570,6 +551,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   envoy::api::v2::core::Metadata metadata_;
+  Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory> typed_metadata_;
   const bool match_grpc_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.

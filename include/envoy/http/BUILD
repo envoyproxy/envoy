@@ -58,14 +58,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "websocket_interface",
-    hdrs = ["websocket.h"],
-    deps = [
-        ":header_map_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "header_map_interface",
     hdrs = ["header_map.h"],
     deps = ["//source/common/common:hash_lib"],

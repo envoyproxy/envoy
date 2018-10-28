@@ -22,21 +22,18 @@ const Upstream::PriorityLoad& OtherPriorityRetryPriority::determinePriorityLoad(
       excluded_priorities_[priority] = true;
     }
 
-    adjustForAttemptedPriorities(priority_set);
+    if (!adjustForAttemptedPriorities(priority_set)) {
+      return original_priority_load;
+    }
   }
 
   return per_priority_load_;
 }
 
-void OtherPriorityRetryPriority::adjustForAttemptedPriorities(
+bool OtherPriorityRetryPriority::adjustForAttemptedPriorities(
     const Upstream::PrioritySet& priority_set) {
   for (auto& host_set : priority_set.hostSetsPerPriority()) {
     recalculatePerPriorityState(host_set->priority(), priority_set);
-  }
-
-  // If all priorities are unhealthy to begin with, there's nothing to do.
-  if (!std::accumulate(per_priority_load_.begin(), per_priority_load_.end(), 0)) {
-    return;
   }
 
   auto adjustedHealthAndSum = adjustedHealth();
@@ -55,6 +52,13 @@ void OtherPriorityRetryPriority::adjustForAttemptedPriorities(
   const auto& adjusted_per_priority_health = adjustedHealthAndSum.first;
   auto total_health = adjustedHealthAndSum.second;
 
+  // If total health is still zero at this point, it must mean that all clusters are
+  // completely unhealthy. If so, fall back to using the original priority set. This mantains
+  // whatever handling the default LB uses when all priorities are unhealthy.
+  if (total_health == 0) {
+    return false;
+  }
+
   std::fill(per_priority_load_.begin(), per_priority_load_.end(), 0);
   // We then adjust the load by rebalancing priorities with the adjusted health values.
   size_t total_load = 100;
@@ -70,14 +74,15 @@ void OtherPriorityRetryPriority::adjustForAttemptedPriorities(
       total_load -= delta;
     }
   }
+
+  return true;
 }
 
 std::pair<std::vector<uint32_t>, uint32_t> OtherPriorityRetryPriority::adjustedHealth() const {
   // Create an adjusted health view of the priorities, where attempted priorities are
   // given a zero weight.
   uint32_t total_health = 0;
-  std::vector<uint32_t> adjusted_per_priority_health(per_priority_health_.size());
-  adjusted_per_priority_health.resize(per_priority_health_.size());
+  std::vector<uint32_t> adjusted_per_priority_health(per_priority_health_.size(), 0);
 
   for (size_t i = 0; i < per_priority_health_.size(); ++i) {
     if (!excluded_priorities_[i]) {

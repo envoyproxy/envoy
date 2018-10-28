@@ -4,7 +4,7 @@ executors:
   ubuntu-build:
     description: "A regular build executor based on ubuntu image"
     docker:
-      - image: envoyproxy/envoy-build:faea2a2ebc397b7a3a5e3c877ceaefc5cf4daf25
+      - image: envoyproxy/envoy-build:f60886c04253d9a096503b949696cbdc8f82fa4d
     resource_class: xlarge
     working_directory: /source
 
@@ -82,6 +82,14 @@ jobs:
        - run: ci/coverage_publish.sh
        - store_artifacts:
            path: /build/envoy/generated/coverage
+
+   clang_tidy:
+     executor: ubuntu-build
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: ci/do_circle_ci.sh bazel.clang_tidy
+
    format:
      executor: ubuntu-build
      resource_class: small
@@ -140,6 +148,7 @@ workflows:
       - ipv6_tests
       - coverage
       - format
+      - clang_tidy
       - build_image
       - docs:
           filters:

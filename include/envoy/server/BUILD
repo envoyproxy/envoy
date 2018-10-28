@@ -212,5 +212,6 @@ envoy_cc_library(
     name = "overload_manager_interface",
     hdrs = ["overload_manager.h"],
     deps = [
+        "//include/envoy/thread_local:thread_local_interface",
     ],
 )
