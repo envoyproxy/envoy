@@ -716,7 +716,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     entry = std::next(filter->entry());
   }
 
-  for (; entry != decoder_filters_.end(); entry++) {
+  for (; entry != decoder_filters_.end() && !decoding_headers_only_; entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     FilterHeadersStatus status = (*entry)->decodeHeaders(
@@ -724,7 +724,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
-    if (!(*entry)->commonHandleAfterHeadersCallback(status) &&
+
+    if (!(*entry)->commonHandleAfterHeadersCallback(status, decoding_headers_only_) &&
         std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
@@ -757,6 +758,11 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
 
 void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* filter,
                                                      Buffer::Instance& data, bool end_stream) {
+  // If we previously decided to decode only the headers, do nothing here.
+  if (decoding_headers_only_) {
+    return;
+  }
+
   resetIdleTimer();
 
   // If a response is complete or a reset has been sent, filters do not care about further body
@@ -854,6 +860,11 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(HeaderMapPtr&& trailers
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilter* filter,
                                                          HeaderMap& trailers) {
+  // If we previously decided to decode only the headers, do nothing here.
+  if (decoding_headers_only_) {
+    return;
+  }
+
   // See decodeData() above for why we check local_complete_ here.
   if (state_.local_complete_) {
     return;
@@ -992,7 +1003,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   std::list<ActiveStreamEncoderFilterPtr>::iterator continue_data_entry = encoder_filters_.end();
 
-  for (; entry != encoder_filters_.end(); entry++) {
+  for (; entry != encoder_filters_.end() && !encoding_headers_only_; entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(
@@ -1000,7 +1011,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
-    if (!(*entry)->commonHandleAfterHeadersCallback(status)) {
+    if (!(*entry)->commonHandleAfterHeadersCallback(status, encoding_headers_only_)) {
       return;
     }
 
@@ -1092,12 +1103,15 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   chargeStats(headers);
 
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this,
-                   end_stream && continue_data_entry == encoder_filters_.end(), headers);
+                   encoding_headers_only_ ||
+                       (end_stream && continue_data_entry == encoder_filters_.end()),
+                   headers);
 
   // Now actually encode via the codec.
   stream_info_.onFirstDownstreamTxByteSent();
-  response_encoder_->encodeHeaders(headers,
-                                   end_stream && continue_data_entry == encoder_filters_.end());
+  response_encoder_->encodeHeaders(
+      headers,
+      encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end()));
 
   if (continue_data_entry != encoder_filters_.end()) {
     // We use the continueEncoding() code since it will correctly handle not calling
@@ -1106,7 +1120,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     (*continue_data_entry)->stopped_ = true;
     (*continue_data_entry)->continueEncoding();
   } else {
-    maybeEndEncode(end_stream);
+    maybeEndEncode(encoding_headers_only_ || end_stream);
   }
 }
 
@@ -1144,6 +1158,11 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
 
 void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* filter,
                                                      Buffer::Instance& data, bool end_stream) {
+  // If we previously decided to encode only the headers, do nothing here.
+  if (encoding_headers_only_) {
+    return;
+  }
+
   resetIdleTimer();
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   auto trailers_added_entry = encoder_filters_.end();
@@ -1196,6 +1215,11 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
 
 void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilter* filter,
                                                          HeaderMap& trailers) {
+  // If we previously decided to encode only the headers, do nothing here.
+  if (encoding_headers_only_) {
+    return;
+  }
+
   resetIdleTimer();
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, true);
   for (; entry != encoder_filters_.end(); entry++) {
@@ -1359,13 +1383,18 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfter100Continue
 }
 
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterHeadersCallback(
-    FilterHeadersStatus status) {
+    FilterHeadersStatus status, bool& headers_only) {
   ASSERT(!headers_continued_);
   ASSERT(!stopped_);
 
   if (status == FilterHeadersStatus::StopIteration) {
     stopped_ = true;
     return false;
+  } else if (status == FilterHeadersStatus::StopIterationAndEnd) {
+    // Set headers_only to true so we know to end early if necessary,
+    // but continue filter iteration so we actually write the headers/run the cleanup code.
+    headers_only = true;
+    return true;
   } else {
     ASSERT(status == FilterHeadersStatus::Continue);
     headers_continued_ = true;

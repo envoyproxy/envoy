@@ -27,7 +27,10 @@ enum class FilterHeadersStatus {
   // Do not iterate to any of the remaining filters in the chain. Returning
   // FilterDataStatus::Continue from decodeData()/encodeData() or calling
   // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
-  StopIteration
+  StopIteration,
+  // Do not iterate to any of the remaining filters in the chain and end encoding/decoding,
+  // resulting in a header only request/response.
+  StopIterationAndEnd
 };
 
 /**
