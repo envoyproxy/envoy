@@ -310,7 +310,7 @@ TEST_P(MainCommonTest, ConstructDestructLogger) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 
   const std::string logger_name = "logger";
-  spdlog::details::log_msg log_msg;
+  static spdlog::details::log_msg log_msg;
   log_msg.logger_name = &logger_name;
   log_msg.level = spdlog::level::level_enum::err;
 
