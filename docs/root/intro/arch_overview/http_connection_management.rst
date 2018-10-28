@@ -66,7 +66,7 @@ two categories:
 These plugins can be combined to affect both host selection and priority load.
 
 For example, to configure retries to prefer hosts that haven't been attempted already, the builtin
-``envoy.retry_host_predicates.other_hosts`` predicate can be used:
+``envoy.retry_host_predicates.previous_hosts`` predicate can be used:
 
 .. code-block:: yaml
 
@@ -81,7 +81,7 @@ impossible (no hosts satisfy the predicate) or very unlikely (the only suitable 
 relative weight).
 
 To configure retries to attempt other priorities during retries, the built in
-``envoy.retry_priority.other_priorities`` can be used.
+``envoy.retry_priority.previous_priorities`` can be used.
 
 .. code-block:: yaml
 
