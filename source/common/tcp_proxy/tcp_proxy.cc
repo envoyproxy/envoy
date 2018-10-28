@@ -114,7 +114,7 @@ const std::string& Config::getRegularRouteFromEntries(Network::Connection& conne
   if (connection.streamInfo().filterState().hasData<PerConnectionCluster>(
           PerConnectionCluster::Key)) {
     const PerConnectionCluster& per_connection_cluster =
-        connection.streamInfo().filterState().getData<PerConnectionCluster>(
+        connection.streamInfo().filterState().getDataReadOnly<PerConnectionCluster>(
             PerConnectionCluster::Key);
     return per_connection_cluster.value();
   }
@@ -515,7 +515,6 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
     read_callbacks_->upstreamHost()->outlierDetector().putResult(
         Upstream::Outlier::Result::SUCCESS);
-    onConnectionSuccess();
 
     getStreamInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
     ENVOY_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",

@@ -63,8 +63,9 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
     EXPECT_TRUE(stream_info.filterState().hasData<TcpProxy::PerConnectionCluster>(
         TcpProxy::PerConnectionCluster::Key));
 
-    auto per_connection_cluster = stream_info.filterState().getData<TcpProxy::PerConnectionCluster>(
-        TcpProxy::PerConnectionCluster::Key);
+    auto per_connection_cluster =
+        stream_info.filterState().getDataReadOnly<TcpProxy::PerConnectionCluster>(
+            TcpProxy::PerConnectionCluster::Key);
     EXPECT_EQ(per_connection_cluster.value(), "filter_state_cluster");
   }
 }

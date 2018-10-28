@@ -66,7 +66,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier), time_source_(factory_context.timeSource()),
       last_updated_(factory_context.timeSource().systemTime()) {
-  ::Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
+  Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
 
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::api::v2::RouteConfiguration>(

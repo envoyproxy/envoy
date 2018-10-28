@@ -144,7 +144,6 @@ envoy_cc_test(
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/common/http/websocket:ws_handler_lib",
         "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
         "//source/common/upstream:upstream_includes",

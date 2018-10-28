@@ -45,17 +45,11 @@ On Fedora (maybe also other red hat distros), run the following:
 dnf install cmake libtool libstdc++
 ```
 
-On OS X, you'll need to install several dependencies. This can be accomplished via Homebrew:
+On OS X, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
 ```
-brew install coreutils # for realpath
-brew install wget
-brew install cmake
-brew install libtool
-brew install go
-brew install bazel
-brew install automake
-brew install ninja
+brew install coreutils wget cmake libtool go bazel automake ninja
 ```
+_note_: `coreutils` is used for realpath
 
 Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
 Apple LLVM version 9.1.0 (clang-902.0.30).
