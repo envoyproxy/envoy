@@ -1630,8 +1630,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketMetadataMatch) {
 
   EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster(_, _, _, _))
       .WillOnce(Invoke([&](const std::string&, Upstream::ResourcePriority,
-                           Upstream::LoadBalancerContext* context)
-                           -> Tcp::ConnectionPool::MockInstance* {
+                           Upstream::LoadBalancerContext* context,
+                           absl::optional<std::string>) -> Tcp::ConnectionPool::MockInstance* {
         EXPECT_EQ(
             context->metadataMatchCriteria(),
             &route_config_provider_.route_config_->route_->route_entry_.metadata_matches_criteria_);
