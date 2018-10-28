@@ -258,7 +258,7 @@ public:
                Http::ConnectionPool::Instance*(const std::string& cluster,
                                                ResourcePriority priority, Http::Protocol protocol,
                                                LoadBalancerContext* context));
-  MOCK_METHOD3(tcpConnPoolForCluster,
+  MOCK_METHOD4(tcpConnPoolForCluster,
                Tcp::ConnectionPool::Instance*(const std::string& cluster, ResourcePriority priority,
                                               LoadBalancerContext* context,
                                               absl::optional<std::string> override_server_name));
