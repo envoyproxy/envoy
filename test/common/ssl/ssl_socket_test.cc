@@ -20,13 +20,12 @@
 #include "test/common/ssl/ssl_certs_test.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -51,13 +50,14 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
               const std::string& expected_subject, const std::string& expected_local_subject,
               const std::string& expected_peer_cert, const std::string& expected_stats,
               bool expect_success, const Network::Address::IpVersion version) {
-  Runtime::MockLoader runtime;
+  Event::SimulatedTimeSystem time_system;
+
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
 
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context);
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl server_stats_store;
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(
       std::move(server_cfg), manager, server_stats_store, std::vector<std::string>{});
@@ -163,9 +163,9 @@ const std::string testUtilV2(
     const std::string& expected_client_cert_uri, const std::string& expected_requested_server_name,
     const std::string& expected_alpn_protocol, const std::string& expected_server_stats,
     const std::string& expected_client_stats, const Network::Address::IpVersion version) {
-  Runtime::MockLoader runtime;
+  Event::SimulatedTimeSystem time_system;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(time_system);
   std::string new_session = EMPTY_STRING;
 
   // SNI-based selection logic isn't happening in Ssl::SslSocket anymore.
@@ -1659,8 +1659,6 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongCA) {
 // Make sure that we do not flush code and do an immediate close if we have not completed the
 // handshake.
 TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
-  Runtime::MockLoader runtime;
-
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -1676,7 +1674,8 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl server_stats_store;
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(
       std::move(server_cfg), manager, server_stats_store, std::vector<std::string>{});
@@ -1721,8 +1720,6 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
 
 // Test that half-close is sent and received correctly
 TEST_P(SslSocketTest, HalfClose) {
-  Runtime::MockLoader runtime;
-
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -1738,7 +1735,8 @@ TEST_P(SslSocketTest, HalfClose) {
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context_);
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl server_stats_store;
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(
       std::move(server_cfg), manager, server_stats_store, std::vector<std::string>{});
@@ -1810,7 +1808,6 @@ TEST_P(SslSocketTest, HalfClose) {
 }
 
 TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
-  Runtime::MockLoader runtime;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1828,7 +1825,8 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context);
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl server_stats_store;
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(
       std::move(server_cfg), manager, server_stats_store, std::vector<std::string>{});
@@ -1906,9 +1904,9 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                                  const std::vector<std::string>& server_names2,
                                  const std::string& client_ctx_yaml, bool expect_reuse,
                                  const Network::Address::IpVersion ip_version) {
-  Runtime::MockLoader runtime;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
 
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context1;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml1), server_tls_context1);
@@ -2286,8 +2284,6 @@ TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertDifferentSAN) {
 // Test that if two listeners use the same cert and session ticket key, but
 // different client CA, that sessions cannot be resumed.
 TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
-  Runtime::MockLoader runtime;
-
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -2323,7 +2319,8 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context2;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server2_ctx_yaml), tls_context2);
   auto server2_cfg = std::make_unique<ServerContextConfigImpl>(tls_context2, factory_context_);
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl server_stats_store;
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(
       std::move(server_cfg), manager, server_stats_store, std::vector<std::string>{});
@@ -2426,8 +2423,6 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
 }
 
 TEST_P(SslSocketTest, SslError) {
-  Runtime::MockLoader runtime;
-
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -2444,7 +2439,8 @@ TEST_P(SslSocketTest, SslError) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl server_stats_store;
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(
       std::move(server_cfg), manager, server_stats_store, std::vector<std::string>{});
@@ -2778,6 +2774,47 @@ TEST_P(SslSocketTest, RevokedCertificate) {
            "ssl.handshake", true, GetParam());
 }
 
+TEST_P(SslSocketTest, RevokedCertificateCRLInTrustedCA) {
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert_with_crl.pem"
+)EOF";
+
+  // This should fail, since the certificate has been revoked.
+  const std::string revoked_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+)EOF";
+
+  testUtil(revoked_client_ctx_yaml, server_ctx_yaml, "", "", "", "db6c9a4af16d9091", "", "", "",
+           "ssl.fail_verify_error", false, GetParam());
+
+  // This should succeed, since the cert isn't revoked.
+  const std::string successful_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert2.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key2.pem"
+)EOF";
+
+  testUtil(successful_client_ctx_yaml, server_ctx_yaml, "", "", "", "db6c9a4af16d9091", "", "", "",
+           "ssl.handshake", true, GetParam());
+}
+
 TEST_P(SslSocketTest, GetRequestedServerName) {
   envoy::api::v2::Listener listener;
   envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
@@ -2799,7 +2836,6 @@ TEST_P(SslSocketTest, GetRequestedServerName) {
 // NotReadySslSocket object to handle downstream connection.
 TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   Stats::IsolatedStoreImpl stats_store;
-  Runtime::MockLoader runtime;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -2822,7 +2858,8 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   EXPECT_EQ(nullptr, server_cfg->tlsCertificate());
   EXPECT_FALSE(server_cfg->isReady());
 
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
   auto transport_socket = server_ssl_socket_factory.createTransportSocket(absl::nullopt);
@@ -2839,13 +2876,13 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
 // NotReadySslSocket object to handle upstream connection.
 TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   Stats::IsolatedStoreImpl stats_store;
-  Runtime::MockLoader runtime;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockRandomGenerator> random;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Init::MockManager> init_manager;
+  Event::SimulatedTimeSystem time_system;
   EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
   EXPECT_CALL(factory_context, random()).WillOnce(ReturnRef(random));
@@ -2862,7 +2899,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   EXPECT_EQ(nullptr, client_cfg->tlsCertificate());
   EXPECT_FALSE(client_cfg->isReady());
 
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(time_system);
   Ssl::ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                         stats_store);
   auto transport_socket = client_ssl_socket_factory.createTransportSocket(absl::nullopt);
@@ -2882,7 +2919,8 @@ public:
                               downstream_tls_context_);
     auto server_cfg =
         std::make_unique<ServerContextConfigImpl>(downstream_tls_context_, factory_context_);
-    manager_.reset(new ContextManagerImpl(runtime_));
+    Event::SimulatedTimeSystem time_system;
+    manager_.reset(new ContextManagerImpl(time_system));
     server_ssl_socket_factory_.reset(new ServerSslSocketFactory(
         std::move(server_cfg), *manager_, server_stats_store_, std::vector<std::string>{}));
 
@@ -3065,7 +3103,6 @@ public:
         filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
 )EOF";
 
-  Runtime::MockLoader runtime_;
   envoy::api::v2::auth::DownstreamTlsContext downstream_tls_context_;
   std::unique_ptr<ContextManagerImpl> manager_;
   Network::TransportSocketFactoryPtr server_ssl_socket_factory_;

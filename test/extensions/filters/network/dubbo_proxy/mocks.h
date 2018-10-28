@@ -33,7 +33,6 @@ public:
   MOCK_METHOD2(decode, bool(Buffer::Instance&, Context*));
   std::string name_{"MockProtocol"};
 };
-
 } // namespace DubboProxy
 } // namespace NetworkFilters
 } // namespace Extensions

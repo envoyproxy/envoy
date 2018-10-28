@@ -15,10 +15,10 @@
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
 #include "test/mocks/init/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -130,8 +130,7 @@ protected:
   const std::string server_cert_;
   const std::string validation_secret_;
   const std::string client_cert_;
-  Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl context_manager_{runtime_};
+  Ssl::ContextManagerImpl context_manager_{timeSystem()};
   FakeHttpConnectionPtr sds_connection_;
   FakeUpstream* sds_upstream_{};
   FakeStreamPtr sds_stream_;

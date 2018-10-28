@@ -27,7 +27,6 @@
 #include "common/config/well_known_names.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
-#include "common/http/websocket/ws_handler_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/retry_state_impl.h"
@@ -54,20 +53,19 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(retry_policy.retry_on());
 
   for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
-    auto& factory =
-        ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
-            host_predicate.name());
-    auto config = ::Envoy::Config::Utility::translateToFactoryConfig(host_predicate, factory);
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
+        host_predicate.name());
+    auto config = Envoy::Config::Utility::translateToFactoryConfig(host_predicate, factory);
     retry_host_predicate_configs_.emplace_back(host_predicate.name(), std::move(config));
   }
 
   const auto retry_priority = retry_policy.retry_priority();
   if (!retry_priority.name().empty()) {
-    auto& factory = ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
         retry_priority.name());
     retry_priority_config_ =
         std::make_pair(retry_priority.name(),
-                       ::Envoy::Config::Utility::translateToFactoryConfig(retry_priority, factory));
+                       Envoy::Config::Utility::translateToFactoryConfig(retry_priority, factory));
   }
 
   auto host_selection_attempts = retry_policy.host_selection_retry_max_attempts();
@@ -84,9 +82,8 @@ std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPre
   std::vector<Upstream::RetryHostPredicateSharedPtr> predicates;
 
   for (const auto& config : retry_host_predicate_configs_) {
-    auto& factory =
-        ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
-            config.first);
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
+        config.first);
     predicates.emplace_back(factory.createHostPredicate(*config.second, num_retries_));
   }
 
@@ -98,7 +95,7 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
     return nullptr;
   }
 
-  auto& factory = ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
+  auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
       retry_priority_config_.first);
 
   return factory.createRetryPriority(*retry_priority_config_.second, num_retries_);
@@ -284,11 +281,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       prefix_rewrite_(route.route().prefix_rewrite()), host_rewrite_(route.route().host_rewrite()),
       vhost_(vhost),
       auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
-      websocket_config_([&]() -> TcpProxy::ConfigSharedPtr {
-        return (PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), use_websocket, false))
-                   ? Http::WebSocket::Config(route.route(), factory_context)
-                   : nullptr;
-      }()),
       cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
@@ -317,6 +309,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                                       route.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
                                                        route.response_headers_to_remove())),
+      metadata_(route.metadata()), typed_metadata_(route.metadata()),
       match_grpc_(route.match().has_grpc()), opaque_config_(parseOpaqueConfig(route)),
       decorator_(parseDecorator(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
@@ -329,10 +322,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     if (filter_it != route.route().metadata_match().filter_metadata().end()) {
       metadata_match_criteria_.reset(new MetadataMatchCriteriaImpl(filter_it->second));
     }
-  }
-
-  if (route.has_metadata()) {
-    metadata_ = route.metadata();
   }
 
   // If this is a weighted_cluster, we create N internal route entries
@@ -414,15 +403,6 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 }
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
-
-Http::WebSocketProxyPtr RouteEntryImplBase::createWebSocketProxy(
-    Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-    Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
-    Network::ReadFilterCallbacks* read_callbacks) const {
-  return std::make_unique<Http::WebSocket::WsHandlerImpl>(
-      request_headers, stream_info, *this, callbacks, cluster_manager, read_callbacks,
-      websocket_config_, time_system_);
-}
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,

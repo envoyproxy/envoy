@@ -33,7 +33,7 @@ Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
 
 :ref:`sds <config_cluster_manager_sds>`
   *(sometimes required, object)* If any defined clusters use the :ref:`sds
-  <arch_overview_service_discovery_types_sds>` cluster type, a global SDS configuration must be specified.
+  <config_cluster_manager_sds>` cluster type, a global SDS configuration must be specified.
 
 .. _config_cluster_manager_local_cluster_name:
 

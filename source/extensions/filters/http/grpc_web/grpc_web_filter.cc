@@ -59,7 +59,7 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
   }
   headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Grpc);
 
-  const Http::HeaderEntry* accept = headers.get(Http::Headers::get().Accept);
+  const Http::HeaderEntry* accept = headers.Accept();
   if (accept != nullptr &&
       (Http::Headers::get().ContentTypeValues.GrpcWebText == accept->value().c_str() ||
        Http::Headers::get().ContentTypeValues.GrpcWebTextProto == accept->value().c_str())) {

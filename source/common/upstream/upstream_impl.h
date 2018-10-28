@@ -13,6 +13,7 @@
 
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/event/timer.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
@@ -369,6 +370,8 @@ public:
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
+  static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
+                                                                  const std::string& stat_prefix);
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
@@ -411,6 +414,7 @@ public:
   };
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
   const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
 
   const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const override {
     return cluster_socket_options_;
@@ -423,9 +427,9 @@ public:
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
-                     const std::string& cluster_name);
+                     const std::string& cluster_name, Stats::Scope& stats_scope);
     ResourceManagerImplPtr load(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
-                                const std::string& cluster_name,
+                                const std::string& cluster_name, Stats::Scope& stats_scope,
                                 const envoy::api::v2::core::RoutingPriority& priority);
 
     typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;
@@ -457,6 +461,7 @@ private:
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::api::v2::core::Metadata metadata_;
+  Envoy::Config::TypedMetadataImpl<ClusterTypedMetadataFactory> typed_metadata_;
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;

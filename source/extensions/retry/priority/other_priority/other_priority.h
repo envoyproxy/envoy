@@ -35,7 +35,9 @@ private:
 
   // Distributes priority load between priorities that should be considered after
   // excluding attempted priorities.
-  void adjustForAttemptedPriorities(const Upstream::PrioritySet& priority_set);
+  // @return whether the adjustment was successful. If not, the original priority load should be
+  // used.
+  bool adjustForAttemptedPriorities(const Upstream::PrioritySet& priority_set);
 
   const uint32_t update_frequency_;
   std::vector<uint32_t> attempted_priorities_;
