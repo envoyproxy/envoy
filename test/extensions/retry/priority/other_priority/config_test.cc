@@ -76,6 +76,37 @@ TEST_F(RetryPriorityTest, DefaultFrequency) {
             retry_priority_->determinePriorityLoad(priority_set_, original_priority_load));
 }
 
+// Tests that we handle all hosts being unhealthy in the orignal priority set.
+TEST_F(RetryPriorityTest, NoHealthyUpstreams) {
+  initialize();
+
+  const Upstream::PriorityLoad original_priority_load{0, 0, 0};
+  addHosts(0, 10, 0);
+  addHosts(1, 10, 0);
+  addHosts(2, 10, 0);
+
+  auto host1 = std::make_shared<NiceMock<Upstream::MockHost>>();
+  ON_CALL(*host1, priority()).WillByDefault(Return(0));
+
+  auto host2 = std::make_shared<NiceMock<Upstream::MockHost>>();
+  ON_CALL(*host2, priority()).WillByDefault(Return(1));
+
+  auto host3 = std::make_shared<NiceMock<Upstream::MockHost>>();
+  ON_CALL(*host3, priority()).WillByDefault(Return(2));
+
+  // Before any hosts attempted, load should be unchanged.
+  ASSERT_EQ(original_priority_load,
+            retry_priority_->determinePriorityLoad(priority_set_, original_priority_load));
+
+  {
+    // After attempting a host in P0, load should remain unchanged.
+    const Upstream::PriorityLoad expected_priority_load{0, 0, 0};
+    retry_priority_->onHostAttempted(host1);
+    ASSERT_EQ(expected_priority_load,
+              retry_priority_->determinePriorityLoad(priority_set_, original_priority_load));
+  }
+}
+
 // Tests that spillover happens as we ignore attempted priorities.
 TEST_F(RetryPriorityTest, DefaultFrequencyDegradedPriorities) {
   initialize();

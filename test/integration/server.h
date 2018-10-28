@@ -20,6 +20,7 @@
 #include "server/test_hooks.h"
 
 #include "test/integration/server_stats.h"
+#include "test/integration/tcp_dump.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -259,6 +260,7 @@ private:
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
   Network::Address::InstanceConstSharedPtr admin_address_;
+  TcpDumpPtr tcp_dump_;
 };
 
 } // namespace Envoy
