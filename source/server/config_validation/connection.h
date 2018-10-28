@@ -1,3 +1,4 @@
+#pragma once
 #include "common/network/connection_impl.h"
 
 namespace Envoy {

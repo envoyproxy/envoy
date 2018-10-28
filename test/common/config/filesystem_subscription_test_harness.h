@@ -1,3 +1,5 @@
+#pragma once
+
 #include <fstream>
 
 #include "envoy/api/v2/eds.pb.h"
