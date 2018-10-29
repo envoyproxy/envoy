@@ -19,7 +19,7 @@ Filter::Filter(const std::string& stat_prefix, ConfigProtocolType protocol_type,
     : stats_(generateStats(stat_prefix, scope)), protocol_type_(protocol_type),
       deserialization_type_(deserialization_type), time_source_(time_source) {}
 
-Filter::~Filter() {}
+Filter::~Filter() = default;
 
 Network::FilterStatus Filter::onData(Buffer::Instance& data, bool) {
   if (!sniffing_) {

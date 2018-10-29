@@ -30,12 +30,12 @@ public:
   TimeSource& timeSystem() { return factory_context_.dispatcher().timeSystem(); }
 
   void initializeFilter() {
-    for (auto counter : store_.counters()) {
+    for (const auto& counter : store_.counters()) {
       counter->reset();
     }
 
-    filter_.reset(new Filter("test.", ConfigDubboProxy::Dubbo, ConfigDubboProxy::Hessian2, store_,
-                             timeSystem()));
+    filter_ = std::make_unique<Filter>("test.", ConfigDubboProxy::Dubbo, ConfigDubboProxy::Hessian2,
+                                       store_, timeSystem());
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -186,9 +186,9 @@ public:
   Buffer::OwnedImpl buffer_;
   Buffer::OwnedImpl write_buffer_;
   Stats::IsolatedStoreImpl store_;
-  std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  std::unique_ptr<Filter> filter_;
 };
 
 TEST_F(DubboFilterTest, OnDataHandlesRequestTwoWay) {
