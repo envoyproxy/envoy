@@ -32,7 +32,6 @@ using SymbolStorage = uint8_t[];
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
 
-/** Forward declaration for the StatName class (see below) */
 class StatName;
 
 /**
@@ -239,6 +238,39 @@ private:
 };
 
 /**
+ * Holds backing storage for a StatName. Usage of this is not required, as some
+ * applications may want to hold multiple StatName objects in one contiguous
+ * uint8_t array, or embed the characters directly in another structure.
+ */
+class StatNameStorage {
+public:
+  StatNameStorage(absl::string_view name, SymbolTable& table);
+  StatNameStorage(StatNameStorage&& src) : bytes_(std::move(src.bytes_)) {}
+
+  /**
+   * Before allowing a StatNameStorage to be destroyed, you must call free()
+   * on it, to drop the references to the symbols, allowing the SymbolTable
+   * to shrink.
+   */
+  ~StatNameStorage();
+
+  /**
+   * Decremences the reference counts in the SymbolTable.
+   *
+   * @param table the symbol table.
+   */
+  void free(SymbolTable& table);
+
+  /**
+   * @return StatName a reference to the owned storage.
+   */
+  inline StatName statName() const; // implementation below.
+
+private:
+  std::unique_ptr<SymbolStorage> bytes_;
+};
+
+/**
  * Efficiently represents a stat name using a variable-length array of uint8_t.
  * This class does not own the backing store for this array; the backing-store
  * can be held in StatNameStorage, or it can be packed more tightly into another
@@ -277,6 +309,7 @@ public:
 protected:
   friend SymbolTable;
   friend class StatNameTest;
+  friend class StatNameJoiner;
 
   /**
    * @return size_t the number of bytes in the symbol array, excluding the two-byte
@@ -294,36 +327,31 @@ protected:
   const uint8_t* symbol_array_;
 };
 
+StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
+
 /**
- * Holds backing storage for a StatName. Usage of this is not required, as some
- * applications may want to hold multiple StatName objects in one contiguous
- * uint8_t array, or embed the characters directly in another structure.
+ * Joins two or more StatNames. For example if we have StatNames for {"a.b",
+ * "c.d", "e.f"} then the joined stat-name matches "a.b.c.d.e.f". The advantage
+ * of using this representation is that it avoids having to decode/encode
+ * into the elaborted form, and does not require locking the SymbolTable.
+ *
+ * The caveat is that this representation does not bump reference counts on
+ * for the referenced Symbols in the SymbolTable, so it's only valid as long
+ * as the joined StatNames.
  */
-class StatNameStorage {
+class StatNameJoiner {
 public:
-  StatNameStorage(absl::string_view name, SymbolTable& table);
-  StatNameStorage(StatNameStorage&& src) : bytes_(std::move(src.bytes_)) {}
+  StatNameJoiner(StatName a, StatName b);
+  StatNameJoiner(const std::vector<StatName>& stat_names);
 
   /**
-   * Before allowing a StatNameStorage to be destroyed, you must call free()
-   * on it, to drop the references to the symbols, allowing the SymbolTable
-   * to shrink.
-   */
-  ~StatNameStorage();
-
-  /**
-   * Decremences the reference counts in the SymbolTable.
-   *
-   * @param table the symbol table.
-   */
-  void free(SymbolTable& table);
-
-  /**
-   * @return StatName a reference to the owned storage.
+   * @return StatName a reference to the joined StatName.
    */
   StatName statName() const { return StatName(bytes_.get()); }
 
 private:
+  uint8_t* alloc(size_t num_bytes);
+
   std::unique_ptr<SymbolStorage> bytes_;
 };
 

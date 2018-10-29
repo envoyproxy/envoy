@@ -86,7 +86,7 @@ TEST_F(StatNameTest, TestSuccessfulDecode) {
 TEST_F(StatNameTest, TestBadDecodes) {
   {
     // If a symbol doesn't exist, decoding it should trigger an ASSERT() and crash.
-    SymbolVec bad_symbol_vec = {0};
+    SymbolVec bad_symbol_vec = {1}; // symbol 0 is the empty symbol.
     EXPECT_DEATH(decodeSymbolVec(bad_symbol_vec), "");
   }
 
@@ -267,6 +267,51 @@ TEST_F(StatNameTest, Sort) {
   EXPECT_EQ(names, sorted_names);
 }
 
+TEST_F(StatNameTest, Concat2) {
+  StatNameJoiner joiner(makeStat("a.b"), makeStat("c.d"));
+  EXPECT_EQ("a.b.c.d", joiner.statName().toString(table_));
+}
+
+TEST_F(StatNameTest, ConcatFirstEmpty) {
+  StatNameJoiner joiner(makeStat(""), makeStat("c.d"));
+  EXPECT_EQ("c.d", joiner.statName().toString(table_));
+}
+
+TEST_F(StatNameTest, ConcatSecondEmpty) {
+  StatNameJoiner joiner(makeStat("a.b"), makeStat(""));
+  EXPECT_EQ("a.b", joiner.statName().toString(table_));
+}
+
+TEST_F(StatNameTest, ConcatAllEmpty) {
+  StatNameJoiner joiner(makeStat(""), makeStat(""));
+  EXPECT_EQ("", joiner.statName().toString(table_));
+}
+
+TEST_F(StatNameTest, Join3) {
+  StatNameJoiner joiner({makeStat("a.b"), makeStat("c.d"), makeStat("e.f")});
+  EXPECT_EQ("a.b.c.d.e.f", joiner.statName().toString(table_));
+}
+
+TEST_F(StatNameTest, Join3FirstEmpty) {
+  StatNameJoiner joiner({makeStat(""), makeStat("c.d"), makeStat("e.f")});
+  EXPECT_EQ("c.d.e.f", joiner.statName().toString(table_));
+}
+
+TEST_F(StatNameTest, Join3SecondEmpty) {
+  StatNameJoiner joiner({makeStat("a.b"), makeStat(""), makeStat("e.f")});
+  EXPECT_EQ("a.b.e.f", joiner.statName().toString(table_));
+}
+
+TEST_F(StatNameTest, Join3ThirdEmpty) {
+  StatNameJoiner joiner({makeStat("a.b"), makeStat("c.d"), makeStat("")});
+  EXPECT_EQ("a.b.c.d", joiner.statName().toString(table_));
+}
+
+TEST_F(StatNameTest, JoinAllEmpty) {
+  StatNameJoiner joiner({makeStat(""), makeStat(""), makeStat("")});
+  EXPECT_EQ("", joiner.statName().toString(table_));
+}
+
 // Tests the memory savings realized from using symbol tables with 1k clusters. This
 // test shows the memory drops from almost 8M to less than 2M.
 TEST(SymbolTableTest, Memory) {
@@ -315,51 +360,6 @@ TEST(SymbolTableTest, Memory) {
     // in the allocation library.
 
     EXPECT_LT(symbol_table_mem_used, string_mem_used / 4);
-  }
-}
-
-// Tests the memory savings realized from using symbol tables with 1k clusters. This
-// test shows the memory drops from almost 8M to less than 2M.
-TEST(SymbolTableTest, Memory) {
-  if (!TestUtil::hasDeterministicMallocStats()) {
-    return;
-  }
-
-  // Tests a stat-name allocation strategy.
-  auto test_memory_usage = [](std::function<void(absl::string_view)> fn) -> size_t {
-    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
-    TestUtil::forEachSampleStat(1000, fn);
-    const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
-    if (end_mem != 0) { // See warning below for asan, tsan, and mac.
-      EXPECT_GT(end_mem, start_mem);
-    }
-    return end_mem - start_mem;
-  };
-
-  size_t string_mem_used, symbol_table_mem_used;
-  {
-    std::vector<std::string> names;
-    auto record_stat = [&names](absl::string_view stat) { names.push_back(std::string(stat)); };
-    string_mem_used = test_memory_usage(record_stat);
-  }
-  {
-    SymbolTableImpl table;
-    std::vector<StatNamePtr> names;
-    auto record_stat = [&names, &table](absl::string_view stat) {
-      names.emplace_back(table.encode(stat));
-    };
-    symbol_table_mem_used = test_memory_usage(record_stat);
-  }
-
-  // This test only works if Memory::Stats::totalCurrentlyAllocated() works, which
-  // appears not to be the case in some tests, including asan, tsan, and mac.
-  if (Memory::Stats::totalCurrentlyAllocated() == 0) {
-    std::cerr << "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0."
-              << std::endl;
-  } else {
-    // In manual tests, string memory used 7759488 in this example, and
-    // symbol-table mem used 5663936, as of Oct 15, 2018.
-    EXPECT_LT(symbol_table_mem_used, string_mem_used);
   }
 }
 

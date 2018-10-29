@@ -9,8 +9,8 @@
 namespace Envoy {
 namespace Stats {
 
-static uint32_t SpilloverMask = 0x80;
-static uint32_t Low7Bits = 0x7f;
+static const uint32_t SpilloverMask = 0x80;
+static const uint32_t Low7Bits = 0x7f;
 
 SymbolEncoding::~SymbolEncoding() { ASSERT(vec_.empty()); }
 
@@ -35,12 +35,8 @@ void SymbolEncoding::addSymbol(Symbol symbol) {
 SymbolVec SymbolEncoding::decodeSymbols(const SymbolStorage array, size_t size) {
   SymbolVec symbol_vec;
   Symbol symbol = 0;
-  uint32_t shift = 0;
-  while (true) {
+  for (uint32_t shift = 0; size > 0; --size, ++array) {
     uint32_t uc = static_cast<uint32_t>(*array);
-    ASSERT(size > 0);
-    --size;
-    ++array;
 
     // Inverse addSymbol encoding, walking down the bytes, shifting them into
     // symbol, until a byte with a zero high order bit indicates this symbol is
@@ -48,15 +44,13 @@ SymbolVec SymbolEncoding::decodeSymbols(const SymbolStorage array, size_t size) 
     symbol |= (uc & Low7Bits) << shift;
     if ((uc & SpilloverMask) == 0) {
       symbol_vec.push_back(symbol);
-      if (size == 0) {
-        return symbol_vec;
-      }
       shift = 0;
       symbol = 0;
     } else {
       shift += 7;
     }
   }
+  return symbol_vec;
 }
 
 void SymbolEncoding::moveToStorage(SymbolStorage symbol_array) {
@@ -84,13 +78,19 @@ SymbolTable::~SymbolTable() {
 // the encoding of IPs / numbers if they appear in stat names. We don't want to
 // waste time symbolizing an integer as an integer, if we can help it.
 SymbolEncoding SymbolTable::encode(const absl::string_view name) {
+  SymbolEncoding encoding;
+
+  if (name.empty()) {
+    return encoding;
+  }
+
   // We want to hold the lock for the minimum amount of time, so we do the
   // string-splitting and prepare a temp vector of Symbol first.
   std::vector<absl::string_view> tokens = absl::StrSplit(name, '.');
   std::vector<Symbol> symbols;
   symbols.reserve(tokens.size());
 
-  // Now take the lock and populte the Symbol objects, which involves bumping
+  // Now take the lock and populate the Symbol objects, which involves bumping
   // ref-counts in this.
   {
     Thread::LockGuard lock(lock_);
@@ -100,7 +100,6 @@ SymbolEncoding SymbolTable::encode(const absl::string_view name) {
   }
 
   // Now efficiently encode the array of 32-bit symbols into a uint8_t array.
-  SymbolEncoding encoding;
   for (Symbol symbol : symbols) {
     encoding.addSymbol(symbol);
   }
@@ -223,6 +222,36 @@ StatNameStorage::~StatNameStorage() {
 void StatNameStorage::free(SymbolTable& table) {
   table.free(statName());
   bytes_.reset();
+}
+
+StatNameJoiner::StatNameJoiner(StatName a, StatName b) {
+  size_t a_size = a.numBytes();
+  size_t b_size = b.numBytes();
+  uint8_t* p = alloc(a_size + b_size);
+  memcpy(p, a.data(), a_size);
+  memcpy(p + a_size, b.data(), b_size);
+}
+
+StatNameJoiner::StatNameJoiner(const std::vector<StatName>& stat_names) {
+  size_t num_bytes = 0;
+  for (StatName stat_name : stat_names) {
+    num_bytes += stat_name.numBytes();
+  }
+  uint8_t* p = alloc(num_bytes);
+  for (StatName stat_name : stat_names) {
+    num_bytes = stat_name.numBytes();
+    ;
+    memcpy(p, stat_name.data(), num_bytes);
+    p += num_bytes;
+  }
+}
+
+uint8_t* StatNameJoiner::alloc(size_t num_bytes) {
+  bytes_.reset(new uint8_t[num_bytes + 2]);
+  uint8_t* p = bytes_.get();
+  *p++ = num_bytes & 0xff;
+  *p++ = num_bytes >> 8;
+  return p;
 }
 
 } // namespace Stats
