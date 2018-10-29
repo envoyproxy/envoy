@@ -35,7 +35,8 @@ void SecretManagerImpl::addStaticSecret(const envoy::api::v2::auth::Secret& secr
     break;
   }
   case envoy::api::v2::auth::Secret::TypeCase::kTrustedCa: {
-    auto secret_provider = std::make_shared<TrustedCaConfigProviderImpl>(secret.trusted_ca().trusted_ca());
+    auto secret_provider =
+        std::make_shared<TrustedCaConfigProviderImpl>(secret.trusted_ca().trusted_ca());
     if (!static_trusted_ca_providers_.insert(std::make_pair(secret.name(), secret_provider))
              .second) {
       throw EnvoyException(fmt::format("Duplicate static TrustedCa secret name {}", secret.name()));
