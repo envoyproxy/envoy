@@ -452,7 +452,7 @@ TEST_F(SslServerContextImplTicketTest, InvalidIgnoreCertsNoCA) {
     validation_context:
       allow_expired_certificate: true
 )EOF";
-  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml, time_system_), EnvoyException,
                             "Certificate validity period is always ignored without trusted CA");
 }
 
