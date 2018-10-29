@@ -116,8 +116,8 @@ TEST_P(ListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
       .WillOnce(Return(true));*/
   TestListenerImpl listener(dispatcher_, socket, listener_callbacks, true, false);
   EXPECT_CALL(listener, getLocalAddress(_))
-     .WillOnce(Invoke(
-         [](int fd) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(fd); }));
+      .WillOnce(Invoke(
+          [](int fd) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(fd); }));
 }
 
 // Test that an exception is thrown if there is an error setting socket options.
