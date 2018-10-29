@@ -9,8 +9,8 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "other_hosts_predicate_lib",
-    hdrs = ["other_hosts.h"],
+    name = "previous_hosts_predicate_lib",
+    hdrs = ["previous_hosts.h"],
     deps = [
         "//include/envoy/upstream:retry_interface",
     ],
@@ -21,7 +21,7 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":other_hosts_predicate_lib",
+        ":previous_hosts_predicate_lib",
         "//include/envoy/registry",
         "//include/envoy/upstream:retry_interface",
         "//source/extensions/retry/host:well_known_names",
