@@ -16,7 +16,8 @@ Network::FilterStatus OriginalSniFilter::onNewConnection() {
 
   if (!sni.empty()) {
     read_callbacks_->connection().streamInfo().filterState().setData(
-        OriginalRequestedServerName::Key, std::make_unique<OriginalRequestedServerName>(sni));
+        OriginalRequestedServerName::Key, std::make_unique<OriginalRequestedServerName>(sni),
+        StreamInfo::FilterState::StateType::ReadOnly);
   }
 
   return Network::FilterStatus::Continue;
