@@ -82,10 +82,10 @@ void TraceReporter::flushTraces() {
 
     Http::MessagePtr message(new Http::RequestMessageImpl());
     message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-    message->headers().insertPath().value(encoder_->path());
-    message->headers().insertHost().value(driver_.cluster()->name());
+    message->headers().insertPath().value().setReference(encoder_->path());
+    message->headers().insertHost().value().setReference(driver_.cluster()->name());
     for (auto& h : encoder_->headers()) {
-      message->headers().addCopy(Http::LowerCaseString(h.first), h.second);
+      message->headers().addReferenceKey(Http::LowerCaseString{h.first}, h.second);
     }
 
     Buffer::InstancePtr body(new Buffer::OwnedImpl());
