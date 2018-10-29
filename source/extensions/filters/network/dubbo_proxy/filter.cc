@@ -153,7 +153,7 @@ void Filter::onResponseMessage(ResponseMessagePtr&& message) {
   }
   active_call_map_.erase(itor);
 
-  ENVOY_LOG(debug, "dubbo reponse: ended {} message", message->requestId());
+  ENVOY_LOG(debug, "dubbo response: ended {} message", message->requestId());
 
   stats_.response_.inc();
   switch (message->responseStatus()) {
@@ -162,7 +162,7 @@ void Filter::onResponseMessage(ResponseMessagePtr&& message) {
     break;
   default:
     stats_.response_error_.inc();
-    ENVOY_LOG(error, "dubbo reponse status: {}", static_cast<uint8_t>(message->responseStatus()));
+    ENVOY_LOG(error, "dubbo response status: {}", static_cast<uint8_t>(message->responseStatus()));
     break;
   }
 }
