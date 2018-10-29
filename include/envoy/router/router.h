@@ -14,7 +14,6 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
-#include "envoy/http/websocket.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
@@ -569,28 +568,6 @@ public:
    * @return bool true if the :authority header should be overwritten with the upstream hostname.
    */
   virtual bool autoHostRewrite() const PURE;
-
-  /**
-   * @return bool true if this route should use WebSockets.
-   * Per https://github.com/envoyproxy/envoy/issues/3301 this is the "old style"
-   * websocket" where headers are proxied upstream unchanged, and the websocket
-   * is handed off to a tcp proxy session.
-   */
-  virtual bool useOldStyleWebSocket() const PURE;
-
-  /**
-   * Create an instance of a WebSocketProxy, using the configuration in this route.
-   *
-   * This may only be called if useWebSocket() returns true on this RouteEntry.
-   *
-   * @return WebSocketProxyPtr An instance of a WebSocketProxy with the configuration specified
-   *         in this route.
-   */
-  virtual Http::WebSocketProxyPtr
-  createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-                       Http::WebSocketProxyCallbacks& callbacks,
-                       Upstream::ClusterManager& cluster_manager,
-                       Network::ReadFilterCallbacks* read_callbacks) const PURE;
 
   /**
    * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when

@@ -226,6 +226,7 @@ private:
  * O(1) access to these headers without even a hash lookup.
  */
 #define ALL_INLINE_HEADERS(HEADER_FUNC)                                                            \
+  HEADER_FUNC(Accept)                                                                              \
   HEADER_FUNC(AcceptEncoding)                                                                      \
   HEADER_FUNC(AccessControlRequestHeaders)                                                         \
   HEADER_FUNC(AccessControlRequestMethod)                                                          \
