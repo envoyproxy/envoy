@@ -1,11 +1,11 @@
 #pragma once
 
-#include "envoy/config/retry/other_priority/other_priority_config.pb.validate.h"
+#include "envoy/config/retry/previous_priorities/previous_priorities_config.pb.validate.h"
 #include "envoy/upstream/retry.h"
 
 #include "common/protobuf/protobuf.h"
 
-#include "extensions/retry/priority/other_priority/other_priority.h"
+#include "extensions/retry/priority/previous_priorities/previous_priorities.h"
 #include "extensions/retry/priority/well_known_names.h"
 
 namespace Envoy {
@@ -13,7 +13,7 @@ namespace Extensions {
 namespace Retry {
 namespace Priority {
 
-class OtherPriorityRetryPriorityFactory : public Upstream::RetryPriorityFactory {
+class PreviousPrioritiesRetryPriorityFactory : public Upstream::RetryPriorityFactory {
 public:
   Upstream::RetryPrioritySharedPtr createRetryPriority(const Protobuf::Message& config,
                                                        uint32_t max_retries) override;
@@ -24,7 +24,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr(
-        new envoy::config::retry::other_priority::OtherPriorityConfig());
+        new envoy::config::retry::previous_priorities::PreviousPrioritiesConfig());
   }
 };
 

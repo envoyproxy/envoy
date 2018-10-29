@@ -12,6 +12,7 @@ namespace TransportSockets {
  */
 class TransportSocketNameValues {
 public:
+  const std::string Alts = "envoy.transport_sockets.alts";
   const std::string Capture = "envoy.transport_sockets.capture";
   const std::string RawBuffer = "raw_buffer";
   const std::string Tls = "tls";
