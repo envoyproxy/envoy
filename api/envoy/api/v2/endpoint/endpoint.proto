@@ -106,12 +106,6 @@ message LocalityLbEndpoints {
   // configured. These weights are ignored otherwise. If no weights are
   // specificed when locality weighted load balancing is enabled, the cluster is
   // assumed to have a weight of 1.
-  //
-  // .. attention::
-  //
-  //   The limit of 128 is somewhat arbitrary, but is applied due to performance
-  //   concerns with the current implementation and can be removed when
-  //   `this issue <https://github.com/envoyproxy/envoy/issues/1285>`_ is fixed.
   google.protobuf.UInt32Value load_balancing_weight = 3
       [(validate.rules).uint32 = {gte: 1, lte: 128}];
 
