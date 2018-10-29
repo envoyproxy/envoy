@@ -18,6 +18,7 @@ envoy_cc_library(
         "//source/common/common:hash_lib",
         "//source/common/common:thread_annotations",
         "//source/common/common:thread_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 
