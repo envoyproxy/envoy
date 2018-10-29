@@ -87,7 +87,7 @@ public:
     envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
         parseProtoFromJson(json_string);
     config_.reset(new ProxyFilterConfig(proto_config, store_, drain_decision_, runtime_));
-    filter_.reset(new ProxyFilter(*this, EncoderPtr{encoder_}, splitter_, config_));
+    filter_ = std::make_unique<ProxyFilter>(*this, EncoderPtr{encoder_}, splitter_, config_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
     EXPECT_EQ(1UL, config_->stats_.downstream_cx_total_.value());

@@ -389,7 +389,8 @@ public:
     if (!cluster_exists) {
       EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
     }
-    conn_pool_.reset(new InstanceImpl(cluster_name_, cm_, *this, tls_, createConnPoolSettings()));
+    conn_pool_ =
+        std::make_unique<InstanceImpl>(cluster_name_, cm_, *this, tls_, createConnPoolSettings());
   }
 
   void makeSimpleRequest(bool create_client) {

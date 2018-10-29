@@ -149,15 +149,17 @@ private:
 
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
                            public Upstream::ClusterUpdateCallbacks {
-    ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
-                    const std::string& cluster_name);
+    ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
     ~ThreadLocalPool();
     PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
                              PoolCallbacks& callbacks);
+    void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
 
     // Upstream::ClusterUpdateCallbacks
-    void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
+    void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override {
+      onClusterAddOrUpdateNonVirtual(cluster);
+    }
     void onClusterRemoval(const std::string& cluster_name) override;
 
     InstanceImpl& parent_;

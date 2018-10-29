@@ -205,13 +205,13 @@ PoolRequest* InstanceImpl::makeRequest(const std::string& hash_key, const RespVa
 }
 
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
-                                               const std::string& cluster_name)
-    : parent_(parent), dispatcher_(dispatcher), cluster_name_(cluster_name) {
+                                               std::string cluster_name)
+    : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)) {
 
   cluster_update_handle_ = parent_.cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent_.cm_.get(cluster_name_);
   if (cluster != nullptr) {
-    onClusterAddOrUpdate(*cluster);
+    onClusterAddOrUpdateNonVirtual(*cluster);
   }
 }
 
@@ -224,7 +224,8 @@ InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
   }
 }
 
-void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
+void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
+    Upstream::ThreadLocalCluster& cluster) {
   if (cluster.info()->name() != cluster_name_) {
     return;
   }
