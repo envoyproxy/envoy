@@ -44,6 +44,11 @@ public:
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
+  TrustedCaConfigProviderSharedPtr
+  findOrCreateTrustedCaProvider(
+      const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+
 private:
   template <class SecretType>
   class DynamicSecretProviders : public Logger::Loggable<Logger::Id::secret> {
@@ -93,6 +98,7 @@ private:
   // map hash code of SDS config source and SdsApi object.
   DynamicSecretProviders<TlsCertificateSdsApi> certificate_providers_;
   DynamicSecretProviders<CertificateValidationContextSdsApi> validation_context_providers_;
+  DynamicSecretProviders<TrustedCaSdsApi> trusted_ca_providers_;
 };
 
 } // namespace Secret

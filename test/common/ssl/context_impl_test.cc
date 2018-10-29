@@ -598,6 +598,43 @@ TEST(ClientContextConfigImplTest, ValidationContextNotReady) {
   client_context_config.setSecretUpdateCallback([]() {});
 }
 
+// Validate client context config supports SDS, and is marked as not ready if dynamic
+// trusted CA is not yet downloaded.
+TEST(ClientContextConfigImplTest, TrustedCaNotReady) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockRandomGenerator> random;
+  Stats::IsolatedStoreImpl stats;
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context, random()).WillOnce(ReturnRef(random));
+  EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats));
+  EXPECT_CALL(factory_context, clusterManager()).WillOnce(ReturnRef(cluster_manager));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+  auto sds_secret_configs =
+      tls_context.mutable_common_tls_context()->mutable_validation_context()->mutable_trusted_ca_sds_secret_config();
+  sds_secret_configs->set_name("abc.com");
+  sds_secret_configs->mutable_sds_config();
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+  // When sds secret is not downloaded, config is not ready.
+  EXPECT_FALSE(client_context_config.isReady());
+  // Set various callbacks to config.
+  NiceMock<Secret::MockSecretCallbacks> secret_callback;
+  client_context_config.setSecretUpdateCallback(
+      [&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+  client_context_config.setSecretUpdateCallback([]() {});
+}
+
 // Validate that client context config with static TLS certificates is created successfully.
 TEST(ClientContextConfigImplTest, StaticTlsCertificates) {
   envoy::api::v2::auth::Secret secret_config;
@@ -826,6 +863,43 @@ TEST(ServerContextConfigImplTest, ValidationContextNotReady) {
   EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_validation_context_sds_secret_config();
+  sds_secret_configs->set_name("abc.com");
+  sds_secret_configs->mutable_sds_config();
+  ServerContextConfigImpl server_context_config(tls_context, factory_context);
+  // When sds secret is not downloaded, config is not ready.
+  EXPECT_FALSE(server_context_config.isReady());
+  // Set various callbacks to config.
+  NiceMock<Secret::MockSecretCallbacks> secret_callback;
+  server_context_config.setSecretUpdateCallback(
+      [&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+  server_context_config.setSecretUpdateCallback([]() {});
+}
+
+// Validate server context config supports SDS, and is marked as not ready if dynamic
+// trusted CA is not yet downloaded.
+TEST(ServerContextConfigImplTest, TrustedCaNotReady) {
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockRandomGenerator> random;
+  Stats::IsolatedStoreImpl stats;
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context, random()).WillOnce(ReturnRef(random));
+  EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats));
+  EXPECT_CALL(factory_context, clusterManager()).WillOnce(ReturnRef(cluster_manager));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+  auto sds_secret_configs =
+      tls_context.mutable_common_tls_context()->mutable_validation_context()->mutable_trusted_ca_sds_secret_config();
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
   ServerContextConfigImpl server_context_config(tls_context, factory_context);

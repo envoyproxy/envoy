@@ -49,10 +49,12 @@ public:
     // Either tls_certficate_provider_ is nullptr or
     // tls_certficate_provider_->secret() is NOT nullptr and
     // either certficate_validation_context_provider_ is nullptr or
-    // certficate_validation_context_provider_->secret() is NOT nullptr.
+    // certficate_validation_context_provider_->secret() is NOT nullptr and
+    // either trusted_ca_provider_ is nullptr or trusted_ca_provider_->secret() is NOT nullptr.
     return (!tls_certficate_provider_ || tls_certficate_provider_->secret() != nullptr) &&
            (!certficate_validation_context_provider_ ||
-            certficate_validation_context_provider_->secret() != nullptr);
+            certficate_validation_context_provider_->secret() != nullptr) && 
+            (!trusted_ca_provider_ || trusted_ca_provider_->secret() != nullptr);
   }
 
   void setSecretUpdateCallback(std::function<void()> callback) override {
@@ -68,6 +70,12 @@ public:
       }
       cvc_update_callback_handle_ =
           certficate_validation_context_provider_->addUpdateCallback(callback);
+    }
+    if (trusted_ca_provider_) {
+      if (tca_update_callback_handle_) {
+        tca_update_callback_handle_->remove();
+      }
+      tca_update_callback_handle_ = trusted_ca_provider_->addUpdateCallback(callback);
     }
   }
 
@@ -93,9 +101,11 @@ private:
       certficate_validation_context_provider_;
   // Handle for certificate validation context dyanmic secret callback.
   Common::CallbackHandle* cvc_update_callback_handle_{};
-  // Provides trusted CA when inline certificate validation context is configured.
+  // Provides trusted CA when inline or static certificate validation context is configured.
   // This will be nullptr if Envoy fetches certificate validation context via SDS.
   Secret::TrustedCaConfigProviderSharedPtr trusted_ca_provider_;
+  // Handle for trusted CA dyanmic secret callback.
+  Common::CallbackHandle* tca_update_callback_handle_{};
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
 };

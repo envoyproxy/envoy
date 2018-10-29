@@ -135,7 +135,6 @@ message CertificateValidationContext {
     core.DataSource trusted_ca = 1;
 
     // Config for fetching trusted CA via SDS API.
-    // [#not-implemented-hide:]
     SdsSecretConfig trusted_ca_sds_secret_config = 9;
   }
 

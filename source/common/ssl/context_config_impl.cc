@@ -76,9 +76,15 @@ getCertificateValidationContextConfigProvider(
 Secret::TrustedCaConfigProviderSharedPtr
 getTrustedCaConfigProvider(const envoy::api::v2::auth::CommonTlsContext& config,
                            Server::Configuration::TransportSocketFactoryContext& factory_context) {
-  if (config.has_validation_context() && config.validation_context().has_trusted_ca()) {
-    return factory_context.secretManager().createInlineTrustedCaProvider(
-        config.validation_context().trusted_ca());
+  if (config.has_validation_context()) {
+    if (config.validation_context().has_trusted_ca()) {
+      return factory_context.secretManager().createInlineTrustedCaProvider(
+          config.validation_context().trusted_ca());
+    } else if (config.validation_context().has_trusted_ca_sds_secret_config() &&
+               config.validation_context().trusted_ca_sds_secret_config().has_sds_config()) {
+      return factory_context.secretManager().findOrCreateTrustedCaProvider(
+          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
+    }
   }
   return nullptr;
 }
@@ -124,6 +130,9 @@ ContextConfigImpl::~ContextConfigImpl() {
   }
   if (cvc_update_callback_handle_) {
     cvc_update_callback_handle_->remove();
+  }
+  if (tca_update_callback_handle_) {
+    tca_update_callback_handle_->remove();
   }
 }
 

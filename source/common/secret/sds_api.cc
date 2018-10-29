@@ -40,6 +40,10 @@ void SdsApi::initialize(std::function<void()> callback) {
   subscription_->start({sds_config_name_}, *this);
 }
 
+bool SdsApi::checkSecret(const envoy::api::v2::auth::Secret&, const uint64_t hash) {
+  return secret_hash_ != hash;
+}
+
 void SdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&) {
   if (resources.empty()) {
     throw EnvoyException(
@@ -59,7 +63,7 @@ void SdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&)
   }
 
   const uint64_t new_hash = MessageUtil::hash(secret);
-  if (new_hash != secret_hash_) {
+  if (checkSecret(secret, new_hash)) {
     secret_hash_ = new_hash;
     setSecret(secret);
     update_callback_manager_.runCallbacks();

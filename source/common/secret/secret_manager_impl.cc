@@ -86,5 +86,13 @@ SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
                                                     secret_provider_context);
 }
 
+TrustedCaConfigProviderSharedPtr
+SecretManagerImpl::findOrCreateTrustedCaProvider(
+    const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+  return trusted_ca_providers_.findOrCreate(sds_config_source, config_name,
+                                            secret_provider_context);
+}
+
 } // namespace Secret
 } // namespace Envoy
