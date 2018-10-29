@@ -46,6 +46,14 @@ public:
   findStaticCertificateValidationContextProvider(const std::string& name) const PURE;
 
   /**
+   * @param name a name of the static TrustedCaConfigProviderSharedPtr.
+   * @return the TrustedCaConfigProviderSharedPtr. Returns nullptr if the static trusted CA config
+   * is not found.
+   */
+  virtual TrustedCaConfigProviderSharedPtr
+  findStaticTrustedCaConfigProvider(const std::string& name) const PURE;
+
+  /**
    * @param tls_certificate the protobuf config of the TLS certificate.
    * @return a TlsCertificateConfigProviderSharedPtr created from tls_certificate.
    */
