@@ -363,7 +363,7 @@ void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
   TcpProxyIntegrationTest::initialize();
 
-  context_manager_.reset(new Ssl::ContextManagerImpl(runtime_, timeSystem()));
+  context_manager_.reset(new Ssl::ContextManagerImpl(timeSystem()));
   payload_reader_.reset(new WaitForPayloadReader(*dispatcher_));
 }
 

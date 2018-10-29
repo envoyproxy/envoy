@@ -5,7 +5,6 @@
 
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
@@ -52,7 +51,6 @@ public:
   bool tls_ = true;
 
 private:
-  std::unique_ptr<Runtime::Loader> runtime_;
   std::unique_ptr<Ssl::ContextManager> context_manager_;
   Network::TransportSocketFactoryPtr client_tls_ssl_ctx_;
   Network::TransportSocketFactoryPtr client_mtls_ssl_ctx_;

@@ -12,7 +12,6 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/filter.h"
-#include "envoy/http/websocket.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -264,7 +263,6 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
-                        public WebSocketProxyCallbacks,
                         public Tracing::Config {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
@@ -316,11 +314,6 @@ private:
       addStreamEncoderFilterWorker(filter, true);
     }
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
-
-    // Http::WebSocketProxyCallbacks
-    void sendHeadersOnlyResponse(HeaderMap& headers) override {
-      encodeHeaders(nullptr, headers, true);
-    }
 
     // Tracing::TracingConfig
     virtual Tracing::OperationName operationName() const override;
@@ -442,8 +435,6 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
 
-  bool isOldStyleWebSocketConnection() const { return ws_connection_ != nullptr; }
-
   enum class DrainState { NotDraining, Draining, Closing };
 
   ConnectionManagerConfig& config_;
@@ -462,7 +453,6 @@ private:
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cluster_manager_;
-  WebSocketProxyPtr ws_connection_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
   // References into the overload manager thread local state map. Using these lets us avoid a map

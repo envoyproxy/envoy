@@ -188,14 +188,19 @@ bool SnapshotImpl::featureEnabled(const std::string& key,
                                   uint64_t random_value) const {
   const auto& entry = values_.find(key);
   uint64_t numerator, denominator;
-  if (entry == values_.end() || !entry->second.fractional_percent_value_.has_value()) {
-    numerator = default_value.numerator();
-    denominator =
-        ProtobufPercentHelper::fractionalPercentDenominatorToInt(default_value.denominator());
-  } else {
+  if (entry != values_.end() && entry->second.fractional_percent_value_.has_value()) {
     numerator = entry->second.fractional_percent_value_->numerator();
     denominator = ProtobufPercentHelper::fractionalPercentDenominatorToInt(
         entry->second.fractional_percent_value_->denominator());
+  } else if (entry != values_.end() && entry->second.uint_value_.has_value()) {
+    // The runtime value must have been specified as an integer rather than a fractional percent
+    // proto. To preserve legacy semantics, we'll assume this represents a percentage.
+    numerator = entry->second.uint_value_.value();
+    denominator = 100;
+  } else {
+    numerator = default_value.numerator();
+    denominator =
+        ProtobufPercentHelper::fractionalPercentDenominatorToInt(default_value.denominator());
   }
 
   return random_value % denominator < numerator;

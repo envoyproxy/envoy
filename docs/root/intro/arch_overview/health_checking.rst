@@ -5,7 +5,7 @@ Health checking
 
 Active health checking can be :ref:`configured <config_cluster_manager_cluster_hc>` on a per
 upstream cluster basis. As described in the :ref:`service discovery
-<arch_overview_service_discovery>` section, active health checking and the SDS service discovery
+<arch_overview_service_discovery>` section, active health checking and the EDS service discovery
 type go hand in hand. However, there are other scenarios where active health checking is desired
 even when using the other service discovery types. Envoy supports three different types of health
 checking along with various settings (check interval, failures required before marking a host
