@@ -725,6 +725,11 @@ message RouteAction {
 }
 
 message RedirectAction {
+  // When the scheme redirection take place, the following rules apply:
+  //  1. If the source URI scheme is `http` and the port is explicitly
+  //     set to `:80`, the port will be removed after the redirection
+  //  2. If the source URI scheme is `https` and the port is explicitly
+  //     set to `:443`, the port will be removed after the redirection
   oneof scheme_rewrite_specifier {
     // The scheme portion of the URL will be swapped with "https".
     bool https_redirect = 4;
