@@ -210,7 +210,7 @@ bool SymbolTable::lessThan(const StatName& a, const StatName& b) const {
 
 StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table) {
   SymbolEncoding encoding = table.encode(name);
-  bytes_.reset(new uint8_t[encoding.bytesRequired()]);
+  bytes_ = std::make_unique<uint8_t[]>(encoding.bytesRequired());
   encoding.moveToStorage(bytes_.get());
 }
 
@@ -218,7 +218,7 @@ StatNameStorage::~StatNameStorage() {
   // StatNameStorage is not fully RAII: you must call free(SymbolTable&) to
   // decrement the reference counts held by the SymbolTable on behalf of
   // this StatName.
-  ASSERT(bytes_.get() == nullptr);
+  ASSERT(bytes_ == nullptr);
 }
 
 void StatNameStorage::free(SymbolTable& table) {
@@ -249,7 +249,7 @@ StatNameJoiner::StatNameJoiner(const std::vector<StatName>& stat_names) {
 }
 
 uint8_t* StatNameJoiner::alloc(size_t num_bytes) {
-  bytes_.reset(new uint8_t[num_bytes + 2]);
+  bytes_ = std::make_unique<uint8_t[]>(num_bytes + 2);  // +2 bytes for the length up to 64k.
   uint8_t* p = bytes_.get();
   *p++ = num_bytes & 0xff;
   *p++ = num_bytes >> 8;
