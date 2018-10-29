@@ -182,7 +182,7 @@ TEST_F(HttpExtAuthzFilterTest, ContextExtensions) {
   EXPECT_EQ(value, check_request_value);
 }
 
-// Test that context extensions make it into the check request.
+// Test that filter can be disabled with route config.
 TEST_F(HttpExtAuthzFilterTest, DisabledOnRoute) {
   envoy::config::filter::http::ext_authz::v2alpha::CheckSettings settings;
   FilterConfigPerRoute auth_per_route(settings);

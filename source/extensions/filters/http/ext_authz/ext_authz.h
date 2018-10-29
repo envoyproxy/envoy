@@ -112,7 +112,7 @@ private:
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
 
 /**
- *  Per route settings for ExtAuth. Allows customizing the CheckRequest on a
+ * Per route settings for ExtAuth. Allows customizing the CheckRequest on a
  * virtualhost\route\weighted cluster level.
  */
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
