@@ -1,11 +1,16 @@
-load("//bazel:api_build_system.bzl", "api_go_proto_library", "api_proto_library_internal")
+load(
+    "//bazel:api_build_system.bzl",
+    "api_go_proto_library",
+    "api_proto_library",
+    "api_proto_library_internal",
+)
 
 licenses(["notice"])  # Apache 2
 
-api_proto_library_internal(
+api_proto_library(
     name = "route",
     srcs = ["route.proto"],
-    visibility = ["//envoy/api/v2:friends"],
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/api/v2/core:base",
         "//envoy/type:range",
