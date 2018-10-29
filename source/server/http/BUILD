@@ -62,6 +62,7 @@ envoy_cc_library(
         "@envoy_api//envoy/admin/v2alpha:clusters_cc",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/admin/v2alpha:memory_cc",
+        "@envoy_api//envoy/admin/v2alpha:server_info_cc",
     ],
 )
 

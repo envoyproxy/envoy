@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "envoy/admin/v2alpha/certs.pb.h"
+#include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/admin/v2alpha/memory.pb.h"
@@ -519,11 +520,15 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
                                         Buffer::Instance& response, AdminStream&) {
   time_t current_time = time(nullptr);
-  response.add(fmt::format("envoy {} {} {} {} {}\n", VersionInfo::version(),
-                           server_.healthCheckFailed() ? "draining" : "live",
-                           current_time - server_.startTimeCurrentEpoch(),
-                           current_time - server_.startTimeFirstEpoch(),
-                           server_.options().restartEpoch()));
+  envoy::admin::v2alpha::ServerInfo server_info;
+  server_info.set_version(VersionInfo::version());
+  server_info.set_state(server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
+                                                    : envoy::admin::v2alpha::ServerInfo::LIVE);
+  server_info.mutable_uptime_current_epoch()->set_seconds(current_time -
+                                                          server_.startTimeCurrentEpoch());
+  server_info.mutable_uptime_all_epochs()->set_seconds(current_time -
+                                                       server_.startTimeFirstEpoch());
+  response.add(MessageUtil::getJsonStringFromMessage(server_info, true));
   return Http::Code::OK;
 }
 
