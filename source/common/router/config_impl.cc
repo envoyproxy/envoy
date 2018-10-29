@@ -483,13 +483,13 @@ absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& 
 
   if (host_end != absl::string_view::npos) {
     absl::string_view request_port = request_host.substr(host_end);
-    absl::string_view request_scheme = headers.ForwardedProto()->value().getStringView();
+    absl::string_view request_protocol = headers.ForwardedProto()->value().getStringView();
     bool remove_port = !new_port.empty();
 
-    if (new_scheme != request_scheme) {
-      remove_port |= (request_scheme == Http::Headers::get().SchemeValues.Https.c_str()) &&
+    if (new_scheme != request_protocol) {
+      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Https.c_str()) &&
                      request_port == ":443";
-      remove_port |= (request_scheme == Http::Headers::get().SchemeValues.Http.c_str()) &&
+      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Http.c_str()) &&
                      request_port == ":80";
     }
 
