@@ -246,9 +246,6 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::rou
     auto* redirect = route.mutable_redirect();
     JSON_UTIL_SET_STRING(json_route, *redirect, host_redirect);
     JSON_UTIL_SET_STRING(json_route, *redirect, path_redirect);
-    if (json_route.hasObject("use_websocket")) {
-      throw EnvoyException("Redirect route entries must not have WebSockets set");
-    }
   }
   const bool has_cluster = json_route.hasObject("cluster") ||
                            json_route.hasObject("cluster_header") ||
@@ -292,7 +289,6 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::rou
       JSON_UTIL_SET_BOOL(json_route, *action, auto_host_rewrite);
     }
 
-    JSON_UTIL_SET_BOOL(json_route, *action, use_websocket);
     JSON_UTIL_SET_DURATION(json_route, *action, timeout);
 
     if (json_route.hasObject("retry_policy")) {

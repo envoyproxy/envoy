@@ -101,7 +101,7 @@ envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::
 }
 
 TEST(RouteMatcherTest, TestRoutes) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -540,7 +540,7 @@ TEST(RouteMatcherTest, TestRoutes) {
 }
 
 TEST(RouteMatcherTest, TestRoutesWithWildcardAndDefaultOnly) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: wildcard
     domains: ["*.solo.io"]
@@ -600,7 +600,7 @@ virtual_hosts:
 
 // Validates behavior of request_headers_to_add at router, vhost, and route action levels.
 TEST(RouteMatcherTest, TestAddRemoveRequestHeaders) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -731,7 +731,7 @@ TEST(RouteMatcherTest, TestAddRemoveRequestHeaders) {
 // Validates behavior of request_headers_to_add at router, vhost, route, and route action levels
 // when append is disabled.
 TEST(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: www2
@@ -857,7 +857,7 @@ request_headers_to_remove: ["x-global-nope"]
 // Validates behavior of response_headers_to_add and response_headers_to_remove at router, vhost,
 // route, and route action levels.
 TEST(RouteMatcherTest, TestAddRemoveResponseHeaders) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: www2
@@ -1032,7 +1032,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatcherTest, Priority) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1066,7 +1066,7 @@ TEST(RouteMatcherTest, Priority) {
 }
 
 TEST(RouteMatcherTest, NoHostRewriteAndAutoRewrite) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1090,32 +1090,8 @@ TEST(RouteMatcherTest, NoHostRewriteAndAutoRewrite) {
                EnvoyException);
 }
 
-TEST(RouteMatcherTest, NoRedirectAndWebSocket) {
-  std::string json = R"EOF(
-{
-  "virtual_hosts": [
-    {
-      "name": "local_service",
-      "domains": ["*"],
-      "routes": [
-        {
-          "prefix": "/foo",
-          "host_redirect": "new.lyft.com",
-          "use_websocket": true
-        }
-      ]
-    }
-  ]
-}
-  )EOF";
-
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
-               EnvoyException);
-}
-
 TEST(RouteMatcherTest, HeaderMatchedRouting) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1279,7 +1255,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatcherTest, QueryParamMatchedRouting) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1414,7 +1390,7 @@ public:
   RouterMatcherHashPolicyTest()
       : add_cookie_nop_(
             [](const std::string&, const std::string&, std::chrono::seconds) { return ""; }) {
-    std::string json = R"EOF(
+    const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1866,7 +1842,7 @@ TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
 }
 
 TEST(RouteMatcherTest, ClusterHeader) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1920,7 +1896,7 @@ TEST(RouteMatcherTest, ClusterHeader) {
 }
 
 TEST(RouteMatcherTest, ContentType) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1966,7 +1942,7 @@ TEST(RouteMatcherTest, ContentType) {
 }
 
 TEST(RouteMatcherTest, FractionalRuntime) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "www2"
     domains: ["www.lyft.com"]
@@ -2008,7 +1984,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatcherTest, ShadowClusterNotFound) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2039,7 +2015,7 @@ TEST(RouteMatcherTest, ShadowClusterNotFound) {
 }
 
 TEST(RouteMatcherTest, ClusterNotFound) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2064,7 +2040,7 @@ TEST(RouteMatcherTest, ClusterNotFound) {
 }
 
 TEST(RouteMatcherTest, ClusterNotFoundNotChecking) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2088,7 +2064,7 @@ TEST(RouteMatcherTest, ClusterNotFoundNotChecking) {
 }
 
 TEST(RouteMatcherTest, ClusterNotFoundNotCheckingViaConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "validate_clusters": false,
   "virtual_hosts": [
@@ -2113,7 +2089,7 @@ TEST(RouteMatcherTest, ClusterNotFoundNotCheckingViaConfig) {
 }
 
 TEST(RouteMatcherTest, AttemptCountHeader) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "www2"
     domains: ["www.lyft.com"]
@@ -2133,7 +2109,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatchTest, ClusterNotFoundResponseCode) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "www2"
     domains: ["www.lyft.com"]
@@ -2154,7 +2130,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatchTest, ClusterNotFoundResponseCodeConfig503) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "www2"
     domains: ["www.lyft.com"]
@@ -2176,7 +2152,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatchTest, ClusterNotFoundResponseCodeConfig404) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "www2"
     domains: ["www.lyft.com"]
@@ -2198,7 +2174,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatcherTest, Shadow) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2262,7 +2238,7 @@ TEST(RouteMatcherTest, Shadow) {
 }
 
 TEST(RouteMatcherTest, Retry) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2345,7 +2321,7 @@ TEST(RouteMatcherTest, Retry) {
 }
 
 TEST(RouteMatcherTest, GrpcRetry) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2428,7 +2404,7 @@ TEST(RouteMatcherTest, GrpcRetry) {
 }
 
 TEST(RouteMatcherTest, TestBadDefaultConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2465,7 +2441,7 @@ TEST(RouteMatcherTest, TestBadDefaultConfig) {
 }
 
 TEST(RouteMatcherTest, TestDuplicateDomainConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2855,7 +2831,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatcherTest, ExclusiveRouteEntryOrDirectResponseEntry) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2899,7 +2875,7 @@ TEST(RouteMatcherTest, ExclusiveRouteEntryOrDirectResponseEntry) {
 }
 
 TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrDirectResponseEntry) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2949,14 +2925,32 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrDirectResponseEntry) {
   }
 }
 
+struct Foo : public Envoy::Config::TypedMetadata::Object {};
+struct Baz : public Envoy::Config::TypedMetadata::Object {
+  Baz(std::string n) : name(n) {}
+  std::string name;
+};
+class BazFactory : public HttpRouteTypedMetadataFactory {
+public:
+  const std::string name() const { return "baz"; }
+  // Returns nullptr (conversion failure) if d is empty.
+  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
+  parse(const ProtobufWkt::Struct& d) const {
+    if (d.fields().find("name") != d.fields().end()) {
+      return std::make_unique<Baz>(d.fields().at("name").string_value());
+    }
+    throw EnvoyException("Cannot create a Baz when metadata is empty.");
+  }
+};
+
 TEST(RouteMatcherTest, WeightedClusters) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: www1
     domains: ["www1.lyft.com"]
     routes:
       - match: { prefix: "/" }
-        metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+        metadata: { filter_metadata: { com.bar.foo: { baz: test_value }, baz: {name: meh} } }
         decorator:
           operation: hello
         route:
@@ -3013,6 +3007,8 @@ virtual_hosts:
             total_weight: 10000
   )EOF";
 
+  BazFactory baz_factory;
+  Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   auto& runtime = factory_context.runtime_loader_;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
@@ -3038,13 +3034,14 @@ virtual_hosts:
     EXPECT_EQ(nullptr, route_entry->hashPolicy());
     EXPECT_TRUE(route_entry->opaqueConfig().empty());
     EXPECT_FALSE(route_entry->autoHostRewrite());
-    EXPECT_FALSE(route_entry->useOldStyleWebSocket());
     EXPECT_TRUE(route_entry->includeVirtualHostRateLimits());
     EXPECT_EQ(Http::Code::ServiceUnavailable, route_entry->clusterNotFoundResponseCode());
     EXPECT_EQ(nullptr, route_entry->corsPolicy());
     EXPECT_EQ("test_value",
               Envoy::Config::Metadata::metadataValue(route_entry->metadata(), "com.bar.foo", "baz")
                   .string_value());
+    EXPECT_EQ(nullptr, route_entry->typedMetadata().get<Foo>(baz_factory.name()));
+    EXPECT_EQ("meh", route_entry->typedMetadata().get<Baz>(baz_factory.name())->name);
     EXPECT_EQ("hello", route->decorator()->getOperation());
 
     Http::TestHeaderMapImpl response_headers;
@@ -3130,7 +3127,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatcherTest, ExclusiveWeightedClustersOrClusterConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -3160,7 +3157,7 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersOrClusterConfig) {
 }
 
 TEST(RouteMatcherTest, WeightedClustersMissingClusterList) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -3185,7 +3182,7 @@ TEST(RouteMatcherTest, WeightedClustersMissingClusterList) {
 }
 
 TEST(RouteMatcherTest, WeightedClustersEmptyClustersList) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -3257,7 +3254,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatcherTest, TestWeightedClusterWithMissingWeights) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -3286,7 +3283,7 @@ TEST(RouteMatcherTest, TestWeightedClusterWithMissingWeights) {
 }
 
 TEST(RouteMatcherTest, TestWeightedClusterInvalidClusterName) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -3322,7 +3319,7 @@ TEST(RouteMatcherTest, TestWeightedClusterInvalidClusterName) {
 }
 
 TEST(RouteMatcherTest, TestWeightedClusterHeaderManipulation) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: www2
     domains: ["www.lyft.com"]
@@ -3397,7 +3394,7 @@ TEST(NullConfigImplTest, All) {
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3422,7 +3419,7 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteConfig) {
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadVirtualHostConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3449,7 +3446,7 @@ TEST(BadHttpRouteConfigurationsTest, BadVirtualHostConfig) {
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3474,7 +3471,7 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfig) {
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPath) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3500,7 +3497,7 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPath) {
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3526,7 +3523,7 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3553,7 +3550,7 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPathAndRegex) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3580,7 +3577,7 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPathAndRegex) {
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3604,7 +3601,7 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoRedirectNoClusters) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3628,7 +3625,7 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoRedirectNoClusters) {
 }
 
 TEST(RouteMatcherTest, TestOpaqueConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -3748,7 +3745,7 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
 }
 
 TEST(RoutePropertyTest, TestVHostCorsConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -3792,7 +3789,7 @@ TEST(RoutePropertyTest, TestVHostCorsConfig) {
 }
 
 TEST(RoutePropertyTest, TestRouteCorsConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -3833,7 +3830,7 @@ TEST(RoutePropertyTest, TestRouteCorsConfig) {
 }
 
 TEST(RoutePropertyTest, TestBadCorsConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -3861,7 +3858,7 @@ TEST(RoutePropertyTest, TestBadCorsConfig) {
 }
 
 TEST(RouterMatcherTest, Decorator) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -4229,7 +4226,7 @@ TEST(ConfigUtility, ParseDirectResponseBody) {
 }
 
 TEST(RouteConfigurationV2, RedirectCode) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: redirect
@@ -4256,7 +4253,7 @@ virtual_hosts:
 
 // Test the parsing of direct response configurations within routes.
 TEST(RouteConfigurationV2, DirectResponse) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: direct
@@ -4279,7 +4276,7 @@ virtual_hosts:
 // Test the parsing of a direct response configuration where the response body is too large.
 TEST(RouteConfigurationV2, DirectResponseTooLarge) {
   std::string response_body(4097, 'A');
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: direct
@@ -4290,7 +4287,7 @@ virtual_hosts:
           status: 200
           body:
             inline_string: )EOF" +
-                     response_body + "\n";
+                           response_body + "\n";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
@@ -4308,8 +4305,29 @@ void checkPathMatchCriterion(const Route* route, const std::string& expected_mat
   EXPECT_EQ(expected_type, match_criterion.matchType());
 }
 
+// Test loading broken config throws EnvoyException.
+TEST(RouteConfigurationV2, BrokenTypedMetadata) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/"}
+        route: { cluster: www2 }
+        metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
+                                       baz: {} } }
+  )EOF";
+  BazFactory baz_factory;
+  Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true),
+      Envoy::EnvoyException, "Cannot create a Baz when metadata is empty.");
+}
+
 TEST(RouteConfigurationV2, RouteConfigGetters) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -4321,9 +4339,10 @@ virtual_hosts:
         route: { cluster: ww2 }
       - match: { prefix: "/"}
         route: { cluster: www2 }
-        metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+        metadata: { filter_metadata: { com.bar.foo: { baz: test_value }, baz: {name: bluh} } }
   )EOF";
-
+  BazFactory baz_factory;
+  Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   const TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
 
@@ -4336,9 +4355,13 @@ virtual_hosts:
 
   const auto route_entry = route->routeEntry();
   const auto& metadata = route_entry->metadata();
+  const auto& typed_metadata = route_entry->typedMetadata();
 
   EXPECT_EQ("test_value",
             Envoy::Config::Metadata::metadataValue(metadata, "com.bar.foo", "baz").string_value());
+  EXPECT_NE(nullptr, typed_metadata.get<Baz>(baz_factory.name()));
+  EXPECT_EQ("bluh", typed_metadata.get<Baz>(baz_factory.name())->name);
+
   EXPECT_EQ("bar", route_entry->virtualHost().name());
   EXPECT_EQ("foo", route_entry->virtualHost().routeConfig().name());
 }
@@ -4534,7 +4557,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatcherTest, HeaderMatchedRoutingV2) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: local_service
@@ -4949,7 +4972,7 @@ public:
 };
 
 TEST_F(PerFilterConfigsTest, UnknownFilter) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -4968,7 +4991,7 @@ virtual_hosts:
 // Test that a trivially specified NamedHttpFilterConfigFactory ignores per_filter_config without
 // error.
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementation) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -4983,7 +5006,7 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalConfig) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -4999,7 +5022,7 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterConfig) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -5019,7 +5042,7 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughConfig) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar

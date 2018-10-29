@@ -23,7 +23,7 @@ maximize the chances of your PR being merged.
 
 * As of the 1.3.0 release, the Envoy user-facing configuration and APIs are
   locked and we will not make breaking changes between official numbered
-  releases. This includes bootstrap configuration, REST/gRPC APIs (SDS, CDS, RDS,
+  releases. This includes bootstrap configuration, REST/gRPC APIs (EDS, CDS, RDS,
   etc.), and CLI switches. We will also try to not change behavioral semantics
   (e.g., HTTP header processing order), though this is harder to outright
   guarantee.

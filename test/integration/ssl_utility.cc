@@ -69,7 +69,6 @@ createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& conte
 
 Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
-
   ConfigHelper::initializeTls(*tls_context.mutable_common_tls_context());
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
