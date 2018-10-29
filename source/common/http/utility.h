@@ -15,6 +15,7 @@
 #include "common/json/json_loader.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -136,11 +137,13 @@ Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOption
  * @param response_code supplies the HTTP response code.
  * @param body_text supplies the optional body text which is sent using the text/plain content
  *                  type.
+ * @param status_map a map of HTTP status codes to corresponding gRPC status
+ *                   codes to override the default code mapping.
  * @param is_head_request tells if this is a response to a HEAD request
  */
 void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
-                    Code response_code, const std::string& body_text, bool is_head_request,
-                    bool rate_limited_as_resource_exhausted);
+                    Code response_code, const std::string& body_text,
+                    const absl::optional<Grpc::StatusMap>& status_map, bool is_head_request);
 
 /**
  * Create a locally generated response using the provided lambdas.
@@ -153,12 +156,15 @@ void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const
  * @param response_code supplies the HTTP response code.
  * @param body_text supplies the optional body text which is sent using the text/plain content
  *                  type.
+ * @param status_map a map of HTTP status codes to corresponding gRPC status
+ *                   codes to override the default code mapping.
  */
 void sendLocalReply(bool is_grpc,
                     std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
                     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
                     const bool& is_reset, Code response_code, const std::string& body_text,
-                    bool is_head_request = false, bool rate_limited_as_resource_exhausted = false);
+                    const absl::optional<Grpc::StatusMap>& status_map,
+                    bool is_head_request = false);
 
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.

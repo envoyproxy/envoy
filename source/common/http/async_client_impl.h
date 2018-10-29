@@ -287,7 +287,7 @@ private:
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void sendLocalReply(Code code, const std::string& body,
                       std::function<void(HeaderMap& headers)> modify_headers,
-                      bool rate_limited_as_resource_exhausted = false) override {
+                      const absl::optional<Grpc::StatusMap>& status_map) override {
     Utility::sendLocalReply(
         is_grpc_request_,
         [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
@@ -297,7 +297,7 @@ private:
           encodeHeaders(std::move(headers), end_stream);
         },
         [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
-        remote_closed_, code, body, is_head_request_, rate_limited_as_resource_exhausted);
+        remote_closed_, code, body, status_map, is_head_request_);
   }
   // The async client won't pause if sending an Expect: 100-Continue so simply
   // swallows any incoming encode100Continue.

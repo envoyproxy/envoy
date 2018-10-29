@@ -4,6 +4,8 @@
 
 #include "envoy/grpc/status.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Grpc {
 
@@ -24,12 +26,12 @@ public:
    * See https://cloud.google.com/apis/design/errors#generating_errors.
    *
    * @param http_response_status HTTP status code.
-   * @param rate_limited_as_resource_exhausted whether a 429 response code
-   * should be mapped to RESOURCE_EXHAUSTED instead of UNAVAILABLE.
+   * @param status_map a map of HTTP status codes to corresponding gRPC status
+   *                   codes to override the default code mapping.
    * @return Status::GrpcStatus corresponding gRPC status code.
    */
   static Status::GrpcStatus httpToGrpcStatus(uint64_t http_response_status,
-                                             bool rate_limited_as_resource_exhausted);
+                                             const absl::optional<StatusMap>& status_map);
 
   /**
    * @param grpc_status gRPC status from grpc-status header.

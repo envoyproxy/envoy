@@ -7,12 +7,15 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -221,18 +224,12 @@ public:
    *                  type, or encoded in the grpc-message header.
    * @param modify_headers supplies an optional callback function that can modify the
    *                       response headers.
-   * @param rate_limited_as_resource_exhausted specifies whether a RESOURCE_EXHAUSTED code
-   *                                           should be returned instead of the default
-   *                                           UNAVAILABLE code for rate limited gRPC calls.
+   * @param status_map a map of HTTP status codes to corresponding gRPC status
+   *                   codes to override the default code mapping.
    */
   virtual void sendLocalReply(Code response_code, const std::string& body_text,
                               std::function<void(HeaderMap& headers)> modify_headers,
-                              bool rate_limited_as_resource_exhausted) PURE;
-
-  void sendLocalReply(Code response_code, const std::string& body_text,
-                      std::function<void(HeaderMap& headers)> modify_headers) {
-    sendLocalReply(response_code, body_text, modify_headers, false);
-  }
+                              const absl::optional<Grpc::StatusMap>& status_map) PURE;
 
   /**
    * Called with 100-Continue headers to be encoded.
