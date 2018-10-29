@@ -57,7 +57,7 @@ Driver::Driver(const envoy::config::trace::v2::DatadogConfig& datadog_config,
 
 opentracing::Tracer& Driver::tracer() { return *tls_->getTyped<TlsTracer>().tracer_; }
 
-TraceReporter::TraceReporter(TraceEncoderPtr encoder, Driver& driver, Event::Dispatcher& dispatcher)
+TraceReporter::TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver, Event::Dispatcher& dispatcher)
     : driver_(driver), encoder_(encoder) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();

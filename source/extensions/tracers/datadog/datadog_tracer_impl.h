@@ -31,7 +31,7 @@ struct DatadogTracerStats {
 
 class TraceReporter;
 typedef std::unique_ptr<TraceReporter> TraceReporterPtr;
-typedef std::shared_ptr<datadog::opentracing::TraceEncoder> TraceEncoderPtr;
+typedef std::shared_ptr<datadog::opentracing::TraceEncoder> TraceEncoderSharedPtr;
 
 /**
  * Class for a Datadog-specific Driver.
@@ -103,7 +103,7 @@ public:
    * @param driver The driver to be associated with the reporter.
    * @param dispatcher Controls the timer used to flush buffered traces.
    */
-  TraceReporter(TraceEncoderPtr encoder, Driver& driver, Event::Dispatcher& dispatcher);
+  TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver, Event::Dispatcher& dispatcher);
 
   // Http::AsyncClient::Callbacks.
   void onSuccess(Http::MessagePtr&&) override;
@@ -123,7 +123,7 @@ private:
 
   Driver& driver_;
   Event::TimerPtr flush_timer_;
-  TraceEncoderPtr encoder_;
+  TraceEncoderSharedPtr encoder_;
 };
 } // namespace Datadog
 } // namespace Tracers
