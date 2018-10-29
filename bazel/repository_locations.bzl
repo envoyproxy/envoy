@@ -12,10 +12,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/boringssl/archive/060e9a583976e73d1ea8b2bfe8b9cab33c62fa17.tar.gz"],
     ),
     com_google_absl = dict(
-        sha256 = "3f24d99cfa1b719ed51e12dae7741e4500a703e2c34bede452b457492d1fe36e",
-        strip_prefix = "abseil-cpp-92e07e5590752d6b8e67f7f2f86c6286561e8cea",
-        # 2018-08-01
-        urls = ["https://github.com/abseil/abseil-cpp/archive/92e07e5590752d6b8e67f7f2f86c6286561e8cea.tar.gz"],
+        sha256 = "c682f37375783028d400e45d0ba930181142c5b50de140f61710ee82aac8f659",
+        strip_prefix = "abseil-cpp-94c298e2a0ae409e283cab96c954a685bd865a70",
+        # 2018-10-24
+        urls = ["https://github.com/abseil/abseil-cpp/archive/94c298e2a0ae409e283cab96c954a685bd865a70.tar.gz"],
     ),
     com_github_apache_thrift = dict(
         sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",

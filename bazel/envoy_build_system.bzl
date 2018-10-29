@@ -188,6 +188,8 @@ def envoy_cc_library(
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             repository + "//include/envoy/common:base_includes",
             repository + "//source/common/common:fmt_lib",
+            envoy_external_dep_path("abseil_flat_hash_map"),
+            envoy_external_dep_path("abseil_flat_hash_set"),
             envoy_external_dep_path("abseil_strings"),
             envoy_external_dep_path("spdlog"),
             envoy_external_dep_path("fmtlib"),
