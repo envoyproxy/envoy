@@ -660,7 +660,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 32 * million); // actual value: 31492864 as of Oct 15, 2018
+  EXPECT_LT(end_mem - start_mem, 22 * million); // actual value: 21190128 as of Oct 26, 2018
 }
 
 TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
@@ -679,7 +679,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 41 * million); // actual value: 40411536 as of Oct 15, 2018
+  EXPECT_LT(end_mem - start_mem, 25 * million); // actual value: 24469488 as of Oct 26, 2018
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {

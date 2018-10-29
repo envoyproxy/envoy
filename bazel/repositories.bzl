@@ -443,6 +443,14 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/base:base",
     )
     native.bind(
+        name = "abseil_flat_hash_map",
+        actual = "@com_google_absl//absl/container:flat_hash_map",
+    )
+    native.bind(
+        name = "abseil_flat_hash_set",
+        actual = "@com_google_absl//absl/container:flat_hash_set",
+    )
+    native.bind(
         name = "abseil_strings",
         actual = "@com_google_absl//absl/strings:strings",
     )
