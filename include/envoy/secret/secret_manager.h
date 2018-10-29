@@ -111,10 +111,9 @@ public:
    * @return TrustedCaConfigProviderSharedPtr the dynamic certificate validation context secret
    * provider.
    */
-  virtual TrustedCaConfigProviderSharedPtr
-  findOrCreateTrustedCaProvider(
+  virtual TrustedCaConfigProviderSharedPtr findOrCreateTrustedCaProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;      
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 };
 
 } // namespace Secret

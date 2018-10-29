@@ -621,8 +621,9 @@ TEST(ClientContextConfigImplTest, TrustedCaNotReady) {
   EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(factory_context, clusterManager()).WillOnce(ReturnRef(cluster_manager));
   EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
-  auto sds_secret_configs =
-      tls_context.mutable_common_tls_context()->mutable_validation_context()->mutable_trusted_ca_sds_secret_config();
+  auto sds_secret_configs = tls_context.mutable_common_tls_context()
+                                ->mutable_validation_context()
+                                ->mutable_trusted_ca_sds_secret_config();
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
   ClientContextConfigImpl client_context_config(tls_context, factory_context);
@@ -898,8 +899,9 @@ TEST(ServerContextConfigImplTest, TrustedCaNotReady) {
   EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(factory_context, clusterManager()).WillOnce(ReturnRef(cluster_manager));
   EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
-  auto sds_secret_configs =
-      tls_context.mutable_common_tls_context()->mutable_validation_context()->mutable_trusted_ca_sds_secret_config();
+  auto sds_secret_configs = tls_context.mutable_common_tls_context()
+                                ->mutable_validation_context()
+                                ->mutable_trusted_ca_sds_secret_config();
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
   ServerContextConfigImpl server_context_config(tls_context, factory_context);

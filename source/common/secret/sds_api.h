@@ -77,7 +77,7 @@ class TrustedCaSdsApi;
 typedef std::shared_ptr<TlsCertificateSdsApi> TlsCertificateSdsApiSharedPtr;
 typedef std::shared_ptr<CertificateValidationContextSdsApi>
     CertificateValidationContextSdsApiSharedPtr;
-typedef std::shared_ptr<TrustedCaSdsApi> TrustedCaSdsApiSharedPtr;    
+typedef std::shared_ptr<TrustedCaSdsApi> TrustedCaSdsApiSharedPtr;
 
 /**
  * TlsCertificateSdsApi implementation maintains and updates dynamic TLS certificate secrets.
@@ -191,29 +191,24 @@ public:
         secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
         sds_config, sds_config_name, destructor_cb);
   }
-  TrustedCaSdsApi(const LocalInfo::LocalInfo& local_info,
-                  Event::Dispatcher& dispatcher,
+  TrustedCaSdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                   Runtime::RandomGenerator& random, Stats::Store& stats,
-                  Upstream::ClusterManager& cluster_manager,
-                  Init::Manager& init_manager,
-                  const envoy::api::v2::core::ConfigSource& sds_config,
-                  std::string sds_config_name,
+                  Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
+                  const envoy::api::v2::core::ConfigSource& sds_config, std::string sds_config_name,
                   std::function<void()> destructor_cb)
       : SdsApi(local_info, dispatcher, random, stats, cluster_manager, init_manager, sds_config,
                sds_config_name, destructor_cb) {}
 
   // SecretProvider
-  const Ssl::TrustedCaConfig* secret() const override {
-    return trusted_ca_secrets_.get();
-  }
+  const Ssl::TrustedCaConfig* secret() const override { return trusted_ca_secrets_.get(); }
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
     return update_callback_manager_.add(callback);
   }
 
 protected:
   void setSecret(const envoy::api::v2::auth::Secret& secret) override {
-    trusted_ca_secrets_ = 
-      std::make_unique<Ssl::TrustedCaConfigImpl>(secret.trusted_ca().trusted_ca());
+    trusted_ca_secrets_ =
+        std::make_unique<Ssl::TrustedCaConfigImpl>(secret.trusted_ca().trusted_ca());
   }
 
 private:

@@ -53,8 +53,8 @@ public:
     // either trusted_ca_provider_ is nullptr or trusted_ca_provider_->secret() is NOT nullptr.
     return (!tls_certficate_provider_ || tls_certficate_provider_->secret() != nullptr) &&
            (!certficate_validation_context_provider_ ||
-            certficate_validation_context_provider_->secret() != nullptr) && 
-            (!trusted_ca_provider_ || trusted_ca_provider_->secret() != nullptr);
+            certficate_validation_context_provider_->secret() != nullptr) &&
+           (!trusted_ca_provider_ || trusted_ca_provider_->secret() != nullptr);
   }
 
   void setSecretUpdateCallback(std::function<void()> callback) override {

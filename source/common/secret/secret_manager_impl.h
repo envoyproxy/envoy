@@ -44,8 +44,7 @@ public:
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
-  TrustedCaConfigProviderSharedPtr
-  findOrCreateTrustedCaProvider(
+  TrustedCaConfigProviderSharedPtr findOrCreateTrustedCaProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 

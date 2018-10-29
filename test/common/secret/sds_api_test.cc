@@ -167,15 +167,14 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextContainsSdsTrustedCaConfig
   handle->remove();
 }
 
-// Validate that TrustedCaSdsApi updates secrets successfully if a good secret is 
+// Validate that TrustedCaSdsApi updates secrets successfully if a good secret is
 // passed to onConfigUpdate().
 TEST_F(SdsApiTest, DynamicTrustedCaUpdateSuccess) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
-  TrustedCaSdsApi sds_api(
-      server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+  TrustedCaSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
+                          server.clusterManager(), init_manager, config_source, "abc.com", []() {});
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
