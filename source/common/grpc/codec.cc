@@ -4,9 +4,8 @@
 #include <cstdint>
 #include <vector>
 
-#include "envoy/common/platform.h"
-
 #include "common/buffer/buffer_impl.h"
+#include "common/common/stack_array.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -25,10 +24,9 @@ Decoder::Decoder() : state_(State::FH_FLAG) {}
 
 bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
   uint64_t count = input.getRawSlices(nullptr, 0);
-  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, count);
-  input.getRawSlices(slices, count);
-  for (uint64_t i = 0; i < count; i++) {
-    Buffer::RawSlice& slice = slices[i];
+  STACK_ARRAY(slices, Buffer::RawSlice, count);
+  input.getRawSlices(slices.begin(), count);
+  for (const Buffer::RawSlice& slice : slices) {
     uint8_t* mem = reinterpret_cast<uint8_t*>(slice.mem_);
     for (uint64_t j = 0; j < slice.len_;) {
       uint8_t c = *mem;
