@@ -19,8 +19,6 @@
         alpn_protocols:
         - h2
         - http/1.1
-        deprecated_v1:
-          alt_alpn_protocols: http/1.1
     {% endif %}
     {% if proxy_proto %}
     use_proxy_proto: true

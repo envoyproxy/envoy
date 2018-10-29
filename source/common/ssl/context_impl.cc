@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -82,6 +81,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     }
 
     X509_STORE* store = SSL_CTX_get_cert_store(ctx_.get());
+    bool has_crl = false;
     for (const X509_INFO* item : list.get()) {
       if (item->x509) {
         X509_STORE_add_cert(store, item->x509);
@@ -92,11 +92,15 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
       }
       if (item->crl) {
         X509_STORE_add_crl(store, item->crl);
+        has_crl = true;
       }
     }
     if (ca_cert_ == nullptr) {
       throw EnvoyException(fmt::format("Failed to load trusted CA certificates from {}",
                                        config.certificateValidationContext()->caCertPath()));
+    }
+    if (has_crl) {
+      X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
     }
     verify_mode = SSL_VERIFY_PEER;
     verify_trusted_ca_ = true;
@@ -235,11 +239,6 @@ int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned ch
   // Currently this uses the standard selection algorithm in priority order.
   const uint8_t* alpn_data = &parsed_alpn_protocols_[0];
   size_t alpn_data_size = parsed_alpn_protocols_.size();
-  if (!parsed_alt_alpn_protocols_.empty() &&
-      runtime_.snapshot().featureEnabled("ssl.alt_alpn", 0)) {
-    alpn_data = &parsed_alt_alpn_protocols_[0];
-    alpn_data_size = parsed_alt_alpn_protocols_.size();
-  }
 
   if (SSL_select_next_proto(const_cast<unsigned char**>(out), outlen, alpn_data, alpn_data_size, in,
                             inlen) != OPENSSL_NPN_NEGOTIATED) {
@@ -512,9 +511,8 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
-                                     Runtime::Loader& runtime, TimeSource& time_source)
-    : ContextImpl(scope, config, time_source), runtime_(runtime),
-      session_ticket_keys_(config.sessionTicketKeys()) {
+                                     TimeSource& time_source)
+    : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()) {
   if (config.tlsCertificate() == nullptr) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
@@ -563,8 +561,6 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
       SSL_CTX_set_verify(ctx_.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
     }
   }
-
-  parsed_alt_alpn_protocols_ = parseAlpnProtocols(config.altAlpnProtocols());
 
   if (!parsed_alpn_protocols_.empty()) {
     SSL_CTX_set_alpn_select_cb(ctx_.get(),

@@ -251,8 +251,10 @@ envoy_cc_test(
     name = "resource_manager_impl_test",
     srcs = ["resource_manager_impl_test.cc"],
     deps = [
+        "//include/envoy/upstream:upstream_interface",
         "//source/common/upstream:resource_manager_lib",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
     ],
 )
 

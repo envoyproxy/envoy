@@ -45,7 +45,7 @@ The Envoy gRPC client is a minimal custom implementation of gRPC that makes use
 of Envoy's HTTP/2 upstream connection management. Services are specified as
 regular Envoy :ref:`clusters <arch_overview_cluster_manager>`, with regular
 treatment of :ref:`timeouts, retries <arch_overview_http_conn_man>`, endpoint
-:ref:`discovery <arch_overview_dynamic_config_sds>`/:ref:`load
+:ref:`discovery <arch_overview_dynamic_config_eds>`/:ref:`load
 balancing/failover <arch_overview_load_balancing>`/load reporting, :ref:`circuit
 breaking <arch_overview_circuit_break>`, :ref:`health checks
 <arch_overview_health_checking>`, :ref:`outlier detection

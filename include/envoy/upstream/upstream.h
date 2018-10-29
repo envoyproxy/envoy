@@ -411,6 +411,17 @@ public:
 // clang-format on
 
 /**
+ * Cluster circuit breakers stats.
+ */
+// clang-format off
+#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GAUGE)                                                  \
+  GAUGE (cx_open)                                                                                  \
+  GAUGE (rq_pending_open)                                                                          \
+  GAUGE (rq_open)                                                                                  \
+  GAUGE (rq_retry_open)
+// clang-format on
+
+/**
  * Struct definition for all cluster stats. @see stats_macros.h
  */
 struct ClusterStats {
@@ -422,6 +433,13 @@ struct ClusterStats {
  */
 struct ClusterLoadReportStats {
   ALL_CLUSTER_LOAD_REPORT_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
+ * Struct definition for cluster circuit breakers stats. @see stats_macros.h
+ */
+struct ClusterCircuitBreakersStats {
+  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT)
 };
 
 /**
@@ -669,8 +687,8 @@ public:
 
   /**
    * @return the phase in which the cluster is initialized at boot. This mechanism is used such that
-   *         clusters that depend on other clusters can correctly initialize. (E.g., an SDS cluster
-   *         that depends on resolution of the SDS server itself).
+   *         clusters that depend on other clusters can correctly initialize. (E.g., an EDS cluster
+   *         that depends on resolution of the EDS server itself).
    */
   virtual InitializePhase initializePhase() const PURE;
 

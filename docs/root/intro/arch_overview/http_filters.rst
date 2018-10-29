@@ -20,5 +20,8 @@ The API for HTTP level filters allows the filters to operate without knowledge o
 protocol. Like network level filters, HTTP filters can stop and continue iteration to subsequent
 filters. This allows for more complex scenarios such as health check handling, calling a rate
 limiting service, buffering, routing, generating statistics for application traffic such as
-DynamoDB, etc. Envoy already includes several HTTP level filters that are documented in this
-architecture overview as well as the :ref:`configuration reference <config_http_filters>`.
+DynamoDB, etc. HTTP level filters can also share state (static and dynamic) among
+themselves within the context of a single request stream. Refer to :ref:`data sharing
+between filters <arch_overview_data_sharing_between_filters>` for more details. Envoy already
+includes several HTTP level filters that are documented in this architecture overview as well as
+the :ref:`configuration reference <config_http_filters>`.

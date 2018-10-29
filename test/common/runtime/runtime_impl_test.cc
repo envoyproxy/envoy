@@ -136,6 +136,13 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   EXPECT_CALL(generator, random()).WillOnce(Return(60));
   EXPECT_FALSE(loader->snapshot().featureEnabled("file8", fractional_percent)); // valid data
 
+  // We currently expect that runtime values represented as fractional percents that are provided as
+  // integers are parsed simply as percents (denominator of 100).
+  EXPECT_CALL(generator, random()).WillOnce(Return(53));
+  EXPECT_FALSE(loader->snapshot().featureEnabled("file10", fractional_percent)); // valid int data
+  EXPECT_CALL(generator, random()).WillOnce(Return(51));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file10", fractional_percent)); // valid int data
+
   EXPECT_CALL(generator, random()).WillOnce(Return(4));
   EXPECT_TRUE(loader->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
 

@@ -27,7 +27,6 @@
 #include "common/config/well_known_names.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
-#include "common/http/websocket/ws_handler_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/retry_state_impl.h"
@@ -282,11 +281,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       prefix_rewrite_(route.route().prefix_rewrite()), host_rewrite_(route.route().host_rewrite()),
       vhost_(vhost),
       auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
-      websocket_config_([&]() -> TcpProxy::ConfigSharedPtr {
-        return (PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), use_websocket, false))
-                   ? Http::WebSocket::Config(route.route(), factory_context)
-                   : nullptr;
-      }()),
       cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
@@ -409,15 +403,6 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 }
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
-
-Http::WebSocketProxyPtr RouteEntryImplBase::createWebSocketProxy(
-    Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-    Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
-    Network::ReadFilterCallbacks* read_callbacks) const {
-  return std::make_unique<Http::WebSocket::WsHandlerImpl>(
-      request_headers, stream_info, *this, callbacks, cluster_manager, read_callbacks,
-      websocket_config_, time_system_);
-}
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
