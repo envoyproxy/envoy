@@ -12,6 +12,7 @@
 #include "common/ssl/context_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
+#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
