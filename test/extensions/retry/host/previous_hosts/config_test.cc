@@ -1,7 +1,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
 
-#include "extensions/retry/host/other_hosts/config.h"
+#include "extensions/retry/host/previous_hosts/config.h"
 #include "extensions/retry/host/well_known_names.h"
 
 #include "test/mocks/upstream/mocks.h"
@@ -16,7 +16,7 @@ namespace Extensions {
 namespace Retry {
 namespace Host {
 
-TEST(OtherHostsRetryPredicateConfigTest, PredicateTest) {
+TEST(PreviousHostsRetryPredicateConfigTest, PredicateTest) {
   auto factory = Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
       RetryHostPredicateValues::get().PreviousHostsPredicate);
 

@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.config.retry.other_priority;
+package envoy.config.retry.previous_priorities;
 
 // A retry host selector that attempts to spread retries between priorities, even if certain
 // priorities would not normally be attempted due to higher priorities being available.
@@ -26,7 +26,7 @@ package envoy.config.retry.other_priority;
 //
 // Using this PriorityFilter requires rebuilding the priority load, which runs in O(# of
 // priorities), which might incur significant overhead for clusters with many priorities.
-message OtherPriorityConfig {
+message PreviousPrioritiesConfig {
   // How often the priority load should be updated based on previously attempted priorities. Useful
   // to allow each priorities to receive more than one request before being excluded or to reduce
   // the number of times that the priority load has to be recomputed.

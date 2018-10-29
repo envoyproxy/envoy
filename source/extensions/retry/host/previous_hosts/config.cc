@@ -1,4 +1,4 @@
-#include "extensions/retry/host/other_hosts/config.h"
+#include "extensions/retry/host/previous_hosts/config.h"
 
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
@@ -8,7 +8,7 @@ namespace Extensions {
 namespace Retry {
 namespace Host {
 
-static Registry::RegisterFactory<OtherHostsRetryPredicateFactory,
+static Registry::RegisterFactory<PreviousHostsRetryPredicateFactory,
                                  Upstream::RetryHostPredicateFactory>
     register_;
 }
