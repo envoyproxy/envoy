@@ -195,7 +195,7 @@ TEST_F(SdsApiTest, DynamicTrustedCaUpdateSuccess) {
 
   const std::string ca_cert = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
-            sds_api.secret()->trustedCa()->caCert());
+            sds_api.secret()->caCert());
 
   handle->remove();
 }
