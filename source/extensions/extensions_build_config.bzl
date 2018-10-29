@@ -112,10 +112,10 @@ EXTENSIONS = {
     "envoy.transport_sockets.capture":                  "//source/extensions/transport_sockets/capture:config",
 
     # Retry host predicates
-    "envoy.retry_host_predicates.other_hosts":          "//source/extensions/retry/host/other_hosts:config",
+    "envoy.retry_host_predicates.previous_hosts":          "//source/extensions/retry/host/previous_hosts:config",
 
     # Retry priorities
-    "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/other_priority:config",
+    "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/previous_priorities:config",
 }
 
 WINDOWS_EXTENSIONS = {
