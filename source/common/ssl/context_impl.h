@@ -1,9 +1,9 @@
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
-#include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/stats/scope.h"
@@ -153,8 +153,7 @@ private:
 class ServerContextImpl : public ContextImpl, public ServerContext {
 public:
   ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
-                    const std::vector<std::string>& server_names, Runtime::Loader& runtime,
-                    TimeSource& time_source);
+                    const std::vector<std::string>& server_names, TimeSource& time_source);
 
 private:
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
@@ -162,8 +161,6 @@ private:
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt);
 
-  Runtime::Loader& runtime_;
-  std::vector<uint8_t> parsed_alt_alpn_protocols_;
   const std::vector<ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };
 

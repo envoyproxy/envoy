@@ -117,7 +117,6 @@ envoy_cc_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
-        "//include/envoy/http:websocket_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:drain_decision_interface",

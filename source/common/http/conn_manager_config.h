@@ -18,7 +18,6 @@ namespace Http {
   COUNTER  (downstream_cx_ssl_total)                                                               \
   COUNTER  (downstream_cx_http1_total)                                                             \
   COUNTER  (downstream_cx_upgrades_total)                                                         \
-  COUNTER  (downstream_cx_websocket_total)                                                         \
   COUNTER  (downstream_cx_http2_total)                                                             \
   COUNTER  (downstream_cx_destroy)                                                                 \
   COUNTER  (downstream_cx_destroy_remote)                                                          \
@@ -30,7 +29,6 @@ namespace Http {
   GAUGE    (downstream_cx_ssl_active)                                                              \
   GAUGE    (downstream_cx_http1_active)                                                            \
   GAUGE    (downstream_cx_upgrades_active)                                                        \
-  GAUGE    (downstream_cx_websocket_active)                                                        \
   GAUGE    (downstream_cx_http2_active)                                                            \
   COUNTER  (downstream_cx_protocol_error)                                                          \
   HISTOGRAM(downstream_cx_length_ms)                                                               \

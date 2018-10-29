@@ -85,7 +85,7 @@ void ValidationInstance::initialize(Options& options,
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   secret_manager_.reset(new Secret::SecretManagerImpl());
-  ssl_context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_loader_, time_system_));
+  ssl_context_manager_.reset(new Ssl::ContextManagerImpl(time_system_));
   cluster_manager_factory_.reset(new Upstream::ValidationClusterManagerFactory(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
       localInfo(), *secret_manager_));

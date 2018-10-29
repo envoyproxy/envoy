@@ -46,7 +46,6 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "//source/common/http/websocket:ws_handler_lib",
         "//source/common/protobuf:utility_lib",
     ],
 )
@@ -176,6 +175,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/common/upstream:load_balancer_lib",
         "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
     ],
 )

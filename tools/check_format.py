@@ -8,6 +8,7 @@ import os
 import os.path
 import re
 import subprocess
+import stat
 import sys
 import traceback
 
@@ -69,6 +70,69 @@ PROTOBUF_TYPE_ERRORS = {
     "ProtobufWkt::MapPair":             "Protobuf::MapPair",
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 }
+
+# lookPath searches for the given executable in all directories in PATH
+# environment variable. If it cannot be found, empty string is returned.
+def lookPath(executable):
+  for path_dir in os.environ["PATH"].split(os.pathsep):
+    executable_path = os.path.join(path_dir, executable)
+    if os.path.exists(executable_path):
+      return executable_path
+  return ""
+
+# pathExists checks whether the given path exists. This function assumes that
+# the path is absolute and evaluates environment variables.
+def pathExists(executable):
+  return os.path.exists(os.path.expandvars(executable))
+
+# executableByOthers checks whether the given path has execute permission for
+# others.
+def executableByOthers(executable):
+  st = os.stat(os.path.expandvars(executable))
+  return bool(st.st_mode & stat.S_IXOTH)
+
+# Check whether all needed external tools (clang-format, buildifier) are
+# available.
+def checkTools():
+  error_messages = []
+
+  clang_format_abs_path = lookPath(CLANG_FORMAT_PATH)
+  if clang_format_abs_path:
+    if not executableByOthers(clang_format_abs_path):
+      error_messages.append("command {} exists, but cannot be executed by other "
+                            "users".format(CLANG_FORMAT_PATH))
+  else:
+    error_messages.append(
+      "Command {} not found. If you have clang-format in version 7.x.x "
+      "installed, but the binary name is different or it's not available in "
+      "PATH, please use CLANG_FORMAT environment variable to specify the path. "
+      "Examples:\n"
+      "    export CLANG_FORMAT=clang-format-7.0.0\n"
+      "    export CLANG_FORMAT=/opt/bin/clang-format-7".format(
+        CLANG_FORMAT_PATH)
+    )
+
+  buildifier_abs_path = lookPath(BUILDIFIER_PATH)
+  if buildifier_abs_path:
+    if not executableByOthers(buildifier_abs_path):
+      error_messages.append("command {} exists, but cannot be executed by other "
+                            "users".format(BUILDIFIER_PATH))
+  elif pathExists(BUILDIFIER_PATH):
+    if not executableByOthers(BUILDIFIER_PATH):
+      error_messages.append("command {} exists, but cannot be executed by other "
+                            "users".format(BUILDIFIER_PATH))
+  else:
+    error_messages.append(
+      "Command {} not found. If you have buildifier installed, but the binary "
+      "name is different or it's not available in $GOPATH/bin, please use "
+      "BUILDIFIER_BIN environment variable to specify the path. Example:"
+      "    export BUILDIFIER_BIN=/opt/bin/buildifier\n"
+      "If you don't have buildifier installed, you can install it by:\n"
+      "    go get -u github.com/bazelbuild/buildtools/buildifier".format(
+        BUILDIFIER_PATH)
+    )
+
+  return error_messages
 
 def checkNamespace(file_path):
   with open(file_path) as f:
@@ -355,6 +419,15 @@ def checkFormatVisitor(arg, dir_name, names):
     result = pool.apply_async(checkFormatReturnTraceOnError, args=(dir_name + "/" + file_name,))
     result_list.append(result)
 
+# checkErrorMessages iterates over the list with error messages and prints
+# errors and returns a bool based on whether there were any errors.
+def checkErrorMessages(error_messages):
+  if error_messages:
+    for e in error_messages:
+      print "ERROR: %s" % e
+    return True
+  return False
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Check or fix file format.')
   parser.add_argument('operation_type', type=str, choices=['check', 'fix'],
@@ -376,6 +449,11 @@ if __name__ == "__main__":
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
 
+  # Check whether all needed external tools are available.
+  ct_error_messages = checkTools()
+  if checkErrorMessages(ct_error_messages):
+    sys.exit(1)
+
   if os.path.isfile(target_path):
     error_messages = checkFormat("./" + target_path)
   else:
@@ -391,10 +469,9 @@ if __name__ == "__main__":
     pool.join()
     error_messages = sum((r.get() for r in results), [])
 
-  if error_messages:
-    for e in error_messages:
-      print "ERROR: %s" % e
+  if checkErrorMessages(error_messages):
     print "ERROR: check format failed. run 'tools/check_format.py fix'"
     sys.exit(1)
+
   if operation_type == "check":
     print "PASS"

@@ -368,6 +368,8 @@ public:
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
+  static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
+                                                                  const std::string& stat_prefix);
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
@@ -421,9 +423,9 @@ public:
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
-                     const std::string& cluster_name);
+                     const std::string& cluster_name, Stats::Scope& stats_scope);
     ResourceManagerImplPtr load(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
-                                const std::string& cluster_name,
+                                const std::string& cluster_name, Stats::Scope& stats_scope,
                                 const envoy::api::v2::core::RoutingPriority& priority);
 
     typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;

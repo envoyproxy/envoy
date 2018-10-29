@@ -3,7 +3,7 @@
 Service discovery service
 =========================
 
-Service discovery service :ref:`architecture overview <arch_overview_service_discovery_types_sds>`.
+Service discovery service architecture overview.
 
 .. code-block:: json
 
