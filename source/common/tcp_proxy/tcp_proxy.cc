@@ -366,8 +366,10 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
       downstreamConnection()->streamInfo().filterState().hasData<OriginalRequestedServerName>(
           OriginalRequestedServerName::Key)) {
     const OriginalRequestedServerName& original_requested_server_name =
-        downstreamConnection()->streamInfo().filterState().getDataReadOnly<OriginalRequestedServerName>(
-            OriginalRequestedServerName::Key);
+        downstreamConnection()
+            ->streamInfo()
+            .filterState()
+            .getDataReadOnly<OriginalRequestedServerName>(OriginalRequestedServerName::Key);
     override_server_name = original_requested_server_name.value();
   }
 
