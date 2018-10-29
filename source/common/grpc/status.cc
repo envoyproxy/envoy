@@ -4,17 +4,13 @@ namespace Envoy {
 namespace Grpc {
 
 Status::GrpcStatus Utility::httpToGrpcStatus(uint64_t http_response_status,
-                                             const absl::optional<StatusMap>& status_map) {
+                                             const absl::optional<Status::GrpcStatus> grpc_status) {
   // See:
   // * https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
   // * https://cloud.google.com/apis/design/errors#generating_errors
 
-  // override default code mapping if provided
-  if (status_map) {
-    StatusMap::const_iterator iter = status_map.value().find(http_response_status);
-    if (iter != status_map.value().end()) {
-      return iter->second;
-    }
+  if (grpc_status) {
+    return grpc_status.value();
   }
 
   switch (http_response_status) {

@@ -137,13 +137,13 @@ Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOption
  * @param response_code supplies the HTTP response code.
  * @param body_text supplies the optional body text which is sent using the text/plain content
  *                  type.
- * @param status_map a map of HTTP status codes to corresponding gRPC status
- *                   codes to override the default code mapping.
+ * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
  * @param is_head_request tells if this is a response to a HEAD request
  */
 void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
                     Code response_code, const std::string& body_text,
-                    const absl::optional<Grpc::StatusMap>& status_map, bool is_head_request);
+                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    bool is_head_request);
 
 /**
  * Create a locally generated response using the provided lambdas.
@@ -156,14 +156,13 @@ void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const
  * @param response_code supplies the HTTP response code.
  * @param body_text supplies the optional body text which is sent using the text/plain content
  *                  type.
- * @param status_map a map of HTTP status codes to corresponding gRPC status
- *                   codes to override the default code mapping.
+ * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
  */
 void sendLocalReply(bool is_grpc,
                     std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
                     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
                     const bool& is_reset, Code response_code, const std::string& body_text,
-                    const absl::optional<Grpc::StatusMap>& status_map,
+                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                     bool is_head_request = false);
 
 struct GetLastAddressFromXffInfo {

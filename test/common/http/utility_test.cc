@@ -492,10 +492,10 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_STREQ(headers.GrpcStatus()->value().c_str(), "8"); // ResourceExhausted
       }));
-  Grpc::StatusMap status_map = {
-      {enumToInt(Http::Code::TooManyRequests), Grpc::Status::GrpcStatus::ResourceExhausted}};
-  Utility::sendLocalReply(true, callbacks, false, Http::Code::TooManyRequests, "",
-                          absl::make_optional<Grpc::StatusMap>(status_map), false);
+  Utility::sendLocalReply(
+      true, callbacks, false, Http::Code::TooManyRequests, "",
+      absl::make_optional<Grpc::Status::GrpcStatus>(Grpc::Status::GrpcStatus::ResourceExhausted),
+      false);
 }
 
 TEST(HttpUtility, SendLocalReplyDestroyedEarly) {

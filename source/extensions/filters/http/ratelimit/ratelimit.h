@@ -14,7 +14,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
 #include "common/http/header_map_impl.h"
 
 namespace Envoy {
@@ -40,7 +39,10 @@ public:
                                                     : stringToType(config.request_type())),
         local_info_(local_info), scope_(scope), runtime_(runtime),
         failure_mode_deny_(config.failure_mode_deny()),
-        status_map_(buildStatusMap(config.rate_limited_as_resource_exhausted())) {}
+        rate_limited_grpc_status_(
+            config.rate_limited_as_resource_exhausted()
+                ? absl::make_optional(Grpc::Status::GrpcStatus::ResourceExhausted)
+                : absl::nullopt) {}
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
@@ -48,7 +50,9 @@ public:
   Stats::Scope& scope() { return scope_; }
   FilterRequestType requestType() const { return request_type_; }
   bool failureModeAllow() const { return !failure_mode_deny_; }
-  const absl::optional<Grpc::StatusMap> statusMap() const { return status_map_; }
+  const absl::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
+    return rate_limited_grpc_status_;
+  }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -62,16 +66,6 @@ private:
     }
   }
 
-  static const absl::optional<Grpc::StatusMap>
-  buildStatusMap(const bool rate_limited_as_resource_exhausted) {
-    if (rate_limited_as_resource_exhausted) {
-      Grpc::StatusMap status_map = {
-          {enumToInt(Http::Code::TooManyRequests), Grpc::Status::GrpcStatus::ResourceExhausted}};
-      return absl::make_optional(status_map);
-    }
-    return absl::nullopt;
-  }
-
   const std::string domain_;
   const uint64_t stage_;
   const FilterRequestType request_type_;
@@ -79,7 +73,7 @@ private:
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
-  const absl::optional<Grpc::StatusMap> status_map_;
+  const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;

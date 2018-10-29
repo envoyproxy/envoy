@@ -26,12 +26,11 @@ public:
    * See https://cloud.google.com/apis/design/errors#generating_errors.
    *
    * @param http_response_status HTTP status code.
-   * @param status_map a map of HTTP status codes to corresponding gRPC status
-   *                   codes to override the default code mapping.
+   * @param grpc_status the gRPC status code to override the default mapping with.
    * @return Status::GrpcStatus corresponding gRPC status code.
    */
   static Status::GrpcStatus httpToGrpcStatus(uint64_t http_response_status,
-                                             const absl::optional<StatusMap>& status_map);
+                                             const absl::optional<Status::GrpcStatus> grpc_status);
 
   /**
    * @param grpc_status gRPC status from grpc-status header.

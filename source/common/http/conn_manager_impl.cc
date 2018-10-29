@@ -931,7 +931,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     bool is_grpc_request, Code code, const std::string& body,
     std::function<void(HeaderMap& headers)> modify_headers, bool is_head_request,
-    const absl::optional<Grpc::StatusMap>& status_map) {
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
   Utility::sendLocalReply(is_grpc_request,
                           [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
                             if (modify_headers != nullptr) {
@@ -947,7 +947,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
                             // request instead.
                             encodeData(nullptr, data, end_stream);
                           },
-                          state_.destroyed_, code, body, status_map, is_head_request);
+                          state_.destroyed_, code, body, grpc_status, is_head_request);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(

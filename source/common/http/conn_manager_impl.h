@@ -174,9 +174,9 @@ private:
     }
     void sendLocalReply(Code code, const std::string& body,
                         std::function<void(HeaderMap& headers)> modify_headers,
-                        const absl::optional<Grpc::StatusMap>& status_map) override {
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
       parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, parent_.is_head_request_,
-                             status_map);
+                             grpc_status);
     }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -284,7 +284,8 @@ private:
     HeaderMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, const std::string& body,
                         std::function<void(HeaderMap& headers)> modify_headers,
-                        bool is_head_request, const absl::optional<Grpc::StatusMap>& status_map);
+                        bool is_head_request,
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);

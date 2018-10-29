@@ -265,11 +265,9 @@ TEST(GrpcCommonTest, HttpToGrpcStatus) {
 
 TEST(GrpcCommonTest, HttpToGrpcStatusRateLimited) {
   EXPECT_EQ(Status::GrpcStatus::Unavailable, Grpc::Utility::httpToGrpcStatus(429, absl::nullopt));
-
-  Grpc::StatusMap status_map = {
-      {enumToInt(Http::Code::TooManyRequests), Grpc::Status::GrpcStatus::ResourceExhausted}};
   EXPECT_EQ(Status::GrpcStatus::ResourceExhausted,
-            Grpc::Utility::httpToGrpcStatus(429, absl::make_optional<Grpc::StatusMap>(status_map)));
+            Grpc::Utility::httpToGrpcStatus(429, absl::make_optional<Status::GrpcStatus>(
+                                                     Grpc::Status::GrpcStatus::ResourceExhausted)));
 }
 
 TEST(GrpcCommonTest, HasGrpcContentType) {

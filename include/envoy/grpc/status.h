@@ -52,10 +52,5 @@ public:
   };
 };
 
-/**
- * A map of HTTP status codes to corresponding gRPC status codes.
- */
-typedef std::map<uint64_t, Status::GrpcStatus> StatusMap;
-
 } // namespace Grpc
 } // namespace Envoy
