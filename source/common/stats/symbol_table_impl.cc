@@ -32,7 +32,7 @@ void SymbolEncoding::addSymbol(Symbol symbol) {
   } while (symbol != 0);
 }
 
-SymbolVec SymbolEncoding::decodeSymbols(const SymbolStorage array, size_t size) {
+SymbolVec SymbolEncoding::decodeSymbols(const SymbolStorage array, uint64_t size) {
   SymbolVec symbol_vec;
   Symbol symbol = 0;
   for (uint32_t shift = 0; size > 0; --size, ++array) {
@@ -40,7 +40,7 @@ SymbolVec SymbolEncoding::decodeSymbols(const SymbolStorage array, size_t size) 
 
     // Inverse addSymbol encoding, walking down the bytes, shifting them into
     // symbol, until a byte with a zero high order bit indicates this symbol is
-    // complete and we can move ot the next one.
+    // complete and we can move to the next one.
     symbol |= (uc & Low7Bits) << shift;
     if ((uc & SpilloverMask) == 0) {
       symbol_vec.push_back(symbol);
@@ -53,13 +53,21 @@ SymbolVec SymbolEncoding::decodeSymbols(const SymbolStorage array, size_t size) 
   return symbol_vec;
 }
 
+// Saves the specified length into the byte array, returning the next byte.
+// There is no guarantee that bytes will be aligned, so we can't cast to a
+// uint16_t* and assign, but must individually copy the bytes.
+static inline uint8_t* saveLengthToBytesReturningNext(uint64_t length, uint8_t* bytes) {
+  ASSERT(length < 65536);
+  *bytes++ = length & 0xff;
+  *bytes++ = length >> 8;
+  return bytes;
+}
+
 void SymbolEncoding::moveToStorage(SymbolStorage symbol_array) {
-  size_t sz = size();
-  ASSERT(sz < 65536);
-  symbol_array[0] = sz & 0xff;
-  symbol_array[1] = sz >> 8;
+  uint64_t sz = size();
+  symbol_array = saveLengthToBytesReturningNext(sz, symbol_array);
   if (sz != 0) {
-    memcpy(symbol_array + 2, vec_.data(), sz * sizeof(uint8_t));
+    memcpy(symbol_array, vec_.data(), sz * sizeof(uint8_t));
   }
   vec_.clear(); // Logically transfer ownership, enabling empty assert on destruct.
 }
@@ -108,7 +116,7 @@ SymbolEncoding SymbolTable::encode(const absl::string_view name) {
   return encoding;
 }
 
-std::string SymbolTable::decode(const SymbolStorage symbol_array, size_t size) const {
+std::string SymbolTable::decode(const SymbolStorage symbol_array, uint64_t size) const {
   return decode(SymbolEncoding::decodeSymbols(symbol_array, size));
 }
 
@@ -199,7 +207,7 @@ bool SymbolTable::lessThan(const StatName& a, const StatName& b) const {
   // without allocating memory.
   SymbolVec av = SymbolEncoding::decodeSymbols(a.data(), a.numBytes());
   SymbolVec bv = SymbolEncoding::decodeSymbols(b.data(), b.numBytes());
-  for (size_t i = 0, n = std::min(av.size(), bv.size()); i < n; ++i) {
+  for (uint64_t i = 0, n = std::min(av.size(), bv.size()); i < n; ++i) {
     if (av[i] != bv[i]) {
       Thread::LockGuard lock(lock_);
       return fromSymbol(av[i]) < fromSymbol(bv[i]);
@@ -217,7 +225,8 @@ StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table) {
 StatNameStorage::~StatNameStorage() {
   // StatNameStorage is not fully RAII: you must call free(SymbolTable&) to
   // decrement the reference counts held by the SymbolTable on behalf of
-  // this StatName.
+  // this StatName. This saves 8 bytes of storage per stat, relative to
+  // holding a SymbolTable& in each StatNameStorage object.
   ASSERT(bytes_ == nullptr);
 }
 
@@ -227,33 +236,29 @@ void StatNameStorage::free(SymbolTable& table) {
 }
 
 StatNameJoiner::StatNameJoiner(StatName a, StatName b) {
-  size_t a_size = a.numBytes();
-  size_t b_size = b.numBytes();
-  uint8_t* p = alloc(a_size + b_size);
+  const uint64_t a_size = a.numBytes();
+  const uint64_t b_size = b.numBytes();
+  uint8_t* const p = alloc(a_size + b_size);
   memcpy(p, a.data(), a_size);
   memcpy(p + a_size, b.data(), b_size);
 }
 
 StatNameJoiner::StatNameJoiner(const std::vector<StatName>& stat_names) {
-  size_t num_bytes = 0;
+  uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
     num_bytes += stat_name.numBytes();
   }
   uint8_t* p = alloc(num_bytes);
   for (StatName stat_name : stat_names) {
     num_bytes = stat_name.numBytes();
-    ;
     memcpy(p, stat_name.data(), num_bytes);
     p += num_bytes;
   }
 }
 
-uint8_t* StatNameJoiner::alloc(size_t num_bytes) {
-  bytes_ = std::make_unique<uint8_t[]>(num_bytes + 2);  // +2 bytes for the length up to 64k.
-  uint8_t* p = bytes_.get();
-  *p++ = num_bytes & 0xff;
-  *p++ = num_bytes >> 8;
-  return p;
+uint8_t* StatNameJoiner::alloc(uint64_t num_bytes) {
+  bytes_ = std::make_unique<uint8_t[]>(num_bytes + 2); // +2 bytes for the length up to 64k.
+  return saveLengthToBytesReturningNext(num_bytes, bytes_.get());
 }
 
 } // namespace Stats

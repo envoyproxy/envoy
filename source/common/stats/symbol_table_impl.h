@@ -59,18 +59,18 @@ public:
   /**
    * Decodes a uint8_t array into a SymbolVec.
    */
-  static SymbolVec decodeSymbols(const SymbolStorage array, size_t size);
+  static SymbolVec decodeSymbols(const SymbolStorage array, uint64_t size);
 
   /**
    * Returns the number of bytes required to represent StatName as a uint8_t
    * array.
    */
-  size_t bytesRequired() const { return size() + 2 /* size encoded as 2 bytes */; }
+  uint64_t bytesRequired() const { return size() + 2 /* size encoded as 2 bytes */; }
 
   /**
    * Returns the number of uint8_t entries we collected while adding symbols.
    */
-  size_t size() const { return vec_.size(); }
+  uint64_t size() const { return vec_.size(); }
 
   /**
    * Moves the contents of the vector into an allocated array. The array
@@ -100,7 +100,8 @@ private:
  * StatNames are backed by StatNameStorage -- the storage may be inlined into
  * another object such as HeapStatData. StaNameStorage is not fully RAII --
  * instead the owner must call free(SymbolTable&) explicitly before
- * StatNameStorage is destructed. This saves 8 bytes of storage per stat.
+ * StatNameStorage is destructed. This saves 8 bytes of storage per stat,
+ * relative to holding a SymbolTable& in each StatNameStorage object.
  *
  * A StatName is a copyable and assignable reference to this storage. It does
  * not own the storage or keep it alive via reference counts; the owner must
@@ -126,8 +127,8 @@ public:
    * each symbol. The caller is responsible for creating a StatName using this
    * SymbolEncoding and ultimately disposing of it by calling
    * StatName::free(). Otherwise the symbols will leak for the lifetime of the
-   * table, though they won't show up as a C++ memory as the memory is still
-   * reachable form the SymolTable.
+   * table, though they won't show up as a C++ leaks as the memory is still
+   * reachable from the SymolTable.
    *
    * @param name The name to encode.
    * @return SymbolEncoding the encoded symbols.
@@ -135,9 +136,9 @@ public:
   SymbolEncoding encode(absl::string_view name);
 
   /**
-   * @return size_t the number of symbols in the symbol table.
+   * @return uint64_t the number of symbols in the symbol table.
    */
-  size_t numSymbols() const {
+  uint64_t numSymbols() const {
     Thread::LockGuard lock(lock_);
     ASSERT(encode_map_.size() == decode_map_.size());
     return encode_map_.size();
@@ -191,7 +192,7 @@ private:
    * @param symbol_vec the vector of symbols to decode.
    * @return std::string the retrieved stat name.
    */
-  std::string decode(const SymbolStorage symbol_vec, size_t size) const;
+  std::string decode(const SymbolStorage symbol_vec, uint64_t size) const;
   std::string decode(const SymbolVec& symbols) const;
 
   /**
@@ -255,7 +256,7 @@ public:
   ~StatNameStorage();
 
   /**
-   * Decremences the reference counts in the SymbolTable.
+   * Decrements the reference counts in the SymbolTable.
    *
    * @param table the symbol table.
    */
@@ -301,7 +302,7 @@ public:
   // Compares on the underlying symbol vectors.
   // NB: operator==(std::vector) checks size first, then compares equality for each element.
   bool operator==(const StatName& rhs) const {
-    const size_t sz = numBytes();
+    const uint64_t sz = numBytes();
     return sz == rhs.numBytes() && memcmp(data(), rhs.data(), sz * sizeof(uint8_t)) == 0;
   }
   bool operator!=(const StatName& rhs) const { return !(*this == rhs); }
@@ -312,11 +313,11 @@ protected:
   friend class StatNameJoiner;
 
   /**
-   * @return size_t the number of bytes in the symbol array, excluding the two-byte
-   *                 overhead for the size itself.
+   * @return uint64_t the number of bytes in the symbol array, excluding the two-byte
+   *                  overhead for the size itself.
    */
-  size_t numBytes() const {
-    return symbol_array_[0] | (static_cast<size_t>(symbol_array_[1]) << 8);
+  uint64_t numBytes() const {
+    return symbol_array_[0] | (static_cast<uint64_t>(symbol_array_[1]) << 8);
   }
 
   /**
@@ -350,7 +351,7 @@ public:
   StatName statName() const { return StatName(bytes_.get()); }
 
 private:
-  uint8_t* alloc(size_t num_bytes);
+  uint8_t* alloc(uint64_t num_bytes);
 
   std::unique_ptr<SymbolStorage> bytes_;
 };
