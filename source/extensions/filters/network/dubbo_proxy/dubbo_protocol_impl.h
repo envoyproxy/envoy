@@ -38,12 +38,12 @@ public:
   void fromBuffer(Buffer::Instance& data);
   virtual MessageType messageType() const override { return MessageType::Request; }
 
-  virtual SerializationType serializationType() const override { return type_; }
+  virtual DeserializationType deserializationType() const override { return type_; }
 
   virtual bool isTwoWay() const override { return is_two_way_; }
 
 private:
-  SerializationType type_;
+  DeserializationType type_;
   bool is_two_way_;
 };
 

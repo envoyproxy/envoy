@@ -95,7 +95,7 @@ TEST(DubboProtocolImplTest, InvalidProtocol) {
     addInt64(buffer, 1);
     addInt32(buffer, 0xff);
     EXPECT_THROW_WITH_MESSAGE(dubbo_protocol.decode(buffer, &context), EnvoyException,
-                              "invalid dubbo message serialization type 3");
+                              "invalid dubbo message deserialization type 3");
   }
 
   // Invalid response status
