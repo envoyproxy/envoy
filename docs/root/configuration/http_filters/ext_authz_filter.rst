@@ -74,7 +74,7 @@ A sample filter configuration for a raw HTTP authorization server:
       hosts:
         - socket_address: { address: 127.0.0.1, port_value: 10003 }
 
-A sample vhost and route filter configuration:
+A sample virtual host and route filter configuration:
 
 .. code-block:: yaml
 
@@ -87,7 +87,7 @@ A sample vhost and route filter configuration:
         envoy.ext_authz:
           check_settings:
             context_extensions:
-              svhost: local_service
+              virtual_host: local_service
       routes:
       - match: { prefix: "/static" }
         route: { cluster: some_service }
