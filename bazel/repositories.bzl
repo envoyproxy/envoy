@@ -485,6 +485,14 @@ def _com_google_protobuf():
         actual = "@com_google_protobuf//:protobuf",
     )
     native.bind(
+        name = "protobuf_clib",
+        actual = "@com_google_protobuf//:protoc_lib",
+    )
+    native.bind(
+        name = "protocol_compiler",
+        actual = "@com_google_protobuf//:protoc",
+    )
+    native.bind(
         name = "protoc",
         actual = "@com_google_protobuf_cc//:protoc",
     )
@@ -521,6 +529,11 @@ def _com_github_grpc_grpc():
     native.bind(
         name = "grpc_health_proto",
         actual = "@envoy//bazel:grpc_health_proto",
+    )
+
+    native.bind(
+        name = "grpc_alts_fake_handshaker_server",
+        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:fake_handshaker_lib",
     )
 
 def _com_github_nanopb_nanopb():
