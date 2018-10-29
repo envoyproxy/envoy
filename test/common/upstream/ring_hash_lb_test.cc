@@ -81,7 +81,6 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
 
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(12);
-  config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
 
   init();
 
@@ -148,7 +147,6 @@ TEST_P(RingHashFailoverTest, BasicFailover) {
 
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(12);
-  config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
   init();
 
   LoadBalancerPtr lb = lb_->factory()->create();
@@ -190,8 +188,8 @@ TEST_P(RingHashLoadBalancerTest, BasicWithStdHash) {
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
-  // use_std_hash defaults to true so don't set it here.
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(true);
   config_.value().mutable_minimum_ring_size()->set_value(12);
   init();
 
@@ -241,7 +239,6 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
 
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(3);
-  config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
   init();
 
   // hash ring:
