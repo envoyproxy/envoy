@@ -156,7 +156,7 @@ protected:
     virtual void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                nghttp2_data_provider* provider) PURE;
     void submitTrailers(const HeaderMap& trailers);
-    int submitMetadata();
+    void submitMetadata();
 
     // Http::StreamEncoder
     void encode100ContinueHeaders(const HeaderMap& headers) override;
@@ -294,6 +294,7 @@ protected:
   CodecStats stats_;
   Network::Connection& connection_;
   uint32_t per_stream_buffer_limit_;
+  bool allow_metadata_;
 
 private:
   virtual ConnectionCallbacks& callbacks() PURE;

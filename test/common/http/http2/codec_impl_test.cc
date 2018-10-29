@@ -33,17 +33,6 @@ namespace Http2 {
 typedef ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t> Http2SettingsTuple;
 typedef ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple> Http2SettingsTestParam;
 
-namespace {
-Http2Settings Http2SettingsFromTuple(const Http2SettingsTuple& tp) {
-  Http2Settings ret;
-  ret.hpack_table_size_ = ::testing::get<0>(tp);
-  ret.max_concurrent_streams_ = ::testing::get<1>(tp);
-  ret.initial_stream_window_size_ = ::testing::get<2>(tp);
-  ret.initial_connection_window_size_ = ::testing::get<3>(tp);
-  return ret;
-}
-} // namespace
-
 class TestServerConnectionImpl : public ServerConnectionImpl {
 public:
   TestServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
@@ -86,6 +75,13 @@ public:
         server_http2settings_(Http2SettingsFromTuple(::testing::get<1>(GetParam()))),
         server_(server_connection_, server_callbacks_, stats_store_, server_http2settings_) {}
 
+  explicit Http2CodecImplTest(bool allow_metadata)
+      : allow_metadata_(allow_metadata),
+        client_http2settings_(Http2SettingsFromTuple(::testing::get<0>(GetParam()))),
+        client_(client_connection_, client_callbacks_, stats_store_, client_http2settings_),
+        server_http2settings_(Http2SettingsFromTuple(::testing::get<1>(GetParam()))),
+        server_(server_connection_, server_callbacks_, stats_store_, server_http2settings_) {}
+
   void initialize() {
     request_encoder_ = &client_.newStream(response_decoder_);
     setupDefaultConnectionMocks();
@@ -101,6 +97,9 @@ public:
   void setupDefaultConnectionMocks() {
     ON_CALL(client_connection_, write(_, _))
         .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
+          if (corrupt_data_) {
+            corruptFramePayload(data);
+          }
           server_wrapper_.dispatch(data, server_);
         }));
     ON_CALL(server_connection_, write(_, _))
@@ -109,6 +108,28 @@ public:
         }));
   }
 
+  Http2Settings Http2SettingsFromTuple(const Http2SettingsTuple& tp) {
+    Http2Settings ret;
+    ret.hpack_table_size_ = ::testing::get<0>(tp);
+    ret.max_concurrent_streams_ = ::testing::get<1>(tp);
+    ret.initial_stream_window_size_ = ::testing::get<2>(tp);
+    ret.initial_connection_window_size_ = ::testing::get<3>(tp);
+    ret.allow_metadata_ = allow_metadata_;
+    return ret;
+  }
+
+  // corruptFramePayload assumes data contains at least 10 bytes of the beginning of a frame.
+  void corruptFramePayload(Buffer::Instance& data) {
+    const size_t length = data.length();
+    uint8_t buf[length] = {0};
+    data.copyOut(0, length, static_cast<void*>(buf));
+    data.drain(length);
+    // Keeps the frame header (9 bytes) valid, and corrupts the payload.
+    buf[10] |= 0xff;
+    data.add(buf, length);
+  }
+
+  bool allow_metadata_ = false;
   Stats::IsolatedStoreImpl stats_store_;
   const Http2Settings client_http2settings_;
   NiceMock<Network::MockConnection> client_connection_;
@@ -125,6 +146,7 @@ public:
   MockStreamDecoder request_decoder_;
   StreamEncoder* response_encoder_{};
   MockStreamCallbacks server_stream_callbacks_;
+  bool corrupt_data_ = false;
 };
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
@@ -361,7 +383,12 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
   response_encoder_->encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
 }
 
-TEST_P(Http2CodecImplTest, SmallMetadataTest) {
+class Http2CodecImplTestEnableMetadata : public Http2CodecImplTest {
+public:
+  Http2CodecImplTestEnableMetadata() : Http2CodecImplTest(true) {}
+};
+
+TEST_P(Http2CodecImplTestEnableMetadata, SmallMetadataTest) {
   initialize();
 
   // Generates a valid stream_id by sending a request header.
@@ -384,7 +411,7 @@ TEST_P(Http2CodecImplTest, SmallMetadataTest) {
   response_encoder_->encodeMetadata(metadata_map);
 }
 
-TEST_P(Http2CodecImplTest, LargeMetadataTest) {
+TEST_P(Http2CodecImplTestEnableMetadata, LargeMetadataTest) {
   initialize();
 
   // Generates a valid stream_id by sending a request header.
@@ -402,6 +429,44 @@ TEST_P(Http2CodecImplTest, LargeMetadataTest) {
 
   EXPECT_CALL(response_decoder_, decodeMetadata_(_));
   response_encoder_->encodeMetadata(metadata_map);
+}
+
+TEST_P(Http2CodecImplTestEnableMetadata, BadMetadataReceivedTest) {
+  initialize();
+
+  // Generates a valid stream_id by sending a request header.
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  MetadataMap metadata_map = {
+      {"header_key1", "header_value1"},
+      {"header_key2", "header_value2"},
+      {"header_key3", "header_value3"},
+      {"header_key4", "header_value4"},
+  };
+
+  corrupt_data_ = true;
+  EXPECT_THROW_WITH_MESSAGE(request_encoder_->encodeMetadata(metadata_map), EnvoyException,
+                            "The user callback function failed");
+}
+
+TEST_P(Http2CodecImplTest, MetadataDisabledTest) {
+  initialize();
+
+  // Generates a valid stream_id by sending a request header.
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  MetadataMap metadata_map = {
+      {"header_key1", std::string(50 * 1024, 'a')},
+  };
+
+  // Metadata is ignored.
+  request_encoder_->encodeMetadata(metadata_map);
 }
 
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
@@ -762,6 +827,10 @@ INSTANTIATE_TEST_CASE_P(Http2CodecImplStreamLimitTest, Http2CodecImplStreamLimit
                                            HTTP2SETTINGS_DEFAULT_COMBINE));
 
 INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
+                        ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
+                                           HTTP2SETTINGS_DEFAULT_COMBINE));
+
+INSTANTIATE_TEST_CASE_P(Http2CodecImplTestEnableMetadata, Http2CodecImplTestEnableMetadata,
                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
                                            HTTP2SETTINGS_DEFAULT_COMBINE));
 

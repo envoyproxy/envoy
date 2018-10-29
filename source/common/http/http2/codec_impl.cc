@@ -132,6 +132,10 @@ void ConnectionImpl::StreamImpl::encodeTrailers(const HeaderMap& trailers) {
 }
 
 void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMap& metadata_map) {
+  if (!parent_.allow_metadata_) {
+    ENVOY_CONN_LOG(error, "Connection doesn't allow metadata", parent_.connection_);
+    return;
+  }
   getMetadataEncoder().createPayload(metadata_map);
 
   // Estimates the number of frames to generate, and breaks the while loop when the size is reached
@@ -140,10 +144,11 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMap& metadata_map)
   size_t count = 0;
   // Keep submitting extension frames if there is payload left in the encoder.
   while (metadata_encoder_->hasNextFrame() && count++ <= frame_count) {
-    int result = submitMetadata();
-    ASSERT(result == 0);
+    submitMetadata();
     parent_.sendPendingFrames();
   }
+
+  ASSERT(!metadata_encoder_->hasNextFrame());
 }
 
 void ConnectionImpl::StreamImpl::readDisable(bool disable) {
@@ -210,11 +215,13 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   ASSERT(rc == 0);
 }
 
-int ConnectionImpl::StreamImpl::submitMetadata() {
+void ConnectionImpl::StreamImpl::submitMetadata() {
   ASSERT(stream_id_ > -1);
   uint64_t payload_size = metadata_encoder_->payload().length();
   const uint8_t flag = payload_size > METADATA_MAX_PAYLOAD_SIZE ? 0 : END_METADATA_FLAG;
-  return nghttp2_submit_extension(parent_.session_, METADATA_FRAME_TYPE, flag, stream_id_, nullptr);
+  int result =
+      nghttp2_submit_extension(parent_.session_, METADATA_FRAME_TYPE, flag, stream_id_, nullptr);
+  ASSERT(result == 0);
 }
 
 ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* data_flags) {
@@ -863,8 +870,10 @@ ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) 
   if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
     nghttp2_option_set_max_deflate_dynamic_table_size(options_, http2_settings.hpack_table_size_);
   }
-
-  nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
+  // TODO(soya3129): change to ENABLE_METADATA when it's available.
+  if (http2_settings.allow_metadata_) {
+    nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
+  }
 }
 
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
@@ -887,6 +896,7 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
                               client_http2_options.options());
   sendSettings(http2_settings, true);
+  allow_metadata_ = http2_settings.allow_metadata_;
 }
 
 Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
@@ -933,6 +943,7 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
   nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options.options());
   sendSettings(http2_settings, false);
+  allow_metadata_ = http2_settings.allow_metadata_;
 }
 
 int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
