@@ -16,7 +16,9 @@ namespace Envoy {
 // This macro is intended to be used as a replacement for variable-length arrays.
 // Note that the StackArray wrapper object will be destructed and each element's
 // destructor will be called when it leaves scope. However, the memory containing
-// the array won't be deallocated until the function containing the macro returns
+// the array won't be deallocated until the function containing the macro returns.
+// We can't call alloca in the StackArray constructor since the memory would
+// be freed when the constructor returns.
 #define STACK_ARRAY(var, type, num) StackArray<type> var(::alloca(sizeof(type) * num), num)
 
 template <typename T> class StackArray {
