@@ -88,6 +88,11 @@ public:
   }
 
   /**
+   * @return a map of data names and their corresponding objects.
+   */
+  const std::map<std::string, std::unique_ptr<FilterObject> getRawState() const PURE;
+
+  /**
    * @param data_name the name of the data being probed.
    * @return Whether data of any type and the name specified exists in the
    * data store.
