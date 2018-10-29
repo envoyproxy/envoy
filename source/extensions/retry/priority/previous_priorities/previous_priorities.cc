@@ -1,10 +1,10 @@
-#include "extensions/retry/priority/other_priority/other_priority.h"
+#include "extensions/retry/priority/previous_priorities/previous_priorities.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Retry {
 namespace Priority {
-const Upstream::PriorityLoad& OtherPriorityRetryPriority::determinePriorityLoad(
+const Upstream::PriorityLoad& PreviousPrioritiesRetryPriority::determinePriorityLoad(
     const Upstream::PrioritySet& priority_set,
     const Upstream::PriorityLoad& original_priority_load) {
   // If we've not seen enough retries to modify the priority load, just
@@ -30,7 +30,7 @@ const Upstream::PriorityLoad& OtherPriorityRetryPriority::determinePriorityLoad(
   return per_priority_load_;
 }
 
-bool OtherPriorityRetryPriority::adjustForAttemptedPriorities(
+bool PreviousPrioritiesRetryPriority::adjustForAttemptedPriorities(
     const Upstream::PrioritySet& priority_set) {
   for (auto& host_set : priority_set.hostSetsPerPriority()) {
     recalculatePerPriorityState(host_set->priority(), priority_set);
@@ -78,7 +78,7 @@ bool OtherPriorityRetryPriority::adjustForAttemptedPriorities(
   return true;
 }
 
-std::pair<std::vector<uint32_t>, uint32_t> OtherPriorityRetryPriority::adjustedHealth() const {
+std::pair<std::vector<uint32_t>, uint32_t> PreviousPrioritiesRetryPriority::adjustedHealth() const {
   // Create an adjusted health view of the priorities, where attempted priorities are
   // given a zero weight.
   uint32_t total_health = 0;
