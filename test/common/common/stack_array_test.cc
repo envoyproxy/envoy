@@ -7,11 +7,11 @@ namespace Envoy {
 
 class TestEntry {
 public:
-  TestEntry() { constructed_ = true; }
+  TestEntry() { self_ = this; }
   ~TestEntry() { destructor_(val_); }
 
   int val_ = 0;
-  bool constructed_ = false;
+  TestEntry* self_;
   MOCK_METHOD1(destructor_, void(int));
 };
 
@@ -19,7 +19,7 @@ TEST(StackArray, ConstructorsAndDestructorsCalled) {
   STACK_ARRAY(entries, TestEntry, 10);
 
   for (TestEntry& entry : entries) {
-    ASSERT_TRUE(entry.constructed_);
+    ASSERT_EQ(&entry, entry.self_);
     EXPECT_CALL(entry, destructor_(0)).Times(1);
   }
 }
