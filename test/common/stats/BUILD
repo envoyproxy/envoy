@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -103,5 +104,22 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/metrics/v2:stats_cc",
+    ],
+)
+
+envoy_cc_test_binary(
+    name = "thread_local_store_speed_test",
+    srcs = ["thread_local_store_speed_test.cc"],
+    external_deps = [
+        "abseil_strings",
+        "benchmark",
+    ],
+    deps = [
+        ":stat_test_utility_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/stats:thread_local_store_lib",
+        "//source/common/thread_local:thread_local_lib",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
