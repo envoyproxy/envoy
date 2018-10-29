@@ -58,7 +58,9 @@ void SymbolEncoding::moveToStorage(SymbolStorage symbol_array) {
   ASSERT(sz < 65536);
   symbol_array[0] = sz & 0xff;
   symbol_array[1] = sz >> 8;
-  memcpy(symbol_array + 2, vec_.data(), sz * sizeof(uint8_t));
+  if (sz != 0) {
+    memcpy(symbol_array + 2, vec_.data(), sz * sizeof(uint8_t));
+  }
   vec_.clear(); // Logically transfer ownership, enabling empty assert on destruct.
 }
 
