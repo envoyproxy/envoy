@@ -58,7 +58,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
-    const envoy::config::filter::http::ext_authz::v2alpha::CheckSettings& proto_config,
+    const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthPerRoute& proto_config,
     Server::Configuration::FactoryContext&) {
   return std::make_shared<FilterConfigPerRoute>(proto_config);
 }

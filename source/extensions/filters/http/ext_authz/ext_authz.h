@@ -117,20 +117,24 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  */
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
-  FilterConfigPerRoute(const envoy::config::filter::http::ext_authz::v2alpha::CheckSettings& config)
-      : context_extensions_(config.context_extensions()), disabled_(config.disabled()) {}
+  using ContextExtensionsMap = Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>;
+
+  FilterConfigPerRoute(
+      const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthPerRoute& config)
+      : context_extensions_(config.has_check_settings()
+                                ? config.check_settings().context_extensions()
+                                : ContextExtensionsMap()),
+        disabled_(config.disabled()) {}
 
   /**
    * @return Context extensions to add to the CheckRequest.
    */
-  const Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>& contextExtensions() const {
-    return context_extensions_;
-  }
+  const ContextExtensionsMap& contextExtensions() const { return context_extensions_; }
 
   bool disabled() const { return disabled_; }
 
 private:
-  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> context_extensions_;
+  ContextExtensionsMap context_extensions_;
   bool disabled_;
 };
 

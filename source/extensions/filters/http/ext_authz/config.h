@@ -15,7 +15,7 @@ namespace ExtAuthz {
  */
 class ExtAuthzFilterConfig
     : public Common::FactoryBase<envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz,
-                                 envoy::config::filter::http::ext_authz::v2alpha::CheckSettings> {
+                                 envoy::config::filter::http::ext_authz::v2alpha::ExtAuthPerRoute> {
 public:
   ExtAuthzFilterConfig() : FactoryBase(HttpFilterNames::get().ExtAuthorization) {}
 
@@ -26,7 +26,7 @@ private:
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
-      const envoy::config::filter::http::ext_authz::v2alpha::CheckSettings& proto_config,
+      const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthPerRoute& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 
