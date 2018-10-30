@@ -1270,6 +1270,9 @@ TEST_F(RouterTest, RetryUpstreamReset) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
+// Verifies that when the request fails with an upstream reset (per try timeout in this case)
+// before an upstream host has been established, then the onHostAttempted function will not be
+// invoked. This ensures that we're not passing a null host to the retry plugins.
 TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
