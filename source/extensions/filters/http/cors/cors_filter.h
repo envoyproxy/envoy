@@ -1,6 +1,8 @@
 #pragma once
 
 #include "envoy/http/filter.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/buffer_impl.h"
 
@@ -9,9 +11,42 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cors {
 
+/**
+ * All CORS filter stats. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_CORS_STATS(COUNTER)\
+  COUNTER(origin_valid)        \
+  COUNTER(origin_invalid)      \
+// clang-format on
+
+/**
+ * Struct definition for CORS stats. @see stats_macros.h
+ */
+struct CorsStats {
+  ALL_CORS_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
+ * Configuration for the CORS filter.
+ */
+class CorsFilterConfig {
+public:
+  CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope);
+  CorsStats& stats() { return stats_; }
+
+private:
+  static CorsStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return CorsStats{ALL_CORS_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+  }
+
+  CorsStats stats_;
+};
+typedef std::shared_ptr<CorsFilterConfig> CorsFilterConfigSharedPtr;
+
 class CorsFilter : public Http::StreamFilter {
 public:
-  CorsFilter();
+  CorsFilter(CorsFilterConfigSharedPtr config);
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -61,6 +96,8 @@ private:
   std::array<const Envoy::Router::CorsPolicy*, 2> policies_;
   bool is_cors_request_{};
   const Http::HeaderEntry* origin_{};
+
+  CorsFilterConfigSharedPtr config_;
 };
 
 } // namespace Cors
