@@ -618,7 +618,7 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extractedNam
   // Add namespacing prefix to avoid conflicts, as per best practice:
   // https://prometheus.io/docs/practices/naming/#metric-names
   // Also, naming conventions on https://prometheus.io/docs/concepts/data_model/
-  return fmt::format("envoy_{0}", sanitizeName(extractedName));
+  return sanitizeName(fmt::format("envoy_{0}", extractedName));
 }
 
 // TODO(ramaraochavali): Add summary histogram output for Prometheus.

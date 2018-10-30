@@ -1150,7 +1150,7 @@ TEST_F(PrometheusStatsFormatterTest, SanitizeMetricName) {
 
 TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
   std::string raw = "3.artists.play-violin@019street";
-  std::string expected = "envoy__3_artists_play_violin_019street";
+  std::string expected = "envoy_3_artists_play_violin_019street";
   auto actual = PrometheusStatsFormatter::metricName(raw);
   EXPECT_EQ(expected, actual);
 }
