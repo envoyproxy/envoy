@@ -27,7 +27,7 @@ namespace Cors {
 class CorsFilterTest : public testing::Test {
 public:
   CorsFilterTest() : config_(new CorsFilterConfig("test.", stats_)), filter_(config_) {
-    cors_policy_.reset(new Router::TestCorsPolicy());
+    cors_policy_ = std::make_unique<Router::TestCorsPolicy>();
     cors_policy_->enabled_ = true;
     cors_policy_->allow_origin_.emplace_back("*");
     cors_policy_->allow_methods_ = "GET";
