@@ -6,6 +6,7 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/stats_options_impl.h"
+#include "common/stats/tag_producer_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 
@@ -18,7 +19,9 @@ namespace Envoy {
 
 class ThreadLocalStorePerf {
 public:
-  ThreadLocalStorePerf() : store_(options_, heap_alloc_) {}
+  ThreadLocalStorePerf() : store_(options_, heap_alloc_) {
+    store_.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config_));
+  }
 
   ~ThreadLocalStorePerf() {
     store_.shutdownThreading();
@@ -45,6 +48,7 @@ private:
   std::unique_ptr<Event::DispatcherImpl> dispatcher_;
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   Stats::ThreadLocalStoreImpl store_;
+  envoy::config::metrics::v2::StatsConfig stats_config_;
 };
 
 } // namespace Envoy
