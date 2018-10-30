@@ -534,6 +534,7 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
     if NOT_IMPLEMENTED_HIDE_ANNOTATION in oneof_comment_annotations:
       return ''
 
+    # If the oneof only has one field and marked required, mark the field as required.
     if len(type_context.oneof_fields[field.oneof_index]) == 1 and type_context.oneof_required[
         field.oneof_index]:
       annotations = ['*REQUIRED*']
