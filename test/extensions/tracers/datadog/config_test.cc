@@ -27,7 +27,6 @@ TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
     config:
       collector_cluster: fake_cluster
       service_name: fake_file
-      priority_sampling: true
    )EOF";
   envoy::config::trace::v2::Tracing configuration;
   MessageUtil::loadFromYaml(yaml_string, configuration);

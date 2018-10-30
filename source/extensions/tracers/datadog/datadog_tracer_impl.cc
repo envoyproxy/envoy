@@ -35,14 +35,10 @@ Driver::Driver(const envoy::config::trace::v2::DatadogConfig& datadog_config,
   // Default tracer options.
   tracer_options_.operation_name_override = "envoy.proxy";
   tracer_options_.service = "envoy";
-  tracer_options_.priority_sampling = true;
 
   // Configuration overrides for tracer options.
   if (!datadog_config.service_name().empty()) {
     tracer_options_.service = datadog_config.service_name();
-  }
-  if (!datadog_config.priority_sampling()) {
-    tracer_options_.priority_sampling = false;
   }
 
   tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
@@ -117,9 +113,7 @@ void TraceReporter::onSuccess(Http::MessagePtr&& http_response) {
   } else {
     ENVOY_LOG(debug, "traces successfully submitted to datadog agent");
     driver_.tracerStats().reports_sent_.inc();
-    if (driver_.tracerOptions().priority_sampling) {
-      encoder_->handleResponse(http_response->body()->toString());
-    }
+    encoder_->handleResponse(http_response->body()->toString());
   }
 }
 
