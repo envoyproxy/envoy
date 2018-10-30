@@ -1125,11 +1125,11 @@ class PrometheusStatsFormatterTest : public testing::Test {
 protected:
   PrometheusStatsFormatterTest() /*: alloc_(stats_options_)*/ {}
   void addCounter(const std::string& name) {
-    counters_.push_back(alloc_.makeCounter(name, tag_producer_));
+    counters_.push_back(alloc_.makeCounter(name, &tag_producer_));
   }
 
-  void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    gauges_.push_back(alloc_.makeGauge(name, tag_producer_));
+  void addGauge(const std::string& name) {
+    gauges_.push_back(alloc_.makeGauge(name, &tag_producer_));
   }
 
   Stats::StatsOptionsImpl stats_options_;
@@ -1141,6 +1141,7 @@ protected:
 
 TEST_F(PrometheusStatsFormatterTest, MetricName) {
   std::string raw = "vulture.eats-liver";
+
   std::string expected = "envoy_vulture_eats_liver";
   auto actual = PrometheusStatsFormatter::metricName(raw);
   EXPECT_EQ(expected, actual);
@@ -1178,7 +1179,7 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
   // statsAsPrometheus() should return four implying it found
   // four unique stat names.
 
-  addCounter("cluster.test_cluster_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+  addCounter("cluster.test_cluster_1.upstream_cx_total");
   addCounter("cluster.test_cluster_2.upstream_cx_total");
   addGauge("cluster.test_cluster_3.upstream_cx_total");
   addGauge("cluster.test_cluster_4.upstream_cx_total");
