@@ -1153,8 +1153,6 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
         EXPECT_EQ(host_address_, host->address());
       }));
 
-  per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-
   Http::TestHeaderMapImpl headers{{"x-envoy-internal", "true"},
                                   {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -1162,6 +1160,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
+  per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
   EXPECT_CALL(*per_try_timeout_, enableTimer(_));
   // The per try timeout timer should not be started yet.
   pool_callbacks->onPoolReady(encoder, cm_.conn_pool_.host_);
