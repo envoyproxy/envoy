@@ -42,7 +42,7 @@ public:
     }));
     subscription_.reset(new GrpcEdsSubscriptionImpl(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
-        *method_descriptor_, stats_, stats_store_));
+        *method_descriptor_, stats_, stats_store_, rate_limit_settings_));
   }
 
   ~GrpcSubscriptionTestHarness() { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
@@ -141,6 +141,7 @@ public:
   std::string last_response_nonce_;
   std::vector<std::string> last_cluster_names_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Envoy::Config::RateLimitSettings rate_limit_settings_;
 };
 
 // TODO(danielhochman): test with RDS and ensure version_info is same as what API returned

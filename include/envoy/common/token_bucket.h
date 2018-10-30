@@ -22,6 +22,12 @@ public:
    * @return true if bucket is not empty, otherwise it returns false.
    */
   virtual bool consume(uint64_t tokens = 1) PURE;
+
+  /**
+   * @return returns the approximate time until a next token is available. Currently it
+   * returns the upper bound on the amount of time until a next token is available.
+   */
+  virtual uint64_t nextTokenAvailableMs() PURE;
 };
 
 typedef std::unique_ptr<TokenBucket> TokenBucketPtr;
