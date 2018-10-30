@@ -416,7 +416,6 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
   r2.inner_decoder_->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, true);
 
-  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
