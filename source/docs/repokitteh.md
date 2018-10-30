@@ -5,7 +5,7 @@
 <img src="https://repokitteh.io/logo.svg" height="100" align="right">
 
 [RepoKitteh](https://repokitteh.io) is a [GitHub application](https://developer.github.com/apps/) that provides and easy way to create, integrate and maintain GitHub bots. It is deployed in GCP and supplied to Envoy under a contract with the CNCF.
-The application is installed on specific GitHub repositories and interacts with these by receiving webhooks and making GitHub API calls. The `repokitteh.sky` scripts instructs the application what to do based on the webhook received.
+The application is installed on specific GitHub repositories and interacts with these by receiving webhooks and making GitHub API calls. A root `repokitteh.sky` script tells the application what to do based on the webhook received.
 
 ## Integration with Envoy
 The file [repokitteh.sky](https://github.com/envoyproxy/envoy/blob/master/repokitteh.sky), which resides in the root of the Envoy repository tells RepoKitteh what functionality to use. The file is written in the [~~Skylark~~ Starlark language](https://github.com/bazelbuild/starlark/), which is a non-turing complete Python dialect.
