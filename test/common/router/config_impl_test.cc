@@ -2600,12 +2600,30 @@ virtual_hosts:
         redirect: { host_redirect: new.lyft.com, port_redirect: 8080 }
       - match: { path: /scheme_host_port }
         redirect: { scheme_redirect: ws, host_redirect: new.lyft.com, port_redirect: 8080 }
-  - name: redirect
+  - name: redirect_domain_port_80
+    domains: [redirect.lyft.com:80]
+    routes:
+      - match: { path: /ws }
+        redirect: { scheme_redirect: ws }
+      - match: { path: /host_path_https }
+        redirect: { host_redirect: new.lyft.com, path_redirect: /new_path, https_redirect: true }
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: new.lyft.com, port_redirect: 8080 }
+  - name: redirect_domain_port_443
+    domains: [redirect.lyft.com:443]
+    routes:
+      - match: { path: /ws }
+        redirect: { scheme_redirect: ws }
+      - match: { path: /host_path_http }
+        redirect: { scheme_redirect: http, host_redirect: new.lyft.com, path_redirect: /new_path}
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: new.lyft.com, port_redirect: 8080 }
+  - name: redirect_domain_port_8080
     domains: [redirect.lyft.com:8080]
     routes:
       - match: { path: /port }
         redirect: { port_redirect: 8181 }
-  - name: redirect
+  - name: redirect_ipv4
     domains: [10.0.0.1]
     routes:
       - match: { path: /port }
@@ -2614,12 +2632,30 @@ virtual_hosts:
         redirect: { host_redirect: 20.0.0.2, port_redirect: 8080 }
       - match: { path: /scheme_host_port }
         redirect: { scheme_redirect: ws, host_redirect: 20.0.0.2, port_redirect: 8080 }
-  - name: redirect
+  - name: redirect_ipv4_port_8080
     domains: [10.0.0.1:8080]
     routes:
       - match: { path: /port }
         redirect: { port_redirect: 8181 }
-  - name: redirect
+  - name: redirect_ipv4_port_80
+    domains: [10.0.0.1:80]
+    routes:
+      - match: { path: /ws }
+        redirect: { scheme_redirect: ws }
+      - match: { path: /host_path_https }
+        redirect: { host_redirect: 20.0.0.2, path_redirect: /new_path, https_redirect: true }
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: 20.0.0.2, port_redirect: 8080 }
+  - name: redirect_ipv4_port_443
+    domains: [10.0.0.1:443]
+    routes:
+      - match: { path: /ws }
+        redirect: { scheme_redirect: ws }
+      - match: { path: /host_path_http }
+        redirect: { scheme_redirect: http, host_redirect: 20.0.0.2, path_redirect: /new_path}
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: 20.0.0.2, port_redirect: 8080 }
+  - name: redirect_ipv6
     domains: ["[fe80::1]"]
     routes:
       - match: { path: /port }
@@ -2628,11 +2664,29 @@ virtual_hosts:
         redirect: { host_redirect: "[fe80::2]", port_redirect: 8080 }
       - match: { path: /scheme_host_port }
         redirect: { scheme_redirect: ws, host_redirect: "[fe80::2]", port_redirect: 8080 }
-  - name: redirect
+  - name: redirect_ipv6_port_8080
     domains: ["[fe80::1]:8080"]
     routes:
       - match: { path: /port }
         redirect: { port_redirect: 8181 }
+  - name: redirect_ipv6_port_80
+    domains: ["[fe80::1]:80"]
+    routes:
+      - match: { path: /ws }
+        redirect: { scheme_redirect: ws }
+      - match: { path: /host_path_https }
+        redirect: { host_redirect: "[fe80::2]", path_redirect: /new_path, https_redirect: true }
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: "[fe80::2]", port_redirect: 8080 }
+  - name: redirect_ipv6_port_443
+    domains: ["[fe80::1]:443"]
+    routes:
+      - match: { path: /ws }
+        redirect: { scheme_redirect: ws }
+      - match: { path: /host_path_http }
+        redirect: { scheme_redirect: http, host_redirect: "[fe80::2]", path_redirect: /new_path}
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: "[fe80::2]", port_redirect: 8080 }
   - name: direct
     domains: [direct.example.com]
     routes:
@@ -2777,6 +2831,42 @@ virtual_hosts:
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
     }
     {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com:80", "/ws", true, false);
+      EXPECT_EQ("ws://redirect.lyft.com:80/ws",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com:80", "/host_path_https", false, false);
+      EXPECT_EQ("https://new.lyft.com/new_path",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com:80", "/scheme_host_port", false, false);
+      EXPECT_EQ("ws://new.lyft.com:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com:443", "/ws", false, false);
+      EXPECT_EQ("ws://redirect.lyft.com:443/ws",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com:443", "/host_path_http", true, false);
+      EXPECT_EQ("http://new.lyft.com/new_path",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com:443", "/scheme_host_port", true, false);
+      EXPECT_EQ("ws://new.lyft.com:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
       Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1", "/port", false, false);
       EXPECT_EQ("http://10.0.0.1:8080/port",
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
@@ -2794,6 +2884,40 @@ virtual_hosts:
     {
       Http::TestHeaderMapImpl headers =
           genRedirectHeaders("10.0.0.1", "/scheme_host_port", false, false);
+      EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1:80", "/ws", true, false);
+      EXPECT_EQ("ws://10.0.0.1:80/ws",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("10.0.0.1:80", "/host_path_https", false, false);
+      EXPECT_EQ("https://20.0.0.2/new_path",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("10.0.0.1:80", "/scheme_host_port", false, false);
+      EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1:443", "/ws", false, false);
+      EXPECT_EQ("ws://10.0.0.1:443/ws",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("10.0.0.1:443", "/host_path_http", true, false);
+      EXPECT_EQ("http://20.0.0.2/new_path",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("10.0.0.1:443", "/scheme_host_port", true, false);
       EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
     }
@@ -2816,6 +2940,40 @@ virtual_hosts:
     {
       Http::TestHeaderMapImpl headers =
           genRedirectHeaders("[fe80::1]", "/scheme_host_port", false, false);
+      EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]:80", "/ws", true, false);
+      EXPECT_EQ("ws://[fe80::1]:80/ws",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("[fe80::1]:80", "/host_path_https", false, false);
+      EXPECT_EQ("https://[fe80::2]/new_path",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("[fe80::1]:80", "/scheme_host_port", false, false);
+      EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]:443", "/ws", false, false);
+      EXPECT_EQ("ws://[fe80::1]:443/ws",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("[fe80::1]:443", "/host_path_http", true, false);
+      EXPECT_EQ("http://[fe80::2]/new_path",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("[fe80::1]:443", "/scheme_host_port", true, false);
       EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
     }
