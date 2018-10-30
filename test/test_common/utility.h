@@ -135,7 +135,7 @@ public:
    * @param v the vector of stats.
    * @return the stat
    */
-  template <typename T> static T findByName(const std::vector<T>& v, absl::string_view name) {
+  template <typename T> static T findByName(const std::vector<T>& v, const std::string& name) {
     auto pos = std::find_if(v.begin(), v.end(),
                             [&name](const T& stat) -> bool { return stat->name() == name; });
     if (pos == v.end()) {
@@ -150,7 +150,7 @@ public:
    * @param name supplies the name to search for.
    * @return Stats::CounterSharedPtr the counter or nullptr if there is none.
    */
-  static Stats::CounterSharedPtr findCounter(Stats::Store& store, absl::string_view name);
+  static Stats::CounterSharedPtr findCounter(Stats::Store& store, const std::string& name);
 
   /**
    * Find a gauge in a stats store.
@@ -158,7 +158,7 @@ public:
    * @param name supplies the name to search for.
    * @return Stats::GaugeSharedPtr the gauge or nullptr if there is none.
    */
-  static Stats::GaugeSharedPtr findGauge(Stats::Store& store, absl::string_view name);
+  static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
 
   /**
    * Convert a string list of IP addresses into a list of network addresses usable for DNS

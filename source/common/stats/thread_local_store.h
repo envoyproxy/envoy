@@ -17,7 +17,6 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
-#include "absl/strings/str_cat.h"
 #include "circllhist.h"
 
 namespace Envoy {
@@ -139,13 +138,13 @@ public:
   ~ThreadLocalStoreImpl();
 
   // Stats::Scope
-  Counter& counter(absl::string_view name) override { return default_scope_->counter(name); }
-  ScopePtr createScope(absl::string_view name) override;
+  Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
+  ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
-  Gauge& gauge(absl::string_view name) override { return default_scope_->gauge(name); }
-  Histogram& histogram(absl::string_view name) override {
+  Gauge& gauge(const std::string& name) override { return default_scope_->gauge(name); }
+  Histogram& histogram(const std::string& name) override {
     return default_scope_->histogram(name);
   };
 
@@ -189,25 +188,26 @@ private:
   };
 
   struct ScopeImpl : public TlsScope {
-    ScopeImpl(ThreadLocalStoreImpl& parent, absl::string_view prefix)
+    ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
         : scope_id_(next_scope_id_++), parent_(parent),
           prefix_(Utility::sanitizeStatsName(prefix)) {}
     ~ScopeImpl();
 
     // Stats::Scope
-    Counter& counter(absl::string_view name) override;
-    ScopePtr createScope(absl::string_view name) override {
-      return parent_.createScope(absl::StrCat(prefix_, name));
+    Counter& counter(const std::string& name) override;
+    ScopePtr createScope(const std::string& name) override {
+      return parent_.createScope(prefix_ + name);
     }
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
-    Gauge& gauge(absl::string_view name) override;
-    Histogram& histogram(absl::string_view name) override;
+    Gauge& gauge(const std::string& name) override;
+    Histogram& histogram(const std::string& name) override;
     Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
     const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
 
     template <class StatType>
-    using MakeStatFn = std::function<std::shared_ptr<StatType>(
-        StatDataAllocator&, absl::string_view name, const TagProducer* tag_producer)>;
+    using MakeStatFn =
+        std::function<std::shared_ptr<StatType>(StatDataAllocator&, const std::string& name,
+                                                const TagProducer* tag_producer)>;
 
     /**
      * Makes a stat either by looking it up in the central cache,

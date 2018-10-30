@@ -67,8 +67,8 @@ TEST_F(IpTaggingFilterTest, InternalRequest) {
   EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
 
-  EXPECT_CALL(stats_, counter(absl::string_view("prefix.ip_tagging.internal_request.hit"))).Times(1);
-  EXPECT_CALL(stats_, counter(absl::string_view("prefix.ip_tagging.total"))).Times(1);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit")).Times(1);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total")).Times(1);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
@@ -94,8 +94,8 @@ ip_tags:
   EXPECT_EQ(FilterRequestType::EXTERNAL, config_->requestType());
   Http::TestHeaderMapImpl request_headers;
 
-  EXPECT_CALL(stats_, counter(absl::string_view("prefix.ip_tagging.total"))).Times(1);
-  EXPECT_CALL(stats_, counter(absl::string_view("prefix.ip_tagging.external_request.hit"))).Times(1);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total")).Times(1);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.external_request.hit")).Times(1);
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.4");
@@ -130,9 +130,9 @@ ip_tags:
   EXPECT_EQ(FilterRequestType::BOTH, config_->requestType());
   Http::TestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
-  EXPECT_CALL(stats_, counter(absl::string_view("prefix.ip_tagging.total"))).Times(2);
-  EXPECT_CALL(stats_, counter(absl::string_view("prefix.ip_tagging.internal_request.hit"))).Times(1);
-  EXPECT_CALL(stats_, counter(absl::string_view("prefix.ip_tagging.external_request.hit"))).Times(1);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total")).Times(2);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit")).Times(1);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.external_request.hit")).Times(1);
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.5");
@@ -159,8 +159,8 @@ TEST_F(IpTaggingFilterTest, NoHits) {
       Network::Utility::parseInternetAddress("10.2.3.5");
   EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
-  EXPECT_CALL(stats_, counter(absl::string_view("prefix.ip_tagging.no_hit"))).Times(1);
-  EXPECT_CALL(stats_, counter(absl::string_view("prefix.ip_tagging.total"))).Times(1);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.no_hit")).Times(1);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total")).Times(1);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
@@ -207,9 +207,9 @@ ip_tags:
   EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
 
-  EXPECT_CALL(stats_, counter(absl::string_view("prefix.ip_tagging.total"))).Times(1);
-  EXPECT_CALL(stats_, counter(absl::string_view("prefix.ip_tagging.internal_request.hit"))).Times(1);
-  EXPECT_CALL(stats_, counter(absl::string_view("prefix.ip_tagging.duplicate_request.hit"))).Times(1);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total")).Times(1);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit")).Times(1);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.duplicate_request.hit")).Times(1);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 

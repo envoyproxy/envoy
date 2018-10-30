@@ -14,6 +14,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/ssl/context_config_impl.h"
+#include "common/stats/tag_producer_impl.h"
 #include "common/stats/thread_local_store.h"
 
 #include "server/http/admin.h"
@@ -1124,17 +1125,18 @@ class PrometheusStatsFormatterTest : public testing::Test {
 protected:
   PrometheusStatsFormatterTest() /*: alloc_(stats_options_)*/ {}
   void addCounter(const std::string& name) {
-    counters_.push_back(alloc_.makeCounter(name, nullptr));
+    counters_.push_back(alloc_.makeCounter(name, tag_producer_));
   }
 
-  void addGauge(const std::string& name) {
-    gauges_.push_back(alloc_.makeGauge(name, nullptr));
+  void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
+    gauges_.push_back(alloc_.makeGauge(name, tag_producer_));
   }
 
   Stats::StatsOptionsImpl stats_options_;
   Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;
+  Stats::TagProducerImpl tag_producer_;
 };
 
 TEST_F(PrometheusStatsFormatterTest, MetricName) {
@@ -1176,7 +1178,7 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
   // statsAsPrometheus() should return four implying it found
   // four unique stat names.
 
-  addCounter("cluster.test_cluster_1.upstream_cx_total");
+  addCounter("cluster.test_cluster_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
   addCounter("cluster.test_cluster_2.upstream_cx_total");
   addGauge("cluster.test_cluster_3.upstream_cx_total");
   addGauge("cluster.test_cluster_4.upstream_cx_total");

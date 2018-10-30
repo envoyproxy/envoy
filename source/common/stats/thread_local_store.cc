@@ -16,7 +16,6 @@
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
-#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -51,7 +50,7 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
-ScopePtr ThreadLocalStoreImpl::createScope(absl::string_view name) {
+ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
   std::unique_ptr<ScopeImpl> new_scope(new ScopeImpl(*this, name));
   Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());
@@ -212,7 +211,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     // values are partially truncated. However this costs a ton of memory for
     // partially reescuing an operational problem, and I think we should
     // reevaluate whether this is worth it.
-    absl::string_view truncated_name = parent_.truncateStatNameIfNeeded(name);
+    const std::string truncated_name = std::string(parent_.truncateStatNameIfNeeded(name));
     std::shared_ptr<StatType> stat = make_stat(parent_.alloc_, truncated_name,
                                                parent_.tag_producer_.get());
     if (stat == nullptr) {
@@ -233,7 +232,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   return **central_ref;
 }
 
-Counter& ThreadLocalStoreImpl::ScopeImpl::counter(absl::string_view name) {
+Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // Determine the final name based on the prefix and the passed name.
   //
   // Note that we can do map.find(final_name.c_str()), but we cannot do
@@ -243,7 +242,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(absl::string_view name) {
   // after we construct the stat we can insert it into the required maps. This
   // strategy costs an extra hash lookup for each miss, but saves time
   // re-copying the string and significant memory overhead.
-  std::string final_name = absl::StrCat(prefix_, name);
+  std::string final_name = prefix_ + name;
 
   // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the hot path) could
   // become prohibitively expensive. Revisit this usage in the future.
@@ -260,7 +259,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(absl::string_view name) {
 
   return safeMakeStat<Counter>(
       final_name, central_cache_.counters_,
-      [](StatDataAllocator& allocator, absl::string_view name, const TagProducer* tag_producer)
+      [](StatDataAllocator& allocator, const std::string& name, const TagProducer* tag_producer)
       -> CounterSharedPtr {
         return allocator.makeCounter(name, tag_producer);
       },
@@ -283,7 +282,7 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
   }
 }
 
-Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(absl::string_view name) {
+Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   //
@@ -292,7 +291,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(absl::string_view name) {
   // a temporary, and address sanitization errors would follow. Instead we must
   // do a find() first, using tha if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
-  std::string final_name = absl::StrCat(prefix_, name);
+  std::string final_name = prefix_ + name;
 
   // See warning/comments in counter().
   if (parent_.stats_matcher_->rejects(final_name)) {
@@ -306,14 +305,14 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(absl::string_view name) {
 
   return safeMakeStat<Gauge>(
       final_name, central_cache_.gauges_,
-      [](StatDataAllocator& allocator, absl::string_view name, const TagProducer* tag_producer)
+      [](StatDataAllocator& allocator, const std::string& name, const TagProducer* tag_producer)
       -> GaugeSharedPtr {
         return allocator.makeGauge(name, tag_producer);
       },
       tls_cache);
 }
 
-Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(absl::string_view name) {
+Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   //
@@ -322,7 +321,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(absl::string_view name) {
   // a temporary, and address sanitization errors would follow. Instead we must
   // do a find() first, using tha if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
-  std::string final_name = absl::StrCat(prefix_, name);
+  std::string final_name = prefix_ + name;
 
   // See warning/comments in counter().
   if (parent_.stats_matcher_->rejects(final_name)) {

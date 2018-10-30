@@ -26,22 +26,22 @@ IsolatedStoreImpl::IsolatedStoreImpl()
       }) {}
 
 struct IsolatedScopeImpl : public Scope {
-  IsolatedScopeImpl(IsolatedStoreImpl& parent, absl::string_view prefix)
+  IsolatedScopeImpl(IsolatedStoreImpl& parent, const std::string& prefix)
       : parent_(parent), prefix_(Utility::sanitizeStatsName(prefix)) {}
 
   // Stats::Scope
-  ScopePtr createScope(absl::string_view name) override {
+  ScopePtr createScope(const std::string& name) override {
     return ScopePtr{new IsolatedScopeImpl(parent_, absl::StrCat(prefix_, name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Counter& counter(absl::string_view name) override {
-    return parent_.counter(absl::StrCat(prefix_, name));
+  Counter& counter(const std::string& name) override {
+    return parent_.counter(prefix_ + name);
   }
-  Gauge& gauge(absl::string_view name) override {
-    return parent_.gauge(absl::StrCat(prefix_, name));
+  Gauge& gauge(const std::string& name) override {
+    return parent_.gauge(prefix_ + name);
   }
-  Histogram& histogram(absl::string_view name) override {
-    return parent_.histogram(absl::StrCat(prefix_, name));
+  Histogram& histogram(const std::string& name) override {
+    return parent_.histogram(prefix_ + name);
   }
   const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
 
@@ -49,7 +49,7 @@ struct IsolatedScopeImpl : public Scope {
   const std::string prefix_;
 };
 
-ScopePtr IsolatedStoreImpl::createScope(absl::string_view name) {
+ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
   return ScopePtr{new IsolatedScopeImpl(*this, name)};
 }
 

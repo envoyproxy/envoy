@@ -2,12 +2,11 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats_options.h"
-
-#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Stats {
@@ -35,7 +34,7 @@ public:
    * gracefully swapped in while an old scope with the same name is being destroyed.
    * @param name supplies the scope's namespace prefix.
    */
-  virtual ScopePtr createScope(absl::string_view name) PURE;
+  virtual ScopePtr createScope(const std::string& name) PURE;
 
   /**
    * Deliver an individual histogram value to all registered sinks.
@@ -45,17 +44,17 @@ public:
   /**
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counter(absl::string_view name) PURE;
+  virtual Counter& counter(const std::string& name) PURE;
 
   /**
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gauge(absl::string_view name) PURE;
+  virtual Gauge& gauge(const std::string& name) PURE;
 
   /**
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogram(absl::string_view name) PURE;
+  virtual Histogram& histogram(const std::string& name) PURE;
 
   /**
    * @return a reference to the top-level StatsOptions struct, containing information about the

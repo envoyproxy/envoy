@@ -130,11 +130,11 @@ void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint6
   buffer.add(str);
 }
 
-Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, absl::string_view name) {
+Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, const std::string& name) {
   return findByName(store.counters(), name);
 }
 
-Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, absl::string_view name) {
+Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::string& name) {
   return findByName(store.gauges(), name);
 }
 

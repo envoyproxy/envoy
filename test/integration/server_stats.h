@@ -36,7 +36,7 @@ public:
    * @param name counter name.
    * @return Stats::CounterSharedPtr counter if it exists, otherwise nullptr.
    */
-  virtual Stats::CounterSharedPtr counter(absl::string_view name) PURE;
+  virtual Stats::CounterSharedPtr counter(const std::string& name) PURE;
 
   /**
    * Gauge lookup. This is not thread safe, since we don't get a consistent
@@ -44,7 +44,7 @@ public:
    * @param name gauge name.
    * @return Stats::GaugeSharedPtr gauge if it exists, otherwise nullptr.
    */
-  virtual Stats::GaugeSharedPtr gauge(absl::string_view name) PURE;
+  virtual Stats::GaugeSharedPtr gauge(const std::string& name) PURE;
 
   /**
    * @return std::vector<Stats::CounterSharedPtr> snapshot of server counters.
