@@ -97,4 +97,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "filter_config_interface",
     hdrs = ["filter_config.h"],
+    deps = [
+        ":jwks_cache_lib",
+        ":matchers_lib",
+        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/stats:stats_macros",
+        "//include/envoy/thread_local:thread_local_interface",
+    ],
 )

@@ -56,11 +56,18 @@ envoy_cc_library(
 envoy_cc_library(
     name = "codec_helper_lib",
     hdrs = ["codec_helper.h"],
+    deps = [
+        "//include/envoy/http:codec_interface",
+        "//source/common/common:assert_lib",
+    ],
 )
 
 envoy_cc_library(
     name = "default_server_string_lib",
     hdrs = ["default_server_string.h"],
+    deps = [
+        "//source/common/common:macros",
+    ],
 )
 
 envoy_cc_library(
@@ -88,7 +95,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "conn_manager_config_interface",
     hdrs = ["conn_manager_config.h"],
-    deps = [":date_provider_lib"],
+    deps = [
+        ":date_provider_lib",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/router:rds_interface",
+        "//source/common/network:utility_lib",
+    ],
 )
 
 envoy_cc_library(

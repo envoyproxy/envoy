@@ -9,7 +9,7 @@ echo "build ${BAZEL_BUILD_OPTIONS}" >> .bazelrc
 
 # bazel build need to be run to setup virtual includes, generating files which are consumed
 # by clang-tidy
-"${ENVOY_SRCDIR}/tools/gen_compilation_database.py" --run_bazel_build
+"${ENVOY_SRCDIR}/tools/gen_compilation_database.py" --run_bazel_build --include_headers
 
 # It had to be in ENVOY_CI_DIR to run bazel to generate compile database, but clang-tidy-diff
 # diff against current directory, moving them to ENVOY_SRCDIR.

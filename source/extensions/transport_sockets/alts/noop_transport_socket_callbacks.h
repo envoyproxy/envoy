@@ -1,3 +1,4 @@
+#pragma once
 #include "envoy/network/transport_socket.h"
 
 namespace Envoy {

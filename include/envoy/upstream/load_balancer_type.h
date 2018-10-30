@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/api/v2/cds.pb.h"
+#include "envoy/common/pure.h"
 
 #include "common/protobuf/protobuf.h"
 
