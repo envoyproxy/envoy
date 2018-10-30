@@ -274,7 +274,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
  }
 )EOF";
 
-  std::string ca_cert_partial_output(TestEnvironment::substitute(ca_cert_json));
+  const std::string ca_cert_partial_output(TestEnvironment::substitute(ca_cert_json));
   envoy::admin::v2alpha::CertificateDetails certificate_details;
   MessageUtil::loadFromJson(ca_cert_partial_output, certificate_details);
 
