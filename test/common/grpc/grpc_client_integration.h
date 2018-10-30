@@ -1,3 +1,5 @@
+#pragma once
+
 #include "common/common/assert.h"
 
 #include "test/test_common/utility.h"

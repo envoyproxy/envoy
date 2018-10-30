@@ -10,10 +10,10 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
-#include "envoy/http/websocket.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
@@ -468,6 +468,11 @@ public:
 };
 
 /**
+ * Base class for all route typed metadata factories.
+ */
+class HttpRouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
+
+/**
  * An individual resolved route entry.
  */
 class RouteEntry : public ResponseEntry {
@@ -565,28 +570,6 @@ public:
   virtual bool autoHostRewrite() const PURE;
 
   /**
-   * @return bool true if this route should use WebSockets.
-   * Per https://github.com/envoyproxy/envoy/issues/3301 this is the "old style"
-   * websocket" where headers are proxied upstream unchanged, and the websocket
-   * is handed off to a tcp proxy session.
-   */
-  virtual bool useOldStyleWebSocket() const PURE;
-
-  /**
-   * Create an instance of a WebSocketProxy, using the configuration in this route.
-   *
-   * This may only be called if useWebSocket() returns true on this RouteEntry.
-   *
-   * @return WebSocketProxyPtr An instance of a WebSocketProxy with the configuration specified
-   *         in this route.
-   */
-  virtual Http::WebSocketProxyPtr
-  createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-                       Http::WebSocketProxyCallbacks& callbacks,
-                       Upstream::ClusterManager& cluster_manager,
-                       Network::ReadFilterCallbacks* read_callbacks) const PURE;
-
-  /**
    * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
    * selecting an upstream host
    */
@@ -602,6 +585,12 @@ public:
    * @return bool true if the virtual host rate limits should be included.
    */
   virtual bool includeVirtualHostRateLimits() const PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
+   * for this route.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 
   /**
    * @return const envoy::api::v2::core::Metadata& return the metadata provided in the config for

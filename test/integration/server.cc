@@ -11,6 +11,7 @@
 #include "common/thread_local/thread_local_impl.h"
 
 #include "server/hot_restart_nop_impl.h"
+#include "server/options_impl.h"
 
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
@@ -18,9 +19,29 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 
+#include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Server {
+
+OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
+                                  Network::Address::IpVersion ip_version) {
+  OptionsImpl test_options("cluster_name", "node_name", "zone_name", spdlog::level::info);
+
+  test_options.setConfigPath(config_path);
+  test_options.setConfigYaml(config_yaml);
+  test_options.setV2ConfigOnly(false);
+  test_options.setLocalAddressIpVersion(ip_version);
+  test_options.setFileFlushIntervalMsec(std::chrono::milliseconds(50));
+  test_options.setDrainTime(std::chrono::seconds(1));
+  test_options.setParentShutdownTime(std::chrono::seconds(2));
+  test_options.setMaxStats(16384u);
+
+  return test_options;
+}
+
+} // namespace Server
 
 IntegrationTestServerPtr
 IntegrationTestServer::create(const std::string& config_path,
@@ -55,6 +76,26 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
     listeners_cv_.wait(listeners_mutex_); // Safe since CondVar::wait won't throw.
   }
   ENVOY_LOG(info, "listener wait complete");
+
+  // If we are capturing, spin up tcpdump.
+  const auto capture_path = TestEnvironment::getOptionalEnvVar("CAPTURE_PATH");
+  if (capture_path) {
+    std::vector<uint32_t> ports;
+    for (auto listener : server().listenerManager().listeners()) {
+      const auto listen_addr = listener.get().socket().localAddress();
+      if (listen_addr->type() == Network::Address::Type::Ip) {
+        ports.push_back(listen_addr->ip()->port());
+      }
+    }
+    // TODO(htuch): Support a different loopback interface as needed.
+    const ::testing::TestInfo* const test_info =
+        ::testing::UnitTest::GetInstance()->current_test_info();
+    const std::string test_id =
+        std::string(test_info->name()) + "_" + std::string(test_info->test_case_name());
+    const std::string pcap_path =
+        capture_path.value() + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}) + "_server.pcap";
+    tcp_dump_ = std::make_unique<TcpDump>(pcap_path, "lo", ports);
+  }
 }
 
 IntegrationTestServer::~IntegrationTestServer() {
@@ -66,7 +107,6 @@ IntegrationTestServer::~IntegrationTestServer() {
     EXPECT_TRUE(response->complete());
     EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   }
-
   thread_->join();
 }
 
@@ -90,7 +130,7 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic) {
-  Server::TestOptionsImpl options(config_path_, version);
+  OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version));
   Server::HotRestartNopImpl restarter;
   Thread::MutexBasicLockable lock;
 
@@ -118,10 +158,6 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   server_->run();
   server_.reset();
   stat_store_ = nullptr;
-}
-
-Server::TestOptionsImpl Server::TestOptionsImpl::asConfigYaml() {
-  return TestOptionsImpl("", Filesystem::fileReadToEnd(config_path_), local_address_ip_version_);
 }
 
 } // namespace Envoy

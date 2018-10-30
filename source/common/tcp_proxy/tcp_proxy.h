@@ -262,8 +262,6 @@ protected:
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   }
 
-  virtual void onConnectionSuccess() {}
-
   virtual StreamInfo::StreamInfo& getStreamInfo() { return stream_info_; }
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);

@@ -12,5 +12,4 @@ Each individual listener configuration has the following format:
   :hidden:
 
   stats
-  runtime
   lds

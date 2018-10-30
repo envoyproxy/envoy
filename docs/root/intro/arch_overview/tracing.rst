@@ -68,7 +68,8 @@ Alternatively the trace context can be manually propagated by the service:
   :ref:`config_http_conn_man_headers_x-b3-sampled`, and
   :ref:`config_http_conn_man_headers_x-b3-flags`). The :ref:`config_http_conn_man_headers_x-b3-sampled`
   header can also be supplied by an external client to either enable or disable tracing for a particular
-  request.
+  request. In addition, the single :ref:`config_http_conn_man_headers_b3` header propagation format is
+  supported, which is a more compressed format.
 
 What data each trace contains
 -----------------------------

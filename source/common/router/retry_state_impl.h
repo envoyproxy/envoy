@@ -75,6 +75,8 @@ private:
   void resetRetry();
   bool wouldRetry(const Http::HeaderMap* response_headers,
                   const absl::optional<Http::StreamResetReason>& reset_reason);
+  bool wouldRetryFromReset(const Http::StreamResetReason& reset_reason);
+  bool wouldRetryFromHeaders(const Http::HeaderMap& response_headers);
 
   const Upstream::ClusterInfo& cluster_;
   Runtime::Loader& runtime_;

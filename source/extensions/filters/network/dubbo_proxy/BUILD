@@ -28,3 +28,50 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
     ],
 )
+
+envoy_cc_library(
+    name = "protocol_interface",
+    hdrs = ["protocol.h"],
+    deps = [
+        ":buffer_helper_lib",
+        "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "dubbo_protocol_impl_lib",
+    srcs = ["dubbo_protocol_impl.cc"],
+    hdrs = ["dubbo_protocol_impl.h"],
+    deps = [
+        ":protocol_interface",
+        "//include/envoy/buffer:buffer_interface",
+        "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "deserializer_interface",
+    srcs = ["deserializer_impl.cc"],
+    hdrs = [
+        "deserializer.h",
+        "deserializer_impl.h",
+    ],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+        "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "hessian_deserializer_impl_lib",
+    srcs = ["hessian_deserializer_impl.cc"],
+    hdrs = [
+        "hessian_deserializer_impl.h",
+    ],
+    deps = [
+        ":buffer_helper_lib",
+        ":deserializer_interface",
+        ":hessian_utils_lib",
+        "//source/common/singleton:const_singleton",
+    ],
+)
