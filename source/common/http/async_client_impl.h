@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"
@@ -17,8 +18,10 @@
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/shadow_writer.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/empty_string.h"
@@ -219,15 +222,9 @@ private:
     }
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
-    bool useOldStyleWebSocket() const override { return false; }
-    Http::WebSocketProxyPtr createWebSocketProxy(Http::HeaderMap&, StreamInfo::StreamInfo&,
-                                                 Http::WebSocketProxyCallbacks&,
-                                                 Upstream::ClusterManager&,
-                                                 Network::ReadFilterCallbacks*) const override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
     bool includeVirtualHostRateLimits() const override { return true; }
     const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
+    const Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
     const Router::PathMatchCriterion& pathMatchCriterion() const override {
       return path_match_criterion_;
     }
@@ -244,6 +241,8 @@ private:
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
     static const envoy::api::v2::core::Metadata metadata_;
+    // Async client doesn't require metadata.
+    static const Config::TypedMetadataImpl<Config::TypedMetadataFactory> typed_metadata_;
     static const NullPathMatchCriterion path_match_criterion_;
 
     const std::string& cluster_name_;

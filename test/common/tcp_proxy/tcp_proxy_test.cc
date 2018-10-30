@@ -786,8 +786,8 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
 
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   configure(accessLogConfig("%RESPONSE_FLAGS%"));
-  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resource_manager_.reset(
-      new Upstream::ResourceManagerImpl(factory_context_.runtime_loader_, "fake_key", 0, 0, 0, 0));
+  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(
+      0, 0, 0, 0);
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
   filter_.reset(new Filter(config_, factory_context_.cluster_manager_, timeSystem()));
@@ -1149,7 +1149,8 @@ TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.filterState().setData("envoy.tcp_proxy.cluster",
-                                    std::make_unique<PerConnectionCluster>("filter_state_cluster"));
+                                    std::make_unique<PerConnectionCluster>("filter_state_cluster"),
+                                    StreamInfo::FilterState::StateType::Mutable);
   ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 

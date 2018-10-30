@@ -12,10 +12,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/boringssl/archive/060e9a583976e73d1ea8b2bfe8b9cab33c62fa17.tar.gz"],
     ),
     com_google_absl = dict(
-        sha256 = "3f24d99cfa1b719ed51e12dae7741e4500a703e2c34bede452b457492d1fe36e",
-        strip_prefix = "abseil-cpp-92e07e5590752d6b8e67f7f2f86c6286561e8cea",
-        # 2018-08-01
-        urls = ["https://github.com/abseil/abseil-cpp/archive/92e07e5590752d6b8e67f7f2f86c6286561e8cea.tar.gz"],
+        sha256 = "c682f37375783028d400e45d0ba930181142c5b50de140f61710ee82aac8f659",
+        strip_prefix = "abseil-cpp-94c298e2a0ae409e283cab96c954a685bd865a70",
+        # 2018-10-24
+        urls = ["https://github.com/abseil/abseil-cpp/archive/94c298e2a0ae409e283cab96c954a685bd865a70.tar.gz"],
     ),
     com_github_apache_thrift = dict(
         sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",
@@ -65,9 +65,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/libprotobuf-mutator/archive/c3d2faf04a1070b0b852b0efdef81e1a81ba925e.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
-        sha256 = "013cc34f3c51c0f87e059a12ea203087a7a15dca2e453295345e1d02e2b9634b",
-        strip_prefix = "grpc-1.15.0",
-        urls = ["https://github.com/grpc/grpc/archive/v1.15.0.tar.gz"],
+        sha256 = "d99db0b39b490d2469a8ef74197d5f211fa740fc9581dccecbb76c56d080fce1",
+        strip_prefix = "grpc-1.16.0",
+        urls = ["https://github.com/grpc/grpc/archive/v1.16.0.tar.gz"],
     ),
     com_github_nanopb_nanopb = dict(
         # From: https://github.com/grpc/grpc/blob/v1.14.0/bazel/grpc_deps.bzl#L123
@@ -167,10 +167,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/golang/protobuf/archive/31e0d063dd98c052257e5b69eeb006818133f45c.tar.gz"],
     ),
     io_bazel_rules_go = dict(
-        sha256 = "d1ad521fbd0997df53161e29df0964468157fc9c6ee16265db37cc6daaf334ef",
-        strip_prefix = "rules_go-3d966375ff7971d43b863f785f495c7dcd6923da",
-        # 2018-10-02
-        urls = ["https://github.com/bazelbuild/rules_go/archive/3d966375ff7971d43b863f785f495c7dcd6923da.tar.gz"],
+        sha256 = "ee5fe78fe417c685ecb77a0a725dc9f6040ae5beb44a0ba4ddb55453aad23a8a",
+        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.16.0/rules_go-0.16.0.tar.gz"],
     ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",

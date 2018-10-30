@@ -232,6 +232,9 @@ envoy_cc_library(
     srcs = ["metadata.cc"],
     hdrs = ["metadata.h"],
     deps = [
+        "//include/envoy/config:typed_metadata_interface",
+        "//include/envoy/registry",
+        "//source/common/common:assert_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],

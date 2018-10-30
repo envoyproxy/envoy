@@ -1,11 +1,15 @@
 #pragma once
 
+#include "envoy/event/timer.h"
+#include "envoy/runtime/runtime.h"
+
 #include "common/event/real_time_system.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "server/options_impl.h"
 #include "server/server.h"
+#include "server/test_hooks.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "exe/signal_action.h"
@@ -24,10 +28,17 @@ public:
 
 class MainCommonBase {
 public:
-  MainCommonBase(OptionsImpl& options);
+  // Consumer must guarantee that all passed references are alive until this object is
+  // destructed.
+  MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_system, TestHooks& test_hooks,
+                 Server::ComponentFactory& component_factory,
+                 std::unique_ptr<Runtime::RandomGenerator>&& random_generator);
   ~MainCommonBase();
 
   bool run();
+
+  // Will be null if options.mode() == Server::Mode::Validate
+  Server::Instance* server() { return server_.get(); }
 
   using AdminRequestFn =
       std::function<void(const Http::HeaderMap& response_headers, absl::string_view body)>;
@@ -49,9 +60,9 @@ public:
 
 protected:
   Envoy::OptionsImpl& options_;
-  ProdComponentFactory component_factory_;
-  Event::RealTimeSystem time_system_;
-  DefaultTestHooks default_test_hooks_;
+
+  Server::ComponentFactory& component_factory_;
+
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> stats_store_;
@@ -93,6 +104,9 @@ private:
 #endif
 
   Envoy::OptionsImpl options_;
+  Event::RealTimeSystem real_time_system_;
+  DefaultTestHooks default_test_hooks_;
+  ProdComponentFactory prod_component_factory_;
   MainCommonBase base_;
 };
 
