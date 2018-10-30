@@ -428,6 +428,15 @@ The encode one or more options. For example, Debug is encoded as
 ``X-B3-Flags: 1``. See more on zipkin tracing
 `here <https://github.com/openzipkin/b3-propagation>`.
 
+.. _config_http_conn_man_headers_b3:
+
+b3
+----------
+
+The *b3* HTTP header is used by the Zipkin tracer in Envoy.
+Is a more compressed header format. See more on zipkin tracing
+`here <https://github.com/openzipkin/b3-propagation#single-header>`.
+
 .. _config_http_conn_man_headers_custom_request_headers:
 
 Custom request/response headers
@@ -493,7 +502,7 @@ Supported variable names are:
     parameters **do not** need to be escaped by doubling them.
 
 %PER_REQUEST_STATE(reverse.dns.data.name)%
-    Populates the header with values set on the stream info perRequestState() object. To be
+    Populates the header with values set on the stream info filterState() object. To be
     usable in custom request/response headers, these values must be of type
     Envoy::Router::StringAccessor. These values should be named in standard reverse DNS style,
     identifying the organization that created the value and ending in a unique name for the data. 

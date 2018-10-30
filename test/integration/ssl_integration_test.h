@@ -5,7 +5,6 @@
 
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 
 #include "gmock/gmock.h"
@@ -31,7 +30,6 @@ public:
   void checkStats();
 
 private:
-  std::unique_ptr<Runtime::Loader> runtime_;
   std::unique_ptr<ContextManager> context_manager_;
 
   Network::TransportSocketFactoryPtr client_ssl_ctx_plain_;

@@ -91,8 +91,8 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
     (*output_struct.mutable_fields())[pair.first] = string_value;
   }
 
-  std::string log_line;
-  const auto conversion_status = ProtobufUtil::MessageToJsonString(output_struct, &log_line);
+  ProtobufTypes::String log_line;
+  const auto conversion_status = Protobuf::util::MessageToJsonString(output_struct, &log_line);
   if (!conversion_status.ok()) {
     log_line =
         fmt::format("Error serializing access log to JSON: {}", conversion_status.ToString());

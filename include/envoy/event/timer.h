@@ -13,8 +13,6 @@
 namespace Envoy {
 namespace Event {
 
-class TimerCB;
-
 /**
  * Callback invoked when a timer event fires.
  */

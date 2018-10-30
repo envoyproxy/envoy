@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/http/async_client.h"
 

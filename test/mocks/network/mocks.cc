@@ -94,10 +94,8 @@ template <class T> static void initializeMockConnection(T& connection) {
     buffer.drain(buffer.length());
   }));
 
-  ON_CALL(connection, perConnectionState())
-      .WillByDefault(ReturnRef(connection.per_connection_state_));
-  ON_CALL(Const(connection), perConnectionState())
-      .WillByDefault(ReturnRef(connection.per_connection_state_));
+  ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(connection.stream_info_));
+  ON_CALL(Const(connection), streamInfo()).WillByDefault(ReturnRef(connection.stream_info_));
 }
 
 MockConnection::MockConnection() {

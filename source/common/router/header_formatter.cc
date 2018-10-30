@@ -77,7 +77,7 @@ parseUpstreamMetadataField(absl::string_view params_str) {
     }
 
     const ProtobufWkt::Value* value =
-        &Config::Metadata::metadataValue(*host->metadata(), params[0], params[1]);
+        &::Envoy::Config::Metadata::metadataValue(*host->metadata(), params[0], params[1]);
     if (value->kind_case() == ProtobufWkt::Value::KIND_NOT_SET) {
       // No kind indicates default ProtobufWkt::Value which means namespace or key not
       // found.
@@ -142,15 +142,15 @@ parsePerRequestStateField(absl::string_view param_str) {
 
   std::string param(modified_param_str);
   return [param](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
-    const Envoy::StreamInfo::FilterState& per_request_state = stream_info.perRequestState();
+    const Envoy::StreamInfo::FilterState& filter_state = stream_info.filterState();
 
     // No such value means don't output anything.
-    if (!per_request_state.hasDataWithName(param)) {
+    if (!filter_state.hasDataWithName(param)) {
       return std::string();
     }
 
     // Value exists but isn't string accessible is a contract violation; throw an error.
-    if (!per_request_state.hasData<StringAccessor>(param)) {
+    if (!filter_state.hasData<StringAccessor>(param)) {
       ENVOY_LOG_MISC(debug,
                      "Invalid header information: PER_REQUEST_STATE value \"{}\" "
                      "exists but is not string accessible",
@@ -158,7 +158,7 @@ parsePerRequestStateField(absl::string_view param_str) {
       return std::string();
     }
 
-    return std::string(per_request_state.getData<StringAccessor>(param).asString());
+    return std::string(filter_state.getDataReadOnly<StringAccessor>(param).asString());
   };
 }
 
