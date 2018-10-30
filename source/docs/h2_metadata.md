@@ -5,7 +5,7 @@ not carried in the standard HTTP(s) and HTTP/2 headers and payloads. The
 information is represented by a string key-value pair. For example, users can
 pass along RTT information associated with a stream using a key of "rtt info", and a value of
 "100ms". In Envoy, we call this type of information metadata.
-A stream can be associated with multiple metadatas, and the multiple metadatas
+A stream can be associated with multiple metadata, and the multiple metadata
 are represented by a map.
 
 Note: the metadata implementation is still in progress, and the doc is in draft
@@ -13,20 +13,15 @@ version.
 
 ### Limitation
 
-For the ease of implementation and compatibility purpose, metadata will only be
+For ease of implementation and compatibility purposes, metadata will only be
 supported in HTTP/2. Metadata sent in any other protocol should result in protocol
 errors or be ignored.
 
-Envoy can consume or add metadata. But for one request (or response), we expect at most one of the
-two operations to be performed.
-TODO(soya3129): check if this limitation is needed after the implementation is
-complete.
-
 ### Envoy metadata handling
 
-Envoy provides the functionality to proxy, process and add metadatas.
+Envoy provides the functionality to proxy, process and add metadata.
 
-## Proxy metadata
+## Proxying metadata
 
 (To be implemented)
 
@@ -35,32 +30,32 @@ unmodified. Note that, we do not guarantee the same frame order will be preserve
 hop by hop. That is, metadata from upstream at the beginning of a stream can be
 received by the downstream at the end of the stream.
 
-## How to consume metadata
+## Consuming metadata
 
 (To be implemented)
 
-If Envoy needs to take actions when a metadata is received, users should
+If Envoy needs to take actions when a metadata frame is received, users should
 create a new filter.
 
 If Envoy needs to parse a metadata sent on a request from downstream to upstream, a
 StreamDecodeFilter should be created. The interface to override is
 
-FilterTrailersStatus StreamDecoderFilter::decodeMetadata(MetadataMap& metadatas);
+FilterTrailersStatus StreamDecoderFilter::decodeMetadata(MetadataMap& metadata);
 
-The metadata passed in is a map of the metadatas associated with the request stream. After metadatas
+The metadata passed in is a map of the metadata associated with the request stream. After metadata
 have been parsed, the filter can choose to remove metadata from the map, or keep
 it untouched.
 
 If Envoy needs to parse a metadata sent on a response from upstream to downstream, a
-StreamEncodeFilter should be created. The interface to override is
+StreamEncoderFilter should be created. The interface to override is
 
-FilterTrailersStatus StreamEncoderFilter::encodeMetadata(MetadataMap& metadatas);
+FilterTrailersStatus StreamEncoderFilter::encodeMetadata(MetadataMap& metadata);
 
-The metadata passed in is a map of the metadatas associated with the response stream. After metadatas
+The metadata passed in is a map of the metadata associated with the response stream. After metadata
 have been parsed, the filter can choose to remove metadata from the map, or keep
 it untouched.
 
-## How to insert new metadata
+## Inserting metadata
 
 (To be implemented)
 

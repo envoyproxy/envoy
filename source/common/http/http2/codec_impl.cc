@@ -870,7 +870,7 @@ ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) 
   if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
     nghttp2_option_set_max_deflate_dynamic_table_size(options_, http2_settings.hpack_table_size_);
   }
-  // TODO(soya3129): change to ENABLE_METADATA when it's available.
+
   if (http2_settings.allow_metadata_) {
     nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
   }
