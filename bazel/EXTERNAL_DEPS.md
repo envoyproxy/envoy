@@ -2,7 +2,7 @@
 
 Where the dependency maintainer provides a tarball, prefer that over the
 automatically generated Github tarball. Github generated tarball SHA256
-values can change when Github changes their tar/gzip libraries breaking
+values can change when Github change their tar/gzip libraries breaking
 builds. Maintainer provided tarballs are more stable and the maintainer
 can provide the SHA256.
 
