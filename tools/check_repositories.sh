@@ -12,12 +12,7 @@ fi
 
 # Check whether number of defined `url =` or `urls =` and `sha256 =` kwargs in
 # repository definitions is equal.
-if [[ `uname` == "Darwin" ]]; then
-  # When running on OSX use egrep instead of perl regexp
-  urls_count=$(egrep -Inrs "url(s)? =" --include=*.bzl . | wc -l)
-else
-  urls_count=$(grep -IPnrs "url(s)? =" --include=*.bzl . | wc -l)
-fi
+urls_count=$(egrep -Inrs "url(s)? =" --include=*.bzl . | wc -l)
 sha256sums_count=$(grep -nr "sha256 =" --include=*.bzl . | wc -l)
 
 if [[ $urls_count != $sha256sums_count ]]; then
