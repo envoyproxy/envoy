@@ -70,27 +70,47 @@ protected:
 
 class Int8Buffer : public IntBuffer<INT8> {
 public:
-  INT8 get() const { return *reinterpret_cast<const INT8*>(buf_); }
+  INT8 get() const {
+    INT8 result;
+    memcpy(&result, buf_, sizeof(result));
+    return result;
+  }
 };
 
 class Int16Buffer : public IntBuffer<INT16> {
 public:
-  INT16 get() const { return be16toh(*reinterpret_cast<const INT16*>(buf_)); }
+  INT16 get() const {
+    INT16 result;
+    memcpy(&result, buf_, sizeof(result));
+    return be16toh(result);
+  }
 };
 
 class Int32Buffer : public IntBuffer<INT32> {
 public:
-  INT32 get() const { return be32toh(*reinterpret_cast<const INT32*>(buf_)); }
+  INT32 get() const {
+    INT32 result;
+    memcpy(&result, buf_, sizeof(result));
+    return be32toh(result);
+  }
 };
 
 class UInt32Buffer : public IntBuffer<UINT32> {
 public:
-  UINT32 get() const { return be32toh(*reinterpret_cast<const UINT32*>(buf_)); }
+  UINT32 get() const {
+    UINT32 result;
+    memcpy(&result, buf_, sizeof(result));
+    return be32toh(result);
+  }
 };
 
 class Int64Buffer : public IntBuffer<INT64> {
 public:
-  INT64 get() const { return be64toh(*reinterpret_cast<const INT64*>(buf_)); }
+  INT64 get() const {
+    INT64 result;
+    memcpy(&result, buf_, sizeof(result));
+    return be64toh(result);
+  }
 };
 
 // === BOOL BUFFER =============================================================

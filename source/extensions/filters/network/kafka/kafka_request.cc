@@ -13,13 +13,11 @@ namespace Kafka {
 GeneratorMap computeGeneratorMap(std::vector<ParserSpec> specs) {
   GeneratorMap result;
   for (auto& spec : specs) {
-    std::shared_ptr<std::unordered_map<INT16, GeneratorFunction>> generators =
-        result[spec.api_key_];
+    auto generators = result[spec.api_key_];
     if (!generators) {
       generators = std::make_shared<std::unordered_map<INT16, GeneratorFunction>>();
       result[spec.api_key_] = generators;
     }
-
     for (INT16 api_version : spec.api_versions_) {
       (*generators)[api_version] = spec.generator_;
     }
