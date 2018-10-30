@@ -42,7 +42,6 @@ parseProtoFromJson(const std::string& json_string) {
 
 class RedisProxyFilterConfigTest : public testing::Test {
 public:
-  NiceMock<Upstream::MockClusterManager> cm_;
   Stats::IsolatedStoreImpl store_;
   Network::MockDrainDecision drain_decision_;
   Runtime::MockLoader runtime_;
@@ -59,44 +58,8 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
       parseProtoFromJson(json_string);
-  ProxyFilterConfig config(proto_config, cm_, store_, drain_decision_, runtime_);
+  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_);
   EXPECT_EQ("fake_cluster", config.cluster_name_);
-}
-
-TEST_F(RedisProxyFilterConfigTest, InvalidCluster) {
-  std::string json_string = R"EOF(
-  {
-    "cluster_name": "fake_cluster",
-    "stat_prefix": "foo",
-    "conn_pool": { "op_timeout_ms" : 10 }
-  }
-  )EOF";
-
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
-      parseProtoFromJson(json_string);
-
-  EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW_WITH_MESSAGE(ProxyFilterConfig(proto_config, cm_, store_, drain_decision_, runtime_),
-                            EnvoyException, "redis: unknown cluster 'fake_cluster'");
-}
-
-TEST_F(RedisProxyFilterConfigTest, InvalidAddedByApi) {
-  std::string json_string = R"EOF(
-  {
-    "cluster_name": "fake_cluster",
-    "stat_prefix": "foo",
-    "conn_pool": { "op_timeout_ms" : 10 }
-  }
-  )EOF";
-
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
-      parseProtoFromJson(json_string);
-
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
-  EXPECT_THROW_WITH_MESSAGE(ProxyFilterConfig(proto_config, cm_, store_, drain_decision_, runtime_),
-                            EnvoyException,
-                            "redis: invalid cluster 'fake_cluster': currently only "
-                            "static (non-CDS) clusters are supported");
 }
 
 TEST_F(RedisProxyFilterConfigTest, BadRedisProxyConfig) {
@@ -123,9 +86,8 @@ public:
 
     envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
         parseProtoFromJson(json_string);
-    NiceMock<Upstream::MockClusterManager> cm;
-    config_.reset(new ProxyFilterConfig(proto_config, cm, store_, drain_decision_, runtime_));
-    filter_.reset(new ProxyFilter(*this, EncoderPtr{encoder_}, splitter_, config_));
+    config_.reset(new ProxyFilterConfig(proto_config, store_, drain_decision_, runtime_));
+    filter_ = std::make_unique<ProxyFilter>(*this, EncoderPtr{encoder_}, splitter_, config_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
     EXPECT_EQ(1UL, config_->stats_.downstream_cx_total_.value());

@@ -824,10 +824,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImpl() {
   // Clear out connection pools as well as the thread local cluster map so that we release all
   // cluster pointers. Currently we have to free all non-local clusters before we free
-  // the local cluster. This is because non-local clusters have a member update callback registered
-  // with the local cluster.
-  // TODO(mattklein123): The above is sub-optimal and is related to the TODO in
-  //                     redis/conn_pool_impl.cc. Will fix at the same time.
+  // the local cluster. This is because non-local clusters with a zone aware load balancer have a
+  // member update callback registered with the local cluster.
   ENVOY_LOG(debug, "shutting down thread local cluster manager");
   destroying_ = true;
   host_http_conn_pool_map_.clear();
