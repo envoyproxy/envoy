@@ -82,6 +82,7 @@ public:
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     test_client.upstream_ready_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+    test_client.client_dispatcher_.reset(new Event::DispatcherImpl(test_time_.timeSystem()));
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
@@ -97,8 +98,6 @@ public:
           return test_clients_.back().codec_client_;
         }));
     EXPECT_CALL(*test_client.connect_timer_, enableTimer(_));
-
-    test_client.client_dispatcher_.reset(new Event::DispatcherImpl(test_time_.timeSystem()));
   }
 
   void expectClientConnect(size_t index, ActiveTestRequest& r);
