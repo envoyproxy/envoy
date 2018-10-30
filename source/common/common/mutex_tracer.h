@@ -37,7 +37,7 @@ private:
   static void contentionHook(const char* msg, const void* obj, int64_t wait_cycles);
 
   // Utility function for contentionHook.
-  void recordContention(const char*, const void*, int64_t wait_cycles);
+  inline void recordContention(const char*, const void*, int64_t wait_cycles);
 
   static MutexTracer* singleton_;
 

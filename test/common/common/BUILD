@@ -109,7 +109,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "mutex_tracer_test",
     srcs = ["mutex_tracer_test.cc"],
-    deps = ["//source/common/common:mutex_tracer"],
+    deps = [
+        "//source/common/common:mutex_tracer",
+        "//test/test_common:test_time_lib",
+    ],
 )
 
 envoy_cc_test(
