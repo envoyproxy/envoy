@@ -267,8 +267,10 @@ void Utility::sendLocalReply(
     HeaderMapPtr response_headers{new HeaderMapImpl{
         {Headers::get().Status, std::to_string(enumToInt(Code::OK))},
         {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
-        {Headers::get().GrpcStatus, std::to_string(enumToInt(Grpc::Utility::httpToGrpcStatus(
-                                        enumToInt(response_code), grpc_status)))}}};
+        {Headers::get().GrpcStatus,
+         std::to_string(
+             enumToInt(grpc_status ? grpc_status.value()
+                                   : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
     if (!body_text.empty() && !is_head_request) {
       // TODO: GrpcMessage should be percent-encoded
       response_headers->insertGrpcMessage().value(body_text);

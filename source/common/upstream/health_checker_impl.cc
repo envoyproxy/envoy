@@ -402,8 +402,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
         return;
       }
     }
-    onRpcComplete(Grpc::Utility::httpToGrpcStatus(http_response_status, absl::nullopt),
-                  "non-200 HTTP response", end_stream);
+    onRpcComplete(Grpc::Utility::httpToGrpcStatus(http_response_status), "non-200 HTTP response",
+                  end_stream);
     return;
   }
   if (!Grpc::Common::hasGrpcContentType(*headers)) {

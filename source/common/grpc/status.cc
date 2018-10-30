@@ -3,16 +3,9 @@
 namespace Envoy {
 namespace Grpc {
 
-Status::GrpcStatus Utility::httpToGrpcStatus(uint64_t http_response_status,
-                                             const absl::optional<Status::GrpcStatus> grpc_status) {
-  // See:
-  // * https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
-  // * https://cloud.google.com/apis/design/errors#generating_errors
-
-  if (grpc_status) {
-    return grpc_status.value();
-  }
-
+Status::GrpcStatus Utility::httpToGrpcStatus(uint64_t http_response_status) {
+  // From
+  // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
   switch (http_response_status) {
   case 400:
     return Status::GrpcStatus::Internal;
