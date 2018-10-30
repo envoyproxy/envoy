@@ -465,6 +465,42 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
   headers.Path()->value(path.replace(0, matched_path.size(), rewrite));
 }
 
+absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& headers,
+                                                         const absl::string_view& new_scheme,
+                                                         const absl::string_view& new_port) const {
+
+  absl::string_view request_host = headers.Host()->value().getStringView();
+  size_t host_end;
+  // Detect if IPv6 URI
+  if (request_host[0] == '[') {
+    host_end = request_host.rfind("]:");
+    if (host_end != absl::string_view::npos) {
+      host_end += 1; // advance to :
+    }
+  } else {
+    host_end = request_host.rfind(":");
+  }
+
+  if (host_end != absl::string_view::npos) {
+    absl::string_view request_port = request_host.substr(host_end);
+    absl::string_view request_protocol = headers.ForwardedProto()->value().getStringView();
+    bool remove_port = !new_port.empty();
+
+    if (new_scheme != request_protocol) {
+      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Https.c_str()) &&
+                     request_port == ":443";
+      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Http.c_str()) &&
+                     request_port == ":80";
+    }
+
+    if (remove_port) {
+      return request_host.substr(0, host_end);
+    }
+  }
+
+  return request_host;
+}
+
 std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
   ASSERT(isDirectResponse());
 
@@ -492,22 +528,7 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
     final_host = host_redirect_.c_str();
   } else {
     ASSERT(headers.Host());
-    final_host = headers.Host()->value().c_str();
-    if (!final_port.empty()) {
-      size_t host_end;
-      // Detect if IPv6 URI
-      if (final_host[0] == '[') {
-        host_end = final_host.rfind("]:");
-        if (host_end != absl::string_view::npos) {
-          host_end += 1; // advance to :
-        }
-      } else {
-        host_end = final_host.rfind(":");
-      }
-      if (host_end != absl::string_view::npos) {
-        final_host = final_host.substr(0, host_end);
-      }
-    }
+    final_host = processRequestHost(headers, final_scheme, final_port);
   }
 
   if (!path_redirect_.empty()) {
