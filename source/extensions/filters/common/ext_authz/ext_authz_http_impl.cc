@@ -143,7 +143,6 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
       }
     }
   }
-  
   return denied_response;
 }
 
