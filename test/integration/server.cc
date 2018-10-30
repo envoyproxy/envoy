@@ -48,7 +48,7 @@ IntegrationTestServer::create(const std::string& config_path,
                               const Network::Address::IpVersion version,
                               std::function<void()> pre_worker_start_test_steps, bool deterministic,
                               Event::TestTimeSystem& time_system) {
-  IntegrationTestServerPtr server{new IntegrationTestServerImpl(time_system, config_path)};
+  IntegrationTestServerPtr server{std::make_unique<IntegrationTestServerImpl>(time_system, config_path)};
   server->start(version, pre_worker_start_test_steps, deterministic);
   return server;
 }
@@ -153,9 +153,12 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
 
   Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
                               access_log_lock, component_factory, std::move(random_generator), tls);
+  // This is technically thread unsafe (assigning to a shared_ptr accessed
+  // across threads), but because we synchronize below through serverReady(), the only
+  // consumer on the main test thread in ~IntegrationTestServerImpl will not race.
+  admin_address_ = server.admin().socket().localAddress();
   server_ = &server;
   stat_store_ = &stat_store;
-  admin_address_ = server.admin().socket().localAddress();
   serverReady();
   server.run();
 }

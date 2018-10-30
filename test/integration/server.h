@@ -276,6 +276,7 @@ private:
   Server::TestDrainManager* drain_manager_{};
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
+  TcpDumpPtr tcp_dump_;
 };
 
 // Default implementation of IntegrationTestServer
@@ -305,10 +306,9 @@ private:
 
   // Owned by this class. An owning pointer is not used because the actual allocation is done
   // on a stack in a non-main thread.
-  Server::Instance* server_;
+  Server::Instance* server_{};
   Stats::Store* stat_store_{};
   Network::Address::InstanceConstSharedPtr admin_address_;
-  TcpDumpPtr tcp_dump_;
 };
 
 } // namespace Envoy
