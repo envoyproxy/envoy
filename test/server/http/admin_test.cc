@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <fstream>
 #include <regex>
 #include <unordered_map>
@@ -71,7 +72,7 @@ public:
 class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   AdminFilterTest()
-      : admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"), server_),
+      : admin_(TestEnvironment::temporaryPath("envoy.prof"), server_),
         filter_(admin_), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
@@ -114,7 +115,11 @@ TEST_P(AdminStatsTest, StatsAsJson) {
 
   std::map<std::string, uint64_t> all_stats;
 
-  std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), false);
+  std::vector<Stats::ParentHistogramSharedPtr> histograms = store_->histograms();
+  std::sort(histograms.begin(), histograms.end(),
+            [](const Stats::ParentHistogramSharedPtr& a,
+               const Stats::ParentHistogramSharedPtr& b) -> bool { return a->name() < b->name(); });
+  std::string actual_json = statsAsJsonHandler(all_stats, histograms, false);
 
   const std::string expected_json = R"EOF({
     "stats": [
@@ -133,51 +138,6 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                     100.0
                 ],
                 "computed_quantiles": [
-                    {
-                        "name": "h2",
-                        "values": [
-                            {
-                                "interval": null,
-                                "cumulative": 100.0
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 102.5
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 105.0
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 107.5
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.0
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.5
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.9
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.95
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.99
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 110.0
-                            }
-                        ]
-                    },
                     {
                         "name": "h1",
                         "values": [
@@ -220,6 +180,51 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                             {
                                 "interval": 110.0,
                                 "cumulative": 210.0
+                            }
+                        ]
+                    },
+                    {
+                        "name": "h2",
+                        "values": [
+                            {
+                                "interval": null,
+                                "cumulative": 100.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 102.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 105.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 107.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.9
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.95
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.99
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 110.0
                             }
                         ]
                     }
@@ -575,9 +580,9 @@ public:
   AdminInstanceTest()
       : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
         cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
-        admin_("/dev/null", cpu_profile_path_, server_), request_headers_{{":path", "/"}},
+        admin_(cpu_profile_path_, server_), request_headers_{{":path", "/"}},
         admin_filter_(admin_) {
-    admin_.startHttpListener(address_out_path_,
+    admin_.startHttpListener("/dev/null", address_out_path_,
                              Network::Test::getCanonicalLoopbackAddress(GetParam()),
                              listener_scope_.createScope("listener.admin."));
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
@@ -645,8 +650,8 @@ TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
 
 TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
-  AdminImpl admin_bad_profile_path(
-      "/dev/null", TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"), server_);
+  AdminImpl admin_bad_profile_path(TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
+                                   server_);
   Http::HeaderMapImpl header_map;
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.insertMethod().value(post.data(), post.size());
@@ -666,12 +671,12 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
-  AdminImpl admin_bad_address_out_path("/dev/null", cpu_profile_path_, server_);
-  EXPECT_LOG_CONTAINS("critical",
-                      "cannot open admin address output file " + bad_path + " for writing.",
-                      admin_bad_address_out_path.startHttpListener(
-                          bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                          listener_scope_.createScope("listener.admin.")));
+  AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_);
+  EXPECT_LOG_CONTAINS(
+      "critical", "cannot open admin address output file " + bad_path + " for writing.",
+      admin_bad_address_out_path.startHttpListener(
+          "/dev/null", bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()),
+          listener_scope_.createScope("listener.admin.")));
   EXPECT_FALSE(std::ifstream(bad_path));
 }
 

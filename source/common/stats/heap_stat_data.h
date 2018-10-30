@@ -9,6 +9,8 @@
 #include "common/common/thread_annotations.h"
 #include "common/stats/stat_data_allocator_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -17,23 +19,32 @@ namespace Stats {
  * so that it can be allocated efficiently from the heap on demand.
  */
 struct HeapStatData {
-  explicit HeapStatData(absl::string_view key);
-
   /**
    * @returns absl::string_view the name as a string_view.
    */
   absl::string_view key() const { return name_; }
 
   /**
-   * @returns std::string the name as a std::string.
+   * @returns std::string the name as a const char*.
    */
-  std::string name() const { return name_; }
+  const char* name() const { return name_; }
+
+  static HeapStatData* alloc(absl::string_view name);
+  void free();
 
   std::atomic<uint64_t> value_{0};
   std::atomic<uint64_t> pending_increment_{0};
   std::atomic<uint16_t> flags_{0};
   std::atomic<uint16_t> ref_count_{1};
-  std::string name_;
+  char name_[];
+
+private:
+  /**
+   * You cannot construct/destruct a HeapStatData directly with new/delete as
+   * it's variable-size. Use alloc()/free() methods above.
+   */
+  explicit HeapStatData(absl::string_view name);
+  ~HeapStatData() {}
 };
 
 /**
@@ -53,10 +64,10 @@ public:
   bool requiresBoundedStatNameSize() const override { return false; }
 
 private:
-  struct HeapStatHash_ {
+  struct HeapStatHash {
     size_t operator()(const HeapStatData* a) const { return HashUtil::xxHash64(a->key()); }
   };
-  struct HeapStatCompare_ {
+  struct HeapStatCompare {
     bool operator()(const HeapStatData* a, const HeapStatData* b) const {
       return (a->key() == b->key());
     }
@@ -65,7 +76,7 @@ private:
   // TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/3927 and
   //  https://github.com/envoyproxy/envoy/issues/3585, which can help reorganize
   // the heap stats using a ref-counted symbol table to compress the stat strings.
-  typedef std::unordered_set<HeapStatData*, HeapStatHash_, HeapStatCompare_> StatSet;
+  using StatSet = absl::flat_hash_set<HeapStatData*, HeapStatHash, HeapStatCompare>;
 
   // An unordered set of HeapStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher.

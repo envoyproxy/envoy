@@ -1,6 +1,7 @@
 licenses(["notice"])  # Apache 2
 
-# TODO(lizan): Add link to docs when it is ready.
+# ALTS transport socket. This provides Google's ALTS protocol support in GCP to Envoy.
+# https://cloud.google.com/security/encryption-in-transit/application-layer-transport-security/
 
 load(
     "//bazel:envoy_build_system.bzl",
@@ -21,6 +22,24 @@ envoy_cc_library(
     visibility = ["//visibility:private"],
     deps = [
         "//source/common/common:c_smart_ptr_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "config",
+    srcs = [
+        "config.cc",
+    ],
+    hdrs = [
+        "config.h",
+    ],
+    deps = [
+        ":tsi_handshaker",
+        ":tsi_socket",
+        "//include/envoy/registry",
+        "//include/envoy/server:transport_socket_config_interface",
+        "//source/extensions/transport_sockets:well_known_names",
+        "@envoy_api//envoy/config/transport_socket/alts/v2alpha:alts_cc",
     ],
 )
 

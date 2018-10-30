@@ -18,6 +18,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
@@ -758,9 +759,9 @@ TEST_F(TcpProxyTest, DisconnectBeforeData) {
 
 // Test that if the downstream connection is closed before the upstream connection
 // is established, the upstream connection is cancelled.
-TEST_F(TcpProxyTest, RemoteClosetBeforeUpstreamConnected) {
+TEST_F(TcpProxyTest, RemoteClosedBeforeUpstreamConnected) {
   setup(1);
-  EXPECT_CALL(*conn_pool_handles_.at(0), cancel());
+  EXPECT_CALL(*conn_pool_handles_.at(0), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -768,7 +769,7 @@ TEST_F(TcpProxyTest, RemoteClosetBeforeUpstreamConnected) {
 // is established, the upstream connection is cancelled.
 TEST_F(TcpProxyTest, LocalClosetBeforeUpstreamConnected) {
   setup(1);
-  EXPECT_CALL(*conn_pool_handles_.at(0), cancel());
+  EXPECT_CALL(*conn_pool_handles_.at(0), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
@@ -785,8 +786,8 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
 
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   configure(accessLogConfig("%RESPONSE_FLAGS%"));
-  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resource_manager_.reset(
-      new Upstream::ResourceManagerImpl(factory_context_.runtime_loader_, "fake_key", 0, 0, 0, 0));
+  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(
+      0, 0, 0, 0);
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
   filter_.reset(new Filter(config_, factory_context_.cluster_manager_, timeSystem()));
@@ -1146,12 +1147,12 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
 TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
   setup();
 
-  StreamInfo::FilterStateImpl per_connection_state;
-  per_connection_state.setData("envoy.tcp_proxy.cluster",
-                               std::make_unique<PerConnectionCluster>("filter_state_cluster"));
-  ON_CALL(connection_, perConnectionState()).WillByDefault(ReturnRef(per_connection_state));
-  EXPECT_CALL(Const(connection_), perConnectionState())
-      .WillRepeatedly(ReturnRef(per_connection_state));
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filterState().setData("envoy.tcp_proxy.cluster",
+                                    std::make_unique<PerConnectionCluster>("filter_state_cluster"),
+                                    StreamInfo::FilterState::StateType::Mutable);
+  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_,

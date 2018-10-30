@@ -159,10 +159,8 @@ public:
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  const Envoy::StreamInfo::FilterState& perRequestState() const override {
-    return per_request_state_;
-  }
-  Envoy::StreamInfo::FilterState& perRequestState() override { return per_request_state_; }
+  const Envoy::StreamInfo::FilterState& filterState() const override { return filter_state_; }
+  Envoy::StreamInfo::FilterState& filterState() override { return filter_state_; }
 
   void setRequestedServerName(const absl::string_view requested_server_name) override {
     requested_server_name_ = std::string(requested_server_name);
@@ -194,7 +192,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
-  Envoy::StreamInfo::FilterStateImpl per_request_state_{};
+  Envoy::StreamInfo::FilterStateImpl filter_state_{};
   std::string requested_server_name_;
   DangerousDeprecatedTestTime test_time_;
 };

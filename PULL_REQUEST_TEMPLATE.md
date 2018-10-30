@@ -1,5 +1,5 @@
 For an explanation of how to fill out the fields, please see the relevant section 
-in PULL_REQUESTS.md
+in [PULL_REQUESTS.md](./PULL_REQUESTS.md)
 
 *Description*:
 *Risk Level*:

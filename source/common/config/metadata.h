@@ -1,8 +1,12 @@
 #pragma once
 
+#include <memory>
 #include <string>
+#include <unordered_map>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/typed_metadata.h"
+#include "envoy/registry/registry.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -44,6 +48,29 @@ public:
   static ProtobufWkt::Value& mutableMetadataValue(envoy::api::v2::core::Metadata& metadata,
                                                   const std::string& filter,
                                                   const std::string& key);
+};
+
+template <typename factoryClass> class TypedMetadataImpl : public TypedMetadata {
+public:
+  static_assert(std::is_base_of<Config::TypedMetadataFactory, factoryClass>::value,
+                "Factory type must be inherited from Envoy::Config::TypedMetadataFactory.");
+  TypedMetadataImpl(const envoy::api::v2::core::Metadata& metadata) : data_() {
+    auto& data_by_key = metadata.filter_metadata();
+    for (const auto& it : Registry::FactoryRegistry<factoryClass>::factories()) {
+      const auto& meta_iter = data_by_key.find(it.first);
+      if (meta_iter != data_by_key.end()) {
+        data_[it.second->name()] = it.second->parse(meta_iter->second);
+      }
+    }
+  }
+
+  const TypedMetadata::Object* getData(const std::string& key) const override {
+    const auto& it = data_.find(key);
+    return it == data_.end() ? nullptr : it->second.get();
+  }
+
+private:
+  std::unordered_map<std::string, std::unique_ptr<const TypedMetadata::Object>> data_;
 };
 
 } // namespace Config
