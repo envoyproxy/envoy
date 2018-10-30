@@ -63,7 +63,7 @@ TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
 }
 
 bool TagExtractorImpl::substrMismatch(absl::string_view stat_name) const {
-  return !substr_.empty() && stat_name.find(substr_) == std::string::npos;
+  return !substr_.empty() && stat_name.find(substr_) == absl::string_view::npos;
 }
 
 bool TagExtractorImpl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
@@ -75,9 +75,12 @@ bool TagExtractorImpl::extractTag(absl::string_view stat_name, std::vector<Tag>&
     return false;
   }
 
-  std::smatch match;
-  // The regex must match and contain one or more subexpressions (all after the first are ignored).
+  // At some point in a future C++ version, std::string_view will exist and will
+  // work with std::regex, eliminating the need for this temp copy.
   std::string stat_name_str = std::string(stat_name);
+  std::smatch match;
+
+  // The regex must match and contain one or more subexpressions (all after the first are ignored).
   if (std::regex_search(stat_name_str, match, regex_) && match.size() > 1) {
     // remove_subexpr is the first submatch. It represents the portion of the string to be removed.
     const auto& remove_subexpr = match[1];
@@ -98,10 +101,13 @@ bool TagExtractorImpl::extractTag(absl::string_view stat_name, std::vector<Tag>&
     remove_characters.insert(start, end);
     absl::string_view removed_string(stat_name.data() + start, end - start);
 
+    // Here we assume that the token we add as a tag is embedded in the
+    // characters we are removing. If at some point we discover that's not the
+    // case, we'll have to provide a mechanism to return backing-store for those
+    // to be saved in MetricImpl.
     absl::string_view::size_type pos = removed_string.find(value_subexpr.str());
     ASSERT(pos != absl::string_view::npos);
     tag.value_ = removed_string.substr(pos, value_subexpr.str().size());
-
 
     PERF_RECORD(perf, "re-match", name_);
     return true;

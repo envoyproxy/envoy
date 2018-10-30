@@ -34,7 +34,7 @@ protected:
    *
    * We don't store the name in MetricImpl object as the storage strategy is
    * diffferent between counters and gauges, where the name can reside in a
-   * shared memroy block, and histograms, where the name is held as a simple
+   * shared memory block, and histograms, where the name is held as a simple
    * std::string in the object.
    *
    * @param tag_producer the tag producer.
@@ -49,6 +49,8 @@ protected:
   };
 
 private:
+  // TODO(jmarantz): consider constructing tag_extracted_name_ on demand only if
+  // asked for, as it is expensive to keep per stat.
   std::string tag_extracted_name_;
   std::vector<Tag> tags_;
 };

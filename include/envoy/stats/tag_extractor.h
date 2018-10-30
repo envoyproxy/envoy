@@ -35,6 +35,11 @@ public:
    * the character intervals to be removed from the name after all the tag extractions are
    * complete. This approach simplifies the tag searching process because without mutations,
    * the tag extraction will be order independent, apart from the order of the tag array.
+   *
+   * The tags are represented as string_view and reference the passed-in
+   * stat_name. The caller is responsible for ensuring that stat_name remains
+   * valid as long as the tags array is needed.
+   *
    * @param stat_name name from which the tag will be extracted if found to exist.
    * @param tags list of tags updated with the tag name and value if found in the name.
    * @param remove_characters set of intervals of character-indices to be removed from name.

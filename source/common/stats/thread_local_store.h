@@ -205,9 +205,8 @@ private:
     const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
 
     template <class StatType>
-    using MakeStatFn =
-        std::function<std::shared_ptr<StatType>(StatDataAllocator&, const std::string& name,
-                                                const TagProducer* tag_producer)>;
+    using MakeStatFn = std::function<std::shared_ptr<StatType>(
+        StatDataAllocator&, const std::string& name, const TagProducer* tag_producer)>;
 
     /**
      * Makes a stat either by looking it up in the central cache,

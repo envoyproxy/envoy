@@ -16,13 +16,13 @@ namespace Stats {
 
 IsolatedStoreImpl::IsolatedStoreImpl()
     : counters_([this](absl::string_view name) -> CounterSharedPtr {
-                  return alloc_.makeCounter(name, nullptr);
+        return alloc_.makeCounter(name, nullptr);
       }),
       gauges_([this](absl::string_view name) -> GaugeSharedPtr {
-                return alloc_.makeGauge(name, nullptr);
+        return alloc_.makeGauge(name, nullptr);
       }),
       histograms_([this](absl::string_view name) -> HistogramSharedPtr {
-                    return std::make_shared<HistogramImpl>(name, *this, nullptr);
+        return std::make_shared<HistogramImpl>(name, *this, nullptr);
       }) {}
 
 struct IsolatedScopeImpl : public Scope {
@@ -34,12 +34,8 @@ struct IsolatedScopeImpl : public Scope {
     return ScopePtr{new IsolatedScopeImpl(parent_, absl::StrCat(prefix_, name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Counter& counter(const std::string& name) override {
-    return parent_.counter(prefix_ + name);
-  }
-  Gauge& gauge(const std::string& name) override {
-    return parent_.gauge(prefix_ + name);
-  }
+  Counter& counter(const std::string& name) override { return parent_.counter(prefix_ + name); }
+  Gauge& gauge(const std::string& name) override { return parent_.gauge(prefix_ + name); }
   Histogram& histogram(const std::string& name) override {
     return parent_.histogram(prefix_ + name);
   }

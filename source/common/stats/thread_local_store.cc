@@ -212,8 +212,8 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     // partially reescuing an operational problem, and I think we should
     // reevaluate whether this is worth it.
     const std::string truncated_name = std::string(parent_.truncateStatNameIfNeeded(name));
-    std::shared_ptr<StatType> stat = make_stat(parent_.alloc_, truncated_name,
-                                               parent_.tag_producer_.get());
+    std::shared_ptr<StatType> stat =
+        make_stat(parent_.alloc_, truncated_name, parent_.tag_producer_.get());
     if (stat == nullptr) {
       parent_.num_last_resort_stats_.inc();
       stat = make_stat(parent_.heap_allocator_, truncated_name, parent_.tag_producer_.get());
@@ -257,13 +257,12 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
     tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].counters_;
   }
 
-  return safeMakeStat<Counter>(
-      final_name, central_cache_.counters_,
-      [](StatDataAllocator& allocator, const std::string& name, const TagProducer* tag_producer)
-      -> CounterSharedPtr {
-        return allocator.makeCounter(name, tag_producer);
-      },
-      tls_cache);
+  return safeMakeStat<Counter>(final_name, central_cache_.counters_,
+                               [](StatDataAllocator& allocator, const std::string& name,
+                                  const TagProducer* tag_producer) -> CounterSharedPtr {
+                                 return allocator.makeCounter(name, tag_producer);
+                               },
+                               tls_cache);
 }
 
 void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& histogram,
@@ -303,13 +302,12 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
     tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].gauges_;
   }
 
-  return safeMakeStat<Gauge>(
-      final_name, central_cache_.gauges_,
-      [](StatDataAllocator& allocator, const std::string& name, const TagProducer* tag_producer)
-      -> GaugeSharedPtr {
-        return allocator.makeGauge(name, tag_producer);
-      },
-      tls_cache);
+  return safeMakeStat<Gauge>(final_name, central_cache_.gauges_,
+                             [](StatDataAllocator& allocator, const std::string& name,
+                                const TagProducer* tag_producer) -> GaugeSharedPtr {
+                               return allocator.makeGauge(name, tag_producer);
+                             },
+                             tls_cache);
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
@@ -373,8 +371,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
     }
   }
 
-  TlsHistogramSharedPtr hist_tls_ptr = std::make_shared<ThreadLocalHistogramImpl>(
-      name, parent_.tag_producer_.get());
+  TlsHistogramSharedPtr hist_tls_ptr =
+      std::make_shared<ThreadLocalHistogramImpl>(name, parent_.tag_producer_.get());
 
   parent.addTlsHistogram(hist_tls_ptr);
 
@@ -411,10 +409,9 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
 
 ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
                                          TlsScope& tls_scope, const TagProducer* tag_producer)
-    : parent_(parent),
-      tls_scope_(tls_scope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
-      interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_),
-      merged_(false), name_(name) {
+    : parent_(parent), tls_scope_(tls_scope), interval_histogram_(hist_alloc()),
+      cumulative_histogram_(hist_alloc()), interval_statistics_(interval_histogram_),
+      cumulative_statistics_(cumulative_histogram_), merged_(false), name_(name) {
   extractTags(tag_producer);
 }
 
