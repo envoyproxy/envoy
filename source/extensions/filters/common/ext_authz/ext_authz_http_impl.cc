@@ -40,16 +40,19 @@ const Response& getOkResponse() {
 } // namespace
 
 RawHttpClientImpl::RawHttpClientImpl(
-    const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
+    Upstream::ClusterManager& cluster_manager, const std::string& cluster_name,
     const absl::optional<std::chrono::milliseconds>& timeout, const std::string& path_prefix,
-    const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers,
     const Http::LowerCaseStrUnorderedSet& allowed_request_headers,
-    const Http::LowerCaseStringPairVec& authorization_headers_to_add)
+    const Http::LowerCaseStrUnorderedSet& allowed_request_headers_prefix,
+    const Http::LowerCaseStrPairVector& authorization_headers_to_add,
+    const Http::LowerCaseStrUnorderedSet& allowed_upstream_headers,
+    const Http::LowerCaseStrUnorderedSet& allowed_client_headers)
     : cluster_name_(cluster_name), path_prefix_(path_prefix),
-      allowed_authorization_headers_(allowed_authorization_headers),
       allowed_request_headers_(allowed_request_headers),
-      authorization_headers_to_add_(authorization_headers_to_add), timeout_(timeout),
-      cm_(cluster_manager) {}
+      allowed_request_headers_prefix_(allowed_request_headers_prefix),
+      authorization_headers_to_add_(authorization_headers_to_add),
+      allowed_upstream_headers_(allowed_upstream_headers),
+      allowed_client_headers_(allowed_client_headers), timeout_(timeout), cm_(cluster_manager) {}
 
 RawHttpClientImpl::~RawHttpClientImpl() { ASSERT(!callbacks_); }
 
@@ -105,26 +108,42 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
     return std::make_unique<Response>(getErrorResponse());
   }
 
-  ResponsePtr response;
   // Set an accepted or a denied authorization response.
   if (status_code == enumToInt(Http::Code::OK)) {
-    response = std::make_unique<Response>(getOkResponse());
-  } else {
-    response = std::make_unique<Response>(getDeniedResponse());
-    response->status_code = static_cast<Http::Code>(status_code);
-    response->body = message->bodyAsString();
+    ResponsePtr ok_response = std::make_unique<Response>(getOkResponse());
+    // Copy all headers that should be forwarded to the upstream.
+    for (const auto& header : allowed_upstream_headers_) {
+      const auto* entry = message->headers().get(header);
+      if (entry) {
+        ok_response->headers_to_add.emplace_back(Http::LowerCaseString{entry->key().c_str()},
+                                                 entry->value().c_str());
+      }
+    }
+    return ok_response;
   }
 
-  // Copy all headers from the message that should be in the response.
-  for (const auto& allowed_header : allowed_authorization_headers_) {
-    const auto* entry = message->headers().get(allowed_header);
-    if (entry) {
-      response->headers_to_add.emplace_back(Http::LowerCaseString{entry->key().c_str()},
-                                            std::string{entry->value().c_str()});
+  ResponsePtr denied_response = std::make_unique<Response>(getDeniedResponse());
+  denied_response->status_code = static_cast<Http::Code>(status_code);
+  denied_response->body = message->bodyAsString();
+  if (allowed_client_headers_.empty()) {
+    message->headers().iterate(
+        [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+          static_cast<Http::HeaderVector*>(context)->emplace_back(
+              Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
+          return Http::HeaderMap::Iterate::Continue;
+        },
+        &(denied_response->headers_to_add));
+  } else {
+    for (const auto& header : allowed_client_headers_) {
+      const auto* entry = message->headers().get(header);
+      if (entry) {
+        denied_response->headers_to_add.emplace_back(Http::LowerCaseString{entry->key().c_str()},
+                                                     entry->value().c_str());
+      }
     }
   }
 
-  return response;
+  return denied_response;
 }
 
 void RawHttpClientImpl::onSuccess(Http::MessagePtr&& message) {

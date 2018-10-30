@@ -55,7 +55,7 @@ public:
   Http::LowerCaseStrUnorderedSet allowed_request_headers_;
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<Http::MockAsyncClientRequest> async_request_;
-  Http::LowerCaseStringPairVec authorization_headers_to_add_;
+  Http::LowerCaseStrPairVector authorization_headers_to_add_;
   RawHttpClientImpl client_;
 };
 

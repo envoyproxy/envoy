@@ -55,7 +55,7 @@ typedef std::unordered_set<LowerCaseString, LowerCaseStringHash> LowerCaseStrUno
  * Convenient type for a vector of lower case string and string pair.
  */
 typedef std::vector<std::pair<const Http::LowerCaseString, const std::string>>
-    LowerCaseStringPairVec;
+    LowerCaseStrPairVector;
 
 /**
  * This is a string implementation for use in header processing. It is heavily optimized for

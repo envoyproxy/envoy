@@ -23,13 +23,15 @@ class RawHttpClientImpl : public Client,
                           public Http::AsyncClient::Callbacks,
                           Logger::Loggable<Logger::Id::config> {
 public:
-  explicit RawHttpClientImpl(const std::string& cluster_name,
-                             Upstream::ClusterManager& cluster_manager,
+  explicit RawHttpClientImpl(Upstream::ClusterManager& cluster_manager,
+                             const std::string& cluster_name,
                              const absl::optional<std::chrono::milliseconds>& timeout,
                              const std::string& path_prefix,
-                             const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers,
                              const Http::LowerCaseStrUnorderedSet& allowed_request_headers,
-                             const Http::LowerCaseStringPairVec& authorization_headers_to_add);
+                             const Http::LowerCaseStrUnorderedSet& allowed_request_headers_prefix,
+                             const Http::LowerCaseStrPairVector& authorization_headers_to_add,
+                             const Http::LowerCaseStrUnorderedSet& allowed_upstream_headers,
+                             const Http::LowerCaseStrUnorderedSet& allowed_client_headers);
   ~RawHttpClientImpl();
 
   // ExtAuthz::Client
@@ -45,9 +47,11 @@ private:
   ResponsePtr messageToResponse(Http::MessagePtr message);
   const std::string cluster_name_;
   const std::string path_prefix_;
-  const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers_;
   const Http::LowerCaseStrUnorderedSet& allowed_request_headers_;
-  const Http::LowerCaseStringPairVec& authorization_headers_to_add_;
+  const Http::LowerCaseStrUnorderedSet& allowed_request_headers_prefix_;
+  const Http::LowerCaseStrPairVector& authorization_headers_to_add_;
+  const Http::LowerCaseStrUnorderedSet& allowed_upstream_headers_;
+  const Http::LowerCaseStrUnorderedSet& allowed_client_headers_;
   absl::optional<std::chrono::milliseconds> timeout_;
   Upstream::ClusterManager& cm_;
   Http::AsyncClient::Request* request_{};

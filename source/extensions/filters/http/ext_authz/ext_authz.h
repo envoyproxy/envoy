@@ -39,46 +39,33 @@ public:
                const LocalInfo::LocalInfo& local_info, const Runtime::Loader& runtime,
                Stats::Scope& scope, Upstream::ClusterManager& cm);
 
-  const LocalInfo::LocalInfo& localInfo() { return local_info_; }
-  const Runtime::Loader& runtime() { return runtime_; }
-  const std::string& cluster() { return cluster_name_; }
-
-  const Http::LowerCaseStrUnorderedSet& allowedUpstreamHeaders() {
-    return allowed_upstream_headers_;
-  }
-
-  const Http::LowerCaseStrUnorderedSet& allowedClientHeaders() { return allowed_client_headers_; }
-
-  const Http::LowerCaseStrUnorderedSet& allowedRequestHeaders() { return allowed_request_headers_; }
-
-  const Http::LowerCaseStrUnorderedSet& allowedRequestHeaderPrefixes() {
-    return allowed_request_headers_prefix_;
-  }
-
-  const Http::LowerCaseStringPairVec& authorizationHeadersToAdd() {
-    return authorization_headers_to_add_;
-  }
-
-  Stats::Scope& scope() const { return scope_; }
-  Upstream::ClusterManager& cm() const { return cm_; }
-
-  bool failureModeAllow() const { return failure_mode_allow_; }
+  const LocalInfo::LocalInfo& localInfo();
+  const Runtime::Loader& runtime();
+  const std::string& cluster();
+  const Http::LowerCaseStrUnorderedSet& allowedRequestHeaders();
+  const Http::LowerCaseStrUnorderedSet& allowedRequestHeaderPrefixes();
+  const Http::LowerCaseStrPairVector& authorizationHeadersToAdd();
+  const Http::LowerCaseStrUnorderedSet& allowedUpstreamHeaders();
+  const Http::LowerCaseStrUnorderedSet& allowedClientHeaders();
+  Stats::Scope& scope() const;
+  Upstream::ClusterManager& cm() const;
+  bool failureModeAllow() const;
 
 private:
   static Http::LowerCaseStrUnorderedSet
-  toResquestHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys);
+  toRequestHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys);
   static Http::LowerCaseStrUnorderedSet
   toHeaderPrefix(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys);
-  static Http::LowerCaseStringPairVec toAuthorizationHeaderToAdd(
+  static Http::LowerCaseStrPairVector toAuthorizationHeaderToAdd(
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& headers);
   static Http::LowerCaseStrUnorderedSet
-  toClientHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::MessagePtr>& message);
+  toClientHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys);
   static Http::LowerCaseStrUnorderedSet
-  toUpstreamHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::MessagePtr>& message);
+  toUpstreamHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys);
 
   const Http::LowerCaseStrUnorderedSet allowed_request_headers_;
   const Http::LowerCaseStrUnorderedSet allowed_request_headers_prefix_;
-  const Http::LowerCaseStringPairVec authorization_headers_to_add_;
+  const Http::LowerCaseStrPairVector authorization_headers_to_add_;
   const Http::LowerCaseStrUnorderedSet allowed_client_headers_;
   const Http::LowerCaseStrUnorderedSet allowed_upstream_headers_;
 

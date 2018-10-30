@@ -13,79 +13,114 @@ namespace ExtAuthz {
 FilterConfig::FilterConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
                            const LocalInfo::LocalInfo& local_info, const Runtime::Loader& runtime,
                            Stats::Scope& scope, Upstream::ClusterManager& cm)
-    : allowed_request_headers_(toRequestHeader(config.http_service().authorization_request())),
+    : allowed_request_headers_(
+          toRequestHeader(config.http_service().authorization_request().allowed_headers())),
       allowed_request_headers_prefix_(
-          toHeaderPrefix(config.http_service().authorization_request())),
-      authorization_headers_to_add_(
-          toAuthorizationHeaderToAdd(config.http_service().authorization_request())),
-      allowed_client_headers_(toClientHeader(config.http_service().authorization_response())),
-      allowed_upstream_headers_(toUpstreamHeader(config.http_service().authorization_response())),
+          toHeaderPrefix(config.http_service().authorization_request().allowed_header_by_prefix())),
+      authorization_headers_to_add_(toAuthorizationHeaderToAdd(
+          config.http_service().authorization_request().headers_to_add())),
+      allowed_client_headers_(
+          toClientHeader(config.http_service().authorization_response().allowed_client_headers())),
+      allowed_upstream_headers_(toUpstreamHeader(
+          config.http_service().authorization_response().allowed_upstream_headers())),
       local_info_(local_info), runtime_(runtime),
-      cluster_name_(config.grpc_service().envoy_grpc().cluster_name()), scope_(scope),
-      cm_(cm) failure_mode_allow_(config.failure_mode_allow()) {}
+      cluster_name_(config.grpc_service().envoy_grpc().cluster_name()), scope_(scope), cm_(cm),
+      failure_mode_allow_(config.failure_mode_allow()) {}
 
-static Http::LowerCaseStrUnorderedSet FilterConfig::toUpstreamHeader(
-    const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::MessagePtr>& message) {
-  Http::LowerCaseStrUnorderedSet keys;
-  keys.reserve(message.allowed_upstream_headers().size());
-  for (const auto& header : message.allowed_upstream_headers()) {
-    keys.emplace(header);
+Http::LowerCaseStrUnorderedSet FilterConfig::toUpstreamHeader(
+    const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys) {
+  Http::LowerCaseStrUnorderedSet key_set;
+  key_set.reserve(keys.size());
+  for (const auto& key : keys) {
+    key_set.emplace(key);
   }
-  return keys;
+  return key_set;
 }
 
-static Http::LowerCaseStrUnorderedSet FilterConfig::toClientHeader(
-    const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::MessagePtr>& message) {
-  Http::LowerCaseStrUnorderedSet keys;
-  keys.reserve(massage.allowed_headers().size() + 3);
-  keys.emplace(Http::Headers::get().WWWAuthenticate);
-  keys.emplace(Http::Headers::get().ProxyAuthenticate);
-  keys.emplace(Http::Headers::get().Location);
-  for (const auto& key : massage.allowed_headers()) {
-    keys.emplace(key);
+Http::LowerCaseStrUnorderedSet
+FilterConfig::toClientHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys) {
+  Http::LowerCaseStrUnorderedSet key_set;
+  key_set.reserve(keys.size() + 3);
+  key_set.emplace(Http::Headers::get().WWWAuthenticate);
+  key_set.emplace(Http::Headers::get().ProxyAuthenticate);
+  key_set.emplace(Http::Headers::get().Location);
+  for (const auto& key : keys) {
+    key_set.emplace(key);
   }
-  return keys;
+  return key_set;
 }
 
-static Http::LowerCaseStrUnorderedSet FilterConfig::toResquestHeader(
-    const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::MessagePtr>& message) {
-  Http::LowerCaseStrUnorderedSet keys;
-  keys.reserve(message.allowed_headers().size() + 10);
-  keys.emplace(Http::Headers::get().Path);
-  keys.emplace(Http::Headers::get().Method);
-  keys.emplace(Http::Headers::get().Host);
-  keys.emplace(Http::Headers::get().Authorization);
-  keys.emplace(Http::Headers::get().ProxyAuthorization);
-  keys.emplace(Http::Headers::get().UserAgent);
-  keys.emplace(Http::Headers::get().Cookie);
-  keys.emplace(Http::Headers::get().ForwardedFor);
-  keys.emplace(Http::Headers::get().ForwardedHost);
-  keys.emplace(Http::Headers::get().ForwardedProto);
-  for (const auto& header : message.allowed_headers()) {
-    keys.emplace(header);
+Http::LowerCaseStrUnorderedSet FilterConfig::toRequestHeader(
+    const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys) {
+  Http::LowerCaseStrUnorderedSet key_set;
+  key_set.reserve(keys.size() + 10);
+  key_set.emplace(Http::Headers::get().Path);
+  key_set.emplace(Http::Headers::get().Method);
+  key_set.emplace(Http::Headers::get().Host);
+  key_set.emplace(Http::Headers::get().Authorization);
+  key_set.emplace(Http::Headers::get().ProxyAuthorization);
+  key_set.emplace(Http::Headers::get().UserAgent);
+  key_set.emplace(Http::Headers::get().Cookie);
+  key_set.emplace(Http::Headers::get().ForwardedFor);
+  key_set.emplace(Http::Headers::get().ForwardedHost);
+  key_set.emplace(Http::Headers::get().ForwardedProto);
+  for (const auto& key : keys) {
+    key_set.emplace(key);
   }
-  return keys;
+  return key_set;
 }
 
-static Http::LowerCaseStrUnorderedSet FilterConfig::toHeaderPrefix(
-    const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::MessagePtr>& message) {
-  Http::LowerCaseStrUnorderedSet keys;
-  keys.reserve(message.allowed_header_by_prefix().size()) for (const auto& prefix :
-                                                               message.allowed_header_by_prefix()) {
-    keys.emplace(prefix);
+Http::LowerCaseStrUnorderedSet
+FilterConfig::toHeaderPrefix(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys) {
+  Http::LowerCaseStrUnorderedSet key_set;
+  key_set.reserve(keys.size());
+  for (const auto& prefix : keys) {
+    key_set.emplace(prefix);
   }
-  return keys;
+  return key_set;
 }
 
-static Http::LowerCaseStringPairVec FilterConfig::toAuthorizationHeaderToAdd(
-    const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::MessagePtr>& message) {
-  Filters::Common::ExtAuthz::HeaderKeyValueVector headers;
-  headers.reserve(message.headers_to_add().size());
-  for (const auto& header : message.headers_to_add()) {
-    headers.emplace_back(Http::LowerCaseString(header.key()), header.value());
+Http::LowerCaseStrPairVector FilterConfig::toAuthorizationHeaderToAdd(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& headers) {
+  Http::LowerCaseStrPairVector header_vec;
+  header_vec.reserve(headers.size());
+  for (const auto& header : headers) {
+    header_vec.emplace_back(Http::LowerCaseString(header.key()), header.value());
   }
-  return headers;
+  return header_vec;
 }
+
+const LocalInfo::LocalInfo& FilterConfig::localInfo() { return local_info_; }
+
+const Runtime::Loader& FilterConfig::runtime() { return runtime_; }
+
+const std::string& FilterConfig::cluster() { return cluster_name_; }
+
+const Http::LowerCaseStrUnorderedSet& FilterConfig::allowedUpstreamHeaders() {
+  return allowed_upstream_headers_;
+}
+
+const Http::LowerCaseStrUnorderedSet& FilterConfig::allowedClientHeaders() {
+  return allowed_client_headers_;
+}
+
+const Http::LowerCaseStrUnorderedSet& FilterConfig::allowedRequestHeaders() {
+  return allowed_request_headers_;
+}
+
+const Http::LowerCaseStrUnorderedSet& FilterConfig::allowedRequestHeaderPrefixes() {
+  return allowed_request_headers_prefix_;
+}
+
+const Http::LowerCaseStrPairVector& FilterConfig::authorizationHeadersToAdd() {
+  return authorization_headers_to_add_;
+}
+
+Stats::Scope& FilterConfig::scope() const { return scope_; }
+
+Upstream::ClusterManager& FilterConfig::cm() const { return cm_; }
+
+bool FilterConfig::failureModeAllow() const { return failure_mode_allow_; }
 
 void Filter::initiateCall(const Http::HeaderMap& headers) {
   Router::RouteConstSharedPtr route = callbacks_->route();
@@ -141,7 +176,6 @@ void Filter::onDestroy() {
 void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   ASSERT(cluster_);
   state_ = State::Complete;
-
   using Filters::Common::ExtAuthz::CheckStatus;
 
   switch (response->status) {
@@ -151,7 +185,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   case CheckStatus::Error:
     cluster_->statsScope().counter("ext_authz.error").inc();
     break;
-
   case CheckStatus::Denied:
     cluster_->statsScope().counter("ext_authz.denied").inc();
     Http::CodeUtility::ResponseStatInfo info{config_->scope(),

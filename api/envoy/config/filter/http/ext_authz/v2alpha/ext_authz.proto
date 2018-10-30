@@ -77,13 +77,13 @@ message HttpService {
   reserved 6;
 
   // Sets the auhtorization request configuration ...
-  Request authorization_request = 7;
+  AuthorizationRequest authorization_request = 7;
 
   // Sets the auhtorization response configuration.
-  Response authorization_response = 8;
+  AuthorizationResponse authorization_response = 8;
 }
 
-message Request {
+message AuthorizationRequest {
   // Sets an optional prefix to the value of authorization request header *Path*.
   string path_prefix = 1;
 
@@ -103,7 +103,7 @@ message Request {
   repeated envoy.api.v2.core.HeaderValue headers_to_add = 4;
 }
 
-message Response {
+message AuthorizationResponse {
   // Sets a list of headers that can be sent from the authorization server to the upstream service
   // when the response status is a 200 OK. Note that a matched request header will have its value
   // overridden by the ones sent from the authorization server.
