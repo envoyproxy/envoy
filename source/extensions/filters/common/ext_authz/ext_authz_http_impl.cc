@@ -108,7 +108,6 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
     return std::make_unique<Response>(getErrorResponse());
   }
 
-  // Set an accepted or a denied authorization response.
   if (status_code == enumToInt(Http::Code::OK)) {
     ResponsePtr ok_response = std::make_unique<Response>(getOkResponse());
     // Copy all headers that should be forwarded to the upstream.
