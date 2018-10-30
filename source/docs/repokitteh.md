@@ -4,11 +4,12 @@
 
 <img src="https://repokitteh.io/logo.svg" height="100" align="right">
 
-[RepoKitteh](https://repokitteh.io) is a [GitHub application](https://developer.github.com/apps/) that provides and easy way to create, integrate and maintain GitHub bots. It is deployed in GCP and supplied to Envoy under a contract with the CNCF.
+[RepoKitteh](https://repokitteh.io) is a [GitHub application](https://developer.github.com/apps/) that provides an easy way to create, integrate and maintain GitHub bots. It is deployed in GCP and supplied to Envoy under a contract with the CNCF.
 The application is installed on specific GitHub repositories and interacts with these by receiving webhooks and making GitHub API calls. A root `repokitteh.sky` script tells the application what to do based on the webhook received.
 
 ## Integration with Envoy
-The file [repokitteh.sky](https://github.com/envoyproxy/envoy/blob/master/repokitteh.sky), which resides in the root of the Envoy repository tells RepoKitteh what functionality to use. The file is written in the [~~Skylark~~ Starlark language](https://github.com/bazelbuild/starlark/), which is a non-turing complete Python dialect.
+The file [repokitteh.sky](https://github.com/envoyproxy/envoy/blob/master/repokitteh.sky), which resides in the root of the Envoy repository tells RepoKitteh what functionality to use. The file is written in the [~~Skylark~~ Starlark language](https://github.com/bazelbuild/starlark/), which is a Python dialect with well defined threading and hermeticity guarantees.
+
 For example, the statement
 ```
 use("github.com/softkitteh/repokitteh-modules/assign.sky")
@@ -22,14 +23,14 @@ Set assignees to issues or pull requests.
 
 Examples:
 ```
-/assign @htuch
+/assign @someone
 ```
-Adds @htuch as an assignee to the issue or pull request that this comment is made on.
+Adds `@someone` as an assignee to the issue or pull request that this comment is made on.
 
 ```
-/unassign @htuch
+/unassign @someone
 ```
-Removes @htuch as an assignee.
+Removes `@someone` as an assignee.
 
 Only organization members can assign or unassign other users, who must be organization members as well.
 
@@ -40,14 +41,14 @@ Requests a a user to recview a pull request.
 
 Examples:
 ```
-/review @mklein123
+/review @someone
 ```
-Asks @mklein123 to review the pull requests that this comment is made on.
+Asks `@someone` to review the pull requests that this comment is made on.
 
 ```
-/unreview @mklein123
+/unreview @someone
 ```
-Removes @mklein123 from the reviewers list.
+Removes `@someone` from the reviewers list.
 
 Only organization members can request a review from other users or cancel it, who must be organization members as well.
 
