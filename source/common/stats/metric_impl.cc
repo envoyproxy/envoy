@@ -5,9 +5,9 @@
 namespace Envoy {
 namespace Stats {
 
-void MetricImpl::extractTags(absl::string_view metric_name, const TagProducer* tag_producer) {
+void MetricImpl::extractTags(const TagProducer* tag_producer) {
   if (tag_producer != nullptr) {
-    tag_extracted_name_ = tag_producer->produceTags(metric_name, tags_);
+    tag_extracted_name_ = tag_producer->produceTags(nameCStr(), tags_);
   } else {
     tag_extracted_name_ = name();
   }

@@ -390,7 +390,7 @@ ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(const std::string& name,
     : current_active_(0), flags_(0), created_thread_id_(std::this_thread::get_id()), name_(name) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();
-  extractTags(nameCStr(), tag_producer);
+  extractTags(tag_producer);
 }
 
 ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
@@ -416,7 +416,7 @@ ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
       tls_scope_(tls_scope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_),
       merged_(false), name_(name) {
-  extractTags(nameCStr(), tag_producer);
+  extractTags(tag_producer);
 }
 
 ParentHistogramImpl::~ParentHistogramImpl() {

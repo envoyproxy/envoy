@@ -21,11 +21,26 @@ namespace Stats {
  */
 class MetricImpl : public virtual Metric {
 public:
-  void extractTags(absl::string_view metric_name, const TagProducer* tag_producer);
   const std::string& tagExtractedName() const override { return tag_extracted_name_; }
   const std::vector<Tag>& tags() const override { return tags_; }
 
 protected:
+  /**
+   * Extracts tags from metric_name, saving them in tags_. This is called from
+   * the constructors of counters, gauges, and histograms that inherit from
+   * MetricImpl, so that the tags can be built using pieces of the full name,
+   * which is stored in those objects. It cannot be called from the constructor
+   * of MetricImpl, as nameCStr() may not be valid yet.
+   *
+   * We don't store the name in MetricImpl object as the storage strategy is
+   * diffferent between counters and gauges, where the name can reside in a
+   * shared memroy block, and histograms, where the name is held as a simple
+   * std::string in the object.
+   *
+   * @param tag_producer the tag producer.
+   */
+  void extractTags(const TagProducer* tag_producer);
+
   /**
    * Flags used by all stats types to figure out whether they have been used.
    */

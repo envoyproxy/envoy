@@ -12,7 +12,7 @@ namespace Stats {
 
 HistogramImpl::HistogramImpl(absl::string_view name, Store& parent, const TagProducer* tag_producer)
     : parent_(parent), name_(name) {
-  extractTags(nameCStr(), tag_producer);
+  extractTags(tag_producer);
 }
 
 HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr)

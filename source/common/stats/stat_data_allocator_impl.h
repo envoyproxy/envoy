@@ -61,7 +61,7 @@ template <class StatData> class CounterImpl : public Counter, public MetricImpl 
 public:
   CounterImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
               const TagProducer* tag_producer) : data_(data), alloc_(alloc) {
-    extractTags(nameCStr(), tag_producer);
+    extractTags(tag_producer);
   }
   ~CounterImpl() { alloc_.free(data_); }
 
@@ -114,7 +114,7 @@ template <class StatData> class GaugeImpl : public Gauge, public MetricImpl {
 public:
   GaugeImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
             const TagProducer* tag_producer) : data_(data), alloc_(alloc) {
-    extractTags(nameCStr(), tag_producer);
+    extractTags(tag_producer);
   }
   ~GaugeImpl() { alloc_.free(data_); }
 
