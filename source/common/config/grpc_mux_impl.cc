@@ -12,12 +12,20 @@ namespace Config {
 GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
-                         Runtime::RandomGenerator& random, Stats::Scope& scope)
+                         Runtime::RandomGenerator& random, Stats::Scope& scope,
+                         const RateLimitSettings& rate_limit_settings)
     : local_info_(local_info), async_client_(std::move(async_client)),
       service_method_(service_method), random_(random), time_source_(dispatcher.timeSystem()),
-      control_plane_stats_(generateControlPlaneStats(scope)) {
+      control_plane_stats_(generateControlPlaneStats(scope)),
+      rate_limiting_enabled_(rate_limit_settings.enabled_) {
   Config::Utility::checkLocalInfo("ads", local_info);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
+  if (rate_limiting_enabled_) {
+    // Default Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
+    limit_request_ = std::make_unique<TokenBucketImpl>(
+        rate_limit_settings.max_tokens_, time_source_, rate_limit_settings.fill_rate_);
+    drain_request_timer_ = dispatcher.createTimer([this]() -> void { drainRequests(); });
+  }
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
                                                                 RETRY_MAX_DELAY_MS, random_);
 }
@@ -47,8 +55,32 @@ void GrpcMuxImpl::establishNewStream() {
 
   control_plane_stats_.connected_state_.set(1);
   for (const auto type_url : subscriptions_) {
-    sendDiscoveryRequest(type_url);
+    queueDiscoveryRequest(type_url);
   }
+}
+
+void GrpcMuxImpl::drainRequests() {
+  ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
+  while (!request_queue_.empty()) {
+    // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
+    if (!rate_limiting_enabled_ || limit_request_->consume()) {
+      sendDiscoveryRequest(request_queue_.front());
+      request_queue_.pop();
+    } else {
+      ASSERT(rate_limiting_enabled_);
+      ASSERT(drain_request_timer_ != nullptr);
+      ENVOY_LOG(warn, "Too many sendDiscoveryRequest calls :");
+      // Enable the drain request timer.
+      drain_request_timer_->enableTimer(
+          std::chrono::milliseconds(limit_request_->nextTokenAvailableMs()));
+      break;
+    }
+  }
+}
+
+void GrpcMuxImpl::queueDiscoveryRequest(const std::string& type_url) {
+  request_queue_.push(type_url);
+  drainRequests();
 }
 
 void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
@@ -62,10 +94,6 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
     ENVOY_LOG(trace, "API {} paused during sendDiscoveryRequest(), setting pending.", type_url);
     api_state.pending_ = true;
     return;
-  }
-
-  if (!api_state.limit_request_->consume() && api_state.limit_log_->consume()) {
-    ENVOY_LOG(warn, "{}", fmt::format("Too many sendDiscoveryRequest calls for {}", type_url));
   }
 
   auto& request = api_state.request_;
@@ -112,10 +140,6 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
   // Envoy's internal dependency ordering.
   // TODO(gsagula): move TokenBucketImpl params to a config.
   if (!api_state_[type_url].subscribed_) {
-    // Bucket contains 100 tokens maximum and refills at 5 tokens/sec.
-    api_state_[type_url].limit_request_ = std::make_unique<TokenBucketImpl>(100, time_source_, 5);
-    // Bucket contains 1 token maximum and refills 1 token on every ~5 seconds.
-    api_state_[type_url].limit_log_ = std::make_unique<TokenBucketImpl>(1, time_source_, 0.2);
     api_state_[type_url].request_.set_type_url(type_url);
     api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
     api_state_[type_url].subscribed_ = true;
@@ -126,7 +150,7 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
   // TODO(htuch): For RDS/EDS, this will generate a new DiscoveryRequest on each resource we added.
   // Consider in the future adding some kind of collation/batching during CDS/LDS updates so that we
   // only send a single RDS/EDS update after the CDS/LDS update.
-  sendDiscoveryRequest(type_url);
+  queueDiscoveryRequest(type_url);
 
   return watch;
 }
@@ -147,7 +171,7 @@ void GrpcMuxImpl::resume(const std::string& type_url) {
 
   if (api_state.pending_) {
     ASSERT(api_state.subscribed_);
-    sendDiscoveryRequest(type_url);
+    queueDiscoveryRequest(type_url);
     api_state.pending_ = false;
   }
 }
@@ -187,7 +211,7 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
       // No watches and we have resources - this should not happen. send a NACK (by not updating
       // the version).
       ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
-      sendDiscoveryRequest(type_url);
+      queueDiscoveryRequest(type_url);
     }
     return;
   }
@@ -232,7 +256,7 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     error_detail->set_message(e.what());
   }
   api_state_[type_url].request_.set_response_nonce(message->nonce());
-  sendDiscoveryRequest(type_url);
+  queueDiscoveryRequest(type_url);
 }
 
 void GrpcMuxImpl::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
