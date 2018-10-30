@@ -20,6 +20,7 @@ Version history
   See `#3611 <https://github.com/envoyproxy/envoy/issues/3611>`_ for details.
 * network: removed the reference to `FilterState` in `Connection` in favor of `StreamInfo`.
 * logging: added missing [ in log prefix.
+* rbac: added dynamic metadata to the network level filter.
 * rbac: added support for permission matching by :ref:`requested server name <envoy_api_field_config.rbac.v2alpha.Permission.requested_server_name>`.
 * redis: static cluster configuration is no longer required. Redis proxy will work with clusters
   delivered via CDS.

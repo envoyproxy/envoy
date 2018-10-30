@@ -10,6 +10,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RBACFilter {
 
+static const std::string shadow_policy_id_field = "shadow_effective_policyID";
+
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::config::filter::network::rbac::v2::RBAC& proto_config, Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(), scope)),
@@ -19,7 +21,8 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {
   ENVOY_LOG(
       debug,
-      "checking connection: requestedServerName: {}, remoteAddress: {}, localAddress: {}, ssl: {}",
+      "checking connection: requestedServerName: {}, remoteAddress: {}, localAddress: {}, ssl: {}, "
+      "dynamicMetadata: {}",
       callbacks_->connection().requestedServerName(),
       callbacks_->connection().remoteAddress()->asString(),
       callbacks_->connection().localAddress()->asString(),
@@ -27,7 +30,8 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
           ? "uriSanPeerCertificate: " + callbacks_->connection().ssl()->uriSanPeerCertificate() +
                 ", subjectPeerCertificate: " +
                 callbacks_->connection().ssl()->subjectPeerCertificate()
-          : "none");
+          : "none",
+      callbacks_->connection().streamInfo().dynamicMetadata().DebugString());
 
   if (shadow_engine_result_ == Unknown) {
     // TODO(quanlin): Pass the shadow engine results to other filters.
@@ -51,14 +55,27 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
   return Network::FilterStatus::Continue;
 }
 
+void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_policy_id) {
+  ProtobufWkt::Struct metrics;
+  auto& fields = *metrics.mutable_fields();
+  if (!shadow_policy_id.empty()) {
+    *fields[shadow_policy_id_field].mutable_string_value() = shadow_policy_id;
+  }
+  callbacks_->connection().streamInfo().setDynamicMetadata(NetworkFilterNames::get().Rbac, metrics);
+}
+
 EngineResult
 RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode mode) {
   const auto& engine = config_->engine(mode);
   if (engine.has_value()) {
-    if (engine->allowed(callbacks_->connection())) {
+    std::string effective_policy_id;
+    if (engine->allowed(callbacks_->connection(),
+                        callbacks_->connection().streamInfo().dynamicMetadata(),
+                        &effective_policy_id)) {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
         ENVOY_LOG(debug, "shadow allowed");
         config_->stats().shadow_allowed_.inc();
+        setDynamicMetadata(effective_policy_id);
       } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
         ENVOY_LOG(debug, "enforced allowed");
         config_->stats().allowed_.inc();
@@ -68,6 +85,7 @@ RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
         ENVOY_LOG(debug, "shadow denied");
         config_->stats().shadow_denied_.inc();
+        setDynamicMetadata(effective_policy_id);
       } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
         ENVOY_LOG(debug, "enforced denied");
         config_->stats().denied_.inc();
