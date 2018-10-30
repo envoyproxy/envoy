@@ -175,11 +175,15 @@ modify different aspects of the server:
 
 .. http:get:: /server_info
 
-  Outputs information about the running server. Sample output looks like:
+  Outputs a JSON message containing nformation about the running server. Sample output looks like:
 
 .. code-block:: none
 
-  envoy 267724/RELEASE live 1571 1571 0
+ {
+   "version": "91a3f686546e0e40fa337bf69e15c2be177c4b02/1.9.0-dev/Modified/DEBUG",
+   "uptime_current_epoch": "10s",
+   "uptime_all_epochs": "10s"
+ }
 
 The fields are:
 

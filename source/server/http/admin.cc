@@ -517,7 +517,7 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
   time_t current_time = time(nullptr);
   envoy::admin::v2alpha::ServerInfo server_info;
@@ -529,6 +529,7 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
   server_info.mutable_uptime_all_epochs()->set_seconds(current_time -
                                                        server_.startTimeFirstEpoch());
   response.add(MessageUtil::getJsonStringFromMessage(server_info, true));
+  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
   return Http::Code::OK;
 }
 
