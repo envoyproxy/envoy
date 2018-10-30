@@ -18,7 +18,7 @@ struct ResponseContext {
 
 class ResponseStartParser : public Parser {
 public:
-  ResponseStartParser(ResponseContext&) {};
+  ResponseStartParser(ResponseContext&){};
   ParseResponse parse(const char*& buffer, uint64_t& remaining);
 };
 

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "extensions/filters/network/kafka/kafka_types.h"
+#include <vector>
 
 #include "common/common/macros.h"
 
-#include <vector>
+#include "extensions/filters/network/kafka/kafka_types.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -65,6 +65,7 @@ struct RequestSpec {
 
 struct KafkaRequest {
 
+  // clang-format off
   static const std::vector<RequestSpec>& requests() {
     CONSTRUCT_ON_FIRST_USE(
         std::vector<RequestSpec>,
@@ -113,7 +114,7 @@ struct KafkaRequest {
         {RequestType::DeleteGroups, "DeleteGroups"}
     );
   }
-
+  // clang-format on
 };
 
 } // namespace Kafka

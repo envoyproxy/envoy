@@ -1,16 +1,17 @@
 #pragma once
 
-#include "extensions/filters/network/kafka/parser.h"
+#include <sstream>
+
+#include "envoy/network/filter.h"
+#include "envoy/stats/scope.h"
+
+#include "common/common/logger.h"
+
 #include "extensions/filters/network/kafka/codec.h"
 #include "extensions/filters/network/kafka/kafka_request.h"
 #include "extensions/filters/network/kafka/kafka_response.h"
 #include "extensions/filters/network/kafka/metrics_holder.h"
-
-#include "envoy/network/filter.h"
-#include "envoy/stats/scope.h"
-#include "common/common/logger.h"
-
-#include <sstream>
+#include "extensions/filters/network/kafka/parser.h"
 
 namespace Envoy {
 namespace Extensions {

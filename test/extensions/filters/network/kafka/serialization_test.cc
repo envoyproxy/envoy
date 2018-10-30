@@ -15,11 +15,11 @@ namespace Kafka {
 // === EMPTY (FRESHLY INITIALIZED) BUFFER TESTS ================================
 
 // freshly created buffers should not be ready
-#define TEST_EmptyBufferShouldNotBeReady(BufferClass) \
-TEST(BufferClass, EmptyBufferShouldNotBeReady) {                               \
-  const BufferClass testee{};                                                  \
-  ASSERT_EQ(testee.ready(), false);                                            \
-}
+#define TEST_EmptyBufferShouldNotBeReady(BufferClass)                                              \
+  TEST(BufferClass, EmptyBufferShouldNotBeReady) {                                                 \
+    const BufferClass testee{};                                                                    \
+    ASSERT_EQ(testee.ready(), false);                                                              \
+  }
 
 TEST_EmptyBufferShouldNotBeReady(Int8Buffer);
 TEST_EmptyBufferShouldNotBeReady(Int16Buffer);
@@ -135,8 +135,7 @@ void serializeThenDeserializeAndCheckEqualityWithChunks(AT expected) {
   ASSERT_EQ(remaining, 1024);
 }
 
-template <typename BT, typename AT>
-void serializeThenDeserializeAndCheckEquality(AT expected) {
+template <typename BT, typename AT> void serializeThenDeserializeAndCheckEquality(AT expected) {
   serializeThenDeserializeAndCheckEqualityInOneGo<BT>(expected);
   serializeThenDeserializeAndCheckEqualityWithChunks<BT>(expected);
 }
@@ -144,12 +143,12 @@ void serializeThenDeserializeAndCheckEquality(AT expected) {
 // === NUMERIC BUFFERS =========================================================
 
 // macroed out test for numeric buffers
-#define TEST_BufferShouldDeserialize(BufferClass, DataClass, Value)            \
-TEST(DataClass, ShouldConsumeCorrectAmountOfData) {                            \
-  /* given */                                                                  \
-  const DataClass value = Value;                                               \
-  serializeThenDeserializeAndCheckEquality<BufferClass>(value);                \
-}
+#define TEST_BufferShouldDeserialize(BufferClass, DataClass, Value)                                \
+  TEST(DataClass, ShouldConsumeCorrectAmountOfData) {                                              \
+    /* given */                                                                                    \
+    const DataClass value = Value;                                                                 \
+    serializeThenDeserializeAndCheckEquality<BufferClass>(value);                                  \
+  }
 
 TEST_BufferShouldDeserialize(Int8Buffer, INT8, 42);
 TEST_BufferShouldDeserialize(Int16Buffer, INT16, 42);
@@ -310,7 +309,7 @@ TEST(NullableBytesIgnoringBuffer, ShouldThrowOnInvalidLength) {
 // === NULLABLE BYTES CAPTURING BUFFER =========================================
 
 TEST(NullableBytesCapturingBuffer, ShouldDeserialize) {
-  const NULLABLE_BYTES value{{ 'a', 'b', 'c', 'd' }};
+  const NULLABLE_BYTES value{{'a', 'b', 'c', 'd'}};
   serializeThenDeserializeAndCheckEquality<NullableBytesCapturingBuffer>(value);
 }
 
@@ -344,7 +343,7 @@ TEST(NullableBytesCapturingBuffer, ShouldThrowOnInvalidLength) {
 // === ARRAY BUFFER ============================================================
 
 TEST(ArrayBuffer, ShouldConsumeCorrectAmountOfData) {
-  const NULLABLE_ARRAY<STRING> value{{ "aaa", "bbbbb", "cc", "d", "e", "ffffffff" }};
+  const NULLABLE_ARRAY<STRING> value{{"aaa", "bbbbb", "cc", "d", "e", "ffffffff"}};
   serializeThenDeserializeAndCheckEquality<ArrayBuffer<STRING, StringBuffer>>(value);
 }
 
@@ -382,19 +381,16 @@ struct CompositeBufferResult {
 };
 
 bool operator==(const CompositeBufferResult& lhs, const CompositeBufferResult& rhs) {
-  return (lhs.field1_== rhs.field1_)
-      && (lhs.field2_== rhs.field2_)
-      && (lhs.field3_== rhs.field3_);
+  return (lhs.field1_ == rhs.field1_) && (lhs.field2_ == rhs.field2_) &&
+         (lhs.field3_ == rhs.field3_);
 }
 
-typedef CompositeBuffer<CompositeBufferResult, StringBuffer, ArrayBuffer<INT32, Int32Buffer>, Int16Buffer> TestCompositeBuffer;
+typedef CompositeBuffer<CompositeBufferResult, StringBuffer, ArrayBuffer<INT32, Int32Buffer>,
+                        Int16Buffer>
+    TestCompositeBuffer;
 
 TEST(CompositeBuffer, ShouldDeserialize) {
-  const CompositeBufferResult expected {
-    "zzzzz",
-    {{ 10, 20, 30, 40, 50 }},
-    1234
-  };
+  const CompositeBufferResult expected{"zzzzz", {{10, 20, 30, 40, 50}}, 1234};
   serializeThenDeserializeAndCheckEquality<TestCompositeBuffer>(expected);
 }
 

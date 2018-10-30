@@ -1,9 +1,9 @@
 #pragma once
 
-#include "absl/types/optional.h"
-
 #include <memory>
 #include <string>
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,8 +23,7 @@ typedef absl::optional<STRING> NULLABLE_STRING;
 typedef std::vector<unsigned char> BYTES;
 typedef absl::optional<BYTES> NULLABLE_BYTES;
 
-template<typename T>
-using NULLABLE_ARRAY = absl::optional<std::vector<T>>;
+template <typename T> using NULLABLE_ARRAY = absl::optional<std::vector<T>>;
 
 } // namespace Kafka
 } // namespace NetworkFilters

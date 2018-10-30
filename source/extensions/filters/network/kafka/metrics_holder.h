@@ -1,10 +1,10 @@
 #pragma once
 
-#include "extensions/filters/network/kafka/kafka_types.h"
+#include <memory>
 
 #include "envoy/stats/scope.h"
 
-#include <memory>
+#include "extensions/filters/network/kafka/kafka_types.h"
 
 namespace Envoy {
 namespace Extensions {

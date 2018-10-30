@@ -59,8 +59,8 @@ envoy_cc_library(
     deps = [
         ":parser_lib",
         ":serialization_lib",
-        "//source/common/common:minimal_logger_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 
@@ -107,7 +107,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "kafka_protocol_lib",
-    hdrs = ["kafka_types.h", "kafka_protocol.h"],
+    hdrs = [
+        "kafka_protocol.h",
+        "kafka_types.h",
+    ],
     external_deps = ["abseil_optional"],
     deps = [
         "//source/common/common:macros",

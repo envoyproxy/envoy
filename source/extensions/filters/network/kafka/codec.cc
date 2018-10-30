@@ -42,8 +42,7 @@ void RequestDecoder::doParse(ParserSharedPtr& parser, const Buffer::RawSlice& sl
   }
 }
 
-void ResponseDecoder::onWrite(Buffer::Instance&) {
-  /* not implemented yet */
+void ResponseDecoder::onWrite(Buffer::Instance&) { /* not implemented yet */
 }
 
 } // namespace Kafka

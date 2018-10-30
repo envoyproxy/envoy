@@ -16,8 +16,7 @@ class RequestDecoderTest : public testing::Test {
 public:
   Buffer::OwnedImpl buffer_;
 
-  template <typename T>
-  std::shared_ptr<T> serializeAndDeserialize(T request);
+  template <typename T> std::shared_ptr<T> serializeAndDeserialize(T request);
 };
 
 class MockMessageListener : public MessageListener {
@@ -25,19 +24,17 @@ public:
   MOCK_METHOD1(onMessage, void(MessageSharedPtr));
 };
 
-template <typename T>
-std::shared_ptr<T> RequestDecoderTest::serializeAndDeserialize(T request) {
+template <typename T> std::shared_ptr<T> RequestDecoderTest::serializeAndDeserialize(T request) {
   char data[1024];
   RequestSerializer serializer;
   size_t written = serializer.encode(request, data);
   buffer_.add(data, written);
 
   std::shared_ptr<MockMessageListener> mock_listener = std::make_shared<MockMessageListener>();
-  RequestDecoder testee{RequestParserResolver::KAFKA_0_11, { mock_listener }};
+  RequestDecoder testee{RequestParserResolver::KAFKA_0_11, {mock_listener}};
 
   MessageSharedPtr receivedMessage;
-  EXPECT_CALL(*mock_listener, onMessage(_))
-    .WillOnce(testing::SaveArg<0>(&receivedMessage));
+  EXPECT_CALL(*mock_listener, onMessage(_)).WillOnce(testing::SaveArg<0>(&receivedMessage));
 
   testee.onData(buffer_);
 
@@ -48,27 +45,16 @@ std::shared_ptr<T> RequestDecoderTest::serializeAndDeserialize(T request) {
 
 TEST_F(RequestDecoderTest, shouldParseFetchRequest) {
   // given
-  FetchRequest request{
-    1,
-    1000,
-    10,
-    20,
-    2,
-    {{
-        {
-            "topic1",
-            {{ { 10, 20, 1000, 2000 } }}
-        },
-        {
-            "topic1",
-            {{ { 11, 21, 1001, 2001 }, { 12, 22, 1002, 2002 } }}
-        },
-        {
-            "topic1",
-            {{ { 13, 23, 1003, 2003 } }}
-        },
-    }}
-  };
+  FetchRequest request{1,
+                       1000,
+                       10,
+                       20,
+                       2,
+                       {{
+                           {"topic1", {{{10, 20, 1000, 2000}}}},
+                           {"topic1", {{{11, 21, 1001, 2001}, {12, 22, 1002, 2002}}}},
+                           {"topic1", {{{13, 23, 1003, 2003}}}},
+                       }}};
   request.apiVersion() = 5;
   request.correlationId() = 10;
   request.clientId() = "client-id";
@@ -85,14 +71,12 @@ TEST_F(RequestDecoderTest, shouldParseFetchRequest) {
 
 TEST_F(RequestDecoderTest, shouldParseListOffsetsRequest) {
   // given
-  ListOffsetsRequest request{
-    10,
-    2,
-    {{
-        { "topic1", {{ {1, 1000}, {2, 2000} } }},
-        { "topic2", {{ {3, 3000} } }},
-    }}
-  };
+  ListOffsetsRequest request{10,
+                             2,
+                             {{
+                                 {"topic1", {{{1, 1000}, {2, 2000}}}},
+                                 {"topic2", {{{3, 3000}}}},
+                             }}};
   request.apiVersion() = 2;
   request.correlationId() = 10;
   request.clientId() = "client-id";
@@ -109,10 +93,7 @@ TEST_F(RequestDecoderTest, shouldParseListOffsetsRequest) {
 
 TEST_F(RequestDecoderTest, shouldParseMetadataRequest) {
   // given
-  MetadataRequest request{
-    {{ "t1", "t2", "t3" }},
-    true
-  };
+  MetadataRequest request{{{"t1", "t2", "t3"}}, true};
   request.apiVersion() = 4;
   request.correlationId() = 10;
   request.clientId() = "client-id";
@@ -129,16 +110,12 @@ TEST_F(RequestDecoderTest, shouldParseMetadataRequest) {
 
 TEST_F(RequestDecoderTest, shouldParseOffsetCommitRequest) {
   // given
-  OffsetCommitRequest request {
-    "group_id",
-    1234,
-    "member",
-    2345,
-    {{
-        { "topic1", {{ { 0, 10, "m1" }, { 2, 20, "m2" } } }},
-        { "topic2", {{ { 3, 30, "m3" } } }}
-    }}
-  };
+  OffsetCommitRequest request{
+      "group_id",
+      1234,
+      "member",
+      2345,
+      {{{"topic1", {{{0, 10, "m1"}, {2, 20, "m2"}}}}, {"topic2", {{{3, 30, "m3"}}}}}}};
   request.apiVersion() = 3;
   request.correlationId() = 10;
   request.clientId() = "client-id";
@@ -155,13 +132,7 @@ TEST_F(RequestDecoderTest, shouldParseOffsetCommitRequest) {
 
 TEST_F(RequestDecoderTest, shouldParseOffsetFetchRequest) {
   // given
-  OffsetFetchRequest request {
-    "group_id",
-    {{
-        { "topic1", {{ 0, 1, 2 } }},
-        { "topic2", {{ 3, 4 } }}
-    }}
-  };
+  OffsetFetchRequest request{"group_id", {{{"topic1", {{0, 1, 2}}}, {"topic2", {{3, 4}}}}}};
 
   request.apiVersion() = 3;
   request.correlationId() = 10;
@@ -209,11 +180,10 @@ TEST_F(RequestDecoderTest, shouldProduceAbortedMessageOnUnknownData) {
 
   std::shared_ptr<MockMessageListener> mock_listener = std::make_shared<MockMessageListener>();
   RequestParserResolver parser_resolver{{}}; // we do not accept any kind of message here
-  RequestDecoder testee{parser_resolver, { mock_listener }};
+  RequestDecoder testee{parser_resolver, {mock_listener}};
 
   MessageSharedPtr rev;
-  EXPECT_CALL(*mock_listener, onMessage(_))
-    .WillOnce(testing::SaveArg<0>(&rev));
+  EXPECT_CALL(*mock_listener, onMessage(_)).WillOnce(testing::SaveArg<0>(&rev));
 
   // when
   testee.onData(buffer_);

@@ -1,10 +1,10 @@
-#include "extensions/filters/network/kafka/kafka_filter.h"
-#include "extensions/filters/network/kafka/metrics_holder.h"
-#include "extensions/filters/network/well_known_names.h"
-
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
+
+#include "extensions/filters/network/kafka/kafka_filter.h"
+#include "extensions/filters/network/kafka/metrics_holder.h"
+#include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,12 +18,14 @@ class KafkaConfigFactory : public Server::Configuration::NamedNetworkFilterConfi
 public:
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
-  createFilterFactory(const Json::Object&, Server::Configuration::FactoryContext& context) override {
+  createFilterFactory(const Json::Object&,
+                      Server::Configuration::FactoryContext& context) override {
     return createInternal(context.scope());
   }
 
   Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&, Server::Configuration::FactoryContext& context) override {
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext& context) override {
     return createInternal(context.scope());
   }
 
@@ -45,7 +47,9 @@ private:
 /**
  * Static registration for the Kafka filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<KafkaConfigFactory, Server::Configuration::NamedNetworkFilterConfigFactory> registered_;
+static Registry::RegisterFactory<KafkaConfigFactory,
+                                 Server::Configuration::NamedNetworkFilterConfigFactory>
+    registered_;
 
 } // namespace Kafka
 } // namespace NetworkFilters
