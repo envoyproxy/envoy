@@ -312,7 +312,8 @@ TEST_P(MainCommonTest, ConstructDestructLogger) {
   // log_msg constructor doesn't initialize all fields, resulting in uninitialized
   // memory accesses.  "static" is a simple way to start from zeroed memory before
   // the constructor is run, avoiding this problem.
-  // See https://github.com/gabime/spdlog/issues/888.
+  // Has been fixed in spdlog; see https://github.com/gabime/spdlog/issues/888.
+  // This change may be reverted after the next spdlog import.
   const std::string logger_name = "logger";
   static spdlog::details::log_msg log_msg(&logger_name, spdlog::level::level_enum::err);
   Logger::Registry::getSink()->log(log_msg);
