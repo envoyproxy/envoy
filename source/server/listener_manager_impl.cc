@@ -516,12 +516,12 @@ ListenerImpl::findFilterChainForSourceTypes(const SourceTypesArray source_types,
 
   envoy::api::v2::listener::FilterChainMatch_RequestSourceType source_type;
 
-  if (Network::Utility::isLocalConnection(*socket.localAddress(), *socket.remoteAddress())) {
+  if (Network::Utility::isLocalConnection(socket)) {
     source_type = envoy::api::v2::listener::FilterChainMatch_RequestSourceType::
-        FilterChainMatch_RequestSourceType_SAME;
+        FilterChainMatch_RequestSourceType_LOCAL;
   } else {
     source_type = envoy::api::v2::listener::FilterChainMatch_RequestSourceType::
-        FilterChainMatch_RequestSourceType_DISTINCT;
+        FilterChainMatch_RequestSourceType_EXTERNAL;
   }
 
   auto filter_chain = source_types[source_type];

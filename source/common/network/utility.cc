@@ -208,10 +208,17 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
   return ret;
 }
 
-bool Utility::isLocalConnection(const Address::Instance& local_address,
-                                const Address::Instance& remote_address) {
-  auto local_ip = local_address.ip();
-  auto remote_ip = remote_address.ip();
+bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
+
+  auto local_address = socket.localAddress();
+  auto remote_address = socket.remoteAddress();
+
+  if (local_address->type() == Envoy::Network::Address::Type::Pipe) {
+    return true;
+  }
+
+  auto local_ip = local_address->ip();
+  auto remote_ip = remote_address->ip();
   if (local_ip && remote_ip) {
     if (local_ip->ipv4() && remote_ip->ipv4()) {
       return local_ip->ipv4()->address() == remote_ip->ipv4()->address();
@@ -220,7 +227,7 @@ bool Utility::isLocalConnection(const Address::Instance& local_address,
     }
   }
 
-  return local_address == remote_address;
+  return false;
 }
 
 bool Utility::isInternalAddress(const Address::Instance& address) {

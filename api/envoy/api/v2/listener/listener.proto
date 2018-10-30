@@ -92,21 +92,10 @@ message FilterChainMatch {
   enum RequestSourceType {
     // Any request origin matches
     ANY = 0;
-    // Match a request with same source and destination IP. In simple network
-    // configurations, this is likely to be a same host origination. This would
-    // only match if the connecting and listener IPs are the same.
-    // See DISTINCT for an example.
-    SAME = 1;
-    // Match a request with distinct source and destination IP. In simple network
-    // configurations, this will usually be process not running on the same host.
-    // This condition will also match any local process communicating over
-    // a socket specifically bound to an interface different from the interface it
-    // contacts Envoy on.
-    // An example would be a host with an interface in 10.10.0.1/16 and Envoy
-    // listening on another interface 10.20.0.1/16. In this case if an application's
-    // client socket is explicitly bound to 10.10.0.1 the connection will
-    // effectively match the DISTINCT condition.
-    DISTINCT = 2;
+    // Match a request originating from the same host
+    LOCAL = 1;
+    // Match a request originating from a different host
+    EXTERNAL = 2;
   }
 
   // Specifies the source IP match type. Can be any, same or distinct network

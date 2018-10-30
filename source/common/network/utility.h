@@ -115,7 +115,7 @@ public:
    * Determine whether this is a local address.
    * @return bool the address is a local address.
    */
-  static bool isLocalConnection(const Address::Instance&, const Address::Instance&);
+  static bool isLocalConnection(const Network::ConnectionSocket& socket);
 
   /**
    * Determine whether this is an internal (RFC1918) address.

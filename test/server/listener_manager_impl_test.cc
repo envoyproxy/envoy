@@ -1325,7 +1325,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
       config: {}
     filter_chains:
     - filter_chain_match:
-        source_type: SAME
+        source_type: LOCAL
       tls_context:
         common_tls_context:
           tls_certificates:
