@@ -117,14 +117,6 @@ void Filter::onRequestMessage(RequestMessagePtr&& message) {
   ASSERT(message);
   ASSERT(message->messageType() == MessageType::Request);
 
-  switch (message->serializationType()) {
-  case SerializationType::Json:
-  case SerializationType::Hessian:
-    break;
-  default:
-    throw EnvoyException(fmt::format("unexpected serialization type {}",
-                                     static_cast<uint8_t>((message->serializationType()))));
-  }
   stats_.request_.inc();
   message->isTwoWay() ? stats_.request_twoway_.inc() : stats_.request_oneway_.inc();
 
