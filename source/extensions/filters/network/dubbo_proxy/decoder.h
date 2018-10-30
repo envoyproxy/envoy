@@ -26,7 +26,7 @@ public:
 class Decoder : public Logger::Loggable<Logger::Id::dubbo> {
 public:
   Decoder(ProtocolPtr&& protocol, DeserializerPtr&& deserializer,
-          DecoderCallbacks* decoder_callbacks);
+          DecoderCallbacks& decoder_callbacks);
 
   /**
    * Drains data from the given buffer
@@ -44,7 +44,7 @@ private:
   ProtocolPtr protocol_;
   bool decode_ended_ = false;
   Protocol::Context context_;
-  DecoderCallbacks* decoder_callbacks_;
+  DecoderCallbacks& decoder_callbacks_;
 };
 
 typedef std::unique_ptr<Decoder> DecoderPtr;

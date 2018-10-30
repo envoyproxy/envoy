@@ -17,9 +17,9 @@ message DubboProxy {
   }
   ProtocolType protocol_type = 2 [(validate.rules).enum.defined_only = true];
 
-  // Configure the deserialization protocol used.
-  enum DeserializationType {
-    Hessian2 = 0; // the default deserialization protocol.
+  // Configure the serialization protocol used.
+  enum SerializationType {
+    Hessian2 = 0; // the default serialization protocol.
   }
-  DeserializationType deserialization_type = 3 [(validate.rules).enum.defined_only = true];
+  SerializationType serialization_type = 3 [(validate.rules).enum.defined_only = true];
 }

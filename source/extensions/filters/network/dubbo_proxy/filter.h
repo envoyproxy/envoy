@@ -57,10 +57,10 @@ class Filter : public Network::Filter,
                Logger::Loggable<Logger::Id::dubbo> {
 public:
   using ConfigProtocolType = envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_ProtocolType;
-  using ConfigDeserializationType = envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_DeserializationType;
+  using ConfigSerializationType = envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_SerializationType;
 
   Filter(const std::string& stat_prefix, ConfigProtocolType protocol_type,
-         ConfigDeserializationType deserialization_type, Stats::Scope& scope,
+         ConfigSerializationType serialization_type, Stats::Scope& scope,
          TimeSource& time_source);
   virtual ~Filter();
 
@@ -128,7 +128,7 @@ private:
   DubboFilterStats stats_;
 
   ConfigProtocolType protocol_type_;
-  ConfigDeserializationType deserialization_type_;
+  ConfigSerializationType serialization_type_;
 
   TimeSource& time_source_;
 };

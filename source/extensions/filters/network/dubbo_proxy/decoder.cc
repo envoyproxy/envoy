@@ -8,7 +8,7 @@ namespace NetworkFilters {
 namespace DubboProxy {
 
 Decoder::Decoder(ProtocolPtr&& protocol, DeserializerPtr&& deserializer,
-                 DecoderCallbacks* decoder_callbacks)
+                 DecoderCallbacks& decoder_callbacks)
     : deserializer_(std::move(deserializer)), protocol_(std::move(protocol)),
       decoder_callbacks_(decoder_callbacks) {}
 
@@ -33,11 +33,11 @@ void Decoder::onData(Buffer::Instance& data) {
     }
 
     if (context_.is_request_) {
-      decoder_callbacks_->onRpcInvocation(
+      decoder_callbacks_.onRpcInvocation(
           deserializer_->deserializeRpcInvocation(data, context_.body_size_));
       ENVOY_LOG(debug, "dubbo: {} RpcInvocation deserialize ended", deserializer_->name());
     } else {
-      decoder_callbacks_->onRpcResult(
+      decoder_callbacks_.onRpcResult(
           deserializer_->deserializeRpcResult(data, context_.body_size_));
       ENVOY_LOG(debug, "dubbo: {} RpcResult deserialize ended", deserializer_->name());
     }

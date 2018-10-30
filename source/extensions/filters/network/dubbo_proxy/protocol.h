@@ -23,8 +23,8 @@ public:
 
 typedef ConstSingleton<ProtocolNameValues> ProtocolNames;
 
-// Supported deserialization type
-enum class DeserializationType : uint8_t {
+// Supported serialization type
+enum class SerializationType : uint8_t {
   Hessian = 2,
   Json = 6,
 };
@@ -65,7 +65,7 @@ public:
 class RequestMessage : public virtual Message {
 public:
   virtual ~RequestMessage() {}
-  virtual DeserializationType deserializationType() const PURE;
+  virtual SerializationType serializationType() const PURE;
   virtual bool isTwoWay() const PURE;
 };
 

@@ -12,7 +12,7 @@ constexpr uint16_t MagicNumber = 0xdabb;
 constexpr uint8_t MessageTypeMask = 0x80;
 constexpr uint8_t EventMask = 0x20;
 constexpr uint8_t TwoWayMask = 0x40;
-constexpr uint8_t DeserializationTypeMask = 0x1f;
+constexpr uint8_t SerializationTypeMask = 0x1f;
 constexpr uint64_t FlagOffset = 2;
 constexpr uint64_t StatusOffset = 3;
 constexpr uint64_t RequestIDOffset = 4;
@@ -21,10 +21,10 @@ constexpr uint64_t BodySizeOffset = 12;
 } // namespace
 
 // Consistent with the SerializationType
-bool isValidDeserializationType(DeserializationType type) {
+bool isValidSerializationType(SerializationType type) {
   switch (type) {
-  case DeserializationType::Hessian:
-  case DeserializationType::Json:
+  case SerializationType::Hessian:
+  case SerializationType::Json:
     break;
   default:
     return false;
@@ -55,11 +55,11 @@ void RequestMessageImpl::fromBuffer(Buffer::Instance& data) {
   ASSERT(data.length() >= DubboProtocolImpl::MessageSize);
   uint8_t flag = data.peekInt<uint8_t>(FlagOffset);
   is_two_way_ = (flag & TwoWayMask) == TwoWayMask ? true : false;
-  type_ = static_cast<DeserializationType>(flag & DeserializationTypeMask);
-  if (!isValidDeserializationType(type_)) {
+  type_ = static_cast<SerializationType>(flag & SerializationTypeMask);
+  if (!isValidSerializationType(type_)) {
     throw EnvoyException(
-        fmt::format("invalid dubbo message deserialization type {}",
-                    static_cast<std::underlying_type<DeserializationType>::type>(type_)));
+        fmt::format("invalid dubbo message serialization type {}",
+                    static_cast<std::underlying_type<SerializationType>::type>(type_)));
   }
 }
 

@@ -14,10 +14,10 @@ namespace NetworkFilters {
 namespace DubboProxy {
 
 Filter::Filter(const std::string& stat_prefix, ConfigProtocolType protocol_type,
-               ConfigDeserializationType deserialization_type, Stats::Scope& scope,
+               ConfigSerializationType serialization_type, Stats::Scope& scope,
                TimeSource& time_source)
     : stats_(generateStats(stat_prefix, scope)), protocol_type_(protocol_type),
-      deserialization_type_(deserialization_type), time_source_(time_source) {}
+      serialization_type_(serialization_type), time_source_(time_source) {}
 
 Filter::~Filter() = default;
 
@@ -117,13 +117,13 @@ void Filter::onRequestMessage(RequestMessagePtr&& message) {
   ASSERT(message);
   ASSERT(message->messageType() == MessageType::Request);
 
-  switch (message->deserializationType()) {
-  case DeserializationType::Json:
-  case DeserializationType::Hessian:
+  switch (message->serializationType()) {
+  case SerializationType::Json:
+  case SerializationType::Hessian:
     break;
   default:
-    throw EnvoyException(fmt::format("unexpected deserialization type {}",
-                                     static_cast<uint8_t>((message->deserializationType()))));
+    throw EnvoyException(fmt::format("unexpected serialization type {}",
+                                     static_cast<uint8_t>((message->serializationType()))));
   }
   stats_.request_.inc();
   message->isTwoWay() ? stats_.request_twoway_.inc() : stats_.request_oneway_.inc();
@@ -187,7 +187,7 @@ DubboFilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& 
 DecoderPtr Filter::createDecoder(ProtocolCallbacks& prot_callback) {
   auto parser = createProtocol(prot_callback);
   auto serializer = createDeserializer();
-  return std::make_unique<Decoder>(std::move(parser), std::move(serializer), this);
+  return std::make_unique<Decoder>(std::move(parser), std::move(serializer), *this);
 }
 
 ProtocolPtr Filter::createProtocol(ProtocolCallbacks& callback) {
@@ -204,13 +204,13 @@ ProtocolPtr Filter::createProtocol(ProtocolCallbacks& callback) {
 
 DeserializerPtr Filter::createDeserializer() {
   using Type = envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy;
-  switch (deserialization_type_) {
+  switch (serialization_type_) {
   case Type::Hessian2:
     return std::make_unique<HessianDeserializerImpl>();
   default:
     throw EnvoyException(fmt::format(
         "unsupported serialization type, value is: {}",
-        static_cast<std::underlying_type<ConfigDeserializationType>::type>(deserialization_type_)));
+        static_cast<std::underlying_type<ConfigSerializationType>::type>(serialization_type_)));
   }
 }
 
