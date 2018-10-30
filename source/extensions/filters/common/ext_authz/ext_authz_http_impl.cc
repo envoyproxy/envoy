@@ -126,6 +126,7 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
   denied_response->status_code = static_cast<Http::Code>(status_code);
   denied_response->body = message->bodyAsString();
   if (allowed_client_headers_.empty()) {
+    // Copy all headers to the client's response.
     message->headers().iterate(
         [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
           static_cast<Http::HeaderVector*>(context)->emplace_back(
@@ -134,6 +135,7 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
         },
         &(denied_response->headers_to_add));
   } else {
+    // Copy only the allowed headers to the client's response.
     for (const auto& header : allowed_client_headers_) {
       const auto* entry = message->headers().get(header);
       if (entry) {
