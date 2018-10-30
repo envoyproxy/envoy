@@ -81,7 +81,7 @@ message Cluster {
     // for an explanation.
     LOGICAL_DNS = 2;
 
-    // Refer to the :ref:`service discovery type<arch_overview_service_discovery_types_sds>`
+    // Refer to the :ref:`service discovery type<arch_overview_service_discovery_types_eds>`
     // for an explanation.
     EDS = 3;
 
@@ -386,12 +386,8 @@ message Cluster {
 
     // [#not-implemented-hide:] Hide from docs.
     message DeprecatedV1 {
-      // Defaults to true, meaning that std::hash is used to hash hosts onto
-      // the ketama ring. std::hash can vary by platform. For this reason,
-      // Envoy will eventually use `xxHash <https://github.com/Cyan4973/xxHash>`_
-      // by default. This field exists for
-      // migration purposes and will eventually be deprecated. Set it to false
-      // to use `xxHash <https://github.com/Cyan4973/xxHash>`_ now.
+      // Defaults to false, meaning that `xxHash <https://github.com/Cyan4973/xxHash>`_
+      // is to hash hosts onto the ketama ring.
       google.protobuf.BoolValue use_std_hash = 1;
     }
 

@@ -14,8 +14,8 @@ namespace Cors {
 
 CorsFilter::CorsFilter() : policies_({{nullptr, nullptr}}), is_cors_request_(false) {}
 
-// This handles the CORS preflight request as described in #6.2
-// https://www.w3.org/TR/cors/
+// This handles the CORS preflight request as described in
+// https://www.w3.org/TR/cors/#resource-preflight-requests
 Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   if (decoder_callbacks_->route() == nullptr ||
       decoder_callbacks_->route()->routeEntry() == nullptr) {
@@ -79,8 +79,8 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-// This handles simple CORS requests as described in #6.1
-// https://www.w3.org/TR/cors/
+// This handles simple CORS requests as described in
+// https://www.w3.org/TR/cors/#resource-requests
 Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
   if (!is_cors_request_) {
     return Http::FilterHeadersStatus::Continue;

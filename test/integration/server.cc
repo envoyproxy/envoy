@@ -19,6 +19,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 
+#include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -75,6 +76,26 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
     listeners_cv_.wait(listeners_mutex_); // Safe since CondVar::wait won't throw.
   }
   ENVOY_LOG(info, "listener wait complete");
+
+  // If we are capturing, spin up tcpdump.
+  const auto capture_path = TestEnvironment::getOptionalEnvVar("CAPTURE_PATH");
+  if (capture_path) {
+    std::vector<uint32_t> ports;
+    for (auto listener : server().listenerManager().listeners()) {
+      const auto listen_addr = listener.get().socket().localAddress();
+      if (listen_addr->type() == Network::Address::Type::Ip) {
+        ports.push_back(listen_addr->ip()->port());
+      }
+    }
+    // TODO(htuch): Support a different loopback interface as needed.
+    const ::testing::TestInfo* const test_info =
+        ::testing::UnitTest::GetInstance()->current_test_info();
+    const std::string test_id =
+        std::string(test_info->name()) + "_" + std::string(test_info->test_case_name());
+    const std::string pcap_path =
+        capture_path.value() + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}) + "_server.pcap";
+    tcp_dump_ = std::make_unique<TcpDump>(pcap_path, "lo", ports);
+  }
 }
 
 IntegrationTestServer::~IntegrationTestServer() {

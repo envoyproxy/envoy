@@ -84,28 +84,14 @@ preferred service discovery mechanism for a few reasons:
   load balancing weight, canary status, zone, etc. These additional attributes are used globally
   by the Envoy mesh during load balancing, statistic gathering, etc.
 
+The Envoy project provides reference gRPC implementations of EDS and
+:ref:`other discovery services <arch_overview_dynamic_config>`
+in both `Java <https://github.com/envoyproxy/java-control-plane>`_
+and `Go <https://github.com/envoyproxy/go-control-plane>`_.
+
 Generally active health checking is used in conjunction with the eventually consistent service
 discovery service data to making load balancing and routing decisions. This is discussed further in
 the following section.
-
-.. _arch_overview_service_discovery_types_sds:
-
-Service discovery service (v1 SDS)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-*(deprecated)* This discovery service was replaced to endpoint discovery service in :ref:`v2 xDS
-API<config_overview_v2>`.
-
-The *service discovery service* is a generic :ref:`REST based API <config_cluster_manager_sds_api>`
-used by Envoy to fetch cluster members. Lyft provides a reference implementation via the Python
-`discovery service <https://github.com/lyft/discovery>`_. That implementation uses AWS DynamoDB as
-the backing store, however the API is simple enough that it could easily be implemented on top of a
-variety of different backing stores.
-
-.. attention::
-
-  In the current xDS API, the word "SDS" is used as an acronym for :ref:`Secret Discovery Service
-  <config_secret_discovery_service>`.
 
 .. _arch_overview_service_discovery_eventually_consistent:
 

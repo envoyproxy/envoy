@@ -169,6 +169,7 @@ private:
   Event::Dispatcher& dispatcher_;
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>> listeners_;
   std::atomic<uint64_t> num_connections_{};
+  bool disable_listeners_;
 };
 
 } // namespace Server

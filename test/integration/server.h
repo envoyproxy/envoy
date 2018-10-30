@@ -20,6 +20,7 @@
 #include "server/test_hooks.h"
 
 #include "test/integration/server_stats.h"
+#include "test/integration/tcp_dump.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -307,6 +308,7 @@ private:
   Server::Instance* server_;
   Stats::Store* stat_store_{};
   Network::Address::InstanceConstSharedPtr admin_address_;
+  TcpDumpPtr tcp_dump_;
 };
 
 } // namespace Envoy

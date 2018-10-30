@@ -167,7 +167,8 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
   const std::string& type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
   if (api_state_.count(type_url) == 0) {
-    ENVOY_LOG(warn, "Ignoring unknown type URL {}", type_url);
+    ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",
+              type_url);
     // TODO(yuval-k): This should never happen. consider dropping the stream as this is a protocol
     // violation
     return;
