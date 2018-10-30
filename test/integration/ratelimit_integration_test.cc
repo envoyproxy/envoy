@@ -12,19 +12,8 @@
 namespace Envoy {
 namespace {
 
-// TODO(junr03): legacy rate limit is deprecated. Go back to having only one
-// GrpcClientIntegrationParamTest after 1.7.0.
-class RatelimitGrpcClientIntegrationParamTest
-    : public Grpc::BaseGrpcClientIntegrationParamTest,
-      public testing::TestWithParam<
-          std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>> {
-public:
-  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
-  Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
-};
-
 class RatelimitIntegrationTest : public HttpIntegrationTest,
-                                 public RatelimitGrpcClientIntegrationParamTest {
+                                 public Grpc::GrpcClientIntegrationParamTest {
 public:
   RatelimitIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
@@ -178,9 +167,9 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, RatelimitIntegrationTest,
-                        RATELIMIT_GRPC_CLIENT_INTEGRATION_PARAMS);
+                        GRPC_CLIENT_INTEGRATION_PARAMS);
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, RatelimitFailureModeIntegrationTest,
-                        RATELIMIT_GRPC_CLIENT_INTEGRATION_PARAMS);
+                        GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(RatelimitIntegrationTest, Ok) {
   initiateClientConnection();

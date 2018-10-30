@@ -39,8 +39,7 @@ class GrpcClientImpl : public Client,
                        public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout,
-                 const std::string& method_name);
+                 const absl::optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl();
 
   static void createRequest(envoy::service::ratelimit::v2::RateLimitRequest& request,

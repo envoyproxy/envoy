@@ -15,10 +15,13 @@
 namespace Envoy {
 namespace RateLimit {
 
+static const std::string ratelimit_method_name =
+    "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit";
+
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                               const absl::optional<std::chrono::milliseconds>& timeout,
-                               const std::string& method_name)
-    : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method_name)),
+                               const absl::optional<std::chrono::milliseconds>& timeout)
+    : service_method_(
+          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(ratelimit_method_name)),
       async_client_(std::move(async_client)), timeout_(timeout) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
@@ -102,9 +105,7 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitSe
 }
 
 ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout) {
-  return std::make_unique<GrpcClientImpl>(
-      async_client_factory_->create(), timeout,
-      "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit");
+  return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout);
 }
 
 } // namespace RateLimit
