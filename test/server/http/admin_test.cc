@@ -1094,7 +1094,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
   EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
   envoy::admin::v2alpha::ServerInfo server_info_proto;
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("text/plain"));
+              HasSubstr("application/json"));
 
   // We only test that it parses as the proto and that some fields are correct, since
   // values such as timestamps + Envoy version are tricky to test for.
