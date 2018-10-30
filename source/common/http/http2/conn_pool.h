@@ -66,11 +66,28 @@ protected:
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
     uint64_t total_streams_{};
     Event::TimerPtr connect_timer_;
+    Event::TimerPtr upstream_ready_timer_;
     Stats::TimespanPtr conn_length_;
+    bool upstream_ready_{};
     bool closed_with_active_rq_{};
   };
 
   typedef std::unique_ptr<ActiveClient> ActiveClientPtr;
+
+  struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
+    PendingRequest(ConnPoolImpl& parent, StreamDecoder& decoder,
+                   ConnectionPool::Callbacks& callbacks);
+    ~PendingRequest();
+
+    // Cancellable
+    void cancel() override { parent_.onPendingRequestCancel(*this); }
+
+    ConnPoolImpl& parent_;
+    StreamDecoder& decoder_;
+    ConnectionPool::Callbacks& callbacks_;
+  };
+
+  typedef std::unique_ptr<PendingRequest> PendingRequestPtr;
 
   void checkForDrained();
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
@@ -81,6 +98,9 @@ protected:
   void onGoAway(ActiveClient& client);
   void onStreamDestroy(ActiveClient& client);
   void onStreamReset(ActiveClient& client, Http::StreamResetReason reason);
+  void newClientStream(Http::StreamDecoder& response_decoder, ConnectionPool::Callbacks& callbacks);
+  void onPendingRequestCancel(PendingRequest& request);
+  void onUpstreamReady();
 
   Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
@@ -88,6 +108,7 @@ protected:
   ActiveClientPtr primary_client_;
   ActiveClientPtr draining_client_;
   std::list<DrainedCb> drained_callbacks_;
+  std::list<PendingRequestPtr> pending_requests_;
   Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
 };
