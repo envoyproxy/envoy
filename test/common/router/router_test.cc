@@ -90,6 +90,7 @@ public:
   }
 
   void expectResponseTimerCreate() {
+    response_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
     EXPECT_CALL(*response_timeout_, enableTimer(_));
     EXPECT_CALL(*response_timeout_, disableTimer());
   }
