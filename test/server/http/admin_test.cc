@@ -1146,6 +1146,20 @@ TEST_F(PrometheusStatsFormatterTest, MetricName) {
   EXPECT_EQ(expected, actual);
 }
 
+TEST_F(PrometheusStatsFormatterTest, SanitizeMetricName) {
+  std::string raw = "An.artist.plays-violin@019street";
+  std::string expected = "envoy_An_artist_plays_violin_019street";
+  auto actual = PrometheusStatsFormatter::metricName(raw);
+  EXPECT_EQ(expected, actual);
+}
+
+TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
+  std::string raw = "3.artists.play-violin@019street";
+  std::string expected = "envoy_3_artists_play_violin_019street";
+  auto actual = PrometheusStatsFormatter::metricName(raw);
+  EXPECT_EQ(expected, actual);
+}
+
 TEST_F(PrometheusStatsFormatterTest, FormattedTags) {
   std::vector<Stats::Tag> tags;
   Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
