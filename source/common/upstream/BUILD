@@ -241,6 +241,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/upstream:resource_manager_interface",
+        "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
     ],
 )

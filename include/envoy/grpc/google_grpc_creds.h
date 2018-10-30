@@ -1,9 +1,9 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/common/pure.h"
-
-#include "common/config/datasource.h"
 
 #include "grpcpp/grpcpp.h"
 
