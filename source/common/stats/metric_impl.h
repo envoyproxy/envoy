@@ -37,7 +37,11 @@ protected:
    * shared memory block, and histograms, where the name is held as a simple
    * std::string in the object.
    *
-   * @param tag_producer the tag producer.
+   * If tag_producer is passed as nullptr, no tag extraction will occur, and
+   * the original name will be copied to tag_extracted_name_. This happens for
+   * IsolatedStore.
+   *
+   * @param tag_producer the tag producer, or nullptr if there is none.
    */
   void extractTags(const TagProducer* tag_producer);
 
