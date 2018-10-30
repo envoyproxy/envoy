@@ -37,7 +37,7 @@ public:
    * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
    * @param tags std::vector a set of Stats::Tag.
    */
-  std::string produceTags(const std::string& metric_name, std::vector<Tag>& tags) const override;
+  std::string produceTags(absl::string_view metric_name, std::vector<Tag>& tags) const override;
 
 private:
   friend class DefaultTagRegexTester;
@@ -89,7 +89,7 @@ private:
    * @param stat_name const std::string& the stat name.
    * @param f std::function<void(const TagExtractorPtr&)> function to call for each extractor.
    */
-  void forEachExtractorMatching(const std::string& stat_name,
+  void forEachExtractorMatching(absl::string_view stat_name,
                                 std::function<void(const TagExtractorPtr&)> f) const;
 
   std::vector<TagExtractorPtr> tag_extractors_without_prefix_;

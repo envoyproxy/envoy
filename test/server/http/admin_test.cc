@@ -1123,14 +1123,12 @@ TEST_P(AdminInstanceTest, PostRequest) {
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
   PrometheusStatsFormatterTest() /*: alloc_(stats_options_)*/ {}
-  void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    std::string tname = std::string(name);
-    counters_.push_back(alloc_.makeCounter(name, std::move(tname), std::move(cluster_tags)));
+  void addCounter(const std::string& name) {
+    counters_.push_back(alloc_.makeCounter(name, nullptr));
   }
 
-  void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    std::string tname = std::string(name);
-    gauges_.push_back(alloc_.makeGauge(name, std::move(tname), std::move(cluster_tags)));
+  void addGauge(const std::string& name) {
+    gauges_.push_back(alloc_.makeGauge(name, nullptr));
   }
 
   Stats::StatsOptionsImpl stats_options_;
@@ -1163,13 +1161,10 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
   // but having different tag names and values.
   //`statsAsPrometheus()` should return two implying it found two unique stat names
 
-  addCounter("cluster.test_cluster_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
-  addCounter("cluster.test_cluster_1.upstream_cx_total",
-             {{"another_tag_name", "another_tag-value"}});
-  addGauge("cluster.test_cluster_2.upstream_cx_total",
-           {{"another_tag_name_3", "another_tag_3-value"}});
-  addGauge("cluster.test_cluster_2.upstream_cx_total",
-           {{"another_tag_name_4", "another_tag_4-value"}});
+  addCounter("cluster.test_cluster_1.upstream_cx_total");
+  addCounter("cluster.test_cluster_1.upstream_cx_total");
+  addGauge("cluster.test_cluster_2.upstream_cx_total");
+  addGauge("cluster.test_cluster_2.upstream_cx_total");
 
   Buffer::OwnedImpl response;
   EXPECT_EQ(2UL, PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, response));
@@ -1181,13 +1176,10 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
   // statsAsPrometheus() should return four implying it found
   // four unique stat names.
 
-  addCounter("cluster.test_cluster_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
-  addCounter("cluster.test_cluster_2.upstream_cx_total",
-             {{"another_tag_name", "another_tag-value"}});
-  addGauge("cluster.test_cluster_3.upstream_cx_total",
-           {{"another_tag_name_3", "another_tag_3-value"}});
-  addGauge("cluster.test_cluster_4.upstream_cx_total",
-           {{"another_tag_name_4", "another_tag_4-value"}});
+  addCounter("cluster.test_cluster_1.upstream_cx_total");
+  addCounter("cluster.test_cluster_2.upstream_cx_total");
+  addGauge("cluster.test_cluster_3.upstream_cx_total");
+  addGauge("cluster.test_cluster_4.upstream_cx_total");
 
   Buffer::OwnedImpl response;
   EXPECT_EQ(4UL, PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, response));

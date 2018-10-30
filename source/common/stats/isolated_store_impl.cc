@@ -9,37 +9,39 @@
 #include "common/stats/histogram_impl.h"
 #include "common/stats/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Stats {
 
 IsolatedStoreImpl::IsolatedStoreImpl()
-    : counters_([this](const std::string& name) -> CounterSharedPtr {
-        std::string tag_extracted_name = name;
-        std::vector<Tag> tags;
-        return alloc_.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
+    : counters_([this](absl::string_view name) -> CounterSharedPtr {
+                  return alloc_.makeCounter(name, nullptr);
       }),
-      gauges_([this](const std::string& name) -> GaugeSharedPtr {
-        std::string tag_extracted_name = name;
-        std::vector<Tag> tags;
-        return alloc_.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
+      gauges_([this](absl::string_view name) -> GaugeSharedPtr {
+                return alloc_.makeGauge(name, nullptr);
       }),
-      histograms_([this](const std::string& name) -> HistogramSharedPtr {
-        return std::make_shared<HistogramImpl>(name, *this, std::string(name), std::vector<Tag>());
+      histograms_([this](absl::string_view name) -> HistogramSharedPtr {
+                    return std::make_shared<HistogramImpl>(name, *this, nullptr);
       }) {}
 
 struct IsolatedScopeImpl : public Scope {
-  IsolatedScopeImpl(IsolatedStoreImpl& parent, const std::string& prefix)
+  IsolatedScopeImpl(IsolatedStoreImpl& parent, absl::string_view prefix)
       : parent_(parent), prefix_(Utility::sanitizeStatsName(prefix)) {}
 
   // Stats::Scope
-  ScopePtr createScope(const std::string& name) override {
-    return ScopePtr{new IsolatedScopeImpl(parent_, prefix_ + name)};
+  ScopePtr createScope(absl::string_view name) override {
+    return ScopePtr{new IsolatedScopeImpl(parent_, absl::StrCat(prefix_, name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Counter& counter(const std::string& name) override { return parent_.counter(prefix_ + name); }
-  Gauge& gauge(const std::string& name) override { return parent_.gauge(prefix_ + name); }
-  Histogram& histogram(const std::string& name) override {
-    return parent_.histogram(prefix_ + name);
+  Counter& counter(absl::string_view name) override {
+    return parent_.counter(absl::StrCat(prefix_, name));
+  }
+  Gauge& gauge(absl::string_view name) override {
+    return parent_.gauge(absl::StrCat(prefix_, name));
+  }
+  Histogram& histogram(absl::string_view name) override {
+    return parent_.histogram(absl::StrCat(prefix_, name));
   }
   const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
 
@@ -47,7 +49,7 @@ struct IsolatedScopeImpl : public Scope {
   const std::string prefix_;
 };
 
-ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
+ScopePtr IsolatedStoreImpl::createScope(absl::string_view name) {
   return ScopePtr{new IsolatedScopeImpl(*this, name)};
 }
 

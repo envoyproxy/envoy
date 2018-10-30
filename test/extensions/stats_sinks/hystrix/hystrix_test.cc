@@ -39,7 +39,7 @@ public:
 
     // Set gauge value.
     membership_total_gauge_.name_ = "membership_total";
-    ON_CALL(cluster_stats_scope_, gauge("membership_total"))
+    ON_CALL(cluster_stats_scope_, gauge(absl::string_view("membership_total")))
         .WillByDefault(ReturnRef(membership_total_gauge_));
     ON_CALL(membership_total_gauge_, value()).WillByDefault(Return(5));
 
@@ -53,8 +53,8 @@ public:
   }
 
   // Attach the counter to cluster_stat_scope and set default value.
-  void setCounterForTest(NiceMock<Stats::MockCounter>& counter, std::string counter_name) {
-    counter.name_ = counter_name;
+  void setCounterForTest(NiceMock<Stats::MockCounter>& counter, absl::string_view counter_name) {
+    counter.name_ = std::string(counter_name);
     ON_CALL(cluster_stats_scope_, counter(counter_name)).WillByDefault(ReturnRef(counter));
   }
 

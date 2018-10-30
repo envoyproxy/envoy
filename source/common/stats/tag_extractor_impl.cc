@@ -62,11 +62,11 @@ TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
   return TagExtractorPtr{new TagExtractorImpl(name, regex, substr)};
 }
 
-bool TagExtractorImpl::substrMismatch(const std::string& stat_name) const {
+bool TagExtractorImpl::substrMismatch(absl::string_view stat_name) const {
   return !substr_.empty() && stat_name.find(substr_) == std::string::npos;
 }
 
-bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>& tags,
+bool TagExtractorImpl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
                                   IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
 
@@ -77,7 +77,8 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 
   std::smatch match;
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
-  if (std::regex_search(stat_name, match, regex_) && match.size() > 1) {
+  std::string stat_name_str = std::string(stat_name);
+  if (std::regex_search(stat_name_str, match, regex_) && match.size() > 1) {
     // remove_subexpr is the first submatch. It represents the portion of the string to be removed.
     const auto& remove_subexpr = match[1];
 
@@ -90,12 +91,18 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
     tags.emplace_back();
     Tag& tag = tags.back();
     tag.name_ = name_;
-    tag.value_ = value_subexpr.str();
 
     // Determines which characters to remove from stat_name to elide remove_subexpr.
-    std::string::size_type start = remove_subexpr.first - stat_name.begin();
-    std::string::size_type end = remove_subexpr.second - stat_name.begin();
+    std::string::size_type start = remove_subexpr.first - stat_name_str.begin();
+    std::string::size_type end = remove_subexpr.second - stat_name_str.begin();
     remove_characters.insert(start, end);
+    absl::string_view removed_string(stat_name.data() + start, end - start);
+
+    absl::string_view::size_type pos = removed_string.find(value_subexpr.str());
+    ASSERT(pos != absl::string_view::npos);
+    tag.value_ = removed_string.substr(pos, value_subexpr.str().size());
+
+
     PERF_RECORD(perf, "re-match", name_);
     return true;
   }

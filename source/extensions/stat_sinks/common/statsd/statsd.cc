@@ -14,6 +14,8 @@
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
@@ -90,7 +92,7 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags
   std::vector<std::string> tag_strings;
   tag_strings.reserve(tags.size());
   for (const Stats::Tag& tag : tags) {
-    tag_strings.emplace_back(tag.name_ + ":" + tag.value_);
+    tag_strings.emplace_back(absl::StrCat(tag.name_, ":", tag.value_));
   }
   return "|#" + StringUtil::join(tag_strings, ",");
 }

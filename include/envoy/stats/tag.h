@@ -1,6 +1,6 @@
 #pragma once
 
-#include <string>
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Stats {
@@ -9,8 +9,8 @@ namespace Stats {
  * General representation of a tag.
  */
 struct Tag {
-  std::string name_;
-  std::string value_;
+  absl::string_view name_;
+  absl::string_view value_;
 };
 
 } // namespace Stats

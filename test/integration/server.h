@@ -65,7 +65,7 @@ public:
   TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopePtr wrapped_scope)
       : lock_(lock), wrapped_scope_(std::move(wrapped_scope)) {}
 
-  ScopePtr createScope(const std::string& name) override {
+  ScopePtr createScope(absl::string_view name) override {
     Thread::LockGuard lock(lock_);
     return ScopePtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
   }
@@ -75,17 +75,17 @@ public:
     wrapped_scope_->deliverHistogramToSinks(histogram, value);
   }
 
-  Counter& counter(const std::string& name) override {
+  Counter& counter(absl::string_view name) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->counter(name);
   }
 
-  Gauge& gauge(const std::string& name) override {
+  Gauge& gauge(absl::string_view name) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->gauge(name);
   }
 
-  Histogram& histogram(const std::string& name) override {
+  Histogram& histogram(absl::string_view name) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogram(name);
   }
@@ -106,20 +106,20 @@ class TestIsolatedStoreImpl : public StoreRoot {
 public:
   TestIsolatedStoreImpl() : source_(*this) {}
   // Stats::Scope
-  Counter& counter(const std::string& name) override {
+  Counter& counter(absl::string_view name) override {
     Thread::LockGuard lock(lock_);
     return store_.counter(name);
   }
-  ScopePtr createScope(const std::string& name) override {
+  ScopePtr createScope(absl::string_view name) override {
     Thread::LockGuard lock(lock_);
     return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gauge(const std::string& name) override {
+  Gauge& gauge(absl::string_view name) override {
     Thread::LockGuard lock(lock_);
     return store_.gauge(name);
   }
-  Histogram& histogram(const std::string& name) override {
+  Histogram& histogram(absl::string_view name) override {
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
   }
@@ -207,13 +207,13 @@ public:
     }
   }
 
-  Stats::CounterSharedPtr counter(const std::string& name) override {
+  Stats::CounterSharedPtr counter(absl::string_view name) override {
     // When using the thread local store, only counters() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
     return TestUtility::findCounter(*stat_store_, name);
   }
 
-  Stats::GaugeSharedPtr gauge(const std::string& name) override {
+  Stats::GaugeSharedPtr gauge(absl::string_view name) override {
     // When using the thread local store, only gauges() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
     return TestUtility::findGauge(*stat_store_, name);

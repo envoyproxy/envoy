@@ -16,6 +16,7 @@
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -50,7 +51,7 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
-ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
+ScopePtr ThreadLocalStoreImpl::createScope(absl::string_view name) {
   std::unique_ptr<ScopeImpl> new_scope(new ScopeImpl(*this, name));
   Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());
@@ -149,11 +150,6 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   }
 }
 
-std::string ThreadLocalStoreImpl::getTagsForName(const std::string& name,
-                                                 std::vector<Tag>& tags) const {
-  return tag_producer_->produceTags(name, tags);
-}
-
 void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
   // If we are shutting down we no longer perform cache flushes as workers may be shutting down
   // at the same time.
@@ -211,16 +207,17 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   } else {
     std::vector<Tag> tags;
 
-    // Tag extraction occurs on the original, untruncated name so the extraction
-    // can complete properly, even if the tag values are partially truncated.
-    std::string tag_extracted_name = parent_.getTagsForName(name, tags);
+    // TODO(jmarantz): Tag extraction should ideally occur on the original,
+    // untruncated name so the extraction can complete properly, even if the tag
+    // values are partially truncated. However this costs a ton of memory for
+    // partially reescuing an operational problem, and I think we should
+    // reevaluate whether this is worth it.
     absl::string_view truncated_name = parent_.truncateStatNameIfNeeded(name);
-    std::shared_ptr<StatType> stat =
-        make_stat(parent_.alloc_, truncated_name, std::move(tag_extracted_name), std::move(tags));
+    std::shared_ptr<StatType> stat = make_stat(parent_.alloc_, truncated_name,
+                                               parent_.tag_producer_.get());
     if (stat == nullptr) {
       parent_.num_last_resort_stats_.inc();
-      stat = make_stat(parent_.heap_allocator_, truncated_name, std::move(tag_extracted_name),
-                       std::move(tags));
+      stat = make_stat(parent_.heap_allocator_, truncated_name, parent_.tag_producer_.get());
       ASSERT(stat != nullptr);
     }
     central_ref = &central_cache_map[stat->nameCStr()];
@@ -236,7 +233,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   return **central_ref;
 }
 
-Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
+Counter& ThreadLocalStoreImpl::ScopeImpl::counter(absl::string_view name) {
   // Determine the final name based on the prefix and the passed name.
   //
   // Note that we can do map.find(final_name.c_str()), but we cannot do
@@ -246,7 +243,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // after we construct the stat we can insert it into the required maps. This
   // strategy costs an extra hash lookup for each miss, but saves time
   // re-copying the string and significant memory overhead.
-  std::string final_name = prefix_ + name;
+  std::string final_name = absl::StrCat(prefix_, name);
 
   // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the hot path) could
   // become prohibitively expensive. Revisit this usage in the future.
@@ -263,9 +260,9 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
 
   return safeMakeStat<Counter>(
       final_name, central_cache_.counters_,
-      [](StatDataAllocator& allocator, absl::string_view name, std::string&& tag_extracted_name,
-         std::vector<Tag>&& tags) -> CounterSharedPtr {
-        return allocator.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
+      [](StatDataAllocator& allocator, absl::string_view name, const TagProducer* tag_producer)
+      -> CounterSharedPtr {
+        return allocator.makeCounter(name, tag_producer);
       },
       tls_cache);
 }
@@ -286,7 +283,7 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
   }
 }
 
-Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
+Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(absl::string_view name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   //
@@ -295,7 +292,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   // a temporary, and address sanitization errors would follow. Instead we must
   // do a find() first, using tha if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
-  std::string final_name = prefix_ + name;
+  std::string final_name = absl::StrCat(prefix_, name);
 
   // See warning/comments in counter().
   if (parent_.stats_matcher_->rejects(final_name)) {
@@ -309,14 +306,14 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
 
   return safeMakeStat<Gauge>(
       final_name, central_cache_.gauges_,
-      [](StatDataAllocator& allocator, absl::string_view name, std::string&& tag_extracted_name,
-         std::vector<Tag>&& tags) -> GaugeSharedPtr {
-        return allocator.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
+      [](StatDataAllocator& allocator, absl::string_view name, const TagProducer* tag_producer)
+      -> GaugeSharedPtr {
+        return allocator.makeGauge(name, tag_producer);
       },
       tls_cache);
 }
 
-Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
+Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(absl::string_view name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   //
@@ -325,7 +322,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // a temporary, and address sanitization errors would follow. Instead we must
   // do a find() first, using tha if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
-  std::string final_name = prefix_ + name;
+  std::string final_name = absl::StrCat(prefix_, name);
 
   // See warning/comments in counter().
   if (parent_.stats_matcher_->rejects(final_name)) {
@@ -348,10 +345,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   if (p != central_cache_.histograms_.end()) {
     central_ref = &p->second;
   } else {
-    std::vector<Tag> tags;
-    std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
-    auto stat = std::make_shared<ParentHistogramImpl>(
-        final_name, parent_, *this, std::move(tag_extracted_name), std::move(tags));
+    auto stat = std::make_shared<ParentHistogramImpl>(final_name, parent_, *this,
+                                                      parent_.tag_producer_.get());
     central_ref = &central_cache_.histograms_[stat->nameCStr()];
     *central_ref = stat;
   }
@@ -379,10 +374,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
     }
   }
 
-  std::vector<Tag> tags;
-  std::string tag_extracted_name = parent_.getTagsForName(name, tags);
   TlsHistogramSharedPtr hist_tls_ptr = std::make_shared<ThreadLocalHistogramImpl>(
-      name, std::move(tag_extracted_name), std::move(tags));
+      name, parent_.tag_producer_.get());
 
   parent.addTlsHistogram(hist_tls_ptr);
 
@@ -393,12 +386,11 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
 }
 
 ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(const std::string& name,
-                                                   std::string&& tag_extracted_name,
-                                                   std::vector<Tag>&& tags)
-    : MetricImpl(std::move(tag_extracted_name), std::move(tags)), current_active_(0), flags_(0),
-      created_thread_id_(std::this_thread::get_id()), name_(name) {
+                                                   const TagProducer* tag_producer)
+    : current_active_(0), flags_(0), created_thread_id_(std::this_thread::get_id()), name_(name) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();
+  extractTags(nameCStr(), tag_producer);
 }
 
 ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
@@ -419,12 +411,13 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
 }
 
 ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
-                                         TlsScope& tls_scope, std::string&& tag_extracted_name,
-                                         std::vector<Tag>&& tags)
-    : MetricImpl(std::move(tag_extracted_name), std::move(tags)), parent_(parent),
+                                         TlsScope& tls_scope, const TagProducer* tag_producer)
+    : parent_(parent),
       tls_scope_(tls_scope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_),
-      merged_(false), name_(name) {}
+      merged_(false), name_(name) {
+  extractTags(nameCStr(), tag_producer);
+}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   hist_free(interval_histogram_);

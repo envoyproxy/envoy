@@ -11,6 +11,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/tag.h"
+#include "envoy/stats/tag_producer.h"
 
 #include "absl/strings/string_view.h"
 
@@ -34,8 +35,8 @@ public:
    * @return CounterSharedPtr a counter, or nullptr if allocation failed, in which case
    *     tag_extracted_name and tags are not moved.
    */
-  virtual CounterSharedPtr makeCounter(absl::string_view name, std::string&& tag_extracted_name,
-                                       std::vector<Tag>&& tags) PURE;
+  virtual CounterSharedPtr makeCounter(absl::string_view name,
+                                       const TagProducer* tag_producer) PURE;
 
   /**
    * @param name the full name of the stat.
@@ -44,8 +45,7 @@ public:
    * @return GaugeSharedPtr a gauge, or nullptr if allocation failed, in which case
    *     tag_extracted_name and tags are not moved.
    */
-  virtual GaugeSharedPtr makeGauge(absl::string_view name, std::string&& tag_extracted_name,
-                                   std::vector<Tag>&& tags) PURE;
+  virtual GaugeSharedPtr makeGauge(absl::string_view name, const TagProducer* tag_producer) PURE;
 
   /**
    * Determines whether this stats allocator requires bounded stat-name size.

@@ -23,10 +23,12 @@ TEST(UserAgentTest, All) {
   Stats::Timespan span(original_histogram, time_system);
 
   EXPECT_CALL(stat_store.counter_, inc()).Times(5);
-  EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_cx_total"));
-  EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_rq_total"));
-  EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_cx_destroy_remote_active_rq"));
-  EXPECT_CALL(stat_store, histogram("test.user_agent.ios.downstream_cx_length_ms"));
+  EXPECT_CALL(stat_store, counter(absl::string_view("test.user_agent.ios.downstream_cx_total")));
+  EXPECT_CALL(stat_store, counter(absl::string_view("test.user_agent.ios.downstream_rq_total")));
+  EXPECT_CALL(stat_store, counter(absl::string_view(
+      "test.user_agent.ios.downstream_cx_destroy_remote_active_rq")));
+  EXPECT_CALL(stat_store, histogram(absl::string_view(
+      "test.user_agent.ios.downstream_cx_length_ms")));
   EXPECT_CALL(
       stat_store,
       deliverHistogramToSinks(
@@ -40,11 +42,11 @@ TEST(UserAgentTest, All) {
     ua.completeConnectionLength(span);
   }
 
-  EXPECT_CALL(stat_store, counter("test.user_agent.android.downstream_cx_total"));
-  EXPECT_CALL(stat_store, counter("test.user_agent.android.downstream_rq_total"));
-  EXPECT_CALL(stat_store,
-              counter("test.user_agent.android.downstream_cx_destroy_remote_active_rq"));
-  EXPECT_CALL(stat_store, histogram("test.user_agent.android.downstream_cx_length_ms"));
+  EXPECT_CALL(stat_store, counter(absl::string_view("test.user_agent.android.downstream_cx_total")));
+  EXPECT_CALL(stat_store, counter(absl::string_view("test.user_agent.android.downstream_rq_total")));
+  EXPECT_CALL(stat_store, counter(absl::string_view("test.user_agent.android.downstream_cx_destroy_remote_active_rq")));
+  EXPECT_CALL(stat_store, histogram(absl::string_view(
+      "test.user_agent.android.downstream_cx_length_ms")));
   EXPECT_CALL(
       stat_store,
       deliverHistogramToSinks(

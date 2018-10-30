@@ -30,10 +30,8 @@ namespace Stats {
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
   // StatDataAllocator
-  CounterSharedPtr makeCounter(absl::string_view name, std::string&& tag_extracted_name,
-                               std::vector<Tag>&& tags) override;
-  GaugeSharedPtr makeGauge(absl::string_view name, std::string&& tag_extracted_name,
-                           std::vector<Tag>&& tags) override;
+  CounterSharedPtr makeCounter(absl::string_view name, const TagProducer* tag_producer) override;
+  GaugeSharedPtr makeGauge(absl::string_view name, const TagProducer* tag_producer) override;
 
   /**
    * @param name the full name of the stat.
@@ -62,8 +60,9 @@ public:
 template <class StatData> class CounterImpl : public Counter, public MetricImpl {
 public:
   CounterImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
-              std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-      : MetricImpl(std::move(tag_extracted_name), std::move(tags)), data_(data), alloc_(alloc) {}
+              const TagProducer* tag_producer) : data_(data), alloc_(alloc) {
+    extractTags(nameCStr(), tag_producer);
+  }
   ~CounterImpl() { alloc_.free(data_); }
 
   // Stats::Metric
@@ -114,8 +113,9 @@ public:
 template <class StatData> class GaugeImpl : public Gauge, public MetricImpl {
 public:
   GaugeImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
-            std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-      : MetricImpl(std::move(tag_extracted_name), std::move(tags)), data_(data), alloc_(alloc) {}
+            const TagProducer* tag_producer) : data_(data), alloc_(alloc) {
+    extractTags(nameCStr(), tag_producer);
+  }
   ~GaugeImpl() { alloc_.free(data_); }
 
   // Stats::Metric
@@ -169,26 +169,22 @@ public:
 
 template <class StatData>
 CounterSharedPtr StatDataAllocatorImpl<StatData>::makeCounter(absl::string_view name,
-                                                              std::string&& tag_extracted_name,
-                                                              std::vector<Tag>&& tags) {
+                                                              const TagProducer* tag_producer) {
   StatData* data = alloc(name);
   if (data == nullptr) {
     return nullptr;
   }
-  return std::make_shared<CounterImpl<StatData>>(*data, *this, std::move(tag_extracted_name),
-                                                 std::move(tags));
+  return std::make_shared<CounterImpl<StatData>>(*data, *this, tag_producer);
 }
 
 template <class StatData>
 GaugeSharedPtr StatDataAllocatorImpl<StatData>::makeGauge(absl::string_view name,
-                                                          std::string&& tag_extracted_name,
-                                                          std::vector<Tag>&& tags) {
+                                                          const TagProducer* tag_producer) {
   StatData* data = alloc(name);
   if (data == nullptr) {
     return nullptr;
   }
-  return std::make_shared<GaugeImpl<StatData>>(*data, *this, std::move(tag_extracted_name),
-                                               std::move(tags));
+  return std::make_shared<GaugeImpl<StatData>>(*data, *this, tag_producer);
 }
 
 } // namespace Stats

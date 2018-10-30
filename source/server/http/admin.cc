@@ -593,8 +593,8 @@ Http::Code AdminImpl::handlerPrometheusStats(absl::string_view, Http::HeaderMap&
   return Http::Code::OK;
 }
 
-std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
-  std::string stats_name = name;
+std::string PrometheusStatsFormatter::sanitizeName(absl::string_view name) {
+  std::string stats_name = std::string(name);
   std::replace(stats_name.begin(), stats_name.end(), '.', '_');
   std::replace(stats_name.begin(), stats_name.end(), '-', '_');
   return stats_name;

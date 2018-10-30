@@ -52,6 +52,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "metric_impl_lib",
+    srcs = ["metric_impl.cc"],
     hdrs = ["metric_impl.h"],
     deps = [
         "//include/envoy/stats:stats_interface",

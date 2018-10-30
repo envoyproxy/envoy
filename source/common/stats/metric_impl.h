@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/stats/stats.h"
+#include "envoy/stats/tag_producer.h"
 
 #include "common/common/assert.h"
 
@@ -19,9 +20,7 @@ namespace Stats {
  */
 class MetricImpl : public virtual Metric {
 public:
-  MetricImpl(std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-      : tag_extracted_name_(std::move(tag_extracted_name)), tags_(std::move(tags)) {}
-
+  void extractTags(absl::string_view metric_name, const TagProducer* tag_producer);
   const std::string& tagExtractedName() const override { return tag_extracted_name_; }
   const std::vector<Tag>& tags() const override { return tags_; }
 
@@ -34,8 +33,8 @@ protected:
   };
 
 private:
-  const std::string tag_extracted_name_;
-  const std::vector<Tag> tags_;
+  std::string tag_extracted_name_;
+  std::vector<Tag> tags_;
 };
 
 } // namespace Stats

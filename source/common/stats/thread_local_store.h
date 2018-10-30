@@ -6,6 +6,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/stats/stat_data_allocator.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/hash.h"
@@ -16,6 +17,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/str_cat.h"
 #include "circllhist.h"
 
 namespace Envoy {
@@ -28,8 +30,7 @@ namespace Stats {
  */
 class ThreadLocalHistogramImpl : public Histogram, public MetricImpl {
 public:
-  ThreadLocalHistogramImpl(const std::string& name, std::string&& tag_extracted_name,
-                           std::vector<Tag>&& tags);
+  ThreadLocalHistogramImpl(const std::string& name, const TagProducer* tag_producer);
   ~ThreadLocalHistogramImpl();
 
   void merge(histogram_t* target);
@@ -71,7 +72,7 @@ class TlsScope;
 class ParentHistogramImpl : public ParentHistogram, public MetricImpl {
 public:
   ParentHistogramImpl(const std::string& name, Store& parent, TlsScope& tlsScope,
-                      std::string&& tag_extracted_name, std::vector<Tag>&& tags);
+                      const TagProducer* tag_producer);
   ~ParentHistogramImpl();
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
@@ -138,13 +139,13 @@ public:
   ~ThreadLocalStoreImpl();
 
   // Stats::Scope
-  Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
-  ScopePtr createScope(const std::string& name) override;
+  Counter& counter(absl::string_view name) override { return default_scope_->counter(name); }
+  ScopePtr createScope(absl::string_view name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
-  Gauge& gauge(const std::string& name) override { return default_scope_->gauge(name); }
-  Histogram& histogram(const std::string& name) override {
+  Gauge& gauge(absl::string_view name) override { return default_scope_->gauge(name); }
+  Histogram& histogram(absl::string_view name) override {
     return default_scope_->histogram(name);
   };
 
@@ -188,27 +189,25 @@ private:
   };
 
   struct ScopeImpl : public TlsScope {
-    ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
+    ScopeImpl(ThreadLocalStoreImpl& parent, absl::string_view prefix)
         : scope_id_(next_scope_id_++), parent_(parent),
           prefix_(Utility::sanitizeStatsName(prefix)) {}
     ~ScopeImpl();
 
     // Stats::Scope
-    Counter& counter(const std::string& name) override;
-    ScopePtr createScope(const std::string& name) override {
-      return parent_.createScope(prefix_ + name);
+    Counter& counter(absl::string_view name) override;
+    ScopePtr createScope(absl::string_view name) override {
+      return parent_.createScope(absl::StrCat(prefix_, name));
     }
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
-    Gauge& gauge(const std::string& name) override;
-    Histogram& histogram(const std::string& name) override;
+    Gauge& gauge(absl::string_view name) override;
+    Histogram& histogram(absl::string_view name) override;
     Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
     const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
 
     template <class StatType>
-    using MakeStatFn =
-        std::function<std::shared_ptr<StatType>(StatDataAllocator&, absl::string_view name,
-                                                std::string&& tag_extracted_name,
-                                                std::vector<Tag>&& tags)>;
+    using MakeStatFn = std::function<std::shared_ptr<StatType>(
+        StatDataAllocator&, absl::string_view name, const TagProducer* tag_producer)>;
 
     /**
      * Makes a stat either by looking it up in the central cache,
@@ -249,7 +248,6 @@ private:
     absl::flat_hash_map<uint64_t, TlsCacheEntry> scope_cache_;
   };
 
-  std::string getTagsForName(const std::string& name, std::vector<Tag>& tags) const;
   void clearScopeFromCaches(uint64_t scope_id);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);

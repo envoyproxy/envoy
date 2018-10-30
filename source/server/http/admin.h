@@ -378,7 +378,7 @@ private:
   /**
    * Take a string and sanitize it according to Prometheus conventions.
    */
-  static std::string sanitizeName(const std::string& name);
+  static std::string sanitizeName(absl::string_view name);
 };
 
 } // namespace Server

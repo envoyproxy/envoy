@@ -150,15 +150,15 @@ public:
   MockStore();
   ~MockStore();
 
-  ScopePtr createScope(const std::string& name) override { return ScopePtr{createScope_(name)}; }
+  ScopePtr createScope(absl::string_view name) override { return ScopePtr{createScope_(name)}; }
 
   MOCK_METHOD2(deliverHistogramToSinks, void(const Histogram& histogram, uint64_t value));
-  MOCK_METHOD1(counter, Counter&(const std::string&));
+  MOCK_METHOD1(counter, Counter&(absl::string_view));
   MOCK_CONST_METHOD0(counters, std::vector<CounterSharedPtr>());
-  MOCK_METHOD1(createScope_, Scope*(const std::string& name));
-  MOCK_METHOD1(gauge, Gauge&(const std::string&));
+  MOCK_METHOD1(createScope_, Scope*(absl::string_view name));
+  MOCK_METHOD1(gauge, Gauge&(absl::string_view));
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
-  MOCK_METHOD1(histogram, Histogram&(const std::string& name));
+  MOCK_METHOD1(histogram, Histogram&(absl::string_view name));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
   MOCK_CONST_METHOD0(statsOptions, const StatsOptions&());
 

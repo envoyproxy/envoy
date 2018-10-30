@@ -22,18 +22,19 @@ namespace Stats {
  */
 template <class Base> class IsolatedStatsCache {
 public:
-  typedef std::function<std::shared_ptr<Base>(const std::string& name)> Allocator;
+  typedef std::function<std::shared_ptr<Base>(absl::string_view name)> Allocator;
 
   IsolatedStatsCache(Allocator alloc) : alloc_(alloc) {}
 
-  Base& get(const std::string& name) {
-    auto stat = stats_.find(name);
+  Base& get(absl::string_view name) {
+    std::string name_str = std::string(name);
+    auto stat = stats_.find(name_str);
     if (stat != stats_.end()) {
       return *stat->second;
     }
 
     std::shared_ptr<Base> new_stat = alloc_(name);
-    stats_.emplace(name, new_stat);
+    stats_.emplace(name_str, new_stat);
     return *new_stat;
   }
 
@@ -57,11 +58,11 @@ public:
   IsolatedStoreImpl();
 
   // Stats::Scope
-  Counter& counter(const std::string& name) override { return counters_.get(name); }
-  ScopePtr createScope(const std::string& name) override;
+  Counter& counter(absl::string_view name) override { return counters_.get(name); }
+  ScopePtr createScope(absl::string_view name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gauge(const std::string& name) override { return gauges_.get(name); }
-  Histogram& histogram(const std::string& name) override {
+  Gauge& gauge(absl::string_view name) override { return gauges_.get(name); }
+  Histogram& histogram(absl::string_view name) override {
     Histogram& histogram = histograms_.get(name);
     return histogram;
   }
