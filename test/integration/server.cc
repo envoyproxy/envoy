@@ -48,7 +48,8 @@ IntegrationTestServer::create(const std::string& config_path,
                               const Network::Address::IpVersion version,
                               std::function<void()> pre_worker_start_test_steps, bool deterministic,
                               Event::TestTimeSystem& time_system) {
-  IntegrationTestServerPtr server{std::make_unique<IntegrationTestServerImpl>(time_system, config_path)};
+  IntegrationTestServerPtr server{
+      std::make_unique<IntegrationTestServerImpl>(time_system, config_path)};
   server->start(version, pre_worker_start_test_steps, deterministic);
   return server;
 }
