@@ -74,7 +74,7 @@ TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
 TEST(UtilityTest, TestValidFrom) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem"));
-  const time_t valid_from = std::chrono::system_clock::to_time_t(Utility::getValidFrom(cert.get()));
+  const time_t valid_from = std::chrono::system_clock::to_time_t(Utility::getValidFrom(*cert));
   EXPECT_EQ("Mon Jan 15 22:40:27 2018\n", std::string(ctime(&valid_from)));
 }
 
@@ -82,7 +82,7 @@ TEST(UtilityTest, TestExpirationTimeWithExpiredCert) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem"));
   const time_t expiration_time =
-      std::chrono::system_clock::to_time_t(Utility::getExpirationTime(cert.get()));
+      std::chrono::system_clock::to_time_t(Utility::getExpirationTime(*cert));
   EXPECT_EQ("Wed Jan 15 22:40:27 2020\n", std::string(ctime(&expiration_time)));
 }
 } // namespace Ssl
