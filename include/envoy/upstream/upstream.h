@@ -633,11 +633,6 @@ public:
    */
   virtual bool drainConnectionsOnHostRemoval() const PURE;
 
-  /**
-   * @return whether to forward the original SNI from the downstream connection
-   */
-  virtual bool forwardOriginalServerNameIndication() const PURE;
-
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.
