@@ -43,13 +43,21 @@ INSTANTIATE_TEST_CASE_P(CorpusExamples, FuzzerCorpusTest, testing::ValuesIn(test
 } // namespace Envoy
 
 int main(int argc, char** argv) {
-  // Expected usage: <test path> <corpus path> [other gtest flags]
-  RELEASE_ASSERT(argc-- >= 2, "");
-  const std::string corpus_path = Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +
-                                  Envoy::TestEnvironment::getCheckedEnvVar("TEST_WORKSPACE") + "/" +
-                                  *++argv;
-  RELEASE_ASSERT(Envoy::Filesystem::directoryExists(corpus_path), "");
-  Envoy::test_corpus_ = Envoy::TestUtility::listFiles(corpus_path, true);
+  // Expected usage: <test path> <corpus paths..> [other gtest flags]
+  RELEASE_ASSERT(argc >= 2, "");
+  // Consider any file after the test path which doesn't have a - prefix to be a corpus entry.
+  for (int i = 1; i < argc; ++i) {
+    const std::string arg{argv[i]};
+    if (arg.empty() || arg[0] == '-') {
+      break;
+    }
+    Envoy::test_corpus_.emplace_back(arg);
+  }
+  argc -= Envoy::test_corpus_.size();
+  for (size_t i = 0; i < Envoy::test_corpus_.size(); ++i) {
+    argv[i + 1] = argv[i + 1 + Envoy::test_corpus_.size()];
+  }
+
   testing::InitGoogleTest(&argc, argv);
   Envoy::Fuzz::Runner::setupEnvironment(argc, argv, spdlog::level::info);
 
