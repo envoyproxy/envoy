@@ -361,18 +361,6 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   }
 
   absl::optional<std::string> override_server_name;
-
-  if (downstreamConnection() &&
-      downstreamConnection()->streamInfo().filterState().hasData<OriginalRequestedServerName>(
-          OriginalRequestedServerName::Key)) {
-    const OriginalRequestedServerName& original_requested_server_name =
-        downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .getDataReadOnly<OriginalRequestedServerName>(OriginalRequestedServerName::Key);
-    override_server_name = original_requested_server_name.value();
-  }
-
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
       cluster_name, Upstream::ResourcePriority::Default, this, override_server_name);
   if (!conn_pool) {
