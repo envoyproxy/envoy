@@ -175,7 +175,7 @@ modify different aspects of the server:
 
 .. http:get:: /server_info
 
-  Outputs a JSON message containing nformation about the running server. Sample output looks like:
+  Outputs a JSON message containing information about the running server. Sample output looks like:
 
 .. code-block:: none
 
