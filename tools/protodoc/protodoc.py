@@ -527,26 +527,6 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
     RST formatted definition list item.
   """
   annotations = []
-  if field.HasField('oneof_index'):
-    oneof_context = outer_type_context.ExtendOneof(field.oneof_index,
-                                                   type_context.oneof_names[field.oneof_index])
-    oneof_comment, oneof_comment_annotations = oneof_context.LeadingCommentPathLookup()
-    if NOT_IMPLEMENTED_HIDE_ANNOTATION in oneof_comment_annotations:
-      return ''
-
-    if len(type_context.oneof_fields[field.oneof_index]) == 1 and type_context.oneof_required[
-        field.oneof_index]:
-      annotations = ['*REQUIRED*']
-
-    if len(type_context.oneof_fields[field.oneof_index]) > 1:
-      oneof_template = '\nPrecisely one of %s must be set.\n' if type_context.oneof_required[
-          field.oneof_index] else '\nOnly one of %s may be set.\n'
-      oneof_comment += oneof_template % ', '.join(
-          FormatInternalLink(
-              f, FieldCrossRefLabel(outer_type_context.ExtendField(i, f).name))
-          for i, f in type_context.oneof_fields[field.oneof_index])
-  else:
-    oneof_comment = ''
 
   anchor = FormatAnchor(FieldCrossRefLabel(type_context.name))
   if field.options.HasExtension(validate_pb2.rules):
@@ -558,6 +538,31 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
   leading_comment, comment_annotations = type_context.LeadingCommentPathLookup()
   if NOT_IMPLEMENTED_HIDE_ANNOTATION in comment_annotations:
     return ''
+
+  if field.HasField('oneof_index'):
+    oneof_context = outer_type_context.ExtendOneof(field.oneof_index,
+                                                   type_context.oneof_names[field.oneof_index])
+    oneof_comment, oneof_comment_annotations = oneof_context.LeadingCommentPathLookup()
+    if NOT_IMPLEMENTED_HIDE_ANNOTATION in oneof_comment_annotations:
+      return ''
+
+    # If the oneof only has one field and marked required, mark the field as required.
+    if len(type_context.oneof_fields[field.oneof_index]) == 1 and type_context.oneof_required[
+        field.oneof_index]:
+      annotations = ['*REQUIRED*']
+
+    if len(type_context.oneof_fields[field.oneof_index]) > 1:
+      # Fields in oneof shouldn't be marked as required when we have oneof comment below it.
+      annotations = []
+      oneof_template = '\nPrecisely one of %s must be set.\n' if type_context.oneof_required[
+          field.oneof_index] else '\nOnly one of %s may be set.\n'
+      oneof_comment += oneof_template % ', '.join(
+          FormatInternalLink(
+              f, FieldCrossRefLabel(outer_type_context.ExtendField(i, f).name))
+          for i, f in type_context.oneof_fields[field.oneof_index])
+  else:
+    oneof_comment = ''
+
   comment = '(%s) ' % ', '.join(
       [FormatFieldType(type_context, field)] + annotations) + leading_comment
   return anchor + field.name + '\n' + MapLines(

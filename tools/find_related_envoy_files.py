@@ -70,6 +70,12 @@ if root == TEST_ROOT:
   emit("test/common", INTERFACE_REAL_ROOT, "_impl_test.cc", ".h")
   emit(TEST_ROOT, SOURCE_ROOT, "_test.cc", ".cc")
   emit(TEST_ROOT, SOURCE_ROOT, "_test.cc", ".h")
+  emit(TEST_ROOT, TEST_ROOT, ".cc", ".h")
+  emit(TEST_ROOT, TEST_ROOT, ".cc", "_test.cc")
+  emit(TEST_ROOT, TEST_ROOT, ".h", "_test.cc")
+  emit(TEST_ROOT, TEST_ROOT, ".h", ".cc")
+  emit(TEST_ROOT, TEST_ROOT, "_test.cc", ".cc")
+  emit(TEST_ROOT, TEST_ROOT, "_test.cc", ".h")
 elif root == SOURCE_ROOT and ext == ".cc":
   emit(SOURCE_ROOT, SOURCE_ROOT, ".cc", ".h")
   emit(SOURCE_ROOT, TEST_ROOT, ".cc", "_test.cc")

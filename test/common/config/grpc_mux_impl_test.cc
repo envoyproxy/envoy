@@ -197,11 +197,11 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
     invalid_response->mutable_resources()->Add()->set_type_url("bar");
     EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)).WillOnce(Invoke([](const EnvoyException* e) {
       EXPECT_TRUE(
-          IsSubstring("", "", "bar does not match foo type URL is DiscoveryResponse", e->what()));
+          IsSubstring("", "", "bar does not match foo type URL in DiscoveryResponse", e->what()));
     }));
 
     expectSendMessage("foo", {"x", "y"}, "", "", Grpc::Status::GrpcStatus::Internal,
-                      fmt::format("bar does not match foo type URL is DiscoveryResponse {}",
+                      fmt::format("bar does not match foo type URL in DiscoveryResponse {}",
                                   invalid_response->DebugString()));
     grpc_mux_->onReceiveMessage(std::move(invalid_response));
   }

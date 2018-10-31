@@ -8,7 +8,7 @@ docutils==0.14
 gitdb==0.6.4
 imagesize==0.7.1
 pytz==2017.2
-requests==2.13.0
+requests>=2.20.0
 six==1.10.0
 smmap==0.9.0
 snowballstemmer==1.2.1
