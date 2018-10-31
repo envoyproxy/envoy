@@ -74,7 +74,11 @@ A sample filter configuration for a raw HTTP authorization server:
       hosts:
         - socket_address: { address: 127.0.0.1, port_value: 10003 }
 
-A sample virtual host and route filter configuration:
+Per-Route Configuration
+-----------------------
+
+A sample virtual host and route filter configuration.
+In this example we add additional context on the virtual host, and disabled the filter for `/static` prefixed routes.
 
 .. code-block:: yaml
 
@@ -92,8 +96,8 @@ A sample virtual host and route filter configuration:
       - match: { prefix: "/static" }
         route: { cluster: some_service }
         per_filter_config:
-            envoy.ext_authz:
-              disabled: true
+          envoy.ext_authz:
+            disabled: true
       - match: { prefix: "/" }
         route: { cluster: some_service }
 

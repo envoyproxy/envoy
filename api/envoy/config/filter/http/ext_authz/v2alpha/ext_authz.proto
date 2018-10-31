@@ -91,7 +91,7 @@ message HttpService {
   repeated envoy.api.v2.core.HeaderValue authorization_headers_to_add = 6;
 }
 
-// Extra settings for the check request on a per virtualhost/route/weighter-cluster level.
+// Extra settings on a per virtualhost/route/weighter-cluster level.
 message ExtAuthPerRoute {
   oneof override {
     option (validate.required) = true;
@@ -104,7 +104,10 @@ message ExtAuthPerRoute {
   }
 }
 
-// Extra settings for the check request
+// Extra settings for the check request. You can use this to provide extra context for the
+// ext-authz server on specific virtual hosts \ routes. For example, adding a context extension on
+// the virtual host level can give the ext-authz server information on what virtual host is used
+// without needing to parse the host header.
 message CheckSettings {
   // Context extensions to set on the CheckRequest's
   // :ref:`AttributeContext<envoy_api_msg_service.auth.v2alpha.AttributeContext>`
