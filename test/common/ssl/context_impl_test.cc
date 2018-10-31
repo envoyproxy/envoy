@@ -250,7 +250,6 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
-  Runtime::MockLoader runtime;
   ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl store;
 
