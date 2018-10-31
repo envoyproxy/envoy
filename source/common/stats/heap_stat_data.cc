@@ -7,15 +7,18 @@
 namespace Envoy {
 namespace Stats {
 
-HeapStatData::HeapStatData(absl::string_view key) {
-  StringUtil::strlcpy(name_, key.data(), key.size() + 1);
+HeapStatData::HeapStatData(SymbolEncoding& encoding) {
+  encoding.moveToStorage(name_encoding_);
 }
 
-HeapStatDataAllocator::HeapStatDataAllocator() {}
+HeapStatDataAllocator::HeapStatDataAllocator(SymbolTable& symbol_table)
+    : table_(symbol_table) {}
 
 HeapStatDataAllocator::~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 
 HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {
+  SymbolVec symbol_vec = table_.encode(name);
+
   // Any expected truncation of name is done at the callsite. No truncation is
   // required to use this allocator. Note that data must be freed by calling
   // its free() method, and not by destruction, thus the more complex use of

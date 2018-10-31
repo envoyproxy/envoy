@@ -29,14 +29,14 @@ struct HeapStatData {
    */
   const char* name() const { return name_; }
 
-  static HeapStatData* alloc(absl::string_view name);
+  static HeapStatData* alloc(const SymbolEncoding& encoding);
   void free();
 
   std::atomic<uint64_t> value_{0};
   std::atomic<uint64_t> pending_increment_{0};
   std::atomic<uint16_t> flags_{0};
   std::atomic<uint16_t> ref_count_{1};
-  char name_[];
+  char name_encoding_[];
 
 private:
   /**
