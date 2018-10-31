@@ -83,7 +83,7 @@ envoy_cc_test(
 envoy_cc_fuzz_test(
     name = "config_fuzz_test",
     srcs = ["config_fuzz_test.cc"],
-    corpus = "config_corpus",
+    corpus = "//test/server:server_fuzz_test_corpus",
     deps = [
         "//source/server/config_validation:server_lib",
         "//source/server:proto_descriptors_lib",
