@@ -1336,47 +1336,6 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
-TEST_F(RouterTest, RetryUpstreamPerTryTimeoutNoUpstreamHost) {
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks&)
-                           -> Http::ConnectionPool::Cancellable* { return nullptr; }));
-  expectResponseTimerCreate();
-  expectPerTryTimerCreate();
-
-  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
-                                  {"x-envoy-internal", "true"},
-                                  {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
-
-  EXPECT_CALL(*router_.retry_state_, onHostAttempted(_)).Times(0);
-
-  router_.retry_state_->expectRetry();
-  per_try_timeout_->callback_();
-
-  Http::StreamDecoder* response_decoder = nullptr;
-  // We expect this reset to kick off a new request.
-  NiceMock<Http::MockStreamEncoder> encoder2;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
-        response_decoder = &decoder;
-        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
-        return nullptr;
-      }));
-  expectPerTryTimerCreate();
-  router_.retry_state_->callback_();
-
-  EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-
-  // Normal response.
-  EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).WillOnce(Return(RetryStatus::No));
-  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
-  response_decoder->decodeHeaders(std::move(response_headers), true);
-  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
-}
-
 TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
