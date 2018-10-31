@@ -133,6 +133,7 @@ HotRestartImpl::HotRestartImpl(Options& options)
     stats_set_.reset(new RawStatDataSet(stats_set_options_, options.restartEpoch() == 0,
                                         shmem_.stats_set_data_, options_.statsOptions()));
   }
+  stat_allocator_ = std::make_unique<Stats::RawStatDataAllocator(stat_lock_, *stat_set_);
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
   initDomainSocketAddress(&parent_address_);
@@ -144,40 +145,6 @@ HotRestartImpl::HotRestartImpl(Options& options)
   // logic killing the entire process tree. We should never exist without our parent.
   int rc = prctl(PR_SET_PDEATHSIG, SIGTERM);
   RELEASE_ASSERT(rc != -1, "");
-}
-
-Stats::RawStatData* HotRestartImpl::alloc(absl::string_view name) {
-  // Try to find the existing slot in shared memory, otherwise allocate a new one.
-  Thread::LockGuard lock(stat_lock_);
-  // In production, the name is truncated in ThreadLocalStore before this
-  // is called. This is just a sanity check to make sure that actually happens;
-  // it is coded as an if/return-null to facilitate testing.
-  ASSERT(name.length() <= options_.statsOptions().maxNameLength());
-  auto value_created = stats_set_->insert(name);
-  Stats::RawStatData* data = value_created.first;
-  if (data == nullptr) {
-    return nullptr;
-  }
-  // For new entries (value-created.second==true), BlockMemoryHashSet calls Value::initialize()
-  // automatically, but on recycled entries (value-created.second==false) we need to bump the
-  // ref-count.
-  if (!value_created.second) {
-    ++data->ref_count_;
-  }
-  return data;
-}
-
-void HotRestartImpl::free(Stats::RawStatData& data) {
-  // We must hold the lock since the reference decrement can race with an initialize above.
-  Thread::LockGuard lock(stat_lock_);
-  ASSERT(data.ref_count_ > 0);
-  if (--data.ref_count_ > 0) {
-    return;
-  }
-  bool key_removed = stats_set_->remove(data.key());
-  ASSERT(key_removed);
-  memset(static_cast<void*>(&data), 0,
-         Stats::RawStatData::structSizeWithOptions(options_.statsOptions()));
 }
 
 int HotRestartImpl::bindDomainSocket(uint64_t id) {

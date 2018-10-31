@@ -41,6 +41,40 @@ void RawStatData::initialize(absl::string_view key, const StatsOptions& stats_op
   name_[key.size()] = '\0';
 }
 
+Stats::RawStatData* RawStatDataAllocator::alloc(absl::string_view name) {
+  // Try to find the existing slot in shared memory, otherwise allocate a new one.
+  Thread::LockGuard lock(stat_lock_);
+  // In production, the name is truncated in ThreadLocalStore before this
+  // is called. This is just a sanity check to make sure that actually happens;
+  // it is coded as an if/return-null to facilitate testing.
+  ASSERT(name.length() <= options_.statsOptions().maxNameLength());
+  auto value_created = stats_set_->insert(name);
+  Stats::RawStatData* data = value_created.first;
+  if (data == nullptr) {
+    return nullptr;
+  }
+  // For new entries (value-created.second==true), BlockMemoryHashSet calls Value::initialize()
+  // automatically, but on recycled entries (value-created.second==false) we need to bump the
+  // ref-count.
+  if (!value_created.second) {
+    ++data->ref_count_;
+  }
+  return data;
+}
+
+void RawStatDataAllocator::free(Stats::RawStatData& data) {
+  // We must hold the lock since the reference decrement can race with an initialize above.
+  Thread::LockGuard lock(stat_lock_);
+  ASSERT(data.ref_count_ > 0);
+  if (--data.ref_count_ > 0) {
+    return;
+  }
+  bool key_removed = stats_set_->remove(data.key());
+  ASSERT(key_removed);
+  memset(static_cast<void*>(&data), 0,
+         Stats::RawStatData::structSizeWithOptions(options_.statsOptions()));
+}
+
 template class StatDataAllocatorImpl<RawStatData>;
 
 } // namespace Stats

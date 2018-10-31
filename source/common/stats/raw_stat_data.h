@@ -15,6 +15,7 @@
 #include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
+#include "common/common/block_memory_hash_set.h"
 #include "common/common/hash.h"
 #include "common/stats/stat_data_allocator_impl.h"
 
@@ -22,6 +23,7 @@
 
 namespace Envoy {
 namespace Stats {
+
 
 /**
  * This structure is the backing memory for both CounterImpl and GaugeImpl. It is designed so that
@@ -90,11 +92,23 @@ struct RawStatData {
   char name_[];
 };
 
+using RawStatDataSet = BlockMemoryHashSet<Stats::RawStatData>;
+
+
 class RawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
 public:
+  RawStatDataAllocator(Thread::MutexLockable& mutex, RawStatDataSet& stat_set_) : mutex_(mutex) {}
+
   // StatDataAllocator
   bool requiresBoundedStatNameSize() const override { return true; }
+  Stats::RawStatData* alloc(absl::string_view name) override;
+  void free(Stats::RawStatData& data) override;
+
+private:
+  Thread::MutexLockable& mutex_;
+  RawStatDataSet& stat_set_;
 };
+
 
 } // namespace Stats
 } // namespace Envoy
