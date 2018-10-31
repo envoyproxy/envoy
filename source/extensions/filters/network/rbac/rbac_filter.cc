@@ -10,8 +10,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RBACFilter {
 
-static const std::string shadow_policy_id_field = "shadow_effective_policyID";
-
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::config::filter::network::rbac::v2::RBAC& proto_config, Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(), scope)),
@@ -59,7 +57,8 @@ void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_policy_
   ProtobufWkt::Struct metrics;
   auto& fields = *metrics.mutable_fields();
   if (!shadow_policy_id.empty()) {
-    *fields[shadow_policy_id_field].mutable_string_value() = shadow_policy_id;
+    *fields[Filters::Common::RBAC::shadow_policy_id_field].mutable_string_value() =
+        shadow_policy_id;
   }
   callbacks_->connection().streamInfo().setDynamicMetadata(NetworkFilterNames::get().Rbac, metrics);
 }

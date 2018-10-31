@@ -12,6 +12,8 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
+static const std::string shadow_policy_id_field = "shadow_effective_policyID";
+
 /**
  * All stats for the RBAC filter. @see stats_macros.h
  */
