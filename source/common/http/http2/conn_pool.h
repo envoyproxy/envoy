@@ -11,6 +11,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/http/codec_client.h"
+#include "common/http/conn_pool_base.h"
 
 namespace Envoy {
 namespace Http {
@@ -21,7 +22,7 @@ namespace Http2 {
  * shifting to a new connection if we reach max streams on the primary. This is a base class
  * used for both the prod implementation as well as the testing one.
  */
-class ConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::Instance {
+class ConnPoolImpl : public ConnectionPool::Instance, public ConnPoolImplBase {
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
@@ -34,6 +35,9 @@ public:
   void drainConnections() override;
   ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
+
+  // Http::ConnPoolImplBase
+  void checkForDrained() override;
 
 protected:
   struct ActiveClient : public Network::ConnectionCallbacks,
@@ -74,22 +78,6 @@ protected:
 
   typedef std::unique_ptr<ActiveClient> ActiveClientPtr;
 
-  struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
-    PendingRequest(ConnPoolImpl& parent, StreamDecoder& decoder,
-                   ConnectionPool::Callbacks& callbacks);
-    ~PendingRequest();
-
-    // Cancellable
-    void cancel() override { parent_.onPendingRequestCancel(*this); }
-
-    ConnPoolImpl& parent_;
-    StreamDecoder& decoder_;
-    ConnectionPool::Callbacks& callbacks_;
-  };
-
-  typedef std::unique_ptr<PendingRequest> PendingRequestPtr;
-
-  void checkForDrained();
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   virtual uint32_t maxTotalStreams() PURE;
   void movePrimaryClientToDraining();
@@ -99,17 +87,13 @@ protected:
   void onStreamDestroy(ActiveClient& client);
   void onStreamReset(ActiveClient& client, Http::StreamResetReason reason);
   void newClientStream(Http::StreamDecoder& response_decoder, ConnectionPool::Callbacks& callbacks);
-  void onPendingRequestCancel(PendingRequest& request);
   void onUpstreamReady();
 
   Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
-  Upstream::HostConstSharedPtr host_;
   ActiveClientPtr primary_client_;
   ActiveClientPtr draining_client_;
   std::list<DrainedCb> drained_callbacks_;
-  std::list<PendingRequestPtr> pending_requests_;
-  Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
 };
 
