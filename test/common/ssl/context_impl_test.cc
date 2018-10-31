@@ -234,6 +234,49 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   EXPECT_TRUE(message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()));
 }
 
+TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem"
+)EOF";
+
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  ClientContextConfigImpl cfg(tls_context, factory_context_);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime, time_system_);
+  Stats::IsolatedStoreImpl store;
+
+  ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
+  std::string ca_cert_json = R"EOF({
+ "path": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem",
+ "serial_number": "b13ff63f2dbc118d",
+ "subject_alt_names": [
+  {
+   "dns": "server1.example.com"
+  }
+ ],
+ "valid_from": "2018-01-15T22:40:27Z",
+ "expiration_time": "2020-01-15T22:40:27Z"
+ }
+)EOF";
+
+  const std::string ca_cert_partial_output(TestEnvironment::substitute(ca_cert_json));
+  envoy::admin::v2alpha::CertificateDetails certificate_details;
+  MessageUtil::loadFromJson(ca_cert_partial_output, certificate_details);
+
+  MessageDifferencer message_differencer;
+  message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
+  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+}
+
 TEST_F(SslContextImplTest, TestNoCert) {
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
   ClientContextConfigImpl cfg(*loader, factory_context_);
