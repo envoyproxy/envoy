@@ -9,8 +9,8 @@
 
 namespace Envoy {
 
-// Encapsulates a contention hook which can be registered with absl::RegisterMutexTracer() which
-// records statistics about that contention.
+// Encapsulates a contention hook which is registered from getOrCreateTracer() which records
+// statistics about that contention.
 //
 // MutexTracer should be accessed via getOrCreateTracer(), which ensures that the global singleton
 // MutexTracer object is always being called. This is necessary because of the type signature which
@@ -32,8 +32,7 @@ public:
 private:
   friend class MutexTracerTest;
 
-  // Returns the callback which can be registered via
-  // absl::RegisterMutexTracer(&Envoy::MutexTracer::contentionHook).
+  // Hook called by absl mutex system once registered from getOrCreateTracer()
   static void contentionHook(const char* msg, const void* obj, int64_t wait_cycles);
 
   // Utility function for contentionHook.

@@ -24,9 +24,23 @@ protected:
     tracer_->contentionHook(nullptr, nullptr, wait_cycles);
   }
 
-  absl::Mutex mu_;
+  Thread::Thread launchThread() {
+    return Thread::Thread([this]() -> void { holdUntilContention(); });
+  }
+
+  Thread::MutexBasicLockable mu_;
   MutexTracer* tracer_;
-  DangerousDeprecatedTestTime time_system_;
+  DangerousDeprecatedTestTime test_time_;
+
+private:
+  void holdUntilContention() {
+    int64_t curr_num_contentions = tracer_->numContentions();
+    while (tracer_->numContentions() == curr_num_contentions) {
+      test_time_.timeSystem().sleep(std::chrono::milliseconds(1));
+      Thread::LockGuard lock(mu_);
+      test_time_.timeSystem().sleep(std::chrono::milliseconds(9));
+    }
+  }
 };
 
 // Call the contention hook manually.
@@ -57,8 +71,7 @@ TEST_F(MutexTracerTest, AddN) {
 // Call the contention hook in a real contention scenario.
 TEST_F(MutexTracerTest, OneThreadNoContention) {
   // Regular operation doesn't cause contention.
-  mu_.Lock();
-  mu_.Unlock();
+  { Thread::LockGuard lock(mu_); }
 
   EXPECT_EQ(tracer_->numContentions(), 0);
   EXPECT_EQ(tracer_->currentWaitCycles(), 0);
@@ -67,30 +80,21 @@ TEST_F(MutexTracerTest, OneThreadNoContention) {
 
 TEST_F(MutexTracerTest, TryLockNoContention) {
   // TryLocks don't cause contention.
-  mu_.Lock();
-  EXPECT_FALSE(mu_.TryLock());
-  mu_.Unlock();
+  {
+    Thread::LockGuard lock(mu_);
+    EXPECT_FALSE(mu_.tryLock());
+  }
 
   EXPECT_EQ(tracer_->numContentions(), 0);
   EXPECT_EQ(tracer_->currentWaitCycles(), 0);
   EXPECT_EQ(tracer_->lifetimeWaitCycles(), 0);
 }
 
-void holdUntilContention(absl::Mutex* mu, MutexTracer* tracer, DangerousDeprecatedTestTime* time) {
-  int64_t curr_num_contentions = tracer->numContentions();
-  while (tracer->numContentions() == curr_num_contentions) {
-    time->timeSystem().sleep(std::chrono::milliseconds(1));
-    mu->Lock();
-    time->timeSystem().sleep(std::chrono::milliseconds(9));
-    mu->Unlock();
-  }
-}
-
 TEST_F(MutexTracerTest, TwoThreadsWithContention) {
   for (int i = 1; i <= 10; ++i) {
     int64_t curr_num_lifetime_wait_cycles = tracer_->lifetimeWaitCycles();
-    std::thread t1(holdUntilContention, &mu_, tracer_, &time_system_);
-    std::thread t2(holdUntilContention, &mu_, tracer_, &time_system_);
+    Thread::Thread t1 = launchThread();
+    Thread::Thread t2 = launchThread();
     t1.join();
     t2.join();
 
