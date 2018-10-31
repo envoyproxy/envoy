@@ -4,7 +4,6 @@
 #include <memory>
 
 #include "common/common/compiler_requirements.h"
-#include "common/common/mutex_tracer.h"
 #include "common/common/perf_annotation.h"
 #include "common/event/libevent.h"
 #include "common/network/utility.h"
@@ -76,10 +75,6 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
     server_ = std::make_unique<Server::InstanceImpl>(
         options_, time_system, local_address, test_hooks, *restarter_, *stats_store_,
         access_log_lock, component_factory, std::move(random_generator), *tls_);
-
-    if (options.mutexTracingEnabled()) {
-      Envoy::MutexTracer::getOrCreateTracer();
-    }
 
     break;
   }

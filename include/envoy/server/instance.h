@@ -24,6 +24,8 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/mutex_tracer.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -115,6 +117,11 @@ public:
    * @return the server's listener manager.
    */
   virtual ListenerManager& listenerManager() PURE;
+
+  /**
+   * @return the server's global mutex tracer.
+   */
+  virtual absl::optional<Envoy::MutexTracer*> mutexTracer() PURE;
 
   /**
    * @return the server's overload manager.

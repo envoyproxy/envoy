@@ -20,6 +20,7 @@
 #include "envoy/stats/stats_options.h"
 #include "envoy/thread/thread.h"
 
+#include "common/common/mutex_tracer.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
@@ -325,6 +326,7 @@ public:
   MOCK_METHOD0(hotRestart, HotRestart&());
   MOCK_METHOD0(initManager, Init::Manager&());
   MOCK_METHOD0(listenerManager, ListenerManager&());
+  MOCK_METHOD0(mutexTracer, absl::optional<Envoy::MutexTracer*>());
   MOCK_METHOD0(options, Options&());
   MOCK_METHOD0(overloadManager, OverloadManager&());
   MOCK_METHOD0(random, Runtime::RandomGenerator&());

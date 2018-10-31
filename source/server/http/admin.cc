@@ -436,7 +436,9 @@ Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap& resp
         Http::Headers::get().ContentTypeValues.Json);
 
     envoy::admin::v2alpha::MutexStats mutex_stats;
-    MutexTracer* tracer = MutexTracer::getOrCreateTracer();
+    // If tracing is enabled, mutexTracer() should never be absl::nullopt.
+    ASSERT(server_.mutexTracer().has_value());
+    MutexTracer* tracer = server_.mutexTracer().value();
     mutex_stats.set_num_contentions(tracer->numContentions());
     mutex_stats.set_current_wait_cycles(tracer->currentWaitCycles());
     mutex_stats.set_lifetime_wait_cycles(tracer->lifetimeWaitCycles());

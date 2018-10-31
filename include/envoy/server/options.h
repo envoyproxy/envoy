@@ -168,7 +168,7 @@ public:
   virtual bool hotRestartDisabled() const PURE;
 
   /**
-   * @return bool indicating whether or not mutex tracing functionality has been enabled via cli
+   * @return bool indicating whether mutex tracing functionality has been enabled.
    * flags.
    */
   virtual bool mutexTracingEnabled() const PURE;

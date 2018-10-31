@@ -16,8 +16,9 @@ namespace Envoy {
 // MutexTracer object is always being called. This is necessary because of the type signature which
 // absl::RegisterMutexTracer() expects.
 //
-// This class is thread-safe, and can be called from multiple mutexes in contention across multiple
-// threads. This is made possible by utilizing memory_order_relaxed atomic writes.
+// *NB*: getOrCreateTracer() is not thread-safe, and should be called once at startup, after which
+// the internal contention hook is thread-safe. This is possible by utilizing memory_order_relaxed
+// atomic writes.
 class MutexTracer final {
 public:
   static MutexTracer* getOrCreateTracer();

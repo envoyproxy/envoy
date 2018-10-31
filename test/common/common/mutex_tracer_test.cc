@@ -38,6 +38,8 @@ private:
     while (tracer_->numContentions() == curr_num_contentions) {
       test_time_.timeSystem().sleep(std::chrono::milliseconds(1));
       Thread::LockGuard lock(mu_);
+      // We hold the lock 90% of the time to ensure both contention and eventual acquisition, which
+      // is needed to bump numContentions().
       test_time_.timeSystem().sleep(std::chrono::milliseconds(9));
     }
   }
