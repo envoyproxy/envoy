@@ -6,6 +6,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Const;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
