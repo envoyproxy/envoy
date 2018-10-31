@@ -205,25 +205,59 @@ PoolRequest* InstanceImpl::makeRequest(const std::string& hash_key, const RespVa
 }
 
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
-                                               const std::string& cluster_name)
-    : parent_(parent), dispatcher_(dispatcher), cluster_(parent_.cm_.get(cluster_name)) {
+                                               std::string cluster_name)
+    : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)) {
 
-  // TODO(mattklein123): Redis is not currently safe for use with CDS. In order to make this work
-  //                     we will need to add thread local cluster removal callbacks so that we can
-  //                     safely clean things up and fail requests.
-  ASSERT(!cluster_->info()->addedViaApi());
-  local_host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
+  cluster_update_handle_ = parent_.cm_.addThreadLocalClusterUpdateCallbacks(*this);
+  Upstream::ThreadLocalCluster* cluster = parent_.cm_.get(cluster_name_);
+  if (cluster != nullptr) {
+    onClusterAddOrUpdateNonVirtual(*cluster);
+  }
+}
+
+InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
+  if (host_set_member_update_cb_handle_ != nullptr) {
+    host_set_member_update_cb_handle_->remove();
+  }
+  while (!client_map_.empty()) {
+    client_map_.begin()->second->redis_client_->close();
+  }
+}
+
+void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
+    Upstream::ThreadLocalCluster& cluster) {
+  if (cluster.info()->name() != cluster_name_) {
+    return;
+  }
+
+  if (cluster_ != nullptr) {
+    // Treat an update as a removal followed by an add.
+    onClusterRemoval(cluster_name_);
+  }
+
+  ASSERT(cluster_ == nullptr);
+  cluster_ = &cluster;
+  ASSERT(host_set_member_update_cb_handle_ == nullptr);
+  host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
       [this](uint32_t, const std::vector<Upstream::HostSharedPtr>&,
              const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> void {
         onHostsRemoved(hosts_removed);
       });
 }
 
-InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
-  local_host_set_member_update_cb_handle_->remove();
+void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_name) {
+  if (cluster_name != cluster_name_) {
+    return;
+  }
+
+  // Treat cluster removal as a removal of all hosts. Close all connections and fail all pending
+  // requests.
   while (!client_map_.empty()) {
     client_map_.begin()->second->redis_client_->close();
   }
+
+  cluster_ = nullptr;
+  host_set_member_update_cb_handle_ = nullptr;
 }
 
 void InstanceImpl::ThreadLocalPool::onHostsRemoved(
@@ -241,6 +275,12 @@ void InstanceImpl::ThreadLocalPool::onHostsRemoved(
 PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& hash_key,
                                                         const RespValue& request,
                                                         PoolCallbacks& callbacks) {
+  if (cluster_ == nullptr) {
+    ASSERT(client_map_.empty());
+    ASSERT(host_set_member_update_cb_handle_ == nullptr);
+    return nullptr;
+  }
+
   LbContextImpl lb_context(hash_key);
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
