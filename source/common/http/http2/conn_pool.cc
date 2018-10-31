@@ -126,6 +126,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
 
+    ENVOY_CONN_LOG(debug, "client disconnected", *client.client_);
     if (client.closed_with_active_rq_) {
       host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
       if (event == Network::ConnectionEvent::RemoteClose) {
@@ -135,18 +136,11 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       }
     }
 
-    if (&client == primary_client_.get()) {
-      ENVOY_CONN_LOG(debug, "destroying primary client", *client.client_);
-      dispatcher_.deferredDelete(std::move(primary_client_));
-    } else {
-      ENVOY_CONN_LOG(debug, "destroying draining client", *client.client_);
-      dispatcher_.deferredDelete(std::move(draining_client_));
-    }
-
     if (client.connect_timer_) {
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
+      ENVOY_CONN_LOG(debug, "canceling pending requests", *client.client_);
       // Raw connect failures should never happen under normal circumstances. If we have an upstream
       // that is behaving badly, requests can get stuck here in the pending state. If we see a
       // connect failure, we purge all pending requests so that calling code can determine what to
@@ -161,6 +155,15 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
         request->callbacks_.onPoolFailure(ConnectionPool::PoolFailureReason::ConnectionFailure,
                                           client.real_host_description_);
       }
+    }
+
+
+    if (&client == primary_client_.get()) {
+      ENVOY_CONN_LOG(debug, "destroying primary client", *client.client_);
+      dispatcher_.deferredDelete(std::move(primary_client_));
+    } else {
+      ENVOY_CONN_LOG(debug, "destroying draining client", *client.client_);
+      dispatcher_.deferredDelete(std::move(draining_client_));
     }
 
     if (client.closed_with_active_rq_) {
