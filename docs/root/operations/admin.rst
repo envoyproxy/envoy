@@ -179,20 +179,16 @@ modify different aspects of the server:
 
 .. code-block:: none
 
- {
-   "version": "91a3f686546e0e40fa337bf69e15c2be177c4b02/1.9.0-dev/Modified/DEBUG",
-   "uptime_current_epoch": "10s",
-   "uptime_all_epochs": "10s"
- }
+  {
+   "version": "b050513e840aa939a01f89b07c162f00ab3150eb/1.9.0-dev/Modified/DEBUG",
+   "state": "LIVE",
+   "epoch": 0,
+   "uptime_current_epoch": "6s",
+   "uptime_all_epochs": "6s"
+  }
 
-The fields are:
-
-* Process name
-* Compiled SHA and build type
-* Health check state (live or draining)
-* Current hot restart epoch uptime in seconds
-* Total uptime in seconds (across all hot restarts)
-* Current hot restart epoch
+See the :ref`ServerInfo proto <envoy_api_msg_service.admin.v2alpha.ServerInfo>` for an
+explanation of the output.
 
 .. _operations_admin_interface_stats:
 
