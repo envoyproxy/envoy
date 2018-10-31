@@ -33,7 +33,7 @@ public:
 private:
   friend class MutexTracerTest;
 
-  // Hook called by absl mutex system once registered from getOrCreateTracer()
+  // Hook called by absl mutex system once registered from getOrCreateTracer().
   static void contentionHook(const char* msg, const void* obj, int64_t wait_cycles);
 
   // Utility function for contentionHook.
