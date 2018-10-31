@@ -9,7 +9,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace OriginalSni {
 
-using ::Envoy::StreamInfo::OriginalRequestedServerName OriginalRequestedServerName;
+using ::Envoy::StreamInfo::OriginalRequestedServerName;
 
 Network::FilterStatus OriginalSniFilter::onNewConnection() {
   absl::string_view sni = read_callbacks_->connection().requestedServerName();
