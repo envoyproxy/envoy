@@ -154,7 +154,7 @@ TEST_F(HttpExtAuthzFilterTest, ContextExtensions) {
   initialize(filter_config_);
 
   // Place something in the context extensions.
-  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthPerRoute settings;
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settings;
   const std::string key = "key";
   const std::string value = "value";
   (*settings.mutable_check_settings()->mutable_context_extensions())[key] = value;
@@ -184,7 +184,7 @@ TEST_F(HttpExtAuthzFilterTest, ContextExtensions) {
 
 // Test that filter can be disabled with route config.
 TEST_F(HttpExtAuthzFilterTest, DisabledOnRoute) {
-  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthPerRoute settings;
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));

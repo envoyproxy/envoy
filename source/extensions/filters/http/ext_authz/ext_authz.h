@@ -120,7 +120,7 @@ public:
   using ContextExtensionsMap = Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>;
 
   FilterConfigPerRoute(
-      const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthPerRoute& config)
+      const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute& config)
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
