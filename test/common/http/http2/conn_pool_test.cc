@@ -61,7 +61,6 @@ public:
     Network::MockClientConnection* connection_;
     CodecClientForTest* codec_client_;
     Event::MockTimer* connect_timer_;
-    Event::MockTimer* upstream_ready_timer_;
     Event::DispatcherPtr client_dispatcher_;
   };
 
@@ -81,7 +80,6 @@ public:
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-    test_client.upstream_ready_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     test_client.client_dispatcher_.reset(new Event::DispatcherImpl(test_time_.timeSystem()));
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
@@ -134,11 +132,9 @@ public:
 };
 
 void Http2ConnPoolImplTest::expectClientConnect(size_t index, ActiveTestRequest& r) {
-  EXPECT_CALL(*test_clients_[index].upstream_ready_timer_, enableTimer(_));
-  EXPECT_CALL(*test_clients_[index].connect_timer_, disableTimer());
   expectStreamConnect(index, r);
+  EXPECT_CALL(*test_clients_[index].connect_timer_, disableTimer());
   test_clients_[index].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  test_clients_[index].upstream_ready_timer_->callback_();
 }
 
 void Http2ConnPoolImplTest::expectStreamConnect(size_t index, ActiveTestRequest& r) {

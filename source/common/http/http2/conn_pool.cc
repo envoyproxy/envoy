@@ -161,8 +161,9 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
 
   if (event == Network::ConnectionEvent::Connected) {
     conn_connect_ms_->complete();
+
     client.upstream_ready_ = true;
-    client.upstream_ready_timer_->enableTimer(std::chrono::milliseconds(0));
+    onUpstreamReady();
   }
 
   if (client.connect_timer_) {
@@ -186,7 +187,6 @@ void ConnPoolImpl::movePrimaryClientToDraining() {
     // close it now.
     primary_client_->client_->close();
   } else {
-    primary_client_->upstream_ready_timer_->disableTimer();
     draining_client_ = std::move(primary_client_);
   }
 
@@ -248,10 +248,7 @@ void ConnPoolImpl::onUpstreamReady() {
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : parent_(parent),
-      connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
-      upstream_ready_timer_(
-          parent_.dispatcher_.createTimer([this]() -> void { parent_.onUpstreamReady(); })) {
-
+      connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })) {
   parent_.conn_connect_ms_.reset(new Stats::Timespan(
       parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem()));
   Upstream::Host::CreateConnectionData data =

@@ -70,9 +70,8 @@ protected:
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
     uint64_t total_streams_{};
     Event::TimerPtr connect_timer_;
-    Event::TimerPtr upstream_ready_timer_;
-    Stats::TimespanPtr conn_length_;
     bool upstream_ready_{};
+    Stats::TimespanPtr conn_length_;
     bool closed_with_active_rq_{};
   };
 
