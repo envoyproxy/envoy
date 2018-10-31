@@ -79,7 +79,6 @@ public:
   MOCK_CONST_METHOD0(typedMetadata, const Envoy::Config::TypedMetadata&());
   MOCK_CONST_METHOD0(clusterSocketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(drainConnectionsOnHostRemoval, bool());
-  MOCK_CONST_METHOD0(forwardOriginalServerNameIndication, bool());
 
   std::string name_{"fake_cluster"};
   Http::Http2Settings http2_settings_{};
