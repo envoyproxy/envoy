@@ -3,7 +3,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
-#include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -81,7 +80,7 @@ void TraceReporter::flushTraces() {
     message->headers().insertPath().value().setReference(encoder_->path());
     message->headers().insertHost().value().setReference(driver_.cluster()->name());
     for (auto& h : encoder_->headers()) {
-      message->headers().addReferenceKey(Http::LowerCaseString{h.first}, h.second);
+      message->headers().addCopy(Http::LowerCaseString{h.first}, h.second);
     }
 
     Buffer::InstancePtr body(new Buffer::OwnedImpl());
