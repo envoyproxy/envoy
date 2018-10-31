@@ -188,9 +188,7 @@ ProtocolPtr Filter::createProtocol(ProtocolCallbacks& callback) {
   case Type::Dubbo:
     return std::make_unique<DubboProtocolImpl>(callback);
   default:
-    throw EnvoyException(
-        fmt::format("unsupported protocol type, value is : {}",
-                    static_cast<std::underlying_type<ConfigProtocolType>::type>(protocol_type_)));
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -200,9 +198,7 @@ DeserializerPtr Filter::createDeserializer() {
   case Type::Hessian2:
     return std::make_unique<HessianDeserializerImpl>();
   default:
-    throw EnvoyException(fmt::format(
-        "unsupported serialization type, value is: {}",
-        static_cast<std::underlying_type<ConfigSerializationType>::type>(serialization_type_)));
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
