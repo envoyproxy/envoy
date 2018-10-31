@@ -3,9 +3,12 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/config/utility.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
+
+#include "extensions/tracers/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,12 +27,9 @@ Driver::Driver(const envoy::config::trace::v2::DatadogConfig& datadog_config,
                                 POOL_COUNTER_PREFIX(stats, "tracing.datadog."))},
       tls_(tls.allocateSlot()), runtime_(runtime) {
 
-  Upstream::ThreadLocalCluster* cluster = cm_.get(datadog_config.collector_cluster());
-  if (!cluster) {
-    throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
-                                     datadog_config.collector_cluster()));
-  }
-  cluster_ = cluster->info();
+  Config::Utility::checkCluster(TracerNames::get().Datadog, datadog_config.collector_cluster(),
+                                cm_);
+  cluster_ = cm_.get(datadog_config.collector_cluster())->info();
 
   // Default tracer options.
   tracer_options_.operation_name_override = "envoy.proxy";
@@ -52,7 +52,8 @@ Driver::Driver(const envoy::config::trace::v2::DatadogConfig& datadog_config,
 
 opentracing::Tracer& Driver::tracer() { return *tls_->getTyped<TlsTracer>().tracer_; }
 
-TraceReporter::TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver, Event::Dispatcher& dispatcher)
+TraceReporter::TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver,
+                             Event::Dispatcher& dispatcher)
     : driver_(driver), encoder_(encoder) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
@@ -63,9 +64,7 @@ TraceReporter::TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver, Even
   enableTimer();
 }
 
-void TraceReporter::enableTimer() {
-  flush_timer_->enableTimer(std::chrono::milliseconds(1000U));
-}
+void TraceReporter::enableTimer() { flush_timer_->enableTimer(std::chrono::milliseconds(1000U)); }
 
 void TraceReporter::flushTraces() {
   auto pendingTraces = encoder_->pendingTraces();
