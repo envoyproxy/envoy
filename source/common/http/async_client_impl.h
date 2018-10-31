@@ -310,7 +310,6 @@ private:
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void setDecoderBufferLimit(uint32_t) override {}
   uint32_t decoderBufferLimit() override { return 0; }
-  void upstreamRequestComplete() override {}
 
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;
