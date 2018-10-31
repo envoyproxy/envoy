@@ -527,6 +527,18 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
     RST formatted definition list item.
   """
   annotations = []
+
+  anchor = FormatAnchor(FieldCrossRefLabel(type_context.name))
+  if field.options.HasExtension(validate_pb2.rules):
+    rule = field.options.Extensions[validate_pb2.rules]
+    if ((rule.HasField('message') and rule.message.required) or
+        (rule.HasField('string') and rule.string.min_bytes > 0) or
+        (rule.HasField('repeated') and rule.repeated.min_items > 0)):
+      annotations = ['*REQUIRED*']
+  leading_comment, comment_annotations = type_context.LeadingCommentPathLookup()
+  if NOT_IMPLEMENTED_HIDE_ANNOTATION in comment_annotations:
+    return ''
+
   if field.HasField('oneof_index'):
     oneof_context = outer_type_context.ExtendOneof(field.oneof_index,
                                                    type_context.oneof_names[field.oneof_index])
@@ -540,6 +552,8 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
       annotations = ['*REQUIRED*']
 
     if len(type_context.oneof_fields[field.oneof_index]) > 1:
+      # Fields in oneof shouldn't be marked as required when we have oneof comment below it.
+      annotations = []
       oneof_template = '\nPrecisely one of %s must be set.\n' if type_context.oneof_required[
           field.oneof_index] else '\nOnly one of %s may be set.\n'
       oneof_comment += oneof_template % ', '.join(
@@ -549,16 +563,6 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
   else:
     oneof_comment = ''
 
-  anchor = FormatAnchor(FieldCrossRefLabel(type_context.name))
-  if field.options.HasExtension(validate_pb2.rules):
-    rule = field.options.Extensions[validate_pb2.rules]
-    if ((rule.HasField('message') and rule.message.required) or
-        (rule.HasField('string') and rule.string.min_bytes > 0) or
-        (rule.HasField('repeated') and rule.repeated.min_items > 0)):
-      annotations = ['*REQUIRED*']
-  leading_comment, comment_annotations = type_context.LeadingCommentPathLookup()
-  if NOT_IMPLEMENTED_HIDE_ANNOTATION in comment_annotations:
-    return ''
   comment = '(%s) ' % ', '.join(
       [FormatFieldType(type_context, field)] + annotations) + leading_comment
   return anchor + field.name + '\n' + MapLines(
