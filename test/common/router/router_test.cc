@@ -1336,23 +1336,28 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
-TEST_F(RouterTest, RetryUpstreamPerTryTimeoutNoUpstreamHost) {
+// Asserts that onHostAttempted is *not* called when the upstream connection fails in such
+// a way that no host is present.
+TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
+  Http::ConnectionPool::Callbacks* conn_pool_callbacks;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks&)
-                           -> Http::ConnectionPool::Cancellable* { return nullptr; }));
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        conn_pool_callbacks = &callbacks;
+        return nullptr;
+      }));
   expectResponseTimerCreate();
-  expectPerTryTimerCreate();
 
-  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
-                                  {"x-envoy-internal", "true"},
-                                  {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
 
   EXPECT_CALL(*router_.retry_state_, onHostAttempted(_)).Times(0);
 
   router_.retry_state_->expectRetry();
-  per_try_timeout_->callback_();
+
+  conn_pool_callbacks->onPoolFailure(Http::ConnectionPool::PoolFailureReason::ConnectionFailure,
+                                     nullptr);
 
   Http::StreamDecoder* response_decoder = nullptr;
   // We expect this reset to kick off a new request.
@@ -1364,7 +1369,6 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeoutNoUpstreamHost) {
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
       }));
-  expectPerTryTimerCreate();
   router_.retry_state_->callback_();
 
   EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
