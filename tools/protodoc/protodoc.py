@@ -204,6 +204,8 @@ class TypeContext(object):
     self.map_typenames = {}
     # Map from a message's oneof index to the fields sharing a oneof.
     self.oneof_fields = {}
+    # Map from a message's oneof index to the name of oneof.
+    self.oneof_names = {}
     # Map from a message's oneof index to the "required" bool property.
     self.oneof_required = {}
     self.type_name = 'file'
@@ -218,6 +220,7 @@ class TypeContext(object):
     extended.type_name = type_name
     extended.map_typenames = self.map_typenames.copy()
     extended.oneof_fields = self.oneof_fields.copy()
+    extended.oneof_names = self.oneof_names.copy()
     extended.oneof_required = self.oneof_required.copy()
     return extended
 
@@ -274,6 +277,15 @@ class TypeContext(object):
       name: value name.
     """
     return self._Extend([2, index], 'enum_value', name)
+
+  def ExtendOneof(self, index, name):
+    """Extend type context with an oneof declaration.
+
+    Args:
+      index: oneof index in oneof_decl.
+      name: oneof name.
+    """
+    return self._Extend([8, index], "oneof", name)
 
   def LeadingCommentPathLookup(self):
     return self.source_code_info.LeadingCommentPathLookup(
@@ -514,26 +526,43 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
   Returns:
     RST formatted definition list item.
   """
-  if field.HasField('oneof_index'):
-    oneof_template = '\nPrecisely one of %s must be set.\n' if type_context.oneof_required[
-        field.oneof_index] else '\nOnly one of %s may be set.\n'
-    oneof_comment = oneof_template % ', '.join(
-        FormatInternalLink(
-            f, FieldCrossRefLabel(outer_type_context.ExtendField(0, f).name))
-        for f in type_context.oneof_fields[field.oneof_index])
-  else:
-    oneof_comment = ''
-  anchor = FormatAnchor(FieldCrossRefLabel(type_context.name))
   annotations = []
+
+  anchor = FormatAnchor(FieldCrossRefLabel(type_context.name))
   if field.options.HasExtension(validate_pb2.rules):
     rule = field.options.Extensions[validate_pb2.rules]
     if ((rule.HasField('message') and rule.message.required) or
         (rule.HasField('string') and rule.string.min_bytes > 0) or
         (rule.HasField('repeated') and rule.repeated.min_items > 0)):
-      annotations.append('*REQUIRED*')
+      annotations = ['*REQUIRED*']
   leading_comment, comment_annotations = type_context.LeadingCommentPathLookup()
   if NOT_IMPLEMENTED_HIDE_ANNOTATION in comment_annotations:
     return ''
+
+  if field.HasField('oneof_index'):
+    oneof_context = outer_type_context.ExtendOneof(field.oneof_index,
+                                                   type_context.oneof_names[field.oneof_index])
+    oneof_comment, oneof_comment_annotations = oneof_context.LeadingCommentPathLookup()
+    if NOT_IMPLEMENTED_HIDE_ANNOTATION in oneof_comment_annotations:
+      return ''
+
+    # If the oneof only has one field and marked required, mark the field as required.
+    if len(type_context.oneof_fields[field.oneof_index]) == 1 and type_context.oneof_required[
+        field.oneof_index]:
+      annotations = ['*REQUIRED*']
+
+    if len(type_context.oneof_fields[field.oneof_index]) > 1:
+      # Fields in oneof shouldn't be marked as required when we have oneof comment below it.
+      annotations = []
+      oneof_template = '\nPrecisely one of %s must be set.\n' if type_context.oneof_required[
+          field.oneof_index] else '\nOnly one of %s may be set.\n'
+      oneof_comment += oneof_template % ', '.join(
+          FormatInternalLink(
+              f, FieldCrossRefLabel(outer_type_context.ExtendField(i, f).name))
+          for i, f in type_context.oneof_fields[field.oneof_index])
+  else:
+    oneof_comment = ''
+
   comment = '(%s) ' % ', '.join(
       [FormatFieldType(type_context, field)] + annotations) + leading_comment
   return anchor + field.name + '\n' + MapLines(
@@ -551,17 +580,19 @@ def FormatMessageAsDefinitionList(type_context, msg):
   """
   type_context.oneof_fields = defaultdict(list)
   type_context.oneof_required = defaultdict(bool)
+  type_context.oneof_names = defaultdict(list)
   for index, field in enumerate(msg.field):
     if field.HasField('oneof_index'):
       _, comment_annotations = type_context.ExtendField(
           index, field.name).LeadingCommentPathLookup()
       if NOT_IMPLEMENTED_HIDE_ANNOTATION in comment_annotations:
         continue
-      type_context.oneof_fields[field.oneof_index].append(field.name)
+      type_context.oneof_fields[field.oneof_index].append((index, field.name))
   for index, oneof_decl in enumerate(msg.oneof_decl):
     if oneof_decl.options.HasExtension(validate_pb2.required):
       type_context.oneof_required[index] = oneof_decl.options.Extensions[
           validate_pb2.required]
+    type_context.oneof_names[index] = oneof_decl.name
   return '\n'.join(
       FormatFieldAsDefinitionListItem(
           type_context, type_context.ExtendField(index, field.name), field)
