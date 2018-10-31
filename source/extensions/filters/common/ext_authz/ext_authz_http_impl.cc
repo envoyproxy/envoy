@@ -69,22 +69,28 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   callbacks_ = &callbacks;
 
   Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(getZeroContentLengthHeader());
-  for (const auto& allowed_header : allowed_request_headers_) {
-    const auto& request_header =
-        request.attributes().request().http().headers().find(allowed_header.get());
-    if (request_header != request.attributes().request().http().headers().cend()) {
-      if (allowed_header == Http::Headers::get().Path && !path_prefix_.empty()) {
+  for (const auto& header : request.attributes().request().http().headers()) {
+    const auto& key = Http::LowerCaseString{header.first};
+    if (allowed_request_headers_.find(key) != allowed_request_headers_.cend()) {
+      if (key == Http::Headers::get().Path && !path_prefix_.empty()) {
         std::string value;
-        absl::StrAppend(&value, path_prefix_, request_header->second);
-        headers->addCopy(allowed_header, value);
+        absl::StrAppend(&value, path_prefix_, header.second);
+        headers->addCopy(key, value);
       } else {
-        headers->addCopy(allowed_header, request_header->second);
+        headers->addCopy(key, header.second);
+      }
+    } else {
+      // Since the prefix list will be most likely small or even empty, O(2) should be ok here.
+      for (const auto& prefix : allowed_request_headers_prefix_) {
+        if (StringUtil::startsWith(key.get().c_str(), prefix.get(), true)) {
+          headers->addCopy(key, header.second);
+        }
       }
     }
   }
 
-  for (const auto& kv : authorization_headers_to_add_) {
-    headers->setReference(kv.first, kv.second);
+  for (const auto& header_to_add : authorization_headers_to_add_) {
+    headers->setReference(header_to_add.first, header_to_add.second);
   }
 
   request_ = cm_.httpAsyncClientForCluster(cluster_name_)
@@ -128,6 +134,7 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
     // Copy all headers to the client's response.
     message->headers().iterate(
         [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+          // std::cout << "ADDING HEADER: " << header.key().c_str() << std::endl;
           static_cast<Http::HeaderVector*>(context)->emplace_back(
               Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
           return Http::HeaderMap::Iterate::Continue;
@@ -138,11 +145,13 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
     for (const auto& header : allowed_client_headers_) {
       const auto* entry = message->headers().get(header);
       if (entry) {
+        // std::cout << "ADDING HEADER: " << entry->key().c_str() << std::endl;
         denied_response->headers_to_add.emplace_back(Http::LowerCaseString{entry->key().c_str()},
                                                      entry->value().c_str());
       }
     }
   }
+
   return denied_response;
 }
 

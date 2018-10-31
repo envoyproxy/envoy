@@ -40,12 +40,17 @@ Http::LowerCaseStrUnorderedSet FilterConfig::toUpstreamHeader(
 Http::LowerCaseStrUnorderedSet
 FilterConfig::toClientHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys) {
   Http::LowerCaseStrUnorderedSet key_set;
-  key_set.reserve(keys.size() + 3);
-  key_set.emplace(Http::Headers::get().WWWAuthenticate);
-  key_set.emplace(Http::Headers::get().ProxyAuthenticate);
-  key_set.emplace(Http::Headers::get().Location);
-  for (const auto& key : keys) {
-    key_set.emplace(key);
+  if (!keys.empty()) {
+    key_set.reserve(keys.size() + 6);
+    key_set.emplace(Http::Headers::get().Status);
+    key_set.emplace(Http::Headers::get().ContentLength);
+    key_set.emplace(Http::Headers::get().Path);
+    key_set.emplace(Http::Headers::get().Host);
+    key_set.emplace(Http::Headers::get().WWWAuthenticate);
+    key_set.emplace(Http::Headers::get().Location);
+    for (const auto& key : keys) {
+      key_set.emplace(key);
+    }
   }
   return key_set;
 }
@@ -53,17 +58,11 @@ FilterConfig::toClientHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTyp
 Http::LowerCaseStrUnorderedSet FilterConfig::toRequestHeader(
     const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys) {
   Http::LowerCaseStrUnorderedSet key_set;
-  key_set.reserve(keys.size() + 10);
+  key_set.reserve(keys.size() + 4);
   key_set.emplace(Http::Headers::get().Path);
   key_set.emplace(Http::Headers::get().Method);
   key_set.emplace(Http::Headers::get().Host);
   key_set.emplace(Http::Headers::get().Authorization);
-  key_set.emplace(Http::Headers::get().ProxyAuthorization);
-  key_set.emplace(Http::Headers::get().UserAgent);
-  key_set.emplace(Http::Headers::get().Cookie);
-  key_set.emplace(Http::Headers::get().ForwardedFor);
-  key_set.emplace(Http::Headers::get().ForwardedHost);
-  key_set.emplace(Http::Headers::get().ForwardedProto);
   for (const auto& key : keys) {
     key_set.emplace(key);
   }
