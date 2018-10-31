@@ -144,10 +144,6 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
 
   // Timer should be re-enabled.
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.datadog.request_timeout", 1000U))
-      .WillOnce(Return(1000U));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.datadog.flush_interval_ms", 1000U))
-      .WillOnce(Return(1000U));
 
   timer_->callback_();
 
@@ -156,6 +152,8 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  msg->body().reset(new Buffer::OwnedImpl(""));
+
   callback->onSuccess(std::move(msg));
 
   EXPECT_EQ(1U, stats_.counter("tracing.datadog.reports_sent").value());

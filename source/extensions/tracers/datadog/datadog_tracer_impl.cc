@@ -64,9 +64,7 @@ TraceReporter::TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver, Even
 }
 
 void TraceReporter::enableTimer() {
-  const uint64_t flush_interval =
-      driver_.runtime().snapshot().getInteger("tracing.datadog.flush_interval_ms", 1000U);
-  flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
+  flush_timer_->enableTimer(std::chrono::milliseconds(1000U));
 }
 
 void TraceReporter::flushTraces() {
@@ -89,11 +87,9 @@ void TraceReporter::flushTraces() {
     ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload {}", pendingTraces,
               encoder_->path(), encoder_->payload().size());
 
-    const uint64_t timeout =
-        driver_.runtime().snapshot().getInteger("tracing.datadog.request_timeout", 1000U);
     driver_.clusterManager()
         .httpAsyncClientForCluster(driver_.cluster()->name())
-        .send(std::move(message), *this, std::chrono::milliseconds(timeout));
+        .send(std::move(message), *this, std::chrono::milliseconds(1000U));
 
     encoder_->clearTraces();
   }
