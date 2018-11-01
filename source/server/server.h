@@ -107,25 +107,22 @@ public:
                                               Options& options);
 };
 
+class InstanceImpl;
+
 /**
  * This is a helper used by InstanceImpl::run() on the stack. It's broken out to make testing
  * easier.
  */
 class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
-  RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, HotRestart& hot_restart,
+  RunHelper(Instance& instance, Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
             AccessLog::AccessLogManager& access_log_manager, InitManagerImpl& init_manager,
             OverloadManager& overload_manager, std::function<void()> workers_start_cb);
-
-  // Helper function to inititate a shutdown. This can be triggered either by catching SIGTERM
-  // or be called from ServerImpl::shutdown().
-  void shutdown(Event::Dispatcher& dispatcher, HotRestart& hot_restart);
 
 private:
   Event::SignalEventPtr sigterm_;
   Event::SignalEventPtr sig_usr_1_;
   Event::SignalEventPtr sig_hup_;
-  bool shutdown_{};
 };
 
 /**
@@ -170,6 +167,7 @@ public:
   }
   Runtime::Loader& runtime() override;
   void shutdown() override;
+  bool isShutdown() override { return shutdown_; }
   void shutdownAdmin() override;
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override;
@@ -196,6 +194,7 @@ private:
   void startWorkers();
   void terminate();
 
+  bool shutdown_;
   Options& options_;
   Event::TimeSystem& time_system_;
   HotRestart& restarter_;
