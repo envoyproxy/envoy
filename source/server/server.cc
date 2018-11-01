@@ -393,21 +393,15 @@ RunHelper::RunHelper(Options& options, Event::Dispatcher& dispatcher, Upstream::
                      std::function<void()> workers_start_cb) {
 
   // Setup signals.
-  if (options.signalHandler().allows("SIGTERM")) {
+  if (options.signalHandlingEnabled()) {
     sigterm_ = dispatcher.listenForSignal(SIGTERM, [this, &hot_restart, &dispatcher]() {
       ENVOY_LOG(warn, "caught SIGTERM");
       shutdown(dispatcher, hot_restart);
     });
-  }
-
-  if (options.signalHandler().allows("SIGUSR1")) {
     sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
       ENVOY_LOG(warn, "caught SIGUSR1");
       access_log_manager.reopen();
     });
-  }
-
-  if (options.signalHandler().allows("SIGHUP")) {
     sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
       ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
     });
@@ -454,7 +448,7 @@ void RunHelper::shutdown(Event::Dispatcher& dispatcher, HotRestart& hot_restart)
 void InstanceImpl::run() {
   // We need the RunHelper to be available to call from InstanceImpl::shutdown() below, so
   // we save it as a member variable.
-  run_helper_ = std::make_unique<RunHelper>(options(), *dispatcher_, clusterManager(), restarter_,
+  run_helper_ = std::make_unique<RunHelper>(options_, *dispatcher_, clusterManager(), restarter_,
                                             access_log_manager_, init_manager_, overloadManager(),
                                             [this]() -> void { startWorkers(); });
 

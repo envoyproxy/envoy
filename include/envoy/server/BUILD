@@ -114,7 +114,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/network:address_interface",
         "//include/envoy/stats:stats_interface",
-        "//source/server:signal_handler",
     ],
 )
 

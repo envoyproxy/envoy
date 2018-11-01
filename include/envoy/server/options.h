@@ -8,8 +8,6 @@
 #include "envoy/network/address.h"
 #include "envoy/stats/stats_options.h"
 
-#include "server/signal_handler.h"
-
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -170,9 +168,9 @@ public:
   virtual bool hotRestartDisabled() const PURE;
 
   /**
-   * @return const SignalHandler& the server's signal handler.
+   * @return bool indicating whether system signal listeners are enabled.
    */
-  virtual const SignalHandler& signalHandler() const PURE;
+  virtual bool signalHandlingEnabled() const PURE;
 };
 
 } // namespace Server

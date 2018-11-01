@@ -223,12 +223,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "signal_handler_test",
-    srcs = ["signal_handler_test.cc"],
-    deps = ["//source/server:signal_handler"],
-)
-
 envoy_cc_test_library(
     name = "utility_lib",
     hdrs = ["utility.h"],

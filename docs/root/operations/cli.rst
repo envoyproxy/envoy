@@ -232,10 +232,6 @@ following are the command line options that Envoy supports.
   *(optional)* This flag disables Envoy hot restart for builds that have it enabled. By default, hot
   restart is enabled.
 
-.. option:: --listen_for_signals <string>
-
-  *(optional)* A comma-separated, case-sensitive list of system signals which Envoy will listen for. For example, `--listen_for_signals SIGTERM,SIGUSR1` will enable listening for those signals. Also accepts `all` or `none` to listen to all system signals, or ignore all system signals. The complete list of system signals which Envoy listens for is as follows: SIGTERM, SIGUSR1.
-
 .. option:: --allow-unknown-fields
 
   *(optional)* This flag disables validation of protobuf configurations for unknown fields. By default, the 
