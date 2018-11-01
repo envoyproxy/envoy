@@ -256,8 +256,10 @@ message CommonTlsContext {
     // Combined certificate validation context holds a default CertificateValidationContext
     // and SDS config. When SDS server returns dynamic CertificateValidationContext, both dynamic
     // and default CertificateValidationContext are merged into a new CertificateValidationContext
-    // for validation. This merge is done by Message::MergeFrom(), so singular fields will be
-    // overwritten, and repeated fields will be concatenated.
+    // for validation. This merge is done by Message::MergeFrom(), so dynamic
+    // CertificateValidationContext overwrites singular fields in default
+    // CertificateValidationContext, and concatenates repeated fields to default
+    // CertificateValidationContext.
     CombinedCertificateValidationContext combined_validation_context = 8;
   }
 

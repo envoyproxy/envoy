@@ -3,13 +3,12 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/auth/cert.pb.h"
-
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/config/datasource.h"
 #include "common/config/tls_context_json.h"
 #include "common/protobuf/utility.h"
+#include "common/secret/sds_api.h"
 
 #include "openssl/ssl.h"
 
@@ -49,8 +48,9 @@ Secret::TlsCertificateConfigProviderSharedPtr getTlsCertificateConfigProvider(
 
 Secret::CertificateValidationContextConfigProviderSharedPtr
 getCertificateValidationContextConfigProviderFromSds(
+    Server::Configuration::TransportSocketFactoryContext& factory_context,
     const envoy::api::v2::auth::SdsSecretConfig& sds_secret_config,
-    const envoy::api::v2::auth::Secret& default_secret) {
+    const envoy::api::v2::auth::CertificateValidationContext* default_cvc) {
   if (!sds_secret_config.has_sds_config()) {
     // static secret
     auto secret_provider =
@@ -65,7 +65,10 @@ getCertificateValidationContextConfigProviderFromSds(
     auto secret_provider =
         factory_context.secretManager().findOrCreateCertificateValidationContextProvider(
             sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
-    secret_provider->setDefaultSecret(default_cvc);
+    if (default_cvc != nullptr) {
+      dynamic_cast<Secret::CertificateValidationContextSdsApi*>(secret_provider.get())
+          ->setDefaultSecret(*default_cvc);
+    }
     return secret_provider;
   }
   return nullptr;
@@ -83,17 +86,16 @@ getCertificateValidationContextConfigProvider(
   case envoy::api::v2::auth::CommonTlsContext::ValidationContextTypeCase::
       kValidationContextSdsSecretConfig: {
     const auto& sds_secret_config = config.validation_context_sds_secret_config();
-    envoy::api::v2::auth::Secret default_secret;
-    return getCertificateValidationContextConfigProviderFromSds(sds_secret_config, default_secret);
+    return getCertificateValidationContextConfigProviderFromSds(factory_context, sds_secret_config,
+                                                                nullptr);
   }
   case envoy::api::v2::auth::CommonTlsContext::ValidationContextTypeCase::
       kCombinedValidationContext: {
-    envoy::api::v2::auth::Secret default_secret;
-    default_secret.mutable_validation_context()->CopyFrom(
-        config.combined_validation_context().default_validation_context());
+    const auto& default_secret = config.combined_validation_context().default_validation_context();
     const auto& sds_secret_config =
         config.combined_validation_context().validation_context_sds_secret_config();
-    return getCertificateValidationContextConfigProviderFromSds(sds_secret_config, default_secret);
+    return getCertificateValidationContextConfigProviderFromSds(factory_context, sds_secret_config,
+                                                                &default_secret);
   }
   default:
     return nullptr;

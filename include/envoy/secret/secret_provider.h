@@ -2,7 +2,6 @@
 
 #include <functional>
 
-#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
@@ -22,10 +21,6 @@ public:
    * @return the secret. Returns nullptr if the secret is not ready.
    */
   virtual const SecretType* secret() const PURE;
-
-  // Sets a default secret. Once the default secret is set, it will be merged with dynamic secret
-  // as new secret to provide.
-  virtual void setDefaultSecret(const envoy::api::v2::auth::Secret&) PURE;
 
   /**
    * Add secret update callback into secret provider.

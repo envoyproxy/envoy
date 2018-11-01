@@ -105,7 +105,6 @@ public:
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
     return update_callback_manager_.add(callback);
   }
-  void setDefaultSecret(const envoy::api::v2::auth::Secret&) override {}
 
 protected:
   void setSecret(const envoy::api::v2::auth::Secret& secret) override {
@@ -153,10 +152,11 @@ public:
     return update_callback_manager_.add(callback);
   }
 
-  void setDefaultSecret(const envoy::api::v2::auth::Secret& default_secret) override {
-    if (default_secret.has_validation_context()) {
-      default_cvc_.CopyFrom(default_secret.validation_context());
-    }
+  // Sets a default CertificateValidationContext. Once the default secret is set,
+  // it will be merged with dynamic CertificateValidationContext as new
+  // secret to provide.
+  void setDefaultSecret(const envoy::api::v2::auth::CertificateValidationContext& default_secret) {
+    default_cvc_.CopyFrom(default_secret);
   }
 
 protected:
