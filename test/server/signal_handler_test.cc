@@ -7,7 +7,7 @@ namespace Server {
 
 class SignalHandlerTest : public testing::Test {
 protected:
-  SignalHandlerTest() {}
+  SignalHandlerTest() = default;
 
   void rejectsInvalidSignals() {
     EXPECT_FALSE(handler_->allows("SIGUNKNOWN"));
@@ -29,7 +29,7 @@ TEST_F(SignalHandlerTest, AllSignalsImplicit) {
 }
 
 TEST_F(SignalHandlerTest, AllSignalsExplicit) {
-  handler_ = std::make_unique<SignalHandler>("ALL");
+  handler_ = std::make_unique<SignalHandler>("all");
   acceptsAllStandardSignals();
   rejectsInvalidSignals();
 }
@@ -52,7 +52,7 @@ TEST_F(SignalHandlerTest, SomeSignalsExplicit) {
 }
 
 TEST_F(SignalHandlerTest, NoneSignals) {
-  handler_ = std::make_unique<SignalHandler>("NONE");
+  handler_ = std::make_unique<SignalHandler>("none");
   EXPECT_FALSE(handler_->allows("SIGTERM"));
   EXPECT_FALSE(handler_->allows("SIGUSR1"));
   EXPECT_FALSE(handler_->allows("SIGHUP"));

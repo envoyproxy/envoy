@@ -398,9 +398,6 @@ RunHelper::RunHelper(Options& options, Event::Dispatcher& dispatcher, Upstream::
       ENVOY_LOG(warn, "caught SIGTERM");
       shutdown(dispatcher, hot_restart);
     });
-  } else {
-    sigterm_ = dispatcher.listenForSignal(
-        SIGTERM, []() { ENVOY_LOG(warn, "caught and ignoring SIGTERM per --listen-for-signals"); });
   }
 
   if (options.signalHandler().allows("SIGUSR1")) {
@@ -408,19 +405,11 @@ RunHelper::RunHelper(Options& options, Event::Dispatcher& dispatcher, Upstream::
       ENVOY_LOG(warn, "caught SIGUSR1");
       access_log_manager.reopen();
     });
-  } else {
-    sig_usr_1_ = dispatcher.listenForSignal(
-        SIGUSR1, []() { ENVOY_LOG(warn, "caught and ignoring SIGUSR1 per --listen-for-signals"); });
   }
 
   if (options.signalHandler().allows("SIGHUP")) {
     sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
       ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
-    });
-  } else {
-    sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
-      ENVOY_LOG(warn, "caught and ignoring SIGHUP per --listen-for-signals. See documentation for "
-                      "how to hot restart.");
     });
   }
 

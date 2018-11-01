@@ -234,7 +234,7 @@ following are the command line options that Envoy supports.
 
 .. option:: --listen_for_signals <string>
 
-  *(optional)* A comma-separated list of system signals which Envoy will listen for. For example, `--listen_for_signals SIGTERM,SIGUSR1` will enable listening for those signals. Also accepts `ALL` or `NONE` to listen to all system signals, or ignore all system signals.
+  *(optional)* A comma-separated, case-sensitive list of system signals which Envoy will listen for. For example, `--listen_for_signals SIGTERM,SIGUSR1` will enable listening for those signals. Also accepts `all` or `none` to listen to all system signals, or ignore all system signals. The complete list of system signals which Envoy listens for is as follows: SIGTERM, SIGUSR1.
 
 .. option:: --allow-unknown-fields
 

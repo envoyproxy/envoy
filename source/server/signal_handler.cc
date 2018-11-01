@@ -4,25 +4,28 @@
 #include <vector>
 
 #include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Server {
 
 // Canonical list of all signals which Envoy knows how to handle.
-std::vector<std::string> all_signals = {"SIGTERM", "SIGUSR1", "SIGHUP"};
+//
+// *NB*: If this list is changed, please also update `cli.rst` under `--listen_for_signals`.
+std::vector<std::string> getAllSignals() { return {"SIGTERM", "SIGUSR1", "SIGHUP"}; }
 
-SignalHandler::SignalHandler() { signals_ = all_signals; }
+SignalHandler::SignalHandler() { signals_ = getAllSignals(); }
 
-SignalHandler::SignalHandler(std::string input) {
+SignalHandler::SignalHandler(absl::string_view input) {
   // Special case to handle default options argument.
-  if (input == "ALL") {
-    signals_ = all_signals;
-  } else if (input != "NONE") {
+  if (input == "all") {
+    signals_ = getAllSignals();
+  } else if (input != "none") {
     signals_ = absl::StrSplit(input, ',');
   }
 }
 
-bool SignalHandler::allows(std::string signal) const {
+bool SignalHandler::allows(absl::string_view signal) const {
   return std::find(signals_.begin(), signals_.end(), signal) != signals_.end();
 }
 
