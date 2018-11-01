@@ -11,6 +11,8 @@
 #include "common/common/version.h"
 #include "common/protobuf/utility.h"
 
+#include "server/signal_handler.h"
+
 #include "absl/strings/str_split.h"
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
@@ -50,6 +52,9 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                   "(see https://github.com/gabime/spdlog/wiki/3.-Custom-formatting)"
                   "\nDefault is \"{}\"",
                   Logger::Logger::DEFAULT_LOG_FORMAT);
+  const std::string listen_for_signals_string =
+      "List of UNIX signals which Envoy listens for. Arguments can be 'ALL', 'NONE', or a "
+      "comma-separated list, such as 'SIGTERM,SIGUSR1'. Defaults to 'ALL'.";
 
   TCLAP::CmdLine cmd("envoy", ' ', VersionInfo::version());
   TCLAP::ValueArg<uint32_t> base_id(
@@ -118,6 +123,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                                              cmd);
   TCLAP::SwitchArg disable_hot_restart("", "disable-hot-restart",
                                        "Disable hot restart functionality", cmd, false);
+  TCLAP::ValueArg<std::string> listen_for_signals(
+      "", "listen-for-signals", listen_for_signals_string, false, "ALL", "string", cmd);
 
   cmd.setExceptionHandling(false);
   try {
@@ -161,6 +168,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   }
 
   log_format_ = log_format.getValue();
+
+  signal_handler_ = Server::SignalHandler(listen_for_signals.getValue());
 
   parseComponentLogLevels(component_log_level.getValue());
 

@@ -33,6 +33,7 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, statsOptions()).WillByDefault(ReturnRef(stats_options_));
   ON_CALL(*this, restartEpoch()).WillByDefault(ReturnPointee(&hot_restart_epoch_));
   ON_CALL(*this, hotRestartDisabled()).WillByDefault(ReturnPointee(&hot_restart_disabled_));
+  ON_CALL(*this, signalHandler()).WillByDefault(ReturnPointee(&signal_handler_));
 }
 MockOptions::~MockOptions() {}
 

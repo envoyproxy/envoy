@@ -10,6 +10,8 @@
 
 #include "common/stats/stats_options_impl.h"
 
+#include "server/signal_handler.h"
+
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -102,6 +104,7 @@ public:
   uint64_t maxStats() const override { return max_stats_; }
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
+  const Server::SignalHandler& signalHandler() const override { return signal_handler_; }
 
 private:
   void parseComponentLogLevels(const std::string& component_log_levels);
@@ -129,6 +132,7 @@ private:
   uint64_t max_stats_;
   Stats::StatsOptionsImpl stats_options_;
   bool hot_restart_disabled_;
+  Server::SignalHandler signal_handler_;
 
   friend class OptionsImplTest;
 };

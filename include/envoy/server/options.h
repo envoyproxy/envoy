@@ -8,6 +8,8 @@
 #include "envoy/network/address.h"
 #include "envoy/stats/stats_options.h"
 
+#include "server/signal_handler.h"
+
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -166,6 +168,11 @@ public:
    * @return bool indicating whether the hot restart functionality has been disabled via cli flags.
    */
   virtual bool hotRestartDisabled() const PURE;
+
+  /**
+   * @return const SignalHandler& the server's signal handler.
+   */
+  virtual const SignalHandler& signalHandler() const PURE;
 };
 
 } // namespace Server

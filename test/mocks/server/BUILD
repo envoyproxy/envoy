@@ -30,6 +30,7 @@ envoy_cc_mock(
         "//source/common/singleton:manager_impl_lib",
         "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",
+        "//source/server:signal_handler",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",

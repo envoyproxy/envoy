@@ -23,6 +23,8 @@
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
+#include "server/signal_handler.h"
+
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -75,6 +77,7 @@ public:
   MOCK_CONST_METHOD0(maxStats, uint64_t());
   MOCK_CONST_METHOD0(statsOptions, const Stats::StatsOptions&());
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
+  MOCK_CONST_METHOD0(signalHandler, const SignalHandler&());
 
   std::string config_path_;
   std::string config_yaml_;
@@ -89,6 +92,7 @@ public:
   uint32_t concurrency_{1};
   uint64_t hot_restart_epoch_{};
   bool hot_restart_disabled_{};
+  SignalHandler signal_handler_;
 };
 
 class MockConfigTracker : public ConfigTracker {

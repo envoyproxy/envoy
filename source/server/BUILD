@@ -152,6 +152,7 @@ envoy_cc_library(
     hdrs = ["options_impl.h"],
     external_deps = ["tclap"],
     deps = [
+        ":signal_handler",
         "//include/envoy/network:address_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
@@ -317,6 +318,13 @@ envoy_cc_library(
         "//source/server/http:admin_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
+)
+
+envoy_cc_library(
+    name = "signal_handler",
+    srcs = ["signal_handler.cc"],
+    hdrs = ["signal_handler.h"],
+    deps = [],
 )
 
 envoy_cc_library(

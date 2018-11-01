@@ -387,25 +387,44 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
 
 uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
-RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
+RunHelper::RunHelper(Options& options, Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
                      HotRestart& hot_restart, AccessLog::AccessLogManager& access_log_manager,
                      InitManagerImpl& init_manager, OverloadManager& overload_manager,
                      std::function<void()> workers_start_cb) {
 
   // Setup signals.
-  sigterm_ = dispatcher.listenForSignal(SIGTERM, [this, &hot_restart, &dispatcher]() {
-    ENVOY_LOG(warn, "caught SIGTERM");
-    shutdown(dispatcher, hot_restart);
-  });
+  if (options.signalHandler().allows("SIGTERM")) {
+    sigterm_ = dispatcher.listenForSignal(SIGTERM, [this, &hot_restart, &dispatcher]() {
+      ENVOY_LOG(warn, "caught SIGTERM");
+      shutdown(dispatcher, hot_restart);
+    });
+  } else {
+    sigterm_ = dispatcher.listenForSignal(SIGTERM, [this]() {
+      ENVOY_LOG(warn, "caught and ignoring SIGTERM per --listen-for-signals");
+    });
+  }
 
-  sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
-    ENVOY_LOG(warn, "caught SIGUSR1");
-    access_log_manager.reopen();
-  });
+  if (options.signalHandler().allows("SIGUSR1")) {
+    sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
+      ENVOY_LOG(warn, "caught SIGUSR1");
+      access_log_manager.reopen();
+    });
+  } else {
+    sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
+      ENVOY_LOG(warn, "caught and ignoring SIGUSR1 per --listen-for-signals");
+    });
+  }
 
-  sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
-    ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
-  });
+  if (options.signalHandler().allows("SIGHUP")) {
+    sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
+      ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
+    });
+  } else {
+    sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
+      ENVOY_LOG(warn, "caught and ignoring SIGHUP per --listen-for-signals. See documentation for "
+                      "how to hot restart.");
+    });
+  }
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
@@ -448,7 +467,7 @@ void RunHelper::shutdown(Event::Dispatcher& dispatcher, HotRestart& hot_restart)
 void InstanceImpl::run() {
   // We need the RunHelper to be available to call from InstanceImpl::shutdown() below, so
   // we save it as a member variable.
-  run_helper_ = std::make_unique<RunHelper>(*dispatcher_, clusterManager(), restarter_,
+  run_helper_ = std::make_unique<RunHelper>(options(), *dispatcher_, clusterManager(), restarter_,
                                             access_log_manager_, init_manager_, overloadManager(),
                                             [this]() -> void { startWorkers(); });
 

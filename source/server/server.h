@@ -113,9 +113,10 @@ public:
  */
 class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
-  RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, HotRestart& hot_restart,
-            AccessLog::AccessLogManager& access_log_manager, InitManagerImpl& init_manager,
-            OverloadManager& overload_manager, std::function<void()> workers_start_cb);
+  RunHelper(Options& options, Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
+            HotRestart& hot_restart, AccessLog::AccessLogManager& access_log_manager,
+            InitManagerImpl& init_manager, OverloadManager& overload_manager,
+            std::function<void()> workers_start_cb);
 
   // Helper function to inititate a shutdown. This can be triggered either by catching SIGTERM
   // or be called from ServerImpl::shutdown().
