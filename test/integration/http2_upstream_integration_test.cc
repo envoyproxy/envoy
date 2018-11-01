@@ -306,6 +306,13 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
                                                             {":authority", "host"}});
     encoders.push_back(&encoder_decoder.first);
     responses.push_back(std::move(encoder_decoder.second));
+
+    // Ensure we've established a connection before issuing the resets.
+    // TODO(snowp): Why can't we handle resets here?
+    if (!fake_upstream_connection_) {
+      ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    }
+
     // Reset a few streams to test how reset and watermark interact.
     if (i % 15 == 0) {
       codec_client_->sendReset(*encoders[i]);
@@ -313,14 +320,11 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
       codec_client_->sendData(*encoders[i], 0, true);
     }
   }
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   for (uint32_t i = 0; i < num_requests; ++i) {
     upstream_requests.emplace_back();
     FakeStreamPtr stream;
-    if (i % 15 != 0) {
-      ASSERT_TRUE(
-          fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests.back()));
-    }
+    ASSERT_TRUE(
+        fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests.back()));
   }
   for (uint32_t i = 0; i < num_requests; ++i) {
     if (i % 15 != 0) {
