@@ -317,6 +317,14 @@ message RouteMatch {
   // route configuration can be used to roll out route changes in a gradual manner without full
   // code/config deploys. Refer to the :ref:`traffic shifting
   // <config_http_conn_man_route_table_traffic_splitting_shift>` docs for additional documentation.
+  //
+  // .. note::
+  //
+  //    Parsing this field is implemented such that the runtime key's data may be represented
+  //    as a FractionalPercent proto represented as JSON/YAM and may also be represented as an
+  //    integer with the assumption that the value is an integral percentage out of 100. For
+  //    instance, a runtime key lookup returning the value "42" would parse as a FractionalPercent
+  //    whose numerator is 42 and denominator is HUNDRED. This preserves legacy semantics.
   core.RuntimeFractionalPercent runtime_fraction = 9;
 
   // Specifies a set of headers that the route should match on. The router will
@@ -506,7 +514,8 @@ message RouteAction {
     }
 
     // Specifies an implementation of a RetryPriority which is used to determine the
-    // distribution of load across priorities used for retries.
+    // distribution of load across priorities used for retries. Refer to
+    // :ref:`retry plugin configuration <arch_overview_http_retry_plugins>` for more details.
     RetryPriority retry_priority = 4;
 
     message RetryHostPredicate {
@@ -516,6 +525,8 @@ message RouteAction {
 
     // Specifies a collection of RetryHostPredicates that will be consulted when selecting a host
     // for retries. If any of the predicates reject the host, host selection will be reattempted.
+    // Refer to :ref:`retry plugin configuration <arch_overview_http_retry_plugins>` for more
+    // details.
     repeated RetryHostPredicate retry_host_predicate = 5;
 
     // The maximum number of times host selection will be reattempted before giving up, at which
@@ -692,49 +703,8 @@ message RouteAction {
   // ignoring the rest of the hash policy list.
   repeated HashPolicy hash_policy = 15;
 
-  // Indicates that a HTTP/1.1 client connection to this particular route is allowed to
-  // upgrade to a WebSocket connection. The default is false.
-  //
-  // .. attention::
-  //
-  //   If a connection is upgraded to a WebSocket connection, Envoy will set up plain TCP
-  //   proxying between the client and the upstream server. Hence, an upstream
-  //   server that rejects the WebSocket upgrade request is also responsible for
-  //   closing the associated connection. Until then, Envoy will continue to
-  //   proxy data from the client to the upstream server.
-  //
-  //   Redirects are not supported on routes where WebSocket upgrades are allowed.
-  google.protobuf.BoolValue use_websocket = 16 [deprecated = true];
-
-  message WebSocketProxyConfig {
-    // See :ref:`stat_prefix
-    // <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.stat_prefix>`. If the parameter
-    // is not specified, the default value of "websocket" is used.
-    //
-    // WebSocket connections support the :ref:`downstream statistics
-    // <config_network_filters_tcp_proxy_stats>` for TCP proxy, except for the following, which are
-    // reported in the :ref:`HTTP Connection Manager statistics <config_http_conn_man_stats>`:
-    // - downstream_cx_tx_bytes_total
-    // - downstream_cx_tx_bytes_buffered
-    // - downstream_cx_rx_bytes_total
-    // - downstream_cx_rx_bytes_buffered
-    string stat_prefix = 1;
-
-    // See :ref:`idle_timeout
-    // <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>`. This timeout is
-    // only in effect after the WebSocket upgrade request is received by Envoy. It does not cover
-    // the initial part of the HTTP request.
-    google.protobuf.Duration idle_timeout = 2
-        [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
-
-    // See :ref:`max_connect_attempts
-    // <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.max_connect_attempts>`.
-    google.protobuf.UInt32Value max_connect_attempts = 3 [(validate.rules).uint32.gte = 1];
-  }
-
-  // Proxy configuration used for WebSocket connections. If unset, the default values as specified
-  // in :ref:`TcpProxy <envoy_api_msg_config.filter.network.tcp_proxy.v2.TcpProxy>` are used.
-  WebSocketProxyConfig websocket_config = 22 [deprecated = true];
+  reserved 16;
+  reserved 22;
 
   // Indicates that the route has a CORS policy.
   CorsPolicy cors = 17;
@@ -755,6 +725,11 @@ message RouteAction {
 }
 
 message RedirectAction {
+  // When the scheme redirection take place, the following rules apply:
+  //  1. If the source URI scheme is `http` and the port is explicitly
+  //     set to `:80`, the port will be removed after the redirection
+  //  2. If the source URI scheme is `https` and the port is explicitly
+  //     set to `:443`, the port will be removed after the redirection
   oneof scheme_rewrite_specifier {
     // The scheme portion of the URL will be swapped with "https".
     bool https_redirect = 4;

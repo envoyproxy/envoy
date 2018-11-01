@@ -432,7 +432,6 @@ void Filter::onRequestComplete() {
     // seems unnecessary right now.
     maybeDoShadowing();
 
-    upstream_request_->setupPerTryTimeout();
     if (timeout_.global_timeout_.count() > 0) {
       response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
       response_timeout_->enableTimer(timeout_.global_timeout_);
@@ -484,7 +483,9 @@ void Filter::onUpstreamReset(UpstreamResetType type,
   // We don't retry on a global timeout or if we already started the response.
   if (type != UpstreamResetType::GlobalTimeout && !downstream_response_started_ && retry_state_) {
     // Notify retry modifiers about the attempted host.
-    retry_state_->onHostAttempted(upstream_host);
+    if (upstream_host != nullptr) {
+      retry_state_->onHostAttempted(upstream_host);
+    }
 
     RetryStatus retry_status =
         retry_state_->shouldRetry(nullptr, reset_reason, [this]() -> void { doRetry(); });
@@ -794,8 +795,6 @@ void Filter::doRetry() {
     if (downstream_trailers_) {
       upstream_request_->encodeTrailers(*downstream_trailers_);
     }
-
-    upstream_request_->setupPerTryTimeout();
   }
 }
 
@@ -1002,6 +1001,8 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
+
+  setupPerTryTimeout();
 
   conn_pool_stream_handle_ = nullptr;
   setRequestEncoder(request_encoder);

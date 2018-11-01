@@ -5,9 +5,12 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/typed_metadata.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
+
+#include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -41,6 +44,11 @@ public:
   MockClusterInfo();
   ~MockClusterInfo();
 
+  void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry) {
+    resource_manager_.reset(new ResourceManagerImpl(runtime_, name_, cx, rq_pending, rq, rq_retry,
+                                                    circuit_breakers_stats_));
+  }
+
   // Upstream::ClusterInfo
   MOCK_CONST_METHOD0(addedViaApi, bool());
   MOCK_CONST_METHOD0(connectTimeout, std::chrono::milliseconds());
@@ -68,6 +76,7 @@ public:
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(lbSubsetInfo, const LoadBalancerSubsetInfo&());
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
+  MOCK_CONST_METHOD0(typedMetadata, const Envoy::Config::TypedMetadata&());
   MOCK_CONST_METHOD0(clusterSocketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(drainConnectionsOnHostRemoval, bool());
 
@@ -80,6 +89,7 @@ public:
   Network::TransportSocketFactoryPtr transport_socket_factory_;
   NiceMock<Stats::MockIsolatedStatsStore> load_report_stats_store_;
   ClusterLoadReportStats load_report_stats_;
+  ClusterCircuitBreakersStats circuit_breakers_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;

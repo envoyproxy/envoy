@@ -4,12 +4,12 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/platform.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/exception.h"
 #include "common/http/headers.h"
@@ -332,10 +332,9 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
 
   ssize_t total_parsed = 0;
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
-  data.getRawSlices(slices, num_slices);
-  for (uint64_t i = 0; i < num_slices; i++) {
-    Buffer::RawSlice& slice = slices[i];
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  data.getRawSlices(slices.begin(), num_slices);
+  for (const Buffer::RawSlice& slice : slices) {
     total_parsed += slice.len_;
     onBody(static_cast<const char*>(slice.mem_), slice.len_);
   }
@@ -357,10 +356,9 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
     uint64_t num_slices = data.getRawSlices(nullptr, 0);
-    STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
-    data.getRawSlices(slices, num_slices);
-    for (uint64_t i = 0; i < num_slices; i++) {
-      Buffer::RawSlice& slice = slices[i];
+    STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+    data.getRawSlices(slices.begin(), num_slices);
+    for (const Buffer::RawSlice& slice : slices) {
       total_parsed += dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
     }
   } else {

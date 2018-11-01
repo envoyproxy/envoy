@@ -176,7 +176,6 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   // Common log properties.
   // TODO(mattklein123): Populate sample_rate field.
   // TODO(mattklein123): Populate tls_properties field.
-  // TODO(mattklein123): Populate metadata field and wire up to filters.
   auto* common_properties = log_entry->mutable_common_properties();
 
   if (stream_info.downstreamRemoteAddress() != nullptr) {
@@ -248,6 +247,9 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
         *stream_info.upstreamLocalAddress(), *common_properties->mutable_upstream_local_address());
   }
   responseFlagsToAccessLogResponseFlags(*common_properties, stream_info);
+  if (stream_info.dynamicMetadata().filter_metadata_size() > 0) {
+    common_properties->mutable_metadata()->MergeFrom(stream_info.dynamicMetadata());
+  }
 
   if (stream_info.protocol()) {
     switch (stream_info.protocol().value()) {

@@ -4,6 +4,8 @@
 
 #include "test/integration/test_host_predicate.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 class TestHostPredicateFactory : public Upstream::RetryHostPredicateFactory {
 public:

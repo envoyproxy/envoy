@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["async_client_impl.cc"],
     hdrs = ["async_client_impl.h"],
     deps = [
+        "//include/envoy/config:typed_metadata_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:async_client_interface",
         "//include/envoy/http:codec_interface",
@@ -55,11 +56,18 @@ envoy_cc_library(
 envoy_cc_library(
     name = "codec_helper_lib",
     hdrs = ["codec_helper.h"],
+    deps = [
+        "//include/envoy/http:codec_interface",
+        "//source/common/common:assert_lib",
+    ],
 )
 
 envoy_cc_library(
     name = "default_server_string_lib",
     hdrs = ["default_server_string.h"],
+    deps = [
+        "//source/common/common:macros",
+    ],
 )
 
 envoy_cc_library(
@@ -87,7 +95,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "conn_manager_config_interface",
     hdrs = ["conn_manager_config.h"],
-    deps = [":date_provider_lib"],
+    deps = [
+        ":date_provider_lib",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/router:rds_interface",
+        "//source/common/network:utility_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -116,7 +129,6 @@ envoy_cc_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
-        "//include/envoy/http:websocket_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:drain_decision_interface",
@@ -202,6 +214,7 @@ envoy_cc_library(
         "//include/envoy/http:message_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:non_copyable",
+        "//source/common/common:stack_array",
     ],
 )
 

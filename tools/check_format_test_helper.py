@@ -10,13 +10,14 @@ import os
 import shutil
 import logging
 import subprocess
+import sys
 
 os.putenv("BUILDIFIER_BIN", "/usr/local/bin/buildifier")
 
 tools = os.path.dirname(os.path.realpath(__file__))
 tmp = os.path.join(os.getenv('TEST_TMPDIR', "/tmp"), "check_format_test")
 src = os.path.join(tools, 'testdata', 'check_format')
-check_format = os.path.join(tools, 'check_format.py')
+check_format = sys.executable + " " + os.path.join(tools, 'check_format.py')
 errors = 0
 
 # Echoes and runs an OS command, returning exit status and the captured
@@ -110,6 +111,16 @@ def checkAndFixError(filename, expected_substring):
   errors += fixFileExpectingSuccess(filename)
   return errors
 
+def checkToolNotFoundError():
+  # Temporarily change PATH to test the error about lack of external tools.
+  oldPath = os.environ["PATH"]
+  os.environ["PATH"] = "/sbin:/usr/sbin"
+  clang_format = os.getenv("CLANG_FORMAT", "clang-format-7")
+  errors = checkFileExpectingError("no_namespace_envoy.cc",
+                                   "Command %s not found." % clang_format)
+  os.environ["PATH"] = oldPath
+  return errors
+
 def checkUnfixableError(filename, expected_substring):
   errors = checkFileExpectingError(filename, expected_substring)
   errors += fixFileExpectingFailure(filename, expected_substring)
@@ -136,6 +147,9 @@ if __name__ == "__main__":
   shutil.rmtree(tmp, True)
   os.makedirs(tmp)
   os.chdir(tmp)
+
+  # The following error is the error about unavailability of external tools.
+  errors += checkToolNotFoundError()
 
   # The following errors can be detected but not fixed automatically.
   errors += checkUnfixableError("no_namespace_envoy.cc",

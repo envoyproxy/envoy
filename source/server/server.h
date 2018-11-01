@@ -89,7 +89,7 @@ public:
   static Runtime::LoaderPtr createRuntime(Instance& server, Server::Configuration::Initial& config);
 
   /**
-   * Helper for flushing counters, gauges and hisograms to sinks. This takes care of calling
+   * Helper for flushing counters, gauges and histograms to sinks. This takes care of calling
    * flush() on each sink and clearing the cache afterward.
    * @param sinks supplies the list of sinks.
    * @param source provides the metrics being flushed.

@@ -107,7 +107,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                                     "traffic normally) or 'validate' (validate configs and exit).",
                                     false, "serve", "string", cmd);
   TCLAP::ValueArg<uint64_t> max_stats("", "max-stats",
-                                      "Maximum number of stats guages and counters "
+                                      "Maximum number of stats gauges and counters "
                                       "that can be allocated in shared memory.",
                                       false, ENVOY_DEFAULT_MAX_STATS, "uint64_t", cmd);
   TCLAP::ValueArg<uint64_t> max_obj_name_len("", "max-obj-name-len",

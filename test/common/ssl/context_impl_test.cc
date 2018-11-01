@@ -10,10 +10,10 @@
 
 #include "test/common/ssl/ssl_certs_test.h"
 #include "test/common/ssl/ssl_test_utility.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -26,7 +26,10 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Ssl {
 
-class SslContextImplTest : public SslCertsTest {};
+class SslContextImplTest : public SslCertsTest {
+protected:
+  Event::SimulatedTimeSystem time_system_;
+};
 
 TEST_F(SslContextImplTest, TestdNSNameMatching) {
   EXPECT_TRUE(ContextImpl::dNSNameMatch("lyft.com", "lyft.com"));
@@ -74,8 +77,7 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
-  Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_MESSAGE(manager.createSslClientContext(store, cfg), EnvoyException,
                             "Failed to initialize cipher suites "
@@ -97,8 +99,7 @@ TEST_F(SslContextImplTest, TestExpiringCert) {
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
 
   ClientContextConfigImpl cfg(tls_context, factory_context_);
-  Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl store;
   ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
 
@@ -123,8 +124,7 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
-  Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl store;
   ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
   EXPECT_EQ(0U, context->daysUntilFirstCertExpires());
@@ -146,8 +146,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
-  Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl store;
 
   ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
@@ -197,8 +196,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
-  Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl store;
 
   ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
@@ -236,11 +234,52 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   EXPECT_TRUE(message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()));
 }
 
+TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem"
+)EOF";
+
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  ClientContextConfigImpl cfg(tls_context, factory_context_);
+  ContextManagerImpl manager(time_system_);
+  Stats::IsolatedStoreImpl store;
+
+  ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
+  std::string ca_cert_json = R"EOF({
+ "path": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem",
+ "serial_number": "b13ff63f2dbc118d",
+ "subject_alt_names": [
+  {
+   "dns": "server1.example.com"
+  }
+ ],
+ "valid_from": "2018-01-15T22:40:27Z",
+ "expiration_time": "2020-01-15T22:40:27Z"
+ }
+)EOF";
+
+  const std::string ca_cert_partial_output(TestEnvironment::substitute(ca_cert_json));
+  envoy::admin::v2alpha::CertificateDetails certificate_details;
+  MessageUtil::loadFromJson(ca_cert_partial_output, certificate_details);
+
+  MessageDifferencer message_differencer;
+  message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
+  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+}
+
 TEST_F(SslContextImplTest, TestNoCert) {
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
   ClientContextConfigImpl cfg(*loader, factory_context_);
-  Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl store;
   ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
   EXPECT_EQ(nullptr, context->getCaCertInformation());
@@ -249,15 +288,15 @@ TEST_F(SslContextImplTest, TestNoCert) {
 
 class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
-  static void loadConfig(ServerContextConfigImpl& cfg) {
-    Runtime::MockLoader runtime;
-    ContextManagerImpl manager(runtime);
+  static void loadConfig(ServerContextConfigImpl& cfg, Event::TestTimeSystem& time_system) {
+    ContextManagerImpl manager(time_system);
     Stats::IsolatedStoreImpl store;
     ServerContextSharedPtr server_ctx(
         manager.createSslServerContext(store, cfg, std::vector<std::string>{}));
   }
 
-  static void loadConfigV2(envoy::api::v2::auth::DownstreamTlsContext& cfg) {
+  static void loadConfigV2(envoy::api::v2::auth::DownstreamTlsContext& cfg,
+                           Event::TestTimeSystem& time_system) {
     // Must add a certificate for the config to be considered valid.
     envoy::api::v2::auth::TlsCertificate* server_cert =
         cfg.mutable_common_tls_context()->add_tls_certificates();
@@ -268,15 +307,15 @@ public:
 
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
     ServerContextConfigImpl server_context_config(cfg, factory_context);
-    loadConfig(server_context_config);
+    loadConfig(server_context_config, time_system);
   }
 
-  static void loadConfigYaml(const std::string& yaml) {
+  static void loadConfigYaml(const std::string& yaml, Event::TestTimeSystem& time_system) {
     envoy::api::v2::auth::DownstreamTlsContext tls_context;
     MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
     ServerContextConfigImpl cfg(tls_context, factory_context);
-    loadConfig(cfg);
+    loadConfig(cfg, time_system);
   }
 };
 
@@ -294,7 +333,7 @@ TEST_F(SslServerContextImplTicketTest, TicketKeySuccess) {
       filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
       filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_b"
 )EOF";
-  EXPECT_NO_THROW(loadConfigYaml(yaml));
+  EXPECT_NO_THROW(loadConfigYaml(yaml, time_system_));
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidLen) {
@@ -311,7 +350,7 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidLen) {
       filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
       filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_wrong_len"
 )EOF";
-  EXPECT_THROW(loadConfigYaml(yaml), EnvoyException);
+  EXPECT_THROW(loadConfigYaml(yaml, time_system_), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidCannotRead) {
@@ -326,54 +365,55 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidCannotRead) {
     keys:
       filename: "{{ test_rundir }}/test/common/ssl/test_data/this_file_does_not_exist"
 )EOF";
-  EXPECT_THROW(loadConfigYaml(yaml), std::exception);
+  EXPECT_THROW(loadConfigYaml(yaml, time_system_), std::exception);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyNone) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
-  EXPECT_NO_THROW(loadConfigV2(cfg));
+  EXPECT_NO_THROW(loadConfigV2(cfg, time_system_));
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineBytesSuccess) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(80, '\0'));
-  EXPECT_NO_THROW(loadConfigV2(cfg));
+  EXPECT_NO_THROW(loadConfigV2(cfg, time_system_));
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineStringSuccess) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_string(std::string(80, '\0'));
-  EXPECT_NO_THROW(loadConfigV2(cfg));
+  EXPECT_NO_THROW(loadConfigV2(cfg, time_system_));
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineBytesFailTooBig) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(81, '\0'));
-  EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
+  EXPECT_THROW(loadConfigV2(cfg, time_system_), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineStringFailTooBig) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_string(std::string(81, '\0'));
-  EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
+  EXPECT_THROW(loadConfigV2(cfg, time_system_), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineBytesFailTooSmall) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(79, '\0'));
-  EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
+  EXPECT_THROW(loadConfigV2(cfg, time_system_), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineStringFailTooSmall) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_string(std::string(79, '\0'));
-  EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
+  EXPECT_THROW(loadConfigV2(cfg, time_system_), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeySdsFail) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys_sds_secret_config();
-  EXPECT_THROW_WITH_MESSAGE(loadConfigV2(cfg), EnvoyException, "SDS not supported yet");
+  EXPECT_THROW_WITH_MESSAGE(loadConfigV2(cfg, time_system_), EnvoyException,
+                            "SDS not supported yet");
 }
 
 TEST_F(SslServerContextImplTicketTest, CRLSuccess) {
@@ -390,7 +430,7 @@ TEST_F(SslServerContextImplTicketTest, CRLSuccess) {
       crl:
         filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl"
 )EOF";
-  EXPECT_NO_THROW(loadConfigYaml(yaml));
+  EXPECT_NO_THROW(loadConfigYaml(yaml, time_system_));
 }
 
 TEST_F(SslServerContextImplTicketTest, CRLInvalid) {
@@ -407,7 +447,7 @@ TEST_F(SslServerContextImplTicketTest, CRLInvalid) {
       crl:
         filename: "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
 )EOF";
-  EXPECT_THROW_WITH_REGEX(loadConfigYaml(yaml), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(loadConfigYaml(yaml, time_system_), EnvoyException,
                           "^Failed to load CRL from .*/not_a_crl.crl$");
 }
 
@@ -423,7 +463,7 @@ TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
       crl:
         filename: "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
 )EOF";
-  EXPECT_THROW_WITH_REGEX(loadConfigYaml(yaml), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(loadConfigYaml(yaml, time_system_), EnvoyException,
                           "^Failed to load CRL from .* without trusted CA$");
 }
 
@@ -438,7 +478,7 @@ TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
     validation_context:
       verify_subject_alt_name: "spiffe://lyft.com/testclient"
 )EOF";
-  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml, time_system_), EnvoyException,
                             "SAN-based verification of peer certificates without trusted CA "
                             "is insecure and not allowed");
 }
@@ -470,8 +510,8 @@ TEST(ClientContextConfigImplTest, InvalidCertificateHash) {
       ->add_verify_certificate_hash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   ClientContextConfigImpl client_context_config(tls_context, factory_context);
-  Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
                           EnvoyException, "Invalid hex-encoded SHA-256 .*");
@@ -486,8 +526,8 @@ TEST(ClientContextConfigImplTest, InvalidCertificateSpki) {
       // Not a base64-encoded string.
       ->add_verify_certificate_spki("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   ClientContextConfigImpl client_context_config(tls_context, factory_context);
-  Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
                           EnvoyException, "Invalid base64-encoded SHA-256 .*");
@@ -831,8 +871,8 @@ TEST(ServerContextImplTest, TlsCertificateNonEmpty) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   ServerContextConfigImpl client_context_config(tls_context, factory_context);
-  Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_MESSAGE(ServerContextSharedPtr server_ctx(manager.createSslServerContext(
                                 store, client_context_config, std::vector<std::string>{})),

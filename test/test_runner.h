@@ -1,3 +1,5 @@
+#pragma once
+
 #include "common/common/logger.h"
 #include "common/common/logger_delegates.h"
 #include "common/common/thread.h"
