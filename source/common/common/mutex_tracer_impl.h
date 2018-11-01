@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "envoy/common/mutex_tracer.h"
+
 #include "absl/base/internal/spinlock.h"
 #include "absl/base/thread_annotations.h"
 
@@ -19,16 +21,16 @@ namespace Envoy {
 // *NB*: getOrCreateTracer() is not thread-safe, and should be called once at startup, after which
 // the internal contention hook is thread-safe. This is possible by utilizing memory_order_relaxed
 // atomic writes.
-class MutexTracer final {
+class MutexTracerImpl final : public MutexTracer {
 public:
-  static MutexTracer* getOrCreateTracer();
+  static MutexTracerImpl* getOrCreateTracer();
 
   // Resets the recorded statistics.
-  void reset();
+  void reset() override;
 
-  int64_t numContentions() const { return num_contentions_.load(order_); }
-  int64_t currentWaitCycles() const { return current_wait_cycles_.load(order_); }
-  int64_t lifetimeWaitCycles() const { return lifetime_wait_cycles_.load(order_); }
+  int64_t numContentions() const override { return num_contentions_.load(order_); }
+  int64_t currentWaitCycles() const override { return current_wait_cycles_.load(order_); }
+  int64_t lifetimeWaitCycles() const override { return lifetime_wait_cycles_.load(order_); }
 
 private:
   friend class MutexTracerTest;
@@ -39,7 +41,7 @@ private:
   // Utility function for contentionHook.
   inline void recordContention(const char*, const void*, int64_t wait_cycles);
 
-  static MutexTracer* singleton_;
+  static MutexTracerImpl* singleton_;
 
   // Number of mutex contention occurrences since last reset.
   std::atomic<int64_t> num_contentions_{0};

@@ -107,12 +107,13 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "mutex_tracer",
-    srcs = ["mutex_tracer.cc"],
-    hdrs = ["mutex_tracer.h"],
+    name = "mutex_tracer_lib",
+    srcs = ["mutex_tracer_impl.cc"],
+    hdrs = ["mutex_tracer_impl.h"],
     external_deps = ["abseil_synchronization"],
     deps = [
         ":assert_lib",
+        "//include/envoy/common:mutex_tracer",
     ],
 )
 

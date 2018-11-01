@@ -21,6 +21,7 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
+#include "common/common/mutex_tracer_impl.h"
 #include "common/config/bootstrap_json.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
@@ -61,7 +62,7 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? absl::optional<Envoy::MutexTracer*>(
-                                                        Envoy::MutexTracer::getOrCreateTracer())
+                                                        Envoy::MutexTracerImpl::getOrCreateTracer())
                                                   : absl::nullopt) {
 
   try {

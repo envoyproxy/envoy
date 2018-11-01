@@ -36,7 +36,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:macros",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:mutex_tracer",
+        "//source/common/common:mutex_tracer_lib",
         "//source/common/common:utility_lib",
         "//source/common/common:version_includes",
         "//source/common/html:utility_lib",

@@ -2,7 +2,7 @@
 #include <thread>
 
 #include "common/common/lock_guard.h"
-#include "common/common/mutex_tracer.h"
+#include "common/common/mutex_tracer_impl.h"
 
 #include "test/test_common/test_time.h"
 
@@ -15,11 +15,11 @@ namespace Envoy {
 class MutexTracerTest : public testing::Test {
 protected:
   void SetUp() override {
-    tracer_ = MutexTracer::getOrCreateTracer();
+    tracer_ = MutexTracerImpl::getOrCreateTracer();
     tracer_->reset();
   }
 
-  // Since MutexTracer::contentionHook is a private method, MutexTracerTest is a friend class.
+  // Since MutexTracerImpl::contentionHook is a private method, MutexTracerTest is a friend class.
   void sendWaitCyclesToContentionHook(int64_t wait_cycles) {
     tracer_->contentionHook(nullptr, nullptr, wait_cycles);
   }
@@ -29,7 +29,7 @@ protected:
   }
 
   Thread::MutexBasicLockable mu_;
-  MutexTracer* tracer_;
+  MutexTracerImpl* tracer_;
   DangerousDeprecatedTestTime test_time_;
 
 private:

@@ -93,6 +93,7 @@ envoy_cc_library(
         ":options_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
+        "//include/envoy/common:mutex_tracer",
         "//include/envoy/event:timer_interface",
         "//include/envoy/http:query_params_interface",
         "//include/envoy/init:init_interface",
@@ -105,7 +106,6 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/common:mutex_tracer",
     ],
 )
 

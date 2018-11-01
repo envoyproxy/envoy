@@ -32,7 +32,7 @@
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
-#include "common/common/mutex_tracer.h"
+#include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/html/utility.h"
@@ -441,7 +441,7 @@ Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap& resp
     envoy::admin::v2alpha::MutexStats mutex_stats;
     // If tracing is enabled, mutexTracer() should never be absl::nullopt.
     ASSERT(server_.mutexTracer().has_value());
-    MutexTracer* tracer = server_.mutexTracer().value();
+    MutexTracerImpl* tracer = dynamic_cast<MutexTracerImpl*>(server_.mutexTracer().value());
     mutex_stats.set_num_contentions(tracer->numContentions());
     mutex_stats.set_current_wait_cycles(tracer->currentWaitCycles());
     mutex_stats.set_lifetime_wait_cycles(tracer->lifetimeWaitCycles());

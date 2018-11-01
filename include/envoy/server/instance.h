@@ -6,6 +6,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/common/mutex_tracer.h"
 #include "envoy/event/timer.h"
 #include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
@@ -23,8 +24,6 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
-
-#include "common/common/mutex_tracer.h"
 
 namespace Envoy {
 namespace Server {
