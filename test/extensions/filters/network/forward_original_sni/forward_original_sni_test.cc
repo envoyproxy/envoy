@@ -62,7 +62,7 @@ TEST(ForwardOriginalSni, SetForwardRequestedServerNameOnlyIfSniIsPresent) {
         .WillByDefault(Return("www.example.com"));
     filter.onNewConnection();
 
-    EXPECT_TRUE(stream_info.filterState().hasaData<ForwardRequestedServerName>(
+    EXPECT_TRUE(stream_info.filterState().hasData<ForwardRequestedServerName>(
         ForwardRequestedServerName::Key));
 
     auto forward_requested_server_name =
