@@ -1466,7 +1466,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisabledByDefault) {
   conn_manager_->onData(fake_input, false);
 }
 
-TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisabledWithZero) {
+TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisabledIfSetToZero) {
   request_timeout_ = std::chrono::milliseconds(0);
   setup(false, "");
 
@@ -1479,7 +1479,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisabledWithZero) {
   conn_manager_->onData(fake_input, false);
 }
 
-TEST_F(HttpConnectionManagerImplTest, RequestTimeoutConfigured) {
+TEST_F(HttpConnectionManagerImplTest, RequestTimeoutValidlyConfigured) {
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
@@ -1495,164 +1495,113 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutConfigured) {
   conn_manager_->onData(fake_input, false);
 }
 
-TEST_F(HttpConnectionManagerImplTest, RequestTimeoutTriggers) {
+TEST_F(HttpConnectionManagerImplTest, RequestTimeoutCallbackDisarmsAndReturns408) {
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
+  std::string response_body;
   EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* request_timer =
         new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-    EXPECT_CALL(*request_timer, enableTimer(request_timeout_));
-    EXPECT_CALL(*request_timer, disableTimer());
-    // 408 direct response after timeout.
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_)).Times(1);
+    EXPECT_CALL(*request_timer, disableTimer()).Times(1);
+
     EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
         .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
           EXPECT_STREQ("408", headers.Status()->value().c_str());
         }));
-    std::string response_body;
     EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
 
     conn_manager_->newStream(response_encoder_);
     request_timer->callback_();
-
-    EXPECT_EQ("request timeout", response_body);
   }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
+  conn_manager_->onData(fake_input, false); // kick off request
+
   EXPECT_EQ(1U, stats_.named_.downstream_rq_timeout_.value());
+  EXPECT_EQ("request timeout", response_body);
 }
 
-TEST_F(HttpConnectionManagerImplTest, RequestTimeoutStaysArmedOnIncompleteRequest) {
+TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsNotDisarmedOnIncompleteRequestWithHeader) {
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
-  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(filter);
-      }));
-
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* request_timer =
         new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-    EXPECT_CALL(*request_timer, enableTimer(_));
-    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
-
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_)).Times(1);
     EXPECT_CALL(*request_timer, disableTimer()).Times(0);
+
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     HeaderMapPtr headers{
         new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-    decoder->decodeHeaders(std::move(headers), false);
 
-    data.drain(4);
+    // the second parameter 'false' leaves the stream open
+    decoder->decodeHeaders(std::move(headers), false);
   }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
+  conn_manager_->onData(fake_input, false); // kick off request
+
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_timeout_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, DisarmRequestTimeoutFilterCallback) {
-  request_timeout_ = std::chrono::milliseconds(10);
-  setup(false, "");
-  Event::MockTimer* request_timer =
-      new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*request_timer, enableTimer(_));
-
-  setUpEncoderAndDecoder();
-  sendRequestHeadersAndData();
-
-  EXPECT_CALL(*request_timer, disableTimer()).Times(1);
-  // decoder_filters_[0]->callbacks_->upstreamRequestComplete();
-}
-
-TEST_F(HttpConnectionManagerImplTest, FilterCallbackDisarmsRequestTimeout) {
+TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestWithHeader) {
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
-  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
-      }));
-  EXPECT_CALL(*filter, decodeHeaders(_, true))
-      .WillOnce(Invoke([&](HeaderMap&, bool) -> FilterHeadersStatus {
-        // filter->callbacks_->upstreamRequestComplete();
-        return FilterHeadersStatus::StopIteration;
-      }));
-  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
-
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* request_timer =
         new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-    EXPECT_CALL(*request_timer, enableTimer(_));
-    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_)).Times(1);
 
-    EXPECT_CALL(*request_timer, disableTimer());
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     HeaderMapPtr headers{
         new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
 
+    EXPECT_CALL(*request_timer, disableTimer()).Times(1);
     decoder->decodeHeaders(std::move(headers), true);
-
-    data.drain(4);
   }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
+  conn_manager_->onData(fake_input, false); // kick off request
+
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_timeout_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteData) {
+TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestWithData) {
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
-
-  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
-      }));
-  EXPECT_CALL(*filter, decodeData(_, true))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterDataStatus {
-        // filter->callbacks_->upstreamRequestComplete();
-        return FilterDataStatus::StopIterationNoBuffer;
-      }));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     Event::MockTimer* request_timer =
         new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-    EXPECT_CALL(*request_timer, enableTimer(_));
-    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_)).Times(1);
 
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     HeaderMapPtr headers{
-        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
     decoder->decodeHeaders(std::move(headers), false);
 
-    EXPECT_CALL(*request_timer, disableTimer());
+    EXPECT_CALL(*request_timer, disableTimer()).Times(1);
     decoder->decodeData(data, true);
-
-    data.drain(4);
   }));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_timeout_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteTrailers) {
+TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestWithTrailers) {
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
-
-  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
-      }));
-  EXPECT_CALL(*filter, decodeTrailers(_)).WillOnce(Invoke([&](HeaderMap&) -> FilterTrailersStatus {
-    // filter->callbacks_->upstreamRequestComplete();
-    return FilterTrailersStatus::Continue;
-  }));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     Event::MockTimer* request_timer =
         new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-    EXPECT_CALL(*request_timer, enableTimer(_));
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_)).Times(1);
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
 
     HeaderMapPtr headers{
@@ -1660,80 +1609,80 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteTrailers) {
     decoder->decodeHeaders(std::move(headers), false);
     decoder->decodeData(data, false);
 
-    EXPECT_CALL(*request_timer, disableTimer());
+    EXPECT_CALL(*request_timer, disableTimer()).Times(1);
     HeaderMapPtr trailers{new TestHeaderMapImpl{{"foo", "bar"}}};
     decoder->decodeTrailers(std::move(trailers));
-
-    data.drain(4);
   }));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_timeout_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnEncodeHeaders) {
+TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnEncodeHeaders) {
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
-
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(filter);
-      }));
+    .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamDecoderFilter(filter);
+  }));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, _));
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* request_timer =
         new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-    EXPECT_CALL(*request_timer, enableTimer(_));
-    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_)).Times(1);
 
+
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     HeaderMapPtr headers{
         new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+
     decoder->decodeHeaders(std::move(headers), false);
 
-    EXPECT_CALL(*request_timer, disableTimer());
-    EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+    EXPECT_CALL(*request_timer, disableTimer()).Times(1);
     HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
     filter->callbacks_->encodeHeaders(std::move(response_headers), false);
-
-    data.drain(4);
   }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
+  conn_manager_->onData(fake_input, false); // kick off request
+
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_timeout_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnEncode100) {
+TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnEncode100Headers) {
   proxy_100_continue_ = true;
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
-
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(filter);
-      }));
+    .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamDecoderFilter(filter);
+  }));
+  EXPECT_CALL(response_encoder_, encode100ContinueHeaders(_));
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* request_timer =
         new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-    EXPECT_CALL(*request_timer, enableTimer(_));
-    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_)).Times(1);
 
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     HeaderMapPtr headers{
         new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), false);
 
-    EXPECT_CALL(*request_timer, disableTimer());
-    EXPECT_CALL(response_encoder_, encode100ContinueHeaders(_));
+    EXPECT_CALL(*request_timer, disableTimer()).Times(1);
     HeaderMapPtr continue_headers{new TestHeaderMapImpl{{":status", "100"}}};
     filter->callbacks_->encode100ContinueHeaders(std::move(continue_headers));
-
-    data.drain(4);
   }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
+  conn_manager_->onData(fake_input, false); // kick off request
+
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_timeout_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, RejectWebSocketOnNonWebSocketRoute) {
