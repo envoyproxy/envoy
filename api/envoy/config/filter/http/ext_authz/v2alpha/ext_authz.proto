@@ -110,6 +110,11 @@ message ExtAuthzPerRoute {
 // without needing to parse the host header.
 message CheckSettings {
   // Context extensions to set on the CheckRequest's
-  // :ref:`AttributeContext<envoy_api_msg_service.auth.v2alpha.AttributeContext>`
+  // :ref:`AttributeContext.context_extensions<envoy_api_field_service.auth.v2alpha.AttributeContext.context_extensions>`
+  //
+  // .. note::
+  //
+  //   These settings are only applied to a filter configured with a
+  //   :ref:`grpc_service<envoy_api_field_config.filter.http.ext_authz.v2alpha.ExtAuthz.grpc_service>`.
   map<string, string> context_extensions = 1;
 }
