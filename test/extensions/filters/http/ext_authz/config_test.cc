@@ -51,11 +51,22 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
       uri: "ext_authz:9000"
       cluster: "ext_authz"
       timeout: 0.25s
-    path_prefix: "/test"
-    allowed_authorization_headers:
-      - foo_header_key
-    allowed_request_headers:
-      - bar_header_key
+   
+    authorization_request:
+      path_prefix: /test
+      allowed_headers:
+        - key
+      allowed_headers_prefix:
+        - key
+      headers_to_add:
+        - { key: foo, value: bar }
+    
+    authorization_response:
+      allowed_upstream_headers:
+        - key
+      allowed_client_headers:
+        - key
+
   failure_mode_allow: true
   )EOF";
 

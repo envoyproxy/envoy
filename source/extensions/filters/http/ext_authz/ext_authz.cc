@@ -16,7 +16,7 @@ FilterConfig::FilterConfig(const envoy::config::filter::http::ext_authz::v2alpha
     : allowed_request_headers_(
           toRequestHeader(config.http_service().authorization_request().allowed_headers())),
       allowed_request_headers_prefix_(
-          toHeaderPrefix(config.http_service().authorization_request().allowed_header_by_prefix())),
+          toHeaderPrefix(config.http_service().authorization_request().allowed_headers_prefix())),
       authorization_headers_to_add_(toAuthorizationHeaderToAdd(
           config.http_service().authorization_request().headers_to_add())),
       allowed_client_headers_(

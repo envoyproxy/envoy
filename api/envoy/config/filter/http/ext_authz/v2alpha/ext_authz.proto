@@ -96,7 +96,7 @@ message AuthorizationRequest {
   // All header keys in the request that match this prefix will be sent to the authorization server.
   // Note that header matched by prefix are in addition to the headers matched by the
   // *allowed_request_headers* list.
-  repeated string allowed_header_by_prefix = 3;
+  repeated string allowed_headers_prefix = 3;
 
   // Sets a list of headers and their values that will be added to the request to external
   // authorization server. Note that these will override the headers coming from the downstream.

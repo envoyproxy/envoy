@@ -37,8 +37,8 @@ public:
   ExtAuthzHttpClientTest()
       : cluster_name_{"foo"}, cluster_manager_{}, timeout_{}, path_prefix_{"/bar"},
         allowed_request_headers_{Http::LowerCaseString{":method"}, Http::LowerCaseString{":path"}},
-        allowed_request_headers_prefix_{}, authorization_headers_to_add_{},
-        allowed_upstream_headers_{Http::LowerCaseString{"bar"}},
+        allowed_request_headers_prefix_{Http::LowerCaseString{"x-"}},
+        authorization_headers_to_add_{}, allowed_upstream_headers_{Http::LowerCaseString{"bar"}},
         allowed_client_headers_{Http::LowerCaseString{"foo"}, Http::LowerCaseString{":status"}},
         async_client_{}, async_request_{&async_client_},
         client_(cluster_manager_, cluster_name_, timeout_, path_prefix_, allowed_request_headers_,
@@ -46,6 +46,34 @@ public:
                 allowed_upstream_headers_, allowed_client_headers_) {
     ON_CALL(cluster_manager_, httpAsyncClientForCluster(cluster_name_))
         .WillByDefault(ReturnRef(async_client_));
+  }
+
+  Http::MessagePtr sendRequest(std::unordered_map<std::string, std::string>&& headers) {
+    envoy::service::auth::v2alpha::CheckRequest request{};
+    auto mutable_headers =
+        request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
+    for (const auto& header : headers) {
+      (*mutable_headers)[header.first] = header.second;
+    }
+
+    Http::MessagePtr message_ptr;
+    EXPECT_CALL(async_client_, send_(_, _, _))
+        .WillOnce(Invoke(
+            [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks&,
+                const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+              message_ptr = std::move(message);
+              return nullptr;
+            }));
+
+    const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
+    const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
+    auto check_response = TestCommon::makeMessageResponse(expected_headers);
+
+    client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+    EXPECT_CALL(request_callbacks_,
+                onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+    client_.onSuccess(std::move(check_response));
+    return message_ptr;
   }
 
   std::string cluster_name_;
@@ -62,6 +90,50 @@ public:
   NiceMock<Http::MockAsyncClientRequest> async_request_;
   RawHttpClientImpl client_;
 };
+
+// Test the client when a request contains path to be re-written and ok response is received.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
+  Http::MessagePtr message_ptr = sendRequest({{":path", "/foo"}, {"foo", "bar"}});
+
+  const auto* path = message_ptr->headers().get(Http::Headers::get().Path);
+  ASSERT_NE(path, nullptr);
+  EXPECT_EQ(path->value().getStringView(), "/bar/foo");
+}
+
+// Test the client when a request contains Content-Length greater than 0.
+TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZero) {
+  Http::MessagePtr message_ptr =
+      sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
+                   {Http::Headers::get().Method.get(), std::string{"POST"}}});
+
+  const auto* content_length = message_ptr->headers().get(Http::Headers::get().ContentLength);
+  ASSERT_NE(content_length, nullptr);
+  EXPECT_EQ(content_length->value().getStringView(), "0");
+
+  const auto* method = message_ptr->headers().get(Http::Headers::get().Method);
+  ASSERT_NE(method, nullptr);
+  EXPECT_EQ(method->value().getStringView(), "POST");
+}
+
+// Test the client when a request contains headers in the prefix whitelist.
+TEST_F(ExtAuthzHttpClientTest, AllowedRequestHeadersPrefix) {
+  allowed_request_headers_.emplace(Http::Headers::get().XContentTypeOptions.get());
+  allowed_request_headers_prefix_.emplace(Http::Headers::get().XContentTypeOptions.get());
+
+  Http::MessagePtr message_ptr =
+      sendRequest({{Http::Headers::get().XContentTypeOptions.get(), "foobar"},
+                   {Http::Headers::get().XSquashDebug.get(), "foo"},
+                   {Http::Headers::get().ContentType.get(), "bar"}});
+
+  EXPECT_EQ(message_ptr->headers().get(Http::Headers::get().ContentType), nullptr);
+  const auto* x_squash = message_ptr->headers().get(Http::Headers::get().XSquashDebug);
+  ASSERT_NE(x_squash, nullptr);
+  EXPECT_EQ(x_squash->value().getStringView(), "foo");
+
+  const auto* x_content_type = message_ptr->headers().get(Http::Headers::get().XContentTypeOptions);
+  ASSERT_NE(x_content_type, nullptr);
+  EXPECT_EQ(x_content_type->value().getStringView(), "foobar");
+}
 
 // Test the client when an ok response is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
@@ -102,65 +174,6 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
   client_.onSuccess(std::move(check_response));
 }
-
-// Test the client when a request contains path to be re-written and ok response is received.
-TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
-  const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
-  auto check_response = TestCommon::makeMessageResponse(expected_headers);
-
-  envoy::service::auth::v2alpha::CheckRequest request{};
-  auto mutable_headers =
-      request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
-  (*mutable_headers)[std::string{":path"}] = std::string{"/foo"};
-  (*mutable_headers)[std::string{"foo"}] = std::string{"bar"};
-
-  EXPECT_CALL(async_client_, send_(_, _, _))
-      .WillOnce(Invoke(
-          [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks&,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-            const auto* length_header_entry = message->headers().get(Http::Headers::get().Path);
-            EXPECT_EQ(length_header_entry->value().getStringView(), "/bar/foo");
-            return nullptr;
-          }));
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
-
-  EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
-  client_.onSuccess(std::move(check_response));
-}
-
-// Test the client when a request contains Content-Length greater than 0.
-TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZero) {
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
-  const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
-  auto check_response = TestCommon::makeMessageResponse(expected_headers);
-
-  envoy::service::auth::v2alpha::CheckRequest request{};
-  auto mutable_headers =
-      request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
-  (*mutable_headers)[Http::Headers::get().ContentLength.get()] = std::string{"47"};
-  (*mutable_headers)[Http::Headers::get().Method.get()] = std::string{"POST"};
-
-  EXPECT_CALL(async_client_, send_(_, _, _))
-      .WillOnce(Invoke(
-          [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks&,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-            const auto* length_header_entry =
-                message->headers().get(Http::Headers::get().ContentLength);
-            EXPECT_EQ(length_header_entry->value().getStringView(), "0");
-            const auto* method_header_entry = message->headers().get(Http::Headers::get().Method);
-            EXPECT_EQ(method_header_entry->value().getStringView(), "POST");
-            return nullptr;
-          }));
-
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
-  EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
-  client_.onSuccess(std::move(check_response));
-}
-
-// Test the client when a request contains headers in the prefix whitelist.
 
 // Test that the client allows only header in the whitelist to be sent to the upstream.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
