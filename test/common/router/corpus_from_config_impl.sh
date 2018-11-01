@@ -4,7 +4,9 @@
 
 set -e
 
-TEST_SRCDIR=/some TEST_WORKSPACE=/bogus $*
+# TEST_SRCDIR/TEST_WORKSPACE don't matter to config_impl_test, but they need to
+# be present because main.cc checks for their presence.
+TEST_SRCDIR=/totally TEST_WORKSPACE=/bogus $*
 
 # Verify at least one entry is actually generated
 [ -e "${ROUTE_CORPUS_PATH}"/generated_corpus_0 ]
