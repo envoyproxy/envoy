@@ -9,9 +9,9 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "original_sni",
-    srcs = ["original_sni.cc"],
-    hdrs = ["original_sni.h"],
+    name = "forward_original_sni",
+    srcs = ["forward_original_sni.cc"],
+    hdrs = ["forward_original_sni.h"],
     deps = [
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
@@ -24,7 +24,7 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":original_sni",
+        ":forward_original_sni",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/network:well_known_names",

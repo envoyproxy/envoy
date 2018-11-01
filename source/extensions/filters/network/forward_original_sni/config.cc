@@ -1,9 +1,9 @@
-#include "extensions/filters/network/original_sni/config.h"
+#include "extensions/filters/network/forward_original_sni/config.h"
 
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/network/original_sni/original_sni.h"
+#include "extensions/filters/network/forward_original_sni/forward_original_sni.h"
 
 namespace Envoy {
 namespace Extensions {

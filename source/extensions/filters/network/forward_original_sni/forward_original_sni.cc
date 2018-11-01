@@ -1,4 +1,4 @@
-#include "extensions/filters/network/original_sni/original_sni.h"
+#include "extensions/filters/network/forward_original_sni/forward_original_sni.h"
 
 #include "envoy/network/connection.h"
 
