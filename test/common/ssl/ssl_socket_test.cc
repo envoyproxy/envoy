@@ -2915,7 +2915,30 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
 // Verify that if override server name is passed to createTransportSocket,
 // the ssl object indeed has SNI set
 TEST_P(SslSocketTest, CreateTransportSocketWithOverrideServerName) {
+  Stats::IsolatedStoreImpl stats_store;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Init::MockManager> init_manager;
   Event::SimulatedTimeSystem time_system;
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context, random()).WillOnce(ReturnRef(random));
+  EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
+  EXPECT_CALL(factory_context, clusterManager()).WillOnce(ReturnRef(cluster_manager));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  auto sds_secret_configs =
+      tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
+  sds_secret_configs->set_name("abc.com");
+  sds_secret_configs->mutable_sds_config();
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context);
+  EXPECT_EQ(nullptr, client_cfg->tlsCertificate());
+  EXPECT_FALSE(client_cfg->isReady());
+
   ContextManagerImpl manager(time_system);
   Ssl::ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                         stats_store);
