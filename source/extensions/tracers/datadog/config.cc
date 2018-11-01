@@ -28,9 +28,9 @@ DatadogTracerFactory::createHttpTracer(const envoy::config::trace::v2::Tracing& 
   const auto& datadog_config =
       dynamic_cast<const envoy::config::trace::v2::DatadogConfig&>(*config_ptr);
 
-  Tracing::DriverPtr datadog_driver{new Driver{datadog_config, server.clusterManager(),
-                                               server.stats(), server.threadLocal(),
-                                               server.runtime()}};
+  Tracing::DriverPtr datadog_driver{
+      std::make_unique<Driver>(datadog_config, server.clusterManager(), server.stats(),
+                               server.threadLocal(), server.runtime())};
   return std::make_unique<Tracing::HttpTracerImpl>(std::move(datadog_driver), server.localInfo());
 }
 

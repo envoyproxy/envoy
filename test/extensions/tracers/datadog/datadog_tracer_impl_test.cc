@@ -50,7 +50,7 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
     }
 
-    driver_.reset(new Driver{datadog_config, cm_, stats_, tls_, runtime_});
+    driver_ = std::make_unique<Driver>(datadog_config, cm_, stats_, tls_, runtime_);
   }
 
   void setupValidDriver() {
@@ -152,7 +152,7 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  msg->body().reset(new Buffer::OwnedImpl(""));
+  msg->body() = std::make_unique<Buffer::OwnedImpl>("");
 
   callback->onSuccess(std::move(msg));
 
