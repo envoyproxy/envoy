@@ -22,13 +22,19 @@ message HealthCheck {
   // The time to wait for a health check response. If the timeout is reached the
   // health check attempt will be considered a failure.
   google.protobuf.Duration timeout = 1 [
-    (validate.rules).duration = {required: true, gt: {seconds: 0}},
+    (validate.rules).duration = {
+      required: true,
+      gt: {seconds: 0}
+    },
     (gogoproto.stdduration) = true
   ];
 
   // The interval between health checks.
   google.protobuf.Duration interval = 2 [
-    (validate.rules).duration = {required: true, gt: {seconds: 0}},
+    (validate.rules).duration = {
+      required: true,
+      gt: {seconds: 0}
+    },
     (gogoproto.stdduration) = true
   ];
 
