@@ -134,6 +134,56 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   handle->remove();
 }
 
+// Validate that default CertificateValidationContext is set into
+// CertificateValidationContextSdsApi, and the default CertificateValidationContext
+// is not a secret.
+TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
+  NiceMock<Server::MockInstance> server;
+  NiceMock<Init::MockManager> init_manager;
+  envoy::api::v2::core::ConfigSource config_source;
+  CertificateValidationContextSdsApi sds_api(
+      server.localInfo(), server.dispatcher(), server.random(), server.stats(),
+      server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+
+  envoy::api::v2::auth::CertificateValidationContext default_cvc;
+  // Set singular fields to verify that they will be overwritten by dynamic
+  // CertificateValidationContext.
+  default_cvc.set_allow_expired_certificate(false);
+  default_cvc.mutable_trusted_ca()->set_inline_bytes("fake trusted ca");
+  // Set repeated fields to verify that they will be concatenated by dynamic
+  // CertificateValidationContext.
+  default_cvc.add_verify_subject_alt_name("first san");
+  sds_api.setDefaultSecret(default_cvc);
+  // Verify that default CertificateValidationContext does not count as a secret.
+  EXPECT_EQ(nullptr, sds_api.secret());
+
+  NiceMock<Secret::MockSecretCallbacks> secret_callback;
+  auto handle =
+      sds_api.addUpdateCallback([&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
+  auto* secret_config = secret_resources.Add();
+  secret_config->set_name("abc.com");
+  auto* dynamic_cvc = secret_config->mutable_validation_context();
+  dynamic_cvc->set_allow_expired_certificate(true);
+  dynamic_cvc->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+  dynamic_cvc->add_verify_subject_alt_name("second san");
+  EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
+  sds_api.onConfigUpdate(secret_resources, "");
+
+  // Verify that singular fields are overwritten.
+  EXPECT_TRUE(sds_api.secret()->allowExpiredCertificate());
+  const std::string ca_cert = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
+            sds_api.secret()->caCert());
+  EXPECT_EQ(2, sds_api.secret()->verifySubjectAltNameList().size());
+  EXPECT_EQ("first san", sds_api.secret()->verifySubjectAltNameList()[0]);
+  EXPECT_EQ("second san", sds_api.secret()->verifySubjectAltNameList()[1]);
+
+  handle->remove();
+}
+
 // Validate that SdsApi throws exception if an empty secret is passed to onConfigUpdate().
 TEST_F(SdsApiTest, EmptyResource) {
   NiceMock<Server::MockInstance> server;
