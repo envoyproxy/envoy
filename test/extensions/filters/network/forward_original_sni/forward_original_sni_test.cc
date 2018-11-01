@@ -21,6 +21,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ForwardOriginalSni {
 
+using ::Envoy::StreamInfo::ForwardRequestedServerName;
+
 // Test that a ForwardOriginalSni filter config works.
 TEST(ForwardOriginalSni, ConfigTest) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
