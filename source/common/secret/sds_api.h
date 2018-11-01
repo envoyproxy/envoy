@@ -156,7 +156,7 @@ public:
   // it will be merged with dynamic CertificateValidationContext as new
   // secret to provide.
   void setDefaultSecret(const envoy::api::v2::auth::CertificateValidationContext& default_secret) {
-    default_cvc_.CopyFrom(default_secret);
+    default_cvc_ = default_secret;
   }
 
 protected:
