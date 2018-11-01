@@ -387,8 +387,8 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
 
 uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
-RunHelper::RunHelper(Instance& instance, Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
-                     AccessLog::AccessLogManager& access_log_manager,
+RunHelper::RunHelper(Instance& instance, Event::Dispatcher& dispatcher,
+                     Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
                      InitManagerImpl& init_manager, OverloadManager& overload_manager,
                      std::function<void()> workers_start_cb) {
 
