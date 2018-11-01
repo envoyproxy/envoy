@@ -365,7 +365,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   if (downstreamConnection() &&
       downstreamConnection()->streamInfo().filterState().hasData<ForwardRequestedServerName>(
           ForwardRequestedServerName::Key)) {
-    const ForwardRequestedServerName& original_requested_server_name =
+    const auto& original_requested_server_name =
         downstreamConnection()
             ->streamInfo()
             .filterState()
