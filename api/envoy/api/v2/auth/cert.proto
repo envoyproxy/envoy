@@ -253,11 +253,11 @@ message CommonTlsContext {
     // Config for fetching validation context via SDS API.
     SdsSecretConfig validation_context_sds_secret_config = 7;
 
-    // Default certificate validation context holds default value for any field
-    // in CertificateValidationContext. If SDS server returns CertificateValidationContext
-    // that contains an empty field, e.g. verify_subject_alt_name, Envoy checks
-    // default_validation_context.verify_subject_alt_name, and uses this default
-    // value for validation.
+    // Combined certificate validation context holds a default CertificateValidationContext
+    // and SDS config. When SDS server returns dynamic CertificateValidationContext, both dynamic
+    // and default CertificateValidationContext are merged into a new CertificateValidationContext
+    // for validation. This merge is done by Message::MergeFrom(), so singular fields will be
+    // overwritten, and repeated fields will be concatenated.
     CombinedCertificateValidationContext combined_validation_context = 8;
   }
 
