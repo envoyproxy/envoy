@@ -1,4 +1,5 @@
 #include <chrono>
+#include <memory>
 #include <string>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
@@ -77,8 +78,8 @@ class RdsImplTest : public RdsTestBase {
 public:
   RdsImplTest() {
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("routes", _));
-    route_config_provider_manager_.reset(
-        new RouteConfigProviderManagerImpl(factory_context_.admin_));
+    route_config_provider_manager_ =
+        std::make_unique<RouteConfigProviderManagerImpl>(factory_context_.admin_);
   }
   ~RdsImplTest() { factory_context_.thread_local_.shutdownThread(); }
 
@@ -218,7 +219,7 @@ TEST_F(RdsImplTest, Basic) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response1_json));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
 
   EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -231,9 +232,9 @@ TEST_F(RdsImplTest, Basic) {
   interval_timer_->callback_();
 
   // 2nd request with same response. Based on hash should not reload config.
-  message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response1_json));
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
 
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
@@ -271,9 +272,9 @@ TEST_F(RdsImplTest, Basic) {
   }
   )EOF";
 
-  message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response2_json));
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response2_json);
 
   // Make sure we don't lookup/verify clusters.
   EXPECT_CALL(factory_context_.cluster_manager_, get("bar")).Times(0);
@@ -312,7 +313,7 @@ TEST_F(RdsImplTest, Failure) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response_json));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
 
   EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -344,7 +345,7 @@ TEST_F(RdsImplTest, FailureArray) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response_json));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
 
   EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -385,8 +386,8 @@ public:
 
   RouteConfigProviderManagerImplTest() {
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("routes", _));
-    route_config_provider_manager_.reset(
-        new RouteConfigProviderManagerImpl(factory_context_.admin_));
+    route_config_provider_manager_ =
+        std::make_unique<RouteConfigProviderManagerImpl>(factory_context_.admin_);
   }
 
   ~RouteConfigProviderManagerImplTest() { factory_context_.thread_local_.shutdownThread(); }
@@ -468,7 +469,7 @@ dynamic_route_configs:
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response1_json));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
   EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));

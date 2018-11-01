@@ -1,4 +1,5 @@
 #include <chrono>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -177,7 +178,7 @@ TEST_F(CdsApiImplTest, Basic) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response1_json));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
 
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   expectAdd("cluster1", "hash_3845eb3523492899");
@@ -197,9 +198,9 @@ TEST_F(CdsApiImplTest, Basic) {
       "{%s}",
       clustersJson({defaultStaticClusterJson("cluster1"), defaultStaticClusterJson("cluster3")}));
 
-  message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response2_json));
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response2_json);
 
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterMap({"cluster1", "cluster2"})));
   expectAdd("cluster1", "hash_19fd657104a2cd34");
@@ -228,7 +229,7 @@ TEST_F(CdsApiImplTest, Failure) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response_json));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -260,7 +261,7 @@ TEST_F(CdsApiImplTest, FailureArray) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response_json));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
