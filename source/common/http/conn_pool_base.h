@@ -12,10 +12,7 @@ class ConnPoolImplBase : protected Logger::Loggable<Logger::Id::pool> {
 protected:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority)
       : host_(host), priority_(priority) {}
-  virtual ~ConnPoolImplBase() {}
-
-  Upstream::HostConstSharedPtr host_;
-  Upstream::ResourcePriority priority_;
+  virtual ~ConnPoolImplBase() = default;
 
   struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
     PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
@@ -40,11 +37,13 @@ protected:
   void onPendingRequestCancel(PendingRequest& request);
 
   // Fails all pending requests, calling onPoolFailure on the associated callbacks.
-  void purgePendingRequests(Upstream::HostDescriptionConstSharedPtr host_description);
+  void purgePendingRequests(const Upstream::HostDescriptionConstSharedPtr& host_description);
 
   // Must be implemented by sub class. Attempts to drain inactive clients.
   virtual void checkForDrained() PURE;
 
+  Upstream::HostConstSharedPtr host_;
+  Upstream::ResourcePriority priority_;
   std::list<PendingRequestPtr> pending_requests_;
 };
 } // namespace Http

@@ -22,7 +22,8 @@ namespace Http1 {
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options)
-    : ConnPoolImplBase(host, priority), dispatcher_(dispatcher), socket_options_(options),
+    : ConnPoolImplBase(std::move(host), std::move(priority)), dispatcher_(dispatcher),
+      socket_options_(options),
       upstream_ready_timer_(dispatcher_.createTimer([this]() { onUpstreamReady(); })) {}
 
 ConnPoolImpl::~ConnPoolImpl() {
