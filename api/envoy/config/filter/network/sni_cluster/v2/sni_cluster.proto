@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package envoy.config.filter.network.sni_cluster.v2;
+option go_package = "v2";
+
+import "envoy/type/substitution.proto";
+
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: SNI Cluster]
+// SNI Cluster :ref:`configuration overview <config_network_filters_sni_cluster>`.
+
+message SniCluster {
+  // Optional substitution to apply over a connection's requested server name
+  // prior to setting it as the TCP Proxy cluster name.
+  envoy.type.Substitution sni_substitution = 1;
+}

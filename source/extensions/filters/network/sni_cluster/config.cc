@@ -10,22 +10,13 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace SniCluster {
 
-Network::FilterFactoryCb
-SniClusterNetworkFilterConfigFactory::createFilterFactory(const Json::Object&,
-                                                          Server::Configuration::FactoryContext&) {
-  // Only used in v1 filters.
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-}
-
-Network::FilterFactoryCb SniClusterNetworkFilterConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message&, Server::Configuration::FactoryContext&) {
-  return [](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<SniClusterFilter>());
+Network::FilterFactoryCb SniClusterNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
+    const envoy::config::filter::network::sni_cluster::v2::SniCluster& proto_config,
+    Server::Configuration::FactoryContext&) {
+  SniClusterFilterConfigSharedPtr config(std::make_shared<SniClusterFilterConfig>(proto_config));
+  return [config](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(std::make_shared<SniClusterFilter>(config));
   };
-}
-
-ProtobufTypes::MessagePtr SniClusterNetworkFilterConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<ProtobufWkt::Empty>();
 }
 
 /**

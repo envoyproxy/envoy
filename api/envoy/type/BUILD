@@ -34,3 +34,14 @@ api_go_proto_library(
     name = "range",
     proto = ":range",
 )
+
+api_proto_library_internal(
+    name = "substitution",
+    srcs = ["substitution.proto"],
+    visibility = ["//visibility:public"],
+)
+
+api_go_proto_library(
+    name = "substitution",
+    proto = ":substitution",
+)

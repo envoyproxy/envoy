@@ -24,3 +24,13 @@ envoy_extension_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_name = "envoy.filters.network.sni_cluster",
+    deps = [
+        "//source/extensions/filters/network/sni_cluster:config",
+        "//test/mocks/server:server_mocks",
+    ],
+)

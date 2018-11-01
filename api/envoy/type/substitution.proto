@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package envoy.type;
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.equal_all) = true;
+
+// [#protodoc-title: Substitution]
+
+// Identifies a substitution.
+message Substitution {
+  // Specifies the regex pattern to be matched.
+  string regex = 1;
+
+  // Specifies the replacement for the regex pattern.
+  string replacement = 2;
+}
