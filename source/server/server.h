@@ -165,7 +165,7 @@ public:
   }
   Runtime::Loader& runtime() override;
   void shutdown() override;
-  bool isShutdown() override { return shutdown_; }
+  bool isShutdown() override final { return shutdown_; }
   void shutdownAdmin() override;
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override;
