@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/auth/cert.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/config/datasource.h"
@@ -46,31 +48,56 @@ Secret::TlsCertificateConfigProviderSharedPtr getTlsCertificateConfigProvider(
 }
 
 Secret::CertificateValidationContextConfigProviderSharedPtr
+getCertificateValidationContextConfigProviderFromSds(
+    const envoy::api::v2::auth::SdsSecretConfig& sds_secret_config,
+    const envoy::api::v2::auth::Secret& default_secret) {
+  if (!sds_secret_config.has_sds_config()) {
+    // static secret
+    auto secret_provider =
+        factory_context.secretManager().findStaticCertificateValidationContextProvider(
+            sds_secret_config.name());
+    if (!secret_provider) {
+      throw EnvoyException(fmt::format("Unknown static certificate validation context: {}",
+                                       sds_secret_config.name()));
+    }
+    return secret_provider;
+  } else {
+    auto secret_provider =
+        factory_context.secretManager().findOrCreateCertificateValidationContextProvider(
+            sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
+    secret_provider->setDefaultSecret(default_cvc);
+    return secret_provider;
+  }
+  return nullptr;
+}
+
+Secret::CertificateValidationContextConfigProviderSharedPtr
 getCertificateValidationContextConfigProvider(
     const envoy::api::v2::auth::CommonTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
-  if (config.has_validation_context()) {
+  switch (config.validation_context_type_case()) {
+  case envoy::api::v2::auth::CommonTlsContext::ValidationContextTypeCase::kValidationContext: {
     return factory_context.secretManager().createInlineCertificateValidationContextProvider(
         config.validation_context());
   }
-  if (config.has_validation_context_sds_secret_config()) {
+  case envoy::api::v2::auth::CommonTlsContext::ValidationContextTypeCase::
+      kValidationContextSdsSecretConfig: {
     const auto& sds_secret_config = config.validation_context_sds_secret_config();
-    if (!sds_secret_config.has_sds_config()) {
-      // static secret
-      auto secret_provider =
-          factory_context.secretManager().findStaticCertificateValidationContextProvider(
-              sds_secret_config.name());
-      if (!secret_provider) {
-        throw EnvoyException(fmt::format("Unknown static certificate validation context: {}",
-                                         sds_secret_config.name()));
-      }
-      return secret_provider;
-    } else {
-      return factory_context.secretManager().findOrCreateCertificateValidationContextProvider(
-          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
-    }
+    envoy::api::v2::auth::Secret default_secret;
+    return getCertificateValidationContextConfigProviderFromSds(sds_secret_config, default_secret);
   }
-  return nullptr;
+  case envoy::api::v2::auth::CommonTlsContext::ValidationContextTypeCase::
+      kCombinedValidationContext: {
+    envoy::api::v2::auth::Secret default_secret;
+    default_secret.mutable_validation_context()->CopyFrom(
+        config.combined_validation_context().default_validation_context());
+    const auto& sds_secret_config =
+        config.combined_validation_context().validation_context_sds_secret_config();
+    return getCertificateValidationContextConfigProviderFromSds(sds_secret_config, default_secret);
+  }
+  default:
+    return nullptr;
+  }
 }
 
 } // namespace

@@ -105,6 +105,7 @@ public:
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
     return update_callback_manager_.add(callback);
   }
+  void setDefaultSecret(const envoy::api::v2::auth::Secret&) override {}
 
 protected:
   void setSecret(const envoy::api::v2::auth::Secret& secret) override {
@@ -152,14 +153,26 @@ public:
     return update_callback_manager_.add(callback);
   }
 
+  void setDefaultSecret(const envoy::api::v2::auth::Secret& default_secret) override {
+    if (default_secret.has_validation_context()) {
+      default_cvc_.CopyFrom(default_secret.validation_context());
+    }
+  }
+
 protected:
   void setSecret(const envoy::api::v2::auth::Secret& secret) override {
+    envoy::api::v2::auth::CertificateValidationContext new_secret(default_cvc_);
+    new_secret.MergeFrom(secret.validation_context());
     certificate_validation_context_secrets_ =
-        std::make_unique<Ssl::CertificateValidationContextConfigImpl>(secret.validation_context());
+        std::make_unique<Ssl::CertificateValidationContextConfigImpl>(new_secret);
   }
 
 private:
   Ssl::CertificateValidationContextConfigPtr certificate_validation_context_secrets_;
+  // Default CertificateValidationContext. Everytime a dynamic CertificateValidationContext is
+  // received, the dynamic CertificateValidationContext and default CertificateValidationContext are
+  // merged into one CertificateValidationContext, which is provided as secret by this provider.
+  envoy::api::v2::auth::CertificateValidationContext default_cvc_;
 };
 
 } // namespace Secret

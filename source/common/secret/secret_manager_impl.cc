@@ -34,6 +34,9 @@ void SecretManagerImpl::addStaticSecret(const envoy::api::v2::auth::Secret& secr
     }
     break;
   }
+  // Static secret of type
+  // envoy::api::v2::auth::CommonTlsContext::ValidationContextTypeCase::kCombinedValidationContext
+  // is not useful.
   default:
     throw EnvoyException("Secret type not implemented");
   }
