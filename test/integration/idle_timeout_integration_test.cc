@@ -196,14 +196,13 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutRequestAndResponse) {
   testRouterRequestAndResponseWithBody(1024, 1024, false, nullptr);
 }
 
-TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDisarmsOnRequestResponse) {
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutConfiguredRequestResponse) {
   enable_request_timeout_ = true;
   testRouterHeaderOnlyRequestAndResponse(true, nullptr);
 }
 
-TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDisarmsOnRequestResponseWithBody) {
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutConfiguredRequestResponseWithBody) {
   enable_request_timeout_ = true;
-
   testRouterRequestAndResponseWithBody(1024, 1024, false, nullptr);
 }
 
@@ -221,14 +220,15 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnBodilessPost) {
   EXPECT_EQ("request timeout", response->body());
 }
 
-TEST_P(IdleTimeoutIntegrationTest, UnconfiguredRequestTimeoutDoesNotTrigger) {
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTrigger) {
+  enable_request_timeout_ = false;
+  // with no request timeout configured, the idle timeout triggers instead
   enable_per_stream_idle_timeout_ = true;
 
   auto response = setupPerStreamIdleTimeoutTest("POST");
 
   waitForTimeout(*response);
 
-  // with no request timeout configured, the idle timeout triggers instead
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
@@ -236,19 +236,32 @@ TEST_P(IdleTimeoutIntegrationTest, UnconfiguredRequestTimeoutDoesNotTrigger) {
   EXPECT_NE("request timeout", response->body());
 }
 
-TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnIncompleteHeaders) {
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnIncompleteRequestWithHeaders) {
   if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
     return;
   }
-
   enable_request_timeout_ = true;
 
   initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   std::string raw_response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1", &raw_response);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1", &raw_response, true);
   EXPECT_THAT(raw_response, testing::HasSubstr("request timeout"));
+}
+
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnCompleteRequestWithHeaders) {
+  if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
+    return;
+  }
+  enable_request_timeout_ = true;
+
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  std::string raw_response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\n\n", &raw_response, true);
+  EXPECT_THAT(raw_response, testing::Not(testing::HasSubstr("request timeout")));
 }
 
 // TODO(auni53) create a test filter that hangs and does not send data upstream, which would
