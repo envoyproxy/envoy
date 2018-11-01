@@ -115,7 +115,7 @@ protected:
         upstream_request_->encodeTrailers(response_trailers);
       }
       EXPECT_TRUE(upstream_request_->complete());
-    } 
+    }
 
     response->waitForEndStream();
     EXPECT_TRUE(response->complete());

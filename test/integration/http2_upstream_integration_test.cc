@@ -308,7 +308,7 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
     responses.push_back(std::move(encoder_decoder.second));
     // Reset a few streams to test how reset and watermark interact.
     if (i % 15 == 0) {
-      //  codec_client_->sendReset(*encoders[i]);
+      codec_client_->sendReset(*encoders[i]);
     } else {
       codec_client_->sendData(*encoders[i], 0, true);
     }
@@ -317,8 +317,10 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   for (uint32_t i = 0; i < num_requests; ++i) {
     upstream_requests.emplace_back();
     FakeStreamPtr stream;
-    ASSERT_TRUE(
-        fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests.back()));
+    if (i % 15 != 0) {
+      ASSERT_TRUE(
+          fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests.back()));
+    }
   }
   for (uint32_t i = 0; i < num_requests; ++i) {
     if (i % 15 != 0) {
