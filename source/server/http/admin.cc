@@ -431,6 +431,7 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& resp
   return Http::Code::OK;
 }
 
+// TODO(ambuc) Export this as a server (?) stat for monitoring.
 Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap& response_headers,
                                         Buffer::Instance& response, AdminStream&) {
 

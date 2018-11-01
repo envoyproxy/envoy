@@ -52,7 +52,7 @@ private:
   // TODO(ambuc): Build running averages here?
 
   // We utilize std::memory_order_relaxed for all operations for the least possible contention.
-  std::memory_order order_{std::memory_order_relaxed};
+  static constexpr std::memory_order order_{std::memory_order_relaxed};
 };
 
 } // namespace Envoy
