@@ -175,6 +175,40 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+// Verifies that requests are queued up in the conn pool until the connection becomes ready.
+TEST_F(Http2ConnPoolImplTest, PendingRequests) {
+  InSequence s;
+
+  // Create three requests. These should be queued up.
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientCreate();
+  ActiveTestRequest r2(*this, 1, false);
+  expectClientCreate();
+  ActiveTestRequest r3(*this, 2, false);
+
+  // The connection now becomes ready. This should cause all the queued requests to be sent.
+  expectStreamConnect(0, r1);
+  expectStreamConnect(1, r2);
+  expectClientConnect(2, r3);
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  r1.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  r2.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+  EXPECT_CALL(r3.inner_encoder_, encodeHeaders(_, true));
+  r3.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+
+  // Since we now have an active connection, subsequent requets should connect immediately.
+  expectClientCreate();
+  ActiveTestRequest r4(*this, 3, true);
+  expectStreamConnect(3, r4);
+
+  // Clean up everything.
+  test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*this, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
 TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
   InSequence s;
   expectClientCreate();
