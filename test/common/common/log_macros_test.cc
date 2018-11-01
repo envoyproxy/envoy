@@ -67,10 +67,11 @@ TEST(Logger, logAsStatement) {
 
   // Make sure that if statement inside of LOGGER macro does not catch trailing
   // else ....
-  if (true)
+  if (true) {
     ENVOY_LOG_MISC(warn, "test message 1 '{}'", i++);
-  else
+  } else {
     ENVOY_LOG_MISC(critical, "test message 2 '{}'", j++);
+  }
 
   EXPECT_THAT(i, testing::Eq(1));
   EXPECT_THAT(j, testing::Eq(1));
