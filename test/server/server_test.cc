@@ -60,9 +60,9 @@ public:
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
     EXPECT_CALL(overload_manager_, start());
 
-    helper_.reset(new RunHelper(options_, dispatcher_, cm_, hot_restart_, access_log_manager_,
-                                init_manager_, overload_manager_,
-                                [this] { start_workers_.ready(); }));
+    helper_ = std::make_unique<RunHelper>(options_, dispatcher_, cm_, hot_restart_,
+                                          access_log_manager_, init_manager_, overload_manager_,
+                                          [this] { start_workers_.ready(); });
   }
 
   testing::NiceMock<MockOptions> options_;
