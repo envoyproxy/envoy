@@ -56,7 +56,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
       restarter_ = std::make_unique<Server::HotRestartImpl>(options_);
     }
 #endif
-    if (restarter_.get() == nullptr) {
+    if (restarter_ == nullptr) {
       restarter_ = std::make_unique<Server::HotRestartNopImpl>();
     }
 
