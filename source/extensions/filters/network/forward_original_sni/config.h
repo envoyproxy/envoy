@@ -7,12 +7,12 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace OriginalSni {
+namespace ForwardOriginalSni {
 
 /**
  * Config registration for the original_sni filter. @see NamedNetworkFilterConfigFactory.
  */
-class OriginalSniNetworkFilterConfigFactory
+class ForwardOriginalSniNetworkFilterConfigFactory
     : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
@@ -22,10 +22,10 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() override { return NetworkFilterNames::get().OriginalSni; }
+  std::string name() override { return NetworkFilterNames::get().ForwardOriginalSni; }
 };
 
-} // namespace OriginalSni
+} // namespace ForwardOriginalSni
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

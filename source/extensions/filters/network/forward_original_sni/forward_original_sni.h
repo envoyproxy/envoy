@@ -5,13 +5,13 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace OriginalSni {
+namespace ForwardOriginalSni {
 
 /**
  * Implementation of the original_sni filter that sets the original requested server name from
  * the SNI field in the TLS connection.
  */
-class OriginalSniFilter : public Network::ReadFilter {
+class ForwardOriginalSniFilter : public Network::ReadFilter {
 public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance&, bool) override {
@@ -26,7 +26,7 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
-} // namespace OriginalSni
+} // namespace ForwardOriginalSni
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

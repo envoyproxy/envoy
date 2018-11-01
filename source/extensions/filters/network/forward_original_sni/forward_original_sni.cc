@@ -7,11 +7,11 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace OriginalSni {
+namespace ForwardOriginalSni {
 
 using ::Envoy::StreamInfo::ForwardRequestedServerName;
 
-Network::FilterStatus OriginalSniFilter::onNewConnection() {
+Network::FilterStatus ForwardOriginalSniFilter::onNewConnection() {
   absl::string_view sni = read_callbacks_->connection().requestedServerName();
 
   if (!sni.empty()) {
@@ -23,7 +23,7 @@ Network::FilterStatus OriginalSniFilter::onNewConnection() {
   return Network::FilterStatus::Continue;
 }
 
-} // namespace OriginalSni
+} // namespace ForwardOriginalSni
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

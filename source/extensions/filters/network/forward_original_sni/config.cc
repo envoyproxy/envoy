@@ -8,34 +8,33 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace OriginalSni {
+namespace ForwardOriginalSni {
 
-Network::FilterFactoryCb
-OriginalSniNetworkFilterConfigFactory::createFilterFactory(const Json::Object&,
-                                                           Server::Configuration::FactoryContext&) {
+Network::FilterFactoryCb ForwardOriginalSniNetworkFilterConfigFactory::createFilterFactory(
+    const Json::Object&, Server::Configuration::FactoryContext&) {
   // Only used in v1 filters.
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
-Network::FilterFactoryCb OriginalSniNetworkFilterConfigFactory::createFilterFactoryFromProto(
+Network::FilterFactoryCb ForwardOriginalSniNetworkFilterConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message&, Server::Configuration::FactoryContext&) {
   return [](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<OriginalSniFilter>());
+    filter_manager.addReadFilter(std::make_shared<ForwardOriginalSniFilter>());
   };
 }
 
-ProtobufTypes::MessagePtr OriginalSniNetworkFilterConfigFactory::createEmptyConfigProto() {
+ProtobufTypes::MessagePtr ForwardOriginalSniNetworkFilterConfigFactory::createEmptyConfigProto() {
   return std::make_unique<ProtobufWkt::Empty>();
 }
 
 /**
- * Static registration for the sni_cluster filter. @see RegisterFactory.
+ * Static registration for the forward_original_sni filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<OriginalSniNetworkFilterConfigFactory,
+static Registry::RegisterFactory<ForwardOriginalSniNetworkFilterConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     registered_;
 
-} // namespace OriginalSni
+} // namespace ForwardOriginalSni
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
