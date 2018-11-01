@@ -1,5 +1,7 @@
 #include "extensions/stat_sinks/statsd/config.h"
 
+#include <memory>
+
 #include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/config/metrics/v2/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -39,8 +41,7 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
 }
 
 ProtobufTypes::MessagePtr StatsdSinkFactory::createEmptyConfigProto() {
-  return std::unique_ptr<envoy::config::metrics::v2::StatsdSink>(
-      new envoy::config::metrics::v2::StatsdSink());
+  return std::make_unique<envoy::config::metrics::v2::StatsdSink>();
 }
 
 std::string StatsdSinkFactory::name() { return StatsSinkNames::get().Statsd; }

@@ -87,7 +87,7 @@ public:
 
   void createAuthFilter() {
     filter_callbacks_.connection_.callbacks_.clear();
-    instance_.reset(new ClientSslAuthFilter(config_));
+    instance_ = std::make_unique<ClientSslAuthFilter>(config_);
     instance_->initializeReadFilterCallbacks(filter_callbacks_);
 
     // NOP currently.
@@ -175,9 +175,9 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(
-      new Buffer::OwnedImpl(Filesystem::fileReadToEnd(TestEnvironment::runfilesPath(
-          "test/extensions/filters/network/client_ssl_auth/test_data/vpn_response_1.json"))));
+  message->body() =
+      std::make_unique<Buffer::OwnedImpl>(Filesystem::fileReadToEnd(TestEnvironment::runfilesPath(
+          "test/extensions/filters/network/client_ssl_auth/test_data/vpn_response_1.json")));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(1U, stats_store_.gauge("auth.clientssl.vpn.total_principals").value());
 
@@ -227,8 +227,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Error response.
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}}));
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}});
   callbacks_->onSuccess(std::move(message));
 
   // Interval timer fires.
@@ -237,9 +237,9 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Parsing error
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl("bad_json"));
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+  message->body() = std::make_unique<Buffer::OwnedImpl>("bad_json");
   callbacks_->onSuccess(std::move(message));
 
   // Interval timer fires.

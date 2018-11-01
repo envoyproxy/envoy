@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
@@ -54,8 +56,8 @@ class ListenerManagerImplTest : public testing::Test {
 public:
   ListenerManagerImplTest() {
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
-    manager_.reset(
-        new ListenerManagerImpl(server_, listener_factory_, worker_factory_, time_system_));
+    manager_ = std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
+                                                     time_system_);
   }
 
   /**
@@ -138,7 +140,7 @@ public:
               return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
                                                                                     context);
             }));
-    socket_.reset(new NiceMock<Network::MockConnectionSocket>());
+    socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
   }
 

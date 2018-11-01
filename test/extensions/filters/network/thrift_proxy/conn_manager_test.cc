@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -96,7 +98,7 @@ public:
 
     decoder_filter_.reset(new NiceMock<ThriftFilters::MockDecoderFilter>());
 
-    config_.reset(new TestConfigImpl(proto_config_, context_, decoder_filter_, stats_));
+    config_ = std::make_unique<TestConfigImpl>(proto_config_, context_, decoder_filter_, stats_);
     if (custom_transport_) {
       config_->transport_ = custom_transport_;
     }
@@ -108,8 +110,8 @@ public:
     }
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
-    filter_.reset(new ConnectionManager(*config_, random_,
-                                        filter_callbacks_.connection_.dispatcher_.timeSystem()));
+    filter_ = std::make_unique<ConnectionManager>(
+        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSystem());
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 

@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "extensions/health_checkers/redis/redis.h"
 #include "extensions/health_checkers/redis/utility.h"
 
@@ -170,7 +172,7 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
+  response = std::make_unique<Extensions::NetworkFilters::RedisProxy::RespValue>();
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
@@ -238,7 +240,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
+  response = std::make_unique<Extensions::NetworkFilters::RedisProxy::RespValue>();
   response->type(Extensions::NetworkFilters::RedisProxy::RespType::Integer);
   response->asInteger() = 1;
   pool_callbacks_->onResponse(std::move(response));
@@ -249,7 +251,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   // Failure, no value
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
+  response = std::make_unique<Extensions::NetworkFilters::RedisProxy::RespValue>();
   pool_callbacks_->onResponse(std::move(response));
 
   EXPECT_CALL(*client_, close());
@@ -291,7 +293,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_CALL(*client_, close());
-  response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
+  response = std::make_unique<Extensions::NetworkFilters::RedisProxy::RespValue>();
   pool_callbacks_->onResponse(std::move(response));
 
   expectClientCreate();

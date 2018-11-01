@@ -60,7 +60,7 @@ public:
   }
 
   void setup() {
-    config_.reset(new ConfigImpl(createConnPoolSettings()));
+    config_ = std::make_unique<ConfigImpl>(createConnPoolSettings());
     finishSetup();
   }
 

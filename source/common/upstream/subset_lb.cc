@@ -1,5 +1,6 @@
 #include "common/upstream/subset_lb.h"
 
+#include <memory>
 #include <unordered_set>
 
 #include "envoy/api/v2/cds.pb.h"
@@ -430,30 +431,30 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
 
   switch (subset_lb.lb_type_) {
   case LoadBalancerType::LeastRequest:
-    lb_.reset(new LeastRequestLoadBalancer(*this, subset_lb.original_local_priority_set_,
-                                           subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
-                                           subset_lb.common_config_));
+    lb_ = std::make_unique<LeastRequestLoadBalancer>(*this, subset_lb.original_local_priority_set_,
+                                                     subset_lb.stats_, subset_lb.runtime_,
+                                                     subset_lb.random_, subset_lb.common_config_);
     break;
 
   case LoadBalancerType::Random:
-    lb_.reset(new RandomLoadBalancer(*this, subset_lb.original_local_priority_set_,
-                                     subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
-                                     subset_lb.common_config_));
+    lb_ = std::make_unique<RandomLoadBalancer>(*this, subset_lb.original_local_priority_set_,
+                                               subset_lb.stats_, subset_lb.runtime_,
+                                               subset_lb.random_, subset_lb.common_config_);
     break;
 
   case LoadBalancerType::RoundRobin:
-    lb_.reset(new RoundRobinLoadBalancer(*this, subset_lb.original_local_priority_set_,
-                                         subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
-                                         subset_lb.common_config_));
+    lb_ = std::make_unique<RoundRobinLoadBalancer>(*this, subset_lb.original_local_priority_set_,
+                                                   subset_lb.stats_, subset_lb.runtime_,
+                                                   subset_lb.random_, subset_lb.common_config_);
     break;
 
   case LoadBalancerType::RingHash:
     // TODO(mattklein123): The ring hash LB is thread aware, but currently the subset LB is not.
     // We should make the subset LB thread aware since the calculations are costly, and then we
     // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
-    thread_aware_lb_.reset(
-        new RingHashLoadBalancer(*this, subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
-                                 subset_lb.lb_ring_hash_config_, subset_lb.common_config_));
+    thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
+        *this, subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
+        subset_lb.lb_ring_hash_config_, subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
     break;
@@ -462,8 +463,8 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     // TODO(mattklein123): The Maglev LB is thread aware, but currently the subset LB is not.
     // We should make the subset LB thread aware since the calculations are costly, and then we
     // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
-    thread_aware_lb_.reset(new MaglevLoadBalancer(*this, subset_lb.stats_, subset_lb.runtime_,
-                                                  subset_lb.random_, subset_lb.common_config_));
+    thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
+        *this, subset_lb.stats_, subset_lb.runtime_, subset_lb.random_, subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
     break;

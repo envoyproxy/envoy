@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <string>
 
 #include "common/common/assert.h"
@@ -283,7 +284,7 @@ void HeaderMapImpl::StaticLookupTable::add(const char* key, StaticLookupEntry::E
   StaticLookupEntry* current = &root_;
   while (uint8_t c = *key) {
     if (!current->entries_[c]) {
-      current->entries_[c].reset(new StaticLookupEntry());
+      current->entries_[c] = std::make_unique<StaticLookupEntry>();
     }
 
     current = current->entries_[c].get();

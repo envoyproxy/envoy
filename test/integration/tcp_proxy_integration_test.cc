@@ -1,5 +1,7 @@
 #include "test/integration/tcp_proxy_integration_test.h"
 
+#include <memory>
+
 #include "envoy/config/accesslog/v2/file.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 
@@ -363,7 +365,7 @@ void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
   TcpProxyIntegrationTest::initialize();
 
-  context_manager_.reset(new Ssl::ContextManagerImpl(timeSystem()));
+  context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(timeSystem());
   payload_reader_.reset(new WaitForPayloadReader(*dispatcher_));
 }
 
