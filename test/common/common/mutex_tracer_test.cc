@@ -4,10 +4,9 @@
 #include "common/common/lock_guard.h"
 #include "common/common/mutex_tracer_impl.h"
 
-#include "test/test_common/test_time.h"
+#include "test/test_common/contention.h"
 
 #include "absl/synchronization/mutex.h"
-#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -24,25 +23,8 @@ protected:
     tracer_->contentionHook(nullptr, nullptr, wait_cycles);
   }
 
-  Thread::Thread launchThread() {
-    return Thread::Thread([this]() -> void { holdUntilContention(); });
-  }
-
   Thread::MutexBasicLockable mu_;
   MutexTracerImpl* tracer_;
-  DangerousDeprecatedTestTime test_time_;
-
-private:
-  void holdUntilContention() {
-    int64_t curr_num_contentions = tracer_->numContentions();
-    while (tracer_->numContentions() == curr_num_contentions) {
-      test_time_.timeSystem().sleep(std::chrono::milliseconds(1));
-      Thread::LockGuard lock(mu_);
-      // We hold the lock 90% of the time to ensure both contention and eventual acquisition, which
-      // is needed to bump numContentions().
-      test_time_.timeSystem().sleep(std::chrono::milliseconds(9));
-    }
-  }
 };
 
 // Call the contention hook manually.
@@ -95,10 +77,8 @@ TEST_F(MutexTracerTest, TryLockNoContention) {
 TEST_F(MutexTracerTest, TwoThreadsWithContention) {
   for (int i = 1; i <= 10; ++i) {
     int64_t curr_num_lifetime_wait_cycles = tracer_->lifetimeWaitCycles();
-    Thread::Thread t1 = launchThread();
-    Thread::Thread t2 = launchThread();
-    t1.join();
-    t2.join();
+
+    Thread::TestUtil::ContentionGenerator::generateContention(tracer_);
 
     EXPECT_EQ(tracer_->numContentions(), i);
     EXPECT_GT(tracer_->currentWaitCycles(), 0); // This shouldn't be hardcoded.
