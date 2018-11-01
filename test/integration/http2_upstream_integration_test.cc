@@ -310,7 +310,8 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
     // Ensure we've established a connection before issuing the resets.
     // TODO(snowp): Why can't we handle resets here?
     if (!fake_upstream_connection_) {
-      ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     }
 
     // Reset a few streams to test how reset and watermark interact.
