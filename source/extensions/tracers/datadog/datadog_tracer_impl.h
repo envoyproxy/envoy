@@ -124,6 +124,8 @@ private:
   Driver& driver_;
   Event::TimerPtr flush_timer_;
   TraceEncoderSharedPtr encoder_;
+
+  std::map<std::string, Http::LowerCaseString> lower_case_headers_;
 };
 } // namespace Datadog
 } // namespace Tracers

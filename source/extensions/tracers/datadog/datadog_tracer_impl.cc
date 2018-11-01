@@ -56,6 +56,9 @@ TraceReporter::TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver,
                              Event::Dispatcher& dispatcher)
     : driver_(driver), encoder_(encoder) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
+    for (auto& h : encoder_->headers()) {
+      lower_case_headers_.emplace(h.first, Http::LowerCaseString{h.first});
+    }
     driver_.tracerStats().timer_flushed_.inc();
     flushTraces();
     enableTimer();
@@ -77,7 +80,7 @@ void TraceReporter::flushTraces() {
     message->headers().insertPath().value().setReference(encoder_->path());
     message->headers().insertHost().value().setReference(driver_.cluster()->name());
     for (auto& h : encoder_->headers()) {
-      message->headers().addCopy(Http::LowerCaseString{h.first}, h.second);
+      message->headers().setReferenceKey(lower_case_headers_.at(h.first), h.second);
     }
 
     Buffer::InstancePtr body(new Buffer::OwnedImpl());
