@@ -902,7 +902,7 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::disarmRequestTimer() {
+void ConnectionManagerImpl::ActiveStream::disarmRequestTimeout() {
   if (request_timer_) {
     request_timer_->disableTimer();
   }
@@ -971,7 +971,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     ActiveStreamEncoderFilter* filter, HeaderMap& headers) {
   resetIdleTimer();
-  disarmRequestTimer();
+  disarmRequestTimeout();
 
   ASSERT(connection_manager_.config_.proxy100Continue());
   // Make sure commonContinue continues encode100ContinueHeaders.
@@ -1010,7 +1010,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
   resetIdleTimer();
-  disarmRequestTimer();
+  disarmRequestTimeout();
 
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   std::list<ActiveStreamEncoderFilterPtr>::iterator continue_data_entry = encoder_filters_.end();
