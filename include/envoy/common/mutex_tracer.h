@@ -36,7 +36,6 @@ public:
    * v. core clock frequency.
    */
   virtual int64_t lifetimeWaitCycles() const PURE;
-
 };
 
 } // namespace Envoy

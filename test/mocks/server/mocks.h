@@ -5,6 +5,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/common/mutex_tracer.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
@@ -20,7 +21,6 @@
 #include "envoy/stats/stats_options.h"
 #include "envoy/thread/thread.h"
 
-#include "envoy/common/mutex_tracer.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
