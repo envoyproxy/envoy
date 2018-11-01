@@ -74,6 +74,18 @@ public:
     }
   }
 
+  void expectStreamClientCreate() {
+    test_clients_.emplace_back();
+    TestCodecClient& test_client = test_clients_.back();
+    test_client.connection_ = new NiceMock<Network::MockClientConnection>();
+    test_client.codec_ = new NiceMock<Http::MockClientConnection>();
+    test_client.client_dispatcher_.reset(new Event::DispatcherImpl(test_time_.timeSystem()));
+    EXPECT_CALL(pool_, createCodecClient_(_))
+        .WillOnce(Invoke([this](Upstream::Host::CreateConnectionData&) -> CodecClient* {
+          return test_clients_.back().codec_client_;
+        }));
+  }
+
   void expectClientCreate() {
     test_clients_.emplace_back();
     TestCodecClient& test_client = test_clients_.back();
@@ -178,19 +190,25 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
 // Verifies that requests are queued up in the conn pool until the connection becomes ready.
 TEST_F(Http2ConnPoolImplTest, PendingRequests) {
   InSequence s;
+  pool_.max_streams_ = 10;
 
   // Create three requests. These should be queued up.
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
-  expectClientCreate();
+  expectStreamClientCreate();
   ActiveTestRequest r2(*this, 1, false);
-  expectClientCreate();
+  expectStreamClientCreate();
   ActiveTestRequest r3(*this, 2, false);
 
+  EXPECT_CALL(*test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&r1.inner_decoder_), ReturnRef(r1.inner_encoder_)));
+
   // The connection now becomes ready. This should cause all the queued requests to be sent.
-  expectStreamConnect(0, r1);
-  expectStreamConnect(1, r2);
-  expectClientConnect(2, r3);
+  /* expectStreamConnect(0, r1); */
+  /* expectStreamConnect(1, r2); */
+  /* expectStreamConnect(2, r3); */
+  std::cerr << "connecitng" << std::endl;
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
   EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
   r1.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
   EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
@@ -199,12 +217,12 @@ TEST_F(Http2ConnPoolImplTest, PendingRequests) {
   r3.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
 
   // Since we now have an active connection, subsequent requets should connect immediately.
-  expectClientCreate();
+  expectStreamClientCreate();
   ActiveTestRequest r4(*this, 3, true);
   expectStreamConnect(3, r4);
 
   // Clean up everything.
-  test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 }
