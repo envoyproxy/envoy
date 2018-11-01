@@ -85,7 +85,6 @@ void ConnPoolImpl::newClientStream(Http::StreamDecoder& response_decoder,
     host_->cluster().stats().upstream_rq_total_.inc();
     host_->cluster().stats().upstream_rq_active_.inc();
     host_->cluster().resourceManager(priority_).requests().inc();
-    std::cerr << "CALLING" << std::endl;
     callbacks.onPoolReady(primary_client_->client_->newStream(response_decoder),
                           primary_client_->real_host_description_);
   }
@@ -241,10 +240,7 @@ void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason r
 
 void ConnPoolImpl::onUpstreamReady() {
   // Establishes new codec streams for each pending request.
-    int c = 0;
-    std::cout << pending_requests_.size() << std::endl;
   while (!pending_requests_.empty()) {
-    std::cout << c << std::endl;
     newClientStream(pending_requests_.back()->decoder_, pending_requests_.back()->callbacks_);
     pending_requests_.pop_back();
   }
