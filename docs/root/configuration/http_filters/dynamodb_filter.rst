@@ -4,7 +4,6 @@ DynamoDB
 ========
 
 * DynamoDB :ref:`architecture overview <arch_overview_dynamo>`
-* :ref:`v1 API reference <config_http_filters_dynamo_v1>`
 * :ref:`v2 API reference <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpFilter.name>`
 
 Statistics

@@ -15,6 +15,7 @@ envoy_cc_library(
     srcs = [
         "span_buffer.cc",
         "span_context.cc",
+        "span_context_extractor.cc",
         "tracer.cc",
         "util.cc",
         "zipkin_core_types.cc",
@@ -23,6 +24,7 @@ envoy_cc_library(
     hdrs = [
         "span_buffer.h",
         "span_context.h",
+        "span_context_extractor.h",
         "tracer.h",
         "tracer_interface.h",
         "util.h",

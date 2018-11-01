@@ -8,14 +8,10 @@ External Authorization
 The external authorization HTTP filter calls an external gRPC or HTTP service to check if the incoming
 HTTP request is authorized or not.
 If the request is deemed unauthorized then the request will be denied normally with 403 (Forbidden) response.
-Note that sending additional custom metadata from the authorization service to the upstream, to the downstream or to the authorization service is 
+Note that sending additional custom metadata from the authorization service to the upstream, to the downstream or to the authorization service is
 also possible. This is explained in more details at :ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2alpha.ExtAuthz>`.
 
-.. tip::
-  It is recommended that this filter is configured first in the filter chain so that requests are
-  authorized prior to the rest of filters processing the request.
-
-The content of the requests that are passed to an authorization service is specified by 
+The content of the requests that are passed to an authorization service is specified by
 :ref:`CheckRequest <envoy_api_msg_service.auth.v2alpha.CheckRequest>`.
 
 .. _config_http_filters_ext_authz_http_configuration:
@@ -35,8 +31,11 @@ A sample filter configuration for a gRPC authorization server:
     - name: envoy.ext_authz
       config:
         grpc_service:
-           envoy_grpc:
-             cluster_name: ext-authz
+          envoy_grpc:
+            cluster_name: ext-authz
+
+          # Default is 200ms; override if your server needs e.g. warmup time.
+          timeout: 0.5s
 
 .. code-block:: yaml
 
@@ -46,6 +45,10 @@ A sample filter configuration for a gRPC authorization server:
       http2_protocol_options: {}
       hosts:
         - socket_address: { address: 127.0.0.1, port_value: 10003 }
+
+      # This timeout controls the initial TCP handshake timeout - not the timeout for the
+      # entire request.
+      connect_timeout: 0.25s
 
 A sample filter configuration for a raw HTTP authorization server:
 
@@ -60,9 +63,9 @@ A sample filter configuration for a raw HTTP authorization server:
               cluster: ext-authz
               timeout: 0.25s
               failure_mode_allow: false
-  
+
 .. code-block:: yaml
-  
+
   clusters:
     - name: ext-authz
       connect_timeout: 0.25s

@@ -26,6 +26,7 @@
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
 #include "common/stream_info/stream_info_impl.h"
+#include "common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
 namespace Router {

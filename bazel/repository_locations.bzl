@@ -1,17 +1,20 @@
 REPOSITORY_LOCATIONS = dict(
     bazel_gazelle = dict(
-        sha256 = "1b959bd6b6ce88fc3fdfc28946adf1eafb1d5e4d470d2e08a51774d09078d031",
-        strip_prefix = "bazel-gazelle-0.14.0",
-        urls = ["https://github.com/bazelbuild/bazel-gazelle/archive/0.14.0.tar.gz"],
+        sha256 = "6e875ab4b6bf64a38c352887760f21203ab054676d9c1b274963907e0768740d",
+        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.15.0/bazel-gazelle-0.15.0.tar.gz"],
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        commit = "ab36a84b91b3116bacc85973995504818748d8a9",  # chromium-69.0.3497.81
-        remote = "https://github.com/google/boringssl",
+        sha256 = "d1700e0455f5f918f8a85ff3ce6cd684d05c766200ba6bdb18c77d5dcadc05a1",
+        strip_prefix = "boringssl-060e9a583976e73d1ea8b2bfe8b9cab33c62fa17",
+        # chromium-70.0.3538.67
+        urls = ["https://github.com/google/boringssl/archive/060e9a583976e73d1ea8b2bfe8b9cab33c62fa17.tar.gz"],
     ),
     com_google_absl = dict(
-        commit = "92e07e5590752d6b8e67f7f2f86c6286561e8cea",  # 2018-08-01
-        remote = "https://github.com/abseil/abseil-cpp",
+        sha256 = "c682f37375783028d400e45d0ba930181142c5b50de140f61710ee82aac8f659",
+        strip_prefix = "abseil-cpp-94c298e2a0ae409e283cab96c954a685bd865a70",
+        # 2018-10-24
+        urls = ["https://github.com/abseil/abseil-cpp/archive/94c298e2a0ae409e283cab96c954a685bd865a70.tar.gz"],
     ),
     com_github_apache_thrift = dict(
         sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",
@@ -24,8 +27,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bombela/backward-cpp/archive/v1.4.tar.gz"],
     ),
     com_github_circonus_labs_libcircllhist = dict(
-        commit = "050da53a44dede7bda136b93a9aeef47bd91fa12",  # 2018-07-02
-        remote = "https://github.com/circonus-labs/libcircllhist",
+        sha256 = "9949e2864b8ad00ee5c3e9c1c3c01e51b6b68bb442a919652fc66b9776477987",
+        strip_prefix = "libcircllhist-fd8a14463739d247b414825cc56ca3946792a3b9",
+        # 2018-09-17
+        urls = ["https://github.com/circonus-labs/libcircllhist/archive/fd8a14463739d247b414825cc56ca3946792a3b9.tar.gz"],
     ),
     com_github_cyan4973_xxhash = dict(
         sha256 = "19030315f4fc1b4b2cdb9d7a317069a109f90e39d1fe4c9159b7aaa39030eb95",
@@ -38,14 +43,14 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/eile/tclap/archive/tclap-1-2-1-release-final.tar.gz"],
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "46628a2f068d0e33c716be0ed9dcae4370242df135aed663a180b9fd8e36733d",
-        strip_prefix = "fmt-4.1.0",
-        urls = ["https://github.com/fmtlib/fmt/archive/4.1.0.tar.gz"],
+        sha256 = "43894ab8fe561fc9e523a8024efc23018431fa86b95d45b06dbe6ddb29ffb6cd",
+        strip_prefix = "fmt-5.2.1",
+        urls = ["https://github.com/fmtlib/fmt/releases/download/5.2.1/fmt-5.2.1.zip"],
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "94f74fd1b3344733d1db3de2ec22e6cbeb769f93a8baa0d4a22b1f62dc7369f8",
-        strip_prefix = "spdlog-0.17.0",
-        urls = ["https://github.com/gabime/spdlog/archive/v0.17.0.tar.gz"],
+        sha256 = "867a4b7cedf9805e6f76d3ca41889679054f7e5a3b67722fe6d0eae41852a767",
+        strip_prefix = "spdlog-1.2.1",
+        urls = ["https://github.com/gabime/spdlog/archive/v1.2.1.tar.gz"],
     ),
     com_github_gcovr_gcovr = dict(
         sha256 = "8a60ba6242d67a58320e9e16630d80448ef6d5284fda5fb3eff927b63c8b04a2",
@@ -53,13 +58,15 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gcovr/gcovr/archive/3.3.tar.gz"],
     ),
     com_github_google_libprotobuf_mutator = dict(
-        commit = "c3d2faf04a1070b0b852b0efdef81e1a81ba925e",  # 2018-03-06
-        remote = "https://github.com/google/libprotobuf-mutator",
+        sha256 = "97b3639630040f41c45f45838ab00b78909e6b4cb69c8028e01302bea5b79495",
+        strip_prefix = "libprotobuf-mutator-c3d2faf04a1070b0b852b0efdef81e1a81ba925e",
+        # 2018-03-06
+        urls = ["https://github.com/google/libprotobuf-mutator/archive/c3d2faf04a1070b0b852b0efdef81e1a81ba925e.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
-        sha256 = "013cc34f3c51c0f87e059a12ea203087a7a15dca2e453295345e1d02e2b9634b",
-        strip_prefix = "grpc-1.15.0",
-        urls = ["https://github.com/grpc/grpc/archive/v1.15.0.tar.gz"],
+        sha256 = "d99db0b39b490d2469a8ef74197d5f211fa740fc9581dccecbb76c56d080fce1",
+        strip_prefix = "grpc-1.16.0",
+        urls = ["https://github.com/grpc/grpc/archive/v1.16.0.tar.gz"],
     ),
     com_github_nanopb_nanopb = dict(
         # From: https://github.com/grpc/grpc/blob/v1.14.0/bazel/grpc_deps.bzl#L123
@@ -78,9 +85,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.8.0.tar.gz"],
     ),
     lightstep_vendored_googleapis = dict(
+        sha256 = "d1ef4f790eeaa805e7b364de05b91f9eed66bd6ae46f1483bbf49c33d86998e5",
+        strip_prefix = "googleapis-d6f78d948c53f3b400bb46996eb3084359914f9b",
         # From: https://github.com/lightstep/lightstep-tracer-cpp/blob/v0.8.0/lightstep-tracer-common/third_party/googleapis/README.lightstep-tracer-common#L6
-        commit = "d6f78d948c53f3b400bb46996eb3084359914f9b",
-        remote = "https://github.com/google/googleapis",
+        urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
         commit = "05ebb8e0c0f1bfb3a3439e5ad4b3b9e6307b67ee",  # v0.3.5
@@ -91,21 +99,24 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/msgpack/msgpack-c",  # v3.1.1
     ),
     com_github_google_jwt_verify = dict(
-        commit = "66792a057ec54e4b75c6a2eeda4e98220bd12a9a",  # 2018-08-17
-        remote = "https://github.com/google/jwt_verify_lib",
+        sha256 = "499f1e145c19f33031eb8fc6452d5d391b4cecfdeda23e2055386a3b33be4d41",
+        strip_prefix = "jwt_verify_lib-66792a057ec54e4b75c6a2eeda4e98220bd12a9a",
+        # 2018-08-16
+        urls = ["https://github.com/google/jwt_verify_lib/archive/66792a057ec54e4b75c6a2eeda4e98220bd12a9a.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
+        sha256 = "f742dc5a206958c4d0a6b2c35e3e102afb5683f55f7a7cb1eae024a03f081347",
+        strip_prefix = "http-parser-77310eeb839c4251c07184a5db8885a572a08352",
         # 2018-07-20 snapshot to pick up:
         # A performance fix, nodejs/http-parser PR 422.
         # A bug fix, nodejs/http-parser PR 432.
         # TODO(brian-pane): Upgrade to the next http-parser release once it's available
-        commit = "77310eeb839c4251c07184a5db8885a572a08352",
-        remote = "https://github.com/nodejs/http-parser",
+        urls = ["https://github.com/nodejs/http-parser/archive/77310eeb839c4251c07184a5db8885a572a08352.tar.gz"],
     ),
     com_github_pallets_jinja = dict(
-        sha256 = "0d31d3466c313a9ca014a2d904fed18cdac873a5ba1f7b70b8fd8b206cd860d6",
-        strip_prefix = "jinja-2.10",
-        urls = ["https://github.com/pallets/jinja/archive/2.10.tar.gz"],
+        sha256 = "f84be1bb0040caca4cea721fcbbbbd61f9be9464ca236387158b0feea01914a4",
+        strip_prefix = "Jinja2-2.10",
+        urls = ["https://github.com/pallets/jinja/releases/download/2.10/Jinja2-2.10.tar.gz"],
     ),
     com_github_pallets_markupsafe = dict(
         sha256 = "dc3938045d9407a73cf9fdd709e2b1defd0588d50ffc85eb0786c095ec846f15",
@@ -138,33 +149,36 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/googletest/archive/release-1.8.1.tar.gz"],
     ),
     com_google_protobuf = dict(
+        sha256 = "3d610ac90f8fa16e12490088605c248b85fdaf23114ce4b3605cdf81f7823604",
+        strip_prefix = "protobuf-fa252ec2a54acb24ddc87d48fed1ecfd458445fd",
         # TODO(htuch): Switch back to released versions for protobuf when a release > 3.6.0 happens
         # that includes:
         # - https://github.com/google/protobuf/commit/f35669b8d3f46f7f1236bd21f14d744bba251e60
         # - https://github.com/google/protobuf/commit/6a4fec616ec4b20f54d5fb530808b855cb664390
         # - https://github.com/google/protobuf/commit/fa252ec2a54acb24ddc87d48fed1ecfd458445fd
-        commit = "fa252ec2a54acb24ddc87d48fed1ecfd458445fd",
-        remote = "https://github.com/google/protobuf",
+        urls = ["https://github.com/protocolbuffers/protobuf/archive/fa252ec2a54acb24ddc87d48fed1ecfd458445fd.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
-        commit = "05a15e4ecd0244a981fdf0348a76658def62fa9c",  # 2018-05-30
-        remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
+        sha256 = "9765764644d74af9a9654f7fb90cf2bc7228014664668719a589a4677967ca09",
+        strip_prefix = "grpc-httpjson-transcoding-05a15e4ecd0244a981fdf0348a76658def62fa9c",
+        # 2018-05-30
+        urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/05a15e4ecd0244a981fdf0348a76658def62fa9c.tar.gz"],
     ),
     com_github_golang_protobuf = dict(
         # TODO(sesmith177): Remove this dependency when both:
         #   1. There's a release of golang/protobuf that includes
         #      https://github.com/golang/protobuf/commit/31e0d063dd98c052257e5b69eeb006818133f45c
         #   2. That release is included in rules_go
-        commit = "31e0d063dd98c052257e5b69eeb006818133f45c",  # 2018-10-03
-        remote = "https://github.com/golang/protobuf",
+        sha256 = "4cbd5303a5cf85791b3c310a50a479027c035d75091bb90c482ba67b0a2cf5b4",
+        strip_prefix = "protobuf-31e0d063dd98c052257e5b69eeb006818133f45c",
+        urls = ["https://github.com/golang/protobuf/archive/31e0d063dd98c052257e5b69eeb006818133f45c.tar.gz"],
     ),
     io_bazel_rules_go = dict(
-        commit = "3d966375ff7971d43b863f785f495c7dcd6923da",  # 2018-10-02
-        remote = "https://github.com/bazelbuild/rules_go",
+        sha256 = "ee5fe78fe417c685ecb77a0a725dc9f6040ae5beb44a0ba4ddb55453aad23a8a",
+        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.16.0/rules_go-0.16.0.tar.gz"],
     ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
-        strip_prefix = "",
         urls = ["https://pypi.python.org/packages/source/s/six/six-1.10.0.tar.gz#md5=34eed507548117b2ab523ab14b2f8b55"],
     ),
     # I'd love to name this `com_github_google_subpar`, but something in the Subpar

@@ -9,13 +9,13 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/platform.h"
 #include "envoy/http/header_map.h"
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/stack_array.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
 #include "common/network/connection_impl.h"
@@ -92,10 +92,9 @@ void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool 
 void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream) {
   saw_end_stream_ = end_stream;
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
-  data.getRawSlices(slices, num_slices);
-  for (uint64_t i = 0; i < num_slices; i++) {
-    Buffer::RawSlice& slice = slices[i];
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  data.getRawSlices(slices.begin(), num_slices);
+  for (const Buffer::RawSlice& slice : slices) {
     body_.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 

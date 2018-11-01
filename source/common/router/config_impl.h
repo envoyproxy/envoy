@@ -17,13 +17,13 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/config/metadata.h"
 #include "common/http/header_utility.h"
 #include "common/router/config_utility.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/router/router_ratelimit.h"
-#include "common/tcp_proxy/tcp_proxy.h"
 
 #include "absl/types/optional.h"
 
@@ -185,9 +185,8 @@ typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
 /**
  * Implementation of RetryPolicy that reads from the proto route config.
  */
-class RetryPolicyImpl : public RetryPolicy,
-                        Upstream::RetryHostPredicateFactoryCallbacks,
-                        Upstream::RetryPriorityFactoryCallbacks {
+class RetryPolicyImpl : public RetryPolicy {
+
 public:
   RetryPolicyImpl(const envoy::api::v2::route::RouteAction& config);
 
@@ -195,32 +194,24 @@ public:
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
-  std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override {
-    return retry_host_predicates_;
-  }
-  Upstream::RetryPrioritySharedPtr retryPriority() const override { return retry_priority_; }
+  std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override;
+  Upstream::RetryPrioritySharedPtr retryPriority() const override;
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_attempts_; }
   const std::vector<uint32_t>& retriableStatusCodes() const override {
     return retriable_status_codes_;
-  }
-
-  // Upstream::RetryHostPredicateFactoryCallbacks
-  void addHostPredicate(Upstream::RetryHostPredicateSharedPtr predicate) override {
-    retry_host_predicates_.emplace_back(predicate);
-  }
-
-  // Upstream::RetryHostPredicateFactoryCallbacks
-  void addRetryPriority(Upstream::RetryPrioritySharedPtr retry_priority) override {
-    ASSERT(!retry_priority_);
-    retry_priority_ = retry_priority;
   }
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
-  std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
+  // Each pair contains the name and config proto to be used to create the RetryHostPredicates
+  // that should be used when with this policy.
+  std::vector<std::pair<std::string, ProtobufTypes::MessagePtr>> retry_host_predicate_configs_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
+  // Name and config proto to use to create the RetryPriority to use with this policy. Default
+  // initialized when no RetryPriority should be used.
+  std::pair<std::string, ProtobufTypes::MessagePtr> retry_priority_config_;
   uint32_t host_selection_attempts_{1};
   std::vector<uint32_t> retriable_status_codes_;
 };
@@ -347,22 +338,20 @@ public:
   }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
-  bool useOldStyleWebSocket() const override { return websocket_config_ != nullptr; }
-  Http::WebSocketProxyPtr
-  createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-                       Http::WebSocketProxyCallbacks& callbacks,
-                       Upstream::ClusterManager& cluster_manager,
-                       Network::ReadFilterCallbacks* read_callbacks) const override;
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
   const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
   bool includeAttemptCount() const override { return vhost_.includeAttemptCount(); }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
+  absl::string_view processRequestHost(const Http::HeaderMap& headers,
+                                       const absl::string_view& new_scheme,
+                                       const absl::string_view& new_port) const;
   void rewritePathHeader(Http::HeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
   const std::string& responseBody() const override { return direct_response_body_; }
@@ -395,13 +384,6 @@ private:
   struct RuntimeData {
     std::string fractional_runtime_key_{};
     envoy::type::FractionalPercent fractional_runtime_default_{};
-
-    // Relating to the deprecated 'runtime' field.
-    std::string runtime_key_{};
-    uint64_t runtime_default_{};
-
-    // Indicates whether to use the deprecated 'runtime' field or 'fractional_percent'.
-    bool legacy_runtime_data_{};
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {
@@ -451,19 +433,13 @@ private:
 
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
-    bool useOldStyleWebSocket() const override { return parent_->useOldStyleWebSocket(); }
-    Http::WebSocketProxyPtr
-    createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-                         Http::WebSocketProxyCallbacks& callbacks,
-                         Upstream::ClusterManager& cluster_manager,
-                         Network::ReadFilterCallbacks* read_callbacks) const override {
-      return parent_->createWebSocketProxy(request_headers, stream_info, callbacks, cluster_manager,
-                                           read_callbacks);
-    }
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
     }
     const envoy::api::v2::core::Metadata& metadata() const override { return parent_->metadata(); }
+    const Envoy::Config::TypedMetadata& typedMetadata() const override {
+      return parent_->typedMetadata();
+    }
     const PathMatchCriterion& pathMatchCriterion() const override {
       return parent_->pathMatchCriterion();
     }
@@ -548,7 +524,6 @@ private:
   const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
                                  // to virtual host is currently safe.
   const bool auto_host_rewrite_;
-  const TcpProxy::ConfigSharedPtr websocket_config_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
   const Http::Code cluster_not_found_response_code_;
@@ -557,7 +532,9 @@ private:
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
   Runtime::Loader& loader_;
   const absl::optional<RuntimeData> runtime_;
+  const std::string scheme_redirect_;
   const std::string host_redirect_;
+  const std::string port_redirect_;
   const std::string path_redirect_;
   const bool https_redirect_;
   const std::string prefix_rewrite_redirect_;
@@ -577,6 +554,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   envoy::api::v2::core::Metadata metadata_;
+  Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory> typed_metadata_;
   const bool match_grpc_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.

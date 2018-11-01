@@ -178,6 +178,7 @@ envoy_cc_test(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2/endpoint:load_report_cc",
         "@envoy_api//envoy/service/discovery/v2:hds_cc",
@@ -250,8 +251,10 @@ envoy_cc_test(
     name = "resource_manager_impl_test",
     srcs = ["resource_manager_impl_test.cc"],
     deps = [
+        "//include/envoy/upstream:upstream_interface",
         "//source/common/upstream:resource_manager_lib",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
     ],
 )
 

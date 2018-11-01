@@ -4,7 +4,6 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
@@ -14,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
@@ -91,6 +91,8 @@ void ConnectionImpl::StreamImpl::encode100ContinueHeaders(const HeaderMap& heade
 void ConnectionImpl::StreamImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   std::vector<nghttp2_nv> final_headers;
 
+  // This must exist outside of the scope of isUpgrade as the underlying memory is
+  // needed until submitHeaders has been called.
   Http::HeaderMapPtr modified_headers;
   if (Http::Utility::isUpgrade(headers)) {
     modified_headers = std::make_unique<Http::HeaderMapImpl>(headers);
@@ -289,10 +291,9 @@ ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
-  data.getRawSlices(slices, num_slices);
-  for (uint64_t i = 0; i < num_slices; i++) {
-    Buffer::RawSlice& slice = slices[i];
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  data.getRawSlices(slices.begin(), num_slices);
+  for (const Buffer::RawSlice& slice : slices) {
     dispatching_ = true;
     ssize_t rc =
         nghttp2_session_mem_recv(session_, static_cast<const uint8_t*>(slice.mem_), slice.len_);
@@ -615,6 +616,10 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings, bool disa
 
   std::vector<nghttp2_settings_entry> iv;
 
+  if (http2_settings.allow_connect_) {
+    iv.push_back({NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, 1});
+  }
+
   if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
     iv.push_back({NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, http2_settings.hpack_table_size_});
     ENVOY_CONN_LOG(debug, "setting HPACK table size to {}", connection_,
@@ -746,10 +751,6 @@ ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) 
 
   if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
     nghttp2_option_set_max_deflate_dynamic_table_size(options_, http2_settings.hpack_table_size_);
-  }
-  if (http2_settings.allow_connect_) {
-    // TODO(alyssawilk) change to ENABLE_CONNECT_PROTOCOL when it's available.
-    nghttp2_option_set_no_http_messaging(options_, 1);
   }
 }
 

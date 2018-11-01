@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
@@ -20,7 +21,7 @@ namespace AccessLog {
  */
 class AccessLogFormatParser {
 public:
-  static std::vector<FormatterPtr> parse(const std::string& format);
+  static std::vector<FormatterProviderPtr> parse(const std::string& format);
 
 private:
   /**
@@ -95,14 +96,33 @@ public:
                      const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
-  std::vector<FormatterPtr> formatters_;
+  std::vector<FormatterProviderPtr> providers_;
+};
+
+class JsonFormatterImpl : public Formatter {
+public:
+  JsonFormatterImpl(std::unordered_map<std::string, std::string>& format_mapping);
+
+  // Formatter::format
+  std::string format(const Http::HeaderMap& request_headers,
+                     const Http::HeaderMap& response_headers,
+                     const Http::HeaderMap& response_trailers,
+                     const StreamInfo::StreamInfo& stream_info) const override;
+
+private:
+  std::vector<FormatterProviderPtr> providers_;
+  std::map<const std::string, Envoy::AccessLog::FormatterPtr> json_output_format_;
+
+  std::unordered_map<std::string, std::string>
+  toMap(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
+        const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info) const;
 };
 
 /**
  * Formatter for string literal. It ignores headers and stream info and returns string by which it
  * was initialized.
  */
-class PlainStringFormatter : public Formatter {
+class PlainStringFormatter : public FormatterProvider {
 public:
   PlainStringFormatter(const std::string& str);
 
@@ -130,7 +150,7 @@ private:
 /**
  * Formatter based on request header.
  */
-class RequestHeaderFormatter : public Formatter, HeaderFormatter {
+class RequestHeaderFormatter : public FormatterProvider, HeaderFormatter {
 public:
   RequestHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
                          absl::optional<size_t> max_length);
@@ -143,7 +163,7 @@ public:
 /**
  * Formatter based on the response header.
  */
-class ResponseHeaderFormatter : public Formatter, HeaderFormatter {
+class ResponseHeaderFormatter : public FormatterProvider, HeaderFormatter {
 public:
   ResponseHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
                           absl::optional<size_t> max_length);
@@ -156,7 +176,7 @@ public:
 /**
  * Formatter based on the response trailer.
  */
-class ResponseTrailerFormatter : public Formatter, HeaderFormatter {
+class ResponseTrailerFormatter : public FormatterProvider, HeaderFormatter {
 public:
   ResponseTrailerFormatter(const std::string& main_header, const std::string& alternative_header,
                            absl::optional<size_t> max_length);
@@ -170,7 +190,7 @@ public:
 /**
  * Formatter based on the StreamInfo field.
  */
-class StreamInfoFormatter : public Formatter {
+class StreamInfoFormatter : public FormatterProvider {
 public:
   StreamInfoFormatter(const std::string& field_name);
 
@@ -201,12 +221,12 @@ private:
 /**
  * Formatter based on the DynamicMetadata from StreamInfo.
  */
-class DynamicMetadataFormatter : public Formatter, MetadataFormatter {
+class DynamicMetadataFormatter : public FormatterProvider, MetadataFormatter {
 public:
   DynamicMetadataFormatter(const std::string& filter_namespace,
                            const std::vector<std::string>& path, absl::optional<size_t> max_length);
 
-  // Formatter::format
+  // FormatterProvider::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
                      const StreamInfo::StreamInfo& stream_info) const override;
 };
@@ -214,7 +234,7 @@ public:
 /**
  * Formatter
  */
-class StartTimeFormatter : public Formatter {
+class StartTimeFormatter : public FormatterProvider {
 public:
   StartTimeFormatter(const std::string& format);
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,

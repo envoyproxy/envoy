@@ -217,6 +217,21 @@ void Utility::translateLdsConfig(const Json::Object& json_lds,
                            *lds_config.mutable_api_config_source());
 }
 
+RateLimitSettings
+Utility::parseRateLimitSettings(const envoy::api::v2::core::ApiConfigSource& api_config_source) {
+  RateLimitSettings rate_limit_settings;
+  if (api_config_source.has_rate_limit_settings()) {
+    rate_limit_settings.enabled_ = true;
+    rate_limit_settings.max_tokens_ =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(api_config_source.rate_limit_settings(), max_tokens,
+                                        Envoy::Config::RateLimitSettings::DefaultMaxTokens);
+    rate_limit_settings.fill_rate_ =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(api_config_source.rate_limit_settings(), fill_rate,
+                                        Envoy::Config::RateLimitSettings::DefaultFillRate);
+  }
+  return rate_limit_settings;
+}
+
 Stats::TagProducerPtr
 Utility::createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
   return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());

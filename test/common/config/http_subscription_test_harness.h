@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/http/async_client.h"
 
@@ -77,7 +79,7 @@ public:
           }
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());
-          EXPECT_EQ(fmt::FormatInt(expected_request.size()).str(),
+          EXPECT_EQ(fmt::format_int(expected_request.size()).str(),
                     std::string(request->headers().ContentLength()->value().c_str()));
           request_in_progress_ = true;
           return &http_request_;

@@ -106,6 +106,7 @@ PROTO_RST="
   /envoy/config/filter/network/tcp_proxy/v2/tcp_proxy/envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.proto.rst
   /envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy/envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.proto.rst
   /envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy/envoy/config/filter/network/thrift_proxy/v2alpha1/route.proto.rst
+  /envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit/envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit.proto.rst
   /envoy/config/filter/thrift/router/v2alpha1/router/envoy/config/filter/thrift/router/v2alpha1/router.proto.rst
   /envoy/config/health_checker/redis/v2/redis/envoy/config/health_checker/redis/v2/redis.proto.rst
   /envoy/config/overload/v2alpha/overload/envoy/config/overload/v2alpha/overload.proto.rst

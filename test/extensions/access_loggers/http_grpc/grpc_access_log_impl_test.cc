@@ -150,6 +150,7 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     stream_info.start_time_monotonic_ = MonotonicTime(1h);
     stream_info.last_downstream_tx_byte_sent_ = 2ms;
     stream_info.setDownstreamLocalAddress(std::make_shared<Network::Address::PipeInstance>("/foo"));
+    (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
 
     expectLog(R"EOF(
 http_logs:
@@ -166,6 +167,9 @@ http_logs:
         seconds: 3600
       time_to_last_downstream_tx_byte:
         nanos: 2000000
+      metadata:
+        filter_metadata:
+          foo: {}
     request: {}
     response: {}
 )EOF");

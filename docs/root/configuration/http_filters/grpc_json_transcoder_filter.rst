@@ -4,7 +4,6 @@ gRPC-JSON transcoder
 ====================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
-* :ref:`v1 API reference <config_http_filters_grpc_json_transcoder_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.transcoder.v2.GrpcJsonTranscoder>`
 
 This is a filter which allows a RESTful JSON API client to send requests to Envoy over HTTP

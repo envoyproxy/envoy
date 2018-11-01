@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -32,8 +31,9 @@ int ContextImpl::sslContextIndex() {
   }());
 }
 
-ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
-    : ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)) {
+ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source)
+    : ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)),
+      time_source_(time_source) {
   RELEASE_ASSERT(ctx_, "");
 
   int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
@@ -81,6 +81,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
     }
 
     X509_STORE* store = SSL_CTX_get_cert_store(ctx_.get());
+    bool has_crl = false;
     for (const X509_INFO* item : list.get()) {
       if (item->x509) {
         X509_STORE_add_cert(store, item->x509);
@@ -91,11 +92,15 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
       }
       if (item->crl) {
         X509_STORE_add_crl(store, item->crl);
+        has_crl = true;
       }
     }
     if (ca_cert_ == nullptr) {
       throw EnvoyException(fmt::format("Failed to load trusted CA certificates from {}",
                                        config.certificateValidationContext()->caCertPath()));
+    }
+    if (has_crl) {
+      X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
     }
     verify_mode = SSL_VERIFY_PEER;
     verify_trusted_ca_ = true;
@@ -234,11 +239,6 @@ int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned ch
   // Currently this uses the standard selection algorithm in priority order.
   const uint8_t* alpn_data = &parsed_alpn_protocols_[0];
   size_t alpn_data_size = parsed_alpn_protocols_.size();
-  if (!parsed_alt_alpn_protocols_.empty() &&
-      runtime_.snapshot().featureEnabled("ssl.alt_alpn", 0)) {
-    alpn_data = &parsed_alt_alpn_protocols_[0];
-    alpn_data_size = parsed_alt_alpn_protocols_.size();
-  }
 
   if (SSL_select_next_proto(const_cast<unsigned char**>(out), outlen, alpn_data, alpn_data_size, in,
                             inlen) != OPENSSL_NPN_NEGOTIATED) {
@@ -438,9 +438,9 @@ SslStats ContextImpl::generateStats(Stats::Scope& store) {
 }
 
 size_t ContextImpl::daysUntilFirstCertExpires() const {
-  int daysUntilExpiration = Utility::getDaysUntilExpiration(ca_cert_.get());
-  daysUntilExpiration =
-      std::min<int>(Utility::getDaysUntilExpiration(cert_chain_.get()), daysUntilExpiration);
+  int daysUntilExpiration = Utility::getDaysUntilExpiration(ca_cert_.get(), time_source_);
+  daysUntilExpiration = std::min<int>(
+      Utility::getDaysUntilExpiration(cert_chain_.get(), time_source_), daysUntilExpiration);
   if (daysUntilExpiration < 0) { // Ensure that the return value is unsigned
     return 0;
   }
@@ -466,7 +466,12 @@ CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::str
       std::make_unique<envoy::admin::v2alpha::CertificateDetails>();
   certificate_details->set_path(path);
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
-  certificate_details->set_days_until_expiration(Utility::getDaysUntilExpiration(cert));
+  certificate_details->set_days_until_expiration(
+      Utility::getDaysUntilExpiration(cert, time_source_));
+  ProtobufWkt::Timestamp* valid_from = certificate_details->mutable_valid_from();
+  TimestampUtil::systemClockToTimestamp(Utility::getValidFrom(*cert), *valid_from);
+  ProtobufWkt::Timestamp* expiration_time = certificate_details->mutable_expiration_time();
+  TimestampUtil::systemClockToTimestamp(Utility::getExpirationTime(*cert), *expiration_time);
 
   for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
     envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
@@ -481,8 +486,10 @@ CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::str
   return certificate_details;
 }
 
-ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config)
-    : ContextImpl(scope, config), server_name_indication_(config.serverNameIndication()),
+ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config,
+                                     TimeSource& time_source)
+    : ContextImpl(scope, config, time_source),
+      server_name_indication_(config.serverNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
@@ -508,9 +515,8 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
-                                     Runtime::Loader& runtime)
-    : ContextImpl(scope, config), runtime_(runtime),
-      session_ticket_keys_(config.sessionTicketKeys()) {
+                                     TimeSource& time_source)
+    : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()) {
   if (config.tlsCertificate() == nullptr) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
@@ -559,8 +565,6 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
       SSL_CTX_set_verify(ctx_.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
     }
   }
-
-  parsed_alt_alpn_protocols_ = parseAlpnProtocols(config.altAlpnProtocols());
 
   if (!parsed_alpn_protocols_.empty()) {
     SSL_CTX_set_alpn_select_cb(ctx_.get(),

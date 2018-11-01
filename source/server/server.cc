@@ -259,11 +259,14 @@ void InstanceImpl::initialize(Options& options,
   info.original_start_time_ = original_start_time_;
   restarter_.shutdownParentAdmin(info);
   original_start_time_ = info.original_start_time_;
-  admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
-                             initial_config.admin().profilePath(), *this));
+  admin_.reset(new AdminImpl(initial_config.admin().profilePath(), *this));
   if (initial_config.admin().address()) {
+    if (initial_config.admin().accessLogPath().empty()) {
+      throw EnvoyException("An admin access log path is required for a listening server.");
+    }
     ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
-    admin_->startHttpListener(options.adminAddressPath(), initial_config.admin().address(),
+    admin_->startHttpListener(initial_config.admin().accessLogPath(), options.adminAddressPath(),
+                              initial_config.admin().address(),
                               stats_store_.createScope("listener.admin."));
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
@@ -296,7 +299,7 @@ void InstanceImpl::initialize(Options& options,
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_loader_));
+  ssl_context_manager_.reset(new Ssl::ContextManagerImpl(time_system_));
 
   cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
@@ -475,7 +478,7 @@ void InstanceImpl::terminate() {
   stats_store_.shutdownThreading();
 
   if (overload_manager_) {
-    overload_manager_.reset();
+    overload_manager_->stop();
   }
 
   // Shutdown all the workers now that the main dispatch loop is done.
