@@ -760,6 +760,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     (*continue_data_entry)->stopped_ = true;
     (*continue_data_entry)->continueDecoding();
   }
+
+  if (end_stream) disarmRequestTimeout();
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -825,6 +827,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   if (trailers_added_entry != decoder_filters_.end()) {
     decodeTrailers(trailers_added_entry->get(), *request_trailers_);
   }
+
+  if (end_stream) disarmRequestTimeout();
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStream::addDecodedTrailers() {
@@ -891,6 +895,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
       return;
     }
   }
+  disarmRequestTimeout();
 }
 
 void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
