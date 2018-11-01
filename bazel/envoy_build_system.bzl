@@ -160,6 +160,13 @@ def envoy_include_prefix(path):
 def envoy_basic_cc_library(name, **kargs):
     native.cc_library(name = name, **kargs)
 
+# Used to select a dependency that has different implementations on POSIX vs Windows
+def envoy_cc_platform_dep(name):
+    return select({
+        "@envoy//bazel:windows_x86_64": [name + "_win32"],
+        "//conditions:default": [name + "_posix"],
+    })
+
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(
         name,

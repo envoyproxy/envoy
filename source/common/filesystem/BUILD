@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_cc_platform_dep",
     "envoy_package",
 )
 
@@ -11,41 +12,28 @@ envoy_package()
 envoy_cc_library(
     name = "directory_lib",
     hdrs = ["directory.h"],
+    deps = envoy_cc_platform_dep("directory_iterator_impl_lib"),
+)
+
+envoy_cc_library(
+    name = "directory_iterator_impl_lib_win32",
+    srcs = ["win32/directory_iterator_impl.cc"],
+    hdrs = ["win32/directory_iterator_impl.h"],
+    strip_include_prefix = "win32",
     deps = [
-        ":directory_iterator_impl_lib",
+        "//include/envoy/filesystem:filesystem_interface",
     ],
 )
 
 envoy_cc_library(
-    name = "directory_iterator_impl_lib",
-    srcs = select({
-        "//bazel:windows_x86_64": [
-            "win32/directory_iterator_impl.cc",
-        ],
-        "//conditions:default": [
-            "posix/directory_iterator_impl.cc",
-        ],
-    }),
-    hdrs = select({
-        "//bazel:windows_x86_64": [
-            "win32/directory_iterator_impl.h",
-        ],
-        "//conditions:default": [
-            "posix/directory_iterator_impl.h",
-        ],
-    }),
-    strip_include_prefix = select({
-        "//bazel:windows_x86_64": "win32",
-        "//conditions:default": "posix",
-    }),
+    name = "directory_iterator_impl_lib_posix",
+    srcs = ["posix/directory_iterator_impl.cc"],
+    hdrs = ["posix/directory_iterator_impl.h"],
+    strip_include_prefix = "posix",
     deps = [
         "//include/envoy/filesystem:filesystem_interface",
-    ] + select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "//source/common/api:os_sys_calls_lib",
-        ],
-    }),
+        "//source/common/api:os_sys_calls_lib",
+    ],
 )
 
 envoy_cc_library(
