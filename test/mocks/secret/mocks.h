@@ -28,10 +28,10 @@ public:
                CertificateValidationContextConfigProviderSharedPtr(
                    const envoy::api::v2::auth::CertificateValidationContext&
                        certificate_validation_context));
-  MOCK_METHOD4(findOrCreateTlsCertificateProvider,
+  MOCK_METHOD3(findOrCreateTlsCertificateProvider,
                TlsCertificateConfigProviderSharedPtr(
                    const envoy::api::v2::core::ConfigSource&, const std::string&,
-                   Server::Configuration::TransportSocketFactoryContext&, const std::string&));
+                   Server::Configuration::TransportSocketFactoryContext&));
   MOCK_METHOD4(findOrCreateCertificateValidationContextProvider,
                CertificateValidationContextConfigProviderSharedPtr(
                    const envoy::api::v2::core::ConfigSource& config_source,
