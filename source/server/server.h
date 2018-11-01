@@ -107,8 +107,6 @@ public:
                                               Options& options);
 };
 
-class InstanceImpl;
-
 /**
  * This is a helper used by InstanceImpl::run() on the stack. It's broken out to make testing
  * easier.
