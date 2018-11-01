@@ -9,7 +9,15 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "directory_iterator_lib",
+    name = "directory_lib",
+    hdrs = ["directory.h"],
+    deps = [
+        ":directory_iterator_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "directory_iterator_impl_lib",
     srcs = select({
         "//bazel:windows_x86_64": [
             "win32/directory_iterator_impl.cc",

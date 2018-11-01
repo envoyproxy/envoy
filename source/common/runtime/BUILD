@@ -23,7 +23,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
-        "//source/common/filesystem:directory_iterator_lib",
+        "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/protobuf:utility_lib",
     ],

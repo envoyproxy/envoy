@@ -12,7 +12,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
-#include "common/filesystem/directory_iterator_impl.h"
+#include "common/filesystem/directory.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/utility.h"
 
@@ -284,22 +284,20 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
     throw EnvoyException(fmt::format("Invalid path: {}", path));
   }
 
-  Filesystem::DirectoryIteratorImpl dir_iterator(path);
-  for (Filesystem::DirectoryIterator::DirectoryEntry entry = dir_iterator.nextEntry();
-       entry.path_ != ""; entry = dir_iterator.nextEntry()) {
-
-    std::string full_path = path + "/" + entry.path_;
+  Filesystem::Directory directory(path);
+  for (const Filesystem::DirectoryEntry& entry : directory) {
+    std::string full_path = path + "/" + entry.name_;
     std::string full_prefix;
     if (prefix.empty()) {
-      full_prefix = entry.path_;
+      full_prefix = entry.name_;
     } else {
-      full_prefix = prefix + "." + entry.path_;
+      full_prefix = prefix + "." + entry.name_;
     }
 
-    if (entry.type_ == Filesystem::DirectoryIterator::FileType::Directory && entry.path_ != "." &&
-        entry.path_ != "..") {
+    if (entry.type_ == Filesystem::FileType::Directory && entry.name_ != "." &&
+        entry.name_ != "..") {
       walkDirectory(full_path, full_prefix, depth + 1);
-    } else if (entry.type_ == Filesystem::DirectoryIterator::FileType::Regular) {
+    } else if (entry.type_ == Filesystem::FileType::Regular) {
       // Suck the file into a string. This is not very efficient but it should be good enough
       // for small files. Also, as noted elsewhere, none of this is non-blocking which could
       // theoretically lead to issues.

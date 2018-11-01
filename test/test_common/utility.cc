@@ -32,7 +32,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/stats_options_impl.h"
-#include "common/filesystem/directory_iterator_impl.h"
+#include "common/filesystem/directory.h"
 
 #include "test/test_common/printers.h"
 
@@ -147,13 +147,11 @@ TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
 
 std::vector<std::string> TestUtility::listFiles(const std::string& path, bool recursive) {
   std::vector<std::string> file_names;
-  Filesystem::DirectoryIteratorImpl dir_iterator(path);
-  for (Filesystem::DirectoryIterator::DirectoryEntry entry = dir_iterator.nextEntry();
-       entry.path_ != ""; entry = dir_iterator.nextEntry()) {
-
-    std::string file_name = fmt::format("{}/{}", path, entry.path_);
-    if (entry.type_ == Filesystem::DirectoryIterator::FileType::Directory) {
-      if (recursive && entry.path_ != "." && entry.path_ != "..") {
+  Filesystem::Directory directory(path);
+  for (const Filesystem::DirectoryEntry& entry : directory) {
+    std::string file_name = fmt::format("{}/{}", path, entry.name_);
+    if (entry.type_ == Filesystem::FileType::Directory) {
+      if (recursive && entry.name_ != "." && entry.name_ != "..") {
         std::vector<std::string> more_file_names = listFiles(file_name, recursive);
         file_names.insert(file_names.end(), more_file_names.begin(), more_file_names.end());
       }

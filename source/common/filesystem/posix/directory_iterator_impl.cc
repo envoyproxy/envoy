@@ -6,41 +6,51 @@
 namespace Envoy {
 namespace Filesystem {
 
+DirectoryIteratorImpl::DirectoryIteratorImpl(const std::string& directory_path)
+    : DirectoryIterator(), directory_path_(directory_path), dir_(nullptr),
+      os_sys_calls_(Api::OsSysCallsSingleton::get()) {
+  openDirectory();
+  nextEntry();
+}
+
 DirectoryIteratorImpl::~DirectoryIteratorImpl() {
   if (dir_ != nullptr) {
     ::closedir(dir_);
   }
 }
 
-DirectoryIterator::DirectoryEntry DirectoryIteratorImpl::nextEntry() {
-  if (dir_ == nullptr) {
-    openDirectory();
-  }
-
-  errno = 0;
-  dirent* entry = ::readdir(dir_);
-  if (entry == nullptr && errno != 0) {
-    throw EnvoyException(fmt::format("unable to iterate directory: {}", directory_path_));
-  }
-
-  if (entry == nullptr) {
-    return {"", FileType::Other};
-  }
-
-  const std::string current_path = std::string(entry->d_name);
-  const std::string full_path = directory_path_ + "/" + current_path;
-  return {current_path, fileType(full_path)};
+DirectoryIteratorImpl& DirectoryIteratorImpl::operator++() {
+  nextEntry();
+  return *this;
 }
 
 void DirectoryIteratorImpl::openDirectory() {
-  dir_ = ::opendir(directory_path_.c_str());
+  DIR* temp_dir = ::opendir(directory_path_.c_str());
+  dir_ = temp_dir;
   if (!dir_) {
     throw EnvoyException(
         fmt::format("unable to open directory {}: {}", directory_path_, strerror(errno)));
   }
 }
 
-DirectoryIterator::FileType DirectoryIteratorImpl::fileType(const std::string& full_path) const {
+void DirectoryIteratorImpl::nextEntry() {
+  errno = 0;
+  dirent* entry = ::readdir(dir_);
+  if (entry == nullptr && errno != 0) {
+    throw EnvoyException(
+        fmt::format("unable to iterate directory {}: {}", directory_path_, strerror(errno)));
+  }
+
+  if (entry == nullptr) {
+    entry_ = {"", FileType::Other};
+  } else {
+    const std::string current_path(entry->d_name);
+    const std::string full_path(directory_path_ + "/" + current_path);
+    entry_ = {current_path, fileType(full_path)};
+  }
+}
+
+FileType DirectoryIteratorImpl::fileType(const std::string& full_path) const {
   struct stat stat_buf;
 
   const Api::SysCallIntResult result = os_sys_calls_.stat(full_path.c_str(), &stat_buf);

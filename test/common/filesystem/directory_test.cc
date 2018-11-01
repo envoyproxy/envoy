@@ -2,7 +2,7 @@
 #include <string>
 #include <unordered_set>
 
-#include "common/filesystem/directory_iterator_impl.h"
+#include "common/filesystem/directory.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -32,32 +32,32 @@ private:
   std::list<std::string> paths_;
 };
 
-bool operator==(const DirectoryIterator::DirectoryEntry& lhs,
-                const DirectoryIterator::DirectoryEntry& rhs) {
-  return lhs.path_ == rhs.path_ && lhs.type_ == rhs.type_;
-}
-
-struct DirectoryEntryHash {
-  std::size_t operator()(DirectoryIterator::DirectoryEntry const& e) const noexcept {
-    return std::hash<std::string>{}(e.path_);
+struct EntryHash {
+  std::size_t operator()(DirectoryEntry const& e) const noexcept {
+    return std::hash<std::string>{}(e.name_);
   }
 };
 
-typedef std::unordered_set<DirectoryIterator::DirectoryEntry, DirectoryEntryHash> EntrySet;
+typedef std::unordered_set<DirectoryEntry, EntryHash> EntrySet;
 
-void checkDirectoryContents(const EntrySet expected, const std::string& dir_path) {
-  DirectoryIteratorImpl dir_iterator(dir_path);
-  EntrySet found;
-
-  for (DirectoryIterator::DirectoryEntry entry = dir_iterator.nextEntry(); entry.path_ != "";
-       entry = dir_iterator.nextEntry()) {
-    found.insert(entry);
+EntrySet getDirectoryContents(const std::string& dir_path, bool recursive) {
+  Directory directory(dir_path);
+  EntrySet ret;
+  for (const DirectoryEntry entry : directory) {
+    ret.insert(entry);
+    if (entry.type_ == FileType::Directory && entry.name_ != "." && entry.name_ != ".." &&
+        recursive) {
+      std::string subdir_name = entry.name_;
+      EntrySet subdir = getDirectoryContents(dir_path + "/" + subdir_name, recursive);
+      for (const DirectoryEntry entry : subdir) {
+        ret.insert({subdir_name + "/" + entry.name_, entry.type_});
+      }
+    }
   }
-
-  ASSERT_EQ(expected, found);
+  return ret;
 }
 
-TEST(DirectoryIteratorImpl, DirectoryWithOneFile) {
+TEST(Directory, DirectoryWithOneFile) {
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
   const std::string file_path(dir_path + "/" + "file");
   ScopedPathRemover s({file_path, dir_path});
@@ -66,14 +66,14 @@ TEST(DirectoryIteratorImpl, DirectoryWithOneFile) {
   { std::ofstream file(file_path); }
 
   EntrySet expected = {
-      {".", DirectoryIterator::FileType::Directory},
-      {"..", DirectoryIterator::FileType::Directory},
-      {"file", DirectoryIterator::FileType::Regular},
+      {".", FileType::Directory},
+      {"..", FileType::Directory},
+      {"file", FileType::Regular},
   };
-  checkDirectoryContents(expected, dir_path);
+  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
 }
 
-TEST(DirectoryIteratorImpl, DirectoryWithOneDirectory) {
+TEST(Directory, DirectoryWithOneDirectory) {
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
   const std::string child_dir_path(dir_path + "/" + "sub_dir");
   ScopedPathRemover s({child_dir_path, dir_path});
@@ -81,14 +81,14 @@ TEST(DirectoryIteratorImpl, DirectoryWithOneDirectory) {
   TestUtility::createDirectory(child_dir_path);
 
   EntrySet expected = {
-      {".", DirectoryIterator::FileType::Directory},
-      {"..", DirectoryIterator::FileType::Directory},
-      {"sub_dir", DirectoryIterator::FileType::Directory},
+      {".", FileType::Directory},
+      {"..", FileType::Directory},
+      {"sub_dir", FileType::Directory},
   };
-  checkDirectoryContents(expected, dir_path);
+  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
 }
 
-TEST(DirectoryIteratorImpl, DirectoryWithFileInSubDirectory) {
+TEST(Directory, DirectoryWithFileInSubDirectory) {
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
   const std::string child_dir_path(dir_path + "/" + "sub_dir");
   const std::string child_file_path(child_dir_path + "/" + "file");
@@ -98,14 +98,37 @@ TEST(DirectoryIteratorImpl, DirectoryWithFileInSubDirectory) {
   { std::ofstream file(child_file_path); }
 
   EntrySet expected = {
-      {".", DirectoryIterator::FileType::Directory},
-      {"..", DirectoryIterator::FileType::Directory},
-      {"sub_dir", DirectoryIterator::FileType::Directory},
+      {".", FileType::Directory},
+      {"..", FileType::Directory},
+      {"sub_dir", FileType::Directory},
   };
-  checkDirectoryContents(expected, dir_path);
+  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
 }
 
-TEST(DirectoryIteratorImpl, DirectoryWithFileAndDirectory) {
+TEST(Directory, RecursionIntoSubDirectory) {
+  const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
+  const std::string file_path(dir_path + "/" + "file");
+  const std::string child_dir_path(dir_path + "/" + "sub_dir");
+  const std::string child_file_path(child_dir_path + "/" + "sub_file");
+  ScopedPathRemover s({child_file_path, child_dir_path, file_path, dir_path});
+  TestUtility::createDirectory(dir_path);
+  TestUtility::createDirectory(child_dir_path);
+  { std::ofstream file(file_path); }
+  { std::ofstream file(child_file_path); }
+
+  EntrySet expected = {
+      {".", FileType::Directory},
+      {"..", FileType::Directory},
+      {"file", FileType::Regular},
+      {"sub_dir", FileType::Directory},
+      {"sub_dir/sub_file", FileType::Regular},
+      {"sub_dir/.", FileType::Directory},
+      {"sub_dir/..", FileType::Directory},
+  };
+  EXPECT_EQ(expected, getDirectoryContents(dir_path, true));
+}
+
+TEST(Directory, DirectoryWithFileAndDirectory) {
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
   const std::string file_path(dir_path + "/" + "file");
   const std::string child_dir_path(dir_path + "/" + "sub_dir");
@@ -115,15 +138,15 @@ TEST(DirectoryIteratorImpl, DirectoryWithFileAndDirectory) {
   { std::ofstream file(file_path); }
 
   EntrySet expected = {
-      {".", DirectoryIterator::FileType::Directory},
-      {"..", DirectoryIterator::FileType::Directory},
-      {"sub_dir", DirectoryIterator::FileType::Directory},
-      {"file", DirectoryIterator::FileType::Regular},
+      {".", FileType::Directory},
+      {"..", FileType::Directory},
+      {"sub_dir", FileType::Directory},
+      {"file", FileType::Regular},
   };
-  checkDirectoryContents(expected, dir_path);
+  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
 }
 
-TEST(DirectoryIteratorImpl, DirectoryWithSymlinkToFile) {
+TEST(Directory, DirectoryWithSymlinkToFile) {
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
   const std::string file_path(dir_path + "/" + "file");
   const std::string link_path(dir_path + "/" + "link");
@@ -133,15 +156,15 @@ TEST(DirectoryIteratorImpl, DirectoryWithSymlinkToFile) {
   TestUtility::createSymlink(file_path, link_path);
 
   EntrySet expected = {
-      {".", DirectoryIterator::FileType::Directory},
-      {"..", DirectoryIterator::FileType::Directory},
-      {"file", DirectoryIterator::FileType::Regular},
-      {"link", DirectoryIterator::FileType::Regular},
+      {".", FileType::Directory},
+      {"..", FileType::Directory},
+      {"file", FileType::Regular},
+      {"link", FileType::Regular},
   };
-  checkDirectoryContents(expected, dir_path);
+  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
 }
 
-TEST(DirectoryIteratorImpl, DirectoryWithSymlinkToDirectory) {
+TEST(Directory, DirectoryWithSymlinkToDirectory) {
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
   const std::string link_dir_path(dir_path + "/" + "link_dir");
   const std::string child_dir_path(dir_path + "/" + "sub_dir");
@@ -151,57 +174,41 @@ TEST(DirectoryIteratorImpl, DirectoryWithSymlinkToDirectory) {
   TestUtility::createSymlink(child_dir_path, link_dir_path);
 
   EntrySet expected = {
-      {".", DirectoryIterator::FileType::Directory},
-      {"..", DirectoryIterator::FileType::Directory},
-      {"sub_dir", DirectoryIterator::FileType::Directory},
-      {"link_dir", DirectoryIterator::FileType::Directory},
+      {".", FileType::Directory},
+      {"..", FileType::Directory},
+      {"sub_dir", FileType::Directory},
+      {"link_dir", FileType::Directory},
   };
-  checkDirectoryContents(expected, dir_path);
+  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
 }
 
-TEST(DirectoryIteratorImpl, DirectoryWithEmptyDirectory) {
+TEST(Directory, DirectoryWithEmptyDirectory) {
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
   ScopedPathRemover s({dir_path});
   TestUtility::createDirectory(dir_path);
 
   EntrySet expected = {
-      {".", DirectoryIterator::FileType::Directory},
-      {"..", DirectoryIterator::FileType::Directory},
+      {".", FileType::Directory},
+      {"..", FileType::Directory},
   };
-  checkDirectoryContents(expected, dir_path);
-}
-
-TEST(DirectoryIteratorImpl, ContinueLookingInDirectory) {
-  const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
-  ScopedPathRemover s({dir_path});
-  TestUtility::createDirectory(dir_path);
-
-  DirectoryIteratorImpl dir_iterator(dir_path);
-  while (dir_iterator.nextEntry().path_ != "") {
-  }
-  // check that we can keep calling nextEntry() without an issue
-  DirectoryIterator::DirectoryEntry empty = {"", DirectoryIterator::FileType::Other};
-  ASSERT_EQ(dir_iterator.nextEntry(), empty);
-  ASSERT_EQ(dir_iterator.nextEntry(), empty);
-  ASSERT_EQ(dir_iterator.nextEntry(), empty);
+  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
 }
 
 TEST(DirectoryIteratorImpl, NonExistingDir) {
-  const std::string dir_path(TestEnvironment::temporaryPath("some/non/existing/dir"));
-  DirectoryIteratorImpl dir_iterator(dir_path);
+  const std::string dir_path("some/non/existing/dir");
 
 #if !defined(WIN32)
   EXPECT_THROW_WITH_MESSAGE(
-      dir_iterator.nextEntry(), EnvoyException,
+      DirectoryIteratorImpl dir_iterator(dir_path), EnvoyException,
       fmt::format("unable to open directory {}: No such file or directory", dir_path));
 #else
   EXPECT_THROW_WITH_MESSAGE(
-      dir_iterator.nextEntry(), EnvoyException,
+      DirectoryIteratorImpl dir_iterator(dir_path), EnvoyException,
       fmt::format("unable to open directory {}: {}", dir_path, ERROR_PATH_NOT_FOUND));
 #endif
 }
 
-TEST(DirectoryIteratorImpl, DirectoryHasTrailingPathSeparator) {
+TEST(Directory, DirectoryHasTrailingPathSeparator) {
 #if !defined(WIN32)
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test") + "/");
 #else
@@ -211,10 +218,10 @@ TEST(DirectoryIteratorImpl, DirectoryHasTrailingPathSeparator) {
   TestUtility::createDirectory(dir_path);
 
   EntrySet expected = {
-      {".", DirectoryIterator::FileType::Directory},
-      {"..", DirectoryIterator::FileType::Directory},
+      {".", FileType::Directory},
+      {"..", FileType::Directory},
   };
-  checkDirectoryContents(expected, dir_path);
+  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
 }
 
 } // namespace Filesystem

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <string>
 
@@ -61,30 +62,48 @@ public:
 
 typedef std::unique_ptr<Watcher> WatcherPtr;
 
+enum class FileType { Regular, Directory, Other };
+
+struct DirectoryEntry {
+  // name_ is the name of the file in the directory, not including the directory path itself
+  // For example, if we have directory a/b containing file c, name_ will be c
+  std::string name_;
+
+  // Note that if the file represented by name_ is a symlink, type_ will be the file type of the
+  // target. For example, if name_ is a symlink to a directory, its file type will be Directory.
+  FileType type_;
+
+  bool operator==(const DirectoryEntry& rhs) const {
+    return name_ == rhs.name_ && type_ == rhs.type_;
+  }
+};
+
 /**
  * Abstraction for listing a directory.
  * TODO(sesmith177): replace with std::filesystem::directory_iterator once we move to C++17
  */
-
+class DirectoryIteratorImpl;
 class DirectoryIterator {
 public:
-  enum class FileType { Regular, Directory, Other };
+  typedef std::input_iterator_tag iterator_category;
+  typedef DirectoryEntry value_type;
+  typedef DirectoryEntry& reference;
+  typedef void pointer;
+  typedef void difference_type;
 
-  typedef struct {
-    std::string path_;
-    FileType type_;
-  } DirectoryEntry;
-
-  DirectoryIterator(const std::string& directory_path) : directory_path_(directory_path) {}
+  DirectoryIterator() : entry_({"", FileType::Other}) {}
   virtual ~DirectoryIterator() {}
 
-  virtual DirectoryEntry nextEntry() PURE;
+  const DirectoryEntry& operator*() const { return entry_; }
+
+  bool operator==(const DirectoryIterator& rhs) const { return entry_ == *rhs; }
+  bool operator!=(const DirectoryIterator& rhs) const { return !(entry_ == *rhs); }
+
+  virtual DirectoryIteratorImpl& operator++() PURE;
 
 protected:
-  std::string directory_path_;
+  DirectoryEntry entry_;
 };
-
-typedef std::unique_ptr<DirectoryIterator> DirectoryIteratorPtr;
 
 } // namespace Filesystem
 } // namespace Envoy

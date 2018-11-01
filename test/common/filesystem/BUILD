@@ -28,10 +28,10 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "directory_iterator_impl_test",
-    srcs = ["directory_iterator_impl_test.cc"],
+    name = "directory_test",
+    srcs = ["directory_test.cc"],
     deps = [
-        "//source/common/filesystem:directory_iterator_lib",
+        "//source/common/filesystem:directory_lib",
         "//test/test_common:environment_lib",
     ],
 )
