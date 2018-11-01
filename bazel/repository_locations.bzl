@@ -91,12 +91,14 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        commit = "05ebb8e0c0f1bfb3a3439e5ad4b3b9e6307b67ee",  # v0.3.5
-        remote = "https://github.com/DataDog/dd-opentracing-cpp",
+        sha256 = "733e9b698a232cfd3aa35b4e27c59641bf1fa78e52e71d29e230af4f2070cdf5",
+        strip_prefix = "dd-opentracing-cpp-0.3.5",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.5.tar.gz"],
     ),
     com_github_msgpack_msgpack_c = dict(
-        commit = "83a82e3eb512b18d4149cabb7eb43c7e8bc081af",
-        remote = "https://github.com/msgpack/msgpack-c",  # v3.1.1
+        sha256 = "bda49f996a73d2c6080ff0523e7b535917cd28c8a79c3a5da54fc29332d61d1e",
+        strip_prefix = "msgpack-c-cpp-3.1.1",
+        urls = ["https://github.com/msgpack/msgpack-c/archive/cpp-3.1.1.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
         sha256 = "499f1e145c19f33031eb8fc6452d5d391b4cecfdeda23e2055386a3b33be4d41",
