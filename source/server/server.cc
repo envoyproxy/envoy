@@ -399,9 +399,8 @@ RunHelper::RunHelper(Options& options, Event::Dispatcher& dispatcher, Upstream::
       shutdown(dispatcher, hot_restart);
     });
   } else {
-    sigterm_ = dispatcher.listenForSignal(SIGTERM, [this]() {
-      ENVOY_LOG(warn, "caught and ignoring SIGTERM per --listen-for-signals");
-    });
+    sigterm_ = dispatcher.listenForSignal(
+        SIGTERM, []() { ENVOY_LOG(warn, "caught and ignoring SIGTERM per --listen-for-signals"); });
   }
 
   if (options.signalHandler().allows("SIGUSR1")) {
@@ -410,9 +409,8 @@ RunHelper::RunHelper(Options& options, Event::Dispatcher& dispatcher, Upstream::
       access_log_manager.reopen();
     });
   } else {
-    sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
-      ENVOY_LOG(warn, "caught and ignoring SIGUSR1 per --listen-for-signals");
-    });
+    sig_usr_1_ = dispatcher.listenForSignal(
+        SIGUSR1, []() { ENVOY_LOG(warn, "caught and ignoring SIGUSR1 per --listen-for-signals"); });
   }
 
   if (options.signalHandler().allows("SIGHUP")) {
