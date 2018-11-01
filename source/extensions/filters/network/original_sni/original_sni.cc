@@ -9,14 +9,14 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace OriginalSni {
 
-using ::Envoy::StreamInfo::OriginalRequestedServerName;
+using ::Envoy::StreamInfo::ForwardRequestedServerName;
 
 Network::FilterStatus OriginalSniFilter::onNewConnection() {
   absl::string_view sni = read_callbacks_->connection().requestedServerName();
 
   if (!sni.empty()) {
     read_callbacks_->connection().streamInfo().filterState().setData(
-        OriginalRequestedServerName::Key, std::make_unique<OriginalRequestedServerName>(sni),
+        ForwardRequestedServerName::Key, std::make_unique<ForwardRequestedServerName>(sni),
         StreamInfo::FilterState::StateType::ReadOnly);
   }
 

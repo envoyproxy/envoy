@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace StreamInfo {
 
-const std::string OriginalRequestedServerName::Key =
+const std::string ForwardRequestedServerName::Key =
     "envoy.stream_info.original_requested_server_name";
 
 } // namespace StreamInfo

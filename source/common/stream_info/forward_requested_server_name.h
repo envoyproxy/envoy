@@ -10,9 +10,9 @@ namespace StreamInfo {
 /**
  * Original Requested Server Name
  */
-class OriginalRequestedServerName : public FilterState::Object {
+class ForwardRequestedServerName : public FilterState::Object {
 public:
-  OriginalRequestedServerName(absl::string_view server_name) : server_name_(server_name) {}
+  ForwardRequestedServerName(absl::string_view server_name) : server_name_(server_name) {}
   const std::string& value() const { return server_name_; }
   static const std::string Key;
 
