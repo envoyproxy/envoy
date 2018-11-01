@@ -47,24 +47,26 @@ SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
 
+# yapf: disable
 PROTOBUF_TYPE_ERRORS = {
     # Well-known types should be referenced from the ProtobufWkt namespace.
-    "Protobuf::Any": "ProtobufWkt::Any",
-    "Protobuf::Empty": "ProtobufWkt::Empty",
-    "Protobuf::ListValue": "ProtobufWkt::ListValue",
-    "Protobuf::NULL_VALUE": "ProtobufWkt::NULL_VALUE",
-    "Protobuf::StringValue": "ProtobufWkt::StringValue",
-    "Protobuf::Struct": "ProtobufWkt::Struct",
-    "Protobuf::Value": "ProtobufWkt::Value",
+    "Protobuf::Any":                    "ProtobufWkt::Any",
+    "Protobuf::Empty":                  "ProtobufWkt::Empty",
+    "Protobuf::ListValue":              "ProtobufWkt::ListValue",
+    "Protobuf::NULL_VALUE":             "ProtobufWkt::NULL_VALUE",
+    "Protobuf::StringValue":            "ProtobufWkt::StringValue",
+    "Protobuf::Struct":                 "ProtobufWkt::Struct",
+    "Protobuf::Value":                  "ProtobufWkt::Value",
 
     # Maps including strings should use the protobuf string types.
-    "Protobuf::MapPair<std::string": "Protobuf::MapPair<Envoy::ProtobufTypes::String",
+    "Protobuf::MapPair<std::string":    "Protobuf::MapPair<Envoy::ProtobufTypes::String",
 
     # Other common mis-namespacing of protobuf types.
-    "ProtobufWkt::Map": "Protobuf::Map",
-    "ProtobufWkt::MapPair": "Protobuf::MapPair",
+    "ProtobufWkt::Map":                 "Protobuf::Map",
+    "ProtobufWkt::MapPair":             "Protobuf::MapPair",
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 }
+# yapf: enable
 
 
 # lookPath searches for the given executable in all directories in PATH
