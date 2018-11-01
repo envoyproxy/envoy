@@ -2,18 +2,23 @@
 
 set -e
 
+VENV_DIR="pyformat"
 SCRIPTPATH=$( cd "$(dirname "$0")" ; pwd -P )
 cd "$SCRIPTPATH"
 
 if [ "${CIRCLECI}" != "true" ]; then
-    if [[ "$(which pip)" == "" ]]; then
-        echo "Could not install yapf dependecy"
-        echo "ERROR: pip not found"
-        exit 1
-    fi
 
-    echo "Installing requirements..."
-    pip install -r requirements.txt
+  if [[ "$VIRTUAL_ENV" == "" ]]; then
+    if [[ ! -d "${VENV_DIR}"/venv ]]; then
+      virtualenv "${VENV_DIR}"/venv --no-site-packages
+    fi
+    source "${VENV_DIR}"/venv/bin/activate
+  else
+    echo "Found existing virtualenv"
+  fi
+
+  echo "Installing requirements..."
+  pip install -r requirements.txt
 fi
 
 echo "Running Python format check..."
