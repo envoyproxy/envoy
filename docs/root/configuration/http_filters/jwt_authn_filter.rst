@@ -56,18 +56,30 @@ Remote JWKS config example
 
 .. code-block:: yaml
 
-  providers:
-    provider_name1:
-      issuer: https://example.com
-      audiences:
-      - bookstore_android.apps.googleusercontent.com
-      - bookstore_web.apps.googleusercontent.com
-      remote_jwks:
-        http_uri:
-          uri: https://example.com/jwks.json
-          cluster: example_jwks_cluster
-        cache_duration:
-          seconds: 300
+          http_filters:
+          - name: envoy.filters.http.jwt_authn
+            config:
+             providers:
+               example_provider:
+                 issuer: http://your-issuer/uaa/oauth/token
+                 audiences:                 
+                 - your_audience 
+                 - openid
+                 remote_jwks:
+                   http_uri:
+                     uri: https://www.googleapis.com/oauth2/v3/certs 
+                     cluster: googleapis_cluster
+                     timeout:
+                       seconds: 5
+                   cache_duration:
+                     seconds: 10
+             rules:
+             - match:                 
+                 prefix: /
+               requires:
+                 provider_name: example_provider
+                 
+                 
 
 Above example fetches JWSK from a remote server with URL https://example.com/jwks.json. The token will be extracted from the default extract locations. The token will not be forwarded to upstream. JWT payload will not be added to the request header.
 
@@ -75,13 +87,18 @@ Following cluster **example_jwks_cluster** is needed to fetch JWKS.
 
 .. code-block:: yaml
 
-  cluster:
-    name: example_jwks_cluster
-    type: STRICT_DNS
+  - name: googleapis_cluster
+    connect_timeout: 0.25s
+    type: LOGICAL_DNS
+    # Comment out the following line to test on v6 networks
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
     hosts:
-      socket_address:
-        address: example.com
-        port_value: 80
+      - socket_address:
+          address: googleapis.com
+          port_value: 443
+    tls_context: { sni: www.googleapis.com }
+    
 
 
 Inline JWKS config example
