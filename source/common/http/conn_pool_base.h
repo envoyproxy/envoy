@@ -1,7 +1,8 @@
 #pragma once
 
-#include "common/common/linked_object.h"
 #include "envoy/http/conn_pool.h"
+
+#include "common/common/linked_object.h"
 
 namespace Envoy {
 namespace Http {
