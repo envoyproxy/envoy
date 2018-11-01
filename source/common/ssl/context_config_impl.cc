@@ -40,7 +40,8 @@ Secret::TlsCertificateConfigProviderSharedPtr getTlsCertificateConfigProvider(
       return secret_provider;
     } else {
       return factory_context.secretManager().findOrCreateTlsCertificateProvider(
-          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
+          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
+          /* extra_key */ "");
     }
   }
   return nullptr;
@@ -62,9 +63,12 @@ getCertificateValidationContextConfigProviderFromSds(
     }
     return secret_provider;
   } else {
+    const std::string extra_provider_key =
+        default_cvc == nullptr ? "" : default_cvc->SerializeAsString();
     auto secret_provider =
         factory_context.secretManager().findOrCreateCertificateValidationContextProvider(
-            sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
+            sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
+            extra_provider_key);
     if (default_cvc != nullptr) {
       dynamic_cast<Secret::CertificateValidationContextSdsApi*>(secret_provider.get())
           ->setDefaultSecret(*default_cvc);

@@ -28,15 +28,16 @@ public:
                CertificateValidationContextConfigProviderSharedPtr(
                    const envoy::api::v2::auth::CertificateValidationContext&
                        certificate_validation_context));
-  MOCK_METHOD3(findOrCreateTlsCertificateProvider,
+  MOCK_METHOD4(findOrCreateTlsCertificateProvider,
                TlsCertificateConfigProviderSharedPtr(
                    const envoy::api::v2::core::ConfigSource&, const std::string&,
-                   Server::Configuration::TransportSocketFactoryContext&));
-  MOCK_METHOD3(findOrCreateCertificateValidationContextProvider,
+                   Server::Configuration::TransportSocketFactoryContext&, const std::string&));
+  MOCK_METHOD4(findOrCreateCertificateValidationContextProvider,
                CertificateValidationContextConfigProviderSharedPtr(
                    const envoy::api::v2::core::ConfigSource& config_source,
                    const std::string& config_name,
-                   Server::Configuration::TransportSocketFactoryContext& secret_provider_context));
+                   Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+                   const std::string&));
 };
 
 class MockSecretCallbacks : public SecretCallbacks {

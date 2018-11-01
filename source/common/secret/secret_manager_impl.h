@@ -34,12 +34,14 @@ public:
 
   TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      const std::string& extra_key) override;
 
   CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      const std::string& extra_key) override;
 
 private:
   template <class SecretType>
@@ -49,8 +51,9 @@ private:
     std::shared_ptr<SecretType>
     findOrCreate(const envoy::api::v2::core::ConfigSource& sds_config_source,
                  const std::string& config_name,
-                 Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
-      const std::string map_key = sds_config_source.SerializeAsString() + config_name;
+                 Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+                 const std::string& extra_key) {
+      const std::string map_key = sds_config_source.SerializeAsString() + config_name + extra_key;
 
       std::shared_ptr<SecretType> secret_provider = dynamic_secret_providers_[map_key].lock();
       if (!secret_provider) {

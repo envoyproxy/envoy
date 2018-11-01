@@ -145,14 +145,13 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
       server.localInfo(), server.dispatcher(), server.random(), server.stats(),
       server.clusterManager(), init_manager, config_source, "abc.com", []() {});
 
+  const std::string default_verify_certificate_hash =
+      "0000000000000000000000000000000000000000000000000000000000000000";
   envoy::api::v2::auth::CertificateValidationContext default_cvc;
-  // Set singular fields to verify that they will be overwritten by dynamic
-  // CertificateValidationContext.
   default_cvc.set_allow_expired_certificate(false);
   default_cvc.mutable_trusted_ca()->set_inline_bytes("fake trusted ca");
-  // Set repeated fields to verify that they will be concatenated by dynamic
-  // CertificateValidationContext.
   default_cvc.add_verify_subject_alt_name("first san");
+  default_cvc.add_verify_certificate_hash(default_verify_certificate_hash);
   sds_api.setDefaultSecret(default_cvc);
   // Verify that default CertificateValidationContext does not count as a secret.
   EXPECT_EQ(nullptr, sds_api.secret());
@@ -169,6 +168,9 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   dynamic_cvc->mutable_trusted_ca()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
   dynamic_cvc->add_verify_subject_alt_name("second san");
+  const std::string dynamic_verify_certificate_spki =
+      "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=";
+  dynamic_cvc->add_verify_certificate_spki(dynamic_verify_certificate_spki);
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   sds_api.onConfigUpdate(secret_resources, "");
 
@@ -177,9 +179,18 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   const std::string ca_cert = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
             sds_api.secret()->caCert());
+  // Verify that repeated fields are concatenated.
   EXPECT_EQ(2, sds_api.secret()->verifySubjectAltNameList().size());
   EXPECT_EQ("first san", sds_api.secret()->verifySubjectAltNameList()[0]);
   EXPECT_EQ("second san", sds_api.secret()->verifySubjectAltNameList()[1]);
+  // Verify that if dynamic CertificateValidationContext does not set certificate hash list, the new
+  // secret contains hash list from default CertificateValidationContext.
+  EXPECT_EQ(1, sds_api.secret()->verifyCertificateHashList().size());
+  EXPECT_EQ(default_verify_certificate_hash, sds_api.secret()->verifyCertificateHashList()[0]);
+  // Verify that if default CertificateValidationContext does not set certificate SPKI list, the new
+  // secret contains SPKI list from dynamic CertificateValidationContext.
+  EXPECT_EQ(1, sds_api.secret()->verifyCertificateSpkiList().size());
+  EXPECT_EQ(dynamic_verify_certificate_spki, sds_api.secret()->verifyCertificateSpkiList()[0]);
 
   handle->remove();
 }

@@ -70,11 +70,13 @@ public:
    * @param config_name a name that uniquely refers to the SDS config source.
    * @param secret_provider_context context that provides components for creating and initializing
    * secret provider.
+   * @param extra_key that is needed to find a dynamic secret provider.
    * @return TlsCertificateConfigProviderSharedPtr the dynamic TLS secret provider.
    */
   virtual TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      const std::string& extra_key) PURE;
 
   /**
    * Finds and returns a dynamic secret provider associated to SDS config. Create
@@ -84,13 +86,15 @@ public:
    * @param config_name a name that uniquely refers to the SDS config source.
    * @param secret_provider_context context that provides components for creating and initializing
    * secret provider.
+   * @param extra_key that is needed to find a dynamic secret provider.
    * @return CertificateValidationContextConfigProviderSharedPtr the dynamic certificate validation
    * context secret provider.
    */
   virtual CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      const std::string& extra_key) PURE;
 };
 
 } // namespace Secret
