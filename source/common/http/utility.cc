@@ -449,25 +449,42 @@ void Utility::transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::strin
 const Router::RouteSpecificFilterConfig*
 Utility::resolvePerFilterConfigGeneric(const std::string& filter_name,
                                        const Router::RouteConstSharedPtr& route) {
-  if (!route) {
-    return nullptr;
-  }
 
   const Router::RouteSpecificFilterConfig* maybe_filter_config{};
+  iteratePerFilterConfigGeneric(
+      filter_name, route, [&maybe_filter_config](const Router::RouteSpecificFilterConfig& cfg) {
+        maybe_filter_config = &cfg;
+      });
+  return maybe_filter_config;
+}
+
+void Utility::iteratePerFilterConfigGeneric(
+    const std::string& filter_name, const Router::RouteConstSharedPtr& route,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+  if (!route) {
+    return;
+  }
 
   const Router::RouteEntry* routeEntry = route->routeEntry();
-  if (routeEntry) {
-    maybe_filter_config = routeEntry->perFilterConfig(filter_name);
+
+  if (routeEntry != nullptr) {
+    auto maybe_vhost_config = routeEntry->virtualHost().perFilterConfig(filter_name);
+    if (maybe_vhost_config != nullptr) {
+      cb(*maybe_vhost_config);
+    }
   }
 
-  if (!maybe_filter_config) {
-    maybe_filter_config = route->perFilterConfig(filter_name);
+  auto maybe_route_config = route->perFilterConfig(filter_name);
+  if (maybe_route_config != nullptr) {
+    cb(*maybe_route_config);
   }
 
-  if (!maybe_filter_config && routeEntry) {
-    maybe_filter_config = routeEntry->virtualHost().perFilterConfig(filter_name);
+  if (routeEntry != nullptr) {
+    auto maybe_weighted_cluster_config = routeEntry->perFilterConfig(filter_name);
+    if (maybe_weighted_cluster_config != nullptr) {
+      cb(*maybe_weighted_cluster_config);
+    }
   }
-  return maybe_filter_config;
 }
 
 } // namespace Http

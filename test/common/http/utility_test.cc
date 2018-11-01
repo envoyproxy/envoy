@@ -601,5 +601,60 @@ TEST(HttpUtility, resolvePerFilterConfigGeneric) {
   EXPECT_EQ(two, Utility::resolvePerFilterConfigGeneric(filter_name, filter_callbacks.route()));
 }
 
+TEST(HttpUtility, iteratePerFilterConfigIteratesInOrder) {
+  const std::string filter_name = "envoy.filter";
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+
+  // Create configs to test; to ease of testing instead of using real objects
+  // we will use pointers that are actually indexes.
+  const Router::RouteSpecificFilterConfig* nullconfig = nullptr;
+  size_t num_configs = 1;
+  ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
+      .WillByDefault(Return(nullconfig + num_configs));
+  num_configs++;
+  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
+      .WillByDefault(Return(nullconfig + num_configs));
+  num_configs++;
+  ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
+      .WillByDefault(Return(nullconfig + num_configs));
+
+  // a vector to save which configs are visited by the iteratePerFilterConfigGeneric
+  std::vector<size_t> visited_configs(num_configs, 0);
+
+  // Iterate; save the retrieved config index in the iteration index in visited_configs.
+  size_t index = 0;
+  Utility::iteratePerFilterConfigGeneric(filter_name, filter_callbacks.route(),
+                                         [&](const Router::RouteSpecificFilterConfig& cfg) {
+                                           int cfg_index = &cfg - nullconfig;
+                                           visited_configs[index] = cfg_index - 1;
+                                           index++;
+                                         });
+
+  // Make sure all methods were called, and in order.
+  for (size_t i = 0; i < visited_configs.size(); i++) {
+    EXPECT_EQ(i, visited_configs[i]);
+  }
+}
+
+TEST(HttpUtility, iteratePerFilterConfigTyped) {
+  class TestConfig : public Router::RouteSpecificFilterConfig {
+  } testConfig;
+
+  const std::string filter_name = "envoy.filter";
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+
+  // make the file callbacks return our test config
+  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
+      .WillByDefault(Return(&testConfig));
+
+  // iterate the configs
+  size_t index = 0;
+  Utility::iteratePerFilterConfig<TestConfig>(filter_name, filter_callbacks.route(),
+                                              [&](const TestConfig&) { index++; });
+
+  // make sure that the callback was called (which means that the dynamic_cast worked.)
+  EXPECT_EQ(1, index);
+}
+
 } // namespace Http
 } // namespace Envoy

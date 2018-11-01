@@ -153,14 +153,22 @@ TEST_F(HttpExtAuthzFilterTest, TestAllowedRequestHeaders) {
 TEST_F(HttpExtAuthzFilterTest, ContextExtensions) {
   initialize(filter_config_);
 
-  // Place something in the context extensions.
-  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settings;
-  const std::string key = "key";
-  const std::string value = "value";
-  (*settings.mutable_check_settings()->mutable_context_extensions())[key] = value;
+  // Place something in the context extensions on the virtualhost.
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settingsvhost;
+  (*settingsvhost.mutable_check_settings()->mutable_context_extensions())["key_vhost"] =
+      "value_vhost";
+  // Initialize the virtual host's per filter config.
+  FilterConfigPerRoute auth_per_vhost(settingsvhost);
+  ON_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
+          perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+      .WillByDefault(Return(&auth_per_vhost));
 
+  // Place something in the context extensions on the route.
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settingsroute;
+  (*settingsroute.mutable_check_settings()->mutable_context_extensions())["key_route"] =
+      "value_route";
   // Initialize the route's per filter config.
-  FilterConfigPerRoute auth_per_route(settings);
+  FilterConfigPerRoute auth_per_route(settingsroute);
   ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
       .WillByDefault(Return(&auth_per_route));
 
@@ -178,8 +186,8 @@ TEST_F(HttpExtAuthzFilterTest, ContextExtensions) {
   filter_->decodeHeaders(request_headers_, false);
 
   // Make sure that the extensions appear in the check request issued by the filter.
-  auto check_request_value = check_request.attributes().context_extensions().at(key);
-  EXPECT_EQ(value, check_request_value);
+  EXPECT_EQ("value_vhost", check_request.attributes().context_extensions().at("key_vhost"));
+  EXPECT_EQ("value_route", check_request.attributes().context_extensions().at("key_route"));
 }
 
 // Test that filter can be disabled with route config.

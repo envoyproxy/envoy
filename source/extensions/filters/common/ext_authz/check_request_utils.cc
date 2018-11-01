@@ -126,7 +126,7 @@ void CheckRequestUtils::setAttrContextRequest(
 void CheckRequestUtils::createHttpCheck(
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers,
-    const Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>* context_extensions,
+    Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>&& context_extensions,
     envoy::service::auth::v2alpha::CheckRequest& request) {
 
   auto attrs = request.mutable_attributes();
@@ -141,9 +141,7 @@ void CheckRequestUtils::createHttpCheck(
   setAttrContextRequest(*attrs->mutable_request(), callbacks, headers);
 
   // Fill in the context extensions:
-  if (context_extensions) {
-    (*attrs->mutable_context_extensions()) = *context_extensions;
-  }
+  (*attrs->mutable_context_extensions()) = context_extensions;
 }
 
 void CheckRequestUtils::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,

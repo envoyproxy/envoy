@@ -258,9 +258,8 @@ resolvePerFilterConfigGeneric(const std::string& filter_name,
  *
  * @param filter_name The name of the filter who's route config should be
  * fetched.
- *
  * @param route The route to check for route configs. nullptr routes will
- * result in nullptr being reutrned.
+ * result in nullptr being returned.
  *
  * @return The route config if found. nullptr if not found. The returned
  * pointer's lifetime is the same as the route parameter.
@@ -270,7 +269,40 @@ const ConfigType* resolvePerFilterConfig(const std::string& filter_name,
                                          const Router::RouteConstSharedPtr& route) {
   static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
                 "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
-  return dynamic_cast<const ConfigType*>(resolvePerFilterConfigGeneric(filter_name, route));
+  const Router::RouteSpecificFilterConfig* generic_config =
+      resolvePerFilterConfigGeneric(filter_name, route);
+  return dynamic_cast<const ConfigType*>(generic_config);
+}
+
+/**
+ * The non template implementation of iteratePerFilterConfig. see
+ * iteratePerFilterConfig for docs.
+ */
+void iteratePerFilterConfigGeneric(
+    const std::string& filter_name, const Router::RouteConstSharedPtr& route,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb);
+
+/**
+ * Iterates all the available per route filter configs, invoking the callback with each config (if
+ * it is present). Iteration of the configs is in order of specificity. That means that the callback
+ * will be called first for a config on a Virtual host, then a route, and finally a route entry
+ * (weighted cluster). If a config is not present, the callback will not be invoked.
+ */
+
+template <class ConfigType>
+void iteratePerFilterConfig(const std::string& filter_name,
+                            const Router::RouteConstSharedPtr& route,
+                            std::function<void(const ConfigType&)> cb) {
+  static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
+                "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
+
+  iteratePerFilterConfigGeneric(
+      filter_name, route, [&cb](const Router::RouteSpecificFilterConfig& cfg) {
+        const ConfigType* type_cfg = dynamic_cast<const ConfigType*>(&cfg);
+        if (type_cfg != nullptr) {
+          cb(*type_cfg);
+        }
+      });
 }
 
 } // namespace Utility
