@@ -15,7 +15,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
-        "//source/common/stream_info:original_requested_server_name_lib",
+        "//source/common/stream_info:forward_requested_server_name_lib",
     ],
 )
 

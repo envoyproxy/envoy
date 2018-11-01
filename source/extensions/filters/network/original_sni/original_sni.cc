@@ -2,7 +2,7 @@
 
 #include "envoy/network/connection.h"
 
-#include "common/stream_info/original_requested_server_name.h"
+#include "common/stream_info/forward_requested_server_name.h"
 
 namespace Envoy {
 namespace Extensions {

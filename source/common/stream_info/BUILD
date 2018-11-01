@@ -28,9 +28,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "original_requested_server_name_lib",
-    srcs = ["original_requested_server_name.cc"],
-    hdrs = ["original_requested_server_name.h"],
+    name = "forward_requested_server_name_lib",
+    srcs = ["forward_requested_server_name.cc"],
+    hdrs = ["forward_requested_server_name.h"],
     deps = [
         "//include/envoy/stream_info:filter_state_interface",
     ],

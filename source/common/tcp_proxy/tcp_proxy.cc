@@ -18,7 +18,7 @@
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/router/metadatamatchcriteria_impl.h"
-#include "common/stream_info/original_requested_server_name.h"
+#include "common/stream_info/forward_requested_server_name.h"
 
 namespace Envoy {
 namespace TcpProxy {
