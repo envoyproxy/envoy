@@ -53,7 +53,7 @@ public:
     config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_));
 
     client_ = new RateLimit::MockClient();
-    filter_.reset(new Filter(config_, RateLimit::ClientPtr{client_}));
+    filter_ = std::make_unique<Filter>(config_, RateLimit::ClientPtr{client_});
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.emplace_back(

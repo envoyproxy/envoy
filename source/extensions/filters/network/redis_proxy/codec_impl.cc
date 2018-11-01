@@ -1,6 +1,7 @@
 #include "extensions/filters/network/redis_proxy/codec_impl.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -134,7 +135,7 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
     switch (state_) {
     case State::ValueRootStart: {
       ENVOY_LOG(trace, "parse slice: ValueRootStart");
-      pending_value_root_.reset(new RespValue());
+      pending_value_root_ = std::make_unique<RespValue>();
       pending_value_stack_.push_front({pending_value_root_.get(), 0});
       state_ = State::ValueStart;
       break;

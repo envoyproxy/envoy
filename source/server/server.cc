@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <unordered_set>
 
@@ -233,8 +234,8 @@ void InstanceImpl::initialize(Options& options,
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
   stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
 
-  server_stats_.reset(
-      new ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});
+  server_stats_ = std::make_unique<ServerStats>(
+      ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});
 
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
@@ -249,9 +250,9 @@ void InstanceImpl::initialize(Options& options,
   server_stats_->version_.set(version_int);
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
 
-  local_info_.reset(
-      new LocalInfo::LocalInfoImpl(bootstrap_.node(), local_address, options.serviceZone(),
-                                   options.serviceClusterName(), options.serviceNodeName()));
+  local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
+      bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
+      options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_);
 
@@ -259,7 +260,7 @@ void InstanceImpl::initialize(Options& options,
   info.original_start_time_ = original_start_time_;
   restarter_.shutdownParentAdmin(info);
   original_start_time_ = info.original_start_time_;
-  admin_.reset(new AdminImpl(initial_config.admin().profilePath(), *this));
+  admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
   if (initial_config.admin().address()) {
     if (initial_config.admin().accessLogPath().empty()) {
       throw EnvoyException("An admin access log path is required for a listening server.");
@@ -280,12 +281,12 @@ void InstanceImpl::initialize(Options& options,
   loadServerFlags(initial_config.flagsPath());
 
   // Initialize the overload manager early so other modules can register for actions.
-  overload_manager_.reset(
-      new OverloadManagerImpl(dispatcher(), stats(), threadLocal(), bootstrap_.overload_manager()));
+  overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
+                                                            bootstrap_.overload_manager());
 
   // Workers get created first so they register for thread local updates.
-  listener_manager_.reset(
-      new ListenerManagerImpl(*this, listener_component_factory_, worker_factory_, time_system_));
+  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_,
+                                                            worker_factory_, time_system_);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -299,11 +300,11 @@ void InstanceImpl::initialize(Options& options,
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_.reset(new Ssl::ContextManagerImpl(time_system_));
+  ssl_context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(time_system_);
 
-  cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
+  cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo(), secretManager()));
+      localInfo(), secretManager());
 
   // Now the configuration gets parsed. The configuration may start setting thread local data
   // per above. See MainImpl::initialize() for why we do this pointer dance.
@@ -321,12 +322,12 @@ void InstanceImpl::initialize(Options& options,
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         clusterManager(), thread_local_, time_system_);
-    hds_delegate_.reset(new Upstream::HdsDelegate(
+    hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
         bootstrap_.node(), stats(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
             ->create(),
         dispatcher(), runtime(), stats(), sslContextManager(), random(), info_factory_,
-        access_log_manager_, clusterManager(), localInfo()));
+        access_log_manager_, clusterManager(), localInfo());
   }
 
   for (Stats::SinkPtr& sink : main_config->statsSinks()) {
@@ -340,7 +341,7 @@ void InstanceImpl::initialize(Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_.reset(new Server::GuardDogImpl(stats_store_, *config_, time_system_));
+  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, *config_, time_system_);
 }
 
 void InstanceImpl::startWorkers() {
