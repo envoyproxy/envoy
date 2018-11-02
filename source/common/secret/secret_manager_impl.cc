@@ -68,16 +68,15 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertific
     const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
   return certificate_providers_.findOrCreate(sds_config_source, config_name,
-                                             secret_provider_context, /* extra_sharing_key */ "");
+                                             secret_provider_context);
 }
 
 CertificateValidationContextConfigProviderSharedPtr
 SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
     const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-    const std::string& extra_key) {
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
   return validation_context_providers_.findOrCreate(sds_config_source, config_name,
-                                                    secret_provider_context, extra_key);
+                                                    secret_provider_context);
 }
 
 } // namespace Secret

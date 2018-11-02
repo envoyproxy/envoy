@@ -30,14 +30,17 @@ public:
    * @param callback callback that is executed by secret provider.
    * @return CallbackHandle the handle which can remove that update callback.
    */
-  virtual Common::CallbackHandle*
-  addUpdateCallback(std::function<void(const envoy::api::v2::auth::Secret&)> callback) PURE;
+  virtual Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) PURE;
 };
 
-typedef SecretProvider<Ssl::TlsCertificateConfig> TlsCertificateConfigProvider;
+typedef std::unique_ptr<envoy::api::v2::auth::TlsCertificate> TlsCertificatePtr;
+typedef std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext>
+    CertificateValidationContextPtr;
+
+typedef SecretProvider<envoy::api::v2::auth::TlsCertificate> TlsCertificateConfigProvider;
 typedef std::shared_ptr<TlsCertificateConfigProvider> TlsCertificateConfigProviderSharedPtr;
 
-typedef SecretProvider<Ssl::CertificateValidationContextConfig>
+typedef SecretProvider<envoy::api::v2::auth::CertificateValidationContext>
     CertificateValidationContextConfigProvider;
 typedef std::shared_ptr<CertificateValidationContextConfigProvider>
     CertificateValidationContextConfigProviderSharedPtr;

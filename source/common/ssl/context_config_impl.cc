@@ -9,6 +9,8 @@
 #include "common/config/tls_context_json.h"
 #include "common/protobuf/utility.h"
 #include "common/secret/sds_api.h"
+#include "common/ssl/certificate_validation_context_config_impl.h"
+#include "common/ssl/tls_certificate_config_impl.h"
 
 #include "openssl/ssl.h"
 
@@ -19,14 +21,17 @@ namespace {
 
 Secret::TlsCertificateConfigProviderSharedPtr getTlsCertificateConfigProvider(
     const envoy::api::v2::auth::CommonTlsContext& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context) {
+    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Ssl::TlsCertificateConfigPtr* tls_config) {
   if (!config.tls_certificates().empty()) {
     const auto& tls_certificate = config.tls_certificates(0);
     if (!tls_certificate.has_certificate_chain() && !tls_certificate.has_private_key()) {
       return nullptr;
     }
-    return factory_context.secretManager().createInlineTlsCertificateProvider(
+    auto secret_provider = factory_context.secretManager().createInlineTlsCertificateProvider(
         config.tls_certificates(0));
+    *tls_config = std::make_unique<Ssl::TlsCertificateConfigImpl>(*secret_provider->secret());
+    return secret_provider;
   }
   if (!config.tls_certificate_sds_secret_configs().empty()) {
     const auto& sds_secret_config = config.tls_certificate_sds_secret_configs(0);
@@ -37,6 +42,7 @@ Secret::TlsCertificateConfigProviderSharedPtr getTlsCertificateConfigProvider(
       if (!secret_provider) {
         throw EnvoyException(fmt::format("Unknown static secret: {}", sds_secret_config.name()));
       }
+      *tls_config = std::make_unique<Ssl::TlsCertificateConfigImpl>(*secret_provider->secret());
       return secret_provider;
     } else {
       return factory_context.secretManager().findOrCreateTlsCertificateProvider(
@@ -48,7 +54,8 @@ Secret::TlsCertificateConfigProviderSharedPtr getTlsCertificateConfigProvider(
 
 Secret::CertificateValidationContextConfigProviderSharedPtr
 getProviderFromSds(Server::Configuration::TransportSocketFactoryContext& factory_context,
-                   const envoy::api::v2::auth::SdsSecretConfig& sds_secret_config) {
+                   const envoy::api::v2::auth::SdsSecretConfig& sds_secret_config,
+                   Ssl::CertificateValidationContextConfigPtr* cvc_config) {
   if (!sds_secret_config.has_sds_config()) {
     // static secret
     auto secret_provider =
@@ -58,6 +65,8 @@ getProviderFromSds(Server::Configuration::TransportSocketFactoryContext& factory
       throw EnvoyException(fmt::format("Unknown static certificate validation context: {}",
                                        sds_secret_config.name()));
     }
+    *cvc_config =
+        std::make_unique<Ssl::CertificateValidationContextConfigImpl>(*secret_provider->secret());
     return secret_provider;
   } else {
     auto secret_provider =
@@ -72,16 +81,21 @@ Secret::CertificateValidationContextConfigProviderSharedPtr
 getCertificateValidationContextConfigProvider(
     const envoy::api::v2::auth::CommonTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Ssl::CertificateValidationContextConfigPtr* cvc_config,
     std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext>* default_cvc) {
   switch (config.validation_context_type_case()) {
   case envoy::api::v2::auth::CommonTlsContext::ValidationContextTypeCase::kValidationContext: {
-    return factory_context.secretManager().createInlineCertificateValidationContextProvider(
-        config.validation_context());
+    auto secret_provider =
+        factory_context.secretManager().createInlineCertificateValidationContextProvider(
+            config.validation_context());
+    *cvc_config =
+        std::make_unique<Ssl::CertificateValidationContextConfigImpl>(*secret_provider->secret());
+    return secret_provider;
   }
   case envoy::api::v2::auth::CommonTlsContext::ValidationContextTypeCase::
       kValidationContextSdsSecretConfig: {
     const auto& sds_secret_config = config.validation_context_sds_secret_config();
-    return getProviderFromSds(factory_context, sds_secret_config);
+    return getProviderFromSds(factory_context, sds_secret_config, cvc_config);
   }
   case envoy::api::v2::auth::CommonTlsContext::ValidationContextTypeCase::
       kCombinedValidationContext: {
@@ -89,7 +103,7 @@ getCertificateValidationContextConfigProvider(
         config.combined_validation_context().default_validation_context());
     const auto& sds_secret_config =
         config.combined_validation_context().validation_context_sds_secret_config();
-    return getProviderFromSds(factory_context, sds_secret_config);
+    return getProviderFromSds(factory_context, sds_secret_config, cvc_config);
   }
   default:
     return nullptr;
@@ -122,9 +136,10 @@ ContextConfigImpl::ContextConfigImpl(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), DEFAULT_CIPHER_SUITES)),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), DEFAULT_ECDH_CURVES)),
-      tls_certficate_provider_(getTlsCertificateConfigProvider(config, factory_context)),
-      certficate_validation_context_provider_(
-          getCertificateValidationContextConfigProvider(config, factory_context, &default_cvc_)),
+      tls_certficate_provider_(
+          getTlsCertificateConfigProvider(config, factory_context, &tls_certificate_config_)),
+      certficate_validation_context_provider_(getCertificateValidationContextConfigProvider(
+          config, factory_context, &validation_context_config_, &default_cvc_)),
       min_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
       max_protocol_version_(
@@ -135,18 +150,51 @@ ContextConfigImpl::ContextConfigImpl(
             certficate_validation_context_provider_.get())
             ->addValidationCallback(
                 [this](const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
-                  onValidationContextUpdate(dynamic_cvc);
+                  getCombinedValidationContextConfig(dynamic_cvc);
                   validation_context_config_.reset();
                 });
   }
 }
 
-void ContextConfigImpl::onValidationContextUpdate(
+Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
     const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
-  const envoy::api::v2::auth::CertificateValidationContext combined_cvc = *default_cvc_.get();
+  envoy::api::v2::auth::CertificateValidationContext combined_cvc = *default_cvc_.get();
   combined_cvc.MergeFrom(dynamic_cvc);
-  validation_context_config_ =
-      std::make_unique<CertificateValidationContextConfigImpl>(combined_cvc);
+  return std::make_unique<CertificateValidationContextConfigImpl>(combined_cvc);
+}
+
+void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
+  if (tls_certficate_provider_) {
+    if (tc_update_callback_handle_) {
+      tc_update_callback_handle_->remove();
+    }
+    tc_update_callback_handle_ = tls_certficate_provider_->addUpdateCallback([this, callback]() {
+      tls_certificate_config_ =
+          std::make_unique<Ssl::TlsCertificateConfigImpl>(*tls_certficate_provider_->secret());
+      callback();
+    });
+  }
+  if (certficate_validation_context_provider_) {
+    if (cvc_update_callback_handle_) {
+      cvc_update_callback_handle_->remove();
+    }
+    if (default_cvc_) {
+      cvc_update_callback_handle_ =
+          certficate_validation_context_provider_->addUpdateCallback([this, callback]() {
+            validation_context_config_ = getCombinedValidationContextConfig(
+                *certficate_validation_context_provider_->secret());
+            callback();
+          });
+    } else {
+      cvc_update_callback_handle_ =
+          certficate_validation_context_provider_->addUpdateCallback([this, callback]() {
+            validation_context_config_ =
+                std::make_unique<Ssl::CertificateValidationContextConfigImpl>(
+                    *certficate_validation_context_provider_->secret());
+            callback();
+          });
+    }
+  }
 }
 
 ContextConfigImpl::~ContextConfigImpl() {

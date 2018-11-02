@@ -26,12 +26,10 @@ public:
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
   const TlsCertificateConfig* tlsCertificate() const override {
-    return tls_certficate_provider_ == nullptr ? nullptr : tls_certficate_provider_->secret();
+    return tls_certificate_config_ == nullptr ? nullptr : tls_certificate_config_.get();
   }
   const CertificateValidationContextConfig* certificateValidationContext() const override {
-    return certficate_validation_context_provider_ == nullptr
-               ? nullptr
-               : certficate_validation_context_provider_->secret();
+    return validation_context_config_ == nullptr ? nullptr : validation_context_config_.get();
   }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
@@ -41,8 +39,7 @@ public:
     // tls_certficate_provider_->secret() is NOT nullptr and
     // either certficate_validation_context_provider_ is nullptr or
     // certficate_validation_context_provider_->secret() is NOT nullptr.
-    bool tls_is_ready =
-        (!tls_certficate_provider_ || tls_certficate_provider_->secret() != nullptr);
+    bool tls_is_ready = (!tls_certficate_provider_ || tls_certificate_config_);
     bool combined_cvc_is_ready = (!default_cvc_ || validation_context_config_);
     bool cvc_is_ready =
         (!certficate_validation_context_provider_ ||
@@ -50,32 +47,10 @@ public:
     return tls_is_ready && combined_cvc_is_ready && cvc_is_ready;
   }
 
-  void setSecretUpdateCallback(std::function<void()> callback) override {
-    if (tls_certficate_provider_) {
-      if (tc_update_callback_handle_) {
-        tc_update_callback_handle_->remove();
-      }
-      tc_update_callback_handle_ = tls_certficate_provider_->addUpdateCallback(callback);
-    }
-    if (certficate_validation_context_provider_) {
-      if (cvc_update_callback_handle_) {
-        cvc_update_callback_handle_->remove();
-      }
-      if (default_cvc_) {
-        cvc_update_callback_handle_ = certficate_validation_context_provider_->addUpdateCallback(
-            [this, callback](const envoy::api::v2::auth::Secret& secret) {
-              onValidationContextUpdate(secret.validation_context());
-              callback();
-            });
-      } else {
-        cvc_update_callback_handle_ =
-            certficate_validation_context_provider_->addUpdateCallback(callback);
-      }
-    }
-  }
+  void setSecretUpdateCallback(std::function<void()> callback) override;
 
-  void
-  onValidationContextUpdate(const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc);
+  Ssl::CertificateValidationContextConfigPtr getCombinedValidationContextConfig(
+      const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc);
 
 protected:
   ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContext& config,
@@ -103,8 +78,9 @@ private:
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
 
-  std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext> default_cvc_;
+  Ssl::TlsCertificateConfigPtr tls_certificate_config_;
   Ssl::CertificateValidationContextConfigPtr validation_context_config_;
+  std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext> default_cvc_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {
