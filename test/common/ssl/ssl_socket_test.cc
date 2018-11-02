@@ -939,7 +939,7 @@ TEST_P(SslSocketTest, ClientCertificateHashVerification) {
 )EOF";
 
   testUtil(client_ctx_yaml, server_ctx_yaml, "", "spiffe://lyft.com/test-team", "",
-           "de8a932ffc6a57da", "", "", "", "ssl.handshake", true, GetParam(), absl::nullopt);
+           "de8a932ffc6a57da", "", "", "", "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashVerificationNoCA) {
@@ -964,7 +964,7 @@ TEST_P(SslSocketTest, ClientCertificateHashVerificationNoCA) {
 )EOF";
 
   testUtil(client_ctx_yaml, server_ctx_yaml, "", "spiffe://lyft.com/test-team", "",
-           "de8a932ffc6a57da", "", "", "", "ssl.handshake", true, GetParam(), absl::nullopt);
+           "de8a932ffc6a57da", "", "", "", "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashListVerification) {
@@ -1066,7 +1066,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoClientCertificate
 )EOF";
 
   testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_no_cert",
-           false, GetParam(), absl::nullopt);
+           false, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCANoClientCertificate) {
@@ -1086,7 +1086,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCANoClientCertifi
 )EOF";
 
   testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_no_cert",
-           false, GetParam(), absl::nullopt);
+           false, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongClientCertificate) {
@@ -1113,7 +1113,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongClientCertific
 )EOF";
 
   testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "",
-           "ssl.fail_verify_cert_hash", false, GetParam(), absl::nullopt);
+           "ssl.fail_verify_cert_hash", false, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCAWrongClientCertificate) {
@@ -1138,7 +1138,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCAWrongClientCert
 )EOF";
 
   testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "",
-           "ssl.fail_verify_cert_hash", false, GetParam(), absl::nullopt);
+           "ssl.fail_verify_cert_hash", false, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongCA) {
@@ -1165,7 +1165,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongCA) {
 )EOF";
 
   testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_error",
-           false, GetParam(), absl::nullopt);
+           false, GetParam());
 }
 
 TEST_P(SslSocketTest, ClientCertificateSpkiVerification) {
