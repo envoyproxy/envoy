@@ -19,7 +19,7 @@ protected:
                    ConnectionPool::Callbacks& callbacks);
     ~PendingRequest();
 
-    // Cancellable
+    // ConnectionPool::Cancellable
     void cancel() override { parent_.onPendingRequestCancel(*this); }
 
     ConnPoolImplBase& parent_;
