@@ -2951,11 +2951,13 @@ TEST_P(SslSocketTest, CreateTransportSocketWithOverrideServerName) {
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(), transport_socket, nullptr);
 
-  const Ssl::SslSocket* ssl_socket =
-    dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
-  EXPECT_NE(nullptr, ssl_socket);
-  SSL* client_ssl_socket = ssl_socket->rawSslForTest();
-  EXPECT_NE(nullptr, client_ssl_socket);
+  if (!client_session.empty()) {
+    const Ssl::SslSocket* ssl_socket =
+        dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
+    EXPECT_NE(nullptr, ssl_socket);
+    SSL* client_ssl_socket = ssl_socket->rawSslForTest();
+    EXPECT_NE(nullptr, client_ssl_socket);
+  }
 }
 
 class SslReadBufferLimitTest : public SslSocketTest {
