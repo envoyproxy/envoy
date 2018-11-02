@@ -71,11 +71,20 @@ typedef std::shared_ptr<Instance> InstanceSharedPtr;
 
 /**
  * Interface for access log formatter.
+ * Formatters provide a complete access log output line for the given headers/trailers/stream.
  */
 class Formatter {
 public:
   virtual ~Formatter() {}
 
+  /**
+   * Return a formatted access log line.
+   * @param request_headers supplies the request headers.
+   * @param response_headers supplies the response headers.
+   * @param response_trailers supplies the response trailers.
+   * @param stream_info supplies the stream info.
+   * @return std::string string containing the complete formatted access log line.
+   */
   virtual std::string format(const Http::HeaderMap& request_headers,
                              const Http::HeaderMap& response_headers,
                              const Http::HeaderMap& response_trailers,
@@ -83,6 +92,30 @@ public:
 };
 
 typedef std::unique_ptr<Formatter> FormatterPtr;
+
+/**
+ * Interface for access log provider.
+ * FormatterProviders extract information from the given headers/trailers/stream.
+ */
+class FormatterProvider {
+public:
+  virtual ~FormatterProvider() {}
+
+  /**
+   * Extract a value from the provided headers/trailers/stream.
+   * @param request_headers supplies the request headers.
+   * @param response_headers supplies the response headers.
+   * @param response_trailers supplies the response trailers.
+   * @param stream_info supplies the stream info.
+   * @return std::string containing a single value extracted from the given headers/trailers/stream.
+   */
+  virtual std::string format(const Http::HeaderMap& request_headers,
+                             const Http::HeaderMap& response_headers,
+                             const Http::HeaderMap& response_trailers,
+                             const StreamInfo::StreamInfo& stream_info) const PURE;
+};
+
+typedef std::unique_ptr<FormatterProvider> FormatterProviderPtr;
 
 } // namespace AccessLog
 } // namespace Envoy

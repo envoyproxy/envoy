@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <memory>
 
 #include "envoy/common/exception.h"
 #include "envoy/event/timer.h"
@@ -46,9 +47,10 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                TransportSocketPtr&& transport_socket, bool connected)
     : transport_socket_(std::move(transport_socket)), filter_manager_(*this, *this),
-      socket_(std::move(socket)), write_buffer_(dispatcher.getWatermarkFactory().create(
-                                      [this]() -> void { this->onLowWatermark(); },
-                                      [this]() -> void { this->onHighWatermark(); })),
+      socket_(std::move(socket)), stream_info_(dispatcher.timeSystem()),
+      write_buffer_(
+          dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
+                                                  [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), id_(next_global_id_++) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -555,7 +557,7 @@ void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
   ASSERT(!connection_stats_,
          "Two network filters are attempting to set connection stats. This indicates an issue "
          "with the configured filter chain.");
-  connection_stats_.reset(new ConnectionStats(stats));
+  connection_stats_ = std::make_unique<ConnectionStats>(stats);
 }
 
 void ConnectionImpl::updateReadBufferStats(uint64_t num_read, uint64_t new_size) {

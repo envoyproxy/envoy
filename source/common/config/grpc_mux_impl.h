@@ -1,5 +1,6 @@
 #pragma once
 
+#include <queue>
 #include <unordered_map>
 
 #include "envoy/common/time.h"
@@ -13,6 +14,7 @@
 
 #include "common/common/backoff_strategy.h"
 #include "common/common/logger.h"
+#include "common/config/utility.h"
 
 namespace Envoy {
 namespace Config {
@@ -26,7 +28,8 @@ class GrpcMuxImpl : public GrpcMux,
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              Runtime::RandomGenerator& random, Stats::Scope& scope);
+              Runtime::RandomGenerator& random, Stats::Scope& scope,
+              const RateLimitSettings& rate_limit_settings);
   ~GrpcMuxImpl();
 
   void start() override;
@@ -51,6 +54,8 @@ private:
   void establishNewStream();
   void sendDiscoveryRequest(const std::string& type_url);
   void handleFailure();
+  void queueDiscoveryRequest(const std::string& type_url);
+  void drainRequests();
   ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
     const std::string control_plane_prefix = "control_plane.";
     return {ALL_CONTROL_PLANE_STATS(POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
@@ -92,10 +97,6 @@ private:
     bool pending_{};
     // Has this API been tracked in subscriptions_?
     bool subscribed_{};
-    // Detects when Envoy is making too many requests.
-    TokenBucketPtr limit_request_;
-    // Limits warning messages when too many requests is detected.
-    TokenBucketPtr limit_log_;
   };
 
   const LocalInfo::LocalInfo& local_info_;
@@ -110,6 +111,11 @@ private:
   TimeSource& time_source_;
   BackOffStrategyPtr backoff_strategy_;
   ControlPlaneStats control_plane_stats_;
+  // Detects when Envoy is making too many requests.
+  TokenBucketPtr limit_request_;
+  std::queue<std::string> request_queue_;
+  Event::TimerPtr drain_request_timer_;
+  const bool rate_limiting_enabled_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {

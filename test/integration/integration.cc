@@ -15,6 +15,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/stack_array.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
 #include "common/network/connection_impl.h"
@@ -91,9 +92,9 @@ void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool 
 void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream) {
   saw_end_stream_ = end_stream;
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
-  data.getRawSlices(slices, num_slices);
-  for (Buffer::RawSlice& slice : slices) {
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  data.getRawSlices(slices.begin(), num_slices);
+  for (const Buffer::RawSlice& slice : slices) {
     body_.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 
@@ -301,8 +302,8 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
 }
 
 IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
-  return IntegrationTcpClientPtr{new IntegrationTcpClient(*dispatcher_, *mock_buffer_factory_, port,
-                                                          version_, enable_half_close_)};
+  return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
+                                                enable_half_close_);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {

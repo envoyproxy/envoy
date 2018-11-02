@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <list>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -117,11 +118,7 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
     if (codec_->protocol() == Protocol::Http2) {
       stats_.named_.downstream_cx_http2_active_.dec();
     } else {
-      if (isOldStyleWebSocketConnection()) {
-        stats_.named_.downstream_cx_websocket_active_.dec();
-      } else {
-        stats_.named_.downstream_cx_http1_active_.dec();
-      }
+      stats_.named_.downstream_cx_http1_active_.dec();
     }
   }
 
@@ -213,16 +210,7 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
   return **streams_.begin();
 }
 
-Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool end_stream) {
-  // Send the data through WebSocket handlers if this connection is a
-  // WebSocket connection. N.B. The first request from the client to Envoy
-  // will still be processed as a normal HTTP/1.1 request, where Envoy will
-  // detect the WebSocket upgrade and establish a connection to the
-  // upstream.
-  if (isOldStyleWebSocketConnection()) {
-    return ws_connection_->onData(data, end_stream);
-  }
-
+Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool) {
   if (!codec_) {
     codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
     if (codec_->protocol() == Protocol::Http2) {
@@ -268,8 +256,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
         redispatch = true;
       }
 
-      if (!streams_.empty() && streams_.front()->state_.remote_complete_ &&
-          !isOldStyleWebSocketConnection()) {
+      if (!streams_.empty() && streams_.front()->state_.remote_complete_) {
         read_callbacks_->connection().readDisable(true);
       }
     }
@@ -420,6 +407,9 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_headers_.get(), stream_info_,
                                              *this);
   }
+  if (state_.successful_upgrade_) {
+    connection_manager_.stats_.named_.downstream_cx_upgrades_active_.dec();
+  }
 
   ASSERT(state_.filter_call_state_ == 0);
 }
@@ -458,7 +448,11 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
     StreamEncoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
-  wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
+  if (connection_manager_.config_.reverseEncodeOrder()) {
+    wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
+  } else {
+    wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
@@ -504,6 +498,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     is_head_request_ = true;
   }
 
+  maybeEndDecode(end_stream);
+
   // Drop new requests when overloaded as soon as we have decoded the headers.
   if (connection_manager_.overload_stop_accepting_requests_ref_ ==
       Server::OverloadActionState::Active) {
@@ -514,8 +510,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   const bool upgrade_rejected = createFilterChain() == false;
-
-  maybeEndDecode(end_stream);
 
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
                    *request_headers_);
@@ -587,10 +581,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   // Currently we only support relative paths at the application layer. We expect the codec to have
-  // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec does not do this
-  // so we only support relative paths in all cases. https://tools.ietf.org/html/rfc7230#section-5.3
-  // We also need to check for the existence of :path because CONNECT does not have a path, and we
-  // don't support that currently.
+  // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does this
+  // when the allow_absolute_url flag is enabled on the HCM.
+  // https://tools.ietf.org/html/rfc7230#section-5.3 We also need to check for the existence of
+  // :path because CONNECT does not have a path, and we don't support that currently.
   if (!request_headers_->Path() || request_headers_->Path()->value().c_str()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
@@ -615,28 +609,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   ASSERT(!cached_route_);
   refreshCachedRoute();
 
-  // Check for WebSocket upgrade request if the route exists, and supports WebSockets.
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
   if (protocol == Protocol::Http11 && cached_route_.value()) {
-    const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
-    const bool old_style_websocket =
-        (route_entry != nullptr) && route_entry->useOldStyleWebSocket();
-    const bool websocket_requested = Utility::isWebSocketUpgradeRequest(*request_headers_);
-
-    if (websocket_requested && old_style_websocket) {
-      ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
-
-      connection_manager_.ws_connection_ = route_entry->createWebSocketProxy(
-          *request_headers_, stream_info_, *this, connection_manager_.cluster_manager_,
-          connection_manager_.read_callbacks_);
-      ASSERT(connection_manager_.ws_connection_ != nullptr);
-      connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
-      connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
-      connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
-      return;
-    } else if (upgrade_rejected) {
-      // Do not allow WebSocket upgrades if the route does not support it.
+    if (upgrade_rejected) {
+      // Do not allow upgrades if the route does not support it.
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
       sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::Forbidden, "",
                      nullptr, is_head_request_);
@@ -775,15 +752,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
   maybeEndDecode(end_stream);
   stream_info_.addBytesReceived(data.length());
-
-  // If the initial websocket upgrade request had an HTTP body
-  // let's send this up
-  if (connection_manager_.isOldStyleWebSocketConnection()) {
-    if (data.length() > 0) {
-      connection_manager_.ws_connection_->onData(data, false);
-    }
-    return;
-  }
 
   decodeData(nullptr, data, end_stream);
 }
@@ -1317,6 +1285,9 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
   if (upgrade != nullptr) {
     if (connection_manager_.config_.filterFactory().createUpgradeFilterChain(
             upgrade->value().c_str(), *this)) {
+      state_.successful_upgrade_ = true;
+      connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
+      connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
       return true;
     } else {
       upgrade_rejected = true;
@@ -1507,9 +1478,9 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
-  auto buffer = Buffer::WatermarkBufferPtr{
-      new Buffer::WatermarkBuffer([this]() -> void { this->requestDataDrained(); },
-                                  [this]() -> void { this->requestDataTooLarge(); })};
+  auto buffer =
+      std::make_unique<Buffer::WatermarkBuffer>([this]() -> void { this->requestDataDrained(); },
+                                                [this]() -> void { this->requestDataTooLarge(); });
   buffer->setWatermarks(parent_.buffer_limit_);
   return buffer;
 }

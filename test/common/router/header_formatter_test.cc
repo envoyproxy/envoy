@@ -1,10 +1,12 @@
 #include <string>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/rds.pb.validate.h"
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
+#include "common/config/utility.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/string_accessor_impl.h"
@@ -161,29 +163,30 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"list_key\"])", "");
 }
 
-// Breaks tsan/asan builds by trying to allocate a lot of memory.
-// Works on debug builds and needs to be fixed. See
-// https://github.com/envoyproxy/envoy/issues/4268
-TEST_F(StreamInfoHeaderFormatterTest, DISABLED_UserDefinedHeadersConsideredHarmful) {
-  // This must be an inline header to get the append-in-place semantics.
-  const char* header_name = "connection";
-  Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
-  const uint32_t num_header_chunks = 10;
-  const uint64_t length = std::numeric_limits<uint32_t>::max() / num_header_chunks;
-  std::string really_long_string(length + 1, 'a');
-  for (uint32_t i = 0; i < num_header_chunks; ++i) {
-    envoy::api::v2::core::HeaderValueOption* header = to_add.Add();
-    header->mutable_header()->set_key(header_name);
-    header->mutable_header()->set_value(really_long_string);
+// Replaces the test of user-defined-headers acting as a Query of Death with
+// size checks on user defined headers.
+TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
+  {
+    envoy::api::v2::RouteConfiguration route;
+    envoy::api::v2::core::HeaderValueOption* header = route.mutable_request_headers_to_add()->Add();
+    std::string long_string(16385, 'a');
+    header->mutable_header()->set_key("header_name");
+    header->mutable_header()->set_value(long_string);
     header->mutable_append()->set_value(true);
+    EXPECT_THROW_WITH_REGEX(MessageUtil::validate(route), ProtoValidationException,
+                            "Proto constraint validation failed.*");
   }
-
-  HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
-
-  Http::TestHeaderMapImpl header_map{{":method", "POST"}};
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_DEATH_LOG_TO_STDERR(req_header_parser->evaluateHeaders(header_map, stream_info),
-                             "Trying to allocate overly large headers.");
+  {
+    envoy::api::v2::RouteConfiguration route;
+    for (int i = 0; i < 1001; ++i) {
+      envoy::api::v2::core::HeaderValueOption* header =
+          route.mutable_request_headers_to_add()->Add();
+      header->mutable_header()->set_key("header_name");
+      header->mutable_header()->set_value("value");
+    }
+    EXPECT_THROW_WITH_REGEX(MessageUtil::validate(route), ProtoValidationException,
+                            "Proto constraint validation failed.*");
+  }
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMissingHost) {
@@ -195,27 +198,29 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMiss
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
-  Envoy::StreamInfo::FilterStateImpl per_request_state;
-  per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  EXPECT_EQ("test_value", per_request_state.getData<StringAccessor>("testing").asString());
+  Envoy::StreamInfo::FilterStateImpl filter_state;
+  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_EQ("test_value", filter_state.getDataReadOnly<StringAccessor>("testing").asString());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  ON_CALL(stream_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
-  ON_CALL(Const(stream_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 
   testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "test_value");
   testFormatting(stream_info, "PER_REQUEST_STATE(testing2)", "");
-  EXPECT_EQ("test_value", per_request_state.getData<StringAccessor>("testing").asString());
+  EXPECT_EQ("test_value", filter_state.getDataReadOnly<StringAccessor>("testing").asString());
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
-  Envoy::StreamInfo::FilterStateImpl per_request_state;
-  per_request_state.setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1));
-  EXPECT_EQ(1, per_request_state.getData<StreamInfo::TestIntAccessor>("testing").access());
+  Envoy::StreamInfo::FilterStateImpl filter_state;
+  filter_state.setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_EQ(1, filter_state.getDataReadOnly<StreamInfo::TestIntAccessor>("testing").access());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  ON_CALL(stream_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
-  ON_CALL(Const(stream_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 
   testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "");
 }
@@ -422,10 +427,11 @@ TEST(HeaderParserTest, TestParseInternal) {
   const SystemTime start_time(std::chrono::milliseconds(1522796769123));
   ON_CALL(stream_info, startTime()).WillByDefault(Return(start_time));
 
-  Envoy::StreamInfo::FilterStateImpl per_request_state;
-  per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  ON_CALL(stream_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
-  ON_CALL(Const(stream_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  Envoy::StreamInfo::FilterStateImpl filter_state;
+  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+  ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 
   for (const auto& test_case : test_cases) {
     Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
@@ -583,10 +589,11 @@ request_headers_to_remove: ["x-nope"]
       )EOF"));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  Envoy::StreamInfo::FilterStateImpl per_request_state;
-  per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  ON_CALL(stream_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
-  ON_CALL(Const(stream_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  Envoy::StreamInfo::FilterStateImpl filter_state;
+  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+  ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 
   req_header_parser->evaluateHeaders(header_map, stream_info);
 

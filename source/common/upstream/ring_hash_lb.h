@@ -45,11 +45,11 @@ private:
   typedef std::shared_ptr<const Ring> RingConstSharedPtr;
 
   // ThreadAwareLoadBalancerBase
-  HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set) override {
+  HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set, bool in_panic) override {
     // Note that we only compute global panic on host set refresh. Given that the runtime setting
     // will rarely change, this is a reasonable compromise to avoid creating extra LBs when we only
     // need to create one per priority level.
-    if (isGlobalPanic(host_set)) {
+    if (in_panic) {
       return std::make_shared<Ring>(config_, host_set.hosts());
     } else {
       return std::make_shared<Ring>(config_, host_set.healthyHosts());

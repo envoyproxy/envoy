@@ -18,6 +18,7 @@ envoy_cc_test_library(
     deps = [
         "//include/envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
+        "//source/common/stream_info:filter_state_lib",
         "//test/test_common:test_time_lib",
     ],
 )

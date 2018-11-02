@@ -19,7 +19,7 @@ namespace Lightstep {
 
 void LightStepLogger::operator()(lightstep::LogLevel level,
                                  opentracing::string_view message) const {
-  const fmt::StringRef fmt_message{message.data(), message.size()};
+  const fmt::string_view fmt_message{message.data(), message.size()};
   switch (level) {
   case lightstep::LogLevel::debug:
     ENVOY_LOG(debug, "{}", fmt_message);
@@ -162,8 +162,8 @@ LightStepDriver::LightStepDriver(const envoy::config::trace::v2::LightstepConfig
       return runtime_.snapshot().getInteger("tracing.lightstep.min_flush_spans",
                                             DefaultMinFlushSpans);
     }};
-    tls_options.metrics_observer.reset(new LightStepMetricsObserver{*this});
-    tls_options.transporter.reset(new LightStepTransporter{*this});
+    tls_options.metrics_observer = std::make_unique<LightStepMetricsObserver>(*this);
+    tls_options.transporter = std::make_unique<LightStepTransporter>(*this);
     std::shared_ptr<lightstep::LightStepTracer> tracer =
         lightstep::MakeLightStepTracer(std::move(tls_options));
 

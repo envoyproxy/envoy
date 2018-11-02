@@ -52,7 +52,7 @@ public:
 
   // Value factory.
   template <typename T> static FieldSharedPtr createValue(T value) {
-    return FieldSharedPtr{new Field(value)};
+    return FieldSharedPtr{new Field(value)}; // NOLINT(modernize-make-shared)
   }
 
   void append(FieldSharedPtr field_ptr) {

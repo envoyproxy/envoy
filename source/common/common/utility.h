@@ -25,7 +25,9 @@ namespace Envoy {
  */
 class DateFormatter {
 public:
-  DateFormatter(const std::string& format_string) : format_string_(parse(format_string)) {}
+  DateFormatter(const std::string& format_string) : raw_format_string_(format_string) {
+    parse(format_string);
+  }
 
   /**
    * @return std::string representing the GMT/UTC time based on the input time.
@@ -33,22 +35,18 @@ public:
   std::string fromTime(const SystemTime& time) const;
 
   /**
-   * @return std::string representing the GMT/UTC time based on the input time.
+   * @param time_source time keeping source.
+   * @return std::string representing the GMT/UTC time of a TimeSource based on the format string.
    */
-  std::string fromTime(time_t time) const;
-
-  /**
-   * @return std::string representing the current GMT/UTC time based on the format string.
-   */
-  std::string now();
+  std::string now(TimeSource& time_source);
 
   /**
    * @return std::string the format string used.
    */
-  const std::string& formatString() const { return format_string_; }
+  const std::string& formatString() const { return raw_format_string_; }
 
 private:
-  std::string parse(const std::string& format_string);
+  void parse(const std::string& format_string);
 
   typedef std::vector<int32_t> SpecifierOffsets;
   std::string fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
@@ -84,7 +82,8 @@ private:
   // This holds all specifiers found in a given format string.
   std::vector<Specifier> specifiers_;
 
-  const std::string format_string_;
+  // This is the format string as supplied in configuration, e.g. "foo %3f bar".
+  const std::string raw_format_string_;
 };
 
 /**
@@ -290,7 +289,7 @@ public:
    * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
    * @param keep_empty_string result contains empty strings if the string starts or ends with
    * 'split', or if instances of 'split' are adjacent; default = false.
-   * @return true if found and false otherwise.
+   * @return vector containing views of the split strings
    */
   static std::vector<absl::string_view> splitToken(absl::string_view source,
                                                    absl::string_view delimiters,

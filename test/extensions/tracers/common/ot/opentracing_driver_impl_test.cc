@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "extensions/tracers/common/ot/opentracing_driver_impl.h"
 
 #include "test/mocks/http/mocks.h"
@@ -50,7 +52,7 @@ public:
   setupValidDriver(OpenTracingDriver::PropagationMode propagation_mode =
                        OpenTracingDriver::PropagationMode::SingleHeader,
                    const opentracing::mocktracer::PropagationOptions& propagation_options = {}) {
-    driver_.reset(new TestDriver{propagation_mode, propagation_options, stats_});
+    driver_ = std::make_unique<TestDriver>(propagation_mode, propagation_options, stats_);
   }
 
   const std::string operation_name_{"test"};

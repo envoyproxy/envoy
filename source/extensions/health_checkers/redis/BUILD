@@ -40,6 +40,8 @@ envoy_cc_library(
     name = "utility",
     hdrs = ["utility.h"],
     deps = [
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/core:health_check_cc",
         "@envoy_api//envoy/config/health_checker/redis/v2:redis_cc",
     ],

@@ -201,8 +201,8 @@ HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) 
   cluster->http2_settings_.allow_connect_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
-  return IntegrationCodecClientPtr{new IntegrationCodecClient(
-      *dispatcher_, std::move(conn), host_description, downstream_protocol_)};
+  return std::make_unique<IntegrationCodecClient>(*dispatcher_, std::move(conn), host_description,
+                                                  downstream_protocol_);
 }
 
 IntegrationCodecClientPtr
@@ -840,8 +840,8 @@ void HttpIntegrationTest::testGrpcRetry() {
 // healthy.
 void HttpIntegrationTest::testRetryPriority() {
   const Upstream::PriorityLoad priority_load{0, 100};
-  Upstream::MockRetryPriorityFactory factory(
-      std::make_shared<NiceMock<Upstream::MockRetryPriority>>(priority_load));
+  NiceMock<Upstream::MockRetryPriority> retry_priority(priority_load);
+  Upstream::MockRetryPriorityFactory factory(retry_priority);
 
   Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_factory(factory);
 

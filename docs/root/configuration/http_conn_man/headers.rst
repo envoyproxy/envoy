@@ -357,7 +357,6 @@ is out of scope for this documentation. If *x-request-id* is propagated across a
 following features are available:
 
 * Stable :ref:`access logging <config_access_log>` via the
-  :ref:`v1 API runtime filter<config_http_con_manager_access_log_filters_runtime_v1>` or the
   :ref:`v2 API runtime filter<envoy_api_field_config.filter.accesslog.v2.AccessLogFilter.runtime_filter>`.
 * Stable tracing when performing random sampling via the :ref:`tracing.random_sampling
   <config_http_conn_man_runtime_random_sampling>` runtime setting or via forced tracing using the
@@ -429,15 +428,23 @@ The encode one or more options. For example, Debug is encoded as
 ``X-B3-Flags: 1``. See more on zipkin tracing
 `here <https://github.com/openzipkin/b3-propagation>`.
 
+.. _config_http_conn_man_headers_b3:
+
+b3
+----------
+
+The *b3* HTTP header is used by the Zipkin tracer in Envoy.
+Is a more compressed header format. See more on zipkin tracing
+`here <https://github.com/openzipkin/b3-propagation#single-header>`.
+
 .. _config_http_conn_man_headers_custom_request_headers:
 
 Custom request/response headers
 -------------------------------
 
 Custom request/response headers can be added to a request/response at the weighted cluster,
-route, virtual host, and/or global route configuration level. See the relevant :ref:`v1
-<config_http_conn_man_route_table>` and :ref:`v2 <envoy_api_msg_RouteConfiguration>` API
-documentation.
+route, virtual host, and/or global route configuration level. See the
+:ref:`v2 <envoy_api_msg_RouteConfiguration>` API documentation.
 
 No *:*-prefixed pseudo-header may be modified via this mechanism. The *:path*
 and *:authority* headers may instead be modified via mechanisms such as
@@ -495,7 +502,7 @@ Supported variable names are:
     parameters **do not** need to be escaped by doubling them.
 
 %PER_REQUEST_STATE(reverse.dns.data.name)%
-    Populates the header with values set on the stream info perRequestState() object. To be
+    Populates the header with values set on the stream info filterState() object. To be
     usable in custom request/response headers, these values must be of type
     Envoy::Router::StringAccessor. These values should be named in standard reverse DNS style,
     identifying the organization that created the value and ending in a unique name for the data. 

@@ -1,15 +1,14 @@
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
-#include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/ssl/context_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
 #include "openssl/ssl.h"
@@ -75,7 +74,7 @@ public:
   CertificateDetailsPtr getCertChainInformation() const override;
 
 protected:
-  ContextImpl(Stats::Scope& scope, const ContextConfig& config);
+  ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source);
 
   /**
    * The global SSL-library index used for storing a pointer to the context
@@ -116,9 +115,6 @@ protected:
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
   static SslStats generateStats(Stats::Scope& scope);
 
-  // TODO: Move helper function to the `Ssl::Utility` namespace.
-  int32_t getDaysUntilExpiration(const X509* cert) const;
-
   std::string getCaFileName() const { return ca_file_path_; };
   std::string getCertChainFileName() const { return cert_chain_file_path_; };
 
@@ -136,13 +132,15 @@ protected:
   bssl::UniquePtr<X509> cert_chain_;
   std::string ca_file_path_;
   std::string cert_chain_file_path_;
+  TimeSource& time_source_;
 };
 
 typedef std::shared_ptr<ContextImpl> ContextImplSharedPtr;
 
 class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
-  ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config);
+  ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config,
+                    TimeSource& time_source);
 
   bssl::UniquePtr<SSL> newSsl() const override;
 
@@ -154,7 +152,7 @@ private:
 class ServerContextImpl : public ContextImpl, public ServerContext {
 public:
   ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
-                    const std::vector<std::string>& server_names, Runtime::Loader& runtime);
+                    const std::vector<std::string>& server_names, TimeSource& time_source);
 
 private:
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
@@ -162,8 +160,6 @@ private:
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt);
 
-  Runtime::Loader& runtime_;
-  std::vector<uint8_t> parsed_alt_alpn_protocols_;
   const std::vector<ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };
 

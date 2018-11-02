@@ -195,8 +195,10 @@ envoy_cc_test(
         ":cluster_dupe_bootstrap.yaml",
         ":cluster_health_check_bootstrap.yaml",
         ":empty_bootstrap.yaml",
+        ":empty_runtime.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",
+        ":node_bootstrap_without_access_log.yaml",
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",
     ],
@@ -227,6 +229,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/config:lds_json_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

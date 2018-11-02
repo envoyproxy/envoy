@@ -20,6 +20,7 @@
 
 using testing::_;
 using testing::InSequence;
+using testing::Matcher;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -48,6 +49,7 @@ public:
   MOCK_METHOD0(dateProvider, DateProvider&());
   MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
+  MOCK_METHOD0(reverseEncodeOrder, bool());
   MOCK_METHOD0(generateRequestId, bool());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
@@ -325,7 +327,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                               {"x-request-id", "will_be_regenerated"}};
     EXPECT_CALL(random_, uuid());
 
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", _)).Times(0);
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", Matcher<uint64_t>(_)))
+        .Times(0);
     EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
               callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
@@ -532,7 +535,7 @@ TEST_F(ConnectionManagerUtilityTest, AppendInternalAddressXffNotInternalRequest)
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_EQ("10.0.0.2, 10.0.0.1", headers.get_("x-forwarded-for"));
+  EXPECT_EQ("10.0.0.2,10.0.0.1", headers.get_("x-forwarded-for"));
 }
 
 // A request that is from an internal address and uses remote address should be an internal request.
