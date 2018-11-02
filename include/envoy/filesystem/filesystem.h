@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <functional>
-#include <iterator>
 #include <memory>
 #include <string>
 
@@ -85,18 +84,11 @@ struct DirectoryEntry {
 class DirectoryIteratorImpl;
 class DirectoryIterator {
 public:
-  typedef std::input_iterator_tag iterator_category;
-  typedef DirectoryEntry value_type;
-  typedef DirectoryEntry& reference;
-  typedef void pointer;
-  typedef void difference_type;
-
   DirectoryIterator() : entry_({"", FileType::Other}) {}
   virtual ~DirectoryIterator() {}
 
   const DirectoryEntry& operator*() const { return entry_; }
 
-  bool operator==(const DirectoryIterator& rhs) const { return entry_ == *rhs; }
   bool operator!=(const DirectoryIterator& rhs) const { return !(entry_ == *rhs); }
 
   virtual DirectoryIteratorImpl& operator++() PURE;

@@ -4,6 +4,8 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_cc_platform_dep",
+    "envoy_cc_posix_library",
+    "envoy_cc_win32_library",
     "envoy_package",
 )
 
@@ -15,8 +17,8 @@ envoy_cc_library(
     deps = envoy_cc_platform_dep("directory_iterator_impl_lib"),
 )
 
-envoy_cc_library(
-    name = "directory_iterator_impl_lib_win32",
+envoy_cc_win32_library(
+    name = "directory_iterator_impl_lib",
     srcs = ["win32/directory_iterator_impl.cc"],
     hdrs = ["win32/directory_iterator_impl.h"],
     strip_include_prefix = "win32",
@@ -25,8 +27,8 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
-    name = "directory_iterator_impl_lib_posix",
+envoy_cc_posix_library(
+    name = "directory_iterator_impl_lib",
     srcs = ["posix/directory_iterator_impl.cc"],
     hdrs = ["posix/directory_iterator_impl.h"],
     strip_include_prefix = "posix",
