@@ -50,7 +50,7 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
                            ThreadLocal::Instance& tls)
-    : options_(options), time_system_(time_system), restarter_(restarter),
+    : shutdown_(false), options_(options), time_system_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
       thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec())),
       secret_manager_(std::make_unique<Secret::SecretManagerImpl>()),
@@ -388,15 +388,15 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
 
 uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
-RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
-                     HotRestart& hot_restart, AccessLog::AccessLogManager& access_log_manager,
+RunHelper::RunHelper(Instance& instance, Event::Dispatcher& dispatcher,
+                     Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
                      InitManagerImpl& init_manager, OverloadManager& overload_manager,
                      std::function<void()> workers_start_cb) {
 
   // Setup signals.
-  sigterm_ = dispatcher.listenForSignal(SIGTERM, [this, &hot_restart, &dispatcher]() {
+  sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
     ENVOY_LOG(warn, "caught SIGTERM");
-    shutdown(dispatcher, hot_restart);
+    instance.shutdown();
   });
 
   sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
@@ -413,8 +413,8 @@ RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm
   // this can fire immediately if all clusters have already initialized. Also note that we need
   // to guard against shutdown at two different levels since SIGTERM can come in once the run loop
   // starts.
-  cm.setInitializedCb([this, &init_manager, &cm, workers_start_cb]() {
-    if (shutdown_) {
+  cm.setInitializedCb([&instance, &init_manager, &cm, workers_start_cb]() {
+    if (instance.isShutdown()) {
       return;
     }
 
@@ -424,8 +424,11 @@ RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm
     cm.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
-    init_manager.initialize([this, workers_start_cb]() {
-      if (shutdown_) {
+
+    // Note: the lamda below should not capture "this" since the RunHelper object may
+    // have been destructed by the time it gets executed.
+    init_manager.initialize([&instance, workers_start_cb]() {
+      if (instance.isShutdown()) {
         return;
       }
 
@@ -440,16 +443,10 @@ RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm
   overload_manager.start();
 }
 
-void RunHelper::shutdown(Event::Dispatcher& dispatcher, HotRestart& hot_restart) {
-  shutdown_ = true;
-  hot_restart.terminateParent();
-  dispatcher.exit();
-}
-
 void InstanceImpl::run() {
   // We need the RunHelper to be available to call from InstanceImpl::shutdown() below, so
   // we save it as a member variable.
-  run_helper_ = std::make_unique<RunHelper>(*dispatcher_, clusterManager(), restarter_,
+  run_helper_ = std::make_unique<RunHelper>(*this, *dispatcher_, clusterManager(),
                                             access_log_manager_, init_manager_, overloadManager(),
                                             [this]() -> void { startWorkers(); });
 
@@ -505,8 +502,9 @@ void InstanceImpl::terminate() {
 Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }
 
 void InstanceImpl::shutdown() {
-  ASSERT(run_helper_.get() != nullptr);
-  run_helper_->shutdown(*dispatcher_, restarter_);
+  shutdown_ = true;
+  restarter_.terminateParent();
+  dispatcher_->exit();
 }
 
 void InstanceImpl::shutdownAdmin() {
