@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/common/version.h"
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -60,8 +62,9 @@ public:
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
     EXPECT_CALL(overload_manager_, start());
 
-    helper_.reset(new RunHelper(dispatcher_, cm_, hot_restart_, access_log_manager_, init_manager_,
-                                overload_manager_, [this] { start_workers_.ready(); }));
+    helper_ = std::make_unique<RunHelper>(dispatcher_, cm_, hot_restart_, access_log_manager_,
+                                          init_manager_, overload_manager_,
+                                          [this] { start_workers_.ready(); });
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -112,11 +115,11 @@ protected:
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
     }
-    server_.reset(new InstanceImpl(
+    server_ = std::make_unique<InstanceImpl>(
         options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_));
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_);
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
@@ -128,11 +131,11 @@ protected:
         {{"health_check_timeout", fmt::format("{}", timeout).c_str()},
          {"health_check_interval", fmt::format("{}", interval).c_str()}},
         TestEnvironment::PortMap{}, version_);
-    server_.reset(new InstanceImpl(
+    server_ = std::make_unique<InstanceImpl>(
         options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_));
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_);
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }

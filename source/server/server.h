@@ -205,13 +205,13 @@ private:
   std::unique_ptr<ServerStats> server_stats_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<AdminImpl> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorPtr random_generator_;
   Runtime::LoaderPtr runtime_loader_;
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;

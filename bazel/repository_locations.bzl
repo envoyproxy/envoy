@@ -1,8 +1,7 @@
 REPOSITORY_LOCATIONS = dict(
     bazel_gazelle = dict(
-        sha256 = "1b959bd6b6ce88fc3fdfc28946adf1eafb1d5e4d470d2e08a51774d09078d031",
-        strip_prefix = "bazel-gazelle-0.14.0",
-        urls = ["https://github.com/bazelbuild/bazel-gazelle/archive/0.14.0.tar.gz"],
+        sha256 = "6e875ab4b6bf64a38c352887760f21203ab054676d9c1b274963907e0768740d",
+        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.15.0/bazel-gazelle-0.15.0.tar.gz"],
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
@@ -30,7 +29,7 @@ REPOSITORY_LOCATIONS = dict(
     com_github_circonus_labs_libcircllhist = dict(
         sha256 = "9949e2864b8ad00ee5c3e9c1c3c01e51b6b68bb442a919652fc66b9776477987",
         strip_prefix = "libcircllhist-fd8a14463739d247b414825cc56ca3946792a3b9",
-        # 2018-07-02
+        # 2018-09-17
         urls = ["https://github.com/circonus-labs/libcircllhist/archive/fd8a14463739d247b414825cc56ca3946792a3b9.tar.gz"],
     ),
     com_github_cyan4973_xxhash = dict(
@@ -44,9 +43,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/eile/tclap/archive/tclap-1-2-1-release-final.tar.gz"],
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "3c812a18e9f72a88631ab4732a97ce9ef5bcbefb3235e9fd465f059ba204359b",
+        sha256 = "43894ab8fe561fc9e523a8024efc23018431fa86b95d45b06dbe6ddb29ffb6cd",
         strip_prefix = "fmt-5.2.1",
-        urls = ["https://github.com/fmtlib/fmt/archive/5.2.1.tar.gz"],
+        urls = ["https://github.com/fmtlib/fmt/releases/download/5.2.1/fmt-5.2.1.zip"],
     ),
     com_github_gabime_spdlog = dict(
         sha256 = "867a4b7cedf9805e6f76d3ca41889679054f7e5a3b67722fe6d0eae41852a767",
@@ -94,7 +93,7 @@ REPOSITORY_LOCATIONS = dict(
     com_github_google_jwt_verify = dict(
         sha256 = "499f1e145c19f33031eb8fc6452d5d391b4cecfdeda23e2055386a3b33be4d41",
         strip_prefix = "jwt_verify_lib-66792a057ec54e4b75c6a2eeda4e98220bd12a9a",
-        # 2018-08-17
+        # 2018-08-16
         urls = ["https://github.com/google/jwt_verify_lib/archive/66792a057ec54e4b75c6a2eeda4e98220bd12a9a.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
@@ -107,9 +106,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/nodejs/http-parser/archive/77310eeb839c4251c07184a5db8885a572a08352.tar.gz"],
     ),
     com_github_pallets_jinja = dict(
-        sha256 = "0d31d3466c313a9ca014a2d904fed18cdac873a5ba1f7b70b8fd8b206cd860d6",
-        strip_prefix = "jinja-2.10",
-        urls = ["https://github.com/pallets/jinja/archive/2.10.tar.gz"],
+        sha256 = "f84be1bb0040caca4cea721fcbbbbd61f9be9464ca236387158b0feea01914a4",
+        strip_prefix = "Jinja2-2.10",
+        urls = ["https://github.com/pallets/jinja/releases/download/2.10/Jinja2-2.10.tar.gz"],
     ),
     com_github_pallets_markupsafe = dict(
         sha256 = "dc3938045d9407a73cf9fdd709e2b1defd0588d50ffc85eb0786c095ec846f15",
@@ -172,7 +171,6 @@ REPOSITORY_LOCATIONS = dict(
     ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
-        strip_prefix = "",
         urls = ["https://pypi.python.org/packages/source/s/six/six-1.10.0.tar.gz#md5=34eed507548117b2ab523ab14b2f8b55"],
     ),
     # I'd love to name this `com_github_google_subpar`, but something in the Subpar

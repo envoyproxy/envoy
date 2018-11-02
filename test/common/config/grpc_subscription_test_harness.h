@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/v2/eds.pb.h"
 
 #include "common/common/hash.h"
@@ -40,9 +42,9 @@ public:
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    subscription_.reset(new GrpcEdsSubscriptionImpl(
+    subscription_ = std::make_unique<GrpcEdsSubscriptionImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
-        *method_descriptor_, stats_, stats_store_, rate_limit_settings_));
+        *method_descriptor_, stats_, stats_store_, rate_limit_settings_);
   }
 
   ~GrpcSubscriptionTestHarness() { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
