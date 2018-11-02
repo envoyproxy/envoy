@@ -144,6 +144,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
   auto filter_meta =
       stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().Rbac);
   EXPECT_EQ("bar", filter_meta.fields().at("shadow_effective_policyID").string_value());
+  EXPECT_EQ("allowed", filter_meta.fields().at("shadow_engine_result").string_value());
 }
 
 } // namespace RBACFilter
