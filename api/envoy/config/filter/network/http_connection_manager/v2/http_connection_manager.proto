@@ -9,6 +9,7 @@ import "envoy/api/v2/rds.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
 import "envoy/type/percent.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
@@ -393,9 +394,14 @@ message HttpFilter {
   // * :ref:`envoy.squash <config_http_filters_squash>`
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
-  // Filter specific configuration which depends on the filter being
-  // instantiated. See the supported filters for further documentation.
-  google.protobuf.Struct config = 2;
+  // Filter specific configuration which depends on the filter being instantiated. See the supported
+  // filters for further documentation.
+  oneof config_type {
+    google.protobuf.Struct config = 2;
+
+    // [#not-implemented-hide:]
+    google.protobuf.Any typed_config = 4;
+  }
 
   reserved 3;
 }

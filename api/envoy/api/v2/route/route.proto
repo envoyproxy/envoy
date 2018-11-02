@@ -7,6 +7,7 @@ option java_generic_services = true;
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/range.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
@@ -25,7 +26,7 @@ option (gogoproto.equal_all) = true;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#comment:next free field: 15]
+// [#comment:next free field: 16]
 message VirtualHost {
   // The logical name of the virtual host. This is used when emitting certain
   // statistics but is not relevant for routing.
@@ -112,6 +113,14 @@ message VirtualHost {
   // for if and how it is utilized.
   map<string, google.protobuf.Struct> per_filter_config = 12;
 
+  // [#not-implemented-hide:]
+  // The per_filter_config field can be used to provide virtual host-specific
+  // configurations for filters. The key should match the filter name, such as
+  // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
+  // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
+  // for if and how it is utilized.
+  map<string, google.protobuf.Any> typed_per_filter_config = 15;
+
   // Decides whether the :ref:`x-envoy-attempt-count
   // <config_http_filters_router_x-envoy-attempt-count>` header should be included
   // in the upstream request. Setting this option will cause it to override any existing header
@@ -130,7 +139,7 @@ message VirtualHost {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_route.HeaderMatcher>`.
-// [#comment:next free field: 13]
+// [#comment:next free field: 14]
 message Route {
   // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
@@ -167,6 +176,14 @@ message Route {
   // if and how it is utilized.
   map<string, google.protobuf.Struct> per_filter_config = 8;
 
+  // [#not-implemented-hide:]
+  // The per_filter_config field can be used to provide route-specific
+  // configurations for filters. The key should match the filter name, such as
+  // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
+  // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
+  // if and how it is utilized.
+  map<string, google.protobuf.Any> typed_per_filter_config = 13;
+
   // Specifies a set of headers that will be added to requests matching this
   // route. Headers specified at this level are applied before headers from the
   // enclosing :ref:`envoy_api_msg_route.VirtualHost` and
@@ -200,7 +217,7 @@ message Route {
 // multiple upstream clusters along with weights that indicate the percentage of
 // traffic to be forwarded to each cluster. The router selects an upstream cluster based on the
 // weights.
-// [#comment:next free field: 10]
+// [#comment:next free field: 11]
 message WeightedCluster {
   message ClusterWeight {
     // Name of the upstream cluster. The cluster must exist in the
@@ -256,6 +273,14 @@ message WeightedCluster {
     // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
     // for if and how it is utilized.
     map<string, google.protobuf.Struct> per_filter_config = 8;
+
+    // [#not-implemented-hide:]
+    // The per_filter_config field can be used to provide weighted cluster-specific
+    // configurations for filters. The key should match the filter name, such as
+    // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
+    // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
+    // for if and how it is utilized.
+    map<string, google.protobuf.Any> typed_per_filter_config = 10;
   }
 
   // Specifies one or more upstream clusters associated with the route.
@@ -510,7 +535,12 @@ message RouteAction {
 
     message RetryPriority {
       string name = 1 [(validate.rules).string.min_bytes = 1];
-      google.protobuf.Struct config = 2;
+      oneof config_type {
+        google.protobuf.Struct config = 2;
+
+        // [#not-implemented-hide:]
+        google.protobuf.Any typed_config = 3;
+      }
     }
 
     // Specifies an implementation of a RetryPriority which is used to determine the
@@ -520,7 +550,12 @@ message RouteAction {
 
     message RetryHostPredicate {
       string name = 1 [(validate.rules).string.min_bytes = 1];
-      google.protobuf.Struct config = 2;
+      oneof config_type {
+        google.protobuf.Struct config = 2;
+
+        // [#not-implemented-hide:]
+        google.protobuf.Any typed_config = 3;
+      }
     }
 
     // Specifies a collection of RetryHostPredicates that will be consulted when selecting a host
