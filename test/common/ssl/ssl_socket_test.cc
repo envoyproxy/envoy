@@ -2846,6 +2846,24 @@ TEST_P(SslSocketTest, GetRequestedServerName) {
              "ssl.handshake", GetParam(), absl::nullopt);
 }
 
+TEST_P(SslSocketTest, OverrideRequestedServerName) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  client.set_sni("lyft.com");
+
+  absl::optional<std::string> override_server_name = "example.com";
+  testUtilV2(listener, client, "", true, "", "", "", "example.com", "", "ssl.handshake",
+             "ssl.handshake", GetParam(), override_server_name);
+}
+
 // Validate that if downstream secrets are not yet downloaded from SDS server, Envoy creates
 // NotReadySslSocket object to handle downstream connection.
 TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
