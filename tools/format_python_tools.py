@@ -5,12 +5,15 @@ import sys
 
 from yapf.yapflib.yapf_api import FormatFile
 
+EXCLUDE_LIST = ['pyformat']
+
 
 def collectFiles():
   """Collect all Python files in the tools directory."""
   # TODO: Add ability to collect a specific file or files.
   matches = []
   for root, dirnames, filenames in os.walk('.'):
+    dirnames[:] = [d for d in dirnames if d not in EXCLUDE_LIST]
     for filename in fnmatch.filter(filenames, '*.py'):
       matches.append(os.path.join(root, filename))
   return matches
@@ -33,7 +36,7 @@ def validateFormat(fix=False):
       if reformatted_source:
         print(reformatted_source)
       continue
-    file_list = failed_update_files if reformatted_source else successful_update_files  # noqa:E503
+    file_list = failed_update_files if reformatted_source else successful_update_files
     file_list.add(python_file)
   if fix:
     displayFixResults(successful_update_files, failed_update_files)
