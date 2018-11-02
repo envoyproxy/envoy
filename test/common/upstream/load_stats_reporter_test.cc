@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/endpoint/load_report.pb.h"
 
@@ -42,8 +44,8 @@ public:
       response_timer_cb_ = timer_cb;
       return response_timer_;
     }));
-    load_stats_reporter_.reset(new LoadStatsReporter(
-        local_info_, cm_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_));
+    load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
+        local_info_, cm_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_);
   }
 
   void expectSendMessage(

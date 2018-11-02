@@ -1,6 +1,7 @@
 #include "common/http/http1/codec_impl.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
@@ -444,7 +445,7 @@ void ConnectionImpl::onMessageCompleteBase() {
 void ConnectionImpl::onMessageBeginBase() {
   ENVOY_CONN_LOG(trace, "message begin", connection_);
   ASSERT(!current_header_map_);
-  current_header_map_.reset(new HeaderMapImpl());
+  current_header_map_ = std::make_unique<HeaderMapImpl>();
   header_parsing_state_ = HeaderParsingState::Field;
   onMessageBegin();
 }
@@ -592,7 +593,7 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
 void ServerConnectionImpl::onMessageBegin() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_);
-    active_request_.reset(new ActiveRequest(*this));
+    active_request_ = std::make_unique<ActiveRequest>(*this);
     active_request_->request_decoder_ = &callbacks_.newStream(active_request_->response_encoder_);
   }
 }
@@ -686,7 +687,7 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
   while (!connection_.readEnabled()) {
     connection_.readDisable(false);
   }
-  request_encoder_.reset(new RequestStreamEncoderImpl(*this));
+  request_encoder_ = std::make_unique<RequestStreamEncoderImpl>(*this);
   pending_responses_.emplace_back(&response_decoder);
   return *request_encoder_;
 }

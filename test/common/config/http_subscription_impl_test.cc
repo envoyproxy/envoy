@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "test/common/config/http_subscription_test_harness.h"
 
 #include "gtest/gtest.h"
@@ -27,7 +29,7 @@ TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
   startSubscription({"cluster0", "cluster1"});
   Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
   Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
-  message->body().reset(new Buffer::OwnedImpl(";!@#badjso n"));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(";!@#badjso n");
   EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
   EXPECT_CALL(*timer_, enableTimer(_));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));

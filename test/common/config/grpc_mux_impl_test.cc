@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 
@@ -42,19 +44,19 @@ public:
   }
 
   void setup() {
-    grpc_mux_.reset(new GrpcMuxImpl(
+    grpc_mux_ = std::make_unique<GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, rate_limit_settings_));
+        random_, stats_, rate_limit_settings_);
   }
 
   void setup(const RateLimitSettings& custom_rate_limit_settings) {
-    grpc_mux_.reset(new GrpcMuxImpl(
+    grpc_mux_ = std::make_unique<GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, custom_rate_limit_settings));
+        random_, stats_, custom_rate_limit_settings);
   }
 
   void expectSendMessage(const std::string& type_url,

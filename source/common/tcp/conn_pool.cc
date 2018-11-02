@@ -1,5 +1,7 @@
 #include "common/tcp/conn_pool.h"
 
+#include <memory>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
@@ -351,8 +353,8 @@ ConnPoolImpl::ActiveConn::ActiveConn(ConnPoolImpl& parent)
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
       remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()), timed_out_(false) {
 
-  parent_.conn_connect_ms_.reset(new Stats::Timespan(
-      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem()));
+  parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan>(
+      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem());
 
   Upstream::Host::CreateConnectionData data =
       parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_);
@@ -371,8 +373,8 @@ ConnPoolImpl::ActiveConn::ActiveConn(ConnPoolImpl& parent)
   parent_.host_->cluster().stats().upstream_cx_active_.inc();
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();
-  conn_length_.reset(new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_length_ms_,
-                                         parent_.dispatcher_.timeSystem()));
+  conn_length_ = std::make_unique<Stats::Timespan>(
+      parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSystem());
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
 
