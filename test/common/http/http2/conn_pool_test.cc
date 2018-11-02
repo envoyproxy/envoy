@@ -303,7 +303,8 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsMaxPendingCircuitBreaker) {
   InSequence s;
 
   // Inflate the resource count to just under the limit.
-  auto& pending_reqs = host_->cluster().resourceManager(Upstream::ResourcePriority::Default).pendingRequests();
+  auto& pending_reqs =
+      host_->cluster().resourceManager(Upstream::ResourcePriority::Default).pendingRequests();
   for (uint64_t i = 0; i < pending_reqs.max() - 1; ++i) {
     pending_reqs.inc();
   }
