@@ -112,7 +112,7 @@ modify different aspects of the server:
     */failed_outlier_check*: The host has failed an outlier detection check.
 
 .. http:get:: /clusters?format=json
-  
+
   Dump the */clusters* output in a JSON-serialized proto. See the
   :ref:`definition <envoy_api_msg_admin.v2alpha.Clusters>` for more information.
 
@@ -187,7 +187,7 @@ modify different aspects of the server:
    "uptime_all_epochs": "6s"
   }
 
-See the :ref`ServerInfo proto <envoy_api_msg_service.admin.v2alpha.ServerInfo>` for an
+See the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
 explanation of the output.
 
 .. _operations_admin_interface_stats:
@@ -209,7 +209,11 @@ explanation of the output.
 
   .. http:get:: /stats?filter=regex
 
-  Filters the returned stats to those with names matching the regular expression `regex`. Compatible with `usedonly`. Performs partial matching by default, so `/stats?filter=server` will return all stats containing the word `server`. Full-string matching can be specified with begin- and end-line anchors. (i.e. `/stats?filter=^server.concurrency$`)
+  Filters the returned stats to those with names matching the regular expression
+  `regex`. Compatible with `usedonly`. Performs partial matching by default, so
+  `/stats?filter=server` will return all stats containing the word `server`.
+  Full-string matching can be specified with begin- and end-line anchors. (i.e.
+  `/stats?filter=^server.concurrency$`)
 
 .. http:get:: /stats?format=json
 
@@ -219,7 +223,7 @@ explanation of the output.
   that has the computed quantile for each histogram.
 
   If a histogram is not updated during an interval, the output will have null for all the quantiles.
-  
+
   Example histogram output:
 
   .. code-block:: json
@@ -261,10 +265,10 @@ explanation of the output.
         ]
       }
     }
- 
+
   .. http:get:: /stats?format=json&usedonly
 
-  Outputs statistics that Envoy has updated (counters incremented at least once, 
+  Outputs statistics that Envoy has updated (counters incremented at least once,
   gauges changed at least once, and histograms added to at least once) in JSON format.
 
 .. http:get:: /stats?format=prometheus
@@ -328,40 +332,38 @@ explanation of the output.
   Use the /runtime_modify endpoint with care. Changes are effectively immediately. It is
   **critical** that the admin interface is :ref:`properly secured
   <operations_admin_interface_security>`.
-  
+
   .. _operations_admin_interface_hystrix_event_stream:
 
 .. http:get:: /hystrix_event_stream
 
   This endpoint is intended to be used as the stream source for
   `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
-  a GET to this endpoint will trriger a stream of statistics from envoy in 
-  `text/event-stream <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_ 
-  format, as expected by the Hystrix dashboard. 
-  
-  If invoked from a browser or a terminal, the response will be shown as a continuous stream, 
-  sent in intervals defined by the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` 
+  a GET to this endpoint will trriger a stream of statistics from envoy in
+  `text/event-stream <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_
+  format, as expected by the Hystrix dashboard.
+
+  If invoked from a browser or a terminal, the response will be shown as a continuous stream,
+  sent in intervals defined by the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>`
   :ref:`stats_flush_interval <envoy_api_field_config.bootstrap.v2.Bootstrap.stats_flush_interval>`
 
   This handler is enabled only when a Hystrix sink is enabled in the config file as documented
   :ref:`here <envoy_api_msg_config.metrics.v2.HystrixSink>`.
-  
-  As Envoy's and Hystrix resiliency mechanisms differ, some of the statistics shown in the dashboard 
+
+  As Envoy's and Hystrix resiliency mechanisms differ, some of the statistics shown in the dashboard
   had to be adapted:
-  
-  * **Thread pool rejections** - Generally similar to what's called short circuited in Envoy, 
-    and counted by *upstream_rq_pending_overflow*, although the term thread pool is not accurate for 
-    Envoy. Both in Hystrix and Envoy, the result is rejected requests which are not passed upstream. 
-  * **circuit breaker status (closed or open)** - Since in Envoy, a circuit is opened based on the 
-    current number of connections/requests in queue, there is no sleeping window for circuit breaker, 
+
+  * **Thread pool rejections** - Generally similar to what's called short circuited in Envoy,
+    and counted by *upstream_rq_pending_overflow*, although the term thread pool is not accurate for
+    Envoy. Both in Hystrix and Envoy, the result is rejected requests which are not passed upstream.
+  * **circuit breaker status (closed or open)** - Since in Envoy, a circuit is opened based on the
+    current number of connections/requests in queue, there is no sleeping window for circuit breaker,
     circuit open/closed is momentary. Hence, we set the circuit breaker status to "forced closed".
-  * **Short-circuited (rejected)** - The term exists in Envoy but refers to requests not sent because 
-    of passing a limit (queue or connections), while in Hystrix it refers to requests not sent because 
-    of high percentage of service unavailable responses during some time frame. 
-    In Envoy, service unavailable response will cause **outlier detection** - removing a node off the 
-    load balancer pool, but requests are not rejected as a result. Therefore, this counter is always 
+  * **Short-circuited (rejected)** - The term exists in Envoy but refers to requests not sent because
+    of passing a limit (queue or connections), while in Hystrix it refers to requests not sent because
+    of high percentage of service unavailable responses during some time frame.
+    In Envoy, service unavailable response will cause **outlier detection** - removing a node off the
+    load balancer pool, but requests are not rejected as a result. Therefore, this counter is always
     set to '0'.
-  * Latency information represents data since last flush. 
+  * Latency information represents data since last flush.
     Mean latency is currently not available.
-  
-  
