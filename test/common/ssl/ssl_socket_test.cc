@@ -219,8 +219,8 @@ const std::string testUtilV2(
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        std::string sni =
-            override_server_name.has_value() ? override_server_name.value() : client_ctx_proto.sni();
+        std::string sni = override_server_name.has_value() ? override_server_name.value()
+                                                           : client_ctx_proto.sni();
         socket->setRequestedServerName(sni);
         Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(absl::nullopt));
