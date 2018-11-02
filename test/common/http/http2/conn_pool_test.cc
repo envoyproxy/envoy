@@ -298,6 +298,41 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsRequestOverflow) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+// Verifies that we honor the max pending requests circuit breaker.
+TEST_F(Http2ConnPoolImplTest, PendingRequestsMaxPendingCircuitBreaker) {
+  InSequence s;
+
+  // Inflate the resource count to just under the limit.
+  auto& pending_reqs = host_->cluster().resourceManager(Upstream::ResourcePriority::Default).pendingRequests();
+  for (uint64_t i = 0; i < pending_reqs.max() - 1; ++i) {
+    pending_reqs.inc();
+  }
+
+  // Create two requests. The first one should be enqueued, while the second one
+  // should fail fast due to us being above the max pending requests limit.
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+
+  Http::MockStreamDecoder decoder;
+  ConnPoolCallbacks callbacks;
+  EXPECT_CALL(callbacks.pool_failure_, ready());
+  EXPECT_EQ(nullptr, pool_.newStream(decoder, callbacks));
+
+  // We queued up three requests, but we can only afford one before hitting the circuit
+  // breaker. Thus, we expect to see 2 resets and one succesful connect.
+  expectStreamConnect(0, r1);
+  EXPECT_CALL(*test_clients_[0].connect_timer_, disableTimer());
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Clean up everything.
+  for (uint64_t i = 0; i < pending_reqs.max() - 1; ++i) {
+    pending_reqs.dec();
+  }
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*this, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
 TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
   InSequence s;
   expectClientCreate();

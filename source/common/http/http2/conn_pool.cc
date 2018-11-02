@@ -110,7 +110,15 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
   }
 
   // If the primary client is not connected yet, queue up the request.
-  if (!primary_client_->upstream_ready_) {
+ if (!primary_client_->upstream_ready_) {
+   // If we're not allowed to enqueue more requests, fail fast.
+   if (!host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
+     ENVOY_LOG(debug, "max pending requests overflow");
+     callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
+     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
+     return nullptr;
+   }
+
     return newPendingRequest(response_decoder, callbacks);
   }
 
