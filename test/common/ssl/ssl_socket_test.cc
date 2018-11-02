@@ -2944,15 +2944,14 @@ TEST_P(SslSocketTest, CreateTransportSocketWithOverrideServerName) {
                                                         stats_store);
 
   absl::optional<std::string> override_server_name = "www.example.com";
-  auto transport_socket = client_ssl_socket_factory.createTransportSocket(override_server_name);
 
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
                                   true);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(), transport_socket, nullptr);
+      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      client_ssl_socket_factory.createTransportSocket(override_server_name), nullptr);
 
-  const Ssl::SslSocket* ssl_socket =
-    dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
+  const Ssl::SslSocket* ssl_socket = dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
   EXPECT_NE(nullptr, ssl_socket);
   SSL* client_ssl_socket = ssl_socket->rawSslForTest();
   EXPECT_NE(nullptr, client_ssl_socket);
