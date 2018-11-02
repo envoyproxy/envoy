@@ -282,7 +282,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsRequestOverflow) {
   ActiveTestRequest r3(*this, 0, false);
 
   // We queued up three requests, but we can only afford one before hitting the circuit
-  // breaker. Thus, we expect to see 2 resets and one succesful connect.
+  // breaker. Thus, we expect to see 2 resets and one successful connect.
   expectStreamConnect(0, r1);
   expectStreamReset(r2);
   expectStreamReset(r3);
@@ -319,8 +319,6 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsMaxPendingCircuitBreaker) {
   EXPECT_CALL(callbacks.pool_failure_, ready());
   EXPECT_EQ(nullptr, pool_.newStream(decoder, callbacks));
 
-  // We queued up three requests, but we can only afford one before hitting the circuit
-  // breaker. Thus, we expect to see 2 resets and one succesful connect.
   expectStreamConnect(0, r1);
   EXPECT_CALL(*test_clients_[0].connect_timer_, disableTimer());
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
