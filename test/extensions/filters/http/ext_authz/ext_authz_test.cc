@@ -157,6 +157,9 @@ TEST_F(HttpExtAuthzFilterTest, ContextExtensions) {
   envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settingsvhost;
   (*settingsvhost.mutable_check_settings()->mutable_context_extensions())["key_vhost"] =
       "value_vhost";
+  // add a default route value to see it overriden
+  (*settingsvhost.mutable_check_settings()->mutable_context_extensions())["key_route"] =
+      "default_route_value";
   // Initialize the virtual host's per filter config.
   FilterConfigPerRoute auth_per_vhost(settingsvhost);
   ON_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,

@@ -38,7 +38,11 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
   Http::Utility::iteratePerFilterConfig<FilterConfigPerRoute>(
       HttpFilterNames::get().ExtAuthorization, route,
       [&context_extensions](const FilterConfigPerRoute& cfg) {
-        context_extensions.insert(cfg.contextExtensions().begin(), cfg.contextExtensions().end());
+        auto begin_it = cfg.contextExtensions().begin();
+        auto end_it = cfg.contextExtensions().end();
+        for (auto it = begin_it; it != end_it; ++it) {
+          context_extensions[it->first] = it->second;
+        }
       });
 
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
