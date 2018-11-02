@@ -41,10 +41,12 @@ public:
     // tls_certficate_provider_->secret() is NOT nullptr and
     // either certficate_validation_context_provider_ is nullptr or
     // certficate_validation_context_provider_->secret() is NOT nullptr.
-    bool tls_is_ready = (!tls_certficate_provider_ || tls_certficate_provider_->secret() != nullptr);
+    bool tls_is_ready =
+        (!tls_certficate_provider_ || tls_certficate_provider_->secret() != nullptr);
     bool combined_cvc_is_ready = (!default_cvc_ || validation_context_config_);
-    bool cvc_is_ready = (!certficate_validation_context_provider_ ||
-            (!default_cvc_ && certficate_validation_context_provider_->secret() != nullptr));
+    bool cvc_is_ready =
+        (!certficate_validation_context_provider_ ||
+         (!default_cvc_ && certficate_validation_context_provider_->secret() != nullptr));
     return tls_is_ready && combined_cvc_is_ready && cvc_is_ready;
   }
 
@@ -60,13 +62,11 @@ public:
         cvc_update_callback_handle_->remove();
       }
       if (default_cvc_) {
-        cvc_update_callback_handle_ =
-            certficate_validation_context_provider_->addUpdateCallback(
-              [this, callback](const envoy::api::v2::auth::Secret& secret) {
-                onValidationContextUpdate(secret.validation_context());
-                callback();
-              }
-            );
+        cvc_update_callback_handle_ = certficate_validation_context_provider_->addUpdateCallback(
+            [this, callback](const envoy::api::v2::auth::Secret& secret) {
+              onValidationContextUpdate(secret.validation_context());
+              callback();
+            });
       } else {
         cvc_update_callback_handle_ =
             certficate_validation_context_provider_->addUpdateCallback(callback);
@@ -74,7 +74,8 @@ public:
     }
   }
 
-  void onValidationContextUpdate(const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc);
+  void
+  onValidationContextUpdate(const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc);
 
 protected:
   ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContext& config,

@@ -30,7 +30,8 @@ public:
    * @param callback callback that is executed by secret provider.
    * @return CallbackHandle the handle which can remove that update callback.
    */
-  virtual Common::CallbackHandle* addUpdateCallback(std::function<void(const envoy::api::v2::auth::Secret&)> callback) PURE;
+  virtual Common::CallbackHandle*
+  addUpdateCallback(std::function<void(const envoy::api::v2::auth::Secret&)> callback) PURE;
 };
 
 typedef SecretProvider<Ssl::TlsCertificateConfig> TlsCertificateConfigProvider;

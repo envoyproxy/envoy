@@ -85,7 +85,8 @@ getCertificateValidationContextConfigProvider(
   }
   case envoy::api::v2::auth::CommonTlsContext::ValidationContextTypeCase::
       kCombinedValidationContext: {
-    *default_cvc = std::make_unique<envoy::api::v2::auth::CertificateValidationContext>(config.combined_validation_context().default_validation_context());
+    *default_cvc = std::make_unique<envoy::api::v2::auth::CertificateValidationContext>(
+        config.combined_validation_context().default_validation_context());
     const auto& sds_secret_config =
         config.combined_validation_context().validation_context_sds_secret_config();
     return getProviderFromSds(factory_context, sds_secret_config);
@@ -126,21 +127,26 @@ ContextConfigImpl::ContextConfigImpl(
           getCertificateValidationContextConfigProvider(config, factory_context, &default_cvc_)),
       min_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
-      max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
-                                                TLS1_2_VERSION)) {
+      max_protocol_version_(
+          tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(), TLS1_2_VERSION)) {
   if (default_cvc_) {
-    cvc_validation_callback_handle_ = dynamic_cast<Secret::CertificateValidationContextSdsApi*>(certficate_validation_context_provider_.get())
-    ->addValidationCallback([this](const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
-      onValidationContextUpdate(dynamic_cvc);
-      validation_context_config_.reset();
-    });
+    cvc_validation_callback_handle_ =
+        dynamic_cast<Secret::CertificateValidationContextSdsApi*>(
+            certficate_validation_context_provider_.get())
+            ->addValidationCallback(
+                [this](const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
+                  onValidationContextUpdate(dynamic_cvc);
+                  validation_context_config_.reset();
+                });
   }
 }
 
-void ContextConfigImpl::onValidationContextUpdate(const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
+void ContextConfigImpl::onValidationContextUpdate(
+    const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
   const envoy::api::v2::auth::CertificateValidationContext combined_cvc = *default_cvc_.get();
   combined_cvc.MergeFrom(dynamic_cvc);
-  validation_context_config_ = std::make_unique<CertificateValidationContextConfigImpl>(combined_cvc);
+  validation_context_config_ =
+      std::make_unique<CertificateValidationContextConfigImpl>(combined_cvc);
 }
 
 ContextConfigImpl::~ContextConfigImpl() {
