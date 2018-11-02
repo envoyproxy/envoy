@@ -2912,25 +2912,6 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   EXPECT_EQ(Network::PostIoAction::Close, result.action_);
 }
 
-// Verify that if override server name is passed to createTransportSocket,
-// the ssl object indeed has SNI set
-TEST_P(SslSocketTest, CreateTransportSocketWithOverrideServerName) {
-  Event::SimulatedTimeSystem time_system;
-  ContextManagerImpl manager(time_system);
-  Ssl::ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
-                                                        stats_store);
-
-  absl::optional<std::string> override_server_name = "www.example.com";
-  auto transport_socket = client_ssl_socket_factory.createTransportSocket(override_server_name);
-  EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
-  EXPECT_EQ(nullptr, transport_socket->ssl());
-
-  const Ssl::SslSocket* ssl_socket = dynamic_cast<const Ssl::SslSocket*>(transport_socket);
-  EXPECT_NE(nullptr, ssl_socket);
-  SSL* client_ssl_socket = ssl_socket->rawSslForTest();
-  EXPECT_NE(nullptr, client_ssl_socket);
-}
-
 class SslReadBufferLimitTest : public SslSocketTest {
 public:
   void initialize() {
