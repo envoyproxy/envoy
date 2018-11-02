@@ -289,7 +289,7 @@ PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& hash_
 
   ThreadLocalActiveClientPtr& client = client_map_[host];
   if (!client) {
-    client.reset(new ThreadLocalActiveClient(*this));
+    client = std::make_unique<ThreadLocalActiveClient>(*this);
     client->host_ = host;
     client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_);
     client->redis_client_->addConnectionCallbacks(*client);

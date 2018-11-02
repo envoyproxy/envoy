@@ -85,9 +85,9 @@ public:
 
   void run(const std::string& primary_dir, const std::string& override_dir) {
     Api::OsSysCallsPtr os_sys_calls(os_sys_calls_);
-    loader.reset(new DiskBackedLoaderImpl(dispatcher, tls,
-                                          TestEnvironment::temporaryPath(primary_dir), "envoy",
-                                          override_dir, store, generator, std::move(os_sys_calls)));
+    loader = std::make_unique<DiskBackedLoaderImpl>(
+        dispatcher, tls, TestEnvironment::temporaryPath(primary_dir), "envoy", override_dir, store,
+        generator, std::move(os_sys_calls));
   }
 
   Event::MockDispatcher dispatcher;

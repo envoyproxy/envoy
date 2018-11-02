@@ -32,9 +32,9 @@ namespace Statsd {
 class TcpStatsdSinkTest : public testing::Test {
 public:
   TcpStatsdSinkTest() {
-    sink_.reset(
-        new TcpStatsdSink(local_info_, "fake_cluster", tls_, cluster_manager_,
-                          cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_));
+    sink_ = std::make_unique<TcpStatsdSink>(
+        local_info_, "fake_cluster", tls_, cluster_manager_,
+        cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_);
   }
 
   void expectCreateConnection() {
@@ -102,9 +102,9 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
 }
 
 TEST_F(TcpStatsdSinkTest, WithCustomPrefix) {
-  sink_.reset(new TcpStatsdSink(local_info_, "fake_cluster", tls_, cluster_manager_,
-                                cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_,
-                                "test_prefix"));
+  sink_ = std::make_unique<TcpStatsdSink>(
+      local_info_, "fake_cluster", tls_, cluster_manager_,
+      cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_, "test_prefix");
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";

@@ -1,5 +1,6 @@
 #include "test/integration/server.h"
 
+#include <memory>
 #include <string>
 
 #include "envoy/http/header_map.h"
@@ -58,8 +59,8 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
                                   bool deterministic) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_.reset(new Thread::Thread(
-      [version, deterministic, this]() -> void { threadRoutine(version, deterministic); }));
+  thread_ = std::make_unique<Thread::Thread>(
+      [version, deterministic, this]() -> void { threadRoutine(version, deterministic); });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
   if (pre_worker_start_test_steps != nullptr) {
@@ -145,9 +146,9 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   } else {
     random_generator = std::make_unique<Runtime::RandomGeneratorImpl>();
   }
-  server_.reset(new Server::InstanceImpl(
+  server_ = std::make_unique<Server::InstanceImpl>(
       options, time_system_, Network::Utility::getLocalAddress(version), *this, restarter,
-      stats_store, lock, *this, std::move(random_generator), tls));
+      stats_store, lock, *this, std::move(random_generator), tls);
   pending_listeners_ = server_->listenerManager().listeners().size();
   ENVOY_LOG(info, "waiting for {} test server listeners", pending_listeners_);
   // This is technically thread unsafe (assigning to a shared_ptr accessed

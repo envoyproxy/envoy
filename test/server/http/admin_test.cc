@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "envoy/admin/v2alpha/memory.pb.h"
+#include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -1096,9 +1097,14 @@ TEST_P(AdminInstanceTest, GetRequest) {
   Http::HeaderMapImpl response_headers;
   std::string body;
   EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
-  EXPECT_TRUE(absl::StartsWith(body, "envoy ")) << body;
+  envoy::admin::v2alpha::ServerInfo server_info_proto;
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("text/plain"));
+              HasSubstr("application/json"));
+
+  // We only test that it parses as the proto and that some fields are correct, since
+  // values such as timestamps + Envoy version are tricky to test for.
+  MessageUtil::loadFromJson(body, server_info_proto);
+  EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::LIVE);
 }
 
 TEST_P(AdminInstanceTest, GetRequestJson) {

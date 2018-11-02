@@ -329,7 +329,7 @@ public:
   HttpTracerImplTest() {
     driver_ = new MockDriver();
     DriverPtr driver_ptr(driver_);
-    tracer_.reset(new HttpTracerImpl(std::move(driver_ptr), local_info_));
+    tracer_ = std::make_unique<HttpTracerImpl>(std::move(driver_ptr), local_info_);
   }
 
   Http::TestHeaderMapImpl request_headers_{
