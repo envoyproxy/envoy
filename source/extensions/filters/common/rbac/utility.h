@@ -4,6 +4,8 @@
 #include "envoy/config/filter/network/rbac/v2/rbac.pb.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/singleton/const_singleton.h"
+
 #include "extensions/filters/common/rbac/engine_impl.h"
 
 namespace Envoy {
@@ -12,7 +14,12 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-static const std::string shadow_policy_id_field = "shadow_effective_policyID";
+class DynamicMetadataKeys {
+public:
+  const std::string ShadowPolicyIdField{"shadow_effective_policyID"};
+};
+
+typedef ConstSingleton<DynamicMetadataKeys> DynamicMetadataKeysSingleton;
 
 /**
  * All stats for the RBAC filter. @see stats_macros.h

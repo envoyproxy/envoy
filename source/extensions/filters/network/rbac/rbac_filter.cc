@@ -62,8 +62,8 @@ void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_engine_
   ProtobufWkt::Struct metrics;
   auto& fields = *metrics.mutable_fields();
   if (!shadow_policy_id.empty()) {
-    *fields[Filters::Common::RBAC::shadow_policy_id_field].mutable_string_value() =
-        shadow_policy_id;
+    *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowPolicyIdField]
+         .mutable_string_value() = shadow_policy_id;
   }
   *fields[shadow_engine_result_field].mutable_string_value() = shadow_engine_result;
   callbacks_->connection().streamInfo().setDynamicMetadata(NetworkFilterNames::get().Rbac, metrics);

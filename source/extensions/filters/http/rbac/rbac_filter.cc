@@ -85,8 +85,8 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
 
     auto& fields = *metrics.mutable_fields();
     if (!effective_policy_id.empty()) {
-      *fields[Filters::Common::RBAC::shadow_policy_id_field].mutable_string_value() =
-          effective_policy_id;
+      *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowPolicyIdField]
+           .mutable_string_value() = effective_policy_id;
     }
 
     *fields[shadow_resp_code_field].mutable_string_value() = shadow_resp_code;
