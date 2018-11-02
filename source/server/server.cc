@@ -480,7 +480,7 @@ void InstanceImpl::terminate() {
   }
 
   // Shutdown all the workers now that the main dispatch loop is done.
-  if (listener_manager_.get() != nullptr) {
+  if (listener_manager_ != nullptr) {
     listener_manager_->stopWorkers();
   }
 
@@ -489,7 +489,7 @@ void InstanceImpl::terminate() {
     flushStats();
   }
 
-  if (config_.get() != nullptr && config_->clusterManager() != nullptr) {
+  if (config_ != nullptr && config_->clusterManager() != nullptr) {
     config_->clusterManager()->shutdown();
   }
   handler_.reset();
