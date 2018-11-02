@@ -76,7 +76,7 @@ public:
 
   // Creates a new test client, expecting a new connection to be created and associated
   // with the new client.
-  void expectClientCreate(absl::optional<int> buffer_limits = {}) {
+  void expectClientCreate(absl::optional<uint32_t> buffer_limits = {}) {
     test_clients_.emplace_back();
     TestCodecClient& test_client = test_clients_.back();
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();

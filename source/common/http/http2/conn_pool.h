@@ -36,9 +36,6 @@ public:
   ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
 
-  // Http::ConnPoolImplBase
-  void checkForDrained() override;
-
 protected:
   struct ActiveClient : public Network::ConnectionCallbacks,
                         public CodecClientCallbacks,
@@ -76,6 +73,9 @@ protected:
   };
 
   typedef std::unique_ptr<ActiveClient> ActiveClientPtr;
+
+  // Http::ConnPoolImplBase
+  void checkForDrained() override;
 
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   virtual uint32_t maxTotalStreams() PURE;

@@ -42,8 +42,8 @@ protected:
   // Must be implemented by sub class. Attempts to drain inactive clients.
   virtual void checkForDrained() PURE;
 
-  Upstream::HostConstSharedPtr host_;
-  Upstream::ResourcePriority priority_;
+  const Upstream::HostConstSharedPtr host_;
+  const Upstream::ResourcePriority priority_;
   std::list<PendingRequestPtr> pending_requests_;
 };
 } // namespace Http
