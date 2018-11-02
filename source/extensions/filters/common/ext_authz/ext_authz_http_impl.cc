@@ -134,7 +134,6 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
     // Copy all headers to the client's response.
     message->headers().iterate(
         [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-          // std::cout << "ADDING HEADER: " << header.key().c_str() << std::endl;
           static_cast<Http::HeaderVector*>(context)->emplace_back(
               Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
           return Http::HeaderMap::Iterate::Continue;
@@ -145,13 +144,11 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
     for (const auto& header : allowed_client_headers_) {
       const auto* entry = message->headers().get(header);
       if (entry) {
-        // std::cout << "ADDING HEADER: " << entry->key().c_str() << std::endl;
         denied_response->headers_to_add.emplace_back(Http::LowerCaseString{entry->key().c_str()},
                                                      entry->value().c_str());
       }
     }
   }
-
   return denied_response;
 }
 

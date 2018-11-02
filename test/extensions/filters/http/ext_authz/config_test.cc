@@ -55,18 +55,23 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
     authorization_request:
       path_prefix: /test
       allowed_headers:
-        - key
+        - key-foo
+        - key-bar  
       allowed_headers_prefix:
-        - key
+        - key-foo
+        - key-bar
       headers_to_add:
-        - { key: foo, value: bar }
-    
+        - { key: key-foo, value: value-foo }
+        - { key: key-bar, value: value-bar }
+
     authorization_response:
       allowed_upstream_headers:
-        - key
+        - key-foo
+        - key-bar
       allowed_client_headers:
-        - key
-
+        - key-foo
+        - key-bar
+        
   failure_mode_allow: true
   )EOF";
 
