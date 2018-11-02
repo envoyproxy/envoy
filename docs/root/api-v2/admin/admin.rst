@@ -4,9 +4,10 @@ Admin
 .. toctree::
   :glob:
   :maxdepth: 2
-  
+
   ../admin/v2alpha/certs.proto
   ../admin/v2alpha/config_dump.proto
   ../admin/v2alpha/clusters.proto
   ../admin/v2alpha/memory.proto
   ../admin/v2alpha/metrics.proto
+  ../admin/v2alpha/server_info.proto
