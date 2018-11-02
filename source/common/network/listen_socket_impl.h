@@ -76,7 +76,7 @@ typedef std::unique_ptr<TcpListenSocket> TcpListenSocketPtr;
 class UdpListenSocket : public ListenSocketImpl {
 public:
   UdpListenSocket(const Address::InstanceConstSharedPtr& address,
-                  const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
+                  const Network::Socket::OptionsSharedPtr& options);
   UdpListenSocket(int fd, const Address::InstanceConstSharedPtr& address,
                   const Network::Socket::OptionsSharedPtr& options);
 };

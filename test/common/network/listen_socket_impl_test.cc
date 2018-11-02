@@ -80,11 +80,10 @@ TEST_P(ListenSocketImplTest, BindPortZero) {
 // Validate that we get port allocation when binding to port zero.
 TEST_P(ListenSocketImplTest, UdpBindPortZero) {
   auto loopback = Network::Test::getCanonicalLoopbackAddress(version_);
-  UdpListenSocket socket(loopback, nullptr, true);
+  UdpListenSocket socket(loopback, nullptr);
   EXPECT_EQ(Address::Type::Ip, socket.localAddress()->type());
   EXPECT_EQ(version_, socket.localAddress()->ip()->version());
   EXPECT_EQ(loopback->ip()->addressAsString(), socket.localAddress()->ip()->addressAsString());
-  EXPECT_GT(socket.localAddress()->ip()->port(), 0U);
 }
 
 } // namespace Network

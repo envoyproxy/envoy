@@ -61,8 +61,7 @@ TcpListenSocket::TcpListenSocket(int fd, const Address::InstanceConstSharedPtr& 
 }
 
 UdpListenSocket::UdpListenSocket(const Address::InstanceConstSharedPtr& address,
-                                 const Network::Socket::OptionsSharedPtr& options,
-                                 bool bind_to_port)
+                                 const Network::Socket::OptionsSharedPtr& options)
     : ListenSocketImpl(address->socket(Address::SocketType::Datagram), address) {
   RELEASE_ASSERT(fd_ != -1, "");
 
@@ -77,10 +76,6 @@ UdpListenSocket::UdpListenSocket(const Address::InstanceConstSharedPtr& address,
   RELEASE_ASSERT(rc != -1, fmt::format("failed to set UDP send buffer to {} bytes", sizeof(on)));
 
   setListenSocketOptions(options);
-
-  if (bind_to_port) {
-    doBind();
-  }
 }
 
 UdpListenSocket::UdpListenSocket(int fd, const Address::InstanceConstSharedPtr& address,
