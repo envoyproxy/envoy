@@ -26,10 +26,10 @@ public:
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
   const TlsCertificateConfig* tlsCertificate() const override {
-    return tls_certificate_config_ == nullptr ? nullptr : tls_certificate_config_.get();
+    return tls_certificate_config_.get();
   }
   const CertificateValidationContextConfig* certificateValidationContext() const override {
-    return validation_context_config_ == nullptr ? nullptr : validation_context_config_.get();
+    return validation_context_config_.get();
   }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };

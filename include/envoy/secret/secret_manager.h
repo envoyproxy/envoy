@@ -70,7 +70,6 @@ public:
    * @param config_name a name that uniquely refers to the SDS config source.
    * @param secret_provider_context context that provides components for creating and initializing
    * secret provider.
-   * @param extra_key that is needed to find a dynamic secret provider.
    * @return TlsCertificateConfigProviderSharedPtr the dynamic TLS secret provider.
    */
   virtual TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
