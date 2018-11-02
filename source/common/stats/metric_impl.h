@@ -3,10 +3,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/tag.h"
 
 #include "common/common/assert.h"
+#include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Stats {
@@ -20,11 +22,13 @@ namespace Stats {
  */
 class MetricImpl : public virtual Metric {
 public:
-  MetricImpl(std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-      : tag_extracted_name_(std::move(tag_extracted_name)), tags_(std::move(tags)) {}
+  MetricImpl(absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
+             SymbolTable& symbol_table);
+  ~MetricImpl();
 
-  const std::string& tagExtractedName() const override { return tag_extracted_name_; }
-  const std::vector<Tag>& tags() const override { return tags_; }
+  std::string name() const override { return statName().toString(symbolTable()); }
+  std::string tagExtractedName() const override;
+  std::vector<Tag> tags() const override;
 
 protected:
   /**
@@ -35,8 +39,11 @@ protected:
   };
 
 private:
-  const std::string tag_extracted_name_;
-  const std::vector<Tag> tags_;
+  StatName tagExtractedStatName() const;
+  const SymbolTable& symbolTable() const { return allocator().symbolTable(); }
+  SymbolTable& symbolTable() { return allocator().symbolTable(); }
+
+  std::unique_ptr<uint8_t[]> storage_;
 };
 
 } // namespace Stats

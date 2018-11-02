@@ -406,7 +406,9 @@ namespace Stats {
  */
 class TestAllocator : public RawStatDataAllocator {
 public:
-  TestAllocator(const StatsOptions& stats_options) : stats_options_(stats_options) {}
+  TestAllocator(const StatsOptions& stats_options)
+      : RawStatDataAllocator(symbol_table_),
+        stats_options_(stats_options) {}
   ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
 
   RawStatData* alloc(absl::string_view name) override {
@@ -435,6 +437,7 @@ public:
 private:
   static void freeAdapter(RawStatData* data) { ::free(data); }
   std::unordered_map<std::string, CSmartPtr<RawStatData, freeAdapter>> stats_;
+  SymbolTable symbol_table_;
   const StatsOptions& stats_options_;
 };
 
@@ -446,6 +449,7 @@ public:
   MOCK_METHOD1(alloc, RawStatData*(absl::string_view name));
   MOCK_METHOD1(free, void(RawStatData& data));
 
+  SymbolTable symbol_table_;
   TestAllocator alloc_;
 };
 

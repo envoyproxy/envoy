@@ -12,6 +12,16 @@ namespace Stats {
 static const uint32_t SpilloverMask = 0x80;
 static const uint32_t Low7Bits = 0x7f;
 
+StatName::StatName(const StatName& src, SymbolStorage memory)
+    : symbol_array_(memory) {
+  memcpy(memory, src.symbolArray(), src.numBytesIncludingLength());
+  //src.symbol_array_ = nullptr;  // transfers ownership.
+}
+
+std::string StatName::toString(const SymbolTable& table) const {
+  return table.decode(data(), numBytes());
+}
+
 SymbolEncoding::~SymbolEncoding() { ASSERT(vec_.empty()); }
 
 void SymbolEncoding::addSymbol(Symbol symbol) {
@@ -63,13 +73,14 @@ static inline uint8_t* saveLengthToBytesReturningNext(uint64_t length, uint8_t* 
   return bytes;
 }
 
-void SymbolEncoding::moveToStorage(SymbolStorage symbol_array) {
+uint64_t SymbolEncoding::moveToStorage(SymbolStorage symbol_array) {
   uint64_t sz = size();
   symbol_array = saveLengthToBytesReturningNext(sz, symbol_array);
   if (sz != 0) {
     memcpy(symbol_array, vec_.data(), sz * sizeof(uint8_t));
   }
   vec_.clear(); // Logically transfer ownership, enabling empty assert on destruct.
+  return sz + 2;
 }
 
 SymbolTable::SymbolTable()
@@ -133,7 +144,7 @@ std::string SymbolTable::decode(const SymbolVec& symbols) const {
   return absl::StrJoin(name_tokens, ".");
 }
 
-void SymbolTable::free(StatName stat_name) {
+void SymbolTable::adjustRefCount(StatName stat_name, int adjustment) {
   // Before taking the lock, decode the array of symbols from the SymbolStorage.
   SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.numBytes());
 
@@ -145,7 +156,8 @@ void SymbolTable::free(StatName stat_name) {
     auto encode_search = encode_map_.find(decode_search->second);
     ASSERT(encode_search != encode_map_.end());
 
-    encode_search->second.ref_count_--;
+    encode_search->second.ref_count_ += adjustment;
+
     // If that was the last remaining client usage of the symbol, erase the the current
     // mappings and add the now-unused symbol to the reuse pool.
     if (encode_search->second.ref_count_ == 0) {
@@ -220,6 +232,12 @@ StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table) {
   SymbolEncoding encoding = table.encode(name);
   bytes_ = std::make_unique<uint8_t[]>(encoding.bytesRequired());
   encoding.moveToStorage(bytes_.get());
+}
+
+StatNameStorage::StatNameStorage(StatName src, SymbolTable& /*table*/) {
+  uint64_t size = src.numBytesIncludingLength();
+  bytes_ = std::make_unique<uint8_t[]>(size);
+  memcpy(bytes_.get(), src.data(), size);
 }
 
 StatNameStorage::~StatNameStorage() {

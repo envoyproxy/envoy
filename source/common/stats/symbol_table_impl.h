@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/stats/symbol_table.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
@@ -17,6 +18,7 @@
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 
@@ -63,7 +65,7 @@ public:
 
   /**
    * Returns the number of bytes required to represent StatName as a uint8_t
-   * array.
+   * array, including the encoded size.
    */
   uint64_t bytesRequired() const { return size() + 2 /* size encoded as 2 bytes */; }
 
@@ -77,8 +79,9 @@ public:
    * must have been allocated with bytesRequired() bytes.
    *
    * @param array destination memory to receive the encoded bytes.
+   * @return uint64_t the number of bytes transferred.
    */
-  void moveToStorage(SymbolStorage array);
+  uint64_t moveToStorage(SymbolStorage array);
 
 private:
   std::vector<uint8_t> vec_;
@@ -170,7 +173,18 @@ public:
    *
    * @param symbol_vec the vector of symbols to be freed.
    */
-  void free(StatName stat_name);
+  void free(StatName stat_name) { adjustRefCount(stat_name, -1); }
+
+  /**
+   * StatName backing-store can be managed by callers in a variety of ways
+   * to minimize overhead. But any persistent reference to a StatName needs
+   * to hold onto its own reference-counts for all symbols. This method
+   * helps callers ensure the symbol-storage is maintained for the lifetime
+   * of a reference.
+   *
+   * @param symbol_vec the vector of symbols to be freed.
+   */
+  void incRefCount(StatName stat_name) { adjustRefCount(stat_name, 1); };
 
 private:
   friend class StatName;
@@ -194,6 +208,8 @@ private:
    */
   std::string decode(const SymbolStorage symbol_vec, uint64_t size) const;
   std::string decode(const SymbolVec& symbols) const;
+
+  void adjustRefCount(StatName stat_name, int adjustment);
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
@@ -247,6 +263,7 @@ class StatNameStorage {
 public:
   StatNameStorage(absl::string_view name, SymbolTable& table);
   StatNameStorage(StatNameStorage&& src) : bytes_(std::move(src.bytes_)) {}
+  StatNameStorage(StatName src, SymbolTable& table);
 
   /**
    * Before allowing a StatNameStorage to be destroyed, you must call free()
@@ -265,70 +282,11 @@ public:
   /**
    * @return StatName a reference to the owned storage.
    */
-  inline StatName statName() const; // implementation below.
+  StatName statName() const { return StatName(bytes_.get()); }
 
 private:
   std::unique_ptr<SymbolStorage> bytes_;
 };
-
-/**
- * Efficiently represents a stat name using a variable-length array of uint8_t.
- * This class does not own the backing store for this array; the backing-store
- * can be held in StatNameStorage, or it can be packed more tightly into another
- * object.
- *
- * For large numbers of clusters, there are a huge number of StatNames so
- * avoiding extra per-stat pointers has a significant memory impact.
- */
-class StatName {
-public:
-  explicit StatName(const SymbolStorage symbol_array) : symbol_array_(symbol_array) {}
-  StatName() : symbol_array_(nullptr) {}
-
-  std::string toString(const SymbolTable& table) const { return table.decode(data(), numBytes()); }
-
-  /**
-   * Note that this hash function will return a different hash than that of
-   * the elaborated string.
-   *
-   * @return uint64_t a hash of the underlying symbol vector, since StatNames
-   *                  are uniquely defined by their symbol vectors.
-   */
-  uint64_t hash() const {
-    const char* cdata = reinterpret_cast<const char*>(data());
-    return HashUtil::xxHash64(absl::string_view(cdata, numBytes()));
-  }
-
-  // Compares on the underlying symbol vectors.
-  // NB: operator==(std::vector) checks size first, then compares equality for each element.
-  bool operator==(const StatName& rhs) const {
-    const uint64_t sz = numBytes();
-    return sz == rhs.numBytes() && memcmp(data(), rhs.data(), sz * sizeof(uint8_t)) == 0;
-  }
-  bool operator!=(const StatName& rhs) const { return !(*this == rhs); }
-
-protected:
-  friend SymbolTable;
-  friend class StatNameTest;
-  friend class StatNameJoiner;
-
-  /**
-   * @return uint64_t the number of bytes in the symbol array, excluding the two-byte
-   *                  overhead for the size itself.
-   */
-  uint64_t numBytes() const {
-    return symbol_array_[0] | (static_cast<uint64_t>(symbol_array_[1]) << 8);
-  }
-
-  /**
-   * @return uint8_t* A pointer to the first byte of data (skipping over size bytes).
-   */
-  const uint8_t* data() const { return symbol_array_ + 2; }
-
-  const uint8_t* symbol_array_;
-};
-
-StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
 
 /**
  * Joins two or more StatNames. For example if we have StatNames for {"a.b",
@@ -368,7 +326,7 @@ struct StatNameCompare {
 
 // Value-templatized hash-map with StatName key.
 template <class T>
-using StatNameHashMap = std::unordered_map<StatName, T, StatNameHash, StatNameCompare>;
+using StatNameHashMap = absl::flat_hash_map<StatName, T, StatNameHash, StatNameCompare>;
 
 // Helper class for sorting StatNames.
 struct StatNameLessThan {

@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["heap_stat_data.cc"],
     hdrs = ["heap_stat_data.h"],
     deps = [
+        ":metric_impl_lib",
         ":stat_data_allocator_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
@@ -52,8 +53,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "metric_impl_lib",
+    srcs = ["metric_impl.cc"],
     hdrs = ["metric_impl.h"],
     deps = [
+        ":symbol_table_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
     ],

@@ -6,12 +6,13 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-
+#include "envoy/stats/symbol_table.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Stats {
 
+class StatDataAllocator;
 struct Tag;
 
 /**
@@ -32,32 +33,28 @@ public:
   virtual std::string name() const PURE;
 
   /**
-   * Returns the full name of the Metric as a nul-terminated string. The
-   * intention is use this as a hash-map key, so that the stat name storage
-   * is not duplicated in every map. You cannot use name() above for this,
-   * as it returns a std::string by value, as not all stat implementations
-   * containe the name as a std::string.
-   *
-   * Note that in the future, the plan is to replace this method with one that
-   * returns a reference to a symbolized representation of the elaborated string
-   * (see source/common/stats/symbol_table_impl.h).
+   * Returns the full name of the Metric as an encoded array of symbols.
    */
-  virtual const char* nameCStr() const PURE;
+  virtual StatName statName() const PURE;
 
   /**
    * Returns a vector of configurable tags to identify this Metric.
    */
-  virtual const std::vector<Tag>& tags() const PURE;
+  virtual std::vector<Tag> tags() const PURE;
 
   /**
-   * Returns the name of the Metric with the portions designated as tags removed.
+   * Returns the name of the Metric with the portions designated as tags
+   * removed as a string.
    */
-  virtual const std::string& tagExtractedName() const PURE;
+  virtual std::string tagExtractedName() const PURE;
 
   /**
    * Indicates whether this metric has been updated since the server was started.
    */
   virtual bool used() const PURE;
+
+  virtual StatDataAllocator& allocator() PURE;
+  virtual const StatDataAllocator& allocator() const PURE;
 };
 
 /**

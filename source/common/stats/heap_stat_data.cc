@@ -7,34 +7,40 @@
 namespace Envoy {
 namespace Stats {
 
-HeapStatData::HeapStatData(SymbolEncoding& encoding) {
-  encoding.moveToStorage(name_encoding_);
+HeapStatDataAllocator::~HeapStatDataAllocator() {
+  ASSERT(stats_.empty());
 }
 
-HeapStatDataAllocator::HeapStatDataAllocator(SymbolTable& symbol_table)
-    : table_(symbol_table) {}
+HeapStatData*  HeapStatData::alloc(StatName stat_name, SymbolTable& symbol_table) {
+  void* memory = ::malloc(sizeof(HeapStatData) + stat_name.numBytesIncludingLength());
+  ASSERT(memory);
+  symbol_table.incRefCount(stat_name);
+  return new (memory) HeapStatData(stat_name);
+}
 
-HeapStatDataAllocator::~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
+void HeapStatData::free(SymbolTable& symbol_table) {
+  symbol_table.free(statName());
+  this->~HeapStatData();
+  ::free(this); // matches malloc() call above.
+}
 
-HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {
-  SymbolVec symbol_vec = table_.encode(name);
 
-  // Any expected truncation of name is done at the callsite. No truncation is
-  // required to use this allocator. Note that data must be freed by calling
-  // its free() method, and not by destruction, thus the more complex use of
-  // unique_ptr.
-  std::unique_ptr<HeapStatData, std::function<void(HeapStatData * d)>> data(
-      HeapStatData::alloc(name), [](HeapStatData* d) { d->free(); });
+HeapStatData& HeapStatDataAllocator::alloc(StatName name) {
+  std::unique_ptr<HeapStatData, std::function<void(HeapStatData * d)>> data_ptr(
+      HeapStatData::alloc(name, symbolTable()), [this](HeapStatData* d) {
+                                                  d->free(symbolTable());
+                                                });
   Thread::ReleasableLockGuard lock(mutex_);
-  auto ret = stats_.insert(data.get());
+  auto ret = stats_.insert(data_ptr.get());
   HeapStatData* existing_data = *ret.first;
   lock.release();
 
   if (ret.second) {
-    return data.release();
+    //symbolTable().incRefCount(existing_data->statName());
+    return *data_ptr.release();
   }
   ++existing_data->ref_count_;
-  return existing_data;
+  return *existing_data;
 }
 
 void HeapStatDataAllocator::free(HeapStatData& data) {
@@ -49,18 +55,7 @@ void HeapStatDataAllocator::free(HeapStatData& data) {
     ASSERT(key_removed == 1);
   }
 
-  data.free();
-}
-
-HeapStatData* HeapStatData::alloc(absl::string_view name) {
-  void* memory = ::malloc(sizeof(HeapStatData) + name.size() + 1);
-  ASSERT(memory);
-  return new (memory) HeapStatData(name);
-}
-
-void HeapStatData::free() {
-  this->~HeapStatData();
-  ::free(this); // matches malloc() call above.
+  data.free(symbolTable());
 }
 
 template class StatDataAllocatorImpl<HeapStatData>;

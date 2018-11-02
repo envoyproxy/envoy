@@ -29,11 +29,7 @@ namespace Stats {
 // available. This could be resolved with placed new, or another nesting level.
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
-  // StatDataAllocator
-  CounterSharedPtr makeCounter(absl::string_view name, std::string&& tag_extracted_name,
-                               std::vector<Tag>&& tags) override;
-  GaugeSharedPtr makeGauge(absl::string_view name, std::string&& tag_extracted_name,
-                           std::vector<Tag>&& tags) override;
+  explicit StatDataAllocatorImpl(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
 
   /**
    * @param name the full name of the stat.
@@ -42,7 +38,7 @@ public:
    *         by name if one already exists with the same name. This is used for intra-process
    *         scope swapping as well as inter-process hot restart.
    */
-  virtual StatData* alloc(absl::string_view name) PURE;
+  //virtual StatData* alloc(StatName name) PURE;
 
   /**
    * Free a raw stat data block. The allocator should handle reference counting and only truly
@@ -50,6 +46,15 @@ public:
    * @param data the data returned by alloc().
    */
   virtual void free(StatData& data) PURE;
+
+  SymbolTable& symbolTable() override { return symbol_table_; }
+  const SymbolTable& symbolTable() const override { return symbol_table_; }
+
+ private:
+  // SymbolTable encodes encodes stat names as back into strings. This does not
+  // get guarded by a mutex, since it has its own internal mutex to guarantee
+  // thread safety.
+  SymbolTable& symbol_table_;
 };
 
 /**
@@ -62,13 +67,9 @@ public:
 template <class StatData> class CounterImpl : public Counter, public MetricImpl {
 public:
   CounterImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
-              std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-      : MetricImpl(std::move(tag_extracted_name), std::move(tags)), data_(data), alloc_(alloc) {}
+              absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
+      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {}
   ~CounterImpl() { alloc_.free(data_); }
-
-  // Stats::Metric
-  std::string name() const override { return std::string(data_.name()); }
-  const char* nameCStr() const override { return data_.name(); }
 
   // Stats::Counter
   void add(uint64_t amount) override {
@@ -83,7 +84,10 @@ public:
   bool used() const override { return data_.flags_ & Flags::Used; }
   uint64_t value() const override { return data_.value_; }
 
-private:
+  StatDataAllocator& allocator() override { return alloc_; }
+  const StatDataAllocator& allocator() const override { return alloc_; }
+
+protected:
   StatData& data_;
   StatDataAllocatorImpl<StatData>& alloc_;
 };
@@ -96,10 +100,13 @@ class NullCounterImpl : public Counter {
 public:
   NullCounterImpl() {}
   ~NullCounterImpl() {}
+
+  // Stats::Metric
   std::string name() const override { return ""; }
-  const char* nameCStr() const override { return ""; }
-  const std::string& tagExtractedName() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
-  const std::vector<Tag>& tags() const override { CONSTRUCT_ON_FIRST_USE(std::vector<Tag>, {}); }
+  StatName statName() const override { return StatName(); }
+
+  std::string tagExtractedName() const override { return ""; }
+  std::vector<Tag> tags() const override { return std::vector<Tag>(); }
   void add(uint64_t) override {}
   void inc() override {}
   uint64_t latch() override { return 0; }
@@ -114,13 +121,9 @@ public:
 template <class StatData> class GaugeImpl : public Gauge, public MetricImpl {
 public:
   GaugeImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
-            std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-      : MetricImpl(std::move(tag_extracted_name), std::move(tags)), data_(data), alloc_(alloc) {}
+            absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
+      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {}
   ~GaugeImpl() { alloc_.free(data_); }
-
-  // Stats::Metric
-  std::string name() const override { return std::string(data_.name()); }
-  const char* nameCStr() const override { return data_.name(); }
 
   // Stats::Gauge
   virtual void add(uint64_t amount) override {
@@ -141,7 +144,10 @@ public:
   virtual uint64_t value() const override { return data_.value_; }
   bool used() const override { return data_.flags_ & Flags::Used; }
 
-private:
+  StatDataAllocator& allocator() override { return alloc_; }
+  const StatDataAllocator& allocator() const override { return alloc_; }
+
+protected:
   StatData& data_;
   StatDataAllocatorImpl<StatData>& alloc_;
 };
@@ -155,9 +161,9 @@ public:
   NullGaugeImpl() {}
   ~NullGaugeImpl() {}
   std::string name() const override { return ""; }
-  const char* nameCStr() const override { return ""; }
-  const std::string& tagExtractedName() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
-  const std::vector<Tag>& tags() const override { CONSTRUCT_ON_FIRST_USE(std::vector<Tag>, {}); }
+  StatName statName() const override { return StatName(); }
+  std::string tagExtractedName() const override { return ""; }
+  std::vector<Tag> tags() const override { return std::vector<Tag>(); }
   void add(uint64_t) override {}
   void inc() override {}
   void dec() override {}
@@ -166,30 +172,6 @@ public:
   bool used() const override { return false; }
   uint64_t value() const override { return 0; }
 };
-
-template <class StatData>
-CounterSharedPtr StatDataAllocatorImpl<StatData>::makeCounter(absl::string_view name,
-                                                              std::string&& tag_extracted_name,
-                                                              std::vector<Tag>&& tags) {
-  StatData* data = alloc(name);
-  if (data == nullptr) {
-    return nullptr;
-  }
-  return std::make_shared<CounterImpl<StatData>>(*data, *this, std::move(tag_extracted_name),
-                                                 std::move(tags));
-}
-
-template <class StatData>
-GaugeSharedPtr StatDataAllocatorImpl<StatData>::makeGauge(absl::string_view name,
-                                                          std::string&& tag_extracted_name,
-                                                          std::vector<Tag>&& tags) {
-  StatData* data = alloc(name);
-  if (data == nullptr) {
-    return nullptr;
-  }
-  return std::make_shared<GaugeImpl<StatData>>(*data, *this, std::move(tag_extracted_name),
-                                               std::move(tags));
-}
 
 } // namespace Stats
 } // namespace Envoy

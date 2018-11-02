@@ -90,10 +90,50 @@ struct RawStatData {
   char name_[];
 };
 
+template<class Stat>
+class RawStat : public Stat {
+public:
+  RawStat(StatName stat_name, RawStatData& data, StatDataAllocatorImpl<RawStatData>& alloc,
+           absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
+      : Stat(data, alloc, tag_extracted_name, tags),
+        stat_name_storage_(stat_name, alloc.symbolTable()) {}
+
+  StatName statName() const override { return stat_name_storage_.statName(); }
+
+ private:
+  StatNameStorage stat_name_storage_;
+};
+
 class RawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
 public:
+  RawStatDataAllocator(SymbolTable& symbol_table) : StatDataAllocatorImpl(symbol_table) {}
+  ~RawStatDataAllocator();
+
+  virtual RawStatData* alloc(absl::string_view name) PURE;
+  RawStatData* allocStatName(StatName stat_name) { return alloc(stat_name.toString(symbolTable())); }
+
   // StatDataAllocator
   bool requiresBoundedStatNameSize() const override { return true; }
+
+  template<class Stat> std::shared_ptr<Stat> makeStat(
+      StatName name, absl::string_view tag_extracted_name, const std::vector<Tag>& tags) {
+    RawStatData* raw_stat_data = allocStatName(name);
+    if (raw_stat_data == nullptr) {
+      return nullptr;
+    }
+    return std::make_shared<RawStat<Stat>>(
+        name, *raw_stat_data, *this, tag_extracted_name, tags);
+  }
+
+  CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
+                               const std::vector<Tag>& tags) override {
+    return makeStat<CounterImpl<RawStatData>>(name, tag_extracted_name, tags);
+  }
+
+  GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
+                           const std::vector<Tag>& tags) override {
+    return makeStat<GaugeImpl<RawStatData>>(name, tag_extracted_name, tags);
+  }
 };
 
 } // namespace Stats
