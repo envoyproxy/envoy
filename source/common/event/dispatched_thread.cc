@@ -1,6 +1,7 @@
 #include "common/event/dispatched_thread.h"
 
 #include <chrono>
+#include <memory>
 
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
@@ -14,7 +15,8 @@ namespace Envoy {
 namespace Event {
 
 void DispatchedThreadImpl::start(Server::GuardDog& guard_dog) {
-  thread_.reset(new Thread::Thread([this, &guard_dog]() -> void { threadRoutine(guard_dog); }));
+  thread_ =
+      std::make_unique<Thread::Thread>([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
 }
 
 void DispatchedThreadImpl::exit() {

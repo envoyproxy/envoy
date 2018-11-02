@@ -1,5 +1,7 @@
 #include "extensions/filters/http/lua/lua_filter.h"
 
+#include <memory>
+
 #include "envoy/http/codes.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -123,7 +125,7 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
 
   Buffer::InstancePtr body;
   if (raw_body != nullptr) {
-    body.reset(new Buffer::OwnedImpl(raw_body, body_size));
+    body = std::make_unique<Buffer::OwnedImpl>(raw_body, body_size);
     headers->insertContentLength().value(body_size);
   }
 
@@ -179,7 +181,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   }
 
   if (body != nullptr) {
-    message->body().reset(new Buffer::OwnedImpl(body, body_size));
+    message->body() = std::make_unique<Buffer::OwnedImpl>(body, body_size);
     message->headers().insertContentLength().value(body_size);
   }
 
@@ -252,7 +254,7 @@ void StreamHandleWrapper::onFailure(Http::AsyncClient::FailureReason) {
   Http::MessagePtr response_message(new Http::ResponseMessageImpl(Http::HeaderMapPtr{
       new Http::HeaderMapImpl{{Http::Headers::get().Status,
                                std::to_string(enumToInt(Http::Code::ServiceUnavailable))}}}));
-  response_message->body().reset(new Buffer::OwnedImpl("upstream failure"));
+  response_message->body() = std::make_unique<Buffer::OwnedImpl>("upstream failure");
   onSuccess(std::move(response_message));
 }
 

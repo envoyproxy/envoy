@@ -201,8 +201,8 @@ HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) 
   cluster->http2_settings_.allow_connect_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
-  return IntegrationCodecClientPtr{new IntegrationCodecClient(
-      *dispatcher_, std::move(conn), host_description, downstream_protocol_)};
+  return std::make_unique<IntegrationCodecClient>(*dispatcher_, std::move(conn), host_description,
+                                                  downstream_protocol_);
 }
 
 IntegrationCodecClientPtr

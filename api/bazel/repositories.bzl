@@ -4,6 +4,9 @@ BAZEL_SKYLIB_SHA256 = "b5f6abe419da897b7901f90cbab08af958b97a8f3575b0d3dd062ac7c
 GOGOPROTO_RELEASE = "1.1.1"
 GOGOPROTO_SHA256 = "9f8c2ad49849ab063cd9fef67e77d49606640044227ecf7f3617ea2c92ef147c"
 
+PGV_RELEASE = "0.0.10"
+PGV_SHA256 = "77b39d7c007255adaf30aa417d750922cc8a10b2c21a0c6aa31bbbf0f9ec5d34"
+
 GOOGLEAPIS_GIT_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411"  # May 23, 2018
 GOOGLEAPIS_SHA = "16f5b2e8bf1e747a32f9a62e211f8f33c94645492e9bbd72458061d9a9de1f63"
 
@@ -12,9 +15,6 @@ PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf391
 
 OPENCENSUS_GIT_SHA = "ab82e5fdec8267dc2a726544b10af97675970847"  # May 23, 2018
 OPENCENSUS_SHA = "1950f844d9f338ba731897a9bb526f9074c0487b3f274ce2ec3b4feaf0bef7e2"
-
-PGV_GIT_SHA = "30da78c4bcdd477b3c24d13e43cf39361ae3859f"  # Sep 27, 2018
-PGV_SHA = "2bc9a34b1c485e73540dc5093d6715ef437294020fa6580f21306aa5e884f511"
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
@@ -27,9 +27,9 @@ def api_dependencies():
     )
     http_archive(
         name = "com_lyft_protoc_gen_validate",
-        url = "https://github.com/lyft/protoc-gen-validate/archive/" + PGV_GIT_SHA + ".tar.gz",
-        sha256 = PGV_SHA,
-        strip_prefix = "protoc-gen-validate-" + PGV_GIT_SHA,
+        sha256 = PGV_SHA256,
+        strip_prefix = "protoc-gen-validate-" + PGV_RELEASE,
+        url = "https://github.com/lyft/protoc-gen-validate/archive/v" + PGV_RELEASE + ".tar.gz",
     )
     http_archive(
         name = "googleapis",

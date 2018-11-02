@@ -8,6 +8,7 @@
 #include "common/common/c_smart_ptr.h"
 #include "common/memory/stats.h"
 #include "common/stats/stats_matcher_impl.h"
+#include "common/stats/tag_producer_impl.h"
 #include "common/stats/thread_local_store.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -650,6 +651,10 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
     return;
   }
 
+  // Use a tag producer that will produce tags.
+  envoy::config::metrics::v2::StatsConfig stats_config;
+  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+
   const size_t million = 1000 * 1000;
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
   if (start_mem == 0) {
@@ -660,13 +665,17 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 22 * million); // actual value: 21190128 as of Oct 26, 2018
+  EXPECT_LT(end_mem - start_mem, 28 * million); // actual value: 27203216 as of Oct 29, 2018
 }
 
 TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
   if (!TestUtil::hasDeterministicMallocStats()) {
     return;
   }
+
+  // Use a tag producer that will produce tags.
+  envoy::config::metrics::v2::StatsConfig stats_config;
+  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
 
   const size_t million = 1000 * 1000;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -679,7 +688,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 25 * million); // actual value: 24469488 as of Oct 26, 2018
+  EXPECT_LT(end_mem - start_mem, 31 * million); // actual value: 30482576 as of Oct 29, 2018
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {

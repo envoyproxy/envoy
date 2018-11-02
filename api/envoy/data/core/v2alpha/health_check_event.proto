@@ -3,11 +3,8 @@ syntax = "proto3";
 package envoy.data.core.v2alpha;
 
 import "envoy/api/v2/core/address.proto";
-import "envoy/api/v2/core/base.proto";
 
-import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
-import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";

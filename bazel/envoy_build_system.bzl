@@ -236,12 +236,27 @@ def envoy_cc_binary(
         deps = deps,
     )
 
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
+
 # Envoy C++ fuzz test targes. These are not included in coverage runs.
 def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
+    if not (corpus.startswith("//") or corpus.startswith(":")):
+        corpus_name = name + "_corpus"
+        corpus = native.glob([corpus + "/**"])
+        native.filegroup(
+            name = corpus_name,
+            srcs = corpus,
+        )
+    else:
+        corpus_name = corpus
+    pkg_tar(
+        name = name + "_corpus_tar",
+        srcs = [corpus_name],
+        testonly = 1,
+    )
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
-        data = native.glob([corpus + "/**"]),
         deps = deps + ["//test/fuzz:fuzz_runner_lib"],
         **kwargs
     )
@@ -250,7 +265,8 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         copts = envoy_copts("@envoy", test = True),
         linkopts = envoy_test_linkopts(),
         linkstatic = 1,
-        args = [PACKAGE_NAME + "/" + corpus],
+        args = ["$(locations %s)" % corpus_name],
+        data = [corpus_name],
         # No fuzzing on OS X.
         deps = select({
             "@bazel_tools//tools/osx:darwin": ["//test:dummy_main"],

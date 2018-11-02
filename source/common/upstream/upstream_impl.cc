@@ -458,18 +458,18 @@ ClusterSharedPtr ClusterImplBase::create(
 
   switch (cluster.type()) {
   case envoy::api::v2::Cluster::STATIC:
-    new_cluster.reset(new StaticClusterImpl(cluster, runtime, factory_context,
-                                            std::move(stats_scope), added_via_api));
+    new_cluster = std::make_unique<StaticClusterImpl>(cluster, runtime, factory_context,
+                                                      std::move(stats_scope), added_via_api);
     break;
   case envoy::api::v2::Cluster::STRICT_DNS:
-    new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, selected_dns_resolver,
-                                               factory_context, std::move(stats_scope),
-                                               added_via_api));
+    new_cluster = std::make_unique<StrictDnsClusterImpl>(cluster, runtime, selected_dns_resolver,
+                                                         factory_context, std::move(stats_scope),
+                                                         added_via_api);
     break;
   case envoy::api::v2::Cluster::LOGICAL_DNS:
-    new_cluster.reset(new LogicalDnsCluster(cluster, runtime, selected_dns_resolver, tls,
-                                            factory_context, std::move(stats_scope),
-                                            added_via_api));
+    new_cluster =
+        std::make_unique<LogicalDnsCluster>(cluster, runtime, selected_dns_resolver, tls,
+                                            factory_context, std::move(stats_scope), added_via_api);
     break;
   case envoy::api::v2::Cluster::ORIGINAL_DST:
     if (cluster.lb_policy() != envoy::api::v2::Cluster::ORIGINAL_DST_LB) {
@@ -480,8 +480,8 @@ ClusterSharedPtr ClusterImplBase::create(
       throw EnvoyException(fmt::format(
           "cluster: cluster type 'original_dst' may not be used with lb_subset_config"));
     }
-    new_cluster.reset(new OriginalDstCluster(cluster, runtime, factory_context,
-                                             std::move(stats_scope), added_via_api));
+    new_cluster = std::make_unique<OriginalDstCluster>(cluster, runtime, factory_context,
+                                                       std::move(stats_scope), added_via_api);
     break;
   case envoy::api::v2::Cluster::EDS:
     if (!cluster.has_eds_cluster_config()) {
@@ -489,8 +489,8 @@ ClusterSharedPtr ClusterImplBase::create(
     }
 
     // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
-    new_cluster.reset(new EdsClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                                         added_via_api));
+    new_cluster = std::make_unique<EdsClusterImpl>(cluster, runtime, factory_context,
+                                                   std::move(stats_scope), added_via_api);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -734,9 +734,9 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
     max_requests = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_requests, max_requests);
     max_retries = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_retries, max_retries);
   }
-  return ResourceManagerImplPtr{new ResourceManagerImpl(
+  return std::make_unique<ResourceManagerImpl>(
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
-      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name))};
+      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name));
 }
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
@@ -750,7 +750,7 @@ void PriorityStateManager::initializePriorityFor(
     priority_state_.resize(priority + 1);
   }
   if (priority_state_[priority].first == nullptr) {
-    priority_state_[priority].first.reset(new HostVector());
+    priority_state_[priority].first = std::make_unique<HostVector>();
   }
   if (locality_lb_endpoint.has_locality() && locality_lb_endpoint.has_load_balancing_weight()) {
     priority_state_[priority].second[locality_lb_endpoint.locality()] =

@@ -1,6 +1,7 @@
 #include "common/http/http2/conn_pool.h"
 
 #include <cstdint>
+#include <memory>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"

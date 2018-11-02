@@ -42,6 +42,7 @@ static_resources:
   clusters:
   - name: grpc
     type: logical_dns
+    dns_lookup_family: V4_ONLY
     lb_policy: round_robin
     connect_timeout: 0.250s
     http_protocol_options: {}

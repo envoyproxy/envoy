@@ -33,6 +33,7 @@ using testing::AssertionFailure;
 using testing::AssertionResult;
 using testing::AssertionSuccess;
 using testing::AtLeast;
+using testing::InSequence;
 using testing::Invoke;
 using testing::MockFunction;
 using testing::NiceMock;
@@ -1129,20 +1130,28 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
-TEST_F(RouterTest, PerTryTimeoutWithNoUpstreamHost) {
+// Ensures that the per try callback is not set until the stream becomes available.
+TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
+  InSequence s;
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
+  Http::ConnectionPool::Callbacks* pool_callbacks;
+
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
-        // simulate connect timeout, do not call callbacks.onPoolReady(...)
-        UNREFERENCED_PARAMETER(callbacks);
-        return &cancellable_;
+        pool_callbacks = &callbacks;
+        return nullptr;
       }));
 
-  expectResponseTimerCreate();
-  expectPerTryTimerCreate();
+  response_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
+  EXPECT_CALL(*response_timeout_, enableTimer(_));
+
+  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
+        EXPECT_EQ(host_address_, host->address());
+      }));
 
   Http::TestHeaderMapImpl headers{{"x-envoy-internal", "true"},
                                   {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
@@ -1151,7 +1160,15 @@ TEST_F(RouterTest, PerTryTimeoutWithNoUpstreamHost) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
-  EXPECT_CALL(cancellable_, cancel());
+  per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
+  EXPECT_CALL(*per_try_timeout_, enableTimer(_));
+  // The per try timeout timer should not be started yet.
+  pool_callbacks->onPoolReady(encoder, cm_.conn_pool_.host_);
+
+  EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+  EXPECT_CALL(*per_try_timeout_, disableTimer());
+  EXPECT_CALL(*response_timeout_, disableTimer());
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
   Http::TestHeaderMapImpl response_headers{
@@ -1163,8 +1180,8 @@ TEST_F(RouterTest, PerTryTimeoutWithNoUpstreamHost) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_rq_per_try_timeout")
                     .value());
-  EXPECT_EQ(0UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
 TEST_F(RouterTest, RetryRequestNotComplete) {
@@ -1270,6 +1287,9 @@ TEST_F(RouterTest, RetryUpstreamReset) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
+// Verifies that when the request fails with an upstream reset (per try timeout in this case)
+// before an upstream host has been established, then the onHostAttempted function will not be
+// invoked. This ensures that we're not passing a null host to the retry plugins.
 TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -1289,6 +1309,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
 
+  EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
   router_.retry_state_->expectRetry();
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
   per_try_timeout_->callback_();
@@ -1306,12 +1327,58 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   expectPerTryTimerCreate();
   router_.retry_state_->callback_();
 
+  EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
   // Normal response.
   EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).WillOnce(Return(RetryStatus::No));
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+}
+
+// Asserts that onHostAttempted is *not* called when the upstream connection fails in such
+// a way that no host is present.
+TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
+  Http::ConnectionPool::Callbacks* conn_pool_callbacks;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        conn_pool_callbacks = &callbacks;
+        return nullptr;
+      }));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  EXPECT_CALL(*router_.retry_state_, onHostAttempted(_)).Times(0);
+
+  router_.retry_state_->expectRetry();
+
+  conn_pool_callbacks->onPoolFailure(Http::ConnectionPool::PoolFailureReason::ConnectionFailure,
+                                     nullptr);
+
+  Http::StreamDecoder* response_decoder = nullptr;
+  // We expect this reset to kick off a new request.
+  NiceMock<Http::MockStreamEncoder> encoder2;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  router_.retry_state_->callback_();
+
+  EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+
+  // Normal response.
+  EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).WillOnce(Return(RetryStatus::No));
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
 TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {

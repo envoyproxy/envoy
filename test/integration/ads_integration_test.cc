@@ -250,27 +250,33 @@ public:
     fake_upstream_connection_ = nullptr;
   }
 
-  void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      auto* grpc_service =
-          bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
-      setGrpcService(*grpc_service, "ads_cluster", fake_upstreams_.back()->localAddress());
-      auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      ads_cluster->set_name("ads_cluster");
-      auto* context = ads_cluster->mutable_tls_context();
-      auto* validation_context =
-          context->mutable_common_tls_context()->mutable_validation_context();
-      validation_context->mutable_trusted_ca()->set_filename(
-          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-      validation_context->add_verify_subject_alt_name("foo.lyft.com");
-      if (clientType() == Grpc::ClientType::GoogleGrpc) {
-        auto* google_grpc = grpc_service->mutable_google_grpc();
-        auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
-        ssl_creds->mutable_root_certs()->set_filename(
-            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-      }
-    });
+  void initialize() override { initializeAds(false); }
+
+  void initializeAds(const bool rate_limiting) {
+    config_helper_.addConfigModifier(
+        [this, &rate_limiting](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+          auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+          if (rate_limiting) {
+            ads_config->mutable_rate_limit_settings();
+          }
+          auto* grpc_service = ads_config->add_grpc_services();
+          setGrpcService(*grpc_service, "ads_cluster", fake_upstreams_.back()->localAddress());
+          auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
+          ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+          ads_cluster->set_name("ads_cluster");
+          auto* context = ads_cluster->mutable_tls_context();
+          auto* validation_context =
+              context->mutable_common_tls_context()->mutable_validation_context();
+          validation_context->mutable_trusted_ca()->set_filename(
+              TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+          validation_context->add_verify_subject_alt_name("foo.lyft.com");
+          if (clientType() == Grpc::ClientType::GoogleGrpc) {
+            auto* google_grpc = grpc_service->mutable_google_grpc();
+            auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
+            ssl_creds->mutable_root_certs()->set_filename(
+                TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+          }
+        });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     AdsIntegrationBaseTest::initialize();
     if (ads_stream_ == nullptr) {
@@ -279,6 +285,111 @@ public:
       RELEASE_ASSERT(result, result.message());
       ads_stream_->startGrpcStream();
     }
+  }
+
+  void testBasicFlow() {
+    // Send initial configuration, validate we can process a request.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
+    sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                   {buildCluster("cluster_0")}, "1");
+
+    EXPECT_TRUE(
+        compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
+    sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+        Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+        "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
+    sendDiscoveryResponse<envoy::api::v2::Listener>(
+        Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
+
+    EXPECT_TRUE(
+        compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {"cluster_0"}));
+    EXPECT_TRUE(
+        compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}));
+    sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+        Config::TypeUrl::get().RouteConfiguration,
+        {buildRouteConfig("route_config_0", "cluster_0")}, "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1",
+                                        {"route_config_0"}));
+
+    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+    makeSingleRequest();
+    const ProtobufWkt::Timestamp first_active_listener_ts_1 =
+        getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
+    const ProtobufWkt::Timestamp first_active_cluster_ts_1 =
+        getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
+    const ProtobufWkt::Timestamp first_route_config_ts_1 =
+        getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
+
+    // Upgrade RDS/CDS/EDS to a newer config, validate we can process a request.
+    sendDiscoveryResponse<envoy::api::v2::Cluster>(
+        Config::TypeUrl::get().Cluster, {buildCluster("cluster_1"), buildCluster("cluster_2")},
+        "2");
+    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
+    sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+        Config::TypeUrl::get().ClusterLoadAssignment,
+        {buildClusterLoadAssignment("cluster_1"), buildClusterLoadAssignment("cluster_2")}, "2");
+    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                        {"cluster_2", "cluster_1"}));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "2", {}));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "2",
+                                        {"cluster_2", "cluster_1"}));
+    sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+        Config::TypeUrl::get().RouteConfiguration,
+        {buildRouteConfig("route_config_0", "cluster_1")}, "2");
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2",
+                                        {"route_config_0"}));
+
+    makeSingleRequest();
+    const ProtobufWkt::Timestamp first_active_listener_ts_2 =
+        getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
+    const ProtobufWkt::Timestamp first_active_cluster_ts_2 =
+        getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
+    const ProtobufWkt::Timestamp first_route_config_ts_2 =
+        getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
+
+    // Upgrade LDS/RDS, validate we can process a request.
+    sendDiscoveryResponse<envoy::api::v2::Listener>(Config::TypeUrl::get().Listener,
+                                                    {buildListener("listener_1", "route_config_1"),
+                                                     buildListener("listener_2", "route_config_2")},
+                                                    "2");
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2",
+                                        {"route_config_2", "route_config_1", "route_config_0"}));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "2", {}));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2",
+                                        {"route_config_2", "route_config_1"}));
+    sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+        Config::TypeUrl::get().RouteConfiguration,
+        {buildRouteConfig("route_config_1", "cluster_1"),
+         buildRouteConfig("route_config_2", "cluster_1")},
+        "3");
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "3",
+                                        {"route_config_2", "route_config_1"}));
+
+    test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+    makeSingleRequest();
+    const ProtobufWkt::Timestamp first_active_listener_ts_3 =
+        getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
+    const ProtobufWkt::Timestamp first_active_cluster_ts_3 =
+        getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
+    const ProtobufWkt::Timestamp first_route_config_ts_3 =
+        getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
+
+    // Expect last_updated timestamps to be updated in a predictable way
+    // For the listener configs in this example, 1 == 2 < 3.
+    EXPECT_EQ(first_active_listener_ts_2, first_active_listener_ts_1);
+    EXPECT_GT(first_active_listener_ts_3, first_active_listener_ts_2);
+    // For the cluster configs in this example, 1 < 2 == 3.
+    EXPECT_GT(first_active_cluster_ts_2, first_active_cluster_ts_1);
+    EXPECT_EQ(first_active_cluster_ts_3, first_active_cluster_ts_2);
+    // For the route configs in this example, 1 < 2 < 3.
+    EXPECT_GT(first_route_config_ts_2, first_route_config_ts_1);
+    EXPECT_GT(first_route_config_ts_3, first_route_config_ts_2);
   }
 
   envoy::admin::v2alpha::ClustersConfigDump getClustersConfigDump() {
@@ -309,107 +420,13 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsIntegrationTest, GRPC_CLIENT_IN
 // Validate basic config delivery and upgrade.
 TEST_P(AdsIntegrationTest, Basic) {
   initialize();
+  testBasicFlow();
+}
 
-  // Send initial configuration, validate we can process a request.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
-  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
-                                                 {buildCluster("cluster_0")}, "1");
-
-  EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
-  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
-      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
-
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
-  sendDiscoveryResponse<envoy::api::v2::Listener>(
-      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
-
-  EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {"cluster_0"}));
-  EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}));
-  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
-      "1");
-
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}));
-  EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {"route_config_0"}));
-
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
-  makeSingleRequest();
-  const ProtobufWkt::Timestamp first_active_listener_ts_1 =
-      getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
-  const ProtobufWkt::Timestamp first_active_cluster_ts_1 =
-      getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
-  const ProtobufWkt::Timestamp first_route_config_ts_1 =
-      getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
-
-  // Upgrade RDS/CDS/EDS to a newer config, validate we can process a request.
-  sendDiscoveryResponse<envoy::api::v2::Cluster>(
-      Config::TypeUrl::get().Cluster, {buildCluster("cluster_1"), buildCluster("cluster_2")}, "2");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
-  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
-      Config::TypeUrl::get().ClusterLoadAssignment,
-      {buildClusterLoadAssignment("cluster_1"), buildClusterLoadAssignment("cluster_2")}, "2");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-                                      {"cluster_2", "cluster_1"}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "2", {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "2",
-                                      {"cluster_2", "cluster_1"}));
-  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_1")},
-      "2");
-  EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2", {"route_config_0"}));
-
-  makeSingleRequest();
-  const ProtobufWkt::Timestamp first_active_listener_ts_2 =
-      getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
-  const ProtobufWkt::Timestamp first_active_cluster_ts_2 =
-      getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
-  const ProtobufWkt::Timestamp first_route_config_ts_2 =
-      getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
-
-  // Upgrade LDS/RDS, validate we can process a request.
-  sendDiscoveryResponse<envoy::api::v2::Listener>(Config::TypeUrl::get().Listener,
-                                                  {buildListener("listener_1", "route_config_1"),
-                                                   buildListener("listener_2", "route_config_2")},
-                                                  "2");
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2",
-                                      {"route_config_2", "route_config_1", "route_config_0"}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "2", {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2",
-                                      {"route_config_2", "route_config_1"}));
-  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration,
-      {buildRouteConfig("route_config_1", "cluster_1"),
-       buildRouteConfig("route_config_2", "cluster_1")},
-      "3");
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "3",
-                                      {"route_config_2", "route_config_1"}));
-
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
-  makeSingleRequest();
-  const ProtobufWkt::Timestamp first_active_listener_ts_3 =
-      getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
-  const ProtobufWkt::Timestamp first_active_cluster_ts_3 =
-      getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
-  const ProtobufWkt::Timestamp first_route_config_ts_3 =
-      getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
-
-  // Expect last_updated timestamps to be updated in a predictable way
-  // For the listener configs in this example, 1 == 2 < 3.
-  EXPECT_EQ(first_active_listener_ts_2, first_active_listener_ts_1);
-  EXPECT_GT(first_active_listener_ts_3, first_active_listener_ts_2);
-  // For the cluster configs in this example, 1 < 2 == 3.
-  EXPECT_GT(first_active_cluster_ts_2, first_active_cluster_ts_1);
-  EXPECT_EQ(first_active_cluster_ts_3, first_active_cluster_ts_2);
-  // For the route configs in this example, 1 < 2 < 3.
-  EXPECT_GT(first_route_config_ts_2, first_route_config_ts_1);
-  EXPECT_GT(first_route_config_ts_3, first_route_config_ts_2);
+// Validate basic config delivery and upgrade with RateLimiting.
+TEST_P(AdsIntegrationTest, BasicWithRateLimiting) {
+  initializeAds(true);
+  testBasicFlow();
 }
 
 // Validate that we can recover from failures.
