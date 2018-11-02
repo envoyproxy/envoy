@@ -36,12 +36,16 @@ mkdir -p "${DOCS_OUTPUT_DIR}"
 rm -rf "${GENERATED_RST_DIR}"
 mkdir -p "${GENERATED_RST_DIR}"
 
-if [ ! -d "${BUILD_DIR}"/venv ]; then
-  virtualenv "${BUILD_DIR}"/venv --no-site-packages --python=python2.7
-  "${BUILD_DIR}"/venv/bin/pip install -r "${SCRIPT_DIR}"/requirements.txt
+if [[ "$VIRTUAL_ENV" == "" ]]; then
+  if [ ! -d "${BUILD_DIR}"/venv ]; then
+    virtualenv "${BUILD_DIR}"/venv --no-site-packages --python=python2.7
+  fi
+  source "${BUILD_DIR}"/venv/bin/activate
+else
+  echo "Found existing virtualenv"
 fi
 
-source "${BUILD_DIR}"/venv/bin/activate
+pip install -r "${SCRIPT_DIR}"/requirements.txt
 
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED  --spawn_strategy=standalone
