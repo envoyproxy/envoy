@@ -6,7 +6,7 @@ import sys
 from yapf.yapflib.yapf_api import FormatFile
 
 
-def collect_files():
+def collectFiles():
   """Collect all Python files in the tools directory."""
   # TODO: Add ability to collect a specific file or files.
   matches = []
@@ -16,7 +16,7 @@ def collect_files():
   return matches
 
 
-def validate_format(fix=False):
+def validateFormat(fix=False):
   """Check the format of python files in the tools directory.
 
     Arguments:
@@ -25,30 +25,30 @@ def validate_format(fix=False):
   fixes_required = False
   failed_update_files = set()
   successful_update_files = set()
-  for file in collect_files():
+  for python_file in collectFiles():
     reformatted_source, encoding, changed = FormatFile(
-        file, style_config='.style.yapf', in_place=fix, print_diff=not fix)
+        python_file, style_config='.style.yapf', in_place=fix, print_diff=not fix)
     if not fix:
-      fixes_required = changed
+      fixes_required = True if changed else fixes_required
       if reformatted_source:
         print(reformatted_source)
       continue
     file_list = failed_update_files if reformatted_source else successful_update_files  # noqa:E503
-    file_list.add(file)
+    file_list.add(python_file)
   if fix:
-    display_fix_results(successful_update_files, failed_update_files)
-    fixes_required = True if failed_update_files else False
+    displayFixResults(successful_update_files, failed_update_files)
+    fixes_required = len(failed_update_files) > 0
   return not fixes_required
 
 
-def display_fix_results(successful_files, failed_files):
+def displayFixResults(successful_files, failed_files):
   if successful_files:
     print('Successfully fixed {} files'.format(len(successful_files)))
 
   if failed_files:
     print('The following files failed to fix inline:')
-    for file in failed_files:
-      print('  - {}'.format(file))
+    for failed_file in failed_files:
+      print('  - {}'.format(failed_file))
 
 
 if __name__ == '__main__':
@@ -56,5 +56,5 @@ if __name__ == '__main__':
   parser.add_argument(
       'action', choices=['check', 'fix'], default='check', help='Fix invalid syntax in files.')
   args = parser.parse_args()
-  is_valid = validate_format(True if args.action == 'fix' else False)
+  is_valid = validateFormat(args.action == 'fix')
   sys.exit(0 if is_valid else 1)
