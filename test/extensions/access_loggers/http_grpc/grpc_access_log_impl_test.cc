@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/network/address_impl.h"
 
 #include "extensions/access_loggers/http_grpc/grpc_access_log_impl.h"
@@ -115,7 +117,8 @@ public:
   void init() {
     ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
-    access_log_.reset(new HttpGrpcAccessLog(AccessLog::FilterPtr{filter_}, config_, streamer_));
+    access_log_ =
+        std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, streamer_);
   }
 
   void expectLog(const std::string& expected_request_msg_yaml) {
@@ -150,6 +153,7 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     stream_info.start_time_monotonic_ = MonotonicTime(1h);
     stream_info.last_downstream_tx_byte_sent_ = 2ms;
     stream_info.setDownstreamLocalAddress(std::make_shared<Network::Address::PipeInstance>("/foo"));
+    (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
 
     expectLog(R"EOF(
 http_logs:
@@ -166,6 +170,9 @@ http_logs:
         seconds: 3600
       time_to_last_downstream_tx_byte:
         nanos: 2000000
+      metadata:
+        filter_metadata:
+          foo: {}
     request: {}
     response: {}
 )EOF");

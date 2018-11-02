@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/hex.h"
 
@@ -38,7 +40,7 @@ public:
     EXPECT_CALL(options_, statsOptions()).WillRepeatedly(ReturnRef(stats_options_));
 
     // Test we match the correct stat with empty-slots before, after, or both.
-    hot_restart_.reset(new HotRestartImpl(options_));
+    hot_restart_ = std::make_unique<HotRestartImpl>(options_);
     hot_restart_->drainParentListeners();
   }
 

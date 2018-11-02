@@ -9,8 +9,7 @@ static_resources:
         config:
           value:
             filters:
-            - type: decoder
-              name: router
+            - name: router
               config: {}
             codec_type: auto
             stat_prefix: router

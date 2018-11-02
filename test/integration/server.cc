@@ -1,5 +1,6 @@
 #include "test/integration/server.h"
 
+#include <memory>
 #include <string>
 
 #include "envoy/http/header_map.h"
@@ -19,6 +20,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 
+#include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -57,8 +59,8 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
                                   bool deterministic) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_.reset(new Thread::Thread(
-      [version, deterministic, this]() -> void { threadRoutine(version, deterministic); }));
+  thread_ = std::make_unique<Thread::Thread>(
+      [version, deterministic, this]() -> void { threadRoutine(version, deterministic); });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
   if (pre_worker_start_test_steps != nullptr) {
@@ -75,6 +77,26 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
     listeners_cv_.wait(listeners_mutex_); // Safe since CondVar::wait won't throw.
   }
   ENVOY_LOG(info, "listener wait complete");
+
+  // If we are capturing, spin up tcpdump.
+  const auto capture_path = TestEnvironment::getOptionalEnvVar("CAPTURE_PATH");
+  if (capture_path) {
+    std::vector<uint32_t> ports;
+    for (auto listener : server().listenerManager().listeners()) {
+      const auto listen_addr = listener.get().socket().localAddress();
+      if (listen_addr->type() == Network::Address::Type::Ip) {
+        ports.push_back(listen_addr->ip()->port());
+      }
+    }
+    // TODO(htuch): Support a different loopback interface as needed.
+    const ::testing::TestInfo* const test_info =
+        ::testing::UnitTest::GetInstance()->current_test_info();
+    const std::string test_id =
+        std::string(test_info->name()) + "_" + std::string(test_info->test_case_name());
+    const std::string pcap_path =
+        capture_path.value() + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}) + "_server.pcap";
+    tcp_dump_ = std::make_unique<TcpDump>(pcap_path, "lo", ports);
+  }
 }
 
 IntegrationTestServer::~IntegrationTestServer() {
@@ -124,9 +146,9 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   } else {
     random_generator = std::make_unique<Runtime::RandomGeneratorImpl>();
   }
-  server_.reset(new Server::InstanceImpl(
+  server_ = std::make_unique<Server::InstanceImpl>(
       options, time_system_, Network::Utility::getLocalAddress(version), *this, restarter,
-      stats_store, lock, *this, std::move(random_generator), tls));
+      stats_store, lock, *this, std::move(random_generator), tls);
   pending_listeners_ = server_->listenerManager().listeners().size();
   ENVOY_LOG(info, "waiting for {} test server listeners", pending_listeners_);
   // This is technically thread unsafe (assigning to a shared_ptr accessed

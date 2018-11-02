@@ -273,7 +273,9 @@ double HostSetImpl::effectiveLocalityWeight(uint32_t index) const {
   ASSERT(hosts_per_locality_ != nullptr);
   const auto& locality_hosts = hosts_per_locality_->get()[index];
   const auto& locality_healthy_hosts = healthy_hosts_per_locality_->get()[index];
-  ASSERT(!locality_hosts.empty());
+  if (locality_hosts.empty()) {
+    return 0.0;
+  }
   const double locality_healthy_ratio = 1.0 * locality_healthy_hosts.size() / locality_hosts.size();
   const uint32_t weight = (*locality_weights_)[index];
   // Health ranges from 0-1.0, and is the ratio of healthy hosts to total hosts, modified by the
@@ -324,13 +326,14 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       features_(parseFeatures(config)),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       extension_protocol_options_(parseExtensionProtocolOptions(config)),
-      resource_managers_(config, runtime, name_),
+      resource_managers_(config, runtime, name_, *stats_scope_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
       source_address_(getSourceAddress(config, bind_config)),
       lb_ring_hash_config_(config.ring_hash_lb_config()),
       lb_original_dst_config_(config.original_dst_lb_config()), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
-      metadata_(config.metadata()), common_lb_config_(config.common_lb_config()),
+      metadata_(config.metadata()), typed_metadata_(config.metadata()),
+      common_lb_config_(config.common_lb_config()),
       cluster_socket_options_(parseClusterSocketOptions(config, bind_config)),
       drain_connections_on_host_removal_(config.drain_connections_on_host_removal()) {
 
@@ -455,18 +458,18 @@ ClusterSharedPtr ClusterImplBase::create(
 
   switch (cluster.type()) {
   case envoy::api::v2::Cluster::STATIC:
-    new_cluster.reset(new StaticClusterImpl(cluster, runtime, factory_context,
-                                            std::move(stats_scope), added_via_api));
+    new_cluster = std::make_unique<StaticClusterImpl>(cluster, runtime, factory_context,
+                                                      std::move(stats_scope), added_via_api);
     break;
   case envoy::api::v2::Cluster::STRICT_DNS:
-    new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, selected_dns_resolver,
-                                               factory_context, std::move(stats_scope),
-                                               added_via_api));
+    new_cluster = std::make_unique<StrictDnsClusterImpl>(cluster, runtime, selected_dns_resolver,
+                                                         factory_context, std::move(stats_scope),
+                                                         added_via_api);
     break;
   case envoy::api::v2::Cluster::LOGICAL_DNS:
-    new_cluster.reset(new LogicalDnsCluster(cluster, runtime, selected_dns_resolver, tls,
-                                            factory_context, std::move(stats_scope),
-                                            added_via_api));
+    new_cluster =
+        std::make_unique<LogicalDnsCluster>(cluster, runtime, selected_dns_resolver, tls,
+                                            factory_context, std::move(stats_scope), added_via_api);
     break;
   case envoy::api::v2::Cluster::ORIGINAL_DST:
     if (cluster.lb_policy() != envoy::api::v2::Cluster::ORIGINAL_DST_LB) {
@@ -477,8 +480,8 @@ ClusterSharedPtr ClusterImplBase::create(
       throw EnvoyException(fmt::format(
           "cluster: cluster type 'original_dst' may not be used with lb_subset_config"));
     }
-    new_cluster.reset(new OriginalDstCluster(cluster, runtime, factory_context,
-                                             std::move(stats_scope), added_via_api));
+    new_cluster = std::make_unique<OriginalDstCluster>(cluster, runtime, factory_context,
+                                                       std::move(stats_scope), added_via_api);
     break;
   case envoy::api::v2::Cluster::EDS:
     if (!cluster.has_eds_cluster_config()) {
@@ -486,8 +489,8 @@ ClusterSharedPtr ClusterImplBase::create(
     }
 
     // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
-    new_cluster.reset(new EdsClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                                         added_via_api));
+    new_cluster = std::make_unique<EdsClusterImpl>(cluster, runtime, factory_context,
+                                                   std::move(stats_scope), added_via_api);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -679,16 +682,24 @@ ClusterImplBase::resolveProtoAddress(const envoy::api::v2::core::Address& addres
 
 ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::Cluster& config,
                                                     Runtime::Loader& runtime,
-                                                    const std::string& cluster_name) {
-  managers_[enumToInt(ResourcePriority::Default)] =
-      load(config, runtime, cluster_name, envoy::api::v2::core::RoutingPriority::DEFAULT);
+                                                    const std::string& cluster_name,
+                                                    Stats::Scope& stats_scope) {
+  managers_[enumToInt(ResourcePriority::Default)] = load(
+      config, runtime, cluster_name, stats_scope, envoy::api::v2::core::RoutingPriority::DEFAULT);
   managers_[enumToInt(ResourcePriority::High)] =
-      load(config, runtime, cluster_name, envoy::api::v2::core::RoutingPriority::HIGH);
+      load(config, runtime, cluster_name, stats_scope, envoy::api::v2::core::RoutingPriority::HIGH);
+}
+
+ClusterCircuitBreakersStats
+ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, const std::string& stat_prefix) {
+  std::string prefix(fmt::format("circuit_breakers.{}.", stat_prefix));
+  return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix))};
 }
 
 ResourceManagerImplPtr
 ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
                                         Runtime::Loader& runtime, const std::string& cluster_name,
+                                        Stats::Scope& stats_scope,
                                         const envoy::api::v2::core::RoutingPriority& priority) {
   uint64_t max_connections = 1024;
   uint64_t max_pending_requests = 1024;
@@ -723,8 +734,9 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
     max_requests = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_requests, max_requests);
     max_retries = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_retries, max_retries);
   }
-  return ResourceManagerImplPtr{new ResourceManagerImpl(
-      runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries)};
+  return std::make_unique<ResourceManagerImpl>(
+      runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
+      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name));
 }
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
@@ -738,7 +750,7 @@ void PriorityStateManager::initializePriorityFor(
     priority_state_.resize(priority + 1);
   }
   if (priority_state_[priority].first == nullptr) {
-    priority_state_[priority].first.reset(new HostVector());
+    priority_state_[priority].first = std::make_unique<HostVector>();
   }
   if (locality_lb_endpoint.has_locality() && locality_lb_endpoint.has_load_balancing_weight()) {
     priority_state_[priority].second[locality_lb_endpoint.locality()] =
@@ -915,7 +927,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   // new host list and raise a change notification. This uses an N^2 search given that this does not
   // happen very often and the list sizes should be small (see
   // https://github.com/envoyproxy/envoy/issues/2874). We also check for duplicates here. It's
-  // possible for DNS to return the same address multiple times, and a bad SDS implementation could
+  // possible for DNS to return the same address multiple times, and a bad EDS implementation could
   // do the same thing.
 
   // Keep track of hosts we see in new_hosts that we are able to match up with an existing host.

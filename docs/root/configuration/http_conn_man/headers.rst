@@ -428,6 +428,15 @@ The encode one or more options. For example, Debug is encoded as
 ``X-B3-Flags: 1``. See more on zipkin tracing
 `here <https://github.com/openzipkin/b3-propagation>`.
 
+.. _config_http_conn_man_headers_b3:
+
+b3
+----------
+
+The *b3* HTTP header is used by the Zipkin tracer in Envoy.
+Is a more compressed header format. See more on zipkin tracing
+`here <https://github.com/openzipkin/b3-propagation#single-header>`.
+
 .. _config_http_conn_man_headers_custom_request_headers:
 
 Custom request/response headers

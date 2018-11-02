@@ -26,11 +26,6 @@ public:
   virtual const std::string& alpnProtocols() const PURE;
 
   /**
-   * The alternate list of ALPN protocols served via kill switch. @see alpnProtocols().
-   */
-  virtual const std::string& altAlpnProtocols() const PURE;
-
-  /**
    * The ':' delimited list of supported cipher suites
    */
   virtual const std::string& cipherSuites() const PURE;

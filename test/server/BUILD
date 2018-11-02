@@ -229,6 +229,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/config:lds_json_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

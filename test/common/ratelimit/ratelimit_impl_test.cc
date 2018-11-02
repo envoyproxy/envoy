@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/stats/scope.h"
@@ -43,15 +44,15 @@ public:
 
   void setClient(const bool use_data_plane_proto) {
     if (use_data_plane_proto) {
-      client_.reset(new GrpcClientImpl(
+      client_ = std::make_unique<GrpcClientImpl>(
           Grpc::AsyncClientPtr{async_client_}, absl::optional<std::chrono::milliseconds>(),
-          "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit"));
+          "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit");
     } else {
       // Force link time dependency on deprecated message type.
       pb::lyft::ratelimit::RateLimit _ignore;
-      client_.reset(new GrpcClientImpl(Grpc::AsyncClientPtr{async_client_},
-                                       absl::optional<std::chrono::milliseconds>(),
-                                       "pb.lyft.ratelimit.RateLimitService.ShouldRateLimit"));
+      client_ = std::make_unique<GrpcClientImpl>(
+          Grpc::AsyncClientPtr{async_client_}, absl::optional<std::chrono::milliseconds>(),
+          "pb.lyft.ratelimit.RateLimitService.ShouldRateLimit");
     }
   }
 
@@ -94,7 +95,7 @@ TEST_P(RateLimitGrpcClientTest, Basic) {
     client_->onCreateInitialMetadata(headers);
     EXPECT_EQ(nullptr, headers.RequestId());
 
-    response.reset(new envoy::service::ratelimit::v2::RateLimitResponse());
+    response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
     response->set_overall_code(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT);
     EXPECT_CALL(span_, setTag("ratelimit_status", "over_limit"));
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OverLimit, _));
@@ -113,7 +114,7 @@ TEST_P(RateLimitGrpcClientTest, Basic) {
 
     client_->onCreateInitialMetadata(headers);
 
-    response.reset(new envoy::service::ratelimit::v2::RateLimitResponse());
+    response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
     response->set_overall_code(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK);
     EXPECT_CALL(span_, setTag("ratelimit_status", "ok"));
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _));
@@ -132,7 +133,7 @@ TEST_P(RateLimitGrpcClientTest, Basic) {
                    {{{{"foo", "bar"}, {"bar", "baz"}}}, {{{"foo2", "bar2"}, {"bar2", "baz2"}}}},
                    Tracing::NullSpan::instance());
 
-    response.reset(new envoy::service::ratelimit::v2::RateLimitResponse());
+    response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::Error, _));
     client_->onFailure(Grpc::Status::Unknown, "", span_);
   }
