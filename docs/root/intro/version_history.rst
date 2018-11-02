@@ -34,6 +34,7 @@ Version history
   is set, Envoy will now add or update the grpc-timeout header to reflect Envoy's expected timeout.
 * router: per try timeouts now starts when an upstream stream is ready instead of when the request has
   been fully decoded by Envoy.
+* router: added :ref:`rate-limited<config_http_filters_router_x-envoy-retry-on>` retry policy.
 * stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.

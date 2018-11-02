@@ -20,6 +20,7 @@ namespace Router {
 const uint32_t RetryPolicy::RETRY_ON_5XX;
 const uint32_t RetryPolicy::RETRY_ON_GATEWAY_ERROR;
 const uint32_t RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+const uint32_t RetryPolicy::RETRY_ON_RATE_LIMITED;
 const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
 const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_CANCELLED;
@@ -115,6 +116,8 @@ uint32_t RetryStateImpl::parseRetryOn(absl::string_view config) {
       ret |= RetryPolicy::RETRY_ON_REFUSED_STREAM;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RetriableStatusCodes) {
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RateLimited) {
+      ret |= RetryPolicy::RETRY_ON_RATE_LIMITED;
     }
   }
 
@@ -210,6 +213,13 @@ bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_heade
       if (Http::Utility::getResponseStatus(response_headers) == code) {
         return true;
       }
+    }
+  }
+
+  if (retry_on_ & RetryPolicy::RETRY_ON_RATE_LIMITED) {
+    // We should retry if it is a rate limited request.
+    if (Http::CodeUtility::isRateLimited(Http::Utility::getResponseStatus(response_headers))) {
+      return true;
     }
   }
 

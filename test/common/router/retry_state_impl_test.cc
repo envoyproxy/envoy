@@ -189,6 +189,29 @@ TEST_F(RouterRetryStateImplTest, PolicyGatewayErrorRemoteReset) {
   EXPECT_EQ(RetryStatus::No, state_->shouldRetry(nullptr, remote_reset_, callback_));
 }
 
+TEST_F(RouterRetryStateImplTest, PolicyRateLimited) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "rate-limited"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  Http::TestHeaderMapImpl response_headers{{":status", "429"}};
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(&response_headers, no_reset_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetry(&response_headers, no_reset_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyUnavailableWhenRateLimited) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-grpc-on", "unavailable"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  Http::TestHeaderMapImpl response_headers{{":status", "429"}};
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetry(&response_headers, no_reset_, callback_));
+}
+
 TEST_F(RouterRetryStateImplTest, PolicyGrpcCancelled) {
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-grpc-on", "cancelled"}};
   setup(request_headers);

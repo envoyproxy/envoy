@@ -140,6 +140,7 @@ public:
     const std::string _5xx{"5xx"};
     const std::string GatewayError{"gateway-error"};
     const std::string ConnectFailure{"connect-failure"};
+    const std::string RateLimited{"rate-limited"};
     const std::string RefusedStream{"refused-stream"};
     const std::string Retriable4xx{"retriable-4xx"};
     const std::string RetriableStatusCodes{"retriable-status-codes"};
