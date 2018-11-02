@@ -39,8 +39,7 @@ public:
   CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-      const std::string& extra_sharing_key) override;
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
 private:
   template <class SecretType>

@@ -85,18 +85,13 @@ public:
    * @param config_name a name that uniquely refers to the SDS config source.
    * @param secret_provider_context context that provides components for creating and initializing
    * secret provider.
-   * @param extra_sharing_key is to control how secret providers can be shared.
-   * Usually they are shared if sds_config is the same. But for CombinedCertificateValidationContext
-   * case, they should not be shared if their default_validation_context is not the same. The
-   * extra_sharing_key will pass in default_validation_context.
    * @return CertificateValidationContextConfigProviderSharedPtr the dynamic certificate validation
    * context secret provider.
    */
   virtual CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-      const std::string& extra_sharing_key) PURE;
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 };
 
 } // namespace Secret

@@ -240,10 +240,10 @@ message CommonTlsContext {
 
   message CombinedCertificateValidationContext {
     // How to validate peer certificates.
-    CertificateValidationContext default_validation_context = 1;
+    CertificateValidationContext default_validation_context = 1 [(validate.rules).message.required = true];
 
     // Config for fetching validation context via SDS API.
-    SdsSecretConfig validation_context_sds_secret_config = 2;
+    SdsSecretConfig validation_context_sds_secret_config = 2 [(validate.rules).message.required = true];
   };
 
   oneof validation_context_type {
