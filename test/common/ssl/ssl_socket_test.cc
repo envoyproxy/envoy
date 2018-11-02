@@ -2945,19 +2945,13 @@ TEST_P(SslSocketTest, CreateTransportSocketWithOverrideServerName) {
 
   absl::optional<std::string> override_server_name = "www.example.com";
   auto transport_socket = client_ssl_socket_factory.createTransportSocket(override_server_name);
+  EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
+  EXPECT_EQ(nullptr, transport_socket->ssl());
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                  true);
-  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(), transport_socket, nullptr);
-
-  if (!client_session.empty()) {
-    const Ssl::SslSocket* ssl_socket =
-        dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
-    EXPECT_NE(nullptr, ssl_socket);
-    SSL* client_ssl_socket = ssl_socket->rawSslForTest();
-    EXPECT_NE(nullptr, client_ssl_socket);
-  }
+  const Ssl::SslSocket* ssl_socket = dynamic_cast<const Ssl::SslSocket*>(transport_socket.get());
+  EXPECT_NE(nullptr, ssl_socket);
+  SSL* client_ssl_socket = ssl_socket->rawSslForTest();
+  EXPECT_NE(nullptr, client_ssl_socket);
 }
 
 class SslReadBufferLimitTest : public SslSocketTest {
