@@ -2951,7 +2951,6 @@ TEST_P(SslSocketTest, CreateTransportSocketWithOverrideServerName) {
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(override_server_name), nullptr);
 
-  EXPECT_NE(nullptr, client_connection);
   const Ssl::SslSocket* ssl_socket = dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
   EXPECT_NE(nullptr, ssl_socket);
   SSL* client_ssl_socket = ssl_socket->rawSslForTest();
