@@ -52,7 +52,7 @@ public:
     }
     config_.reset(new FilterConfig(proto_config, local_info_, runtime_, stats_store_, cm_));
     client_ = new Filters::Common::ExtAuthz::MockClient();
-    filter_.reset(new Filter(config_, Filters::Common::ExtAuthz::ClientPtr{client_}));
+    filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
   }

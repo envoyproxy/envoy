@@ -349,6 +349,9 @@ public:
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
+  absl::string_view processRequestHost(const Http::HeaderMap& headers,
+                                       const absl::string_view& new_scheme,
+                                       const absl::string_view& new_port) const;
   void rewritePathHeader(Http::HeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
   const std::string& responseBody() const override { return direct_response_body_; }

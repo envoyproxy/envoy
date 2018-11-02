@@ -2920,9 +2920,9 @@ public:
     auto server_cfg =
         std::make_unique<ServerContextConfigImpl>(downstream_tls_context_, factory_context_);
     Event::SimulatedTimeSystem time_system;
-    manager_.reset(new ContextManagerImpl(time_system));
-    server_ssl_socket_factory_.reset(new ServerSslSocketFactory(
-        std::move(server_cfg), *manager_, server_stats_store_, std::vector<std::string>{}));
+    manager_ = std::make_unique<ContextManagerImpl>(time_system);
+    server_ssl_socket_factory_ = std::make_unique<ServerSslSocketFactory>(
+        std::move(server_cfg), *manager_, server_stats_store_, std::vector<std::string>{});
 
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
@@ -2930,8 +2930,8 @@ public:
     auto client_cfg =
         std::make_unique<ClientContextConfigImpl>(upstream_tls_context_, factory_context_);
 
-    client_ssl_socket_factory_.reset(
-        new ClientSslSocketFactory(std::move(client_cfg), *manager_, client_stats_store_));
+    client_ssl_socket_factory_ = std::make_unique<ClientSslSocketFactory>(
+        std::move(client_cfg), *manager_, client_stats_store_);
     client_connection_ = dispatcher_->createClientConnection(
         socket_.localAddress(), source_address_,
         client_ssl_socket_factory_->createTransportSocket(), nullptr);
@@ -3008,8 +3008,8 @@ public:
   void singleWriteTest(uint32_t read_buffer_limit, uint32_t bytes_to_write) {
     MockWatermarkBuffer* client_write_buffer = nullptr;
     MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
-    dispatcher_.reset(
-        new Event::DispatcherImpl(test_time_.timeSystem(), Buffer::WatermarkFactoryPtr{factory}));
+    dispatcher_ = std::make_unique<Event::DispatcherImpl>(test_time_.timeSystem(),
+                                                          Buffer::WatermarkFactoryPtr{factory});
 
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
     EXPECT_CALL(*factory, create_(_, _))

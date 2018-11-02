@@ -175,20 +175,20 @@ modify different aspects of the server:
 
 .. http:get:: /server_info
 
-  Outputs information about the running server. Sample output looks like:
+  Outputs a JSON message containing information about the running server. Sample output looks like:
 
 .. code-block:: none
 
-  envoy 267724/RELEASE live 1571 1571 0
+  {
+   "version": "b050513e840aa939a01f89b07c162f00ab3150eb/1.9.0-dev/Modified/DEBUG",
+   "state": "LIVE",
+   "epoch": 0,
+   "uptime_current_epoch": "6s",
+   "uptime_all_epochs": "6s"
+  }
 
-The fields are:
-
-* Process name
-* Compiled SHA and build type
-* Health check state (live or draining)
-* Current hot restart epoch uptime in seconds
-* Total uptime in seconds (across all hot restarts)
-* Current hot restart epoch
+See the :ref`ServerInfo proto <envoy_api_msg_service.admin.v2alpha.ServerInfo>` for an
+explanation of the output.
 
 .. _operations_admin_interface_stats:
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "extensions/filters/http/jwt_authn/authenticator.h"
 #include "extensions/filters/http/jwt_authn/verifier.h"
 
@@ -61,7 +63,7 @@ public:
                                   -> Http::AsyncClient::Request* {
           Http::MessagePtr response_message(new Http::ResponseMessageImpl(
               Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-          response_message->body().reset(new Buffer::OwnedImpl(response_body_));
+          response_message->body() = std::make_unique<Buffer::OwnedImpl>(response_body_);
           cb.onSuccess(std::move(response_message));
           called_count_++;
           return &request_;
