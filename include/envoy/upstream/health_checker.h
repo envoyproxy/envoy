@@ -79,6 +79,18 @@ public:
                     envoy::data::core::v2alpha::HealthCheckFailureType failure_type) PURE;
 
   /**
+   * Log an unhealthy host event.
+   * @param health_checker_type supplies the type of health checker that generated the event.
+   * @param host supplies the host that generated the event.
+   * @param failure_type supplies the type of health check failure
+   * @param first_check whether this is a failure on the first unhealth check for this host
+   */
+  virtual void logUnhealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+                            const HostDescriptionConstSharedPtr& host,
+                            envoy::data::core::v2alpha::HealthCheckFailureType failure_type,
+                            bool first_check) PURE;
+
+  /**
    * Log a healthy host addition event.
    * @param health_checker_type supplies the type of health checker that generated the event.
    * @param host supplies the host that generated the event.

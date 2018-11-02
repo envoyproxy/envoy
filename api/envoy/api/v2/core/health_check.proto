@@ -212,6 +212,9 @@ message HealthCheck {
   // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
   // If empty, no event log will be written.
   string event_log_path = 17;
+
+  // If set, health check failure events will always be logged
+  google.protobuf.BoolValue always_log_health_check_failures = 19;
 }
 
 // Endpoint health status.
