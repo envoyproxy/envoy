@@ -233,9 +233,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     uint64_t overall_sampling{
         PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing_config, overall_sampling, 100, 100)};
 
-    tracing_config_.reset(new Http::TracingConnectionManagerConfig(
-        {tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
-         overall_sampling}));
+    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(
+        Http::TracingConnectionManagerConfig{tracing_operation_name, request_headers_for_tags,
+                                             client_sampling, random_sampling, overall_sampling});
   }
 
   for (const auto& access_log : config.access_log()) {

@@ -1,6 +1,7 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "common/common/fmt.h"
@@ -53,10 +54,10 @@ public:
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
-    cluster_manager_factory_.reset(new Upstream::ValidationClusterManagerFactory(
+    cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
-        server_.secretManager()));
+        server_.secretManager());
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();

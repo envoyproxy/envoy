@@ -1,6 +1,7 @@
 #include "server/worker_impl.h"
 
 #include <functional>
+#include <memory>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -69,7 +70,8 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
 
 void WorkerImpl::start(GuardDog& guard_dog) {
   ASSERT(!thread_);
-  thread_.reset(new Thread::Thread([this, &guard_dog]() -> void { threadRoutine(guard_dog); }));
+  thread_ =
+      std::make_unique<Thread::Thread>([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
 }
 
 void WorkerImpl::stop() {

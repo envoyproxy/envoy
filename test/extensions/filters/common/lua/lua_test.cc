@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "extensions/filters/common/lua/lua.h"
 
 #include "test/mocks/common.h"
@@ -36,7 +38,7 @@ public:
   LuaTest() : yield_callback_([this]() { on_yield_.ready(); }) {}
 
   void setup(const std::string& code) {
-    state_.reset(new ThreadLocalState(code, tls_));
+    state_ = std::make_unique<ThreadLocalState>(code, tls_);
     state_->registerType<TestObject>();
   }
 

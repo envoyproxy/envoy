@@ -1,6 +1,7 @@
 #include "common/http/codec_client.h"
 
 #include <cstdint>
+#include <memory>
 
 #include "common/common/enum_to_int.h"
 #include "common/http/exception.h"
@@ -139,12 +140,12 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case Type::HTTP1: {
-    codec_.reset(new Http1::ClientConnectionImpl(*connection_, *this));
+    codec_ = std::make_unique<Http1::ClientConnectionImpl>(*connection_, *this);
     break;
   }
   case Type::HTTP2: {
-    codec_.reset(new Http2::ClientConnectionImpl(*connection_, *this, host->cluster().statsScope(),
-                                                 host->cluster().http2Settings()));
+    codec_ = std::make_unique<Http2::ClientConnectionImpl>(
+        *connection_, *this, host->cluster().statsScope(), host->cluster().http2Settings());
     break;
   }
   }
