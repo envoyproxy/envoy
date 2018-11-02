@@ -202,7 +202,7 @@ const std::string testUtilV2(
     const Ssl::SslSocket* ssl_socket =
         dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
     SSL* client_ssl_socket = ssl_socket->rawSslForTest();
-    auto requested_server_name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+    auto requested_server_name = SSL_get_servername(client_ssl_socket, TLSEXT_NAMETYPE_host_name);
     if (requested_server_name != nullptr) {
       client_ssl_requested_server_name = std::string(requested_server_name);
     }
@@ -250,7 +250,7 @@ const std::string testUtilV2(
       const Ssl::SslSocket* ssl_socket =
           dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
       SSL* client_ssl_socket = ssl_socket->rawSslForTest();
-      auto requested_server_name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+      auto requested_server_name = SSL_get_servername(client_ssl_socket, TLSEXT_NAMETYPE_host_name);
       if (requested_server_name != nullptr) {
         client_ssl_requested_server_name = std::string(requested_server_name);
       }
