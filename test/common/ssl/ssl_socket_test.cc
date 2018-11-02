@@ -2948,7 +2948,7 @@ TEST_P(SslSocketTest, CreateTransportSocketWithOverrideServerName) {
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
   EXPECT_EQ(nullptr, transport_socket->ssl());
 
-  const Ssl::SslSocket* ssl_socket = dynamic_cast<const Ssl::SslSocket*>(transport_socket.get());
+  const Ssl::SslSocket* ssl_socket = dynamic_cast<const Ssl::SslSocket*>(transport_socket);
   EXPECT_NE(nullptr, ssl_socket);
   SSL* client_ssl_socket = ssl_socket->rawSslForTest();
   EXPECT_NE(nullptr, client_ssl_socket);
