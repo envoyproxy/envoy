@@ -59,7 +59,7 @@ public:
     callbacks_ = &callbacks;
   }
 
-  void setDynamicMetadata(std::string shadow_policy_id);
+  void setDynamicMetadata(std::string shadow_engine_result, std::string shadow_policy_id);
 
 private:
   RoleBasedAccessControlFilterConfigSharedPtr config_;
