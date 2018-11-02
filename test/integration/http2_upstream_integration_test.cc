@@ -323,7 +323,6 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   }
   for (uint32_t i = 0; i < num_requests; ++i) {
     upstream_requests.emplace_back();
-    FakeStreamPtr stream;
     ASSERT_TRUE(
         fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests.back()));
   }
