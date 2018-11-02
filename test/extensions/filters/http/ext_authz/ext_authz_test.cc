@@ -111,13 +111,14 @@ INSTANTIATE_TEST_CASE_P(ParameterizedFilterConfig, HttpFilterTestParam,
 // Test when failure_mode_allow is NOT set and the response from the authorization service is Error
 // that the request is not allowed to continue.
 TEST_F(HttpFilterTest, ErrorFailClose) {
+  InSequence s;
+
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: false
   )EOF");
-  InSequence s;
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -140,13 +141,14 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
 // Test when failure_mode_allow is set and the response from the authorization service is Error that
 // the request is allowed to continue.
 TEST_F(HttpFilterTest, ErrorOpen) {
+  InSequence s;
+
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
   )EOF");
-  InSequence s;
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -169,13 +171,14 @@ TEST_F(HttpFilterTest, ErrorOpen) {
 // Test when failure_mode_allow is set and the response from the authorization service is an
 // immediate Error that the request is allowed to continue.
 TEST_F(HttpFilterTest, ImmediateErrorOpen) {
+  InSequence s;
+
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
   )EOF");
-  InSequence s;
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -214,8 +217,8 @@ TEST_F(HttpFilterTest, BadConfig) {
                ProtoValidationException);
 }
 
-// Test allowed request headers values in the HTTP client.
-TEST_F(HttpFilterTest, TestAllowedRequestHeaders) {
+// Test allowed header in the HTTP client.
+TEST_F(HttpFilterTest, TestAllowedHeaders) {
   initialize(R"EOF(
   http_service:
     server_uri:
@@ -246,7 +249,7 @@ TEST_F(HttpFilterTest, TestAllowedRequestHeaders) {
   EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Authorization), 1);
   EXPECT_EQ(config_->allowedRequestHeaders().count(Http::LowerCaseString{"key"}), 1);
 
-  // Check allowed authorization headers.
+  // Check allowed client headers.
   EXPECT_EQ(config_->allowedClientHeaders().size(), 7);
   EXPECT_EQ(config_->allowedClientHeaders().count(Http::Headers::get().Path), 1);
   EXPECT_EQ(config_->allowedClientHeaders().count(Http::Headers::get().Status), 1);
@@ -255,6 +258,35 @@ TEST_F(HttpFilterTest, TestAllowedRequestHeaders) {
   EXPECT_EQ(config_->allowedClientHeaders().count(Http::Headers::get().WWWAuthenticate), 1);
   EXPECT_EQ(config_->allowedClientHeaders().count(Http::Headers::get().Location), 1);
   EXPECT_EQ(config_->allowedClientHeaders().count(Http::LowerCaseString{"key"}), 1);
+
+  // Check allowed upstream headers.
+  EXPECT_EQ(config_->allowedUpstreamHeaders().size(), 1);
+  EXPECT_EQ(config_->allowedUpstreamHeaders().count(Http::LowerCaseString{"key"}), 1);
+}
+
+// Test default allowed headers in the HTTP client.
+TEST_F(HttpFilterTest, TestDefaultAllowedHeaders) {
+  initialize(R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  failure_mode_allow: true
+  )EOF");
+
+  // Check allowed request headers.
+  EXPECT_EQ(config_->allowedRequestHeaders().size(), 4);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Path), 1);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Method), 1);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Host), 1);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Authorization), 1);
+
+  // Check allowed client headers.
+  EXPECT_EQ(config_->allowedClientHeaders().size(), 0);
+
+  // Check allowed upstream headers.
+  EXPECT_EQ(config_->allowedUpstreamHeaders().size(), 0);
 }
 
 // -------------------
