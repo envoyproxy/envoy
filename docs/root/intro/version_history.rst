@@ -63,7 +63,7 @@ Version history
   in case of schema/validation error.
 * config: Added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with
   management server.
-* ext_authz: added support for configuring additional :ref:`authorization headers <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_headers_to_add>`
+* ext_authz: added support for configuring additional :ref:`authorization headers <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_request.headers_to_add>`
   to be sent from Envoy to the authorization service.
 * fault: added support for fractional percentages in :ref:`FaultDelay <envoy_api_field_config.filter.fault.v2.FaultDelay.percentage>`
   and in :ref:`FaultAbort <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percentage>`.

@@ -84,7 +84,7 @@ message HttpService {
   // Settings for controlling request headers forwared from the filter to the authorization server.
   AuthorizationRequest authorization_request = 7;
 
-  // Settings for controlling authorizaton response forwared from the filter to a client,
+  // Settings for controlling authorization response forwared from the filter to a client,
   // or to an upstream service.
   AuthorizationResponse authorization_response = 8;
 }
