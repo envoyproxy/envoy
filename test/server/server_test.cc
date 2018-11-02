@@ -65,15 +65,9 @@ public:
     EXPECT_CALL(overload_manager_, start());
     ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
 
-<<<<<<< HEAD
-    helper_ =
-        std::make_unique<RunHelper>(server_, dispatcher_, cm_, access_log_manager_, init_manager_,
-                                    overload_manager_, [this] { start_workers_.ready(); });
-=======
-    helper_ = std::make_unique<RunHelper>(dispatcher_, cm_, hot_restart_, access_log_manager_,
+    helper_ = std::make_unique<RunHelper>(server_, dispatcher_, cm_, access_log_manager_,
                                           init_manager_, overload_manager_,
                                           [this] { start_workers_.ready(); });
->>>>>>> upstream/master
   }
 
   NiceMock<MockInstance> server_;
