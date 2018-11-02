@@ -5,7 +5,7 @@ package envoy.admin.v2alpha;
 // [#protodoc-title: Mutex Stats]
 
 // Proto representation of the statistics collected upon absl::Mutex contention, if Envoy is run
-// under --enable-mutex-tracing. For more information, see the `absl::Mutex`
+// under :option:`--enable-mutex-tracing`. For more information, see the `absl::Mutex`
 // [docs](https://abseil.io/about/design/mutex#extra-features).
 //
 // *NB*: The wait cycles below are measured by `absl::base_internal::CycleClock`, and may not

@@ -435,17 +435,14 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& resp
 Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap& response_headers,
                                         Buffer::Instance& response, AdminStream&) {
 
-  if (server_.options().mutexTracingEnabled()) {
+  if (server_.options().mutexTracingEnabled() && server_.mutexTracer().has_value()) {
     response_headers.insertContentType().value().setReference(
         Http::Headers::get().ContentTypeValues.Json);
 
     envoy::admin::v2alpha::MutexStats mutex_stats;
-    // If tracing is enabled, mutexTracer() should never be absl::nullopt.
-    ASSERT(server_.mutexTracer().has_value());
-    MutexTracerImpl* tracer = dynamic_cast<MutexTracerImpl*>(server_.mutexTracer().value());
-    mutex_stats.set_num_contentions(tracer->numContentions());
-    mutex_stats.set_current_wait_cycles(tracer->currentWaitCycles());
-    mutex_stats.set_lifetime_wait_cycles(tracer->lifetimeWaitCycles());
+    mutex_stats.set_num_contentions(server_.mutexTracer().value()->numContentions());
+    mutex_stats.set_current_wait_cycles(server_.mutexTracer().value()->currentWaitCycles());
+    mutex_stats.set_lifetime_wait_cycles(server_.mutexTracer().value()->lifetimeWaitCycles());
     response.add(MessageUtil::getJsonStringFromMessage(mutex_stats, true, true));
   } else {
     response.add("Mutex contention tracing is not enabled. To enable, run Envoy with flag "

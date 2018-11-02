@@ -41,6 +41,8 @@ private:
   // Utility function for contentionHook.
   inline void recordContention(const char*, const void*, int64_t wait_cycles);
 
+  // Keeping singleton_ as a static class member avoids the barrier-lookup for the tracer object on
+  // every contention.
   static MutexTracerImpl* singleton_;
 
   // Number of mutex contention occurrences since last reset.

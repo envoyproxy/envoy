@@ -71,9 +71,6 @@ public:
   void setHotRestartDisabled(bool hot_restart_disabled) {
     hot_restart_disabled_ = hot_restart_disabled;
   }
-  void setMutexTracingEnabled(bool mutex_tracing_enabled) {
-    mutex_tracing_enabled_ = mutex_tracing_enabled;
-  }
 
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
