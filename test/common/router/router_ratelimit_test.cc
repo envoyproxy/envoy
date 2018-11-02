@@ -104,7 +104,7 @@ public:
     auto json_object_ptr = Json::Factory::loadFromString(json);
     Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config,
                                                         stats_options);
-    config_.reset(new ConfigImpl(route_config, factory_context_, true));
+    config_ = std::make_unique<ConfigImpl>(route_config, factory_context_, true);
   }
 
   std::unique_ptr<ConfigImpl> config_;
@@ -346,7 +346,7 @@ TEST_F(RateLimitConfiguration, Stages) {
 class RateLimitPolicyEntryTest : public testing::Test {
 public:
   void SetUpTest(const std::string json) {
-    rate_limit_entry_.reset(new RateLimitPolicyEntryImpl(parseRateLimitFromJson(json)));
+    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(parseRateLimitFromJson(json));
     descriptors_.clear();
   }
 

@@ -45,8 +45,8 @@ public:
   ~MockClusterInfo();
 
   void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry) {
-    resource_manager_.reset(new ResourceManagerImpl(runtime_, name_, cx, rq_pending, rq, rq_retry,
-                                                    circuit_breakers_stats_));
+    resource_manager_ = std::make_unique<ResourceManagerImpl>(runtime_, name_, cx, rq_pending, rq,
+                                                              rq_retry, circuit_breakers_stats_);
   }
 
   // Upstream::ClusterInfo

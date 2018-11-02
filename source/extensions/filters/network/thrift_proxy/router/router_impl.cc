@@ -1,5 +1,7 @@
 #include "extensions/filters/network/thrift_proxy/router/router_impl.h"
 
+#include <memory>
+
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
@@ -27,8 +29,8 @@ RouteEntryImplBase::RouteEntryImplBase(
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
     if (filter_it != route.route().metadata_match().filter_metadata().end()) {
-      metadata_match_criteria_.reset(
-          new Envoy::Router::MetadataMatchCriteriaImpl(filter_it->second));
+      metadata_match_criteria_ =
+          std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
     }
   }
 
@@ -74,8 +76,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
         metadata_match_criteria_ =
             parent.metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
       } else {
-        metadata_match_criteria_.reset(
-            new Envoy::Router::MetadataMatchCriteriaImpl(filter_it->second));
+        metadata_match_criteria_ =
+            std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
       }
     }
   }
@@ -255,7 +257,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 
   ENVOY_STREAM_LOG(debug, "router decoding request", *callbacks_);
 
-  upstream_request_.reset(new UpstreamRequest(*this, *conn_pool, metadata, transport, protocol));
+  upstream_request_ =
+      std::make_unique<UpstreamRequest>(*this, *conn_pool, metadata, transport, protocol);
   return upstream_request_->start();
 }
 
