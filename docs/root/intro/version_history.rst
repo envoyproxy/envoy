@@ -43,6 +43,12 @@ Version history
 * tracing: added support to the Zipkin tracer for the :ref:`b3 <config_http_conn_man_headers_b3>` single header format.
 * upstream: changed how load calculation for :ref:`priority levels<arch_overview_load_balancing_priority_levels>` and :ref:`panic thresholds<arch_overview_load_balancing_panic_threshold>` interact. As long as normalized total health is 100% panic thresholds are disregarded.
 * upstream: changed the default hash for :ref:`ring hash <envoy_api_msg_Cluster.RingHashLbConfig>` from std::hash to `xxHash <https://github.com/Cyan4973/xxHash>`_.
+* ext_authz: ability to configure authorization request and response have been separated in :ref:`authorization request 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_request>` and :ref:`authorization response 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_response>`. Also added support for configuring additional :ref:`request header prefix 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationRequest.allowed_headers_prefix>`, :ref:`client headers 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_client_headers>` and :ref:`upstream headers 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_upstream_headers>` which replaces the old *allowed_authorization_headers* object.
 
 1.8.0 (Oct 4, 2018)
 ===================
@@ -63,7 +69,7 @@ Version history
   in case of schema/validation error.
 * config: Added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with
   management server.
-* ext_authz: added support for configuring additional :ref:`authorization headers <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_request.headers_to_add>`
+* ext_authz: added support for configuring additional :ref:`authorization headers <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationRequest.headers_to_add>`
   to be sent from Envoy to the authorization service.
 * fault: added support for fractional percentages in :ref:`FaultDelay <envoy_api_field_config.filter.fault.v2.FaultDelay.percentage>`
   and in :ref:`FaultAbort <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percentage>`.
