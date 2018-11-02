@@ -427,7 +427,6 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
 
 void DecoderImpl::onData(Buffer::Instance& data) {
   while (data.length() > 0 && decode(data)) {
-    ;
   }
 }
 
