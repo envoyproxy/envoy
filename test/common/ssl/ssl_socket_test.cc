@@ -220,7 +220,7 @@ const std::string testUtilV2(
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         std::string sni =
-            override_server_name.hasValue() ? override_server_name.value() : client_ctx_proto.sni();
+            override_server_name.has_value() ? override_server_name.value() : client_ctx_proto.sni();
         socket->setRequestedServerName(sni);
         Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(absl::nullopt));
@@ -280,10 +280,10 @@ const std::string testUtilV2(
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
           if (!expected_requested_server_name.empty()) {
-            EXPECT_TRUE(client_ssl_requested_server_name.hasValue());
+            EXPECT_TRUE(client_ssl_requested_server_name.has_value());
             EXPECT_EQ(expected_requested_server_name, client_ssl_requested_server_name.value());
           } else {
-            EXPECT_FALSE(client_ssl_requested_server_name.hasValue());
+            EXPECT_FALSE(client_ssl_requested_server_name.has_value());
           }
           stopSecondTime();
         }));
