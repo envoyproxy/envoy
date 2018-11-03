@@ -141,7 +141,7 @@ void CheckRequestUtils::createHttpCheck(
   setAttrContextRequest(*attrs->mutable_request(), callbacks, headers);
 
   // Fill in the context extensions:
-  (*attrs->mutable_context_extensions()) = context_extensions;
+  (*attrs->mutable_context_extensions()) = std::move(context_extensions);
 }
 
 void CheckRequestUtils::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
