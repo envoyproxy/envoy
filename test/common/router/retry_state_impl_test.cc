@@ -203,12 +203,13 @@ TEST_F(RouterRetryStateImplTest, PolicyRateLimited) {
   EXPECT_EQ(RetryStatus::No, state_->shouldRetry(&response_headers, no_reset_, callback_));
 }
 
+// Validate that retry does not happen for rate limited requests if the policy is not set.
 TEST_F(RouterRetryStateImplTest, PolicyUnavailableWhenRateLimited) {
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-grpc-on", "unavailable"}};
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
 
-  Http::TestHeaderMapImpl response_headers{{":status", "429"}};
+  Http::TestHeaderMapImpl response_headers{{":status", "429"}, {"grpc-status", "14"}};
   EXPECT_EQ(RetryStatus::No, state_->shouldRetry(&response_headers, no_reset_, callback_));
 }
 

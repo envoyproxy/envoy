@@ -100,7 +100,7 @@ retriable-status-codes
   or in the :ref:`config_http_filters_router_x-envoy-retriable-status-codes` header.
 
 rate-limited
-  Envoy will attempt a retry if a request is rate limited (with response code 429) by the :ref:`rate limit service <arch_overview_rate_limit>`.
+  Envoy will attempt a retry if a request is rate limited (with response code 429).
 
 The number of retries can be controlled via the
 :ref:`config_http_filters_router_x-envoy-max-retries` header or via the :ref:`route

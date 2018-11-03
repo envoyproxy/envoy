@@ -189,6 +189,11 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
 }
 
 bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_headers) {
+  // We should retry rate limited request only if the policy is set.
+  if (Http::CodeUtility::isRateLimited(Http::Utility::getResponseStatus(response_headers))) {
+    return retry_on_ & RetryPolicy::RETRY_ON_RATE_LIMITED;
+  }
+
   if (retry_on_ & RetryPolicy::RETRY_ON_5XX) {
     if (Http::CodeUtility::is5xx(Http::Utility::getResponseStatus(response_headers))) {
       return true;
@@ -213,13 +218,6 @@ bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_heade
       if (Http::Utility::getResponseStatus(response_headers) == code) {
         return true;
       }
-    }
-  }
-
-  if (retry_on_ & RetryPolicy::RETRY_ON_RATE_LIMITED) {
-    // We should retry if it is a rate limited request.
-    if (Http::CodeUtility::isRateLimited(Http::Utility::getResponseStatus(response_headers))) {
-      return true;
     }
   }
 
