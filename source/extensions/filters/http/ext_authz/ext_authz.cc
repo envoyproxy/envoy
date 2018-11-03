@@ -12,6 +12,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
+void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
+  disabled_ = other.disabled_;
+  auto begin_it = other.context_extensions_.begin();
+  auto end_it = other.context_extensions_.end();
+  for (auto it = begin_it; it != end_it; ++it) {
+    context_extensions_[it->first] = it->second;
+  }
+}
+
 void Filter::initiateCall(const Http::HeaderMap& headers) {
   Router::RouteConstSharedPtr route = callbacks_->route();
   if (route == nullptr || route->routeEntry() == nullptr) {
@@ -22,29 +31,28 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
     return;
   }
 
-  const FilterConfigPerRoute* per_route_config =
+  // fast route - if we are disabled, no need to merge
+  const FilterConfigPerRoute* specific_per_route_config =
       Http::Utility::resolvePerFilterConfig<FilterConfigPerRoute>(
           HttpFilterNames::get().ExtAuthorization, route);
-
-  if (per_route_config) {
-    if (per_route_config->disabled()) {
+  if (specific_per_route_config) {
+    if (specific_per_route_config->disabled()) {
       return;
     }
   }
 
+  // get a merged view of the config:
+  auto&& maybe_merged_per_route_config =
+      Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
+          HttpFilterNames::get().ExtAuthorization, route,
+          [](FilterConfigPerRoute& cfg_base, const FilterConfigPerRoute& cfg) {
+            cfg_base.merge(cfg);
+          });
+
   Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> context_extensions;
-
-  // merge all the context_extensions from all the per filters config:
-  Http::Utility::iteratePerFilterConfig<FilterConfigPerRoute>(
-      HttpFilterNames::get().ExtAuthorization, route,
-      [&context_extensions](const FilterConfigPerRoute& cfg) {
-        auto begin_it = cfg.contextExtensions().begin();
-        auto end_it = cfg.contextExtensions().end();
-        for (auto it = begin_it; it != end_it; ++it) {
-          context_extensions[it->first] = it->second;
-        }
-      });
-
+  if (maybe_merged_per_route_config) {
+    context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
+  }
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
       callbacks_, headers, std::move(context_extensions), check_request_);
 

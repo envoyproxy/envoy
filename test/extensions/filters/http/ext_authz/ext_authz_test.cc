@@ -44,6 +44,41 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
+TEST(HttpExtAuthzFilterConfigPerRouteTest, MergeConfig) {
+
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settings;
+  auto&& extensions = settings.mutable_check_settings()->mutable_context_extensions();
+
+  // First config base config with one base value, and one value to be overriden.
+  (*extensions)["base_key"] = "base_value";
+  (*extensions)["merged_key"] = "base_value";
+  FilterConfigPerRoute base_config(settings);
+
+  // Construct a config to merge, that provides one value and overrides one value.
+  settings.Clear();
+  auto&& specific_extensions = settings.mutable_check_settings()->mutable_context_extensions();
+  (*specific_extensions)["merged_key"] = "value";
+  (*specific_extensions)["key"] = "value";
+  FilterConfigPerRoute specific_config(settings);
+
+  // Perform the merge:
+  base_config.merge(specific_config);
+
+  settings.Clear();
+  settings.set_disabled(true);
+  FilterConfigPerRoute disabled_config(settings);
+
+  // Perform a merge with disabled config:
+  base_config.merge(disabled_config);
+
+  // Make sure all values were merged:
+  EXPECT_TRUE(base_config.disabled());
+  auto&& merged_extensions = base_config.contextExtensions();
+  EXPECT_EQ("base_value", merged_extensions.at("base_key"));
+  EXPECT_EQ("value", merged_extensions.at("merged_key"));
+  EXPECT_EQ("value", merged_extensions.at("key"));
+}
+
 class HttpExtAuthzFilterTestBase {
 public:
   HttpExtAuthzFilterTestBase() {}

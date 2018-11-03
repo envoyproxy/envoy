@@ -126,10 +126,13 @@ public:
                                 : ContextExtensionsMap()),
         disabled_(config.disabled()) {}
 
+  void merge(const FilterConfigPerRoute& other);
+
   /**
    * @return Context extensions to add to the CheckRequest.
    */
   const ContextExtensionsMap& contextExtensions() const { return context_extensions_; }
+  ContextExtensionsMap&& takeContextExtensions() { return std::move(context_extensions_); }
 
   bool disabled() const { return disabled_; }
 
