@@ -53,3 +53,14 @@ Removes `@someone` from the reviewers list.
 Only organization members can request a review from other users or cancel it, who must be organization members as well.
 
 [Demo PR](https://github.com/envoyproxy/envoybot/pull/7)
+
+### [Wait](https://github.com/softkitteh/repokitteh-modules/blob/master/wait.star)
+Wait for activity on an issue or a PR.
+
+Example:
+```
+/wait
+```
+Sets the label `waiting` on a PR. When a new comment is submitted or a new commit is pushed the label will be removed.
+
+[Demo PR](https://github.com/envoyproxy/envoybot/pull/9)
