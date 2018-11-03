@@ -13,15 +13,17 @@ namespace Config {
  * All control plane related stats. @see stats_macros.h
  */
 // clang-format off
-#define ALL_CONTROL_PLANE_STATS(GAUGE)                                         \
-  GAUGE    (connected_state)
+#define ALL_CONTROL_PLANE_STATS(COUNTER, GAUGE)                                                    \
+  COUNTER(rate_limit_enforced)                                                                     \
+  GAUGE(connected_state)                                                                           \
+  GAUGE(pending_requests)                                                                          \
 // clang-format on
 
 /**
  * Struct definition for all control plane stats. @see stats_macros.h
  */
 struct ControlPlaneStats {
-  ALL_CONTROL_PLANE_STATS(GENERATE_GAUGE_STRUCT)
+  ALL_CONTROL_PLANE_STATS(GENERATE_COUNTER_STRUCT,GENERATE_GAUGE_STRUCT)
 };
 
 class GrpcMuxCallbacks {

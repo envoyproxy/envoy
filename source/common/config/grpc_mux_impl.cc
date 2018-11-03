@@ -69,7 +69,8 @@ void GrpcMuxImpl::drainRequests() {
     } else {
       ASSERT(rate_limiting_enabled_);
       ASSERT(drain_request_timer_ != nullptr);
-      ENVOY_LOG(warn, "Too many sendDiscoveryRequest calls :");
+      control_plane_stats_.rate_limit_enforced_.inc();
+      control_plane_stats_.pending_requests_.set(request_queue_.size());
       // Enable the drain request timer.
       drain_request_timer_->enableTimer(
           std::chrono::milliseconds(limit_request_->nextTokenAvailableMs()));
