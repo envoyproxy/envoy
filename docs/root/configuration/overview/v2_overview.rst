@@ -1,7 +1,7 @@
 .. _config_overview_v2:
 
-Overview (v2 API)
-=================
+Overview
+========
 
 The Envoy v2 APIs are defined as `proto3
 <https://developers.google.com/protocol-buffers/docs/proto3>`_ `Protocol Buffers

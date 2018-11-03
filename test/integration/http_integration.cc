@@ -1423,7 +1423,7 @@ void HttpIntegrationTest::testHttp10Enabled() {
 
   std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
-  ASSERT_TRUE(upstream_headers.get() != nullptr);
+  ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
 
   sendRawHttpAndWaitForResponse(lookupPort("http"), "HEAD / HTTP/1.0\r\n\r\n", &response, false);
@@ -1448,7 +1448,7 @@ void HttpIntegrationTest::testHttp10WithHostAndKeepAlive() {
 
   std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
-  ASSERT_TRUE(upstream_headers.get() != nullptr);
+  ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
 }
 
@@ -1465,7 +1465,7 @@ void HttpIntegrationTest::testHttp09Enabled() {
 
   std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
-  ASSERT_TRUE(upstream_headers.get() != nullptr);
+  ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
 }
 
@@ -1544,7 +1544,7 @@ void HttpIntegrationTest::testInlineHeaders() {
 
   std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
-  ASSERT_TRUE(upstream_headers.get() != nullptr);
+  ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
   EXPECT_EQ(upstream_headers->CacheControl()->value(), "public,123");
   ASSERT_TRUE(upstream_headers->get(Envoy::Http::LowerCaseString("foo")) != nullptr);
