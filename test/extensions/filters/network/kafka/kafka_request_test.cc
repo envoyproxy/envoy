@@ -70,7 +70,7 @@ public:
     return reinterpret_cast<const char*>((slices[0]).mem_);
   }
 
-private:
+protected:
   Buffer::OwnedImpl buffer_;
   EncodingContext encoder_{-1};
 };
