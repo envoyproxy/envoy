@@ -451,14 +451,14 @@ Utility::resolvePerFilterConfigGeneric(const std::string& filter_name,
                                        const Router::RouteConstSharedPtr& route) {
 
   const Router::RouteSpecificFilterConfig* maybe_filter_config{};
-  iteratePerFilterConfigGeneric(
-      filter_name, route, [&maybe_filter_config](const Router::RouteSpecificFilterConfig& cfg) {
-        maybe_filter_config = &cfg;
-      });
+  foldPerFilterConfigGeneric(filter_name, route,
+                             [&maybe_filter_config](const Router::RouteSpecificFilterConfig& cfg) {
+                               maybe_filter_config = &cfg;
+                             });
   return maybe_filter_config;
 }
 
-void Utility::iteratePerFilterConfigGeneric(
+void Utility::foldPerFilterConfigGeneric(
     const std::string& filter_name, const Router::RouteConstSharedPtr& route,
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
   if (!route) {

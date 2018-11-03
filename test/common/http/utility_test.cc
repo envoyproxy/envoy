@@ -555,9 +555,14 @@ TEST(HttpUtility, resolvePerFilterConfigNilRoute) {
   EXPECT_EQ(nullptr, Utility::resolvePerFilterConfigGeneric("envoy.filter", nullptr));
 }
 
+class TestConfig : public Router::RouteSpecificFilterConfig {
+public:
+  int state_;
+  void merge(const TestConfig& other) { state_ += other.state_; }
+};
+
 TEST(HttpUtility, resolvePerFilterConfig) {
-  class TestConfig : public Router::RouteSpecificFilterConfig {
-  } testConfig;
+  TestConfig testConfig;
 
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
@@ -601,7 +606,7 @@ TEST(HttpUtility, resolvePerFilterConfigGeneric) {
   EXPECT_EQ(two, Utility::resolvePerFilterConfigGeneric(filter_name, filter_callbacks.route()));
 }
 
-TEST(HttpUtility, iteratePerFilterConfigIteratesInOrder) {
+TEST(HttpUtility, foldPerFilterConfigIteratesInOrder) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
@@ -618,17 +623,17 @@ TEST(HttpUtility, iteratePerFilterConfigIteratesInOrder) {
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
       .WillByDefault(Return(nullconfig + num_configs));
 
-  // a vector to save which configs are visited by the iteratePerFilterConfigGeneric
+  // a vector to save which configs are visited by the foldPerFilterConfigGeneric
   std::vector<size_t> visited_configs(num_configs, 0);
 
   // Iterate; save the retrieved config index in the iteration index in visited_configs.
   size_t index = 0;
-  Utility::iteratePerFilterConfigGeneric(filter_name, filter_callbacks.route(),
-                                         [&](const Router::RouteSpecificFilterConfig& cfg) {
-                                           int cfg_index = &cfg - nullconfig;
-                                           visited_configs[index] = cfg_index - 1;
-                                           index++;
-                                         });
+  Utility::foldPerFilterConfigGeneric(filter_name, filter_callbacks.route(),
+                                      [&](const Router::RouteSpecificFilterConfig& cfg) {
+                                        int cfg_index = &cfg - nullconfig;
+                                        visited_configs[index] = cfg_index - 1;
+                                        index++;
+                                      });
 
   // Make sure all methods were called, and in order.
   for (size_t i = 0; i < visited_configs.size(); i++) {
@@ -636,9 +641,8 @@ TEST(HttpUtility, iteratePerFilterConfigIteratesInOrder) {
   }
 }
 
-TEST(HttpUtility, iteratePerFilterConfigTyped) {
-  class TestConfig : public Router::RouteSpecificFilterConfig {
-  } testConfig;
+TEST(HttpUtility, foldPerFilterConfigTyped) {
+  TestConfig testConfig;
 
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
@@ -649,11 +653,36 @@ TEST(HttpUtility, iteratePerFilterConfigTyped) {
 
   // iterate the configs
   size_t index = 0;
-  Utility::iteratePerFilterConfig<TestConfig>(filter_name, filter_callbacks.route(),
-                                              [&](const TestConfig&) { index++; });
+  Utility::foldPerFilterConfig<TestConfig>(filter_name, filter_callbacks.route(),
+                                           [&](const TestConfig&) { index++; });
 
   // make sure that the callback was called (which means that the dynamic_cast worked.)
   EXPECT_EQ(1, index);
+}
+
+TEST(HttpUtility, getMergedPerFilterConfig) {
+  TestConfig baseTestConfig, routeTestConfig;
+
+  baseTestConfig.state_ = 1;
+  routeTestConfig.state_ = 1;
+
+  const std::string filter_name = "envoy.filter";
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+
+  // make the file callbacks return our test config
+  ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
+      .WillByDefault(Return(&baseTestConfig));
+  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
+      .WillByDefault(Return(&routeTestConfig));
+
+  // merge the configs
+  auto merged_cfg = Utility::getMergedPerFilterConfig<TestConfig>(
+      filter_name, filter_callbacks.route(),
+      [&](TestConfig& base_cfg, const TestConfig& route_cfg) { base_cfg.merge(route_cfg); });
+
+  // make sure that the callback was called (which means that the dynamic_cast worked.)
+  ASSERT_TRUE(merged_cfg.has_value());
+  EXPECT_EQ(2, merged_cfg.value().state_);
 }
 
 } // namespace Http
