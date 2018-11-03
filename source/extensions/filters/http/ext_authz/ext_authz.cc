@@ -41,7 +41,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
     }
   }
 
-  // get a merged view of the config:
+  // we are not disabled - get a merged view of the config:
   auto&& maybe_merged_per_route_config =
       Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
           HttpFilterNames::get().ExtAuthorization, route,
