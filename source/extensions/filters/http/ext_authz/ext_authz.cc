@@ -35,7 +35,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
   const FilterConfigPerRoute* specific_per_route_config =
       Http::Utility::resolvePerFilterConfig<FilterConfigPerRoute>(
           HttpFilterNames::get().ExtAuthorization, route);
-  if (specific_per_route_config) {
+  if (specific_per_route_config != nullptr) {
     if (specific_per_route_config->disabled()) {
       return;
     }
