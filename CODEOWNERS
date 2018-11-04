@@ -3,7 +3,7 @@
 #*       @envoyproxy/maintainers
 
 # dubbo_proxy extension
-/*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan 
+/*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan
 # thrift_proxy extension
 /*/extensions/filters/network/thrift_proxy @zuercher @brian-pane
 # jwt_authn http filter extension
@@ -14,3 +14,5 @@
 /*/extensions/transport_sockets/alts @htuch @yangminzhu
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
+#  extension
+/*/extensions/filters/network/forward_original_sni @lizan

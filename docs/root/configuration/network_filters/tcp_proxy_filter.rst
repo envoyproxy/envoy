@@ -18,6 +18,14 @@ implementation for the details.
 
 .. _config_network_filters_tcp_proxy_stats:
 
+Setting SNI
+-----------
+
+If `forward_original_sni` filter is installed, the TCP proxy filter will
+override the value in the `sni` field of
+:ref:`UpstreamTlsContext <envoy_api_msg_auth.UpstreamTlsContext>` of the
+upstream cluster by the SNI value from the downstream TLS connection.
+
 Statistics
 ----------
 

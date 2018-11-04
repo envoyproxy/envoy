@@ -18,7 +18,7 @@ requirements (TLS1.2, SNI, etc.). Envoy supports the following TLS features:
   (CRL) if one is :ref:`provided <envoy_api_field_auth.CertificateValidationContext.crl>`.
 * **ALPN**: TLS listeners support ALPN. The HTTP connection manager uses this information (in
   addition to protocol inference) to determine whether a client is speaking HTTP/1.1 or HTTP/2.
-* **SNI**: SNI is supported for both server (listener) and client (upstream) connections.
+* **SNI**: SNI is supported for both server (listener) and client (upstream) connections, including forwarding the SNI value from the downstream connection to the upstream one.
 * **Session resumption**: Server connections support resuming previous sessions via TLS session
   tickets (see `RFC 5077 <https://www.ietf.org/rfc/rfc5077.txt>`_). Resumption can be performed
   across hot restarts and between parallel Envoy instances (typically useful in a front proxy
