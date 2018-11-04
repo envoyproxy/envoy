@@ -456,9 +456,7 @@ TEST_P(Http2CodecImplTest, MetadataDisabledTest) {
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
-  MetadataMap metadata_map = {
-    {"header_key1", std::string(50 * 1024, 'a')},
-  };
+  MetadataMap metadata_map = {{"header_key1", std::string(50 * 1024, 'a')},};
   // Metadata is ignored.
   EXPECT_DEATH_LOG_TO_STDERR(request_encoder_->encodeMetadata(metadata_map), "");
 }
