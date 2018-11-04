@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "envoy/config/filter/network/find_and_replace/v2alpha1/find_and_replace.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 
@@ -15,7 +16,7 @@ namespace FindAndReplace {
 
 class Config {
 public:
-  Config(const Envoy::ProtobufWkt::Struct& proto_config);
+  Config(const envoy::config::filter::network::find_and_replace::v2alpha1::FindAndReplace& config);
 
   const std::string& input_rewrite_from() const { return input_rewrite_from_; };
   const std::string& input_rewrite_to() const { return input_rewrite_to_; };

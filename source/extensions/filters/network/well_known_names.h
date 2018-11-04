@@ -16,6 +16,8 @@ public:
   const std::string ClientSslAuth = "envoy.client_ssl_auth";
   // Echo filter
   const std::string Echo = "envoy.echo";
+  // Find and Replace filter
+  const std::string FindAndReplace = "envoy.find_and_replace";
   // HTTP connection manager filter
   const std::string HttpConnectionManager = "envoy.http_connection_manager";
   // Mongo proxy filter

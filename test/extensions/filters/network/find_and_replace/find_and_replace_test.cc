@@ -13,15 +13,15 @@ namespace FindAndReplace {
 class FindAndReplaceFilterTest : public testing::Test {
 public:
   void initialize() {
-    const std::string config = R"EOF(
+    const std::string yaml = R"EOF(
     input_rewrite_from: "PUT /test HTTP/1.1"
     input_rewrite_to: "GET /test HTTP/1.1\r\nConnection: Upgrade\r\nUpgrade: Websocket"
     output_rewrite_from: "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\nupgrade: websocket"
     output_rewrite_to: "HTTP/1.1 200 OK"
     )EOF";
-    Envoy::ProtobufWkt::Struct message;
-    MessageUtil::loadFromYaml(config, message);
-    config_ = std::make_shared<Config>(message);
+    envoy::config::filter::network::find_and_replace::v2alpha1::FindAndReplace proto_config{};
+    MessageUtil::loadFromYaml(yaml, proto_config);
+    config_ = std::make_shared<Config>(proto_config);
     filter_ = std::make_unique<Filter>(config_);
   }
 

@@ -47,6 +47,7 @@ proto_library(
         "//envoy/config/filter/http/transcoder/v2:transcoder",
         "//envoy/config/filter/network/client_ssl_auth/v2:client_ssl_auth",
         "//envoy/config/filter/network/ext_authz/v2:ext_authz",
+        "//envoy/config/filter/network/find_and_replace/v2alpha1:find_and_replace",
         "//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager",
         "//envoy/config/filter/network/mongo_proxy/v2:mongo_proxy",
         "//envoy/config/filter/network/rate_limit/v2:rate_limit",

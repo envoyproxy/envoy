@@ -22,16 +22,19 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "@envoy_api//envoy/config/filter/network/find_and_replace/v2alpha1:find_and_replace_cc",
     ],
 )
 
 envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
+    hdrs = ["config.h"],
     deps = [
         ":find_and_replace",
         "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:well_known_names",
+        "//source/extensions/filters/network:well_known_names",
+        "//source/extensions/filters/network/common:factory_base_lib",
+        "@envoy_api//envoy/config/filter/network/find_and_replace/v2alpha1:find_and_replace_cc",
     ],
 )

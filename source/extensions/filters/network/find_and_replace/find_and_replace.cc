@@ -11,31 +11,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace FindAndReplace {
 
-Config::Config(const Envoy::ProtobufWkt::Struct& proto_config) {
-
-  const Envoy::Protobuf::Map<std::string, Envoy::ProtobufWkt::Value>& fields =
-      proto_config.fields();
-
-  auto iterator = fields.find("input_rewrite_from");
-  if (iterator != fields.end()) {
-    input_rewrite_from_ = iterator->second.string_value();
-  }
-
-  iterator = fields.find("input_rewrite_to");
-  if (iterator != fields.end()) {
-    input_rewrite_to_ = iterator->second.string_value();
-  }
-
-  iterator = fields.find("output_rewrite_from");
-  if (iterator != fields.end()) {
-    output_rewrite_from_ = iterator->second.string_value();
-  }
-
-  iterator = fields.find("output_rewrite_to");
-  if (iterator != fields.end()) {
-    output_rewrite_to_ = iterator->second.string_value();
-  }
-}
+Config::Config(
+    const envoy::config::filter::network::find_and_replace::v2alpha1::FindAndReplace& config)
+    : input_rewrite_from_(config.input_rewrite_from()),
+      input_rewrite_to_(config.input_rewrite_to()),
+      output_rewrite_from_(config.output_rewrite_from()),
+      output_rewrite_to_(config.output_rewrite_to()) {}
 
 Filter::Filter(const ConfigConstSharedPtr& config)
     : config_(config), is_read_active_(false), is_write_active_(false) {

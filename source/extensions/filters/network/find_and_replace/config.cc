@@ -1,4 +1,4 @@
-#include <string>
+#include "extensions/filters/network/find_and_replace/config.h"
 
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
@@ -10,40 +10,21 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace FindAndReplace {
 
-/**
- * Config registration for the FindAndReplace Filter. @see NamedNetworkFilterConfigFactory.
- */
-class ConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
-public:
-  // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                               Server::Configuration::FactoryContext&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+Network::FilterFactoryCb FindAndReplaceConfigFactory::createFilterFactoryFromProtoTyped(
+    const envoy::config::filter::network::find_and_replace::v2alpha1::FindAndReplace& proto_config,
+    Server::Configuration::FactoryContext&) {
 
-  Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               Server::Configuration::FactoryContext&) override {
+  ConfigConstSharedPtr filter_config(std::make_shared<Config>(proto_config));
 
-    ConfigConstSharedPtr filter_config(
-        std::make_shared<Config>(dynamic_cast<const Envoy::ProtobufWkt::Struct&>(proto_config)));
-
-    return [filter_config](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addFilter(std::make_shared<Filter>(filter_config));
-    };
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
-  }
-
-  std::string name() override { return "find_and_replace"; }
-};
+  return [filter_config](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addFilter(std::make_shared<Filter>(filter_config));
+  };
+}
 
 /**
  * Static registration for the FindAndReplace filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<ConfigFactory,
+static Registry::RegisterFactory<FindAndReplaceConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     registered_;
 

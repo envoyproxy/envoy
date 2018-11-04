@@ -18,7 +18,7 @@ public:
     find_and_replace_config = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
     - filters:
-      - name: find_and_replace
+      - name: envoy.find_and_replace
         config:
           input_rewrite_from: "PUT /test HTTP/1.1"
           input_rewrite_to: "GET /test HTTP/1.1\r\nConnection: Upgrade\r\nUpgrade: Websocket"

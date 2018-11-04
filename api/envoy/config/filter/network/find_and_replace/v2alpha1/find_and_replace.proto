@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package envoy.config.filter.network.find_and_replace.v2alpha1;
+option go_package = "v2alpha1";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: Find and Replace]
+// Find and Replace Network Filter :ref:`configuration overview
+// <config_network_filters_find_and_replace>`.
+
+// Find and Replace network filter config.
+//
+message FindAndReplace {
+  string input_rewrite_from = 1;
+  string input_rewrite_to = 2;
+  string output_rewrite_from = 3;
+  string output_rewrite_to = 4;
+}
