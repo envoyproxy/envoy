@@ -8,6 +8,7 @@
 #include "common/config/filter_json.h"
 #include "common/network/address_impl.h"
 #include "common/router/metadatamatchcriteria_impl.h"
+#include "common/stream_info/forward_requested_server_name.h"
 #include "common/tcp_proxy/tcp_proxy.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -39,6 +40,8 @@ using testing::SaveArg;
 
 namespace Envoy {
 namespace TcpProxy {
+
+using ::Envoy::StreamInfo::ForwardRequestedServerName;
 
 namespace {
 Config constructConfigFromJson(const Json::Object& json,
@@ -1158,6 +1161,28 @@ TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_,
               tcpConnPoolForCluster("filter_state_cluster", _, _, _))
+      .WillOnce(Return(nullptr));
+
+  filter_->onNewConnection();
+}
+
+// Test that the tcp proxy uses forwards the requested server name from FilterState if set
+TEST_F(TcpProxyRoutingTest, ForwardRequestedServerName) {
+  setup();
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filterState().setData("envoy.tcp_proxy.forward_requested_server_name",
+                                    std::make_unique<ForwardRequestedServerName>("www.example.com"),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+
+  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+
+  absl::optional<std::string> override_server_name = "www.example.com";
+
+  // Expect filter to try to open a connection to a cluster with the override_server_name
+  EXPECT_CALL(factory_context_.cluster_manager_,
+              tcpConnPoolForCluster("fake_cluster", _, _, override_server_name))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
