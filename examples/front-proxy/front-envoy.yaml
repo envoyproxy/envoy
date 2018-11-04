@@ -34,19 +34,29 @@ static_resources:
     type: strict_dns
     lb_policy: round_robin
     http2_protocol_options: {}
-    hosts:
-    - socket_address:
-        address: service1
-        port_value: 80
+    load_assignment:
+      cluster_name: service1
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: service1
+                    port_value: 80
   - name: service2
     connect_timeout: 0.25s
     type: strict_dns
     lb_policy: round_robin
     http2_protocol_options: {}
-    hosts:
-    - socket_address:
-        address: service2
-        port_value: 80
+    load_assignment:
+      cluster_name: service2
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: service2
+                    port_value: 80
 admin:
   access_log_path: "/dev/null"
   address:

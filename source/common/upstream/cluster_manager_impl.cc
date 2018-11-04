@@ -207,6 +207,10 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
     if (cluster.type() != envoy::api::v2::Cluster::EDS) {
       loadCluster(cluster, "", false, active_clusters_);
     }
+
+    // TODO(dio): make sure cluster's load_assignment cluster name to be the same with its cluster
+    // name, even for static configuration.
+    // https://github.com/envoyproxy/envoy/pull/4123#issuecomment-412693859.
   }
 
   // Now setup ADS if needed, this might rely on a primary cluster.

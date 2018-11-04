@@ -125,10 +125,13 @@ void HdsDelegate::processMessage(
     cluster_config.mutable_per_connection_buffer_limit_bytes()->set_value(
         ClusterConnectionBufferLimitBytes);
 
-    // Add endpoints to cluster
+    // Add endpoints to cluster.
+    auto* load_assignment = cluster_config.mutable_load_assignment();
+    auto* locality_lb_endpoints = load_assignment->add_endpoints();
     for (const auto& locality_endpoints : cluster_health_check.locality_endpoints()) {
       for (const auto& endpoint : locality_endpoints.endpoints()) {
-        cluster_config.add_hosts()->MergeFrom(endpoint.address());
+        auto* lb_endpoint = locality_lb_endpoints->add_lb_endpoints();
+        lb_endpoint->mutable_endpoint()->MergeFrom(endpoint);
       }
     }
 
@@ -194,13 +197,15 @@ HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& 
   info_ =
       info_factory.createClusterInfo(runtime_, cluster_, bind_config_, stats_, ssl_context_manager_,
                                      added_via_api_, cm, local_info, dispatcher, random);
-
-  for (const auto& host : cluster.hosts()) {
-    initial_hosts_->emplace_back(new HostImpl(
-        info_, "", Network::Address::resolveProtoAddress(host),
-        envoy::api::v2::core::Metadata::default_instance(), 1,
-        envoy::api::v2::core::Locality().default_instance(),
-        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0));
+  const auto& locality_lb_endpoints = cluster.load_assignment().endpoints();
+  for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
+    for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
+      const auto& host = lb_endpoint.endpoint().address();
+      // TODO(dio): Check if initial weight and priority need to be inferred from the config.
+      initial_hosts_->emplace_back(new HostImpl(
+          info_, "", Network::Address::resolveProtoAddress(host), lb_endpoint.metadata(), 1,
+          locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(), 0));
+    }
   }
   initialize([] {});
 }

@@ -290,8 +290,11 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   }
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(setupFromV1Json(multiple_hosts_json), EnvoyException,
-                            "LOGICAL_DNS clusters must have a single host");
+  EXPECT_THROW_WITH_MESSAGE(
+      setupFromV1Json(multiple_hosts_json), EnvoyException,
+      // Since Envoy::Config::CdsJson now translates hosts to load_assignment, hence the message is
+      // changed.
+      "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string multiple_lb_endpoints_yaml = R"EOF(
   name: name
@@ -379,10 +382,15 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
   # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
   dns_lookup_family: V4_ONLY
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 443
+  load_assignment:
+    cluster_name: name
+    endpoints:
+      - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: foo.bar.com
+                  port_value: 443
   )EOF";
 
   const std::string basic_yaml_load_assignment = R"EOF(

@@ -44,8 +44,10 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
     }
   }
   for (auto& cluster : *output.mutable_static_resources()->mutable_clusters()) {
-    for (auto& host : *cluster.mutable_hosts()) {
-      makePortHermetic(test_env, host);
+    for (auto& locality_lb : cluster->load_assignment()->mutable_endpoints()) {
+      for (auto& lb_endpoint : locality_lb->mutable_lb_endpoints) {
+        makePortHermetic(lb_endpoint->mutable_endpoint().mutable_address());
+      }
     }
   }
   return output;

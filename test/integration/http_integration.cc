@@ -858,22 +858,22 @@ void HttpIntegrationTest::testRetryPriority() {
     auto cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
     auto load_assignment = cluster->mutable_load_assignment();
     load_assignment->set_cluster_name(cluster->name());
-    const auto& host_address = cluster->hosts(0).socket_address().address();
+
+    // Add another endpoint to simulate multiple priorities.
+    auto locality = load_assignment->add_endpoints();
+    locality->MergeFrom(load_assignment->endpoints(0));
 
     for (int i = 0; i < 2; ++i) {
-      auto locality = load_assignment->add_endpoints();
+      auto locality = load_assignment->mutable_endpoints(i);
       locality->set_priority(i);
       locality->mutable_locality()->set_region("region");
       locality->mutable_locality()->set_zone("zone");
       locality->mutable_locality()->set_sub_zone("sub_zone" + std::to_string(i));
-      auto lb_endpoint = locality->add_lb_endpoints();
-      lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
-          host_address);
+
+      auto lb_endpoint = locality->mutable_lb_endpoints(0);
       lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
           0);
     }
-
-    cluster->clear_hosts();
   });
 
   fake_upstreams_count_ = 2;
@@ -931,8 +931,15 @@ void HttpIntegrationTest::testRetryHostPredicateFilter() {
 
   // We want to work with a cluster with two hosts.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-    auto* new_host = bootstrap.mutable_static_resources()->mutable_clusters(0)->add_hosts();
-    new_host->MergeFrom(bootstrap.static_resources().clusters(0).hosts(0));
+    // Add a new endpoint.
+    auto* new_lb_endpoint = bootstrap.mutable_static_resources()
+                                ->mutable_clusters(0)
+                                ->mutable_load_assignment()
+                                ->mutable_endpoints(0)
+                                ->add_lb_endpoints();
+
+    new_lb_endpoint->MergeFrom(
+        bootstrap.static_resources().clusters(0).load_assignment().endpoints(0).lb_endpoints(0));
   });
   fake_upstreams_count_ = 2;
   initialize();

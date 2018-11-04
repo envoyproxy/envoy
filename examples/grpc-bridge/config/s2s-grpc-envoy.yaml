@@ -31,10 +31,15 @@ static_resources:
     type: static
     lb_policy: round_robin
     http2_protocol_options: {}
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 8081
+    load_assignment:
+      cluster_name: local_service_grpc
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 8081
 admin:
   access_log_path: "/var/log/envoy/admin_access.log"
   address:

@@ -34,10 +34,15 @@ static_resources:
     type: strict_dns
     lb_policy: round_robin
     http2_protocol_options: {}
-    hosts:
-    - socket_address:
-        address: service1
-        port_value: 80
+    load_assignment:
+      cluster_name: service1
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: service1
+                    port_value: 80
 tracing:
   http:
     name: envoy.dynamic.ot

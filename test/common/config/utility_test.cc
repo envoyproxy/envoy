@@ -203,7 +203,9 @@ TEST(UtilityTest, UnixClusterStatic) {
   envoy::api::v2::core::ConfigSource eds_config;
   Stats::StatsOptionsImpl stats_options;
   Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster, stats_options);
-  EXPECT_EQ("/test.sock", cluster.hosts(0).pipe().path());
+  EXPECT_EQ(
+      "/test.sock",
+      cluster.load_assignment().endpoints(0).lb_endpoints(0).endpoint().address().pipe().path());
 }
 
 TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {

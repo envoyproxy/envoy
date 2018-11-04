@@ -46,7 +46,12 @@ static_resources:
     lb_policy: round_robin
     connect_timeout: 0.250s
     http_protocol_options: {}
-    hosts:
-    - socket_address:
-        address: grpc
-        port_value: 9211
+    load_assignment:
+      cluster_name: grpc
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: grpc
+                    port_value: 9211

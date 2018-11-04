@@ -35,18 +35,28 @@ static_resources:
     type: strict_dns
     lb_policy: round_robin
     http2_protocol_options: {}
-    hosts:
-    - socket_address:
-        address: service1
-        port_value: 80
+    load_assignment:
+      cluster_name: service1
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: service1
+                    port_value: 80
   - name: zipkin
     connect_timeout: 1s
     type: strict_dns
     lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: zipkin
-        port_value: 9411
+    load_assignment:
+      cluster_name: zipkin
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: zipkin
+                    port_value: 9411
 tracing:
   http:
     name: envoy.zipkin

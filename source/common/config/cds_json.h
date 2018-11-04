@@ -67,6 +67,22 @@ public:
                                const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                                envoy::api::v2::Cluster& cluster,
                                const Stats::StatsOptions& stats_options);
+
+  /**
+   * Translate a v1 JSON Cluster addresses (hosts) vector to v2
+   * envoy::api::v2::ClusterLoadAssignment. This is needed since there are many tests depends on
+   * CdsJson::translateCluster that previously sets v2 envoy::api::v2::Cluster's hosts.
+   * @param cluster_name the cluster name.
+   * @param json_cluster_hosts source v1 JSON Cluster Hosts vector.
+   * @param url is json_address a URL? E.g. tcp://<ip>:<port>. If not, it is
+   *            treated as <ip>:<port>.
+   * @param resolved is the address of json_addresses a concrete IP/pipe or unresolved hostname?
+   * @param load assignment destination v2 envoy::api::v2::ClusterLoadAssignment.
+   */
+  static void translateClusterHosts(const std::string& cluster_name,
+                                    const std::vector<Json::ObjectSharedPtr>& json_addresses,
+                                    bool url, bool resolved,
+                                    envoy::api::v2::ClusterLoadAssignment& load_assignment);
 };
 
 } // namespace Config

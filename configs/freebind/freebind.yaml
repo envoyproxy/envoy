@@ -29,10 +29,15 @@ static_resources:
     connect_timeout: 30s
     type: STATIC
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 10001
+    load_assignment:
+      cluster_name: service_local
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 10001
 # TODO(htuch): Figure out how to do end-to-end testing with
 # outgoing connections and free bind.
 #    upstream_bind_config:

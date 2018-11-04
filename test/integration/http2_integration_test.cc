@@ -454,10 +454,15 @@ TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
 Http2RingHashIntegrationTest::Http2RingHashIntegrationTest() {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->clear_hosts();
     cluster->set_lb_policy(envoy::api::v2::Cluster_LbPolicy_RING_HASH);
-    for (int i = 0; i < num_upstreams_; i++) {
-      auto* socket = cluster->add_hosts()->mutable_socket_address();
+    auto* load_assignment = cluster->mutable_load_assignment();
+    auto* locality_lb_endpoints = load_assignment->mutable_endpoints(0);
+    locality_lb_endpoints->clear_lb_endpoints();
+    for (int i = 0; i < num_upstreams_; ++i) {
+      auto* socket = locality_lb_endpoints->add_lb_endpoints()
+                         ->mutable_endpoint()
+                         ->mutable_address()
+                         ->mutable_socket_address();
       socket->set_address(Network::Test::getLoopbackAddressString(version_));
     }
   });

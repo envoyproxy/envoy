@@ -218,10 +218,15 @@ public:
                       name: unused-cluster
                       type: STATIC
                       lb_policy: ROUND_ROBIN
-                      hosts:
-                        - socket_address:
-                            address: {}
-                            port_value: 0
+                      load_assignment:
+                        cluster_name: unused-cluster
+                        endpoints:
+                            - lb_endpoints:
+                                - endpoint:
+                                    address:
+                                      socket_address:
+                                        address: {}
+                                        port_value: 0
                   )EOF",
               Network::Test::getLoopbackAddressString(version_))));
 
@@ -233,10 +238,15 @@ public:
                       lb_policy: ROUND_ROBIN
                       http2_protocol_options: {{}}
                       connect_timeout: 5s
-                      hosts:
-                        - socket_address:
-                            address: {}
-                            port_value: 0
+                      load_assignment:
+                        cluster_name: eds-cluster
+                        endpoints:
+                            - lb_endpoints:
+                                - endpoint:
+                                    address:
+                                      socket_address:
+                                        address: {}
+                                        port_value: 0
                   )EOF",
               Network::Test::getLoopbackAddressString(version_))));
     });

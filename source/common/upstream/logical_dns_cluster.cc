@@ -28,10 +28,7 @@ LogicalDnsCluster::LogicalDnsCluster(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       tls_(tls.allocateSlot()), resolve_timer_(factory_context.dispatcher().createTimer(
                                     [this]() -> void { startResolve(); })),
-      local_info_(factory_context.localInfo()),
-      load_assignment_(cluster.has_load_assignment()
-                           ? cluster.load_assignment()
-                           : Config::Utility::translateClusterHosts(cluster.hosts())) {
+      local_info_(factory_context.localInfo()), load_assignment_(cluster.load_assignment()) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
     if (cluster.has_load_assignment()) {

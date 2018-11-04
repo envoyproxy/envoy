@@ -335,11 +335,16 @@ static_resources:
     {% endif %}
     type: LOGICAL_DNS
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        address: {{ host['remote_address'] }}
-        port_value: {{ host['port_value'] }}
-        protocol: {{ host['protocol'] }}
+    load_assignment:
+      cluster_name: egress_{{ host['name'] }}
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: {{ host['remote_address'] }}
+                    port_value: {{ host['port_value'] }}
+                    protocol: {{ host['protocol'] }}
   {% endfor -%}
   {% endfor -%}
   {% for key, value in mongos_servers.iteritems() -%}
@@ -347,13 +352,18 @@ static_resources:
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: RANDOM
-    hosts:
-    {% for server in value['hosts'] -%}
-    - socket_address:
-        protocol: {{ server['protocol'] }}
-        port_value: {{ server['port_value'] }}
-        address: {{ server['address'] }}
-    {% endfor -%}
+    load_assignment:
+      cluster_name: mongo_{{ key }}
+      endpoints:
+        - lb_endpoints:
+            {% for server in value['hosts'] -%}
+            - endpoint:
+                address:
+                  socket_address:
+                    protocol: {{ server['protocol'] }}
+                    port_value: {{ server['port_value'] }}
+                    address: {{ server['address'] }}
+            {% endfor -%}
   {% endfor %}
   - name: main_website
     connect_timeout: 0.25s
@@ -361,20 +371,30 @@ static_resources:
     # Comment out the following line to test on v6 networks
     dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        address: main_website.com
-        port_value: 443
+    load_assignment:
+      cluster_name: main_website
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: main_website.com
+                    port_value: 443
     tls_context: { sni: www.main_website.com }
   - name: local_service
     connect_timeout: 0.25s
     type: STATIC
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        protocol: TCP
-        address: 127.0.0.1
-        port_value: 8080
+    load_assignment:
+      cluster_name: local_service
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    protocol: TCP
+                    address: 127.0.0.1
+                    port_value: 8080
     circuit_breakers:
       thresholds:
         max_pending_requests: 30
@@ -384,11 +404,16 @@ static_resources:
     type: STATIC
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
-    hosts:
-    - socket_address:
-        protocol: TCP
-        address: 127.0.0.1
-        port_value: 8081
+    load_assignment:
+      cluster_name: local_service_grpc
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    protocol: TCP
+                    address: 127.0.0.1
+                    port_value: 8081
     circuit_breakers:
       thresholds:
         max_requests: 200
@@ -397,31 +422,46 @@ static_resources:
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        protocol: TCP
-        address: rds.yourcompany.net
-        port_value: 80
+    load_assignment:
+      cluster_name: rds
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    protocol: TCP
+                    address: rds.yourcompany.net
+                    port_value: 80
     dns_lookup_family: V4_ONLY
   - name: statsd
     connect_timeout: 0.25s
     type: STATIC
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        protocol: TCP
-        address: 127.0.0.1
-        port_value: 8125
+    load_assignment:
+      cluster_name: statsd
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    protocol: TCP
+                    address: 127.0.0.1
+                    port_value: 8125
     dns_lookup_family: V4_ONLY
   - name: lightstep_saas
     connect_timeout: 1s
     type: LOGICAL_DNS
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        protocol: TCP
-        address: collector-grpc.lightstep.com
-        port_value: 443
+    load_assignment:
+      cluster_name: statsd
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    protocol: TCP
+                    address: collector-grpc.lightstep.com
+                    port_value: 443
     http2_protocol_options:
       max_concurrent_streams: 100
     tls_context:
@@ -435,20 +475,30 @@ static_resources:
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        protocol: TCP
-        address: cds.yourcompany.net
-        port_value: 80
+    load_assignment:
+      cluster_name: cds_cluster
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    protocol: TCP
+                    address: cds.yourcompany.net
+                    port_value: 80
   - name: sds
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        protocol: TCP
-        address: discovery.yourcompany.net
-        port_value: 80
+    load_assignment:
+      cluster_name: sds
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    protocol: TCP
+                    address: discovery.yourcompany.net
+                    port_value: 80
 dynamic_resources:
   cds_config:
     api_config_source:

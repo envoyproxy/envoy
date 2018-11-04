@@ -275,10 +275,15 @@ static_resources:
   - name: ads_cluster
     connect_timeout: { seconds: 5 }
     type: STATIC
-    hosts:
-    - socket_address:
-        address: <ADS management server IP address>
-        port_value: <ADS management server port>
+    load_assignment:
+      cluster_name: ads_cluster
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: <ADS management server IP address>
+                    port_value: <ADS management server port>
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
 admin:

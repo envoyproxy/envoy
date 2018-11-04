@@ -135,7 +135,12 @@ gRPC or RESTful JSON requests to localhost:51051.
       lb_policy: round_robin
       dns_lookup_family: V4_ONLY
       http2_protocol_options: {}
-      hosts:
-      - socket_address:
-          address: docker.for.mac.localhost
-          port_value: 50051
+      load_assignment:
+        cluster_name: grpc
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: docker.for.mac.localhost
+                      port_value: 50051

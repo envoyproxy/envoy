@@ -93,7 +93,15 @@ The specification of the :ref:`clusters <envoy_api_file_envoy/api/v2/cds.proto>`
         # Comment out the following line to test on v6 networks
         dns_lookup_family: V4_ONLY
         lb_policy: ROUND_ROBIN
-        hosts: [{ socket_address: { address: google.com, port_value: 443 }}]
+        load_assignment:
+          cluster_name: some_service
+          endpoints:
+            - lb_endpoints:
+                - endpoint:
+                    address:
+                      socket_address:
+                        address: google.com
+                        port_value: 443
         tls_context: { sni: www.google.com }
 
 

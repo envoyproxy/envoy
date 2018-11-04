@@ -20,7 +20,7 @@ static_resources:
               routes:
               - match:
                   prefix: "/"
-                route: 
+                route:
                   cluster: web_service
           http_filters:
           - name: envoy.lua
@@ -41,10 +41,15 @@ static_resources:
     connect_timeout: 0.25s
     type: strict_dns # static
     lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: web_service
-        port_value: 80
+    load_assignment:
+      cluster_name: web_service
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: web_service
+                    port_value: 80
 admin:
   access_log_path: "/dev/null"
   address:

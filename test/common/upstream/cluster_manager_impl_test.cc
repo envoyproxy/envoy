@@ -180,13 +180,20 @@ public:
       connect_timeout: 0.250s
       type: STATIC
       lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11002
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11002
   )EOF";
     const std::string merge_window = R"EOF(
       common_lb_config:
@@ -565,13 +572,20 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
     - name: redis_cluster
       connect_timeout: 0.250s
       lb_policy: RING_HASH
-      hosts:
-      - socket_address:
-          address: 127.0.0.1
-          port_value: 8000
-      - socket_address:
-          address: 127.0.0.1
-          port_value: 8001
+      load_assignment:
+        cluster_name: redis_cluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 8000
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 8001
       dns_lookup_family: V4_ONLY
       ring_hash_lb_config:
         minimum_ring_size: 125
@@ -842,10 +856,19 @@ static_clusters:
   - cluster:
       name: "cds_cluster"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: cds_cluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
+                load_balancing_weight:
+                  value: 1
+            load_balancing_weight:
+              value: 1
       dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
@@ -853,10 +876,19 @@ static_clusters:
   - cluster:
       name: "fake_cluster"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: fake_cluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
+                load_balancing_weight:
+                  value: 1
+            load_balancing_weight:
+              value: 1
       dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
@@ -864,10 +896,19 @@ static_clusters:
   - cluster:
       name: "fake_cluster2"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: fake_cluster2
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
+                load_balancing_weight:
+                  value: 1
+            load_balancing_weight:
+              value: 1
       dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
@@ -877,10 +918,19 @@ dynamic_active_clusters:
     cluster:
       name: "cluster3"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: cluster3
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
+                load_balancing_weight:
+                  value: 1
+            load_balancing_weight:
+              value: 1
       dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
@@ -889,10 +939,19 @@ dynamic_active_clusters:
     cluster:
       name: "cluster4"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: cluster4
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
+                load_balancing_weight:
+                  value: 1
+            load_balancing_weight:
+              value: 1
       dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
@@ -901,10 +960,19 @@ dynamic_active_clusters:
     cluster:
       name: "cluster5"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: cluster5
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
+                load_balancing_weight:
+                  value: 1
+            load_balancing_weight:
+              value: 1
       dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
@@ -1014,10 +1082,19 @@ dynamic_warming_clusters:
     cluster:
       name: "fake_cluster"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: fake_cluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
+                load_balancing_weight:
+                  value: 1
+            load_balancing_weight:
+              value: 1
       dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
@@ -1559,10 +1636,15 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
           address: 1.2.3.4
           port_value: 80
       lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: localhost
-          port_value: 11001
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: localhost
+                      port_value: 11001
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -1634,10 +1716,15 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
           address: 1.2.3.4
           port_value: 80
       lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: localhost
-          port_value: 11001
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: localhost
+                      port_value: 11001
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -1956,10 +2043,15 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   connect_timeout: 0.250s
   type: STATIC
   lb_policy: ROUND_ROBIN
-  hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 12001
+  load_assignment:
+    cluster_name: fake_cluster
+    endpoints:
+      - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 12001
   common_lb_config:
     update_merge_window: 3s
   )EOF";
@@ -2003,10 +2095,15 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   connect_timeout: 0.250s
   type: STATIC
   lb_policy: ROUND_ROBIN
-  hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 12001
+  load_assignment:
+    cluster_name: fake_cluster
+    endpoints:
+      - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 12001
   common_lb_config:
     update_merge_window: 4s
   )EOF";
@@ -2242,10 +2339,15 @@ TEST_F(SockoptsTest, SockoptsUnset) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
   )EOF";
   initialize(yaml);
   expectNoSocketOptions();
@@ -2259,10 +2361,15 @@ TEST_F(SockoptsTest, FreebindClusterOnly) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
       upstream_bind_config:
         freebind: true
   )EOF";
@@ -2278,10 +2385,15 @@ TEST_F(SockoptsTest, FreebindClusterManagerOnly) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
   cluster_manager:
     upstream_bind_config:
       freebind: true
@@ -2298,10 +2410,15 @@ TEST_F(SockoptsTest, FreebindClusterOverride) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
       upstream_bind_config:
         freebind: true
   cluster_manager:
@@ -2320,10 +2437,15 @@ TEST_F(SockoptsTest, SockoptsClusterOnly) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
       upstream_bind_config:
         socket_options: [
           { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
@@ -2344,10 +2466,15 @@ TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
   cluster_manager:
     upstream_bind_config:
       socket_options: [
@@ -2368,10 +2495,15 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
       upstream_bind_config:
         socket_options: [
           { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
@@ -2495,10 +2627,15 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveUnset) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: TcpKeepaliveCluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
   )EOF";
   initialize(yaml);
   expectNoSocketOptions();
@@ -2512,10 +2649,15 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveCluster) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: TcpKeepaliveCluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
       upstream_connection_options:
         tcp_keepalive: {}
   )EOF";
@@ -2531,10 +2673,15 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterProbes) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: TcpKeepaliveCluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
       upstream_connection_options:
         tcp_keepalive:
           keepalive_probes: 7
@@ -2551,10 +2698,15 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        cluster_name: TcpKeepaliveCluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
       upstream_connection_options:
         tcp_keepalive:
           keepalive_probes: 7

@@ -178,7 +178,15 @@ TEST(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
   )EOF";
 
   ResolverData resolver(*dns_resolver, dispatcher);
@@ -367,7 +375,15 @@ TEST(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     drain_connections_on_host_removal: true
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
   )EOF";
 
   ResolverData resolver(*dns_resolver, dispatcher);
@@ -797,10 +813,15 @@ TEST(StaticClusterImplTest, InitialHosts) {
     connect_timeout: 0.25s
     type: STATIC
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        address: 10.0.0.1
-        port_value: 443
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 443
   )EOF";
 
   NiceMock<MockClusterManager> cm;
@@ -1021,7 +1042,15 @@ TEST(StaticClusterImplTest, AltStatName) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: 10.0.0.1, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 443
   )EOF";
 
   NiceMock<MockClusterManager> cm;
@@ -1321,7 +1350,15 @@ TEST(StaticClusterImplTest, MalformedHostIP) {
     connect_timeout: 0.25s
     type: STATIC
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
   )EOF";
 
   NiceMock<MockClusterManager> cm;
@@ -1439,7 +1476,15 @@ TEST(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     close_connections_on_host_health_failure: true
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
   )EOF";
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
@@ -1559,7 +1604,15 @@ TEST_F(ClusterInfoImplTest, Metadata) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: MAGLEV
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
     metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
                                    baz: {name: meh } } }
     common_lb_config:
@@ -1587,7 +1640,15 @@ TEST_F(ClusterInfoImplTest, BrokenTypedMetadata) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: MAGLEV
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
     metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
                                    baz: {boom: meh} } }
     common_lb_config:
@@ -1608,7 +1669,15 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
     extension_protocol_options:
       no_such_filter: { option: value }
   )EOF";
@@ -1713,7 +1782,15 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
     extension_protocol_options:
       envoy.test.filter: { option: value }
   )EOF";
@@ -1751,7 +1828,15 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
     extension_protocol_options:
       envoy.test.filter: { option: "value" }
   )EOF";

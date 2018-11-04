@@ -33,10 +33,15 @@ static_resources:
     connect_timeout: 0.250s
     type: strict_dns
     lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 8080
+    load_assignment:
+      cluster_name: local_service
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 8080
 tracing:
   http:
     name: envoy.dynamic.ot

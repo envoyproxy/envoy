@@ -33,18 +33,28 @@ static_resources:
     connect_timeout: 0.250s
     type: strict_dns
     lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 8080
+    load_assignment:
+      cluster_name: local_service
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 8080
   - name: zipkin
     connect_timeout: 1s
     type: strict_dns
     lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: zipkin
-        port_value: 9411
+    load_assignment:
+      cluster_name: zipkin
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: zipkin
+                    port_value: 9411
 tracing:
   http:
     name: envoy.zipkin

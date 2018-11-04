@@ -110,26 +110,14 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
   cluster.set_name(name);
 
   const std::string string_type = json_cluster.getString("type");
-  auto set_dns_hosts = [&json_cluster, &cluster] {
+  auto set_dns_hosts = [&json_cluster, &cluster, name] {
     const auto hosts = json_cluster.getObjectArray("hosts");
-    std::transform(hosts.cbegin(), hosts.cend(),
-                   Protobuf::RepeatedPtrFieldBackInserter(cluster.mutable_hosts()),
-                   [](const Json::ObjectSharedPtr& host) {
-                     envoy::api::v2::core::Address address;
-                     AddressJson::translateAddress(host->getString("url"), true, false, address);
-                     return address;
-                   });
+    translateClusterHosts(name, hosts, true, false, *cluster.mutable_load_assignment());
   };
   if (string_type == "static") {
     cluster.set_type(envoy::api::v2::Cluster::STATIC);
     const auto hosts = json_cluster.getObjectArray("hosts");
-    std::transform(hosts.cbegin(), hosts.cend(),
-                   Protobuf::RepeatedPtrFieldBackInserter(cluster.mutable_hosts()),
-                   [](const Json::ObjectSharedPtr& host) {
-                     envoy::api::v2::core::Address address;
-                     AddressJson::translateAddress(host->getString("url"), true, true, address);
-                     return address;
-                   });
+    translateClusterHosts(name, hosts, true, true, *cluster.mutable_load_assignment());
   } else if (string_type == "strict_dns") {
     cluster.set_type(envoy::api::v2::Cluster::STRICT_DNS);
     set_dns_hosts();
@@ -220,6 +208,24 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
   if (json_cluster.hasObject("outlier_detection")) {
     translateOutlierDetection(*json_cluster.getObject("outlier_detection"),
                               *cluster.mutable_outlier_detection());
+  }
+}
+
+void CdsJson::translateClusterHosts(const std::string& cluster_name,
+                                    const std::vector<Json::ObjectSharedPtr>& json_cluster_hosts,
+                                    bool url, bool resolved,
+                                    envoy::api::v2::ClusterLoadAssignment& load_assignment) {
+  // TODO(dio): Early return when json_cluster_hosts is empty.
+  load_assignment.set_cluster_name(cluster_name);
+  auto* locality_lb_endpoints = load_assignment.add_endpoints();
+  // Since this LocalityLbEndpoints is built from hosts list, set the default weight to 1.
+  locality_lb_endpoints->mutable_load_balancing_weight()->set_value(1);
+  for (const Json::ObjectSharedPtr& json_host : json_cluster_hosts) {
+    envoy::api::v2::core::Address address;
+    AddressJson::translateAddress(json_host->getString("url"), url, resolved, address);
+    auto* lb_endpoint = locality_lb_endpoints->add_lb_endpoints();
+    lb_endpoint->mutable_endpoint()->mutable_address()->MergeFrom(address);
+    lb_endpoint->mutable_load_balancing_weight()->set_value(1);
   }
 }
 

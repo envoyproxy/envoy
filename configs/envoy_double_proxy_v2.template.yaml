@@ -92,20 +92,30 @@ static_resources:
     type: STATIC
     connect_timeout: 0.25s
     lb_policy: ROUND_ROBIN
-    hosts:
-      - socket_address:
-          protocol: TCP
-          address: 127.0.0.1
-          port_value: 8125
+    load_assignment:
+      cluster_name: statsd
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    protocol: TCP
+                    address: 127.0.0.1
+                    port_value: 8125
   - name: backhaul
     type: STRICT_DNS
     connect_timeout: 1s
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        protocol: TCP
-        address: front-proxy.yourcompany.net
-        port_value: 9400
+    load_assignment:
+      cluster_name: backhaul
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    protocol: TCP
+                    address: front-proxy.yourcompany.net
+                    port_value: 9400
     # There are so few connections going back
     # that we can get some imbalance. Until we come up
     # with a better solution just limit the requests
@@ -128,11 +138,16 @@ static_resources:
     type: LOGICAL_DNS
     connect_timeout: 1s
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        protocol: TCP
-        address: collector-grpc.lightstep.com
-        port_value: 443
+    load_assignment:
+      cluster_name: lightstep_saas
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    protocol: TCP
+                    address: collector-grpc.lightstep.com
+                    port_value: 443
     http2_protocol_options: {}
     tls_context:
       common_tls_context:
@@ -144,7 +159,7 @@ static_resources:
 flags_path: "/etc/envoy/flags"
 stats_sinks:
 - name: envoy.statsd
-  config: 
+  config:
     tcp_cluster_name: statsd
 tracing:
   http:

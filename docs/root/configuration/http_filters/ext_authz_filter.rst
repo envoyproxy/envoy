@@ -43,8 +43,15 @@ A sample filter configuration for a gRPC authorization server:
     - name: ext-authz
       type: static
       http2_protocol_options: {}
-      hosts:
-        - socket_address: { address: 127.0.0.1, port_value: 10003 }
+      load_assignment:
+        cluster_name: ext-authz
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 10003
 
       # This timeout controls the initial TCP handshake timeout - not the timeout for the
       # entire request.
@@ -71,8 +78,15 @@ A sample filter configuration for a raw HTTP authorization server:
       connect_timeout: 0.25s
       type: logical_dns
       lb_policy: round_robin
-      hosts:
-        - socket_address: { address: 127.0.0.1, port_value: 10003 }
+      load_assignment:
+        cluster_name: ext-authz
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 10003
 
 Statistics
 ----------

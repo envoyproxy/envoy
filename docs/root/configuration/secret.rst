@@ -59,9 +59,13 @@ This example show how to configure secrets in the static_resource:
             E0:F3:C8:CE:5E:2E:A3:05:F0:70:1F:F5:12:E3:6E:2E:97:92:82:84:A2:28:BC:F7:73:32:D3:39:30:A1:B6:FD
     clusters:
       - connect_timeout: 0.25s
-        hosts:
-        - name: local_service_tls
-          ...
+        name: local_service_tls
+        load_assignment:
+          cluster_name: local_service_tls
+          endpoints:
+            - lb_endpoints:
+              - endpoint:
+                ...
           tls_context:
             common_tls_context:
               tls_certificate_sds_secret_configs:
@@ -89,10 +93,15 @@ This example shows how to configure secrets fetched from remote SDS servers:
     clusters:
       - name: sds_server_mtls
         http2_protocol_options: {}
-        hosts:
-          socket_address:
-            address: 127.0.0.1
-            port_value: 8234
+        load_assignment:
+          cluster_name: sds_server_mtls
+          endpoints:
+            - lb_endpoints:
+                - endpoint:
+                    address:
+                      socket_address:
+                        address: 127.0.0.1
+                        port_value: 8234
         tls_context:
           common_tls_context:
           - tls_certificate:
@@ -102,24 +111,31 @@ This example shows how to configure secrets fetched from remote SDS servers:
               filename: certs/sds_key.pem
       - name: sds_server_uds
         http2_protocol_options: {}
-        hosts:
-          - pipe:
-              path: /tmp/uds_path
-      - name: example_cluster
+        load_assignment:
+          cluster_name: local_service_tls
+          endpoints:
+            - lb_endpoints:
+                - endpoint:
+                    pipe:
+                      path: /tmp/uds_path
+      - name: local_service_tls
+        load_assignment:
+          cluster_name: local_service_tls
+          endpoints:
+            - lb_endpoints:
+                - endpoint:
+                    ...
         connect_timeout: 0.25s
-        hosts:
-        - name: local_service_tls
-          ...
-          tls_context:
-            common_tls_context:
-              tls_certificate_sds_secret_configs:
-              - name: client_cert
-                sds_config:
-                  api_config_source:
-                    api_type: GRPC
-                    grpc_services:
-                      google_grpc:
-                        target_uri: unix:/tmp/uds_path
+        tls_context:
+          common_tls_context:
+            tls_certificate_sds_secret_configs:
+            - name: client_cert
+              sds_config:
+                api_config_source:
+                  api_type: GRPC
+                  grpc_services:
+                    google_grpc:
+                      target_uri: unix:/tmp/uds_path
     listeners:
       ....
       filter_chains:

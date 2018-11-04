@@ -868,12 +868,7 @@ StaticClusterImpl::StaticClusterImpl(
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
       priority_state_manager_(new PriorityStateManager(*this, factory_context.localInfo())) {
-  // TODO(dio): Use by-reference when cluster.hosts() is removed.
-  const envoy::api::v2::ClusterLoadAssignment cluster_load_assignment(
-      cluster.has_load_assignment() ? cluster.load_assignment()
-                                    : Config::Utility::translateClusterHosts(cluster.hosts()));
-
-  for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
+  for (const auto& locality_lb_endpoint : cluster.load_assignment().endpoints()) {
     priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       priority_state_manager_->registerHostForPriority(
@@ -1111,10 +1106,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  const envoy::api::v2::ClusterLoadAssignment load_assignment(
-      cluster.has_load_assignment() ? cluster.load_assignment()
-                                    : Config::Utility::translateClusterHosts(cluster.hosts()));
-  const auto& locality_lb_endpoints = load_assignment.endpoints();
+  const auto& locality_lb_endpoints = cluster.load_assignment().endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& host = lb_endpoint.endpoint().address();

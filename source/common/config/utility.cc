@@ -268,8 +268,10 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
 }
 
 envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
+    const std::string& cluster_name,
     const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts) {
   envoy::api::v2::ClusterLoadAssignment load_assignment;
+  load_assignment.set_cluster_name(cluster_name);
   envoy::api::v2::endpoint::LocalityLbEndpoints* locality_lb_endpoints =
       load_assignment.add_endpoints();
   // Since this LocalityLbEndpoints is built from hosts list, set the default weight to 1.

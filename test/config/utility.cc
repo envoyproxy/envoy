@@ -27,10 +27,15 @@ admin:
 static_resources:
   clusters:
     name: cluster_0
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: cluster_0
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
   listeners:
     name: listener_0
     address:
@@ -132,9 +137,21 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, const std:
 
   for (int i = 0; i < static_resources->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
-    if (!cluster->hosts().empty() && cluster->mutable_hosts(0)->has_socket_address()) {
-      auto host_socket_addr = cluster->mutable_hosts(0)->mutable_socket_address();
-      host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+
+    if (cluster->has_load_assignment()) {
+      auto* load_assignment = cluster->mutable_load_assignment();
+      // TODO(dio): Probably setting endpoint and address to be non-nullable will be helpful here.
+      if (!load_assignment->endpoints().empty() &&
+          !load_assignment->endpoints(0).lb_endpoints().empty() &&
+          load_assignment->endpoints(0).lb_endpoints(0).has_endpoint() &&
+          load_assignment->endpoints(0).lb_endpoints(0).endpoint().has_address() &&
+          load_assignment->endpoints(0).lb_endpoints(0).endpoint().address().has_socket_address()) {
+        auto locality_lb_endpoint = load_assignment->mutable_endpoints(0);
+        auto lb_endpoint = locality_lb_endpoint->mutable_lb_endpoints(0);
+        auto host_socket_addr =
+            lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+        host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+      }
     }
   }
 }
@@ -176,14 +193,6 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
     if (cluster->type() == envoy::api::v2::Cluster::EDS) {
       eds_hosts = true;
     } else {
-      for (int j = 0; j < cluster->hosts_size(); ++j) {
-        if (cluster->mutable_hosts(j)->has_socket_address()) {
-          auto* host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
-          RELEASE_ASSERT(ports.size() > port_idx, "");
-          host_socket_addr->set_port_value(ports[port_idx++]);
-        }
-      }
-
       // Assign ports to statically defined load_assignment hosts.
       for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
         auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);

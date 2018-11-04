@@ -46,10 +46,15 @@ static_resources:
     name: dummy_cluster
     connect_timeout: { seconds: 5 }
     type: STATIC
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: dummy_cluster
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
 admin:
