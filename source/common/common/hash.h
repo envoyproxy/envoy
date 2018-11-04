@@ -1,7 +1,11 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/string_view.h"
 #include "xxhash.h"
@@ -36,5 +40,17 @@ public:
     return hash;
   }
 };
+
+struct CharStarHash {
+  size_t operator()(const char* a) const { return HashUtil::xxHash64(a); }
+};
+
+struct CharStarEqual {
+  size_t operator()(const char* a, const char* b) const { return strcmp(a, b) == 0; }
+};
+
+template <class Value>
+using CharStarHashMap = absl::flat_hash_map<const char*, Value, CharStarHash, CharStarEqual>;
+using CharStarHashSet = absl::flat_hash_set<const char*, CharStarHash, CharStarEqual>;
 
 } // namespace Envoy

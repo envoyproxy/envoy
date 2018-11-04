@@ -449,18 +449,6 @@ TEST_P(Http2CodecImplTest, BadMetadataReceivedTest) {
                             "The user callback function failed");
 }
 
-TEST_P(Http2CodecImplTest, MetadataDisabledTest) {
-  initialize();
-  // Generates a valid stream_id by sending a request header.
-  TestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  request_encoder_->encodeHeaders(request_headers, true);
-  MetadataMap metadata_map = {{"header_key1", std::string(50 * 1024, 'a')},};
-  // Metadata is ignored.
-  EXPECT_DEATH_LOG_TO_STDERR(request_encoder_->encodeMetadata(metadata_map), "");
-}
-
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
 
 TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {

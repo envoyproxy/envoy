@@ -7,7 +7,6 @@ Configuration reference
   :maxdepth: 2
   :includehidden:
 
-  overview/v1_overview
   overview/v2_overview
   listeners/listeners
   listener_filters/listener_filters

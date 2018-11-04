@@ -1,5 +1,7 @@
 #include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
+#include <memory>
+
 #include "envoy/common/exception.h"
 #include "envoy/http/filter.h"
 
@@ -121,9 +123,9 @@ JsonTranscoderConfig::JsonTranscoderConfig(
 
   path_matcher_ = pmb.Build();
 
-  type_helper_.reset(
-      new google::grpc::transcoding::TypeHelper(Protobuf::util::NewTypeResolverForDescriptorPool(
-          Grpc::Common::typeUrlPrefix(), &descriptor_pool_)));
+  type_helper_ = std::make_unique<google::grpc::transcoding::TypeHelper>(
+      Protobuf::util::NewTypeResolverForDescriptorPool(Grpc::Common::typeUrlPrefix(),
+                                                       &descriptor_pool_));
 
   const auto print_config = proto_config.print_options();
   print_options_.add_whitespace = print_config.add_whitespace();
@@ -192,8 +194,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
       type_helper_->Resolver(), response_type_url, method_descriptor->server_streaming(),
       &response_input, print_options_)};
 
-  transcoder.reset(
-      new TranscoderImpl(std::move(request_translator), std::move(response_translator)));
+  transcoder = std::make_unique<TranscoderImpl>(std::move(request_translator),
+                                                std::move(response_translator));
   return ProtobufUtil::Status();
 }
 

@@ -3,9 +3,8 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/common/platform.h"
-
 #include "common/common/empty_string.h"
+#include "common/common/stack_array.h"
 
 namespace Envoy {
 namespace {
@@ -180,13 +179,12 @@ std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
   ret.reserve(output_length);
 
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
-  buffer.getRawSlices(slices, num_slices);
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  buffer.getRawSlices(slices.begin(), num_slices);
 
   uint64_t j = 0;
   uint8_t next_c = 0;
-  for (uint64_t i = 0; i < num_slices; i++) {
-    Buffer::RawSlice& slice = slices[i];
+  for (const Buffer::RawSlice& slice : slices) {
     const uint8_t* slice_mem = static_cast<const uint8_t*>(slice.mem_);
 
     for (uint64_t i = 0; i < slice.len_ && j < length; ++i, ++j) {

@@ -24,7 +24,6 @@
 #include "common/router/header_parser.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/router/router_ratelimit.h"
-#include "common/tcp_proxy/tcp_proxy.h"
 
 #include "absl/types/optional.h"
 
@@ -339,12 +338,6 @@ public:
   }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
-  bool useOldStyleWebSocket() const override { return websocket_config_ != nullptr; }
-  Http::WebSocketProxyPtr
-  createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-                       Http::WebSocketProxyCallbacks& callbacks,
-                       Upstream::ClusterManager& cluster_manager,
-                       Network::ReadFilterCallbacks* read_callbacks) const override;
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
@@ -356,6 +349,9 @@ public:
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
+  absl::string_view processRequestHost(const Http::HeaderMap& headers,
+                                       const absl::string_view& new_scheme,
+                                       const absl::string_view& new_port) const;
   void rewritePathHeader(Http::HeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
   const std::string& responseBody() const override { return direct_response_body_; }
@@ -437,15 +433,6 @@ private:
 
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
-    bool useOldStyleWebSocket() const override { return parent_->useOldStyleWebSocket(); }
-    Http::WebSocketProxyPtr
-    createWebSocketProxy(Http::HeaderMap& request_headers, StreamInfo::StreamInfo& stream_info,
-                         Http::WebSocketProxyCallbacks& callbacks,
-                         Upstream::ClusterManager& cluster_manager,
-                         Network::ReadFilterCallbacks* read_callbacks) const override {
-      return parent_->createWebSocketProxy(request_headers, stream_info, callbacks, cluster_manager,
-                                           read_callbacks);
-    }
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
     }
@@ -537,7 +524,6 @@ private:
   const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
                                  // to virtual host is currently safe.
   const bool auto_host_rewrite_;
-  const TcpProxy::ConfigSharedPtr websocket_config_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
   const Http::Code cluster_not_found_response_code_;
