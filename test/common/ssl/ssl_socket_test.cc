@@ -196,16 +196,10 @@ const std::string testUtilV2(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(override_server_name), nullptr);
 
-  absl::optional<std::string> client_ssl_requested_server_name;
-
   if (!client_session.empty()) {
     const Ssl::SslSocket* ssl_socket =
         dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
     SSL* client_ssl_socket = ssl_socket->rawSslForTest();
-    auto requested_server_name = SSL_get_servername(client_ssl_socket, TLSEXT_NAMETYPE_host_name);
-    if (requested_server_name != nullptr) {
-      client_ssl_requested_server_name = std::string(requested_server_name);
-    }
     SSL_CTX* client_ssl_context = SSL_get_SSL_CTX(client_ssl_socket);
     SSL_SESSION* client_ssl_session =
         SSL_SESSION_from_bytes(reinterpret_cast<const uint8_t*>(client_session.data()),
@@ -250,10 +244,6 @@ const std::string testUtilV2(
       const Ssl::SslSocket* ssl_socket =
           dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
       SSL* client_ssl_socket = ssl_socket->rawSslForTest();
-      auto requested_server_name = SSL_get_servername(client_ssl_socket, TLSEXT_NAMETYPE_host_name);
-      if (requested_server_name != nullptr) {
-        client_ssl_requested_server_name = std::string(requested_server_name);
-      }
       if (!expected_protocol_version.empty()) {
         EXPECT_EQ(expected_protocol_version, SSL_get_version(client_ssl_socket));
       }
@@ -278,15 +268,7 @@ const std::string testUtilV2(
 
   if (expect_success) {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
-          if (!expected_requested_server_name.empty()) {
-            EXPECT_TRUE(client_ssl_requested_server_name.has_value());
-            EXPECT_EQ(expected_requested_server_name, client_ssl_requested_server_name.value());
-          } else {
-            EXPECT_FALSE(client_ssl_requested_server_name.has_value());
-          }
-          stopSecondTime();
-        }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { stopSecondTime(); }));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
           EXPECT_EQ(expected_requested_server_name, server_connection->requestedServerName());
