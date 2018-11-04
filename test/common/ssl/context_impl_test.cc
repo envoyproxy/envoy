@@ -276,14 +276,12 @@ TEST_F(SslContextImplTest, TestNoCert) {
 
 class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
-  static void loadConfig(ServerContextConfigImpl& cfg, ContextManagerImpl& manager,
-                         Stats::IsolatedStoreImpl& store) {
+  void loadConfig(ServerContextConfigImpl& cfg) {
     ServerContextSharedPtr server_ctx(
-        manager.createSslServerContext(store, cfg, std::vector<std::string>{}));
+        manager_.createSslServerContext(store_, cfg, std::vector<std::string>{}));
   }
 
-  static void loadConfigV2(envoy::api::v2::auth::DownstreamTlsContext& cfg,
-                           ContextManagerImpl& manager, Stats::IsolatedStoreImpl& store) {
+  void loadConfigV2(envoy::api::v2::auth::DownstreamTlsContext& cfg) {
     // Must add a certificate for the config to be considered valid.
     envoy::api::v2::auth::TlsCertificate* server_cert =
         cfg.mutable_common_tls_context()->add_tls_certificates();
@@ -294,16 +292,15 @@ public:
 
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
     ServerContextConfigImpl server_context_config(cfg, factory_context);
-    loadConfig(server_context_config, manager, store);
+    loadConfig(server_context_config);
   }
 
-  static void loadConfigYaml(const std::string& yaml, ContextManagerImpl& manager,
-                             Stats::IsolatedStoreImpl& store) {
+  void loadConfigYaml(const std::string& yaml) {
     envoy::api::v2::auth::DownstreamTlsContext tls_context;
     MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
     ServerContextConfigImpl cfg(tls_context, factory_context);
-    loadConfig(cfg, manager, store);
+    loadConfig(cfg);
   }
 };
 
@@ -321,7 +318,7 @@ TEST_F(SslServerContextImplTicketTest, TicketKeySuccess) {
       filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
       filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_b"
 )EOF";
-  EXPECT_NO_THROW(loadConfigYaml(yaml, manager_, store_));
+  EXPECT_NO_THROW(loadConfigYaml(yaml));
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidLen) {
@@ -338,7 +335,7 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidLen) {
       filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
       filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_wrong_len"
 )EOF";
-  EXPECT_THROW(loadConfigYaml(yaml, manager_, store_), EnvoyException);
+  EXPECT_THROW(loadConfigYaml(yaml), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidCannotRead) {
@@ -353,55 +350,54 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidCannotRead) {
     keys:
       filename: "{{ test_rundir }}/test/common/ssl/test_data/this_file_does_not_exist"
 )EOF";
-  EXPECT_THROW(loadConfigYaml(yaml, manager_, store_), std::exception);
+  EXPECT_THROW(loadConfigYaml(yaml), std::exception);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyNone) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
-  EXPECT_NO_THROW(loadConfigV2(cfg, manager_, store_));
+  EXPECT_NO_THROW(loadConfigV2(cfg));
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineBytesSuccess) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(80, '\0'));
-  EXPECT_NO_THROW(loadConfigV2(cfg, manager_, store_));
+  EXPECT_NO_THROW(loadConfigV2(cfg));
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineStringSuccess) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_string(std::string(80, '\0'));
-  EXPECT_NO_THROW(loadConfigV2(cfg, manager_, store_));
+  EXPECT_NO_THROW(loadConfigV2(cfg));
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineBytesFailTooBig) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(81, '\0'));
-  EXPECT_THROW(loadConfigV2(cfg, manager_, store_), EnvoyException);
+  EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineStringFailTooBig) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_string(std::string(81, '\0'));
-  EXPECT_THROW(loadConfigV2(cfg, manager_, store_), EnvoyException);
+  EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineBytesFailTooSmall) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(79, '\0'));
-  EXPECT_THROW(loadConfigV2(cfg, manager_, store_), EnvoyException);
+  EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineStringFailTooSmall) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_string(std::string(79, '\0'));
-  EXPECT_THROW(loadConfigV2(cfg, manager_, store_), EnvoyException);
+  EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeySdsFail) {
   envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys_sds_secret_config();
-  EXPECT_THROW_WITH_MESSAGE(loadConfigV2(cfg, manager_, store_), EnvoyException,
-                            "SDS not supported yet");
+  EXPECT_THROW_WITH_MESSAGE(loadConfigV2(cfg), EnvoyException, "SDS not supported yet");
 }
 
 TEST_F(SslServerContextImplTicketTest, CRLSuccess) {
@@ -418,7 +414,7 @@ TEST_F(SslServerContextImplTicketTest, CRLSuccess) {
       crl:
         filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl"
 )EOF";
-  EXPECT_NO_THROW(loadConfigYaml(yaml, manager_, store_));
+  EXPECT_NO_THROW(loadConfigYaml(yaml));
 }
 
 TEST_F(SslServerContextImplTicketTest, CRLInvalid) {
@@ -435,7 +431,7 @@ TEST_F(SslServerContextImplTicketTest, CRLInvalid) {
       crl:
         filename: "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
 )EOF";
-  EXPECT_THROW_WITH_REGEX(loadConfigYaml(yaml, manager_, store_), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(loadConfigYaml(yaml), EnvoyException,
                           "^Failed to load CRL from .*/not_a_crl.crl$");
 }
 
@@ -451,7 +447,7 @@ TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
       crl:
         filename: "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
 )EOF";
-  EXPECT_THROW_WITH_REGEX(loadConfigYaml(yaml, manager_, store_), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(loadConfigYaml(yaml), EnvoyException,
                           "^Failed to load CRL from .* without trusted CA$");
 }
 
@@ -466,7 +462,7 @@ TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
     validation_context:
       verify_subject_alt_name: "spiffe://lyft.com/testclient"
 )EOF";
-  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml, manager_, store_), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException,
                             "SAN-based verification of peer certificates without trusted CA "
                             "is insecure and not allowed");
 }
