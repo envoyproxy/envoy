@@ -69,8 +69,7 @@ public:
     Buffer::OwnedImpl buffer_;
   };
 
-  Http2CodecImplTest()
-      : client_http2settings_(), server_http2settings_() {}
+  Http2CodecImplTest() : client_http2settings_(), server_http2settings_() {}
 
   void initialize() {
     Http2SettingsFromTuple(client_http2settings_, ::testing::get<0>(GetParam()));
@@ -79,7 +78,6 @@ public:
                                                          stats_store_, client_http2settings_);
     server_ = std::make_unique<TestServerConnectionImpl>(server_connection_, server_callbacks_,
                                                          stats_store_, server_http2settings_);
-
 
     request_encoder_ = &client_->newStream(response_decoder_);
     setupDefaultConnectionMocks();
@@ -453,15 +451,15 @@ TEST_P(Http2CodecImplTest, BadMetadataReceivedTest) {
 
 TEST_P(Http2CodecImplTest, MetadataDisabledTest) {
   initialize();
-   // Generates a valid stream_id by sending a request header.
+  // Generates a valid stream_id by sending a request header.
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
-   MetadataMap metadata_map = {
-      {"header_key1", std::string(50 * 1024, 'a')},
+  MetadataMap metadata_map = {
+    {"header_key1", std::string(50 * 1024, 'a')},
   };
-   // Metadata is ignored.
+  // Metadata is ignored.
   EXPECT_DEATH_LOG_TO_STDERR(request_encoder_->encodeMetadata(metadata_map), "");
 }
 
