@@ -61,7 +61,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.network.client_ssl_auth":            "//source/extensions/filters/network/client_ssl_auth:config",
-    "envoy.filters.network.dubbo_proxy":                "//source/extensions/filters/network/dubbo_proxy:hessian_utils_lib",
+    "envoy.filters.network.dubbo_proxy":                "//source/extensions/filters/network/dubbo_proxy:config",
     "envoy.filters.network.echo":                       "//source/extensions/filters/network/echo:config",
     "envoy.filters.network.ext_authz":                  "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.find_and_replace":           "//source/extensions/filters/network/find_and_replace:config",

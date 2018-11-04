@@ -75,3 +75,47 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
     ],
 )
+
+envoy_cc_library(
+    name = "decoder_lib",
+    srcs = ["decoder.cc"],
+    hdrs = ["decoder.h"],
+    deps = [
+        ":dubbo_protocol_impl_lib",
+        ":hessian_deserializer_impl_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_lib",
+    srcs = ["filter.cc"],
+    hdrs = ["filter.h"],
+    deps = [
+        ":decoder_lib",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+        "//include/envoy/stats:timespan",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/network:filter_lib",
+        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:dubbo_proxy_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        ":filter_lib",
+        "//include/envoy/registry",
+        "//source/extensions/filters/network:well_known_names",
+        "//source/extensions/filters/network/common:factory_base_lib",
+        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:dubbo_proxy_cc",
+    ],
+)

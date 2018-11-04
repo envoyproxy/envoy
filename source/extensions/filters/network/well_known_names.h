@@ -16,8 +16,10 @@ public:
   const std::string ClientSslAuth = "envoy.client_ssl_auth";
   // Echo filter
   const std::string Echo = "envoy.echo";
+  // Dubbo proxy filter
+  const std::string DubboProxy = "envoy.filters.network.dubbo_proxy";
   // Find and Replace filter
-  const std::string FindAndReplace = "envoy.find_and_replace";
+  const std::string FindAndReplace = "envoy.filters.network.find_and_replace";
   // HTTP connection manager filter
   const std::string HttpConnectionManager = "envoy.http_connection_manager";
   // Mongo proxy filter

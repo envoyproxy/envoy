@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.api.v2.core;
 option go_package = "core";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -186,7 +187,12 @@ message TransportSocket {
 
   // Implementation specific configuration which depends on the implementation being instantiated.
   // See the supported transport socket implementations for further documentation.
-  google.protobuf.Struct config = 2;
+  oneof config_type {
+    google.protobuf.Struct config = 2;
+
+    // [#not-implemented-hide:]
+    google.protobuf.Any typed_config = 3;
+  }
 }
 
 // Generic socket option message. This would be used to set socket options that
