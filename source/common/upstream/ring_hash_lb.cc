@@ -89,8 +89,8 @@ RingHashLoadBalancer::Ring::Ring(
   ring_.reserve(hosts.size() * hashes_per_host);
 
   const bool use_std_hash =
-      config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(), use_std_hash, true)
-             : true;
+      config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(), use_std_hash, false)
+             : false;
 
   char hash_key_buffer[196];
   for (const auto& host : hosts) {

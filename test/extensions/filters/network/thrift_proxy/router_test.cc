@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/route.pb.h"
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/route.pb.validate.h"
 #include "envoy/tcp/conn_pool.h"
@@ -86,7 +88,7 @@ public:
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    router_.reset(new Router(context_.clusterManager()));
+    router_ = std::make_unique<Router>(context_.clusterManager());
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
@@ -166,7 +168,7 @@ public:
         }));
 
     if (!conn_state_) {
-      conn_state_.reset(new ThriftConnectionState());
+      conn_state_ = std::make_unique<ThriftConnectionState>();
     }
     EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, connectionState())
         .WillRepeatedly(
@@ -739,7 +741,7 @@ TEST_F(ThriftRouterTest, CallWithExistingConnection) {
   initializeRouter();
 
   // Simulate previous sequence id usage.
-  conn_state_.reset(new ThriftConnectionState(3));
+  conn_state_ = std::make_unique<ThriftConnectionState>(3);
 
   startRequestWithExistingConnection(MessageType::Call);
   sendTrivialStruct(FieldType::I32);

@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/network/utility.h"
 
 #include "extensions/filters/common/rbac/utility.h"
@@ -42,7 +44,7 @@ public:
   }
 
   RoleBasedAccessControlNetworkFilterTest() : config_(setupConfig()) {
-    filter_.reset(new RoleBasedAccessControlFilter(config_));
+    filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
     filter_->initializeReadFilterCallbacks(callbacks_);
   }
 
@@ -98,7 +100,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, RequestedServerName) {
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithNoPolicy) {
   config_ = setupConfig(false /* with_policy */);
-  filter_.reset(new RoleBasedAccessControlFilter(config_));
+  filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
   filter_->initializeReadFilterCallbacks(callbacks_);
   setDestinationPort(0);
 

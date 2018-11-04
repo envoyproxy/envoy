@@ -45,7 +45,7 @@ protected:
    */
   void SetupForDeath() {
     InSequence s;
-    guard_dog_.reset(new GuardDogImpl(fakestats_, config_kill_, time_system_));
+    guard_dog_ = std::make_unique<GuardDogImpl>(fakestats_, config_kill_, time_system_);
     unpet_dog_ = guard_dog_->createWatchDog(0);
     guard_dog_->forceCheckForTest();
     time_system_.sleep(std::chrono::milliseconds(500));
@@ -57,7 +57,7 @@ protected:
    */
   void SetupForMultiDeath() {
     InSequence s;
-    guard_dog_.reset(new GuardDogImpl(fakestats_, config_multikill_, time_system_));
+    guard_dog_ = std::make_unique<GuardDogImpl>(fakestats_, config_multikill_, time_system_);
     auto unpet_dog_ = guard_dog_->createWatchDog(0);
     guard_dog_->forceCheckForTest();
     auto second_dog_ = guard_dog_->createWatchDog(1);

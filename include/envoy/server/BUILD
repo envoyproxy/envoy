@@ -121,6 +121,7 @@ envoy_cc_library(
     name = "worker_interface",
     hdrs = ["worker.h"],
     deps = [
+        ":overload_manager_interface",
         "//include/envoy/server:guarddog_interface",
     ],
 )
@@ -213,5 +214,6 @@ envoy_cc_library(
     hdrs = ["overload_manager.h"],
     deps = [
         "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/singleton:const_singleton",
     ],
 )

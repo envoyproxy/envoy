@@ -9,18 +9,20 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cors {
 
-Http::FilterFactoryCb CorsFilterConfig::createFilter(const std::string&,
-                                                     Server::Configuration::FactoryContext&) {
-
-  return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<CorsFilter>());
+Http::FilterFactoryCb
+CorsFilterFactory::createFilter(const std::string& stats_prefix,
+                                Server::Configuration::FactoryContext& context) {
+  CorsFilterConfigSharedPtr config =
+      std::make_shared<CorsFilterConfig>(stats_prefix, context.scope());
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<CorsFilter>(config));
   };
 }
 
 /**
  * Static registration for the cors filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<CorsFilterConfig,
+static Registry::RegisterFactory<CorsFilterFactory,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 

@@ -31,7 +31,7 @@ void SslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
   HttpIntegrationTest::initialize();
 
-  context_manager_.reset(new ContextManagerImpl(timeSystem()));
+  context_manager_ = std::make_unique<ContextManagerImpl>(timeSystem());
 
   registerTestServerPorts({"http"});
   client_ssl_ctx_plain_ = createClientSslTransportSocketFactory(false, false, *context_manager_);
