@@ -201,7 +201,7 @@ protected:
     // Get MetadataDecoder for this stream.
     MetadataDecoder& getMetadataDecoder();
     // Callback function for MetadataDecoder.
-    void onMetadataDecoded(MetadataMap& metadata_map);
+    void onMetadataDecoded(std::unique_ptr<MetadataMap> metadata_map);
 
     virtual void transformUpgradeFromH1toH2(HeaderMap& headers) PURE;
     virtual void maybeTransformUpgradeFromH2ToH1() PURE;
@@ -221,8 +221,8 @@ protected:
         [this]() -> void { this->pendingSendBufferLowWatermark(); },
         [this]() -> void { this->pendingSendBufferHighWatermark(); }};
     HeaderMapPtr pending_trailers_;
-    std::unique_ptr<MetadataDecoder> metadata_decoder_{nullptr};
-    std::unique_ptr<MetadataEncoder> metadata_encoder_{nullptr};
+    std::unique_ptr<MetadataDecoder> metadata_decoder_;
+    std::unique_ptr<MetadataEncoder> metadata_encoder_;
     absl::optional<StreamResetReason> deferred_reset_;
     HeaderString cookies_;
     bool local_end_stream_sent_ : 1;

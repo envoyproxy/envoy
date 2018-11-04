@@ -134,10 +134,9 @@ public:
     nghttp2_option_del(option_);
   }
 
-  void verifyMetadata(MetadataMap& expect) {
-    MetadataMap& metadata_map = decoder_->getMetadataMap();
-    EXPECT_EQ(metadata_map.size(), expect.size());
-    for (const auto& metadata : metadata_map) {
+  void verifyMetadata(MetadataMap& expect, std::unique_ptr<MetadataMap> metadata_map) {
+    EXPECT_EQ(metadata_map->size(), expect.size());
+    for (const auto& metadata : *metadata_map) {
       EXPECT_EQ(expect.find(metadata.first)->second, metadata.second);
     }
   }
@@ -167,7 +166,8 @@ TEST_F(MetadataEncoderDecoderTest, EncodeDecodeSmallHeaderBlock) {
   };
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map);
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map,
+                                  std::placeholders::_1);
   initialize(cb);
 
   // Creates metadata payload.
@@ -197,7 +197,8 @@ TEST_F(MetadataEncoderDecoderTest, EncodeLargeHeaderBlock) {
   };
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map);
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map,
+                                  std::placeholders::_1);
   initialize(cb);
 
   // Creates metadata payload.
@@ -234,7 +235,8 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
   };
 
   // Encode and decode the first MetadataMap.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map);
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map,
+                                  std::placeholders::_1);
   initialize(cb);
 
   encoder_.createPayload(metadata_map);
@@ -254,8 +256,8 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
   };
 
   // Encode and decode the second MetadataMap.
-  MetadataCallback cb2 =
-      std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map_2);
+  MetadataCallback cb2 = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this,
+                                   metadata_map_2, std::placeholders::_1);
   decoder_->callback_ = cb2;
   encoder_.createPayload(metadata_map_2);
   nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID, nullptr);
@@ -271,7 +273,8 @@ TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
   };
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map);
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map,
+                                  std::placeholders::_1);
   initialize(cb);
 
   // metadata_map exceeds size limit.
@@ -290,7 +293,8 @@ TEST_F(MetadataEncoderDecoderTest, TestDecodeBadData) {
   };
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map);
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map,
+                                  std::placeholders::_1);
   initialize(cb);
 
   // Generates payload.

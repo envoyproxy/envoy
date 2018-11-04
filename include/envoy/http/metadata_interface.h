@@ -19,7 +19,7 @@ const uint64_t METADATA_MAX_PAYLOAD_SIZE = 16384;
 typedef std::unordered_map<std::string, std::string> MetadataMap;
 typedef std::unique_ptr<MetadataMap> MetadataMapPtr;
 
-typedef std::function<void(MetadataMap&)> MetadataCallback;
+typedef std::function<void(std::unique_ptr<MetadataMap>)> MetadataCallback;
 
 } // namespace Http
 } // namespace Envoy

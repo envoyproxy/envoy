@@ -149,7 +149,7 @@ public:
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
-  void decodeMetadata(Http::MetadataMap&) override {}
+  void decodeMetadata(std::unique_ptr<Http::MetadataMap>) override {}
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason) override;

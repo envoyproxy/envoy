@@ -132,10 +132,8 @@ void ConnectionImpl::StreamImpl::encodeTrailers(const HeaderMap& trailers) {
 }
 
 void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMap& metadata_map) {
-  if (!parent_.allow_metadata_) {
-    ENVOY_CONN_LOG(error, "Connection doesn't allow metadata", parent_.connection_);
-    return;
-  }
+  ASSERT(parent_.allow_metadata_);
+
   getMetadataEncoder().createPayload(metadata_map);
 
   // Estimates the number of frames to generate, and breaks the while loop when the size is reached
@@ -216,7 +214,7 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
 }
 
 void ConnectionImpl::StreamImpl::submitMetadata() {
-  ASSERT(stream_id_ > -1);
+  ASSERT(stream_id_ > 0);
   uint64_t payload_size = metadata_encoder_->payload().length();
   const uint8_t flag = payload_size > METADATA_MAX_PAYLOAD_SIZE ? 0 : END_METADATA_FLAG;
   int result =
@@ -325,15 +323,16 @@ MetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
 
 MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
   if (metadata_decoder_ == nullptr) {
-    auto cb =
-        std::bind(&ConnectionImpl::StreamImpl::onMetadataDecoded, this, std::placeholders::_1);
+    auto cb = [this](std::unique_ptr<MetadataMap> metadata_map) {
+      this->onMetadataDecoded(std::move(metadata_map));
+    };
     metadata_decoder_ = std::make_unique<MetadataDecoder>(cb);
   }
   return *metadata_decoder_;
 }
 
-void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMap& metadata_map) {
-  decoder_->decodeMetadata(metadata_map);
+void ConnectionImpl::StreamImpl::onMetadataDecoded(std::unique_ptr<MetadataMap> metadata_map) {
+  decoder_->decodeMetadata(std::move(metadata_map));
 }
 
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
@@ -630,7 +629,7 @@ ssize_t ConnectionImpl::packMetadata(int32_t stream_id, uint8_t* buf, size_t len
   // NGHTTP2_MAX_PAYLOADLEN is consistent with METADATA_MAX_PAYLOAD_SIZE.
   ASSERT(len >= size_to_copy);
 
-  Buffer::OwnedImpl& p = reinterpret_cast<Buffer::OwnedImpl&>(encoder.payload());
+  Buffer::OwnedImpl& p = encoder.payload();
   p.copyOut(0, size_to_copy, buf);
 
   // Releases the payload that has been copied to nghttp2.

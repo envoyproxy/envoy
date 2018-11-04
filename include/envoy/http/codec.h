@@ -98,7 +98,7 @@ public:
    * Called with decoded METADATA.
    * @param decoded METADATA.
    */
-  virtual void decodeMetadata(MetadataMap& metadata_map) PURE;
+  virtual void decodeMetadata(std::unique_ptr<MetadataMap> metadata_map) PURE;
 };
 
 /**

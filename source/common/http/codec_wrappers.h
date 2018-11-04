@@ -45,7 +45,9 @@ public:
     onDecodeComplete();
   }
 
-  void decodeMetadata(MetadataMap& metadata_map) override { inner_.decodeMetadata(metadata_map); }
+  void decodeMetadata(std::unique_ptr<MetadataMap> metadata_map) override {
+    inner_.decodeMetadata(std::move(metadata_map));
+  }
 
 protected:
   StreamDecoderWrapper(StreamDecoder& inner) : inner_(inner) {}

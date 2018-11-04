@@ -362,7 +362,7 @@ TEST_F(Http1ServerConnectionImplTest, MetadataTest) {
   EXPECT_EQ(0U, buffer.length());
 
   MetadataMap metadata_map = {{"key", "value"}};
-  response_encoder->encodeMetadata(metadata_map);
+  EXPECT_DEATH_LOG_TO_STDERR(response_encoder->encodeMetadata(metadata_map), "");
 }
 
 TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {

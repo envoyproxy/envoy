@@ -628,9 +628,9 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithSpuriousMetadata) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
 
-  Http::MetadataMap metadata_map;
-  metadata_map.insert(std::make_pair<std::string, std::string>("key", "value"));
-  test_sessions_[0]->stream_response_callbacks_->decodeMetadata(metadata_map);
+  std::unique_ptr<Http::MetadataMap> metadata_map(new Http::MetadataMap());
+  metadata_map->insert(std::make_pair<std::string, std::string>("key", "value"));
+  test_sessions_[0]->stream_response_callbacks_->decodeMetadata(std::move(metadata_map));
 
   respond(0, "200", false, true);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());

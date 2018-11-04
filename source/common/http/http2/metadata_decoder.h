@@ -48,7 +48,7 @@ public:
    */
   Buffer::OwnedImpl& payload() { return payload_; }
 
-  MetadataMap& getMetadataMap() { return metadata_map_; }
+  MetadataMap& getMetadataMap() { return *metadata_map_; }
 
 private:
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
@@ -59,14 +59,14 @@ private:
    */
   bool decodeMetadataPayloadUsingNghttp2(bool end_metadata);
 
+  // Metadata that is currently under decoding.
+  std::unique_ptr<MetadataMap> metadata_map_;
+
   // Metadata event callback function.
   MetadataCallback callback_;
 
   // Payload received.
   Buffer::OwnedImpl payload_;
-
-  // Metadata that is currently under decoding.
-  MetadataMap metadata_map_;
 
   // Payload size limit. If the payload received exceeds the limit, fails the connection.
   const uint64_t max_payload_size_bound_ = 1024 * 1024;
