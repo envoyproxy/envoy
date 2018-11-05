@@ -709,10 +709,18 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default,
                                                               Http::Protocol::Http2, nullptr));
+  absl::optional<std::string> override_server_name;
   EXPECT_EQ(nullptr, cluster_manager_->tcpConnPoolForCluster("hello", ResourcePriority::Default,
-                                                             nullptr, absl::nullopt));
-  EXPECT_THROW(cluster_manager_->tcpConnForCluster("hello", nullptr, absl::nullopt),
+                                                             nullptr, override_server_name));
+  EXPECT_THROW(cluster_manager_->tcpConnForCluster("hello", nullptr, override_server_name),
                EnvoyException);
+
+  override_server_name = "example.com";
+  EXPECT_EQ(nullptr, cluster_manager_->tcpConnPoolForCluster("hello", ResourcePriority::Default,
+                                                             nullptr, override_server_name));
+  EXPECT_THROW(cluster_manager_->tcpConnForCluster("hello", nullptr, override_server_name),
+               EnvoyException);
+
   EXPECT_THROW(cluster_manager_->httpAsyncClientForCluster("hello"), EnvoyException);
   factory_.tls_.shutdownThread();
 }
