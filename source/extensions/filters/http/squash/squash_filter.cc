@@ -1,11 +1,13 @@
 #include "extensions/filters/http/squash/squash_filter.h"
 
-#include "envoy/common/platform.h"
+#include <memory>
+
 #include "envoy/http/codes.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
+#include "common/common/stack_array.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
@@ -146,7 +148,7 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::HeaderMap& headers, 
   request->headers().insertPath().value().setReference(POST_ATTACHMENT_PATH);
   request->headers().insertHost().value().setReference(SERVER_AUTHORITY);
   request->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-  request->body().reset(new Buffer::OwnedImpl(config_->attachmentJson()));
+  request->body() = std::make_unique<Buffer::OwnedImpl>(config_->attachmentJson());
 
   is_squashing_ = true;
   in_flight_request_ =
@@ -304,11 +306,10 @@ void SquashFilter::cleanup() {
 Json::ObjectSharedPtr SquashFilter::getJsonBody(Http::MessagePtr&& m) {
   Buffer::InstancePtr& data = m->body();
   uint64_t num_slices = data->getRawSlices(nullptr, 0);
-  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
-  data->getRawSlices(slices, num_slices);
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  data->getRawSlices(slices.begin(), num_slices);
   std::string jsonbody;
-  for (uint64_t i = 0; i < num_slices; i++) {
-    Buffer::RawSlice& slice = slices[i];
+  for (const Buffer::RawSlice& slice : slices) {
     jsonbody += std::string(static_cast<const char*>(slice.mem_), slice.len_);
   }
 

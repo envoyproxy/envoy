@@ -84,7 +84,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       tracing_config_(Tracing::EgressConfig::get()),
       route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), timeout)) {
   if (buffer_body_for_retry) {
-    buffered_body_.reset(new Buffer::OwnedImpl());
+    buffered_body_ = std::make_unique<Buffer::OwnedImpl>();
   }
 
   router_.setDecoderFilterCallbacks(*this);
@@ -198,7 +198,7 @@ void AsyncRequestImpl::initialize() {
 void AsyncRequestImpl::onComplete() { callbacks_.onSuccess(std::move(response_)); }
 
 void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
-  response_.reset(new ResponseMessageImpl(std::move(headers)));
+  response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
 
   if (end_stream) {
     onComplete();
@@ -207,7 +207,7 @@ void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
 
 void AsyncRequestImpl::onData(Buffer::Instance& data, bool end_stream) {
   if (!response_->body()) {
-    response_->body().reset(new Buffer::OwnedImpl());
+    response_->body() = std::make_unique<Buffer::OwnedImpl>();
   }
   response_->body()->move(data);
 

@@ -62,6 +62,7 @@ RpcResultPtr HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buf
   case RpcResponseType::ResponseWithValue:
   case RpcResponseType::ResponseWithNullValue:
     has_value = false;
+    FALLTHRU;
   case RpcResponseType::ResponseValueWithAttachments:
   case RpcResponseType::ResponseNullValueWithAttachments:
     result = std::make_unique<RpcResultImpl>();

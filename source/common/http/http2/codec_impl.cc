@@ -4,7 +4,6 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
@@ -14,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
@@ -124,7 +124,7 @@ void ConnectionImpl::StreamImpl::encodeTrailers(const HeaderMap& trailers) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
     ASSERT(!pending_trailers_);
-    pending_trailers_.reset(new HeaderMapImpl(trailers));
+    pending_trailers_ = std::make_unique<HeaderMapImpl>(trailers);
   } else {
     submitTrailers(trailers);
     parent_.sendPendingFrames();
@@ -340,10 +340,9 @@ ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
-  data.getRawSlices(slices, num_slices);
-  for (uint64_t i = 0; i < num_slices; i++) {
-    Buffer::RawSlice& slice = slices[i];
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  data.getRawSlices(slices.begin(), num_slices);
+  for (const Buffer::RawSlice& slice : slices) {
     dispatching_ = true;
     ssize_t rc =
         nghttp2_session_mem_recv(session_, static_cast<const uint8_t*>(slice.mem_), slice.len_);
@@ -920,7 +919,7 @@ int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   if (frame->headers.cat == NGHTTP2_HCAT_HEADERS) {
     StreamImpl* stream = getStream(frame->hd.stream_id);
     ASSERT(!stream->headers_);
-    stream->headers_.reset(new HeaderMapImpl());
+    stream->headers_ = std::make_unique<HeaderMapImpl>();
   }
 
   return 0;
@@ -954,7 +953,7 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
 
     StreamImpl* stream = getStream(frame->hd.stream_id);
     ASSERT(!stream->headers_);
-    stream->headers_.reset(new HeaderMapImpl());
+    stream->headers_ = std::make_unique<HeaderMapImpl>();
     return 0;
   }
 

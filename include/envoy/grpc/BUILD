@@ -33,6 +33,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "google_grpc_creds_interface",
     hdrs = ["google_grpc_creds.h"],
+    external_deps = [
+        "grpc",
+    ],
     deps = [
         "@envoy_api//envoy/api/v2/core:grpc_service_cc",
     ],

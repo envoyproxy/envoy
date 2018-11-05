@@ -1,11 +1,13 @@
 #include "extensions/filters/network/redis_proxy/codec_impl.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 
 namespace Envoy {
@@ -115,8 +117,8 @@ void RespValue::type(RespType type) {
 
 void DecoderImpl::decode(Buffer::Instance& data) {
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
-  data.getRawSlices(slices, num_slices);
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  data.getRawSlices(slices.begin(), num_slices);
   for (const Buffer::RawSlice& slice : slices) {
     parseSlice(slice);
   }
@@ -133,7 +135,7 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
     switch (state_) {
     case State::ValueRootStart: {
       ENVOY_LOG(trace, "parse slice: ValueRootStart");
-      pending_value_root_.reset(new RespValue());
+      pending_value_root_ = std::make_unique<RespValue>();
       pending_value_stack_.push_front({pending_value_root_.get(), 0});
       state_ = State::ValueStart;
       break;

@@ -27,6 +27,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "token_bucket_interface",
     hdrs = ["token_bucket.h"],
+    deps = [
+        ":time_interface",
+    ],
 )
 
 envoy_cc_library(

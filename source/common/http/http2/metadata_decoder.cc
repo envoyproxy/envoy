@@ -1,6 +1,7 @@
 #include "common/http/http2/metadata_decoder.h"
 
 #include "common/common/assert.h"
+#include "common/common/stack_array.h"
 
 namespace Envoy {
 namespace Http {
@@ -39,8 +40,8 @@ bool MetadataDecoder::onMetadataFrameComplete(bool end_metadata) {
 bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
   // Computes how many slices are needed to get all the data out.
   const int num_slices = payload_.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
-  payload_.getRawSlices(slices, num_slices);
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  payload_.getRawSlices(slices.begin(), num_slices);
 
   // Data consumed by nghttp2 so far.
   ssize_t payload_size_consumed = 0;

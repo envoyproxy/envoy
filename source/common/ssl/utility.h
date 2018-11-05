@@ -40,7 +40,21 @@ std::string getSubjectFromCertificate(X509& cert);
  * @param time_source the time source to use for current time calculation.
  * @return the number of days till this certificate is valid.
  */
-int32_t getDaysUntilExpiration(X509* cert, TimeSource& time_source);
+int32_t getDaysUntilExpiration(const X509* cert, TimeSource& time_source);
+
+/**
+ * Returns the time from when this certificate is valid.
+ * @param cert the certificate.
+ * @return time from when this certificate is valid.
+ */
+SystemTime getValidFrom(const X509& cert);
+
+/**
+ * Returns the time when this certificate expires.
+ * @param cert the certificate.
+ * @return time after which the certificate expires.
+ */
+SystemTime getExpirationTime(const X509& cert);
 
 } // namespace Utility
 } // namespace Ssl

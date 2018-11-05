@@ -13,8 +13,7 @@ statistics:
    downstream_cx_total, Counter, Total connections
    downstream_cx_ssl_total, Counter, Total TLS connections
    downstream_cx_http1_total, Counter, Total HTTP/1.1 connections
-   downstream_cx_upgrades_total, Counter, Total successfully upgraded connections
-   downstream_cx_websocket_total, Counter, Total WebSocket connections
+   downstream_cx_upgrades_total, Counter, Total successfully upgraded connections. These are also counted as total http1/http2 connections.
    downstream_cx_http2_total, Counter, Total HTTP/2 connections
    downstream_cx_destroy, Counter, Total connections destroyed
    downstream_cx_destroy_remote, Counter, Total connections destroyed due to remote close
@@ -25,8 +24,7 @@ statistics:
    downstream_cx_active, Gauge, Total active connections
    downstream_cx_ssl_active, Gauge, Total active TLS connections
    downstream_cx_http1_active, Gauge, Total active HTTP/1.1 connections
-   downstream_cx_upgrades_active, Gauge, Total active upgraded connections
-   downstream_cx_websocket_active, Gauge, Total active WebSocket connections
+   downstream_cx_upgrades_active, Gauge, Total active upgraded connections. These are also counted as active http1/http2 connections.
    downstream_cx_http2_active, Gauge, Total active HTTP/2 connections
    downstream_cx_protocol_error, Counter, Total protocol errors
    downstream_cx_length_ms, Histogram, Connection length milliseconds
