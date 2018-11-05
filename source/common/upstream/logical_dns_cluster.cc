@@ -31,8 +31,8 @@ LogicalDnsCluster::LogicalDnsCluster(
       local_info_(factory_context.localInfo()), load_assignment_(cluster.load_assignment()) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
-      throw EnvoyException(
-          "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+    throw EnvoyException(
+        "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
   }
 
   switch (cluster.dns_lookup_family()) {
