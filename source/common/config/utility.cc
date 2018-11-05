@@ -267,22 +267,5 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
   return async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }
 
-envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
-    const std::string& cluster_name,
-    const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts) {
-  envoy::api::v2::ClusterLoadAssignment load_assignment;
-  load_assignment.set_cluster_name(cluster_name);
-  envoy::api::v2::endpoint::LocalityLbEndpoints* locality_lb_endpoints =
-      load_assignment.add_endpoints();
-  // Since this LocalityLbEndpoints is built from hosts list, set the default weight to 1.
-  locality_lb_endpoints->mutable_load_balancing_weight()->set_value(1);
-  for (const envoy::api::v2::core::Address& host : hosts) {
-    envoy::api::v2::endpoint::LbEndpoint* lb_endpoint = locality_lb_endpoints->add_lb_endpoints();
-    lb_endpoint->mutable_endpoint()->mutable_address()->MergeFrom(host);
-    lb_endpoint->mutable_load_balancing_weight()->set_value(1);
-  }
-  return load_assignment;
-}
-
 } // namespace Config
 } // namespace Envoy

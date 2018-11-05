@@ -156,35 +156,21 @@ message Cluster {
   // when picking a host in the cluster.
   LbPolicy lb_policy = 6 [(validate.rules).enum.defined_only = true];
 
-  // If the service discovery type is
-  // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,
-  // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
-  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
-  // then hosts is required.
-  //
-  // .. attention::
-  //
-  //   **This field is deprecated**. Set the
-  //   :ref:`load_assignment<envoy_api_field_Cluster.load_assignment>` field instead.
-  //
-  repeated core.Address hosts = 7 [deprecated = true];
+  reserved 7; // hosts is deprecated by :ref:`load_assignment
+              // <envoy_api_field_Cluster.load_assignment>`
 
   // Setting this is required for specifying members of
   // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
   // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>` clusters.
-  // This field supersedes :ref:`hosts<envoy_api_field_Cluster.hosts>` field.
-  // [#comment:TODO(dio): Deprecate the hosts field and add it to DEPRECATED.md
-  // once load_assignment is implemented.]
   //
-  // .. attention::
+  // .. note::
   //
   //   Setting this allows non-EDS cluster types to contain embedded EDS equivalent
   //   :ref:`endpoint assignments<envoy_api_msg_ClusterLoadAssignment>`.
-  //   Setting this overrides :ref:`hosts<envoy_api_field_Cluster.hosts>` values.
   //
-  // [(validate.rules).message.required = true, (gogoproto.nullable) = false];
-  ClusterLoadAssignment load_assignment = 33;
+  ClusterLoadAssignment load_assignment = 33
+      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
 
   // Optional :ref:`active health checking <arch_overview_health_checking>`
   // configuration for the cluster. If no
