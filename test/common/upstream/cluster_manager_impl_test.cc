@@ -1716,10 +1716,18 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_NE(tcp2_example_com, tcp1_high);
   EXPECT_NE(tcp2_example_com, tcp2_high);
 
+  EXPECT_CALL(factory_.tls_.dispatcher_, deferredDelete_(_)).Times(10);
+
   Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb;
   EXPECT_CALL(*tcp1, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
   Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb_high;
   EXPECT_CALL(*tcp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb_high));
+
+  Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb_example_com;
+  EXPECT_CALL(*tcp1_example_com, addDrainedCallback(_))
+      .WillOnce(SaveArg<0>(&tcp_drained_cb_example_com));
+  Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb_ibm_com;
+  EXPECT_CALL(*tcp1_ibm_com, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb_ibm_com));
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->callback_();
@@ -1728,11 +1736,14 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   drained_cb = nullptr;
   tcp_drained_cb();
   tcp_drained_cb = nullptr;
-  EXPECT_CALL(factory_.tls_.dispatcher_, deferredDelete_(_)).Times(8);
   drained_cb_high();
   drained_cb_high = nullptr;
   tcp_drained_cb_high();
   tcp_drained_cb_high = nullptr;
+  tcp_drained_cb_example_com();
+  tcp_drained_cb_example_com = nullptr;
+  tcp_drained_cb_ibm_com();
+  tcp_drained_cb_ibm_com = nullptr;
 
   // Make sure we get back the same connection pool for the 2nd host as we did before the change.
   Http::ConnectionPool::MockInstance* cp3 =
