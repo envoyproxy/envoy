@@ -35,7 +35,7 @@ namespace Envoy {
 OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                          const HotRestartVersionCb& hot_restart_version_cb,
                          spdlog::level::level_enum default_log_level)
-    : v2_config_only_(true) {
+    : v2_config_only_(true), signal_handling_enabled_(true) {
   std::string log_levels_string = "Log levels: ";
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
     log_levels_string += fmt::format("[{}]", spdlog::level::level_names[i]);
@@ -257,7 +257,7 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       log_format_(Logger::Logger::DEFAULT_LOG_FORMAT), restart_epoch_(0u),
       service_cluster_(service_cluster), service_node_(service_node), service_zone_(service_zone),
       file_flush_interval_msec_(10000), drain_time_(600), parent_shutdown_time_(900),
-      mode_(Server::Mode::Serve), max_stats_(ENVOY_DEFAULT_MAX_STATS),
-      hot_restart_disabled_(false) {}
+      mode_(Server::Mode::Serve), max_stats_(ENVOY_DEFAULT_MAX_STATS), hot_restart_disabled_(false),
+      signal_handling_enabled_(true) {}
 
 } // namespace Envoy
