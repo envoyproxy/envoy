@@ -3,10 +3,9 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/common/platform.h"
-
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
+#include "common/common/stack_array.h"
 
 #include "event2/buffer.h"
 
@@ -36,10 +35,9 @@ void OwnedImpl::add(const std::string& data) {
 
 void OwnedImpl::add(const Instance& data) {
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  STACK_ALLOC_ARRAY(slices, RawSlice, num_slices);
-  data.getRawSlices(slices, num_slices);
-  for (uint64_t i = 0; i < num_slices; i++) {
-    RawSlice& slice = slices[i];
+  STACK_ARRAY(slices, RawSlice, num_slices);
+  data.getRawSlices(slices.begin(), num_slices);
+  for (const RawSlice& slice : slices) {
     add(slice.mem_, slice.len_);
   }
 }
@@ -116,7 +114,7 @@ Api::SysCallIntResult OwnedImpl::read(int fd, uint64_t max_length) {
   constexpr uint64_t MaxSlices = 2;
   RawSlice slices[MaxSlices];
   const uint64_t num_slices = reserve(max_length, slices, MaxSlices);
-  STACK_ALLOC_ARRAY(iov, iovec, num_slices);
+  STACK_ARRAY(iov, iovec, num_slices);
   uint64_t num_slices_to_read = 0;
   uint64_t num_bytes_to_read = 0;
   for (; num_slices_to_read < num_slices && num_bytes_to_read < max_length; num_slices_to_read++) {
@@ -130,7 +128,7 @@ Api::SysCallIntResult OwnedImpl::read(int fd, uint64_t max_length) {
   ASSERT(num_bytes_to_read <= max_length);
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSizeResult result =
-      os_syscalls.readv(fd, iov, static_cast<int>(num_slices_to_read));
+      os_syscalls.readv(fd, iov.begin(), static_cast<int>(num_slices_to_read));
   if (result.rc_ < 0) {
     return {static_cast<int>(result.rc_), result.errno_};
   }
@@ -171,7 +169,7 @@ Api::SysCallIntResult OwnedImpl::write(int fd) {
   constexpr uint64_t MaxSlices = 16;
   RawSlice slices[MaxSlices];
   const uint64_t num_slices = std::min(getRawSlices(slices, MaxSlices), MaxSlices);
-  STACK_ALLOC_ARRAY(iov, iovec, num_slices);
+  STACK_ARRAY(iov, iovec, num_slices);
   uint64_t num_slices_to_write = 0;
   for (uint64_t i = 0; i < num_slices; i++) {
     if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
@@ -184,7 +182,7 @@ Api::SysCallIntResult OwnedImpl::write(int fd) {
     return {0, 0};
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result = os_syscalls.writev(fd, iov, num_slices_to_write);
+  const Api::SysCallSizeResult result = os_syscalls.writev(fd, iov.begin(), num_slices_to_write);
   if (result.rc_ > 0) {
     drain(static_cast<uint64_t>(result.rc_));
   }
@@ -201,17 +199,15 @@ OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, 
 
 std::string OwnedImpl::toString() const {
   uint64_t num_slices = getRawSlices(nullptr, 0);
-  STACK_ALLOC_ARRAY(slices, RawSlice, num_slices);
-  getRawSlices(slices, num_slices);
+  STACK_ARRAY(slices, RawSlice, num_slices);
+  getRawSlices(slices.begin(), num_slices);
   size_t len = 0;
-  for (uint64_t i = 0; i < num_slices; i++) {
-    RawSlice& slice = slices[i];
+  for (const RawSlice& slice : slices) {
     len += slice.len_;
   }
   std::string output;
   output.reserve(len);
-  for (uint64_t i = 0; i < num_slices; i++) {
-    RawSlice& slice = slices[i];
+  for (const RawSlice& slice : slices) {
     output.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 

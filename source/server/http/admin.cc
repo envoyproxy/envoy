@@ -14,6 +14,7 @@
 #include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/admin/v2alpha/memory.pb.h"
+#include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
@@ -132,6 +133,8 @@ const char AdminHtmlEnd[] = R"(
   </table>
 </body>
 )";
+
+const std::regex PromRegex("[^a-zA-Z0-9_]");
 
 void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_map) {
   header_map.insertStatus().value(std::to_string(enumToInt(code)));
@@ -516,14 +519,19 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
   time_t current_time = time(nullptr);
-  response.add(fmt::format("envoy {} {} {} {} {}\n", VersionInfo::version(),
-                           server_.healthCheckFailed() ? "draining" : "live",
-                           current_time - server_.startTimeCurrentEpoch(),
-                           current_time - server_.startTimeFirstEpoch(),
-                           server_.options().restartEpoch()));
+  envoy::admin::v2alpha::ServerInfo server_info;
+  server_info.set_version(VersionInfo::version());
+  server_info.set_state(server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
+                                                    : envoy::admin::v2alpha::ServerInfo::LIVE);
+  server_info.mutable_uptime_current_epoch()->set_seconds(current_time -
+                                                          server_.startTimeCurrentEpoch());
+  server_info.mutable_uptime_all_epochs()->set_seconds(current_time -
+                                                       server_.startTimeFirstEpoch());
+  response.add(MessageUtil::getJsonStringFromMessage(server_info, true, true));
+  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
   return Http::Code::OK;
 }
 
@@ -594,10 +602,14 @@ Http::Code AdminImpl::handlerPrometheusStats(absl::string_view, Http::HeaderMap&
 }
 
 std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
-  std::string stats_name = name;
-  std::replace(stats_name.begin(), stats_name.end(), '.', '_');
-  std::replace(stats_name.begin(), stats_name.end(), '-', '_');
-  return stats_name;
+  // The name must match the regex [a-zA-Z_][a-zA-Z0-9_]* as required by
+  // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
+  std::string stats_name = std::regex_replace(name, PromRegex, "_");
+  if (stats_name[0] >= '0' && stats_name[0] <= '9') {
+    return fmt::format("_{}", stats_name);
+  } else {
+    return stats_name;
+  }
 }
 
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
@@ -612,7 +624,7 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extractedNam
   // Add namespacing prefix to avoid conflicts, as per best practice:
   // https://prometheus.io/docs/practices/naming/#metric-names
   // Also, naming conventions on https://prometheus.io/docs/concepts/data_model/
-  return fmt::format("envoy_{0}", sanitizeName(extractedName));
+  return sanitizeName(fmt::format("envoy_{0}", extractedName));
 }
 
 // TODO(ramaraochavali): Add summary histogram output for Prometheus.
@@ -964,6 +976,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
       },
+      date_provider_(server.dispatcher().timeSystem()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,

@@ -258,6 +258,7 @@ envoy_cc_test_library(
     data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
         ":server_stats_interface",
+        ":tcp_dump",
         "//include/envoy/api:api_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -476,7 +477,6 @@ envoy_cc_test(
         "//source/common/ssl:context_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/transport_sockets/ssl:config",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
@@ -532,7 +532,6 @@ envoy_cc_test(
         "//source/common/ssl:context_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/transport_sockets/ssl:config",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
@@ -577,6 +576,16 @@ envoy_cc_test(
         "//test/server:utility_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "tcp_dump",
+    srcs = ["tcp_dump.cc"],
+    hdrs = ["tcp_dump.h"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:fmt_lib",
     ],
 )
 

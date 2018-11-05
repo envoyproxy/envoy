@@ -1,4 +1,9 @@
+#pragma once
+
+#include <memory>
+
 #include "extensions/filters/http/jwt_authn/authenticator.h"
+#include "extensions/filters/http/jwt_authn/verifier.h"
 
 #include "test/mocks/upstream/mocks.h"
 
@@ -19,12 +24,12 @@ public:
 
 class MockAuthenticator : public Authenticator {
 public:
-  MOCK_METHOD3(doVerify, void(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>* tokens,
-                              std::function<void(const ::google::jwt_verify::Status&)> callback));
+  MOCK_METHOD4(doVerify, void(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>* tokens,
+                              SetPayloadCallback set_payload_cb, AuthenticatorCallback callback));
 
   void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
-              AuthenticatorCallback callback) {
-    doVerify(headers, &tokens, std::move(callback));
+              SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
+    doVerify(headers, &tokens, std::move(set_payload_cb), std::move(callback));
   }
 
   MOCK_METHOD0(onDestroy, void());
@@ -32,6 +37,7 @@ public:
 
 class MockVerifierCallbacks : public Verifier::Callbacks {
 public:
+  MOCK_METHOD1(setPayload, void(const ProtobufWkt::Struct& payload));
   MOCK_METHOD1(onComplete, void(const Status& status));
 };
 
@@ -57,7 +63,7 @@ public:
                                   -> Http::AsyncClient::Request* {
           Http::MessagePtr response_message(new Http::ResponseMessageImpl(
               Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-          response_message->body().reset(new Buffer::OwnedImpl(response_body_));
+          response_message->body() = std::make_unique<Buffer::OwnedImpl>(response_body_);
           cb.onSuccess(std::move(response_message));
           called_count_++;
           return &request_;

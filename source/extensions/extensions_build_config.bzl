@@ -61,7 +61,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.network.client_ssl_auth":            "//source/extensions/filters/network/client_ssl_auth:config",
-    "envoy.filters.network.dubbo_proxy":                "//source/extensions/filters/network/dubbo_proxy:hessian_utils_lib",
+    "envoy.filters.network.dubbo_proxy":                "//source/extensions/filters/network/dubbo_proxy:config",
     "envoy.filters.network.echo":                       "//source/extensions/filters/network/echo:config",
     "envoy.filters.network.ext_authz":                  "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.http_connection_manager":    "//source/extensions/filters/network/http_connection_manager:config",
@@ -108,15 +108,14 @@ EXTENSIONS = {
     # Transport sockets
     #
 
-    # TODO(lizan): switch to config target once a transport socket exists
-    "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:tsi_handshaker",
+    "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
     "envoy.transport_sockets.capture":                  "//source/extensions/transport_sockets/capture:config",
 
     # Retry host predicates
-    "envoy.retry_host_predicates.other_hosts":          "//source/extensions/retry/host/other_hosts:config",
+    "envoy.retry_host_predicates.previous_hosts":          "//source/extensions/retry/host/previous_hosts:config",
 
     # Retry priorities
-    "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/other_priority:config",
+    "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/previous_priorities:config",
 }
 
 WINDOWS_EXTENSIONS = {

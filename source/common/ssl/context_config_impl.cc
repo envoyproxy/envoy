@@ -95,7 +95,6 @@ ContextConfigImpl::ContextConfigImpl(
     const envoy::api::v2::auth::CommonTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
-      alt_alpn_protocols_(config.deprecated_v1().alt_alpn_protocols()),
       cipher_suites_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), DEFAULT_CIPHER_SUITES)),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(

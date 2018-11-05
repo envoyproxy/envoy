@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/subscription.h"
 
@@ -68,7 +70,8 @@ public:
     stats_.update_attempt_.inc();
     request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
     request.headers().insertPath().value(path_);
-    request.body().reset(new Buffer::OwnedImpl(MessageUtil::getJsonStringFromMessage(request_)));
+    request.body() =
+        std::make_unique<Buffer::OwnedImpl>(MessageUtil::getJsonStringFromMessage(request_));
     request.headers().insertContentType().value().setReference(
         Http::Headers::get().ContentTypeValues.Json);
     request.headers().insertContentLength().value(request.body()->length());

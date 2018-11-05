@@ -1,7 +1,7 @@
 .. _config_overview_v2:
 
-Overview (v2 API)
-=================
+Overview
+========
 
 The Envoy v2 APIs are defined as `proto3
 <https://developers.google.com/protocol-buffers/docs/proto3>`_ `Protocol Buffers
@@ -107,7 +107,7 @@ Mostly static with dynamic EDS
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A bootstrap config that continues from the above example with :ref:`dynamic endpoint
-discovery <arch_overview_dynamic_config_sds>` via an
+discovery <arch_overview_dynamic_config_eds>` via an
 :ref:`EDS<envoy_api_file_envoy/api/v2/eds.proto>` gRPC management server listening
 on 127.0.0.3:5678 is provided below:
 

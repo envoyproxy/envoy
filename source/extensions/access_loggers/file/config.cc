@@ -1,5 +1,6 @@
 #include "extensions/access_loggers/file/config.h"
 
+#include <memory>
 #include <unordered_map>
 
 #include "envoy/config/accesslog/v2/file.pb.validate.h"
@@ -32,12 +33,12 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
     if (fal_config.format().empty()) {
       formatter = AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter();
     } else {
-      formatter.reset(new AccessLog::FormatterImpl(fal_config.format()));
+      formatter = std::make_unique<AccessLog::FormatterImpl>(fal_config.format());
     }
   } else if (fal_config.access_log_format_case() ==
              envoy::config::accesslog::v2::FileAccessLog::kJsonFormat) {
     auto json_format_map = this->convertJsonFormatToMap(fal_config.json_format());
-    formatter.reset(new AccessLog::JsonFormatterImpl(json_format_map));
+    formatter = std::make_unique<AccessLog::JsonFormatterImpl>(json_format_map);
   } else {
     throw EnvoyException(
         "Invalid access_log format provided. Only 'format' and 'json_format' are supported.");

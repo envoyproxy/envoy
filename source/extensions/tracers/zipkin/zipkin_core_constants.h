@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/http/header_map.h"
+
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -30,11 +32,14 @@ public:
   const std::string SERVER_ADDR = "sa";
 
   // Zipkin B3 headers
-  const std::string X_B3_TRACE_ID = "X-B3-TraceId";
-  const std::string X_B3_SPAN_ID = "X-B3-SpanId";
-  const std::string X_B3_PARENT_SPAN_ID = "X-B3-ParentSpanId";
-  const std::string X_B3_SAMPLED = "X-B3-Sampled";
-  const std::string X_B3_FLAGS = "X-B3-Flags";
+  const Http::LowerCaseString X_B3_TRACE_ID{"X-B3-TraceId"};
+  const Http::LowerCaseString X_B3_SPAN_ID{"X-B3-SpanId"};
+  const Http::LowerCaseString X_B3_PARENT_SPAN_ID{"X-B3-ParentSpanId"};
+  const Http::LowerCaseString X_B3_SAMPLED{"X-B3-Sampled"};
+  const Http::LowerCaseString X_B3_FLAGS{"X-B3-Flags"};
+
+  // Zipkin b3 single header
+  const Http::LowerCaseString B3{"b3"};
 
   const std::string SAMPLED = "1";
   const std::string NOT_SAMPLED = "0";
