@@ -17,6 +17,7 @@ SOURCE_VERSION
 tags
 TAGS
 /test/coverage/BUILD
+/tools/deprecate_version/build
 .vimrc
 .vs
 .vscode
