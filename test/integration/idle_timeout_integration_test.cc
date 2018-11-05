@@ -12,18 +12,18 @@ public:
             -> void {
           if (enable_global_idle_timeout_) {
             hcm.mutable_stream_idle_timeout()->set_seconds(0);
-            hcm.mutable_stream_idle_timeout()->set_nanos(TimeoutMs * 1000 * 1000);
+            hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
           }
           if (enable_per_stream_idle_timeout_) {
             auto* route_config = hcm.mutable_route_config();
             auto* virtual_host = route_config->mutable_virtual_hosts(0);
             auto* route = virtual_host->mutable_routes(0)->mutable_route();
             route->mutable_idle_timeout()->set_seconds(0);
-            route->mutable_idle_timeout()->set_nanos(TimeoutMs * 1000 * 1000);
+            route->mutable_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
           }
           if (enable_request_timeout_) {
             hcm.mutable_request_timeout()->set_seconds(0);
-            hcm.mutable_request_timeout()->set_nanos(TimeoutMs * 1000 * 1000);
+            hcm.mutable_request_timeout()->set_nanos(RequestTimeoutMs * 1000 * 1000);
           }
 
           // For validating encode100ContinueHeaders() timer kick.
@@ -53,7 +53,7 @@ public:
     return response;
   }
 
-  void sleep() { test_time_.timeSystem().sleep(std::chrono::milliseconds(TimeoutMs / 2)); }
+  void sleep() { test_time_.timeSystem().sleep(std::chrono::milliseconds(IdleTimeoutMs / 2)); }
 
   void waitForTimeout(IntegrationStreamDecoder& response, absl::string_view stat_name = "",
                       absl::string_view stat_prefix = "http.config_test") {
@@ -70,7 +70,8 @@ public:
 
   // TODO(htuch): This might require scaling for TSAN/ASAN/Valgrind/etc. Bump if
   // this is the cause of flakes.
-  static constexpr uint64_t TimeoutMs = 200;
+  static constexpr uint64_t IdleTimeoutMs = 200;
+  static constexpr uint64_t RequestTimeoutMs = 100;
   bool enable_global_idle_timeout_{false};
   bool enable_per_stream_idle_timeout_{false};
   bool enable_request_timeout_{false};
@@ -220,7 +221,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnBodilessPost) {
   EXPECT_EQ("request timeout", response->body());
 }
 
-TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTrigger) {
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTriggerOnBodilessPost) {
   enable_request_timeout_ = false;
   // with no request timeout configured, the idle timeout triggers instead
   enable_per_stream_idle_timeout_ = true;
@@ -236,7 +237,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTrigger) {
   EXPECT_NE("request timeout", response->body());
 }
 
-TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnIncompleteRequestWithHeaders) {
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestWithHeaders) {
   if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
     return;
   }
@@ -250,7 +251,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnIncompleteRequestWith
   EXPECT_THAT(raw_response, testing::HasSubstr("request timeout"));
 }
 
-TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnCompleteRequestWithHeaders) {
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnRawCompleteRequestWithHeaders) {
   if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
     return;
   }
@@ -262,6 +263,20 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnCompleteRequest
   std::string raw_response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\n\n", &raw_response, true);
   EXPECT_THAT(raw_response, testing::Not(testing::HasSubstr("request timeout")));
+}
+
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsDisarmedByPrematureEncodeHeaders) {
+  enable_request_timeout_ = true;
+  enable_per_stream_idle_timeout_ = true;
+
+  auto response = setupPerStreamIdleTimeoutTest("POST");
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+
+  waitForTimeout(*response);
+
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_FALSE(response->complete());
+  EXPECT_NE("request timeout", response->body());
 }
 
 // TODO(auni53) create a test filter that hangs and does not send data upstream, which would
