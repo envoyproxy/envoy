@@ -80,7 +80,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         headers->addCopy(key, header.second);
       }
     } else {
-      // Since the prefix list will be most likely small or even empty, O(2) should be ok here.
+      // Performance should be ok here, since the prefix list will be small or empty in most cases.
       for (const auto& prefix : allowed_request_headers_prefix_) {
         if (StringUtil::startsWith(key.get().c_str(), prefix.get(), true)) {
           headers->addCopy(key, header.second);

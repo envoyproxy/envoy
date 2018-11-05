@@ -46,17 +46,19 @@ message ExtAuthz {
 //
 // A successful check allows the authorization service adding or overriding headers from the
 // original request before dispatching it to the upstream. This is done by configuring which headers
-// in the authorization response should be sent to the upstream. See *allowed_upstream_headers* in
-// the AuthorizationResponse for more details.
+// in the authorization response should be sent to the upstream. See :ref:`allowed_upstream_headers
+// <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_upstream_headers>`
+// for more details.
 //
 // A failed check will cause this filter to close the HTTP request with 403 (Forbidden),
 // unless a different status code has been indicated by the authorization server via response
 // headers. In addition to the the status code, the filter will send all headers from the
-// authorization server back to the client by default. See *allowed_client_headers* in the
-// AuthorizationResponse for more details.
+// authorization server back to the client by default. See :ref:`allowed_client_headers
+// <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_client_headers>`
+// for more details.
 //
-// IMPORTANT: Unlike the gRPC client that request and response headers are passed via message body,
-// headers forwarded by the raw HTTP client will directly affect the servers or the clients.
+// IMPORTANT: Unlike the gRPC client that request and response headers are passed in the message,
+// headers forwarded by via the raw HTTP client will affect the request.
 //
 // If an error happens during the checking process, two situations may occur depending on the
 // filter's configuration:
@@ -81,10 +83,10 @@ message HttpService {
   reserved 5;
   reserved 6;
 
-  // Settings for controlling request headers forwared from the filter to the authorization server.
+  // Settings for controlling request headers forwarded from the filter to the authorization server.
   AuthorizationRequest authorization_request = 7;
 
-  // Settings for controlling authorization response forwared from the filter to a client,
+  // Settings for controlling authorization response forwarded from the filter to a client,
   // or to an upstream service.
   AuthorizationResponse authorization_response = 8;
 }
