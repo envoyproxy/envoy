@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 
-# Trace driver for LightStep (https://lightstep.com/)
+# Trace driver for Datadog (https://datadoghq.com/)
 
 load(
     "//bazel:envoy_build_system.bzl",
@@ -11,14 +11,14 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "lightstep_tracer_lib",
+    name = "datadog_tracer_lib",
     srcs = [
-        "lightstep_tracer_impl.cc",
+        "datadog_tracer_impl.cc",
     ],
     hdrs = [
-        "lightstep_tracer_impl.h",
+        "datadog_tracer_impl.h",
     ],
-    external_deps = ["lightstep"],
+    external_deps = ["dd_opentracing_cpp"],
     deps = [
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers:well_known_names",
@@ -32,7 +32,7 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":lightstep_tracer_lib",
+        ":datadog_tracer_lib",
         "//source/extensions/tracers:well_known_names",
         "//source/server:configuration_lib",
     ],
