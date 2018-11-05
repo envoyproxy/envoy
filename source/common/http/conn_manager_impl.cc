@@ -979,7 +979,6 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     ActiveStreamEncoderFilter* filter, HeaderMap& headers) {
   resetIdleTimer();
-  disarmRequestTimeout();
 
   ASSERT(connection_manager_.config_.proxy100Continue());
   // Make sure commonContinue continues encode100ContinueHeaders.
