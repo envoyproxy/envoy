@@ -247,6 +247,23 @@ const std::string testUtilV2(
       if (!expected_protocol_version.empty()) {
         EXPECT_EQ(expected_protocol_version, SSL_get_version(client_ssl_socket));
       }
+
+      absl::optional<std::string> server_ssl_requested_server_name;
+      const Ssl::SslSocket* server_ssl_socket =
+          dynamic_cast<const Ssl::SslSocket*>(server_connection->ssl());
+      SSL* server_ssl = server_ssl_socket->rawSslForTest();
+      auto requested_server_name = SSL_get_servername(server_ssl, TLSEXT_NAMETYPE_host_name);
+      if (requested_server_name != nullptr) {
+        server_ssl_requested_server_name = std::string(requested_server_name);
+      }
+
+      if (!expected_requested_server_name.empty()) {
+        EXPECT_TRUE(server_ssl_requested_server_name.has_value());
+        EXPECT_EQ(expected_requested_server_name, server_ssl_requested_server_name.value());
+      } else {
+        EXPECT_FALSE(server_ssl_requested_server_name.has_value());
+      }
+
       SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_socket);
       EXPECT_TRUE(SSL_SESSION_is_resumable(client_ssl_session));
       uint8_t* session_data;
