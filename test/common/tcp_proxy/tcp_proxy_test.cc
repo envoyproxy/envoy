@@ -1178,12 +1178,16 @@ TEST_F(TcpProxyRoutingTest, ForwardRequestedServerName) {
   ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 
-  absl::optional<std::string> override_server_name = "www.example.com";
-
   // Expect filter to try to open a connection to a cluster with the override_server_name
-  EXPECT_CALL(factory_context_.cluster_manager_,
-              tcpConnPoolForCluster("fake_cluster", _, _, override_server_name))
-      .WillOnce(Return(nullptr));
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _, _))
+      .WillOnce(Invoke(
+          [](const std::string& cluster, ResourcePriority, LoadBalancerContext,
+             absl::optional<std::string> override_server_name) -> Tcp::ConnectionPool::Instance* {
+            EXPECT_EQ(cluster, "fake_cluster");
+            EXPECT_TRUE(override_server_name.has_value());
+            EXPECT_EQ(override_server_name.value(), "www.example.com");
+            return nullptr;
+          }));
 
   // Port 9999 is within the specified destination port range.
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
