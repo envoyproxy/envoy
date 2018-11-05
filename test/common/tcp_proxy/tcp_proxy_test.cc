@@ -1171,7 +1171,7 @@ TEST_F(TcpProxyRoutingTest, ForwardRequestedServerName) {
   setup();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filterState().setData("envoy.tcp_proxy.forward_requested_server_name",
+  stream_info.filterState().setData("envoy.stream_info.forward_requested_server_name",
                                     std::make_unique<ForwardRequestedServerName>("www.example.com"),
                                     StreamInfo::FilterState::StateType::ReadOnly);
 
