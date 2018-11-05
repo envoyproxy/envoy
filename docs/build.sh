@@ -38,7 +38,7 @@ mkdir -p "${DOCS_OUTPUT_DIR}"
 rm -rf "${GENERATED_RST_DIR}"
 mkdir -p "${GENERATED_RST_DIR}"
 
-source_venv $BUILD_DIR
+source_venv "$BUILD_DIR"
 pip install -r "${SCRIPT_DIR}"/requirements.txt
 
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \

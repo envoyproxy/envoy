@@ -5,10 +5,10 @@
 set -e
 
 SCRIPT_DIR=$(realpath "$(dirname "$0")")
-BUILD_DIR=$SCRIPT_DIR/build
-VENV_DIR=$BUILD_DIR/deprecate_version
+BUILD_DIR="$SCRIPT_DIR"/build
+VENV_DIR="$BUILD_DIR"/deprecate_version
 
-source_venv $VENV_DIR
+source_venv "$VENV_DIR"
 pip install -r "${SCRIPT_DIR}"/requirements.txt
 
 python "${SCRIPT_DIR}/deprecate_version.py" $*
