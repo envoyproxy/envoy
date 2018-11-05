@@ -3,7 +3,7 @@
 set -e
 
 VENV_DIR="pyformat"
-SCRIPTPATH=$( cd "$(dirname "$0")" ; pwd -P )
+SCRIPTPATH=$(realpath "$(dirname $0)")
 cd "$SCRIPTPATH"
 
 if [ "${CIRCLECI}" != "true" ]; then

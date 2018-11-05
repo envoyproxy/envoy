@@ -9,7 +9,11 @@ EXCLUDE_LIST = ['pyformat']
 
 
 def collectFiles():
-  """Collect all Python files in the tools directory."""
+  """Collect all Python files in the tools directory.
+
+  Returns: A collection of python files in the tools directory excluding
+    any directories in the EXCLUDE_LIST constant.
+  """
   # TODO: Add ability to collect a specific file or files.
   matches = []
   for root, dirnames, filenames in os.walk('.'):
