@@ -59,11 +59,15 @@ public:
         TestEnvironment::getOptionalEnvVar("ROUTE_CORPUS_PATH");
     if (corpus_path) {
       static uint32_t n;
+      const uint32_t max_test_cases =
+          std::atoi(TestEnvironment::getCheckedEnvVar("ROUTE_CORPUS_MAX").c_str());
       test::common::router::RouteTestCase route_test_case;
       route_test_case.mutable_config()->MergeFrom(config_);
       route_test_case.mutable_headers()->MergeFrom(Fuzz::toHeaders(headers));
       route_test_case.set_random_value(random_value);
-      const std::string path = fmt::format("{}/config_impl_test_{}", corpus_path.value(), n++);
+      RELEASE_ASSERT(n < max_test_cases,
+                     "ROUTE_CORPUS_MAX is too low, consider increasing in build rule");
+      const std::string path = fmt::format("{}/generated_corpus_{}", corpus_path.value(), n++);
       const std::string corpus = route_test_case.DebugString();
       {
         std::ofstream corpus_file(path);
@@ -1427,8 +1431,7 @@ public:
 
   ConfigImpl& config() {
     if (config_ == nullptr) {
-      config_ = std::unique_ptr<TestConfigImpl>{
-          new TestConfigImpl(route_config_, factory_context_, true)};
+      config_ = std::make_unique<TestConfigImpl>(route_config_, factory_context_, true);
     }
     return *config_;
   }
@@ -3836,8 +3839,8 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
   Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
   std::unique_ptr<ConfigImpl> config_ptr;
 
-  config_ptr.reset(
-      new TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true));
+  config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromJson(json),
+                                                factory_context, true);
   EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 
   json = R"EOF(
@@ -3866,8 +3869,8 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
   }
   )EOF";
 
-  config_ptr.reset(
-      new TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true));
+  config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromJson(json),
+                                                factory_context, true);
   EXPECT_FALSE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 
   json = R"EOF(
@@ -3897,8 +3900,8 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
   }
   )EOF";
 
-  config_ptr.reset(
-      new TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true));
+  config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromJson(json),
+                                                factory_context, true);
   EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 }
 

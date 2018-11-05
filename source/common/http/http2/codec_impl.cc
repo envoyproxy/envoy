@@ -124,7 +124,7 @@ void ConnectionImpl::StreamImpl::encodeTrailers(const HeaderMap& trailers) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
     ASSERT(!pending_trailers_);
-    pending_trailers_.reset(new HeaderMapImpl(trailers));
+    pending_trailers_ = std::make_unique<HeaderMapImpl>(trailers);
   } else {
     submitTrailers(trailers);
     parent_.sendPendingFrames();
@@ -798,7 +798,7 @@ int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   if (frame->headers.cat == NGHTTP2_HCAT_HEADERS) {
     StreamImpl* stream = getStream(frame->hd.stream_id);
     ASSERT(!stream->headers_);
-    stream->headers_.reset(new HeaderMapImpl());
+    stream->headers_ = std::make_unique<HeaderMapImpl>();
   }
 
   return 0;
@@ -831,7 +831,7 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
 
     StreamImpl* stream = getStream(frame->hd.stream_id);
     ASSERT(!stream->headers_);
-    stream->headers_.reset(new HeaderMapImpl());
+    stream->headers_ = std::make_unique<HeaderMapImpl>();
     return 0;
   }
 

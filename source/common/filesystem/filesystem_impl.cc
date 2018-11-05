@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 
@@ -248,7 +249,7 @@ void FileImpl::write(absl::string_view data) {
 }
 
 void FileImpl::createFlushStructures() {
-  flush_thread_.reset(new Thread::Thread([this]() -> void { flushThreadFunc(); }));
+  flush_thread_ = std::make_unique<Thread::Thread>([this]() -> void { flushThreadFunc(); });
   flush_timer_->enableTimer(flush_interval_msec_);
 }
 

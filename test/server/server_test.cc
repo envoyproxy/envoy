@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/common/version.h"
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -14,12 +16,14 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Assign;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Property;
 using testing::Ref;
+using testing::Return;
 using testing::SaveArg;
 using testing::StrictMock;
 
@@ -51,7 +55,7 @@ TEST(ServerInstanceUtil, flushHelper) {
 
 class RunHelperTest : public testing::Test {
 public:
-  RunHelperTest() {
+  RunHelperTest() : shutdown_(false) {
     InSequence s;
 
     sigterm_ = new Event::MockSignalEvent(&dispatcher_);
@@ -59,14 +63,17 @@ public:
     sighup_ = new Event::MockSignalEvent(&dispatcher_);
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
     EXPECT_CALL(overload_manager_, start());
+    ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
 
-    helper_.reset(new RunHelper(dispatcher_, cm_, hot_restart_, access_log_manager_, init_manager_,
-                                overload_manager_, [this] { start_workers_.ready(); }));
+    helper_ = std::make_unique<RunHelper>(server_, options_, dispatcher_, cm_, access_log_manager_,
+                                          init_manager_, overload_manager_,
+                                          [this] { start_workers_.ready(); });
   }
 
+  NiceMock<MockInstance> server_;
+  testing::NiceMock<MockOptions> options_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<MockHotRestart> hot_restart_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   NiceMock<MockOverloadManager> overload_manager_;
   InitManagerImpl init_manager_;
@@ -76,6 +83,7 @@ public:
   Event::MockSignalEvent* sigterm_;
   Event::MockSignalEvent* sigusr1_;
   Event::MockSignalEvent* sighup_;
+  bool shutdown_ = false;
 };
 
 TEST_F(RunHelperTest, Normal) {
@@ -86,6 +94,7 @@ TEST_F(RunHelperTest, Normal) {
 TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
   EXPECT_CALL(start_workers_, ready()).Times(0);
   sigterm_->callback_();
+  EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   cm_init_callback_();
 }
 
@@ -96,6 +105,7 @@ TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
   EXPECT_CALL(target, initialize(_));
   cm_init_callback_();
   sigterm_->callback_();
+  EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   target.callback_();
 }
 
@@ -112,11 +122,11 @@ protected:
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
     }
-    server_.reset(new InstanceImpl(
+    server_ = std::make_unique<InstanceImpl>(
         options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_));
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_);
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
@@ -128,11 +138,11 @@ protected:
         {{"health_check_timeout", fmt::format("{}", timeout).c_str()},
          {"health_check_interval", fmt::format("{}", interval).c_str()}},
         TestEnvironment::PortMap{}, version_);
-    server_.reset(new InstanceImpl(
+    server_ = std::make_unique<InstanceImpl>(
         options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_));
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_);
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }

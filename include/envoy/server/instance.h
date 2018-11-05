@@ -159,6 +159,11 @@ public:
   virtual void shutdown() PURE;
 
   /**
+   * @return whether the shutdown method has been called.
+   */
+  virtual bool isShutdown() PURE;
+
+  /**
    * Shutdown the server's admin processing. This includes the admin API, stat flushing, etc.
    */
   virtual void shutdownAdmin() PURE;

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <list>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -1477,9 +1478,9 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
-  auto buffer = Buffer::WatermarkBufferPtr{
-      new Buffer::WatermarkBuffer([this]() -> void { this->requestDataDrained(); },
-                                  [this]() -> void { this->requestDataTooLarge(); })};
+  auto buffer =
+      std::make_unique<Buffer::WatermarkBuffer>([this]() -> void { this->requestDataDrained(); },
+                                                [this]() -> void { this->requestDataTooLarge(); });
   buffer->setWatermarks(parent_.buffer_limit_);
   return buffer;
 }

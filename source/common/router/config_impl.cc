@@ -320,7 +320,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
     if (filter_it != route.route().metadata_match().filter_metadata().end()) {
-      metadata_match_criteria_.reset(new MetadataMatchCriteriaImpl(filter_it->second));
+      metadata_match_criteria_ = std::make_unique<MetadataMatchCriteriaImpl>(filter_it->second);
     }
   }
 
@@ -358,7 +358,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   if (!route.route().hash_policy().empty()) {
-    hash_policy_.reset(new HashPolicyImpl(route.route().hash_policy()));
+    hash_policy_ = std::make_unique<HashPolicyImpl>(route.route().hash_policy());
   }
 
   // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
@@ -368,7 +368,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
        PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false));
 
   if (route.route().has_cors()) {
-    cors_policy_.reset(new CorsPolicyImpl(route.route().cors()));
+    cors_policy_ = std::make_unique<CorsPolicyImpl>(route.route().cors());
   }
 }
 
@@ -669,7 +669,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
         cluster_metadata_match_criteria_ =
             parent->metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
       } else {
-        cluster_metadata_match_criteria_.reset(new MetadataMatchCriteriaImpl(filter_it->second));
+        cluster_metadata_match_criteria_ =
+            std::make_unique<MetadataMatchCriteriaImpl>(filter_it->second);
       }
     }
   }
@@ -827,7 +828,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
   }
 
   if (virtual_host.has_cors()) {
-    cors_policy_.reset(new CorsPolicyImpl(virtual_host.cors()));
+    cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors());
   }
 }
 
@@ -976,9 +977,9 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
                        Server::Configuration::FactoryContext& factory_context,
                        bool validate_clusters_default)
     : name_(config.name()) {
-  route_matcher_.reset(new RouteMatcher(
+  route_matcher_ = std::make_unique<RouteMatcher>(
       config, *this, factory_context,
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default)));
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));
 
   for (const std::string& header : config.internal_only_headers()) {
     internal_only_headers_.push_back(Http::LowerCaseString(header));

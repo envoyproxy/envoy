@@ -71,6 +71,9 @@ public:
   void setHotRestartDisabled(bool hot_restart_disabled) {
     hot_restart_disabled_ = hot_restart_disabled;
   }
+  void setSignalHandling(bool signal_handling_enabled) {
+    signal_handling_enabled_ = signal_handling_enabled;
+  }
 
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
@@ -102,6 +105,7 @@ public:
   uint64_t maxStats() const override { return max_stats_; }
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
+  bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
 
 private:
@@ -130,6 +134,7 @@ private:
   uint64_t max_stats_;
   Stats::StatsOptionsImpl stats_options_;
   bool hot_restart_disabled_;
+  bool signal_handling_enabled_;
   bool mutex_tracing_enabled_;
 
   friend class OptionsImplTest;

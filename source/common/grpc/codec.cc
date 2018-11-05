@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 #include "common/buffer/buffer_impl.h"
@@ -65,7 +66,7 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
           output.push_back(std::move(frame_));
           state_ = State::FH_FLAG;
         } else {
-          frame_.data_.reset(new Buffer::OwnedImpl());
+          frame_.data_ = std::make_unique<Buffer::OwnedImpl>();
           state_ = State::DATA;
         }
         mem++;

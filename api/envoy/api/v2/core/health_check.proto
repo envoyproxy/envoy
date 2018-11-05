@@ -4,6 +4,7 @@ package envoy.api.v2.core;
 
 import "envoy/api/v2/core/base.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
@@ -154,7 +155,12 @@ message HealthCheck {
 
     // A custom health checker specific configuration which depends on the custom health checker
     // being instantiated. See :api:`envoy/config/health_checker` for reference.
-    google.protobuf.Struct config = 2;
+    oneof config_type {
+      google.protobuf.Struct config = 2;
+
+      // [#not-implemented-hide:]
+      google.protobuf.Any typed_config = 3;
+    }
   }
 
   oneof health_checker {
