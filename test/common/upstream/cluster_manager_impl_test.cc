@@ -1613,7 +1613,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
             cluster_manager_->tcpConnForCluster("cluster_1", nullptr, override_server_name_ibm_com)
                 .connection_);
 
-  EXPECT_EQ(3UL, factory_.stats_.counter("cluster.cluster_1.upstream_cx_none_healthy").value());
+  EXPECT_EQ(7UL, factory_.stats_.counter("cluster.cluster_1.upstream_cx_none_healthy").value());
 
   // Set up for an initialize callback.
   ReadyWatcher initialized;
