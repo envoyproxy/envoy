@@ -23,7 +23,7 @@ namespace Envoy {
 // atomic writes.
 class MutexTracerImpl final : public MutexTracer {
 public:
-  static MutexTracerImpl* getOrCreateTracer();
+  static MutexTracerImpl& getOrCreateTracer();
 
   // Resets the recorded statistics.
   void reset() override;

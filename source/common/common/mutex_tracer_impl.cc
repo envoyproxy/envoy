@@ -11,7 +11,7 @@ namespace Envoy {
 
 MutexTracerImpl* MutexTracerImpl::singleton_ = nullptr;
 
-MutexTracerImpl* MutexTracerImpl::getOrCreateTracer() {
+MutexTracerImpl& MutexTracerImpl::getOrCreateTracer() {
   if (singleton_ == nullptr) {
     singleton_ = new MutexTracerImpl;
     // There's no easy way to unregister a hook. Luckily, this hook is innocuous enough that it
@@ -19,7 +19,7 @@ MutexTracerImpl* MutexTracerImpl::getOrCreateTracer() {
     // hermeticity.
     absl::RegisterMutexTracer(&Envoy::MutexTracerImpl::contentionHook);
   }
-  return singleton_;
+  return *singleton_;
 }
 
 void MutexTracerImpl::contentionHook(const char* msg, const void* obj, int64_t wait_cycles) {

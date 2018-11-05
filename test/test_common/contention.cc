@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Thread {
 namespace TestUtil {
 
-void ContentionGenerator::generateContention(MutexTracerImpl* tracer) {
+void ContentionGenerator::generateContention(MutexTracerImpl& tracer) {
   MutexBasicLockable mu;
   Envoy::Thread::Thread t1 = launchThread(tracer, &mu);
   Envoy::Thread::Thread t2 = launchThread(tracer, &mu);
@@ -12,15 +12,15 @@ void ContentionGenerator::generateContention(MutexTracerImpl* tracer) {
   t2.join();
 }
 
-Envoy::Thread::Thread ContentionGenerator::launchThread(MutexTracerImpl* tracer,
+Envoy::Thread::Thread ContentionGenerator::launchThread(MutexTracerImpl& tracer,
                                                         MutexBasicLockable* mu) {
-  return Envoy::Thread::Thread([tracer, mu]() -> void { holdUntilContention(tracer, mu); });
+  return Envoy::Thread::Thread([&tracer, mu]() -> void { holdUntilContention(tracer, mu); });
 }
 
-void ContentionGenerator::holdUntilContention(MutexTracerImpl* tracer, MutexBasicLockable* mu) {
+void ContentionGenerator::holdUntilContention(MutexTracerImpl& tracer, MutexBasicLockable* mu) {
   DangerousDeprecatedTestTime test_time;
-  int64_t curr_num_contentions = tracer->numContentions();
-  while (tracer->numContentions() == curr_num_contentions) {
+  int64_t curr_num_contentions = tracer.numContentions();
+  while (tracer.numContentions() == curr_num_contentions) {
     test_time.timeSystem().sleep(std::chrono::milliseconds(1));
     LockGuard lock(*mu);
     // We hold the lock 90% of the time to ensure both contention and eventual acquisition, which

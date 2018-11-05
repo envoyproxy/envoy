@@ -15,7 +15,7 @@ namespace TestUtil {
 
 /**
  * Generates mutex contention, as measured by the MutexTracer passed in via argument.
- * @param tracer a pointer to the global MutexTracerImpl.
+ * @param tracer a reference to the global MutexTracerImpl.
  */
 
 class ContentionGenerator {
@@ -23,12 +23,12 @@ public:
   /**
    * Generates at least once occurrence of mutex contention, as measured by tracer.
    */
-  static void generateContention(MutexTracerImpl* tracer);
+  static void generateContention(MutexTracerImpl& tracer);
 
 private:
-  static Envoy::Thread::Thread launchThread(MutexTracerImpl* tracer, MutexBasicLockable* mu);
+  static Envoy::Thread::Thread launchThread(MutexTracerImpl& tracer, MutexBasicLockable* mu);
 
-  static void holdUntilContention(MutexTracerImpl* tracer, MutexBasicLockable* mu);
+  static void holdUntilContention(MutexTracerImpl& tracer, MutexBasicLockable* mu);
 };
 
 } // namespace TestUtil
