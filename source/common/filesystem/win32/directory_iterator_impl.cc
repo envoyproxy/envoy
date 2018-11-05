@@ -9,7 +9,7 @@ namespace Filesystem {
 DirectoryIteratorImpl::DirectoryIteratorImpl(const std::string& directory_path)
     : DirectoryIterator(), find_handle_(INVALID_HANDLE_VALUE) {
   WIN32_FIND_DATA find_data;
-  std::string glob = directory_path + "\\*";
+  const std::string glob = directory_path + "\\*";
   find_handle_ = ::FindFirstFile(glob.c_str(), &find_data);
   if (find_handle_ == INVALID_HANDLE_VALUE) {
     throw EnvoyException(

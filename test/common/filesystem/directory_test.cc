@@ -1,4 +1,5 @@
 #include <fstream>
+#include <stack>
 #include <string>
 #include <unordered_set>
 
@@ -17,19 +18,50 @@ namespace Filesystem {
 // as it looks like some versions of libstdc++ have a bug in
 // std::experimental::filesystem::remove_all where it fails with nested directories:
 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=71313
-
-class ScopedPathRemover {
+class DirectoryTest : public testing::Test {
 public:
-  ScopedPathRemover(std::list<std::string> paths) : paths_(paths) {}
+  DirectoryTest() : dir_path_(TestEnvironment::temporaryPath("envoy_test")) {
+    files_to_remove_.push(dir_path_);
+  }
 
-  ~ScopedPathRemover() {
-    for (const std::string& path : paths_) {
-      TestEnvironment::removePath(path);
+protected:
+  void SetUp() override { TestUtility::createDirectory(dir_path_); }
+
+  void TearDown() override {
+    while (!files_to_remove_.empty()) {
+      const std::string& f = files_to_remove_.top();
+      TestEnvironment::removePath(f);
+      files_to_remove_.pop();
     }
   }
 
-private:
-  std::list<std::string> paths_;
+  void addSubDirs(std::list<std::string> sub_dirs) {
+    for (const std::string& dir_name : sub_dirs) {
+      const std::string full_path = dir_path_ + "/" + dir_name;
+      TestUtility::createDirectory(full_path);
+      files_to_remove_.push(full_path);
+    }
+  }
+
+  void addFiles(std::list<std::string> files) {
+    for (const std::string& file_name : files) {
+      const std::string full_path = dir_path_ + "/" + file_name;
+      { const std::ofstream file(full_path); }
+      files_to_remove_.push(full_path);
+    }
+  }
+
+  void addSymlinks(std::list<std::pair<std::string, std::string>> symlinks) {
+    for (const auto& link : symlinks) {
+      const std::string target_path = dir_path_ + "/" + link.first;
+      const std::string link_path = dir_path_ + "/" + link.second;
+      TestUtility::createSymlink(target_path, link_path);
+      files_to_remove_.push(link_path);
+    }
+  }
+
+  const std::string dir_path_;
+  std::stack<std::string> files_to_remove_;
 };
 
 struct EntryHash {
@@ -57,66 +89,49 @@ EntrySet getDirectoryContents(const std::string& dir_path, bool recursive) {
   return ret;
 }
 
-TEST(Directory, DirectoryWithOneFile) {
-  const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
-  const std::string file_path(dir_path + "/" + "file");
-  ScopedPathRemover s({file_path, dir_path});
+// Test that we can list a file in a directory
+TEST_F(DirectoryTest, DirectoryWithOneFile) {
+  addFiles({"file"});
 
-  TestUtility::createDirectory(dir_path);
-  { std::ofstream file(file_path); }
-
-  EntrySet expected = {
+  const EntrySet expected = {
       {".", FileType::Directory},
       {"..", FileType::Directory},
       {"file", FileType::Regular},
   };
-  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
+  EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
-TEST(Directory, DirectoryWithOneDirectory) {
-  const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
-  const std::string child_dir_path(dir_path + "/" + "sub_dir");
-  ScopedPathRemover s({child_dir_path, dir_path});
-  TestUtility::createDirectory(dir_path);
-  TestUtility::createDirectory(child_dir_path);
+// Test that we can list a sub directory in a directory
+TEST_F(DirectoryTest, DirectoryWithOneDirectory) {
+  addSubDirs({"sub_dir"});
 
-  EntrySet expected = {
+  const EntrySet expected = {
       {".", FileType::Directory},
       {"..", FileType::Directory},
       {"sub_dir", FileType::Directory},
   };
-  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
+  EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
-TEST(Directory, DirectoryWithFileInSubDirectory) {
-  const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
-  const std::string child_dir_path(dir_path + "/" + "sub_dir");
-  const std::string child_file_path(child_dir_path + "/" + "file");
-  ScopedPathRemover s({child_file_path, child_dir_path, dir_path});
-  TestUtility::createDirectory(dir_path);
-  TestUtility::createDirectory(child_dir_path);
-  { std::ofstream file(child_file_path); }
+// Test that we do not recurse into directories when listing files
+TEST_F(DirectoryTest, DirectoryWithFileInSubDirectory) {
+  addSubDirs({"sub_dir"});
+  addFiles({"sub_dir/sub_file"});
 
-  EntrySet expected = {
+  const EntrySet expected = {
       {".", FileType::Directory},
       {"..", FileType::Directory},
       {"sub_dir", FileType::Directory},
   };
-  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
+  EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
-TEST(Directory, RecursionIntoSubDirectory) {
-  const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
-  const std::string file_path(dir_path + "/" + "file");
-  const std::string child_dir_path(dir_path + "/" + "sub_dir");
-  const std::string child_file_path(child_dir_path + "/" + "sub_file");
-  ScopedPathRemover s({child_file_path, child_dir_path, file_path, dir_path});
-  TestUtility::createDirectory(dir_path);
-  TestUtility::createDirectory(child_dir_path);
-  { std::ofstream file(file_path); }
-  { std::ofstream file(child_file_path); }
+// Test that when recursively creating DirectoryIterators, they do not interfere with eachother
+TEST_F(DirectoryTest, RecursionIntoSubDirectory) {
+  addSubDirs({"sub_dir"});
+  addFiles({"file", "sub_dir/sub_file"});
 
-  EntrySet expected = {
+  const EntrySet expected = {
       {".", FileType::Directory},
       {"..", FileType::Directory},
       {"file", FileType::Regular},
@@ -125,75 +140,61 @@ TEST(Directory, RecursionIntoSubDirectory) {
       {"sub_dir/.", FileType::Directory},
       {"sub_dir/..", FileType::Directory},
   };
-  EXPECT_EQ(expected, getDirectoryContents(dir_path, true));
+  EXPECT_EQ(expected, getDirectoryContents(dir_path_, true));
 }
 
-TEST(Directory, DirectoryWithFileAndDirectory) {
-  const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
-  const std::string file_path(dir_path + "/" + "file");
-  const std::string child_dir_path(dir_path + "/" + "sub_dir");
-  ScopedPathRemover s({file_path, child_dir_path, dir_path});
-  TestUtility::createDirectory(dir_path);
-  TestUtility::createDirectory(child_dir_path);
-  { std::ofstream file(file_path); }
+// Test that we can list a file and a sub directory in a directory
+TEST_F(DirectoryTest, DirectoryWithFileAndDirectory) {
+  addSubDirs({"sub_dir"});
+  addFiles({"file"});
 
-  EntrySet expected = {
+  const EntrySet expected = {
       {".", FileType::Directory},
       {"..", FileType::Directory},
       {"sub_dir", FileType::Directory},
       {"file", FileType::Regular},
   };
-  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
+  EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
-TEST(Directory, DirectoryWithSymlinkToFile) {
-  const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
-  const std::string file_path(dir_path + "/" + "file");
-  const std::string link_path(dir_path + "/" + "link");
-  ScopedPathRemover s({link_path, file_path, dir_path});
-  TestUtility::createDirectory(dir_path);
-  { std::ofstream file(file_path); }
-  TestUtility::createSymlink(file_path, link_path);
+// Test that a symlink to a file has type FileType::Regular
+TEST_F(DirectoryTest, DirectoryWithSymlinkToFile) {
+  addFiles({"file"});
+  addSymlinks({{"file", "link"}});
 
-  EntrySet expected = {
+  const EntrySet expected = {
       {".", FileType::Directory},
       {"..", FileType::Directory},
       {"file", FileType::Regular},
       {"link", FileType::Regular},
   };
-  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
+  EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
-TEST(Directory, DirectoryWithSymlinkToDirectory) {
-  const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
-  const std::string link_dir_path(dir_path + "/" + "link_dir");
-  const std::string child_dir_path(dir_path + "/" + "sub_dir");
-  ScopedPathRemover s({link_dir_path, child_dir_path, dir_path});
-  TestUtility::createDirectory(dir_path);
-  TestUtility::createDirectory(child_dir_path);
-  TestUtility::createSymlink(child_dir_path, link_dir_path);
+// Test that a symlink to a directory has type FileType::Directory
+TEST_F(DirectoryTest, DirectoryWithSymlinkToDirectory) {
+  addSubDirs({"sub_dir"});
+  addSymlinks({{"sub_dir", "link_dir"}});
 
-  EntrySet expected = {
+  const EntrySet expected = {
       {".", FileType::Directory},
       {"..", FileType::Directory},
       {"sub_dir", FileType::Directory},
       {"link_dir", FileType::Directory},
   };
-  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
+  EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
-TEST(Directory, DirectoryWithEmptyDirectory) {
-  const std::string dir_path(TestEnvironment::temporaryPath("envoy_test"));
-  ScopedPathRemover s({dir_path});
-  TestUtility::createDirectory(dir_path);
-
-  EntrySet expected = {
+// Test that we can list an empty directory
+TEST_F(DirectoryTest, DirectoryWithEmptyDirectory) {
+  const EntrySet expected = {
       {".", FileType::Directory},
       {"..", FileType::Directory},
   };
-  EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
+  EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
+// Test that the constructor throws an exception when given a non-existing path
 TEST(DirectoryIteratorImpl, NonExistingDir) {
   const std::string dir_path("some/non/existing/dir");
 
@@ -208,20 +209,21 @@ TEST(DirectoryIteratorImpl, NonExistingDir) {
 #endif
 }
 
+// Test that we correctly handle trailing path separators
 TEST(Directory, DirectoryHasTrailingPathSeparator) {
 #if !defined(WIN32)
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test") + "/");
 #else
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test") + "\\");
 #endif
-  ScopedPathRemover s({dir_path});
   TestUtility::createDirectory(dir_path);
 
-  EntrySet expected = {
+  const EntrySet expected = {
       {".", FileType::Directory},
       {"..", FileType::Directory},
   };
   EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
+  TestEnvironment::removePath(dir_path);
 }
 
 } // namespace Filesystem

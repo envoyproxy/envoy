@@ -7,10 +7,10 @@
 namespace Envoy {
 namespace Filesystem {
 
+// This class does not do any validation of input data. Do not use with untrusted inputs.
 class Directory {
 public:
   Directory(const std::string& directory_path) : directory_path_(directory_path) {}
-  ~Directory() {}
 
   DirectoryIteratorImpl begin() { return DirectoryIteratorImpl(directory_path_); }
 
