@@ -165,10 +165,11 @@ message HttpConnectionManager {
   // timeout, although per-route idle timeout overrides will continue to apply.
   google.protobuf.Duration stream_idle_timeout = 24 [(gogoproto.stdduration) = true];
 
-  // A timeout for idle requests managed by the connection manager. The timer is activated when the
-  // request initiates, and is disarmed when the last byte of the request is sent upstream, OR when
-  // the response is encoded. If not specified or set to 0, this timeout is disabled. Retries
-  // are not currently supported.
+  // A timeout for idle requests managed by the connection manager.
+  // The timer is activated when the request is initiated, and is disarmed when the last byte of the
+  // request is sent upstream (i.e. all decoding filters have processed the request), OR when the
+  // response is initiated. If not specified or set to 0, this timeout is disabled. Retries are not
+  // currently supported.
   google.protobuf.Duration request_timeout = 28 [(gogoproto.stdduration) = true];
 
   // The time that Envoy will wait between sending an HTTP/2 “shutdown
