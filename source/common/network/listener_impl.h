@@ -30,11 +30,9 @@ protected:
   const bool hand_off_restored_destination_connections_;
 
 private:
-  static void errorCallback(evconnlistener* listener, void* context);
-  static void listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,
-                             int remote_addr_len, void* arg);
+  void listenCallback(int fd, const sockaddr& remote_addr, socklen_t remote_addr_len);
 
-  Event::Libevent::ListenerPtr listener_;
+  Event::FileEventPtr file_event_;
 };
 
 } // namespace Network

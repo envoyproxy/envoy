@@ -566,7 +566,7 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
     }
 
     // Add the options to the socket_ so that STATE_LISTENING options can be
-    // set in the worker after listen()/evconnlistener_new() is called.
+    // set in the worker after listen() is called.
     socket_->addOptions(listen_socket_options_);
   }
 }
