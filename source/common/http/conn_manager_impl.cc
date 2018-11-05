@@ -762,8 +762,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     (*continue_data_entry)->continueDecoding();
   }
 
-  if (end_stream)
+  if (end_stream) {
     disarmRequestTimeout();
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -830,8 +831,9 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     decodeTrailers(trailers_added_entry->get(), *request_trailers_);
   }
 
-  if (end_stream)
+  if (end_stream) {
     disarmRequestTimeout();
+  }
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStream::addDecodedTrailers() {
