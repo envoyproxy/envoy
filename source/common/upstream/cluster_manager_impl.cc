@@ -1157,13 +1157,13 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
         option->hashKey(hash_key);
       }
     }
+  }
 
-    // add the server-name-to-override to the hash key, so the pool will contain
-    // connections with the identical requested server name
-    if (override_server_name.has_value()) {
-      std::hash<std::string> hash_function;
-      hash_key.push_back(hash_function(override_server_name.value()));
-    }
+  // add the server-name-to-override to the hash key, so the pool will contain
+  // connections with the identical requested server name
+  if (override_server_name.has_value()) {
+    std::hash<std::string> hash_function;
+    hash_key.push_back(hash_function(override_server_name.value()));
   }
 
   TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];
