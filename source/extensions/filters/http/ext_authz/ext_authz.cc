@@ -33,7 +33,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
 
   // fast route - if we are disabled, no need to merge
   const FilterConfigPerRoute* specific_per_route_config =
-      Http::Utility::resolvePerFilterConfig<FilterConfigPerRoute>(
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
           HttpFilterNames::get().ExtAuthorization, route);
   if (specific_per_route_config != nullptr) {
     if (specific_per_route_config->disabled()) {

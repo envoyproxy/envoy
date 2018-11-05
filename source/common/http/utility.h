@@ -234,12 +234,12 @@ void transformUpgradeRequestFromH2toH1(HeaderMap& headers);
 void transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade);
 
 /**
- * The non template implementation of resolvePerFilterConfig. see
- * resolvePerFilterConfig for docs.
+ * The non template implementation of resolveMostSpecificPerFilterConfig. see
+ * resolveMostSpecificPerFilterConfig for docs.
  */
 const Router::RouteSpecificFilterConfig*
-resolvePerFilterConfigGeneric(const std::string& filter_name,
-                              const Router::RouteConstSharedPtr& route);
+resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
+                                          const Router::RouteConstSharedPtr& route);
 
 /**
  * Retreives the route specific config. Route specific config can be in a few
@@ -252,7 +252,8 @@ resolvePerFilterConfigGeneric(const std::string& filter_name,
  * To use, simply:
  *
  *     const auto* config =
- *         Utility::resolvePerFilterConfig<ConcreteType>(FILTER_NAME, stream_callbacks_.route());
+ *         Utility::resolveMostSpecificPerFilterConfig<ConcreteType>(FILTER_NAME,
+ * stream_callbacks_.route());
  *
  * See notes about config's lifetime below.
  *
@@ -265,22 +266,22 @@ resolvePerFilterConfigGeneric(const std::string& filter_name,
  * pointer's lifetime is the same as the route parameter.
  */
 template <class ConfigType>
-const ConfigType* resolvePerFilterConfig(const std::string& filter_name,
-                                         const Router::RouteConstSharedPtr& route) {
+const ConfigType* resolveMostSpecificPerFilterConfig(const std::string& filter_name,
+                                                     const Router::RouteConstSharedPtr& route) {
   static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
                 "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
   const Router::RouteSpecificFilterConfig* generic_config =
-      resolvePerFilterConfigGeneric(filter_name, route);
+      resolveMostSpecificPerFilterConfigGeneric(filter_name, route);
   return dynamic_cast<const ConfigType*>(generic_config);
 }
 
 /**
- * The non template implementation of foldPerFilterConfig. see
- * foldPerFilterConfig for docs.
+ * The non template implementation of traversePerFilterConfig. see
+ * traversePerFilterConfig for docs.
  */
-void foldPerFilterConfigGeneric(const std::string& filter_name,
-                                const Router::RouteConstSharedPtr& route,
-                                std::function<void(const Router::RouteSpecificFilterConfig&)> cb);
+void traversePerFilterConfigGeneric(
+    const std::string& filter_name, const Router::RouteConstSharedPtr& route,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb);
 
 /**
  * Fold all the available per route filter configs, invoking the callback with each config (if
@@ -289,18 +290,19 @@ void foldPerFilterConfigGeneric(const std::string& filter_name,
  * (weighted cluster). If a config is not present, the callback will not be invoked.
  */
 template <class ConfigType>
-void foldPerFilterConfig(const std::string& filter_name, const Router::RouteConstSharedPtr& route,
-                         std::function<void(const ConfigType&)> cb) {
+void traversePerFilterConfig(const std::string& filter_name,
+                             const Router::RouteConstSharedPtr& route,
+                             std::function<void(const ConfigType&)> cb) {
   static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
                 "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
 
-  foldPerFilterConfigGeneric(filter_name, route,
-                             [&cb](const Router::RouteSpecificFilterConfig& cfg) {
-                               const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
-                               if (typed_cfg != nullptr) {
-                                 cb(*typed_cfg);
-                               }
-                             });
+  traversePerFilterConfigGeneric(
+      filter_name, route, [&cb](const Router::RouteSpecificFilterConfig& cfg) {
+        const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
+        if (typed_cfg != nullptr) {
+          cb(*typed_cfg);
+        }
+      });
 }
 
 /**
@@ -322,13 +324,14 @@ getMergedPerFilterConfig(const std::string& filter_name, const Router::RouteCons
 
   absl::optional<ConfigType> merged;
 
-  foldPerFilterConfig<ConfigType>(filter_name, route, [&reduce, &merged](const ConfigType& cfg) {
-    if (!merged) {
-      merged.emplace(cfg);
-    } else {
-      reduce(merged.value(), cfg);
-    }
-  });
+  traversePerFilterConfig<ConfigType>(filter_name, route,
+                                      [&reduce, &merged](const ConfigType& cfg) {
+                                        if (!merged) {
+                                          merged.emplace(cfg);
+                                        } else {
+                                          reduce(merged.value(), cfg);
+                                        }
+                                      });
 
   return merged;
 }

@@ -551,8 +551,8 @@ TEST(HttpUtility, QueryParamsToString) {
             Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}, {"b", "2"}})));
 }
 
-TEST(HttpUtility, resolvePerFilterConfigNilRoute) {
-  EXPECT_EQ(nullptr, Utility::resolvePerFilterConfigGeneric("envoy.filter", nullptr));
+TEST(HttpUtility, resolveMostSpecificPerFilterConfigNilRoute) {
+  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric("envoy.filter", nullptr));
 }
 
 class TestConfig : public Router::RouteSpecificFilterConfig {
@@ -561,7 +561,7 @@ public:
   void merge(const TestConfig& other) { state_ += other.state_; }
 };
 
-TEST(HttpUtility, resolvePerFilterConfig) {
+TEST(HttpUtility, resolveMostSpecificPerFilterConfig) {
   TestConfig testConfig;
 
   const std::string filter_name = "envoy.filter";
@@ -572,12 +572,12 @@ TEST(HttpUtility, resolvePerFilterConfig) {
       .WillByDefault(Return(&testConfig));
 
   // test the we get the same object back (as this goes through the dynamic_cast)
-  auto resolved_filter_config =
-      Utility::resolvePerFilterConfig<TestConfig>(filter_name, filter_callbacks.route());
+  auto resolved_filter_config = Utility::resolveMostSpecificPerFilterConfig<TestConfig>(
+      filter_name, filter_callbacks.route());
   EXPECT_EQ(&testConfig, resolved_filter_config);
 }
 
-TEST(HttpUtility, resolvePerFilterConfigGeneric) {
+TEST(HttpUtility, resolveMostSpecificPerFilterConfigGeneric) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
@@ -587,26 +587,31 @@ TEST(HttpUtility, resolvePerFilterConfigGeneric) {
   const Router::RouteSpecificFilterConfig* three = nullconfig + 3;
 
   // Test when there's nothing on the route
-  EXPECT_EQ(nullptr, Utility::resolvePerFilterConfigGeneric(filter_name, filter_callbacks.route()));
+  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                        filter_callbacks.route()));
 
   // Testing in reverse order, so that the method always returns the last object.
   ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
       .WillByDefault(Return(one));
-  EXPECT_EQ(one, Utility::resolvePerFilterConfigGeneric(filter_name, filter_callbacks.route()));
+  EXPECT_EQ(one, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                    filter_callbacks.route()));
 
   ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name)).WillByDefault(Return(two));
-  EXPECT_EQ(two, Utility::resolvePerFilterConfigGeneric(filter_name, filter_callbacks.route()));
+  EXPECT_EQ(two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                    filter_callbacks.route()));
 
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
       .WillByDefault(Return(three));
-  EXPECT_EQ(three, Utility::resolvePerFilterConfigGeneric(filter_name, filter_callbacks.route()));
+  EXPECT_EQ(three, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                      filter_callbacks.route()));
 
   // Cover the case of no route entry
   ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
-  EXPECT_EQ(two, Utility::resolvePerFilterConfigGeneric(filter_name, filter_callbacks.route()));
+  EXPECT_EQ(two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                    filter_callbacks.route()));
 }
 
-TEST(HttpUtility, foldPerFilterConfigIteratesInOrder) {
+TEST(HttpUtility, traversePerFilterConfigIteratesInOrder) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
@@ -623,17 +628,17 @@ TEST(HttpUtility, foldPerFilterConfigIteratesInOrder) {
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
       .WillByDefault(Return(nullconfig + num_configs));
 
-  // a vector to save which configs are visited by the foldPerFilterConfigGeneric
+  // a vector to save which configs are visited by the traversePerFilterConfigGeneric
   std::vector<size_t> visited_configs(num_configs, 0);
 
   // Iterate; save the retrieved config index in the iteration index in visited_configs.
   size_t index = 0;
-  Utility::foldPerFilterConfigGeneric(filter_name, filter_callbacks.route(),
-                                      [&](const Router::RouteSpecificFilterConfig& cfg) {
-                                        int cfg_index = &cfg - nullconfig;
-                                        visited_configs[index] = cfg_index - 1;
-                                        index++;
-                                      });
+  Utility::traversePerFilterConfigGeneric(filter_name, filter_callbacks.route(),
+                                          [&](const Router::RouteSpecificFilterConfig& cfg) {
+                                            int cfg_index = &cfg - nullconfig;
+                                            visited_configs[index] = cfg_index - 1;
+                                            index++;
+                                          });
 
   // Make sure all methods were called, and in order.
   for (size_t i = 0; i < visited_configs.size(); i++) {
@@ -641,7 +646,7 @@ TEST(HttpUtility, foldPerFilterConfigIteratesInOrder) {
   }
 }
 
-TEST(HttpUtility, foldPerFilterConfigTyped) {
+TEST(HttpUtility, traversePerFilterConfigTyped) {
   TestConfig testConfig;
 
   const std::string filter_name = "envoy.filter";
@@ -653,8 +658,8 @@ TEST(HttpUtility, foldPerFilterConfigTyped) {
 
   // iterate the configs
   size_t index = 0;
-  Utility::foldPerFilterConfig<TestConfig>(filter_name, filter_callbacks.route(),
-                                           [&](const TestConfig&) { index++; });
+  Utility::traversePerFilterConfig<TestConfig>(filter_name, filter_callbacks.route(),
+                                               [&](const TestConfig&) { index++; });
 
   // make sure that the callback was called (which means that the dynamic_cast worked.)
   EXPECT_EQ(1, index);

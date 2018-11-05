@@ -447,18 +447,18 @@ void Utility::transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::strin
 }
 
 const Router::RouteSpecificFilterConfig*
-Utility::resolvePerFilterConfigGeneric(const std::string& filter_name,
-                                       const Router::RouteConstSharedPtr& route) {
+Utility::resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
+                                                   const Router::RouteConstSharedPtr& route) {
 
   const Router::RouteSpecificFilterConfig* maybe_filter_config{};
-  foldPerFilterConfigGeneric(filter_name, route,
-                             [&maybe_filter_config](const Router::RouteSpecificFilterConfig& cfg) {
-                               maybe_filter_config = &cfg;
-                             });
+  traversePerFilterConfigGeneric(
+      filter_name, route, [&maybe_filter_config](const Router::RouteSpecificFilterConfig& cfg) {
+        maybe_filter_config = &cfg;
+      });
   return maybe_filter_config;
 }
 
-void Utility::foldPerFilterConfigGeneric(
+void Utility::traversePerFilterConfigGeneric(
     const std::string& filter_name, const Router::RouteConstSharedPtr& route,
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
   if (!route) {
