@@ -234,10 +234,10 @@ following are the command line options that Envoy supports.
 
 .. option:: --enable-mutex-tracing
 
-  *(optional)* This flag enables the collection of mutex contention statistics as well as the
-  `/contention` endpoint where those statistics can be found. By default, mutex tracing is not
-  enabled, since it incurs a slight performance penalty for Envoys which already experience mutex
-  contention.
+  *(optional)* This flag enables the collection of mutex contention statistics
+  (:ref:`MutexStats <envoy_api_msg_admin.v2alpha.MutexStats>`) as well as a contention endpoint
+  (:http:get:`/contention`). Mutex tracing is not enabled by default, since it incurs a slight performance
+  penalty for those Envoys which already experience mutex contention.
 
 .. option:: --allow-unknown-fields
 
