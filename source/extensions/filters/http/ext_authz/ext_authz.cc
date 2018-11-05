@@ -31,7 +31,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
     return;
   }
 
-  // fast route - if we are disabled, no need to merge
+  // Fast route - if we are disabled, no need to merge.
   const FilterConfigPerRoute* specific_per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
           HttpFilterNames::get().ExtAuthorization, route);
@@ -41,7 +41,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
     }
   }
 
-  // we are not disabled - get a merged view of the config:
+  // We are not disabled - get a merged view of the config:
   auto&& maybe_merged_per_route_config =
       Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
           HttpFilterNames::get().ExtAuthorization, route,

@@ -45,7 +45,6 @@ namespace HttpFilters {
 namespace ExtAuthz {
 
 TEST(HttpExtAuthzFilterConfigPerRouteTest, MergeConfig) {
-
   envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settings;
   auto&& extensions = settings.mutable_check_settings()->mutable_context_extensions();
 

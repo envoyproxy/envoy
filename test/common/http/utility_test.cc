@@ -551,7 +551,8 @@ TEST(HttpUtility, QueryParamsToString) {
             Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}, {"b", "2"}})));
 }
 
-TEST(HttpUtility, resolveMostSpecificPerFilterConfigNilRoute) {
+// Verify that it resolveMostSpecificPerFilterConfigGeneric works with nil routes.
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
   EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric("envoy.filter", nullptr));
 }
 
@@ -561,7 +562,8 @@ public:
   void merge(const TestConfig& other) { state_ += other.state_; }
 };
 
-TEST(HttpUtility, resolveMostSpecificPerFilterConfig) {
+// Verify that resolveMostSpecificPerFilterConfig works and we get back the original type.
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
   TestConfig testConfig;
 
   const std::string filter_name = "envoy.filter";
@@ -577,7 +579,9 @@ TEST(HttpUtility, resolveMostSpecificPerFilterConfig) {
   EXPECT_EQ(&testConfig, resolved_filter_config);
 }
 
-TEST(HttpUtility, resolveMostSpecificPerFilterConfigGeneric) {
+// Verify that resolveMostSpecificPerFilterConfigGeneric indeed returns the most specific per filter
+// config.
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
@@ -611,7 +615,8 @@ TEST(HttpUtility, resolveMostSpecificPerFilterConfigGeneric) {
                                                                     filter_callbacks.route()));
 }
 
-TEST(HttpUtility, traversePerFilterConfigIteratesInOrder) {
+// Verify that traversePerFilterConfigGeneric traverses in the order of specificity.
+TEST(HttpUtility, TraversePerFilterConfigIteratesInOrder) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
@@ -646,7 +651,8 @@ TEST(HttpUtility, traversePerFilterConfigIteratesInOrder) {
   }
 }
 
-TEST(HttpUtility, traversePerFilterConfigTyped) {
+// Verify that traversePerFilterConfig works and we get back the original type.
+TEST(HttpUtility, TraversePerFilterConfigTyped) {
   TestConfig testConfig;
 
   const std::string filter_name = "envoy.filter";
@@ -665,7 +671,8 @@ TEST(HttpUtility, traversePerFilterConfigTyped) {
   EXPECT_EQ(1, index);
 }
 
-TEST(HttpUtility, getMergedPerFilterConfig) {
+// Verify that merging works as expected and we get back the merged result.
+TEST(HttpUtility, GetMergedPerFilterConfig) {
   TestConfig baseTestConfig, routeTestConfig;
 
   baseTestConfig.state_ = 1;
