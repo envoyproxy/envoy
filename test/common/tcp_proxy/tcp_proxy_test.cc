@@ -1185,6 +1185,9 @@ TEST_F(TcpProxyRoutingTest, ForwardRequestedServerName) {
               tcpConnPoolForCluster("fake_cluster", _, _, override_server_name))
       .WillOnce(Return(nullptr));
 
+  // Port 9999 is within the specified destination port range.
+  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+
   filter_->onNewConnection();
 }
 
