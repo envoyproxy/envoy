@@ -30,8 +30,8 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-typedef ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t> Http2SettingsTuple;
-typedef ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple> Http2SettingsTestParam;
+using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
+using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple>;
 
 class TestServerConnectionImpl : public ServerConnectionImpl {
 public:
@@ -68,8 +68,6 @@ public:
     bool dispatching_{};
     Buffer::OwnedImpl buffer_;
   };
-
-  Http2CodecImplTest() : client_http2settings_(), server_http2settings_() {}
 
   void initialize() {
     Http2SettingsFromTuple(client_http2settings_, ::testing::get<0>(GetParam()));
@@ -447,20 +445,6 @@ TEST_P(Http2CodecImplTest, BadMetadataReceivedTest) {
   corrupt_data_ = true;
   EXPECT_THROW_WITH_MESSAGE(request_encoder_->encodeMetadata(metadata_map), EnvoyException,
                             "The user callback function failed");
-}
-
-TEST_P(Http2CodecImplTest, MetadataDisabledTest) {
-  initialize();
-  // Generates a valid stream_id by sending a request header.
-  TestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  request_encoder_->encodeHeaders(request_headers, true);
-  MetadataMap metadata_map = {
-      {"header_key1", std::string(50 * 1024, 'a')},
-  };
-  // Metadata is ignored.
-  EXPECT_DEATH_LOG_TO_STDERR(request_encoder_->encodeMetadata(metadata_map), "");
 }
 
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};

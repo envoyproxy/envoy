@@ -44,7 +44,7 @@ static ssize_t pack_extension_callback(nghttp2_session* session, uint8_t* buf, s
       std::min(METADATA_MAX_PAYLOAD_SIZE, encoder->payload().length());
   const uint64_t size_to_copy = std::min(static_cast<uint64_t>(len), size_from_encoder);
 
-  Buffer::OwnedImpl& p = reinterpret_cast<Buffer::OwnedImpl&>(encoder->payload());
+  Buffer::OwnedImpl& p = encoder->payload();
   p.copyOut(0, size_to_copy, buf);
 
   // Releases the payload that has been copied to nghttp2.
@@ -81,7 +81,7 @@ static int unpack_extension_callback(nghttp2_session* session, void** payload,
   EXPECT_NE(nullptr, payload);
 
   MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
-  bool result = decoder->onMetadataFrameComplete((hd->flags == END_METADATA_FLAG) ? 1 : 0);
+  bool result = decoder->onMetadataFrameComplete((hd->flags == END_METADATA_FLAG) ? true : false);
   return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 
@@ -100,8 +100,6 @@ static ssize_t send_callback(nghttp2_session* session, const uint8_t* buf, size_
 
 class MetadataEncoderDecoderTest : public ::testing::Test {
 public:
-  MetadataEncoderDecoderTest() : encoder_() {}
-
   void initialize(MetadataCallback cb) {
     decoder_ = std::make_unique<MetadataDecoder>(cb);
 
