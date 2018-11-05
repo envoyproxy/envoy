@@ -12,13 +12,13 @@ The file [repokitteh.star](https://github.com/envoyproxy/envoy/blob/master/repok
 
 For example, the statement
 ```
-use("github.com/softkitteh/repokitteh-modules/assign.star")
+use("github.com/repokitteh/modules/assign.star")
 ```
-tells RepoKitteh to use the [assign.star](https://github.com/softkitteh/repokitteh-modules/blob/master/assign.star) module.
+tells RepoKitteh to use the [assign.star](https://github.com/repokitteh/modules/blob/master/assign.star) module.
 Similar modules can be integrated in the future into Envoy in the same way.
 
 ## Current Functionality
-### [Assign](https://github.com/softkitteh/repokitteh-modules/blob/master/assign.star)
+### [Assign](https://github.com/repokitteh/modules/blob/master/assign.star)
 Set assignees to issues or pull requests.
 
 Examples:
@@ -36,7 +36,7 @@ Only organization members can assign or unassign other users, who must be organi
 
 [Demo PR](https://github.com/envoyproxy/envoybot/pull/6)
 
-### [Review](https://github.com/softkitteh/repokitteh-modules/blob/master/review.star)
+### [Review](https://github.com/repokitteh/modules/blob/master/review.star)
 Requests a a user to recview a pull request.
 
 Examples:
@@ -54,7 +54,7 @@ Only organization members can request a review from other users or cancel it, wh
 
 [Demo PR](https://github.com/envoyproxy/envoybot/pull/7)
 
-### [Wait](https://github.com/softkitteh/repokitteh-modules/blob/master/wait.star)
+### [Wait](https://github.com/repokitteh/modules/blob/master/wait.star)
 Wait for activity on an issue or a PR.
 
 Example:
