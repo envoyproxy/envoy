@@ -1166,7 +1166,7 @@ TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
   filter_->onNewConnection();
 }
 
-// Test that the tcp proxy uses forwards the requested server name from FilterState if set
+// Test that the tcp proxy forwards the requested server name from FilterState if set
 TEST_F(TcpProxyRoutingTest, ForwardRequestedServerName) {
   setup();
 
