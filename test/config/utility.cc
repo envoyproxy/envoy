@@ -138,20 +138,18 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, const std:
   for (int i = 0; i < static_resources->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
 
-    if (cluster->has_load_assignment()) {
-      auto* load_assignment = cluster->mutable_load_assignment();
-      // TODO(dio): Probably setting endpoint and address to be non-nullable will be helpful here.
-      if (!load_assignment->endpoints().empty() &&
-          !load_assignment->endpoints(0).lb_endpoints().empty() &&
-          load_assignment->endpoints(0).lb_endpoints(0).has_endpoint() &&
-          load_assignment->endpoints(0).lb_endpoints(0).endpoint().has_address() &&
-          load_assignment->endpoints(0).lb_endpoints(0).endpoint().address().has_socket_address()) {
-        auto locality_lb_endpoint = load_assignment->mutable_endpoints(0);
-        auto lb_endpoint = locality_lb_endpoint->mutable_lb_endpoints(0);
-        auto host_socket_addr =
-            lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
-        host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
-      }
+    auto* load_assignment = cluster->mutable_load_assignment();
+    // TODO(dio): Probably setting endpoint and address to be non-nullable will be helpful here.
+    if (!load_assignment->endpoints().empty() &&
+        !load_assignment->endpoints(0).lb_endpoints().empty() &&
+        load_assignment->endpoints(0).lb_endpoints(0).has_endpoint() &&
+        load_assignment->endpoints(0).lb_endpoints(0).endpoint().has_address() &&
+        load_assignment->endpoints(0).lb_endpoints(0).endpoint().address().has_socket_address()) {
+      auto locality_lb_endpoint = load_assignment->mutable_endpoints(0);
+      auto lb_endpoint = locality_lb_endpoint->mutable_lb_endpoints(0);
+      auto host_socket_addr =
+          lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+      host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
     }
   }
 }

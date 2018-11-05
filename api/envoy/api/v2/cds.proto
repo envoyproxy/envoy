@@ -169,8 +169,7 @@ message Cluster {
   //   Setting this allows non-EDS cluster types to contain embedded EDS equivalent
   //   :ref:`endpoint assignments<envoy_api_msg_ClusterLoadAssignment>`.
   //
-  ClusterLoadAssignment load_assignment = 33
-      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  ClusterLoadAssignment load_assignment = 33 [(gogoproto.nullable) = false];
 
   // Optional :ref:`active health checking <arch_overview_health_checking>`
   // configuration for the cluster. If no
