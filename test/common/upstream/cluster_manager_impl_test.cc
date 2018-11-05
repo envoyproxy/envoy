@@ -1572,8 +1572,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
       "type": "strict_dns",
       "dns_resolvers": [ "1.2.3.4:80" ],
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://localhost:11001"}],
-      "ssl_context": { "sni": "lyft.com"}
+      "hosts": [{"url": "tcp://localhost:11001"}]
     }]
   }
   )EOF";
