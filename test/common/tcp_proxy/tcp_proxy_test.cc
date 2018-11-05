@@ -1181,11 +1181,16 @@ TEST_F(TcpProxyRoutingTest, ForwardRequestedServerName) {
   // Expect filter to try to open a connection to a cluster with the override_server_name
   EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _, _))
       .WillOnce(Invoke(
-          [](const std::string& cluster, ResourcePriority, LoadBalancerContext,
+          [](const std::string& cluster, Upstream::ResourcePriority priority,
+             Upstream::LoadBalancerContext* context,
              absl::optional<std::string> override_server_name) -> Tcp::ConnectionPool::Instance* {
             EXPECT_EQ(cluster, "fake_cluster");
             EXPECT_TRUE(override_server_name.has_value());
             EXPECT_EQ(override_server_name.value(), "www.example.com");
+
+            (void)priority; // suppress unused warning
+            (void)context;  // suppress unused warning
+
             return nullptr;
           }));
 
