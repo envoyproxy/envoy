@@ -468,7 +468,8 @@ TEST(HttpUtility, SendLocalGrpcReply) {
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
         EXPECT_STREQ(headers.Status()->value().c_str(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_STREQ(headers.GrpcStatus()->value().c_str(), "2"); // Unknown gRPC error.
+        EXPECT_EQ(headers.GrpcStatus()->value().c_str(),
+                  std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unknown)));
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_STREQ(headers.GrpcMessage()->value().c_str(), "large");
       }));
@@ -482,7 +483,8 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_STREQ(headers.GrpcStatus()->value().c_str(), "14"); // Unavailable
+        EXPECT_EQ(headers.GrpcStatus()->value().c_str(),
+                  std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unavailable)));
       }));
   Utility::sendLocalReply(true, callbacks, false, Http::Code::TooManyRequests, "", absl::nullopt,
                           false);
@@ -490,7 +492,8 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_STREQ(headers.GrpcStatus()->value().c_str(), "8"); // ResourceExhausted
+        EXPECT_EQ(headers.GrpcStatus()->value().c_str(),
+                  std::to_string(enumToInt(Grpc::Status::GrpcStatus::ResourceExhausted)));
       }));
   Utility::sendLocalReply(
       true, callbacks, false, Http::Code::TooManyRequests, "",

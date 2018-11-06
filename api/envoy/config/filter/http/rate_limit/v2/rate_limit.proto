@@ -41,7 +41,8 @@ message RateLimit {
   // Defaults to false.
   bool failure_mode_deny = 5;
 
-  // Specifies whether a `RESOURCE_EXHAUSTED` code must be returned instead of
-  // the default `UNAVAILABLE` code for a rate limited gRPC call.
+  // Specifies whether a `RESOURCE_EXHAUSTED` gRPC code must be returned instead
+  // of the default `UNAVAILABLE` gRPC code for a rate limited gRPC call. The
+  // HTTP code will be 200 for a gRPC response.
   bool rate_limited_as_resource_exhausted = 6;
 }
