@@ -530,6 +530,7 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
                                                           server_.startTimeCurrentEpoch());
   server_info.mutable_uptime_all_epochs()->set_seconds(current_time -
                                                        server_.startTimeFirstEpoch());
+  server_info.set_epoch(server_.options().restartEpoch());
   response.add(MessageUtil::getJsonStringFromMessage(server_info, true, true));
   headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
   return Http::Code::OK;
