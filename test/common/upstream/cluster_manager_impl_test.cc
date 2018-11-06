@@ -1716,7 +1716,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_NE(tcp2_example_com, tcp1_high);
   EXPECT_NE(tcp2_example_com, tcp2_high);
 
-  EXPECT_CALL(factory_.tls_.dispatcher_, deferredDelete_(_)).Times(10);
+  EXPECT_CALL(factory_.tls_.dispatcher_, deferredDelete_(_)).Times(6);
 
   Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb;
   EXPECT_CALL(*tcp1, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
