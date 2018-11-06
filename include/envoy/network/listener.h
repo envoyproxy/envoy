@@ -72,6 +72,12 @@ public:
    * @return const std::string& the listener's name.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return bool indicates whether write filters should be in the reversed order of the filter
+   *         chain config.
+   */
+  virtual bool reverseWriteFilterOrder() const PURE;
 };
 
 /**

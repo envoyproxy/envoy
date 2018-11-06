@@ -261,6 +261,18 @@ public:
    * @return std::chrono::milliseconds The delayed close timeout value.
    */
   virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
+
+  /**
+   * Set the order of the write filters, indicating whether it is reversed to the filter chain
+   * config.
+   */
+  virtual void setWriteFilterOrder(bool reversed) PURE;
+
+  /**
+   * @return bool indicates whether write filters should be in the reversed order of the filter
+   *         chain config.
+   */
+  virtual bool reverseWriteFilterOrder() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

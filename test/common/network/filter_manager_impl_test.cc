@@ -88,14 +88,14 @@ TEST_F(NetworkFilterManagerTest, All) {
 
   write_buffer_.add("foo");
   write_end_stream_ = false;
-  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foo"), false))
+  EXPECT_CALL(*filter, onWrite(BufferStringEqual("foo"), false))
       .WillOnce(Return(FilterStatus::StopIteration));
   manager.onWrite();
 
   write_buffer_.add("bar");
-  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foobar"), false))
-      .WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*filter, onWrite(BufferStringEqual("foobar"), false))
+      .WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foobar"), false))
       .WillOnce(Return(FilterStatus::Continue));
   manager.onWrite();
 }
@@ -136,14 +136,14 @@ TEST_F(NetworkFilterManagerTest, EndStream) {
 
   write_buffer_.add("foo");
   write_end_stream_ = true;
-  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foo"), true))
+  EXPECT_CALL(*filter, onWrite(BufferStringEqual("foo"), true))
       .WillOnce(Return(FilterStatus::StopIteration));
   manager.onWrite();
 
   write_buffer_.add("bar");
-  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foobar"), true))
-      .WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*filter, onWrite(BufferStringEqual("foobar"), true))
+      .WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foobar"), true))
       .WillOnce(Return(FilterStatus::Continue));
   manager.onWrite();
 }
