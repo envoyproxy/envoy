@@ -721,7 +721,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     FilterHeadersStatus status = (*entry)->decodeHeaders(
-        headers, decoding_headers_only_ || (end_stream && continue_data_entry == decoder_filters_.end()));
+        headers,
+        decoding_headers_only_ || (end_stream && continue_data_entry == decoder_filters_.end()));
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -1008,7 +1009,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(
-        headers, encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end()));
+        headers,
+        encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end()));
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
