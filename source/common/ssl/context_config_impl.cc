@@ -30,12 +30,6 @@ Secret::TlsCertificateConfigProviderSharedPtr getTlsCertificateConfigProvider(
     }
     auto secret_provider = factory_context.secretManager().createInlineTlsCertificateProvider(
         config.tls_certificates(0));
-    if (secret_provider->secret() == nullptr) {
-      std::cout << "debug*** secret_provider->secret() is nullptr" << std::endl;
-    } else {
-      std::cout << "debug*** secret_provider->secret():" << secret_provider->secret()->DebugString()
-                << std::endl;
-    }
     *tls_config = std::make_unique<Ssl::TlsCertificateConfigImpl>(*secret_provider->secret());
     return secret_provider;
   }
