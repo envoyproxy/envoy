@@ -32,7 +32,7 @@ bool MetadataDecoder::onMetadataFrameComplete(bool end_metadata) {
 
   if (end_metadata) {
     callback_(std::move(metadata_map_));
-    metadata_map_.reset(new MetadataMap());
+    metadata_map_ = std::make_unique<MetadataMap>();
   }
   return true;
 }

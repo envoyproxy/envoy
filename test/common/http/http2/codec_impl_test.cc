@@ -30,8 +30,8 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-typedef ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t> Http2SettingsTuple;
-typedef ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple> Http2SettingsTestParam;
+using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
+using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple>;
 
 class TestServerConnectionImpl : public ServerConnectionImpl {
 public:
@@ -68,8 +68,6 @@ public:
     bool dispatching_{};
     Buffer::OwnedImpl buffer_;
   };
-
-  Http2CodecImplTest() : client_http2settings_(), server_http2settings_() {}
 
   void initialize() {
     Http2SettingsFromTuple(client_http2settings_, ::testing::get<0>(GetParam()));
