@@ -27,7 +27,7 @@ def validateFormat(fix=False):
   """Check the format of python files in the tools directory.
 
     Arguments:
-        fix: a flag to indicate if fixes should be applied.
+      fix: a flag to indicate if fixes should be applied.
     """
   fixes_required = False
   failed_update_files = set()
