@@ -75,7 +75,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ASSERT(file_event_ == nullptr);
 
   file_event_ = cb.dispatcher().createFileEvent(
-      socket.fd(),
+      socket.ioHandle(),
       [this](uint32_t events) {
         if (events & Event::FileReadyType::Closed) {
           config_->stats().connection_closed_.inc();
@@ -145,7 +145,7 @@ void Filter::onRead() {
   // platforms.
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSizeResult result =
-      os_syscalls.recv(cb_->socket().fd(), buf_, config_->maxClientHelloSize(), MSG_PEEK);
+      os_syscalls.recv(cb_->socket().ioHandle().fd(), buf_, config_->maxClientHelloSize(), MSG_PEEK);
   ENVOY_LOG(trace, "tls inspector: recv: {}", result.rc_);
 
   if (result.rc_ == -1 && result.errno_ == EAGAIN) {

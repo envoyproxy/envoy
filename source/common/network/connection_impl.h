@@ -79,7 +79,7 @@ public:
   }
   void setConnectionStats(const ConnectionStats& stats) override;
   const Ssl::Connection* ssl() const override { return transport_socket_->ssl(); }
-  State state() const override;
+  State state() override;
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
@@ -97,7 +97,7 @@ public:
   }
 
   // Network::TransportSocketCallbacks
-  int fd() const override { return socket_->fd(); }
+  IoHandle& ioHandle() override { return socket_->ioHandle(); }
   Connection& connection() override { return *this; }
   void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?

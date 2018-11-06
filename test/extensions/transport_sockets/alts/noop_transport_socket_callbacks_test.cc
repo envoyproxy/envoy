@@ -13,9 +13,9 @@ namespace {
 class TestTransportSocketCallbacks : public Network::TransportSocketCallbacks {
 public:
   explicit TestTransportSocketCallbacks(Network::Connection& connection)
-      : connection_(connection) {}
+      : ioHandle_(1), connection_(connection) {}
 
-  int fd() const override { return 1; }
+  IoHandle& ioHandle() override { return ioHandle_; }
   Network::Connection& connection() override { return connection_; }
   bool shouldDrainReadBuffer() override { return false; }
   void setReadBufferReady() override { set_read_buffer_ready_ = true; }
@@ -27,6 +27,7 @@ public:
 private:
   bool event_raised_{false};
   bool set_read_buffer_ready_{false};
+  IoHandle ioHandle_;
   Network::Connection& connection_;
 };
 
@@ -41,7 +42,7 @@ protected:
 };
 
 TEST_F(NoOpTransportSocketCallbacksTest, TestAllCallbacks) {
-  EXPECT_EQ(wrapper_callbacks_.fd(), wrapped_callbacks_.fd());
+  EXPECT_EQ(wrapper_callbacks_.ioHandle(), wrapped_callbacks_.ioHandle());
   EXPECT_EQ(&connection_, &wrapped_callbacks_.connection());
   EXPECT_FALSE(wrapped_callbacks_.shouldDrainReadBuffer());
 

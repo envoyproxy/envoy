@@ -70,7 +70,7 @@ public:
       : ListenerImpl(dispatcher, socket, cb, bind_to_port,
                      hand_off_restored_destination_connections) {}
 
-  MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
+  MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(IoHandle& io_handle));
 };
 
 class ListenerImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -224,7 +224,7 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
 
   EXPECT_CALL(listener, getLocalAddress(_))
       .WillOnce(Invoke(
-          [](int fd) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(fd); }));
+          [](IoHandle io_handle) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(io_handle); }));
 
   EXPECT_CALL(listener_callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {

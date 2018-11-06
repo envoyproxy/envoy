@@ -1,7 +1,8 @@
 #pragma once
 
-#include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/io_handle.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/ssl/connection.h"
 
 namespace Envoy {
@@ -46,9 +47,9 @@ public:
   virtual ~TransportSocketCallbacks() {}
 
   /**
-   * @return int the file descriptor associated with the connection.
+   * @return int the I/O handle associated with the connection.
    */
-  virtual int fd() const PURE;
+  virtual IoHandle& ioHandle() PURE;
 
   /**
    * @return Network::Connection& the connection interface.

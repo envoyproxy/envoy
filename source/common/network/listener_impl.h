@@ -20,7 +20,7 @@ public:
                bool bind_to_port, bool hand_off_restored_destination_connections);
 
 protected:
-  virtual Address::InstanceConstSharedPtr getLocalAddress(int fd);
+  virtual Address::InstanceConstSharedPtr getLocalAddress(IoHandle& io_handle);
 
   Address::InstanceConstSharedPtr local_address_;
   ListenerCallbacks& cb_;

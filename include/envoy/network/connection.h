@@ -189,7 +189,7 @@ public:
   /**
    * @return State the current state of the connection.
    */
-  virtual State state() const PURE;
+  virtual State state() PURE;
 
   /**
    * Write data to the connection. Will iterate through downstream filters with the buffer if any

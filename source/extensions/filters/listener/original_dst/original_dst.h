@@ -14,7 +14,7 @@ namespace OriginalDst {
  */
 class OriginalDstFilter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  virtual Network::Address::InstanceConstSharedPtr getOriginalDst(int fd);
+  virtual Network::Address::InstanceConstSharedPtr getOriginalDst(Network::IoHandle& io_handle);
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;

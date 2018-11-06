@@ -293,7 +293,7 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
+Address::InstanceConstSharedPtr Utility::getOriginalDst(IoHandle& io_handle) {
 #ifdef SOL_IP
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
@@ -301,7 +301,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
   socklen_t domain_len = sizeof(socket_domain);
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   const Api::SysCallIntResult result =
-      os_syscalls.getsockopt(fd, SOL_SOCKET, SO_DOMAIN, &socket_domain, &domain_len);
+      os_syscalls.getsockopt(io_handle, SOL_SOCKET, SO_DOMAIN, &socket_domain, &domain_len);
   int status = result.rc_;
 
   if (status != 0) {
@@ -309,9 +309,9 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
   }
 
   if (socket_domain == AF_INET) {
-    status = os_syscalls.getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
+    status = os_syscalls.getsockopt(io_handle, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
   } else if (socket_domain == AF_INET6) {
-    status = os_syscalls.getsockopt(fd, SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
+    status = os_syscalls.getsockopt(io_handle, SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
   } else {
     return nullptr;
   }
@@ -333,7 +333,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
 #else
   // TODO(zuercher): determine if connection redirection is possible under OS X (c.f. pfctl and
   // divert), and whether it's possible to find the learn destination address.
-  UNREFERENCED_PARAMETER(fd);
+  UNREFERENCED_PARAMETER(io_handle);
   return nullptr;
 #endif
 }

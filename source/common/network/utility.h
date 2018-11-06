@@ -166,7 +166,7 @@ public:
    * @param fd is the descriptor returned by accept()
    * @return the original destination or nullptr if not available.
    */
-  static Address::InstanceConstSharedPtr getOriginalDst(int fd);
+  static Address::InstanceConstSharedPtr getOriginalDst(IoHandle& io_handle);
 
   /**
    * Parses a string containing a comma-separated list of port numbers and/or

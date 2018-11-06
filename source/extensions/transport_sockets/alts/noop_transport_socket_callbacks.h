@@ -5,6 +5,8 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 
+using Envoy::Network::IoHandle;
+
 /**
  * A TransportSocketCallbacks for wrapped TransportSocket object. Some
  * TransportSocket implementation wraps another socket which does actual I/O.
@@ -16,7 +18,7 @@ public:
   explicit NoOpTransportSocketCallbacks(Network::TransportSocketCallbacks& parent)
       : parent_(parent) {}
 
-  int fd() const override { return parent_.fd(); }
+  IoHandle& ioHandle() override { return parent_.ioHandle(); }
   Network::Connection& connection() override { return parent_.connection(); }
   bool shouldDrainReadBuffer() override { return false; }
   /*

@@ -29,15 +29,15 @@ class Writer : public ThreadLocal::ThreadLocalObject {
 public:
   Writer(Network::Address::InstanceConstSharedPtr address);
   // For testing.
-  Writer() : fd_(-1) {}
+  Writer() : io_handle_(-1) {}
   virtual ~Writer();
 
   virtual void write(const std::string& message);
   // Called in unit test to validate address.
-  int getFdForTests() const { return fd_; };
+  int getFdForTests() const { return io_handle_; };
 
 private:
-  int fd_;
+  Network::IoHandle io_handle_;
 };
 
 /**

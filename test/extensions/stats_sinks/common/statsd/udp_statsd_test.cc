@@ -40,10 +40,10 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
       Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:8125", Network::Test::getLoopbackAddressUrlString(GetParam())));
   UdpStatsdSink sink(tls_, server_address, false);
-  int fd = sink.getFdForTests();
-  EXPECT_NE(fd, -1);
+  Network::IoHandle io_handle = sink.getFdForTests();
+  EXPECT_NE(io_handle, -1);
 
-  // Check that fd has not changed.
+  // Check that io_handle has not changed.
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
   counter->used_ = true;
@@ -62,12 +62,12 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   timer.name_ = "test_timer";
   sink.onHistogramComplete(timer, 5);
 
-  EXPECT_EQ(fd, sink.getFdForTests());
+  EXPECT_EQ(io_handle, sink.getFdForTests());
 
   if (GetParam() == Network::Address::IpVersion::v4) {
-    EXPECT_EQ("127.0.0.1:8125", Network::Address::peerAddressFromFd(fd)->asString());
+    EXPECT_EQ("127.0.0.1:8125", Network::Address::peerAddressFromFd(io_handle)->asString());
   } else {
-    EXPECT_EQ("[::1]:8125", Network::Address::peerAddressFromFd(fd)->asString());
+    EXPECT_EQ("[::1]:8125", Network::Address::peerAddressFromFd(io_handle)->asString());
   }
   tls_.shutdownThread();
 }
@@ -85,10 +85,10 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
       Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:8125", Network::Test::getLoopbackAddressUrlString(GetParam())));
   UdpStatsdSink sink(tls_, server_address, true);
-  int fd = sink.getFdForTests();
-  EXPECT_NE(fd, -1);
+  Network::IoHandle io_handle = sink.getFdForTests();
+  EXPECT_NE(io_handle, -1);
 
-  // Check that fd has not changed.
+  // Check that io_handle has not changed.
   std::vector<Stats::Tag> tags = {Stats::Tag{"node", "test"}};
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
@@ -111,12 +111,12 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
   timer.tags_ = tags;
   sink.onHistogramComplete(timer, 5);
 
-  EXPECT_EQ(fd, sink.getFdForTests());
+  EXPECT_EQ(io_handle, sink.getFdForTests());
 
   if (GetParam() == Network::Address::IpVersion::v4) {
-    EXPECT_EQ("127.0.0.1:8125", Network::Address::peerAddressFromFd(fd)->asString());
+    EXPECT_EQ("127.0.0.1:8125", Network::Address::peerAddressFromFd(io_handle)->asString());
   } else {
-    EXPECT_EQ("[::1]:8125", Network::Address::peerAddressFromFd(fd)->asString());
+    EXPECT_EQ("[::1]:8125", Network::Address::peerAddressFromFd(io_handle)->asString());
   }
   tls_.shutdownThread();
 }

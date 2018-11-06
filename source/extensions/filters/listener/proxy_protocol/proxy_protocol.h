@@ -74,12 +74,12 @@ private:
    * throws EnvoyException on any socket errors.
    * @return bool true valid header, false if more data is needed.
    */
-  bool readProxyHeader(int fd);
+  bool readProxyHeader(Network::IoHandle& io_handle);
 
   /**
    * Parse (and discard unknown) header extensions (until hdr.extensions_length == 0)
    */
-  bool parseExtensions(int fd);
+  bool parseExtensions(Network::IoHandle& io_handle);
 
   /**
    * Given a char * & len, parse the header as per spec
