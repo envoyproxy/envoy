@@ -36,9 +36,10 @@ public:
 
   bool isReady() const override {
     // Either tls_certficate_provider_ is nullptr or
-    // tls_certficate_provider_->secret() is NOT nullptr and
+    // tls_certificate_config_ is NOT nullptr and
+    // either default_cvc_ is nullptr or validation_context_config_ is NOT nullptr and
     // either certficate_validation_context_provider_ is nullptr or
-    // certficate_validation_context_provider_->secret() is NOT nullptr.
+    // default_cvc_ is NOT nullptr or validation_context_config_ is NOT nullptr.
     bool tls_is_ready = (!tls_certficate_provider_ || tls_certificate_config_);
     bool combined_cvc_is_ready = (!default_cvc_ || validation_context_config_);
     bool cvc_is_ready =
