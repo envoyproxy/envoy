@@ -993,22 +993,24 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
 
 PerFilterConfigs::PerFilterConfigs(
     const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
-    Server::Configuration::FactoryContext& factory_context) {
-  for (const auto& cfg : configs) {
-    const std::string& name = cfg.first;
-    const ProtobufWkt::Struct& struct_config = cfg.second;
-
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<
-        Server::Configuration::NamedHttpFilterConfigFactory>(name);
-
-    auto object = factory.createRouteSpecificFilterConfig(
-        *Envoy::Config::Utility::translateToFactoryRouteConfig(struct_config, factory),
-        factory_context);
-    if (object) {
-      configs_[name] = object;
-    }
-  }
-}
+    Server::Configuration::FactoryContext& factory_context)
+    : configs_(Envoy::Config::Utility::translateOpaqueConfigMap<
+               RouteSpecificFilterConfigConstSharedPtr,
+               Server::Configuration::NamedHttpFilterConfigFactory>(
+          configs,
+          [](const std::string& name) -> Server::Configuration::NamedHttpFilterConfigFactory& {
+            return Envoy::Config::Utility::getAndCheckFactory<
+                Server::Configuration::NamedHttpFilterConfigFactory>(name);
+          },
+          [](Server::Configuration::NamedHttpFilterConfigFactory& factory, const std::string&) {
+            auto message = factory.createEmptyRouteConfigProto();
+            RELEASE_ASSERT(message != nullptr, "");
+            return message;
+          },
+          [&factory_context](Server::Configuration::NamedHttpFilterConfigFactory& factory,
+                             const Protobuf::Message& config) {
+            return factory.createRouteSpecificFilterConfig(config, factory_context);
+          })) {}
 
 const RouteSpecificFilterConfig* PerFilterConfigs::get(const std::string& name) const {
   auto it = configs_.find(name);

@@ -42,6 +42,7 @@
 
 #include "server/init_manager_impl.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -447,7 +448,8 @@ private:
   mutable ClusterLoadReportStats load_report_stats_;
   const uint64_t features_;
   const Http::Http2Settings http2_settings_;
-  const std::map<std::string, ProtocolOptionsConfigConstSharedPtr> extension_protocol_options_;
+  const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
+      extension_protocol_options_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
   const Network::Address::InstanceConstSharedPtr source_address_;

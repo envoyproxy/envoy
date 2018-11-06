@@ -25,6 +25,7 @@
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/router/router_ratelimit.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -56,7 +57,7 @@ public:
   const RouteSpecificFilterConfig* get(const std::string& name) const;
 
 private:
-  std::unordered_map<std::string, RouteSpecificFilterConfigConstSharedPtr> configs_;
+  const absl::flat_hash_map<std::string, RouteSpecificFilterConfigConstSharedPtr> configs_;
 };
 
 class RouteEntryImplBase;

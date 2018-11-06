@@ -23,6 +23,8 @@
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -275,45 +277,32 @@ public:
   }
 
   /**
-   * Translate a nested config into a route-specific proto message provided by
-   * the implementation factory.
-   * @param source Protobuf::Message containing the opaque config for the given factory's
-   *        route-local configuration.
-   * @param factory Server::Configuration::NamedHttpFilterConfigFactory implementation
-   * @return ProtobufTypes::MessagePtr the translated config
+   * Translate an opaque config map into a map of config objects provided by implementation factory.
+   * @param opaque_config_map the proto map from name to opaque config struct.
+   * @param factory_lookup a function to lookup factory from name.
+   * @param message_factory a function to create empty proto message from the factory.
+   * @param object_factory a function to create the config object from the message.
    */
-  static ProtobufTypes::MessagePtr
-  translateToFactoryRouteConfig(const Protobuf::Message& source,
-                                Server::Configuration::NamedHttpFilterConfigFactory& factory) {
-    ProtobufTypes::MessagePtr config = factory.createEmptyRouteConfigProto();
+  template <class ConfigObject, class Factory>
+  static absl::flat_hash_map<std::string, ConfigObject> translateOpaqueConfigMap(
+      const Protobuf::Map<std::string, ProtobufWkt::Struct>& opaque_config_map,
+      std::function<Factory&(const std::string&)> factory_lookup,
+      std::function<ProtobufTypes::MessagePtr(Factory&, const std::string&)> message_factory,
+      std::function<ConfigObject(Factory&, Protobuf::Message&)> object_factory) {
+    absl::flat_hash_map<std::string, ConfigObject> result;
+    for (const auto& cfg : opaque_config_map) {
+      auto& factory = factory_lookup(cfg.first);
+      ProtobufTypes::MessagePtr message = message_factory(factory, cfg.first);
 
-    // Fail in an obvious way if a plugin does not return a proto.
-    RELEASE_ASSERT(config != nullptr, "");
+      MessageUtil::jsonConvert(cfg.second, *message);
 
-    MessageUtil::jsonConvert(source, *config);
-    return config;
-  }
-
-  /**
-   * Translate a nested config into a protocol-specific options proto message provided by the
-   * implementation factory.
-   * @param source Protobuf::Message containing the opaque config for the given factory's
-   *        protocol specific configuration.
-   * @param factory Server::Configuration::NamedNetworkFilterConfigFactory implementation
-   * @return ProtobufTypes::MessagePtr the translated config
-   * @throws EnvoyException if the factory does not support protocol options
-   */
-  static ProtobufTypes::MessagePtr
-  translateToFactoryProtocolOptionsConfig(const Protobuf::Message& source, const std::string& name,
-                                          Server::Configuration::ProtocolOptionsFactory& factory) {
-    ProtobufTypes::MessagePtr config = factory.createEmptyProtocolOptionsProto();
-
-    if (config == nullptr) {
-      throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
+      ConfigObject object = object_factory(factory, *message);
+      if (object) {
+        result.emplace(cfg.first, std::move(object));
+      }
     }
 
-    MessageUtil::jsonConvert(source, *config);
-    return config;
+    return result;
   }
 
   /**

@@ -113,35 +113,39 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
   return cluster_options;
 }
 
-std::map<std::string, ProtocolOptionsConfigConstSharedPtr>
+absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
 parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
-  std::map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
-  for (const auto& iter : config.extension_protocol_options()) {
-    const std::string& name = iter.first;
-    const ProtobufWkt::Struct& config_struct = iter.second;
-    Server::Configuration::ProtocolOptionsFactory* factory = nullptr;
+  return Envoy::Config::Utility::translateOpaqueConfigMap<
+      ProtocolOptionsConfigConstSharedPtr, Server::Configuration::ProtocolOptionsFactory>(
+      config.extension_protocol_options(),
+      [](const std::string& name) -> Server::Configuration::ProtocolOptionsFactory& {
+        Server::Configuration::ProtocolOptionsFactory* factory = nullptr;
 
-    factory = Registry::FactoryRegistry<
-        Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(name);
-    if (factory == nullptr) {
-      factory = Registry::FactoryRegistry<
-          Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(name);
-    }
+        factory = Registry::FactoryRegistry<
+            Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(name);
+        if (factory == nullptr) {
+          factory = Registry::FactoryRegistry<
+              Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(name);
+        }
 
-    if (factory == nullptr) {
-      throw EnvoyException(fmt::format(
-          "Didn't find a registered network or http filter implementation for name: '{}'", name));
-    }
+        if (factory == nullptr) {
+          throw EnvoyException(fmt::format(
+              "Didn't find a registered network or http filter implementation for name: '{}'",
+              name));
+        }
 
-    auto object = factory->createProtocolOptionsConfig(
-        *Envoy::Config::Utility::translateToFactoryProtocolOptionsConfig(config_struct, name,
-                                                                         *factory));
-    if (object) {
-      options[name] = object;
-    }
-  }
-
-  return options;
+        return *factory;
+      },
+      [](Server::Configuration::ProtocolOptionsFactory& factory, const std::string& name) {
+        auto message = factory.createEmptyProtocolOptionsProto();
+        if (message == nullptr) {
+          throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
+        }
+        return message;
+      },
+      [](Server::Configuration::ProtocolOptionsFactory& factory, const Protobuf::Message& config) {
+        return factory.createProtocolOptionsConfig(config);
+      });
 }
 
 } // namespace
