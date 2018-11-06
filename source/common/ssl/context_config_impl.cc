@@ -145,13 +145,16 @@ ContextConfigImpl::ContextConfigImpl(
       max_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(), TLS1_2_VERSION)) {
   if (default_cvc_) {
+    // We need to validate combined certificate validation context.
+    // The default certificate validation context and dynamic certificate validation
+    // context could only contain partial fields, which is okay to fail the validation.
+    // But the combined certificate validation context should pass validation.
     cvc_validation_callback_handle_ =
         dynamic_cast<Secret::CertificateValidationContextSdsApi*>(
             certficate_validation_context_provider_.get())
             ->addValidationCallback(
                 [this](const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
                   getCombinedValidationContextConfig(dynamic_cvc);
-                  validation_context_config_.reset();
                 });
   }
 }
@@ -168,6 +171,8 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
     if (tc_update_callback_handle_) {
       tc_update_callback_handle_->remove();
     }
+    // Once SdsApi gets updated, this callback updates ContextConfigImpl::tls_certificate_config_
+    // with new secret.
     tc_update_callback_handle_ = tls_certficate_provider_->addUpdateCallback([this, callback]() {
       tls_certificate_config_ =
           std::make_unique<Ssl::TlsCertificateConfigImpl>(*tls_certficate_provider_->secret());
@@ -179,6 +184,10 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
       cvc_update_callback_handle_->remove();
     }
     if (default_cvc_) {
+      // Once SdsApi gets updated, this callback updates
+      // ContextConfigImpl::validation_context_config_ with a combined certificate validation
+      // context. The combined certificate validation context is created by merging new secret into
+      // default_cvc_.
       cvc_update_callback_handle_ =
           certficate_validation_context_provider_->addUpdateCallback([this, callback]() {
             validation_context_config_ = getCombinedValidationContextConfig(
@@ -186,6 +195,8 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
             callback();
           });
     } else {
+      // Once SdsApi gets updated, this callback updates
+      // ContextConfigImpl::validation_context_config_ with new secret.
       cvc_update_callback_handle_ =
           certficate_validation_context_provider_->addUpdateCallback([this, callback]() {
             validation_context_config_ =

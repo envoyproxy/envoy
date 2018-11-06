@@ -175,7 +175,7 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   auto* secret_config = secret_resources.Add();
   secret_config->set_name("abc.com");
   auto* dynamic_cvc = secret_config->mutable_validation_context();
-  dynamic_cvc->set_allow_expired_certificate(true);
+  dynamic_cvc->set_allow_expired_certificate(false);
   dynamic_cvc->mutable_trusted_ca()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
   dynamic_cvc->add_verify_subject_alt_name("second san");
@@ -189,15 +189,17 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   const std::string default_verify_certificate_hash =
       "0000000000000000000000000000000000000000000000000000000000000000";
   envoy::api::v2::auth::CertificateValidationContext default_cvc;
-  default_cvc.set_allow_expired_certificate(false);
+  default_cvc.set_allow_expired_certificate(true);
   default_cvc.mutable_trusted_ca()->set_inline_bytes("fake trusted ca");
   default_cvc.add_verify_subject_alt_name("first san");
   default_cvc.add_verify_certificate_hash(default_verify_certificate_hash);
   envoy::api::v2::auth::CertificateValidationContext merged_cvc = default_cvc;
   merged_cvc.MergeFrom(*sds_api.secret());
   Ssl::CertificateValidationContextConfigImpl cvc_config(merged_cvc);
-  // Verify that singular fields are overwritten.
+  // Verify that merging CertificateValidationContext applies logical OR to bool
+  // field.
   EXPECT_TRUE(cvc_config.allowExpiredCertificate());
+  // Verify that singular fields are overwritten.
   const std::string ca_cert = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
             cvc_config.caCert());
