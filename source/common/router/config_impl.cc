@@ -743,7 +743,7 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
                                          const envoy::api::v2::route::Route& route,
                                          Server::Configuration::FactoryContext& factory_context)
     : RouteEntryImplBase(vhost, route, factory_context),
-      regex_(RegexUtil::parseRegex(route.match().regex().c_str())),
+      regex_(RegexUtil::parseRegex(route.match().regex())),
       regex_str_(route.match().regex()) {}
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
