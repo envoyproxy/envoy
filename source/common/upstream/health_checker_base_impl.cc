@@ -251,7 +251,7 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
     }
   }
 
-  if (first_check_ || parent_.always_log_health_check_failures_) {
+  if ((first_check_ || parent_.always_log_health_check_failures_) && parent_.event_logger_) {
     parent_.event_logger_->logUnhealthy(parent_.healthCheckerType(), host_, type, first_check_);
   }
 
