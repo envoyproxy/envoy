@@ -36,6 +36,8 @@ public:
   const std::string Rbac = "envoy.filters.network.rbac";
   // SNI Cluster filter
   const std::string SniCluster = "envoy.filters.network.sni_cluster";
+  // Forward Original SNI filter
+  const std::string ForwardOriginalSni = "envoy.filters.network.forward_original_sni";
 
   // Converts names from v1 to v2
   const Config::V1Converter v1_converter_;

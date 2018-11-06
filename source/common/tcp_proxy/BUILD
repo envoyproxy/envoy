@@ -36,6 +36,7 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:metadatamatchcriteria_lib",
+        "//source/common/stream_info:forward_requested_server_name_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/upstream:load_balancer_lib",
         "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:tcp_proxy_cc",

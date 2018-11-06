@@ -148,20 +148,23 @@ parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
 
 Host::CreateConnectionData
 HostImpl::createConnection(Event::Dispatcher& dispatcher,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options) const {
-  return {createConnection(dispatcher, *cluster_, address_, options), shared_from_this()};
+                           const Network::ConnectionSocket::OptionsSharedPtr& options,
+                           absl::optional<std::string> override_server_name) const {
+  return {createConnection(dispatcher, *cluster_, address_, options, override_server_name),
+          shared_from_this()};
 }
 
 Host::CreateConnectionData
 HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), nullptr),
+  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), nullptr, absl::nullopt),
           shared_from_this()};
 }
 
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                            Network::Address::InstanceConstSharedPtr address,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options) {
+                           const Network::ConnectionSocket::OptionsSharedPtr& options,
+                           absl::optional<std::string> override_server_name) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
   if (cluster.clusterSocketOptions() != nullptr) {
     if (options) {
@@ -177,7 +180,8 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   }
 
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
+      address, cluster.sourceAddress(),
+      cluster.transportSocketFactory().createTransportSocket(override_server_name),
       connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;

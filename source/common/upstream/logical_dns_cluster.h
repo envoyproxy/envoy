@@ -53,7 +53,8 @@ private:
     // Upstream::Host
     CreateConnectionData
     createConnection(Event::Dispatcher& dispatcher,
-                     const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
+                     const Network::ConnectionSocket::OptionsSharedPtr& options,
+                     absl::optional<std::string> override_server_name) const override;
 
     // Upstream::HostDescription
     // Override setting health check address, since for logical DNS the registered host has 0.0.0.0

@@ -116,7 +116,7 @@ public:
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-    logical_host->createConnection(dispatcher_, nullptr);
+    logical_host->createConnection(dispatcher_, nullptr, absl::nullopt);
     logical_host->outlierDetector().putHttpResponseCode(200);
 
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
@@ -135,7 +135,8 @@ public:
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-    Host::CreateConnectionData data = logical_host->createConnection(dispatcher_, nullptr);
+    Host::CreateConnectionData data =
+        logical_host->createConnection(dispatcher_, nullptr, absl::nullopt);
     EXPECT_FALSE(data.host_description_->canary());
     EXPECT_EQ(&cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->cluster(),
               &data.host_description_->cluster());
@@ -167,7 +168,7 @@ public:
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-    logical_host->createConnection(dispatcher_, nullptr);
+    logical_host->createConnection(dispatcher_, nullptr, absl::nullopt);
 
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     resolve_timer_->callback_();
@@ -181,7 +182,7 @@ public:
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-    logical_host->createConnection(dispatcher_, nullptr);
+    logical_host->createConnection(dispatcher_, nullptr, absl::nullopt);
 
     // Make sure we cancel.
     EXPECT_CALL(active_dns_query_, cancel());
