@@ -233,11 +233,22 @@ private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
 };
 
+class MockClusterUpdateCallbacksHandle : public ClusterUpdateCallbacksHandle {
+public:
+  MockClusterUpdateCallbacksHandle();
+  ~MockClusterUpdateCallbacksHandle();
+};
+
 class MockClusterManager : public ClusterManager {
 public:
   explicit MockClusterManager(TimeSource& time_source);
   MockClusterManager();
   ~MockClusterManager();
+
+  ClusterUpdateCallbacksHandlePtr
+  addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) override {
+    return ClusterUpdateCallbacksHandlePtr{addThreadLocalClusterUpdateCallbacks_(callbacks)};
+  }
 
   Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
                                                LoadBalancerContext* context) override {
@@ -271,8 +282,8 @@ public:
   MOCK_METHOD0(grpcAsyncClientManager, Grpc::AsyncClientManager&());
   MOCK_CONST_METHOD0(versionInfo, const std::string());
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
-  MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks,
-               std::unique_ptr<ClusterUpdateCallbacksHandle>(ClusterUpdateCallbacks& callbacks));
+  MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks_,
+               ClusterUpdateCallbacksHandle*(ClusterUpdateCallbacks& callbacks));
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;

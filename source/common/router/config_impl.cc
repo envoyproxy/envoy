@@ -320,7 +320,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
     if (filter_it != route.route().metadata_match().filter_metadata().end()) {
-      metadata_match_criteria_.reset(new MetadataMatchCriteriaImpl(filter_it->second));
+      metadata_match_criteria_ = std::make_unique<MetadataMatchCriteriaImpl>(filter_it->second);
     }
   }
 
@@ -358,7 +358,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   if (!route.route().hash_policy().empty()) {
-    hash_policy_.reset(new HashPolicyImpl(route.route().hash_policy()));
+    hash_policy_ = std::make_unique<HashPolicyImpl>(route.route().hash_policy());
   }
 
   // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
@@ -368,7 +368,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
        PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false));
 
   if (route.route().has_cors()) {
-    cors_policy_.reset(new CorsPolicyImpl(route.route().cors()));
+    cors_policy_ = std::make_unique<CorsPolicyImpl>(route.route().cors());
   }
 }
 
@@ -465,6 +465,42 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
   headers.Path()->value(path.replace(0, matched_path.size(), rewrite));
 }
 
+absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& headers,
+                                                         const absl::string_view& new_scheme,
+                                                         const absl::string_view& new_port) const {
+
+  absl::string_view request_host = headers.Host()->value().getStringView();
+  size_t host_end;
+  // Detect if IPv6 URI
+  if (request_host[0] == '[') {
+    host_end = request_host.rfind("]:");
+    if (host_end != absl::string_view::npos) {
+      host_end += 1; // advance to :
+    }
+  } else {
+    host_end = request_host.rfind(":");
+  }
+
+  if (host_end != absl::string_view::npos) {
+    absl::string_view request_port = request_host.substr(host_end);
+    absl::string_view request_protocol = headers.ForwardedProto()->value().getStringView();
+    bool remove_port = !new_port.empty();
+
+    if (new_scheme != request_protocol) {
+      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Https.c_str()) &&
+                     request_port == ":443";
+      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Http.c_str()) &&
+                     request_port == ":80";
+    }
+
+    if (remove_port) {
+      return request_host.substr(0, host_end);
+    }
+  }
+
+  return request_host;
+}
+
 std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
   ASSERT(isDirectResponse());
 
@@ -492,22 +528,7 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
     final_host = host_redirect_.c_str();
   } else {
     ASSERT(headers.Host());
-    final_host = headers.Host()->value().c_str();
-    if (!final_port.empty()) {
-      size_t host_end;
-      // Detect if IPv6 URI
-      if (final_host[0] == '[') {
-        host_end = final_host.rfind("]:");
-        if (host_end != absl::string_view::npos) {
-          host_end += 1; // advance to :
-        }
-      } else {
-        host_end = final_host.rfind(":");
-      }
-      if (host_end != absl::string_view::npos) {
-        final_host = final_host.substr(0, host_end);
-      }
-    }
+    final_host = processRequestHost(headers, final_scheme, final_port);
   }
 
   if (!path_redirect_.empty()) {
@@ -648,7 +669,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
         cluster_metadata_match_criteria_ =
             parent->metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
       } else {
-        cluster_metadata_match_criteria_.reset(new MetadataMatchCriteriaImpl(filter_it->second));
+        cluster_metadata_match_criteria_ =
+            std::make_unique<MetadataMatchCriteriaImpl>(filter_it->second);
       }
     }
   }
@@ -806,7 +828,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
   }
 
   if (virtual_host.has_cors()) {
-    cors_policy_.reset(new CorsPolicyImpl(virtual_host.cors()));
+    cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors());
   }
 }
 
@@ -955,9 +977,9 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
                        Server::Configuration::FactoryContext& factory_context,
                        bool validate_clusters_default)
     : name_(config.name()) {
-  route_matcher_.reset(new RouteMatcher(
+  route_matcher_ = std::make_unique<RouteMatcher>(
       config, *this, factory_context,
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default)));
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));
 
   for (const std::string& header : config.internal_only_headers()) {
     internal_only_headers_.push_back(Http::LowerCaseString(header));

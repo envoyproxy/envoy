@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/http/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
 

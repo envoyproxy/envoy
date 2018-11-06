@@ -205,13 +205,13 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
                                        Event::TestTimeSystem& time_system)
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
-    codec_.reset(new Http::Http1::ServerConnectionImpl(shared_connection_.connection(), *this,
-                                                       Http::Http1Settings()));
+    codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(shared_connection_.connection(),
+                                                                 *this, Http::Http1Settings());
   } else {
     auto settings = Http::Http2Settings();
     settings.allow_connect_ = true;
-    codec_.reset(new Http::Http2::ServerConnectionImpl(shared_connection_.connection(), *this,
-                                                       store, settings));
+    codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(shared_connection_.connection(),
+                                                                 *this, store, settings);
     ASSERT(type == Type::HTTP2);
   }
 
@@ -369,7 +369,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close), listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
-  thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
+  thread_ = std::make_unique<Thread::Thread>([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
 }
 

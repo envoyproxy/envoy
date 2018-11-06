@@ -53,14 +53,14 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
   case Server::Mode::Serve: {
 #ifdef ENVOY_HOT_RESTART
     if (!options.hotRestartDisabled()) {
-      restarter_.reset(new Server::HotRestartImpl(options_));
+      restarter_ = std::make_unique<Server::HotRestartImpl>(options_);
     }
 #endif
-    if (restarter_.get() == nullptr) {
-      restarter_.reset(new Server::HotRestartNopImpl());
+    if (restarter_ == nullptr) {
+      restarter_ = std::make_unique<Server::HotRestartNopImpl>();
     }
 
-    tls_.reset(new ThreadLocal::InstanceImpl);
+    tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
@@ -78,7 +78,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
     break;
   }
   case Server::Mode::Validate:
-    restarter_.reset(new Server::HotRestartNopImpl());
+    restarter_ = std::make_unique<Server::HotRestartNopImpl>();
     logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
                                                          restarter_->logLock());
     break;

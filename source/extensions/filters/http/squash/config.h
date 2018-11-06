@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/filter/http/squash/v2/squash.pb.h"
+#include "envoy/config/filter/http/squash/v2/squash.pb.validate.h"
 
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"

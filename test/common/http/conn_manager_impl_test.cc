@@ -99,7 +99,7 @@ public:
 
   void setup(bool ssl, const std::string& server_name, bool tracing = true) {
     if (ssl) {
-      ssl_connection_.reset(new Ssl::MockConnection());
+      ssl_connection_ = std::make_unique<Ssl::MockConnection>();
     }
 
     server_name_ = server_name;
@@ -110,14 +110,15 @@ public:
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
     filter_callbacks_.connection_.remote_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    conn_manager_.reset(new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_,
-                                                  local_info_, cluster_manager_, &overload_manager_,
-                                                  test_time_.timeSystem()));
+    conn_manager_ = std::make_unique<ConnectionManagerImpl>(
+        *this, drain_close_, random_, tracer_, runtime_, local_info_, cluster_manager_,
+        &overload_manager_, test_time_.timeSystem());
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
     if (tracing) {
-      tracing_config_.reset(new TracingConnectionManagerConfig(
-          {Tracing::OperationName::Ingress, {LowerCaseString(":method")}, 100, 10000, 100}));
+      tracing_config_ =
+          std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
+              Tracing::OperationName::Ingress, {LowerCaseString(":method")}, 100, 10000, 100});
     }
   }
 
@@ -755,8 +756,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
 
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorator) {
   setup(false, "");
-  tracing_config_.reset(new TracingConnectionManagerConfig(
-      {Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100}));
+  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
+      Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100});
 
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
@@ -822,8 +823,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
 
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecoratorOverrideOp) {
   setup(false, "");
-  tracing_config_.reset(new TracingConnectionManagerConfig(
-      {Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100}));
+  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
+      Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100});
 
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
@@ -884,8 +885,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
 TEST_F(HttpConnectionManagerImplTest,
        StartAndFinishSpanNormalFlowEgressDecoratorOverrideOpNoActiveSpan) {
   setup(false, "");
-  tracing_config_.reset(new TracingConnectionManagerConfig(
-      {Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100}));
+  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
+      Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100});
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(false));

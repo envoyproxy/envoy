@@ -229,7 +229,7 @@ protected:
   void completeRequest(const std::string& status, const std::string& body) {
     Http::MessagePtr msg(new Http::ResponseMessageImpl(
         Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", status}}}));
-    msg->body().reset(new Buffer::OwnedImpl(body));
+    msg->body() = std::make_unique<Buffer::OwnedImpl>(body);
     popPendingCallback()->onSuccess(std::move(msg));
   }
 
