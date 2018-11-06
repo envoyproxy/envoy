@@ -1,7 +1,7 @@
 #pragma once
 
 namespace Envoy {
-    namespace Extensions {
+namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 
@@ -43,4 +43,4 @@ private:
 } // namespace MysqlProxy
 } // namespace NetworkFilters
 } // namespace Extensions
-    } // namespace Envoy
+} // namespace Envoy

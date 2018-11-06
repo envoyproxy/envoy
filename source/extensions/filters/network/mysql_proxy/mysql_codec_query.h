@@ -2,7 +2,7 @@
 #include "common/buffer/buffer_impl.h"
 
 namespace Envoy {
-    namespace Extensions {
+namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 

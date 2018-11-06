@@ -1,9 +1,10 @@
 #pragma once
 #include "common/buffer/buffer_impl.h"
+
 #include "mysql_codec.h"
 
 namespace Envoy {
-    namespace Extensions {
+namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 
@@ -20,8 +21,8 @@ public:
   int Decode(Buffer::Instance& buffer);
   std::string Encode();
 };
- 
+
 } // namespace MysqlProxy
 } // namespace NetworkFilters
 } // namespace Extensions
-    } // namespace Envoy
+} // namespace Envoy

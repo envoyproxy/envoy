@@ -3,7 +3,7 @@
 #include "common/common/logger.h"
 
 namespace Envoy {
-    namespace Extensions {
+namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 
@@ -123,10 +123,12 @@ public:
   };
 
   union MysqlHeader {
-    struct {
-      uint32_t length : 24;
-      uint32_t seq : 8;
-    } __attribute__((packed)) fields;
+    PACKED_STRUCT(
+        struct {
+          uint32_t length : 24;
+          uint32_t seq : 8;
+        },
+        fields);
     uint32_t bits;
   };
 
@@ -160,4 +162,4 @@ private:
 } // namespace MysqlProxy
 } // namespace NetworkFilters
 } // namespace Extensions
-    } // namespace Envoy
+} // namespace Envoy

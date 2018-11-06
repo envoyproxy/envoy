@@ -1,16 +1,18 @@
-#include "extensions/filters/network/mysql_proxy/mysql_filter.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
-#include "mysql_test_utils.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "extensions/filters/network/mysql_proxy/mysql_filter.h"
+
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/network/mocks.h"
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "mysql_test_utils.h"
+
 using testing::NiceMock;
 
 namespace Envoy {
-  namespace Extensions {
+namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 
@@ -430,5 +432,5 @@ TEST_F(MysqlFilterTest, MySqlHandshake320AuthSwitchWromgSeqTest) {
 
 } // namespace MysqlProxy
 } // namespace NetworkFilters
-    } // namespace Extensions
+} // namespace Extensions
 } // namespace Envoy

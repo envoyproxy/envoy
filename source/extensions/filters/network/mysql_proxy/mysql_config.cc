@@ -1,14 +1,16 @@
-#include <string>
-
-#include "common/common/logger.h"
 #include "mysql_config.h"
-#include "mysql_filter.h"
+
+#include <string>
 
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "common/common/logger.h"
+
+#include "mysql_filter.h"
+
 namespace Envoy {
-  namespace Extensions {
+namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 
@@ -40,4 +42,4 @@ static Registry::RegisterFactory<MysqlConfigFactory,
 } // namespace MysqlProxy
 } // namespace NetworkFilters
 } // namespace Extensions
-  } // namespace Envoy
+} // namespace Envoy

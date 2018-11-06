@@ -1,8 +1,9 @@
 #include "mysql_codec_greeting.h"
+
 #include "mysql_codec.h"
 
 namespace Envoy {
-  namespace Extensions {
+namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 
@@ -113,4 +114,4 @@ std::string ServerGreeting::Encode() {
 } // namespace MysqlProxy
 } // namespace NetworkFilters
 } // namespace Extensions
-  } // namespace Envoy
+} // namespace Envoy

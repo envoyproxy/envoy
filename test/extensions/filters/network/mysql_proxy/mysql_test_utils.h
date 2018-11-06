@@ -3,11 +3,12 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_loginok.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
+
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 
 namespace Envoy {
-    namespace Extensions {
+namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 
@@ -98,5 +99,5 @@ std::string MysqlTestUtils::EncodeAuthSwitchResp() {
 
 } // namespace MysqlProxy
 } // namespace NetworkFilters
- } // namespace Extensions
+} // namespace Extensions
 } // namespace Envoy

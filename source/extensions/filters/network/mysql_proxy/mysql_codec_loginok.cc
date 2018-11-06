@@ -1,8 +1,9 @@
 #include "mysql_codec_loginok.h"
+
 #include "mysql_codec.h"
 
 namespace Envoy {
-  namespace Extensions {
+namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 
@@ -81,4 +82,4 @@ std::string ClientLoginResponse::Encode() {
 } // namespace MysqlProxy
 } // namespace NetworkFilters
 } // namespace Extensions
-  } // namespace Envoy
+} // namespace Envoy

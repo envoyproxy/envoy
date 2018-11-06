@@ -3,14 +3,16 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_loginok.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_query.h"
-#include "mysql_test_utils.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "mysql_test_utils.h"
+
 namespace Envoy {
-  namespace Extensions {
+namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 
@@ -271,5 +273,5 @@ TEST_F(MysqlCodecTest, MysqlLoginOkEncDec) {
 
 } // namespace MysqlProxy
 } // namespace NetworkFilters
-    } // namespace Extensions
+} // namespace Extensions
 } // namespace Envoy

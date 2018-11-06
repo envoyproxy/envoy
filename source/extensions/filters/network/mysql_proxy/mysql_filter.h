@@ -1,12 +1,14 @@
 #pragma once
 
-#include "envoy/network/connection.h"
-#include "common/common/logger.h"
 #include "envoy/access_log/access_log.h"
-#include "envoy/stats/scope.h"
+#include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
+
+#include "common/common/logger.h"
+
 #include "mysql_codec.h"
 #include "mysql_codec_clogin.h"
 #include "mysql_codec_greeting.h"
@@ -17,7 +19,7 @@
 #include "mysql_session.h"
 
 namespace Envoy {
-    namespace Extensions {
+namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 

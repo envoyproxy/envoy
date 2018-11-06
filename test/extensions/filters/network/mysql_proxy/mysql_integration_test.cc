@@ -1,18 +1,20 @@
 #include <pthread.h>
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-#include "rapidjson/document.h"
+
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/network_utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "mysql_test_utils.h"
+#include "rapidjson/document.h"
 
 using namespace rapidjson;
 
 namespace Envoy {
-  namespace Extensions {
+namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 
@@ -191,5 +193,5 @@ TEST_P(MysqlIntegrationTest, MysqlUnitTestMultiClientsLoop) {
 
 } // namespace MysqlProxy
 } // namespace NetworkFilters
-    } // namespace Extensions
+} // namespace Extensions
 } // namespace Envoy

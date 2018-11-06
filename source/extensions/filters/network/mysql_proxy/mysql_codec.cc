@@ -1,8 +1,9 @@
 #include "mysql_codec.h"
+
 #include <arpa/inet.h>
 
 namespace Envoy {
-  namespace Extensions {
+namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 
@@ -148,4 +149,4 @@ bool MysqlCodec::EndOfBuffer(Buffer::Instance& buffer) { return (buffer.length()
 } // namespace MysqlProxy
 } // namespace NetworkFilters
 } // namespace Extensions
-  } // namespace Envoy
+} // namespace Envoy
