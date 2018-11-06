@@ -1096,6 +1096,9 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 TEST_P(AdminInstanceTest, GetRequest) {
   Http::HeaderMapImpl response_headers;
   std::string body;
+
+  EXPECT_CALL(server_.options_, restartEpoch()).WillOnce(Return(2));
+
   EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
   envoy::admin::v2alpha::ServerInfo server_info_proto;
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
@@ -1105,6 +1108,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
   // values such as timestamps + Envoy version are tricky to test for.
   MessageUtil::loadFromJson(body, server_info_proto);
   EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::LIVE);
+  EXPECT_EQ(server_info_proto.epoch(), 2);
 }
 
 TEST_P(AdminInstanceTest, GetRequestJson) {
