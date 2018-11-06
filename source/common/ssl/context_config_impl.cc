@@ -149,8 +149,9 @@ ContextConfigImpl::ContextConfigImpl(
     // The default certificate validation context and dynamic certificate validation
     // context could only contain partial fields, which is okay to fail the validation.
     // But the combined certificate validation context should pass validation. If
-    // validation of combined certificate validation context fails, getCombinedValidationContextConfig()
-    // throws exception, validation_context_config_ will not get updated.
+    // validation of combined certificate validation context fails,
+    // getCombinedValidationContextConfig() throws exception, validation_context_config_ will not
+    // get updated.
     cvc_validation_callback_handle_ =
         dynamic_cast<Secret::CertificateValidationContextSdsApi*>(
             certficate_validation_context_provider_.get())
