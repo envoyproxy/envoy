@@ -66,9 +66,9 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, Li
           while (true) {
             sockaddr_storage remote_addr;
             socklen_t remote_addr_len = sizeof(remote_addr);
-            const int ret = ::accept4(socket_fd, reinterpret_cast<sockaddr*>(&remote_addr),
-                                      &remote_addr_len, O_NONBLOCK);
-            if (ret < 0) {
+            const int ret =
+                ::accept(socket_fd, reinterpret_cast<sockaddr*>(&remote_addr), &remote_addr_len);
+            if (ret < 0 || ::fcntl(ret, F_SETFL, O_NONBLOCK) == -1) {
               if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK ||
                   errno == ECONNABORTED) {
                 return;
