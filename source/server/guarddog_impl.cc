@@ -1,6 +1,7 @@
 #include "server/guarddog_impl.h"
 
 #include <chrono>
+#include <memory>
 
 #include "envoy/stats/scope.h"
 
@@ -136,7 +137,7 @@ bool GuardDogImpl::waitOrDetectStop() {
 
 void GuardDogImpl::start() {
   run_thread_ = true;
-  thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
+  thread_ = std::make_unique<Thread::Thread>([this]() -> void { threadRoutine(); });
 }
 
 void GuardDogImpl::stop() {

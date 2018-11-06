@@ -3,11 +3,13 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/tracers/well_known_names.h"
 #include "extensions/tracers/zipkin/span_context_extractor.h"
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 
@@ -65,13 +67,8 @@ Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
                                 POOL_COUNTER_PREFIX(stats, "tracing.zipkin."))},
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
       time_source_(time_source) {
-
-  Upstream::ThreadLocalCluster* cluster = cm_.get(zipkin_config.collector_cluster());
-  if (!cluster) {
-    throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
-                                     zipkin_config.collector_cluster()));
-  }
-  cluster_ = cluster->info();
+  Config::Utility::checkCluster(TracerNames::get().Zipkin, zipkin_config.collector_cluster(), cm_);
+  cluster_ = cm_.get(zipkin_config.collector_cluster())->info();
 
   std::string collector_endpoint = ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT;
   if (zipkin_config.collector_endpoint().size() > 0) {

@@ -49,8 +49,8 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000)));
     }
 
-    driver_.reset(
-        new Driver(zipkin_config, cm_, stats_, tls_, runtime_, local_info_, random_, time_source_));
+    driver_ = std::make_unique<Driver>(zipkin_config, cm_, stats_, tls_, runtime_, local_info_,
+                                       random_, time_source_);
   }
 
   void setupValidDriver() {

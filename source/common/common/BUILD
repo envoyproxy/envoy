@@ -33,6 +33,7 @@ envoy_cc_library(
     hdrs = ["base64.h"],
     deps = [
         ":empty_string",
+        ":stack_array",
         "//include/envoy/buffer:buffer_interface",
     ],
 )
@@ -148,6 +149,14 @@ envoy_cc_library(
 envoy_cc_library(
     name = "stl_helpers",
     hdrs = ["stl_helpers.h"],
+)
+
+envoy_cc_library(
+    name = "stack_array",
+    hdrs = ["stack_array.h"],
+    deps = [
+        ":assert_lib",
+    ],
 )
 
 envoy_cc_library(

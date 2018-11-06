@@ -72,7 +72,7 @@ public:
                 ->create(),
             dispatcher, random,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), stats,
-            scope));
+            scope, Utility::parseRateLimitSettings(api_config_source)));
         break;
       }
       default:

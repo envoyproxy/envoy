@@ -1,5 +1,6 @@
 #include "test/integration/server.h"
 
+#include <memory>
 #include <string>
 
 #include "envoy/http/header_map.h"
@@ -59,8 +60,8 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
                                   bool deterministic) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_.reset(new Thread::Thread(
-      [version, deterministic, this]() -> void { threadRoutine(version, deterministic); }));
+  thread_ = std::make_unique<Thread::Thread>(
+      [version, deterministic, this]() -> void { threadRoutine(version, deterministic); });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
   if (pre_worker_start_test_steps != nullptr) {

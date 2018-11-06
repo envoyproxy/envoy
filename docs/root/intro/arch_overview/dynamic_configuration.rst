@@ -74,7 +74,7 @@ deployment, etc).
 EDS, CDS, RDS, and LDS
 --------------------------
 
-The :ref:`listener discovery service (LDS) <config_overview_lds>` layers on a mechanism by which
+The :ref:`listener discovery service (LDS) <config_listeners_lds>` layers on a mechanism by which
 Envoy can discover entire listeners at runtime. This includes all filter stacks, up to and including
 HTTP filters with embedded references to :ref:`RDS <config_http_conn_man_rds>`. Adding LDS into
 the mix allows almost every aspect of Envoy to be dynamically configured. Hot restart should

@@ -276,6 +276,7 @@ envoy_cc_library(
     name = "thrift_object_interface",
     hdrs = ["thrift_object.h"],
     deps = [
+        ":thrift_lib",
         "//include/envoy/buffer:buffer_interface",
     ],
 )
