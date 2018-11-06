@@ -273,7 +273,7 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
 
   EXPECT_CALL(listener, getLocalAddress(_))
       .WillOnce(Invoke(
-          [](int fd) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(fd); }));
+          [](IoHandle io_handle) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(io_handle); }));
   EXPECT_CALL(listener_callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](ConnectionSocketPtr&, bool) -> void {
         client_connection->close(ConnectionCloseType::NoFlush);
