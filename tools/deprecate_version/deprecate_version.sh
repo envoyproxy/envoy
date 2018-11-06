@@ -5,7 +5,7 @@
 set -e
 
 SCRIPT_DIR=$(realpath "$(dirname "$0")")
-BUILD_DIR="$SCRIPT_DIR"/build
+BUILD_DIR=build_tools
 VENV_DIR="$BUILD_DIR"/deprecate_version
 
 source_venv "$VENV_DIR"
