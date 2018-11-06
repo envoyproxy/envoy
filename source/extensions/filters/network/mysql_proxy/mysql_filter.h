@@ -9,14 +9,14 @@
 
 #include "common/common/logger.h"
 
-#include "mysql_codec.h"
-#include "mysql_codec_clogin.h"
-#include "mysql_codec_greeting.h"
-#include "mysql_codec_loginok.h"
-#include "mysql_codec_query.h"
-#include "mysql_codec_srvresp.h"
-#include "mysql_codec_switch_resp.h"
-#include "mysql_session.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec_loginok.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec_query.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec_srvresp.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
+#include "extensions/filters/network/mysql_proxy/mysql_session.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -100,4 +100,4 @@ class MysqlFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter>
 }  // namespace MysqlProxy
 }  // namespace NetworkFilters
 }  // namespace Extensions
-    }  // namespace Envoy
+}  // namespace Envoy

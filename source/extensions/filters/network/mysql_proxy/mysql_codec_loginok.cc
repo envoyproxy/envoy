@@ -1,6 +1,6 @@
-#include "mysql_codec_loginok.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec_loginok.h"
 
-#include "mysql_codec.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 
 namespace Envoy {
 namespace Extensions {

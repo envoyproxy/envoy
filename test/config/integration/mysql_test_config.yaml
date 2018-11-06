@@ -21,7 +21,7 @@ static_resources:
         port_value: 3307
     filter_chains:
       - filters:
-          - name: mysql
+          - name: envoy.filters.network.mysql_proxy
             config:
               stat_prefix: mysql_stats
           - name: envoy.tcp_proxy

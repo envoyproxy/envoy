@@ -1,6 +1,7 @@
 #pragma once
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
+#include "envoy/common/platform.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -122,13 +123,13 @@ public:
     COM_RESET_CONNECTION = 31,
   };
 
+  PACKED_STRUCT(struct header_fields {
+      uint32_t length:24;
+      uint32_t seq:8;
+  });
+
   union MysqlHeader {
-    PACKED_STRUCT(
-        struct {
-          uint32_t length : 24;
-          uint32_t seq : 8;
-        },
-        fields);
+    header_fields fields;
     uint32_t bits;
   };
 

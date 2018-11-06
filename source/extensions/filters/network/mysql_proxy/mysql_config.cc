@@ -1,13 +1,14 @@
-#include "mysql_config.h"
+#include "extensions/filters/network/mysql_proxy/mysql_config.h"
 
 #include <string>
 
+#include "envoy/config/filter/network/mysql_proxy/v2/mysql_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
 
-#include "mysql_filter.h"
+#include "extensions/filters/network/mysql_proxy/mysql_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,15 +21,16 @@ namespace MysqlProxy {
  */
 
 Network::FilterFactoryCb
-NetworkFilters::MysqlProxy::MysqlConfigFactory::createFilterFactoryFromProtoTyped(
-    const mysql::MysqlProxy& mysql_config, Server::Configuration::FactoryContext& context) {
-  const std::string stat_prefix = fmt::format("mysql.{}.", mysql_config.stat_prefix());
+NetworkFilters::MysqlProxy::MysqlConfigFactory::createFilterFactoryFromProtoTyped(const envoy::config::filter::network::mysql_proxy::v2::MysqlProxy& proto_config, Server::Configuration::FactoryContext& context) {
+
+  ASSERT(!proto_config.stat_prefix().empty());
+
+  const std::string stat_prefix = fmt::format("mysql.{}.", proto_config.stat_prefix());
 
   MysqlFilterConfigSharedPtr filter_config(
       std::make_shared<MysqlFilterConfig>(stat_prefix, context.scope()));
   return [filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addFilter(Network::FilterSharedPtr{
-        new Envoy::NetworkFilters::MysqlProxy::MysqlFilter(filter_config)});
+    filter_manager.addFilter(std::make_shared<MysqlFilter>(filter_config));
   };
 }
 

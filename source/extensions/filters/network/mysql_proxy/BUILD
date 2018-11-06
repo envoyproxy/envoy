@@ -49,6 +49,7 @@ envoy_cc_library(
     deps = [
         ":proxy_lib",
         "//source/extensions/filters/network/common:factory_base_lib",
+        "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/config/filter/network/mysql_proxy/v2:mysql_proxy_cc",
     ],
 )
