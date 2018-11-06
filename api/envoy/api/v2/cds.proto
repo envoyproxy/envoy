@@ -47,7 +47,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 37]
+// [#comment:next free field: 38]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -440,7 +440,7 @@ message Cluster {
     // Optional configuration for the Original Destination load balancing policy.
     OriginalDstLbConfig original_dst_lb_config = 34;
     // Optional configuration for the LeastRequest load balancing policy.
-    LeastRequestLbConfig least_request_lb_config = 36;
+    LeastRequestLbConfig least_request_lb_config = 37;
   }
 
   // Common configuration for all load balancer implementations.
