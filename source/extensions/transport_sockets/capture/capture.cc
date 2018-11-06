@@ -99,11 +99,9 @@ CaptureSocketFactory::CaptureSocketFactory(
     : path_prefix_(path_prefix), format_(format),
       transport_socket_factory_(std::move(transport_socket_factory)), time_system_(time_system) {}
 
-Network::TransportSocketPtr
-CaptureSocketFactory::createTransportSocket(absl::optional<std::string>) const {
+Network::TransportSocketPtr CaptureSocketFactory::createTransportSocket() const {
   return std::make_unique<CaptureSocket>(
-      path_prefix_, format_, transport_socket_factory_->createTransportSocket(absl::nullopt),
-      time_system_);
+      path_prefix_, format_, transport_socket_factory_->createTransportSocket(), time_system_);
 }
 
 bool CaptureSocketFactory::implementsSecureTransport() const {

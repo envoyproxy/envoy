@@ -249,8 +249,7 @@ TsiSocketFactory::TsiSocketFactory(HandshakerFactory handshaker_factory,
 
 bool TsiSocketFactory::implementsSecureTransport() const { return true; }
 
-Network::TransportSocketPtr
-TsiSocketFactory::createTransportSocket(absl::optional<std::string>) const {
+Network::TransportSocketPtr TsiSocketFactory::createTransportSocket() const {
   return std::make_unique<TsiSocket>(handshaker_factory_, handshake_validator_);
 }
 

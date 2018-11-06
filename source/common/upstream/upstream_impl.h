@@ -173,8 +173,7 @@ public:
   std::vector<Stats::CounterSharedPtr> counters() const override { return stats_store_.counters(); }
   CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   absl::optional<std::string> override_server_name) const override;
+                   const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
   CreateConnectionData createHealthCheckConnection(Event::Dispatcher& dispatcher) const override;
   std::vector<Stats::GaugeSharedPtr> gauges() const override { return stats_store_.gauges(); }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
@@ -204,8 +203,7 @@ protected:
   static Network::ClientConnectionPtr
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                    Network::Address::InstanceConstSharedPtr address,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   absl::optional<std::string> override_server_name);
+                   const Network::ConnectionSocket::OptionsSharedPtr& options);
 
 private:
   std::atomic<uint64_t> health_flags_{};

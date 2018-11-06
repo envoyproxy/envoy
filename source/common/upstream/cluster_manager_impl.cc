@@ -667,8 +667,7 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
 
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                                          LoadBalancerContext* context,
-                                          absl::optional<std::string> override_server_name) {
+                                          LoadBalancerContext* context) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -677,7 +676,7 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
   }
 
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->tcpConnPool(priority, context, override_server_name);
+  return entry->second->tcpConnPool(priority, context);
 }
 
 void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
@@ -707,9 +706,8 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
       [this, host] { ThreadLocalClusterManagerImpl::onHostHealthFailure(host, *tls_); });
 }
 
-Host::CreateConnectionData
-ClusterManagerImpl::tcpConnForCluster(const std::string& cluster, LoadBalancerContext* context,
-                                      absl::optional<std::string> override_server_name) {
+Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster,
+                                                                 LoadBalancerContext* context) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -719,8 +717,8 @@ ClusterManagerImpl::tcpConnForCluster(const std::string& cluster, LoadBalancerCo
 
   HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(context);
   if (logical_host) {
-    auto conn_info = logical_host->createConnection(cluster_manager.thread_local_dispatcher_,
-                                                    nullptr, override_server_name);
+    auto conn_info =
+        logical_host->createConnection(cluster_manager.thread_local_dispatcher_, nullptr);
     if ((entry->second->cluster_info_->features() &
          ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) &&
         conn_info.connection_ != nullptr) {
@@ -1132,8 +1130,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
-    ResourcePriority priority, LoadBalancerContext* context,
-    absl::optional<std::string> override_server_name) {
+    ResourcePriority priority, LoadBalancerContext* context) {
   HostConstSharedPtr host = lb_->chooseHost(context);
   if (!host) {
     ENVOY_LOG(debug, "no healthy host for TCP connection pool");
@@ -1159,19 +1156,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     }
   }
 
-  // add the server-name-to-override to the hash key, so the pool will contain
-  // connections with the identical requested server name
-  if (override_server_name.has_value()) {
-    std::hash<std::string> hash_function;
-    hash_key.push_back(hash_function(override_server_name.value()));
-  }
-
   TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];
   if (!container.pools_[hash_key]) {
     container.pools_[hash_key] = parent_.parent_.factory_.allocateTcpConnPool(
         parent_.thread_local_dispatcher_, host, priority,
-        have_options ? context->downstreamConnection()->socketOptions() : nullptr,
-        override_server_name);
+        have_options ? context->downstreamConnection()->socketOptions() : nullptr);
   }
 
   return container.pools_[hash_key].get();
@@ -1202,10 +1191,9 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
-    const Network::ConnectionSocket::OptionsSharedPtr& options,
-    absl::optional<std::string> override_server_name) {
+    const Network::ConnectionSocket::OptionsSharedPtr& options) {
   return Tcp::ConnectionPool::InstancePtr{
-      new Tcp::ConnPoolImpl(dispatcher, host, priority, options, override_server_name)};
+      new Tcp::ConnPoolImpl(dispatcher, host, priority, options)};
 }
 
 ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(

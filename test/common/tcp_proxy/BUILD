@@ -17,7 +17,6 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
-        "//source/common/stream_info:forward_requested_server_name_lib",
         "//source/common/tcp_proxy",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",

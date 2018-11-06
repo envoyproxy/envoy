@@ -22,8 +22,7 @@ class ConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
-               const Network::ConnectionSocket::OptionsSharedPtr& options,
-               absl::optional<std::string> override_server_name);
+               const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   ~ConnPoolImpl();
 
@@ -149,7 +148,6 @@ protected:
   Upstream::HostConstSharedPtr host_;
   Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
-  absl::optional<std::string> override_server_name_;
 
   std::list<ActiveConnPtr> pending_conns_; // conns awaiting connected event
   std::list<ActiveConnPtr> ready_conns_;   // conns ready for assignment

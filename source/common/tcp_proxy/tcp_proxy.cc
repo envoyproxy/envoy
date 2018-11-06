@@ -18,13 +18,11 @@
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/router/metadatamatchcriteria_impl.h"
-#include "common/stream_info/forward_requested_server_name.h"
 
 namespace Envoy {
 namespace TcpProxy {
 
 const std::string PerConnectionCluster::Key = "envoy.tcp_proxy.cluster";
-using ::Envoy::StreamInfo::ForwardRequestedServerName;
 
 Config::Route::Route(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute& config) {
@@ -360,21 +358,8 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  absl::optional<std::string> override_server_name;
-
-  if (downstreamConnection() &&
-      downstreamConnection()->streamInfo().filterState().hasData<ForwardRequestedServerName>(
-          ForwardRequestedServerName::Key)) {
-    const auto& original_requested_server_name =
-        downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .getDataReadOnly<ForwardRequestedServerName>(ForwardRequestedServerName::Key);
-    override_server_name = original_requested_server_name.value();
-  }
-
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      cluster_name, Upstream::ResourcePriority::Default, this, override_server_name);
+      cluster_name, Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
     // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
     // cluster->stats().upstream_cx_none_healthy in the latter case.

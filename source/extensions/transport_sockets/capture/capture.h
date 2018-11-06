@@ -49,8 +49,7 @@ public:
                        Event::TimeSystem& time_system);
 
   // Network::TransportSocketFactory
-  Network::TransportSocketPtr
-  createTransportSocket(absl::optional<std::string> override_server_name) const override;
+  Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 
 private:
