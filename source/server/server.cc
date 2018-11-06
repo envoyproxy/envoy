@@ -62,10 +62,8 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
       worker_factory_(thread_local_, *api_, hooks, time_system),
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false),
-      mutex_tracer_(
-          options.mutexTracingEnabled()
-              ? absl::optional<Envoy::MutexTracer*>(&Envoy::MutexTracerImpl::getOrCreateTracer())
-              : absl::nullopt) {
+      mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
+                                                  : nullptr) {
 
   try {
     if (!options.logPath().empty()) {

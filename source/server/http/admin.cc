@@ -435,14 +435,14 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& resp
 Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap& response_headers,
                                         Buffer::Instance& response, AdminStream&) {
 
-  if (server_.options().mutexTracingEnabled() && server_.mutexTracer().has_value()) {
+  if (server_.options().mutexTracingEnabled() && server_.mutexTracer() != nullptr) {
     response_headers.insertContentType().value().setReference(
         Http::Headers::get().ContentTypeValues.Json);
 
     envoy::admin::v2alpha::MutexStats mutex_stats;
-    mutex_stats.set_num_contentions(server_.mutexTracer().value()->numContentions());
-    mutex_stats.set_current_wait_cycles(server_.mutexTracer().value()->currentWaitCycles());
-    mutex_stats.set_lifetime_wait_cycles(server_.mutexTracer().value()->lifetimeWaitCycles());
+    mutex_stats.set_num_contentions(server_.mutexTracer()->numContentions());
+    mutex_stats.set_current_wait_cycles(server_.mutexTracer()->currentWaitCycles());
+    mutex_stats.set_lifetime_wait_cycles(server_.mutexTracer()->lifetimeWaitCycles());
     response.add(MessageUtil::getJsonStringFromMessage(mutex_stats, true, true));
   } else {
     response.add("Mutex contention tracing is not enabled. To enable, run Envoy with flag "

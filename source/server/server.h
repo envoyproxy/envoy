@@ -158,7 +158,7 @@ public:
   Init::Manager& initManager() override { return init_manager_; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
-  absl::optional<MutexTracer*> mutexTracer() override { return mutex_tracer_; }
+  Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
   Runtime::RandomGenerator& random() override { return *random_generator_; }
   RateLimit::ClientPtr
@@ -234,7 +234,7 @@ private:
   Upstream::HdsDelegatePtr hds_delegate_;
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
   std::unique_ptr<RunHelper> run_helper_;
-  absl::optional<Envoy::MutexTracer*> mutex_tracer_;
+  Envoy::MutexTracer* mutex_tracer_;
 };
 
 } // namespace Server

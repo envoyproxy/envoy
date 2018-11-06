@@ -45,8 +45,7 @@ ValidationInstance::ValidationInstance(Options& options, Event::TimeSystem& time
       api_(new Api::ValidationImpl(options.fileFlushIntervalMsec())),
       dispatcher_(api_->allocateDispatcher(time_system)),
       singleton_manager_(new Singleton::ManagerImpl()),
-      access_log_manager_(*api_, *dispatcher_, access_log_lock, store),
-      mutex_tracer_(absl::nullopt) {
+      access_log_manager_(*api_, *dispatcher_, access_log_lock, store), mutex_tracer_(nullptr) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {

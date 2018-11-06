@@ -118,9 +118,9 @@ public:
   virtual ListenerManager& listenerManager() PURE;
 
   /**
-   * @return the server's global mutex tracer.
+   * @return the server's global mutex tracer, if it was instantiated. Nullptr otherwise.
    */
-  virtual absl::optional<Envoy::MutexTracer*> mutexTracer() PURE;
+  virtual Envoy::MutexTracer* mutexTracer() PURE;
 
   /**
    * @return the server's overload manager.
