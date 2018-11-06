@@ -8,11 +8,10 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
-
-#include "test/mocks/network/mocks.h"
 
 #include "gtest/gtest.h"
 
@@ -134,134 +133,27 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
 
 TEST(NetworkUtility, GetOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
 
-
 TEST(NetworkUtility, LocalConnection) {
+  Network::Address::InstanceConstSharedPtr remote_addr;
+
   testing::NiceMock<Network::MockConnectionSocket> socket;
-  
-  // socket.setLocalAddress(Address::Ipv4Instance("127.0.0.1"), true);
-  // socket.setRemoteAddress(Address::Ipv4Instance("127.0.0.1"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
 
-  // socket.setRemoteAddress(Address::Ipv4Instance("127.0.0.2"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
+  EXPECT_CALL(socket, remoteAddress()).WillRepeatedly(testing::ReturnRef(remote_addr));
 
-  // socket.setLocalAddress(Address::Ipv4Instance("10.0.0.1"), true);
-  // socket.setRemoteAddress(Address::Ipv4Instance("10.0.0.1"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
+  remote_addr.reset(new Network::Address::PipeInstance("/pipe/path"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
 
-  // socket.setRemoteAddress(Address::Ipv4Instance("10.0.0.2"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
+  remote_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
 
-  // socket.setLocalAddress(Address::Ipv4Instance("192.168.0.1"), true);
-  // socket.setRemoteAddress(Address::Ipv4Instance("192.168.0.1"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
+  remote_addr.reset(new Network::Address::Ipv4Instance("8.8.8.8"));
+  EXPECT_FALSE(Utility::isLocalConnection(socket));
 
-  // socket.setRemoteAddress(Address::Ipv4Instance("192.168.0.2"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
+  remote_addr.reset(new Network::Address::Ipv6Instance("::1"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
 
-  // socket.setLocalAddress(Address::Ipv4Instance("172.16.0.1"), true);
-  // socket.setRemoteAddress(Address::Ipv4Instance("172.16.0.1"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
-
-  // socket.setRemoteAddress(Address::Ipv4Instance("172.16.0.2"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket);
-
-  // socket.setLocalAddress(Address::Ipv4Instance("172.30.2.1"), true);
-  // socket.setRemoteAddress(Address::Ipv4Instance("172.30.2.1"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
-
-  // socket.setRemoteAddress(Address::Ipv4Instance("172.30.2.2"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
-
-  // socket.setLocalAddress(Address::Ipv4Instance("11.0.0.1"), true);
-  // socket.setRemoteAddress(Address::Ipv4Instance("11.0.0.1"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
-
-  // socket.setRemoteAddress(Address::Ipv4Instance("11.0.0.2"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
-
-  // socket.setLocalAddress(Address::Ipv6Instance("fd00::"), true);
-  // socket.setRemoteAddress(Address::Ipv6Instance("fd00::"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
-
-  // socket.setRemoteAddress(Address::Ipv6Instance("fd00::1"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
-
-  // socket.setLocalAddress(Address::Ipv6Instance("::1"), true);
-  // socket.setRemoteAddress(Address::Ipv6Instance("::1"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
-  
-  // socket.setRemoteAddress(Address::Ipv6Instance("::2"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
-
-  // socket.setLocalAddress(Address::Ipv6Instance("fdff::"), true);
-  // socket.setRemoteAddress(Address::Ipv6Instance("fdff::"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
-
-  // socket.setRemoteAddress(Address::Ipv6Instance("fdff::1"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
-
-  // socket.setLocalAddress(Address::Ipv6Instance("fd01::"), true);
-  // socket.setRemoteAddress(Address::Ipv6Instance("fd01::"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
-
-  // socket.setRemoteAddress(Address::Ipv6Instance("fd01::1"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
-
-  // socket.setLocalAddress(Address::Ipv6Instance("fd12:3456:7890:1234:5678:9012:3456:7890"), true);
-  // socket.setRemoteAddress(Address::Ipv6Instance("fd12:3456:7890:1234:5678:9012:3456:7890"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
-
-  // socket.setRemoteAddress(Address::Ipv6Instance("fd12:3456:7890:1234:5678:9012:3456:7891"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
-
-  // socket.setLocalAddress(Address::Ipv6Instance("fd::"), true);
-  // socket.setRemoteAddress(Address::Ipv6Instance("fd::"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
-
-  // socket.setRemoteAddress(Address::Ipv6Instance("fd::1"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
-
-  // socket.setLocalAddress(Address::Ipv6Instance("::"), true);
-  // socket.setRemoteAddress(Address::Ipv6Instance("::"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
-
-  // socket.setRemoteAddress(Address::Ipv6Instance("::1"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
-
-  // socket.setLocalAddress(Address::Ipv6Instance("fc00::"), true);
-  // socket.setRemoteAddress(Address::Ipv6Instance("fc00::"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
-
-  // socket.setRemoteAddress(Address::Ipv6Instance("fc00::1"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
-
-  // socket.setLocalAddress(Address::Ipv6Instance("fe00::"), true);
-  // socket.setRemoteAddress(Address::Ipv6Instance("fe00::"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
-
-  // socket.setRemoteAddress(Address::Ipv6Instance("fe00::1"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
-
-  // socket.setLocalAddress(Address::PipeInstance("/hello"), true);
-  // socket.setRemoteAddress(Address::PipeInstance("/hello"));
-  // EXPECT_TRUE(Utility::isLocalConnection(socket));
-
-  // socket.setRemoteAddress(Address::PipeInstance("/world"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
-
-  // socket.setLocalAddress(Address::Ipv6Instance("::"), true);
-  // socket.setRemoteAddress(Address::Ipv4Instance("0.0.0.0"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
-
-  // socket.setLocalAddress(Address::Ipv6Instance("::1"), true);
-  // socket.setRemoteAddress(Address::PipeInstance("/hello"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
-
-  // socket.setLocalAddress(Address::Ipv4Instance("10.0.0.1"), true);
-  // socket.setRemoteAddress(Address::PipeInstance("/hello"));
-  // EXPECT_FALSE(Utility::isLocalConnection(socket));
-
+  remote_addr.reset(new Network::Address::Ipv6Instance("fd00::"));
+  EXPECT_FALSE(Utility::isLocalConnection(socket));
 }
 
 TEST(NetworkUtility, InternalAddress) {

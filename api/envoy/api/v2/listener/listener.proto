@@ -60,7 +60,7 @@ message Filter {
 // 3. Server name (e.g. SNI for TLS protocol),
 // 4. Transport protocol.
 // 5. Application protocols (e.g. ALPN for TLS protocol).
-// 6. Request source type (e.g. any, same or external network).
+// 6. Request source type (e.g. any, local or external network).
 //
 // For criteria that allow ranges or wildcards, the most specific value in any
 // of the configured filter chains that matches the incoming connection is going

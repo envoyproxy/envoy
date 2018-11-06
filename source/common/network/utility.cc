@@ -210,21 +210,41 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 
 bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
 
-  auto local_address = socket.localAddress();
   auto remote_address = socket.remoteAddress();
-
-  if (local_address->type() == Envoy::Network::Address::Type::Pipe) {
+  if (remote_address->type() == Envoy::Network::Address::Type::Pipe ||
+      isLoopbackAddress(*remote_address)) {
     return true;
   }
 
-  auto local_ip = local_address->ip();
-  auto remote_ip = remote_address->ip();
-  if (local_ip && remote_ip) {
-    if (local_ip->ipv4() && remote_ip->ipv4()) {
-      return local_ip->ipv4()->address() == remote_ip->ipv4()->address();
-    } else if (local_ip->ipv6() && remote_ip->ipv6()) {
-      return local_ip->ipv6()->address() == remote_ip->ipv6()->address();
+  struct ifaddrs* ifaddr;
+  struct ifaddrs* ifa;
+
+  int rc = getifaddrs(&ifaddr);
+  RELEASE_ASSERT(!rc, "");
+
+  auto af_look_up =
+      (remote_address->ip()->version() == Address::IpVersion::v4) ? AF_INET : AF_INET6;
+
+  for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == nullptr) {
+      continue;
     }
+
+    if (ifa->ifa_addr->sa_family == af_look_up) {
+      const struct sockaddr_storage* addr =
+          reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
+      auto local_address = Address::addressFromSockAddr(
+          *addr, (af_look_up == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
+
+      if (remote_address == local_address) {
+        freeifaddrs(ifaddr);
+        return true;
+      }
+    }
+  }
+
+  if (ifaddr) {
+    freeifaddrs(ifaddr);
   }
 
   return false;
