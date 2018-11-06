@@ -8,6 +8,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
+#include "test/test_common/environment.h"
 
 #define ENV_VAR_VALUE "somerandomevalue"
 
@@ -18,7 +19,8 @@ namespace Envoy {
 class SquashFilterIntegrationTest : public HttpIntegrationTest,
                                     public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  SquashFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  SquashFilterIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 
   ~SquashFilterIntegrationTest() {
     if (fake_squash_connection_) {
@@ -70,7 +72,8 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
     fake_upstreams_.back()->set_allow_unexpected_disconnects(true);
   }
 
@@ -78,7 +81,7 @@ public:
    * Initializer for an individual integration test.
    */
   void initialize() override {
-    ::setenv("SQUASH_ENV_TEST", ENV_VAR_VALUE, 1);
+    TestEnvironment::setEnvVar("SQUASH_ENV_TEST", ENV_VAR_VALUE, 1);
 
     autonomous_upstream_ = true;
 

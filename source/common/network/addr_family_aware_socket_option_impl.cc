@@ -47,7 +47,7 @@ bool AddrFamilyAwareSocketOptionImpl::setIpSocketOption(
     return ipv4_option->setOption(socket, state);
   }
 
-  // If the FD is v6, we first try the IPv6 variant if the platfrom supports it and fallback to the
+  // If the FD is v6, we first try the IPv6 variant if the platform supports it and fallback to the
   // IPv4 variant otherwise.
   ASSERT(ip->version() == Network::Address::IpVersion::v6);
   if (ipv6_option->isSupported()) {

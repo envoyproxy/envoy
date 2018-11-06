@@ -37,7 +37,7 @@ using testing::AssertionSuccess;
 
 namespace Envoy {
 FakeStream::FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
-                       Event::TimeSystem& time_system)
+                       Event::TestTimeSystem& time_system)
     : parent_(parent), encoder_(encoder), time_system_(time_system) {
   encoder.getStream().addCallbacks(*this);
 }
@@ -127,7 +127,7 @@ AssertionResult FakeStream::waitForHeadersComplete(milliseconds timeout) {
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for headers.";
     }
-    decoder_event_.waitFor(lock_, 5ms);
+    time_system_.waitFor(lock_, decoder_event_, 5ms);
   }
   return AssertionSuccess();
 }
@@ -140,7 +140,7 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, ui
     if (time_system_.monotonicTime() >= start_time + timeout) {
       return AssertionFailure() << "Timed out waiting for data.";
     }
-    decoder_event_.waitFor(lock_, 5ms);
+    time_system_.waitFor(lock_, decoder_event_, 5ms);
     if (bodyLength() < body_length) {
       // Run the client dispatcher since we may need to process window updates, etc.
       client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
@@ -169,7 +169,7 @@ AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatche
     if (time_system_.monotonicTime() >= start_time + timeout) {
       return AssertionFailure() << "Timed out waiting for end of stream.";
     }
-    decoder_event_.waitFor(lock_, 5ms);
+    time_system_.waitFor(lock_, decoder_event_, 5ms);
     if (!end_stream_) {
       // Run the client dispatcher since we may need to process window updates, etc.
       client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
@@ -186,7 +186,7 @@ AssertionResult FakeStream::waitForReset(milliseconds timeout) {
       return AssertionFailure() << "Timed out waiting for reset.";
     }
     // Safe since CondVar::waitFor won't throw.
-    decoder_event_.waitFor(lock_, 5ms);
+    time_system_.waitFor(lock_, decoder_event_, 5ms);
   }
   return AssertionSuccess();
 }
@@ -202,16 +202,16 @@ void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
 
 FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connection,
                                        Stats::Store& store, Type type,
-                                       Event::TimeSystem& time_system)
+                                       Event::TestTimeSystem& time_system)
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
-    codec_.reset(new Http::Http1::ServerConnectionImpl(shared_connection_.connection(), *this,
-                                                       Http::Http1Settings()));
+    codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(shared_connection_.connection(),
+                                                                 *this, Http::Http1Settings());
   } else {
     auto settings = Http::Http2Settings();
     settings.allow_connect_ = true;
-    codec_.reset(new Http::Http2::ServerConnectionImpl(shared_connection_.connection(), *this,
-                                                       store, settings));
+    codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(shared_connection_.connection(),
+                                                                 *this, store, settings);
     ASSERT(type == Type::HTTP2);
   }
 
@@ -254,7 +254,7 @@ AssertionResult FakeConnectionBase::waitForDisconnect(bool ignore_spurious_event
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for disconnect.";
     }
-    Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
+    Thread::CondVar::WaitStatus status = time_system_.waitFor(lock_, connection_event_, 5ms);
     // The default behavior of waitForDisconnect is to assume the test cleanly
     // calls waitForData, waitForNewStream, etc. to handle all events on the
     // connection. If the caller explicitly notes that other events should be
@@ -280,7 +280,7 @@ AssertionResult FakeConnectionBase::waitForHalfClose(bool ignore_spurious_events
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for half close.";
     }
-    Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
+    Thread::CondVar::WaitStatus status = time_system_.waitFor(lock_, connection_event_, 5ms);
     // The default behavior of waitForHalfClose is to assume the test cleanly
     // calls waitForData, waitForNewStream, etc. to handle all events on the
     // connection. If the caller explicitly notes that other events should be
@@ -306,7 +306,7 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for new stream.";
     }
-    Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
+    Thread::CondVar::WaitStatus status = time_system_.waitFor(lock_, connection_event_, 5ms);
     // As with waitForDisconnect, by default, waitForNewStream returns after the next event.
     // If the caller explicitly notes other events should be ignored, it will instead actually
     // wait for the next new stream, ignoring other events such as onData()
@@ -327,11 +327,12 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
   return AssertionSuccess();
 }
 
-FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type)
+FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type,
+                           Event::TestTimeSystem& time_system)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
                    Network::SocketPtr{new Network::UdsListenSocket(
                        std::make_shared<Network::Address::PipeInstance>(uds_path))},
-                   type, false) {
+                   type, time_system, false) {
   ENVOY_LOG(info, "starting fake server on unix domain socket {}", uds_path);
 }
 
@@ -343,31 +344,32 @@ static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::I
 }
 
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
-                           Network::Address::IpVersion version, bool enable_half_close)
+                           Network::Address::IpVersion version, Event::TestTimeSystem& time_system,
+                           bool enable_half_close)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
-                   makeTcpListenSocket(port, version), type, enable_half_close) {
+                   makeTcpListenSocket(port, version), type, time_system, enable_half_close) {
   ENVOY_LOG(info, "starting fake server on port {}. Address version is {}",
             this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            uint32_t port, FakeHttpConnection::Type type,
-                           Network::Address::IpVersion version)
+                           Network::Address::IpVersion version, Event::TestTimeSystem& time_system)
     : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version), type,
-                   false) {
+                   time_system, false) {
   ENVOY_LOG(info, "starting fake SSL server on port {}. Address version is {}",
             this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type,
-                           bool enable_half_close)
+                           Event::TestTimeSystem& time_system, bool enable_half_close)
     : http_type_(type), socket_(std::move(listen_socket)), api_(new Api::Impl(milliseconds(10000))),
-      dispatcher_(api_->allocateDispatcher(test_time_.timeSystem())),
+      time_system_(time_system), dispatcher_(api_->allocateDispatcher(time_system_)),
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close), listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
-  thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
+  thread_ = std::make_unique<Thread::Thread>([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
 }
 
@@ -410,7 +412,7 @@ void FakeUpstream::threadRoutine() {
 AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                                     FakeHttpConnectionPtr& connection,
                                                     milliseconds timeout) {
-  Event::TimeSystem& time_system = timeSystem();
+  Event::TestTimeSystem& time_system = timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   {
     Thread::LockGuard lock(lock_);
@@ -418,7 +420,7 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
       if (time_system.monotonicTime() >= end_time) {
         return AssertionFailure() << "Timed out waiting for new connection.";
       }
-      new_connection_event_.waitFor(lock_, 5ms);
+      time_system_.waitFor(lock_, new_connection_event_, 5ms);
       if (new_connections_.empty()) {
         // Run the client dispatcher since we may need to process window updates, etc.
         client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
@@ -440,14 +442,17 @@ AssertionResult
 FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                     std::vector<std::unique_ptr<FakeUpstream>>& upstreams,
                                     FakeHttpConnectionPtr& connection, milliseconds timeout) {
-  Event::TimeSystem& time_system = client_dispatcher.timeSystem();
+  if (upstreams.empty()) {
+    return AssertionFailure() << "No upstreams confgured.";
+  }
+  Event::TestTimeSystem& time_system = upstreams[0]->timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   while (time_system.monotonicTime() < end_time) {
     for (auto it = upstreams.begin(); it != upstreams.end(); ++it) {
       FakeUpstream& upstream = **it;
       Thread::ReleasableLockGuard lock(upstream.lock_);
       if (upstream.new_connections_.empty()) {
-        upstream.new_connection_event_.waitFor(upstream.lock_, 5ms);
+        time_system.waitFor(upstream.lock_, upstream.new_connection_event_, 5ms);
       }
 
       if (upstream.new_connections_.empty()) {
@@ -455,7 +460,8 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
       } else {
         connection = std::make_unique<FakeHttpConnection>(
-            upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_, time_system);
+            upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_,
+            upstream.timeSystem());
         lock.release();
         VERIFY_ASSERTION(connection->initialize());
         VERIFY_ASSERTION(connection->readDisable(false));
@@ -472,7 +478,8 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
     Thread::LockGuard lock(lock_);
     if (new_connections_.empty()) {
       ENVOY_LOG(debug, "waiting for raw connection");
-      new_connection_event_.waitFor(lock_, timeout); // Safe since CondVar::waitFor won't throw.
+      time_system_.waitFor(lock_, new_connection_event_,
+                           timeout); // Safe since CondVar::waitFor won't throw.
     }
 
     if (new_connections_.empty()) {
@@ -503,7 +510,7 @@ AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* 
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for data.";
     }
-    connection_event_.waitFor(lock_, 5ms); // Safe since CondVar::waitFor won't throw.
+    time_system_.waitFor(lock_, connection_event_, 5ms); // Safe since CondVar::waitFor won't throw.
   }
   if (data != nullptr) {
     *data = data_;
@@ -521,7 +528,7 @@ FakeRawConnection::waitForData(const std::function<bool(const std::string&)>& da
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for data.";
     }
-    connection_event_.waitFor(lock_, 5ms); // Safe since CondVar::waitFor won't throw.
+    time_system_.waitFor(lock_, connection_event_, 5ms); // Safe since CondVar::waitFor won't throw.
   }
   if (data != nullptr) {
     *data = data_;

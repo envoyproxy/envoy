@@ -36,10 +36,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "authenticator_lib",
     srcs = ["authenticator.cc"],
-    hdrs = [
-        "authenticator.h",
-        "filter_config.h",
-    ],
+    hdrs = ["authenticator.h"],
     deps = [
         ":extractor_lib",
         ":jwks_cache_lib",
@@ -55,7 +52,8 @@ envoy_cc_library(
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
-        ":authenticator_lib",
+        ":filter_config_interface",
+        ":matchers_lib",
         "//include/envoy/http:filter_interface",
         "//source/extensions/filters/http:well_known_names",
     ],
@@ -70,5 +68,40 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "matchers_lib",
+    srcs = ["matcher.cc"],
+    hdrs = ["matcher.h"],
+    deps = [
+        ":verifier_lib",
+        "//source/common/http:header_utility_lib",
+        "//source/common/router:config_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "verifier_lib",
+    srcs = ["verifier.cc"],
+    hdrs = ["verifier.h"],
+    deps = [
+        ":authenticator_lib",
+        ":extractor_lib",
+        "//include/envoy/http:header_map_interface",
+        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:jwt_authn_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_config_interface",
+    hdrs = ["filter_config.h"],
+    deps = [
+        ":jwks_cache_lib",
+        ":matchers_lib",
+        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/stats:stats_macros",
+        "//include/envoy/thread_local:thread_local_interface",
     ],
 )

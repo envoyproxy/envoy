@@ -390,7 +390,7 @@ TEST(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   resolver.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // Verify that both endpoints are initially marked with FAILED_ACTIVE_HC, then
-  // clear the flag to simulate that these endpoints have been sucessfully health
+  // clear the flag to simulate that these endpoints have been successfully health
   // checked.
   {
     const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -521,13 +521,8 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
 
-  resolver1.expectResolve(*dns_resolver);
-  resolver1.timer_->callback_();
-  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
-  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
-  EXPECT_THAT(
-      std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+  // This is the first time we receveived an update for localhost1, we expect to rebuild.
+  EXPECT_EQ(0UL, stats.counter("cluster.name.update_no_rebuild").value());
 
   resolver1.expectResolve(*dns_resolver);
   resolver1.timer_->callback_();
@@ -536,18 +531,46 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+
+  // Since no change for localhost1, we expect no rebuild.
+  EXPECT_EQ(1UL, stats.counter("cluster.name.update_no_rebuild").value());
+
+  resolver1.expectResolve(*dns_resolver);
+  resolver1.timer_->callback_();
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+
+  // Since no change for localhost1, we expect no rebuild.
+  EXPECT_EQ(2UL, stats.counter("cluster.name.update_no_rebuild").value());
+
+  EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  EXPECT_CALL(membership_updated, ready());
+  resolver2.dns_callback_(TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
+
+  // We received a new set of hosts for localhost2. Should rebuild the cluster.
+  EXPECT_EQ(2UL, stats.counter("cluster.name.update_no_rebuild").value());
+
+  resolver1.expectResolve(*dns_resolver);
+  resolver1.timer_->callback_();
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
+
+  // We again received the same set as before for localhost1. No rebuild this time.
+  EXPECT_EQ(3UL, stats.counter("cluster.name.update_no_rebuild").value());
 
   resolver1.timer_->callback_();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
-      std::list<std::string>({"127.0.0.3:11001"}),
+      std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000)));
-  EXPECT_CALL(membership_updated, ready());
   resolver2.dns_callback_(TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
@@ -751,13 +774,14 @@ TEST(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_sub_zone("world");
   HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
                 metadata, 1, locality,
-                envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance());
+                envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 1);
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_EQ("lyft.com", host.hostname());
   EXPECT_TRUE(host.canary());
   EXPECT_EQ("oceania", host.locality().region());
   EXPECT_EQ("hello", host.locality().zone());
   EXPECT_EQ("world", host.locality().sub_zone());
+  EXPECT_EQ(1, host.priority());
 }
 
 TEST(StaticClusterImplTest, InitialHosts) {
@@ -1508,6 +1532,26 @@ public:
   std::unique_ptr<Server::Configuration::TransportSocketFactoryContextImpl> factory_context_;
 };
 
+struct Foo : public Envoy::Config::TypedMetadata::Object {};
+
+struct Baz : public Envoy::Config::TypedMetadata::Object {
+  Baz(std::string n) : name(n) {}
+  std::string name;
+};
+
+class BazFactory : public ClusterTypedMetadataFactory {
+public:
+  const std::string name() const { return "baz"; }
+  // Returns nullptr (conversion failure) if d is empty.
+  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
+  parse(const ProtobufWkt::Struct& d) const {
+    if (d.fields().find("name") != d.fields().end()) {
+      return std::make_unique<Baz>(d.fields().at("name").string_value());
+    }
+    throw EnvoyException("Cannot create a Baz when metadata is empty.");
+  }
+};
+
 // Cluster metadata and common config retrieval.
 TEST_F(ClusterInfoImplTest, Metadata) {
   const std::string yaml = R"EOF(
@@ -1516,19 +1560,45 @@ TEST_F(ClusterInfoImplTest, Metadata) {
     type: STRICT_DNS
     lb_policy: MAGLEV
     hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
-    metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
+                                   baz: {name: meh } } }
     common_lb_config:
       healthy_panic_threshold:
         value: 0.3
   )EOF";
 
+  BazFactory baz_factory;
+  Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
   auto cluster = makeCluster(yaml);
 
+  EXPECT_EQ("meh", cluster->info()->typedMetadata().get<Baz>(baz_factory.name())->name);
+  EXPECT_EQ(nullptr, cluster->info()->typedMetadata().get<Foo>(baz_factory.name()));
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(cluster->info()->metadata(), "com.bar.foo", "baz")
                 .string_value());
   EXPECT_EQ(0.3, cluster->info()->lbConfig().healthy_panic_threshold().value());
   EXPECT_EQ(LoadBalancerType::Maglev, cluster->info()->lbType());
+}
+
+// Typed metadata loading throws exception.
+TEST_F(ClusterInfoImplTest, BrokenTypedMetadata) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
+                                   baz: {boom: meh} } }
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 0.3
+  )EOF";
+
+  BazFactory baz_factory;
+  Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Cannot create a Baz when metadata is empty.");
 }
 
 // Cluster extension protocol options fails validation when configured for an unregistered filter.
@@ -1804,6 +1874,19 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
   host_set_.updateHosts(hosts, std::make_shared<const HostVector>(), hosts_per_locality,
                         hosts_per_locality, locality_weights, {}, {}, absl::nullopt);
   EXPECT_FALSE(host_set_.chooseLocality().has_value());
+}
+
+// When a locality has zero hosts, it should be treated as if it has zero healthy.
+TEST_F(HostSetImplLocalityTest, EmptyLocality) {
+  HostsPerLocalitySharedPtr hosts_per_locality =
+      makeHostsPerLocality({{hosts_[0], hosts_[1], hosts_[2]}, {}});
+  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
+  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
+  host_set_.updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, locality_weights, {},
+                        {}, absl::nullopt);
+  // Verify that we are not RRing between localities.
+  EXPECT_EQ(0, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseLocality().value());
 }
 
 // When all locality weights are zero we should fail to select a locality.

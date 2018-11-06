@@ -1,7 +1,9 @@
-# TODO(zuercher): determine how we want to deal deal with auto-assignment
+# TODO(zuercher): determine how we want to deal with auto-assignment
 # By default, @envoyproxy/maintainers own everything.
 #*       @envoyproxy/maintainers
 
+# dubbo_proxy extension
+/*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan 
 # thrift_proxy extension
 /*/extensions/filters/network/thrift_proxy @zuercher @brian-pane
 # jwt_authn http filter extension
@@ -9,4 +11,6 @@
 # header_to_metadata extension
 /*/extensions/filters/http/header_to_metadata @rgs1 @zuercher
 # alts transport socket extension
-/*/extensions/transport_sockets/alts @lizan @yangminzhu
+/*/extensions/transport_sockets/alts @htuch @yangminzhu
+# sni_cluster extension
+/*/extensions/filters/network/sni_cluster @rshriram @lizan

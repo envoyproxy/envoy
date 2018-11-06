@@ -4,20 +4,22 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
     "envoy_cc_fuzz_test",
-    "envoy_cc_library",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "test_util",
     hdrs = ["test_util.h"],
     deps = [
-        "//include/envoy/request_info:request_info_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "//test/test_common:test_time_lib",
     ],
 )
 
@@ -46,7 +48,7 @@ envoy_cc_test(
         "//source/common/common:utility_lib",
         "//source/common/http:header_map_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/request_info:request_info_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -98,7 +100,7 @@ envoy_cc_binary(
         "//source/common/http:header_map_lib",
         "//source/common/network:address_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/request_info:request_info_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
     ],
 )

@@ -114,6 +114,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/common:utility_lib",
+        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -135,6 +136,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "stack_array_test",
+    srcs = ["stack_array_test.cc"],
+    deps = [
+        "//source/common/common:stack_array",
+    ],
+)
+
+envoy_cc_test(
     name = "to_lower_table_test",
     srcs = ["to_lower_table_test.cc"],
     deps = ["//source/common/common:to_lower_table_lib"],
@@ -145,7 +154,7 @@ envoy_cc_test(
     srcs = ["token_bucket_impl_test.cc"],
     deps = [
         "//source/common/common:token_bucket_impl_lib",
-        "//test/mocks:common_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )

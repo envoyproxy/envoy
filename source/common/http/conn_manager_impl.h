@@ -12,7 +12,6 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/filter.h"
-#include "envoy/http/websocket.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -31,7 +30,7 @@
 #include "common/http/conn_manager_config.h"
 #include "common/http/user_agent.h"
 #include "common/http/utility.h"
-#include "common/request_info/request_info_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -120,9 +119,10 @@ private:
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;
+    Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     void clearRouteCache() override;
     uint64_t streamId() override;
-    RequestInfo::RequestInfo& requestInfo() override;
+    StreamInfo::StreamInfo& streamInfo() override;
     Tracing::Span& activeSpan() override;
     Tracing::Config& tracingConfig() override;
 
@@ -263,7 +263,6 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
-                        public WebSocketProxyCallbacks,
                         public Tracing::Config {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
@@ -316,11 +315,6 @@ private:
     }
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
-    // Http::WebSocketProxyCallbacks
-    void sendHeadersOnlyResponse(HeaderMap& headers) override {
-      encodeHeaders(nullptr, headers, true);
-    }
-
     // Tracing::TracingConfig
     virtual Tracing::OperationName operationName() const override;
     virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
@@ -358,7 +352,9 @@ private:
 
     // All state for the stream. Put here for readability.
     struct State {
-      State() : remote_complete_(false), local_complete_(false), saw_connection_close_(false) {}
+      State()
+          : remote_complete_(false), local_complete_(false), saw_connection_close_(false),
+            successful_upgrade_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -370,6 +366,7 @@ private:
       bool remote_complete_ : 1;
       bool local_complete_ : 1;
       bool saw_connection_close_ : 1;
+      bool successful_upgrade_ : 1;
     };
 
     // Possibly increases buffer_limit_ to the value of limit.
@@ -401,8 +398,9 @@ private:
     Event::TimerPtr idle_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
-    RequestInfo::RequestInfoImpl request_info_;
+    StreamInfo::StreamInfoImpl stream_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
+    absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
@@ -437,8 +435,6 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
 
-  bool isOldStyleWebSocketConnection() const { return ws_connection_ != nullptr; }
-
   enum class DrainState { NotDraining, Draining, Closing };
 
   ConnectionManagerConfig& config_;
@@ -457,10 +453,12 @@ private:
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cluster_manager_;
-  WebSocketProxyPtr ws_connection_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
-  const Server::OverloadActionState& overload_stop_accepting_requests_;
+  // References into the overload manager thread local state map. Using these lets us avoid a map
+  // lookup in the hot path of processing each request.
+  const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
+  const Server::OverloadActionState& overload_disable_keepalive_ref_;
   Event::TimeSystem& time_system_;
 };
 

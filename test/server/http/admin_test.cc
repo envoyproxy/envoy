@@ -1,8 +1,10 @@
+#include <algorithm>
 #include <fstream>
 #include <regex>
 #include <unordered_map>
 
 #include "envoy/admin/v2alpha/memory.pb.h"
+#include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -12,6 +14,7 @@
 #include "common/profiler/profiler.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/ssl/context_config_impl.h"
 #include "common/stats/thread_local_store.h"
 
 #include "server/http/admin.h"
@@ -69,12 +72,8 @@ public:
 
 class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  // TODO(mattklein123): Switch to mocks and do not bind to a real port.
   AdminFilterTest()
-      : admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"),
-               TestEnvironment::temporaryPath("admin.address"),
-               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
-               listener_scope_.createScope("listener.admin.")),
+      : admin_(TestEnvironment::temporaryPath("envoy.prof"), server_),
         filter_(admin_), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
@@ -117,7 +116,11 @@ TEST_P(AdminStatsTest, StatsAsJson) {
 
   std::map<std::string, uint64_t> all_stats;
 
-  std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), false);
+  std::vector<Stats::ParentHistogramSharedPtr> histograms = store_->histograms();
+  std::sort(histograms.begin(), histograms.end(),
+            [](const Stats::ParentHistogramSharedPtr& a,
+               const Stats::ParentHistogramSharedPtr& b) -> bool { return a->name() < b->name(); });
+  std::string actual_json = statsAsJsonHandler(all_stats, histograms, false);
 
   const std::string expected_json = R"EOF({
     "stats": [
@@ -136,51 +139,6 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                     100.0
                 ],
                 "computed_quantiles": [
-                    {
-                        "name": "h2",
-                        "values": [
-                            {
-                                "interval": null,
-                                "cumulative": 100.0
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 102.5
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 105.0
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 107.5
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.0
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.5
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.9
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.95
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.99
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 110.0
-                            }
-                        ]
-                    },
                     {
                         "name": "h1",
                         "values": [
@@ -223,6 +181,51 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                             {
                                 "interval": 110.0,
                                 "cumulative": 210.0
+                            }
+                        ]
+                    },
+                    {
+                        "name": "h2",
+                        "values": [
+                            {
+                                "interval": null,
+                                "cumulative": 100.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 102.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 105.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 107.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.9
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.95
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.99
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 110.0
                             }
                         ]
                     }
@@ -578,11 +581,11 @@ public:
   AdminInstanceTest()
       : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
         cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
-        admin_("/dev/null", cpu_profile_path_, address_out_path_,
-               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
-               listener_scope_.createScope("listener.admin.")),
-        request_headers_{{":path", "/"}}, admin_filter_(admin_) {
-
+        admin_(cpu_profile_path_, server_), request_headers_{{":path", "/"}},
+        admin_filter_(admin_) {
+    admin_.startHttpListener("/dev/null", address_out_path_,
+                             Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                             listener_scope_.createScope("listener.admin."));
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
     EXPECT_TRUE(admin_.setCurrentClientCertDetails().empty());
@@ -648,10 +651,8 @@ TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
 
 TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
-  AdminImpl admin_bad_profile_path("/dev/null",
-                                   TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
-                                   "", Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                                   server_, listener_scope_.createScope("listener.admin."));
+  AdminImpl admin_bad_profile_path(TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
+                                   server_);
   Http::HeaderMapImpl header_map;
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.insertMethod().value(post.data(), post.size());
@@ -671,13 +672,12 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
-  std::unique_ptr<AdminImpl> admin_bad_address_out_path;
+  AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_);
   EXPECT_LOG_CONTAINS(
       "critical", "cannot open admin address output file " + bad_path + " for writing.",
-      admin_bad_address_out_path =
-          std::make_unique<AdminImpl>("/dev/null", cpu_profile_path_, bad_path,
-                                      Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                                      server_, listener_scope_.createScope("listener.admin.")));
+      admin_bad_address_out_path.startHttpListener(
+          "/dev/null", bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()),
+          listener_scope_.createScope("listener.admin.")));
   EXPECT_FALSE(std::ifstream(bad_path));
 }
 
@@ -841,6 +841,35 @@ TEST_P(AdminInstanceTest, Memory) {
                                   Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0))));
 }
 
+TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  // Setup a context that returns null cert details.
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
+  Ssl::ClientContextConfigImpl cfg(*loader, factory_context);
+  Stats::IsolatedStoreImpl store;
+  Ssl::ClientContextSharedPtr client_ctx(
+      server_.sslContextManager().createSslClientContext(store, cfg));
+
+  const std::string expected_empty_json = R"EOF({
+ "certificates": [
+  {
+   "ca_cert": [],
+   "cert_chain": []
+  }
+ ]
+}
+)EOF";
+
+  // Validate that cert details are null and /certs handles it correctly.
+  EXPECT_EQ(nullptr, client_ctx->getCaCertInformation());
+  EXPECT_EQ(nullptr, client_ctx->getCertChainInformation());
+  EXPECT_EQ(Http::Code::OK, getCallback("/certs", header_map, response));
+  EXPECT_EQ(expected_empty_json, response.toString());
+}
+
 TEST_P(AdminInstanceTest, Runtime) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
@@ -849,10 +878,10 @@ TEST_P(AdminInstanceTest, Runtime) {
   Runtime::MockLoader loader;
   auto layer1 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
   auto layer2 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
-  std::unordered_map<std::string, Runtime::Snapshot::Entry> entries1{
-      {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
   std::unordered_map<std::string, Runtime::Snapshot::Entry> entries2{
-      {"string_key", {"override", {}}}, {"extra_key", {"bar", {}}}};
+      {"string_key", {"override", {}, {}}}, {"extra_key", {"bar", {}, {}}}};
+  std::unordered_map<std::string, Runtime::Snapshot::Entry> entries1{
+      {"string_key", {"foo", {}, {}}}, {"int_key", {"1", 1, {}}}, {"other_key", {"bar", {}, {}}}};
 
   ON_CALL(*layer1, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer1"}));
   ON_CALL(*layer1, values()).WillByDefault(testing::ReturnRef(entries1));
@@ -1067,10 +1096,19 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 TEST_P(AdminInstanceTest, GetRequest) {
   Http::HeaderMapImpl response_headers;
   std::string body;
+
+  EXPECT_CALL(server_.options_, restartEpoch()).WillOnce(Return(2));
+
   EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
-  EXPECT_TRUE(absl::StartsWith(body, "envoy ")) << body;
+  envoy::admin::v2alpha::ServerInfo server_info_proto;
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("text/plain"));
+              HasSubstr("application/json"));
+
+  // We only test that it parses as the proto and that some fields are correct, since
+  // values such as timestamps + Envoy version are tricky to test for.
+  MessageUtil::loadFromJson(body, server_info_proto);
+  EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::LIVE);
+  EXPECT_EQ(server_info_proto.epoch(), 2);
 }
 
 TEST_P(AdminInstanceTest, GetRequestJson) {
@@ -1114,6 +1152,20 @@ protected:
 TEST_F(PrometheusStatsFormatterTest, MetricName) {
   std::string raw = "vulture.eats-liver";
   std::string expected = "envoy_vulture_eats_liver";
+  auto actual = PrometheusStatsFormatter::metricName(raw);
+  EXPECT_EQ(expected, actual);
+}
+
+TEST_F(PrometheusStatsFormatterTest, SanitizeMetricName) {
+  std::string raw = "An.artist.plays-violin@019street";
+  std::string expected = "envoy_An_artist_plays_violin_019street";
+  auto actual = PrometheusStatsFormatter::metricName(raw);
+  EXPECT_EQ(expected, actual);
+}
+
+TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
+  std::string raw = "3.artists.play-violin@019street";
+  std::string expected = "envoy_3_artists_play_violin_019street";
   auto actual = PrometheusStatsFormatter::metricName(raw);
   EXPECT_EQ(expected, actual);
 }

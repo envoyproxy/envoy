@@ -15,13 +15,10 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
   if (route == nullptr || route->routeEntry() == nullptr) {
     return;
   }
-
-  const Router::RouteEntry* route_entry = route->routeEntry();
-  Upstream::ThreadLocalCluster* cluster = config_->cm().get(route_entry->clusterName());
-  if (cluster == nullptr) {
+  cluster_ = callbacks_->clusterInfo();
+  if (!cluster_) {
     return;
   }
-  cluster_ = cluster->info();
 
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(callbacks_, headers,
                                                                 check_request_);
@@ -113,8 +110,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                                                     header.first.get(), header.second);
                                  }
                                });
-    callbacks_->requestInfo().setResponseFlag(
-        RequestInfo::ResponseFlag::UnauthorizedExternalService);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService);
   } else {
     ENVOY_STREAM_LOG(debug, "ext_authz accepted the request", *callbacks_);
     // Let the filter chain continue.

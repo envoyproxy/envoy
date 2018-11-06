@@ -15,10 +15,13 @@ namespace Envoy {
 namespace Server {
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Event::Dispatcher& dispatcher)
-    : logger_(logger), dispatcher_(dispatcher) {}
+    : logger_(logger), dispatcher_(dispatcher), disable_listeners_(false) {}
 
 void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   ActiveListenerPtr l(new ActiveListener(*this, config));
+  if (disable_listeners_) {
+    l->listener_->disable();
+  }
   listeners_.emplace_back(config.socket().localAddress(), std::move(l));
 }
 
@@ -43,6 +46,20 @@ void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
 void ConnectionHandlerImpl::stopListeners() {
   for (auto& listener : listeners_) {
     listener.second->listener_.reset();
+  }
+}
+
+void ConnectionHandlerImpl::disableListeners() {
+  disable_listeners_ = true;
+  for (auto& listener : listeners_) {
+    listener.second->listener_->disable();
+  }
+}
+
+void ConnectionHandlerImpl::enableListeners() {
+  disable_listeners_ = false;
+  for (auto& listener : listeners_) {
+    listener.second->listener_->enable();
   }
 }
 

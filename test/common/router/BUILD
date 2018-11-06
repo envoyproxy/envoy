@@ -93,10 +93,44 @@ envoy_proto_library(
     ],
 )
 
+# We generate the route_fuzz_test corpus from config_impl_test below. Since Bazel forces us to
+# enumerate all outputs from any rule (including genrule), we create dummy outputs of the form
+# generated_corpus_%d for [0..route_corpus_max). These placeholders are then populated by
+# config_impl_test. We need to increase this number if the test grows significantly.
+ROUTE_CORPUS_MAX = 1000
+
+sh_binary(
+    name = "corpus_from_config_impl_sh",
+    srcs = ["corpus_from_config_impl.sh"],
+)
+
+genrule(
+    name = "corpus_from_config_impl",
+    testonly = 1,
+    srcs = [
+        # This is deliberately in srcs, since we run into host/target confusion
+        # otherwise in oss-fuzz builds.
+        ":config_impl_test",
+    ],
+    outs = ["generated_corpus_%d" % n for n in range(ROUTE_CORPUS_MAX)],
+    cmd = " ".join([
+        "ROUTE_CORPUS_PATH=\"$(@D)\" ROUTE_CORPUS_MAX=%d" % ROUTE_CORPUS_MAX,
+        "$(location corpus_from_config_impl_sh)",
+        "$(location //test/common/router:config_impl_test)",
+    ]),
+    tools = [":corpus_from_config_impl_sh"],
+)
+
+filegroup(
+    name = "route_corpus",
+    testonly = 1,
+    srcs = [":corpus_from_config_impl"] + native.glob(["route_corpus/**"]),
+)
+
 envoy_cc_fuzz_test(
     name = "route_fuzz_test",
     srcs = ["route_fuzz_test.cc"],
-    corpus = "route_corpus",
+    corpus = ":route_corpus",
     deps = [
         ":route_fuzz_proto_cc",
         "//source/common/router:config_lib",
@@ -190,11 +224,11 @@ envoy_cc_test(
     deps = [
         "//source/common/config:metadata_lib",
         "//source/common/config:rds_json_lib",
-        "//source/common/request_info:filter_state_lib",
         "//source/common/router:header_formatter_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/router:string_accessor_lib",
-        "//test/common/request_info:test_int_accessor_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "//test/common/stream_info:test_int_accessor_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",

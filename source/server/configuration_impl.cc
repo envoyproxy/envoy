@@ -80,11 +80,10 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
   initializeTracers(bootstrap.tracing(), server);
 
   if (bootstrap.has_rate_limit_service()) {
-    ratelimit_client_factory_.reset(
-        new RateLimit::GrpcFactoryImpl(bootstrap.rate_limit_service(),
-                                       cluster_manager_->grpcAsyncClientManager(), server.stats()));
+    ratelimit_client_factory_ = std::make_unique<RateLimit::GrpcFactoryImpl>(
+        bootstrap.rate_limit_service(), cluster_manager_->grpcAsyncClientManager(), server.stats());
   } else {
-    ratelimit_client_factory_.reset(new RateLimit::NullFactoryImpl());
+    ratelimit_client_factory_ = std::make_unique<RateLimit::NullFactoryImpl>();
   }
 
   initializeStatsSinks(bootstrap, server);
@@ -95,7 +94,7 @@ void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& config
   ENVOY_LOG(info, "loading tracing configuration");
 
   if (!configuration.has_http()) {
-    http_tracer_.reset(new Tracing::HttpNullTracer());
+    http_tracer_ = std::make_unique<Tracing::HttpNullTracer>();
     return;
   }
 
@@ -103,13 +102,9 @@ void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& config
   std::string type = configuration.http().name();
   ENVOY_LOG(info, "  loading tracing driver: {}", type);
 
-  // TODO(htuch): Make this dynamically pluggable one day.
-  Json::ObjectSharedPtr driver_config =
-      MessageUtil::getJsonObjectFromMessage(configuration.http().config());
-
   // Now see if there is a factory that will accept the config.
   auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(type);
-  http_tracer_ = factory.createHttpTracer(*driver_config, server);
+  http_tracer_ = factory.createHttpTracer(configuration, server);
 }
 
 void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
@@ -131,14 +126,16 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstra
   admin_.access_log_path_ = admin.access_log_path();
   admin_.profile_path_ =
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
-  admin_.address_ = Network::Address::resolveProtoAddress(admin.address());
+  if (admin.has_address()) {
+    admin_.address_ = Network::Address::resolveProtoAddress(admin.address());
+  }
 
   if (!bootstrap.flags_path().empty()) {
     flags_path_ = bootstrap.flags_path();
   }
 
   if (bootstrap.has_runtime()) {
-    runtime_.reset(new RuntimeImpl());
+    runtime_ = std::make_unique<RuntimeImpl>();
     runtime_->symlink_root_ = bootstrap.runtime().symlink_root();
     runtime_->subdirectory_ = bootstrap.runtime().subdirectory();
     runtime_->override_subdirectory_ = bootstrap.runtime().override_subdirectory();

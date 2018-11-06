@@ -1,3 +1,4 @@
+#include <memory>
 #include <string>
 
 #include "common/http/header_map_impl.h"
@@ -515,7 +516,7 @@ TEST(HeaderMapImplTest, AddCopy) {
 
   // Build "hello" with string concatenation to make it unlikely that the
   // compiler is just reusing the same string constant for everything.
-  lcKeyPtr.reset(new LowerCaseString(std::string("he") + "llo"));
+  lcKeyPtr = std::make_unique<LowerCaseString>(std::string("he") + "llo");
   EXPECT_STREQ("hello", lcKeyPtr->get().c_str());
 
   headers.addCopy(*lcKeyPtr, 42);
@@ -913,7 +914,8 @@ TEST(HeaderMapImplTest, TestHeaderMapImplyCopy) {
   TestHeaderMapImpl baz{{"foo", "baz"}};
   baz = *headers;
   EXPECT_STREQ("bar", baz.get(LowerCaseString("foo"))->value().c_str());
-  baz = baz;
+  const TestHeaderMapImpl& baz2 = baz;
+  baz = baz2;
   EXPECT_STREQ("bar", baz.get(LowerCaseString("foo"))->value().c_str());
 }
 

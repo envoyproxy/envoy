@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 
@@ -18,6 +19,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
+#include "common/common/stack_array.h"
 #include "common/common/thread.h"
 
 #include "absl/strings/match.h"
@@ -141,8 +143,8 @@ FileImpl::~FileImpl() {
 
 void FileImpl::doWrite(Buffer::Instance& buffer) {
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
-  buffer.getRawSlices(slices, num_slices);
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  buffer.getRawSlices(slices.begin(), num_slices);
 
   // We must do the actual writes to disk under lock, so that we don't intermix chunks from
   // different FileImpl pointing to the same underlying file. This can happen either via hot
@@ -154,7 +156,7 @@ void FileImpl::doWrite(Buffer::Instance& buffer) {
   //            process lock or had multiple locks.
   {
     Thread::LockGuard lock(file_lock_);
-    for (Buffer::RawSlice& slice : slices) {
+    for (const Buffer::RawSlice& slice : slices) {
       const Api::SysCallSizeResult result = os_sys_calls_.write(fd_, slice.mem_, slice.len_);
       ASSERT(result.rc_ == static_cast<ssize_t>(slice.len_));
       stats_.write_completed_.inc();
@@ -247,7 +249,7 @@ void FileImpl::write(absl::string_view data) {
 }
 
 void FileImpl::createFlushStructures() {
-  flush_thread_.reset(new Thread::Thread([this]() -> void { flushThreadFunc(); }));
+  flush_thread_ = std::make_unique<Thread::Thread>([this]() -> void { flushThreadFunc(); });
   flush_timer_->enableTimer(flush_interval_msec_);
 }
 

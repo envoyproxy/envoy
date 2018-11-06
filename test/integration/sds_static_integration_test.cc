@@ -13,10 +13,10 @@
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
 #include "test/mocks/init/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -36,7 +36,7 @@ class SdsStaticDownstreamIntegrationTest
       public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   SdsStaticDownstreamIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -90,8 +90,7 @@ public:
   }
 
 private:
-  Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl context_manager_{runtime_};
+  Ssl::ContextManagerImpl context_manager_{timeSystem()};
 
   Network::TransportSocketFactoryPtr client_ssl_ctx_;
 };
@@ -112,7 +111,7 @@ class SdsStaticUpstreamIntegrationTest
       public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   SdsStaticUpstreamIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -148,12 +147,12 @@ public:
 
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(context_manager_), 0,
-                                                  FakeHttpConnection::Type::HTTP1, version_));
+                                                  FakeHttpConnection::Type::HTTP1, version_,
+                                                  timeSystem()));
   }
 
 private:
-  Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl context_manager_{runtime_};
+  Ssl::ContextManagerImpl context_manager_{timeSystem()};
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SdsStaticUpstreamIntegrationTest,

@@ -74,8 +74,9 @@ public:
   }
 
   void initializeFilter() {
-    filter_.reset(new TestProxyFilter("test.", store_, runtime_, access_log_, fault_config_,
-                                      drain_decision_, generator_, dispatcher_.timeSystem()));
+    filter_ =
+        std::make_unique<TestProxyFilter>("test.", store_, runtime_, access_log_, fault_config_,
+                                          drain_decision_, generator_, dispatcher_.timeSystem());
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -86,7 +87,6 @@ public:
 
   void setupDelayFault(bool enable_fault) {
     envoy::config::filter::fault::v2::FaultDelay fault{};
-    fault.set_percent(100);
     fault.mutable_percentage()->set_numerator(50);
     fault.mutable_percentage()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
     fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
@@ -437,7 +437,7 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
     message->query(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeQuery(std::move(message));
 
-    message.reset(new QueryMessageImpl(2, 0));
+    message = std::make_unique<QueryMessageImpl>(2, 0);
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create());
@@ -454,7 +454,7 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
     message->documents().push_back(Bson::DocumentImpl::create()->addString("hello", "world"));
     filter_->callbacks_->decodeReply(std::move(message));
 
-    message.reset(new ReplyMessageImpl(0, 2));
+    message = std::make_unique<ReplyMessageImpl>(0, 2);
     message->flags(0b11);
     message->cursorId(1);
     message->documents().push_back(Bson::DocumentImpl::create()->addString("hello", "world"));

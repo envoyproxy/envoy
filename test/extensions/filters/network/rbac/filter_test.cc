@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/network/utility.h"
 
 #include "extensions/filters/common/rbac/utility.h"
@@ -6,6 +8,7 @@
 #include "test/mocks/network/mocks.h"
 
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -21,13 +24,17 @@ public:
 
     if (with_policy) {
       envoy::config::rbac::v2alpha::Policy policy;
-      policy.add_permissions()->set_destination_port(123);
+      auto policy_rules = policy.add_permissions()->mutable_or_rules();
+      policy_rules->add_rules()->mutable_requested_server_name()->set_regex(".*cncf.io");
+      policy_rules->add_rules()->set_destination_port(123);
       policy.add_principals()->set_any(true);
       config.mutable_rules()->set_action(envoy::config::rbac::v2alpha::RBAC::ALLOW);
       (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
       envoy::config::rbac::v2alpha::Policy shadow_policy;
-      shadow_policy.add_permissions()->set_destination_port(456);
+      auto shadow_policy_rules = shadow_policy.add_permissions()->mutable_or_rules();
+      shadow_policy_rules->add_rules()->mutable_requested_server_name()->set_exact("xyz.cncf.io");
+      shadow_policy_rules->add_rules()->set_destination_port(456);
       shadow_policy.add_principals()->set_any(true);
       config.mutable_shadow_rules()->set_action(envoy::config::rbac::v2alpha::RBAC::ALLOW);
       (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
@@ -37,13 +44,19 @@ public:
   }
 
   RoleBasedAccessControlNetworkFilterTest() : config_(setupConfig()) {
-    filter_.reset(new RoleBasedAccessControlFilter(config_));
+    filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
     filter_->initializeReadFilterCallbacks(callbacks_);
   }
 
   void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
     EXPECT_CALL(callbacks_.connection_, localAddress()).WillRepeatedly(ReturnRef(address_));
+  }
+
+  void setRequestedServerName(std::string server_name) {
+    requested_server_name_ = server_name;
+    ON_CALL(callbacks_.connection_, requestedServerName())
+        .WillByDefault(Return(requested_server_name_));
   }
 
   NiceMock<Network::MockReadFilterCallbacks> callbacks_;
@@ -53,6 +66,7 @@ public:
 
   std::unique_ptr<RoleBasedAccessControlFilter> filter_;
   Network::Address::InstanceConstSharedPtr address_;
+  std::string requested_server_name_;
 };
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, Allowed) {
@@ -69,9 +83,24 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Allowed) {
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
 }
 
+TEST_F(RoleBasedAccessControlNetworkFilterTest, RequestedServerName) {
+  setDestinationPort(999);
+  setRequestedServerName("www.cncf.io");
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Call onData() twice, should only increase stats once.
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
+  EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+}
+
 TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithNoPolicy) {
   config_ = setupConfig(false /* with_policy */);
-  filter_.reset(new RoleBasedAccessControlFilter(config_));
+  filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
   filter_->initializeReadFilterCallbacks(callbacks_);
   setDestinationPort(0);
 

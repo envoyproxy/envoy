@@ -15,10 +15,10 @@
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
 #include "test/mocks/init/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -43,7 +43,7 @@ class SdsDynamicIntegrationBaseTest : public HttpIntegrationTest,
                                       public Grpc::GrpcClientIntegrationParamTest {
 public:
   SdsDynamicIntegrationBaseTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()),
         server_cert_("server_cert"), validation_secret_("validation_secret"),
         client_cert_("client_cert") {}
 
@@ -130,8 +130,7 @@ protected:
   const std::string server_cert_;
   const std::string validation_secret_;
   const std::string client_cert_;
-  Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl context_manager_{runtime_};
+  Ssl::ContextManagerImpl context_manager_{timeSystem()};
   FakeHttpConnectionPtr sds_connection_;
   FakeUpstream* sds_upstream_{};
   FakeStreamPtr sds_stream_;
@@ -179,8 +178,8 @@ public:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     // SDS upstream
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, enable_half_close_));
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
+                                                  timeSystem(), enable_half_close_));
   }
 
   void TearDown() override {
@@ -352,10 +351,11 @@ public:
   void createUpstreams() override {
     // This is for backend with ssl
     fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(context_manager_), 0,
-                                                  FakeHttpConnection::Type::HTTP1, version_));
+                                                  FakeHttpConnection::Type::HTTP1, version_,
+                                                  timeSystem()));
     // This is sds.
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, enable_half_close_));
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
+                                                  timeSystem(), enable_half_close_));
   }
 };
 

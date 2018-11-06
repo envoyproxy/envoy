@@ -68,24 +68,26 @@ Envoy can also pickup the original destination from a :ref:`HTTP header
 Original destination service discovery must be used with the original destination :ref:`load
 balancer <arch_overview_load_balancing_types_original_destination>`. 
 
-.. _arch_overview_service_discovery_types_sds:
+.. _arch_overview_service_discovery_types_eds:
 
-Service discovery service (SDS)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Endpoint discovery service (EDS)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The *service discovery service* is a generic :ref:`REST based API <config_cluster_manager_sds_api>`
-used by Envoy to fetch cluster members. Lyft provides a reference implementation via the Python
-`discovery service <https://github.com/lyft/discovery>`_. That implementation uses AWS DynamoDB as
-the backing store, however the API is simple enough that it could easily be implemented on top of a
-variety of different backing stores. For each SDS cluster, Envoy will periodically fetch the cluster
-members from the discovery service. SDS is the preferred service discovery mechanism for a few
-reasons:
+The *endpoint discovery service* is a :ref:`xDS management server based on gRPC or REST-JSON API server
+<config_overview_v2_management_server>` used by Envoy to fetch cluster members. The cluster members are called
+"endpoint" in Envoy terminology. For each cluster, Envoy fetch the endpoints from the discovery service. EDS is the
+preferred service discovery mechanism for a few reasons:
 
 * Envoy has explicit knowledge of each upstream host (vs. routing through a DNS resolved load
   balancer) and can make more intelligent load balancing decisions.
 * Extra attributes carried in the discovery API response for each host inform Envoy of the host’s
   load balancing weight, canary status, zone, etc. These additional attributes are used globally
   by the Envoy mesh during load balancing, statistic gathering, etc.
+
+The Envoy project provides reference gRPC implementations of EDS and
+:ref:`other discovery services <arch_overview_dynamic_config>`
+in both `Java <https://github.com/envoyproxy/java-control-plane>`_
+and `Go <https://github.com/envoyproxy/go-control-plane>`_.
 
 Generally active health checking is used in conjunction with the eventually consistent service
 discovery service data to making load balancing and routing decisions. This is discussed further in

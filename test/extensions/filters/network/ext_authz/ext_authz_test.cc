@@ -52,7 +52,7 @@ public:
     MessageUtil::loadFromJson(json, proto_config);
     config_.reset(new Config(proto_config, stats_store_));
     client_ = new Filters::Common::ExtAuthz::MockClient();
-    filter_.reset(new Filter(config_, Filters::Common::ExtAuthz::ClientPtr{client_}));
+    filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
 
@@ -204,7 +204,7 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
 
 TEST_F(ExtAuthzFilterTest, FailClose) {
   InSequence s;
-  // Explicitily set the failure_mode_allow to false.
+  // Explicitly set the failure_mode_allow to false.
   config_->setFailModeAllow(false);
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));

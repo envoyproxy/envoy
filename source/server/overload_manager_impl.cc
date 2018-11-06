@@ -128,18 +128,20 @@ OverloadManagerImpl::OverloadManagerImpl(
       resource_to_actions_.insert(std::make_pair(resource, name));
     }
   }
-
-  tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalOverloadState>();
-  });
 }
 
 void OverloadManagerImpl::start() {
   ASSERT(!started_);
   started_ = true;
+
+  tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalOverloadState>();
+  });
+
   if (resources_.empty()) {
     return;
   }
+
   timer_ = dispatcher_.createTimer([this]() -> void {
     for (auto& resource : resources_) {
       resource.second.update();
@@ -148,6 +150,16 @@ void OverloadManagerImpl::start() {
     timer_->enableTimer(refresh_interval_);
   });
   timer_->enableTimer(refresh_interval_);
+}
+
+void OverloadManagerImpl::stop() {
+  // Disable any pending timeouts.
+  if (timer_) {
+    timer_->disableTimer();
+  }
+
+  // Clear the resource map to block on any pending updates.
+  resources_.clear();
 }
 
 void OverloadManagerImpl::registerForAction(const std::string& action,

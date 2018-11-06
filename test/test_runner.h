@@ -1,3 +1,5 @@
+#pragma once
+
 #include "common/common/logger.h"
 #include "common/common/logger_delegates.h"
 #include "common/common/thread.h"
@@ -23,10 +25,7 @@ public:
     ::testing::Test::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
     ::testing::Test::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
 
-    if (::setenv("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory().c_str(), 1) != 0) {
-      ::perror("Failed to set temporary UDS directory.");
-      ::exit(1);
-    }
+    TestEnvironment::setEnvVar("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory(), 1);
 
     TestEnvironment::initializeOptions(argc, argv);
     Thread::MutexBasicLockable lock;

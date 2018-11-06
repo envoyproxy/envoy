@@ -26,6 +26,7 @@ namespace Logger {
   FUNCTION(client)               \
   FUNCTION(config)               \
   FUNCTION(connection)           \
+  FUNCTION(dubbo)                \
   FUNCTION(file)                 \
   FUNCTION(filter)               \
   FUNCTION(grpc)                 \
@@ -136,7 +137,7 @@ private:
 
 /**
  * Stacks logging sinks, so you can temporarily override the logging mechanism, restoring
- * the prevoius state when the DelegatingSink is destructed.
+ * the previous state when the DelegatingSink is destructed.
  */
 class DelegatingLogSink : public spdlog::sinks::sink {
 public:
@@ -146,6 +147,12 @@ public:
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
   void flush() override { sink_->flush(); }
+  void set_pattern(const std::string& pattern) override {
+    set_formatter(spdlog::details::make_unique<spdlog::pattern_formatter>(pattern));
+  }
+  void set_formatter(std::unique_ptr<spdlog::formatter> formatter) override {
+    formatter_ = std::move(formatter);
+  }
 
   /**
    * @return bool whether a lock has been established.
@@ -170,6 +177,7 @@ private:
 
   SinkDelegate* sink_{nullptr};
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
+  std::unique_ptr<spdlog::formatter> formatter_;
 };
 
 /**
@@ -239,6 +247,8 @@ public:
    */
   static bool initialized() { return getSink()->hasLock(); }
 
+  static Logger* logger(const std::string& log_name);
+
 private:
   /*
    * @return std::vector<Logger>& return the installed loggers.
@@ -247,7 +257,7 @@ private:
 };
 
 /**
- * Mixin class that allows any class to peform logging with a logger of a particular ID.
+ * Mixin class that allows any class to perform logging with a logger of a particular ID.
  */
 template <Id id> class Loggable {
 protected:
@@ -267,7 +277,7 @@ protected:
 #define DO_STRINGIZE(x) STRINGIZE(x)
 #define STRINGIZE(x) #x
 #define LINE_STRING DO_STRINGIZE(__LINE__)
-#define LOG_PREFIX __FILE__ ":" LINE_STRING "] "
+#define LOG_PREFIX "[" __FILE__ ":" LINE_STRING "] "
 
 /**
  * Base logging macros. It is expected that users will use the convenience macros below rather than

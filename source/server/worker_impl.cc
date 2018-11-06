@@ -1,6 +1,7 @@
 #include "server/worker_impl.h"
 
 #include <functional>
+#include <memory>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -14,17 +15,22 @@
 namespace Envoy {
 namespace Server {
 
-WorkerPtr ProdWorkerFactory::createWorker() {
+WorkerPtr ProdWorkerFactory::createWorker(OverloadManager& overload_manager) {
   Event::DispatcherPtr dispatcher(api_.allocateDispatcher(time_system_));
   return WorkerPtr{new WorkerImpl(
       tls_, hooks_, std::move(dispatcher),
-      Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher)})};
+      Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher)},
+      overload_manager)};
 }
 
 WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, TestHooks& hooks,
-                       Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler)
+                       Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler,
+                       OverloadManager& overload_manager)
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)) {
   tls_.registerThread(*dispatcher_, false);
+  overload_manager.registerForAction(
+      OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
+      [this](OverloadActionState state) { stopAcceptingConnectionsCb(state); });
 }
 
 void WorkerImpl::addListener(Network::ListenerConfig& listener, AddListenerCompletion completion) {
@@ -64,7 +70,8 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
 
 void WorkerImpl::start(GuardDog& guard_dog) {
   ASSERT(!thread_);
-  thread_.reset(new Thread::Thread([this, &guard_dog]() -> void { threadRoutine(guard_dog); }));
+  thread_ =
+      std::make_unique<Thread::Thread>([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
 }
 
 void WorkerImpl::stop() {
@@ -102,6 +109,17 @@ void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   handler_.reset();
   tls_.shutdownThread();
   watchdog.reset();
+}
+
+void WorkerImpl::stopAcceptingConnectionsCb(OverloadActionState state) {
+  switch (state) {
+  case OverloadActionState::Active:
+    handler_->disableListeners();
+    break;
+  case OverloadActionState::Inactive:
+    handler_->enableListeners();
+    break;
+  }
 }
 
 } // namespace Server

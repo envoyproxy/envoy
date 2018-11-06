@@ -25,12 +25,14 @@ const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rat
 const AsyncStreamImpl::NullConfig AsyncStreamImpl::NullVirtualHost::route_configuration_;
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
 const envoy::api::v2::core::Metadata AsyncStreamImpl::RouteEntryImpl::metadata_;
+const Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
+    AsyncStreamImpl::RouteEntryImpl::typed_metadata_({});
 const AsyncStreamImpl::NullPathMatchCriterion
     AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
 const std::list<LowerCaseString> AsyncStreamImpl::NullConfig::internal_only_headers_;
 
-AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,
-                                 Event::Dispatcher& dispatcher,
+AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
+                                 Stats::Store& stats_store, Event::Dispatcher& dispatcher,
                                  const LocalInfo::LocalInfo& local_info,
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random,
@@ -78,15 +80,15 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
                                  const absl::optional<std::chrono::milliseconds>& timeout,
                                  bool buffer_body_for_retry)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
-      router_(parent.config_), request_info_(Protocol::Http11, parent.dispatcher().timeSystem()),
+      router_(parent.config_), stream_info_(Protocol::Http11, parent.dispatcher().timeSystem()),
       tracing_config_(Tracing::EgressConfig::get()),
-      route_(std::make_shared<RouteImpl>(parent_.cluster_.name(), timeout)) {
+      route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), timeout)) {
   if (buffer_body_for_retry) {
-    buffered_body_.reset(new Buffer::OwnedImpl());
+    buffered_body_ = std::make_unique<Buffer::OwnedImpl>();
   }
 
   router_.setDecoderFilterCallbacks(*this);
-  // TODO(mattklein123): Correctly set protocol in request info when we support access logging.
+  // TODO(mattklein123): Correctly set protocol in stream info when we support access logging.
 }
 
 void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
@@ -196,7 +198,7 @@ void AsyncRequestImpl::initialize() {
 void AsyncRequestImpl::onComplete() { callbacks_.onSuccess(std::move(response_)); }
 
 void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
-  response_.reset(new ResponseMessageImpl(std::move(headers)));
+  response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
 
   if (end_stream) {
     onComplete();
@@ -205,7 +207,7 @@ void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
 
 void AsyncRequestImpl::onData(Buffer::Instance& data, bool end_stream) {
   if (!response_->body()) {
-    response_->body().reset(new Buffer::OwnedImpl());
+    response_->body() = std::make_unique<Buffer::OwnedImpl>();
   }
   response_->body()->move(data);
 

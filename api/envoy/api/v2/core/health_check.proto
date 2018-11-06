@@ -4,6 +4,7 @@ package envoy.api.v2.core;
 
 import "envoy/api/v2/core/base.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
@@ -22,22 +23,28 @@ message HealthCheck {
   // The time to wait for a health check response. If the timeout is reached the
   // health check attempt will be considered a failure.
   google.protobuf.Duration timeout = 1 [
-    (validate.rules).duration = {required: true, gt: {seconds: 0}},
+    (validate.rules).duration = {
+      required: true,
+      gt: {seconds: 0}
+    },
     (gogoproto.stdduration) = true
   ];
 
   // The interval between health checks.
   google.protobuf.Duration interval = 2 [
-    (validate.rules).duration = {required: true, gt: {seconds: 0}},
+    (validate.rules).duration = {
+      required: true,
+      gt: {seconds: 0}
+    },
     (gogoproto.stdduration) = true
   ];
 
   // An optional jitter amount in millseconds. If specified, during every
-  // interval Envoy will add 0 to interval_jitter to the wait time.
+  // interval Envoy will add interval_jitter to the wait time.
   google.protobuf.Duration interval_jitter = 3;
 
   // An optional jitter amount as a percentage of interval_ms. If specified,
-  // during every interval Envoy will add 0 to interval_ms *
+  // during every interval Envoy will add interval_ms *
   // interval_jitter_percent / 100 to the wait time.
   //
   // If interval_jitter_ms and interval_jitter_percent are both set, both of
@@ -99,7 +106,8 @@ message HealthCheck {
     // health checked cluster. For more information, including details on header value syntax, see
     // the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
-    repeated core.HeaderValueOption request_headers_to_add = 6;
+    repeated core.HeaderValueOption request_headers_to_add = 6
+        [(validate.rules).repeated .max_items = 1000];
 
     // Specifies a list of HTTP headers that should be removed from each request that is sent to the
     // health checked cluster.
@@ -147,7 +155,12 @@ message HealthCheck {
 
     // A custom health checker specific configuration which depends on the custom health checker
     // being instantiated. See :api:`envoy/config/health_checker` for reference.
-    google.protobuf.Struct config = 2;
+    oneof config_type {
+      google.protobuf.Struct config = 2;
+
+      // [#not-implemented-hide:]
+      google.protobuf.Any typed_config = 3;
+    }
   }
 
   oneof health_checker {
@@ -178,14 +191,14 @@ message HealthCheck {
   // any other.
   //
   // The default value for "no traffic interval" is 60 seconds.
-  google.protobuf.Duration no_traffic_interval = 12;
+  google.protobuf.Duration no_traffic_interval = 12 [(validate.rules).duration.gt = {}];
 
   // The "unhealthy interval" is a health check interval that is used for hosts that are marked as
   // unhealthy. As soon as the host is marked as healthy, Envoy will shift back to using the
   // standard health check interval that is defined.
   //
   // The default value for "unhealthy interval" is the same as "interval".
-  google.protobuf.Duration unhealthy_interval = 14;
+  google.protobuf.Duration unhealthy_interval = 14 [(validate.rules).duration.gt = {}];
 
   // The "unhealthy edge interval" is a special health check interval that is used for the first
   // health check right after a host is marked as unhealthy. For subsequent health checks
@@ -193,14 +206,14 @@ message HealthCheck {
   // check interval that is defined.
   //
   // The default value for "unhealthy edge interval" is the same as "unhealthy interval".
-  google.protobuf.Duration unhealthy_edge_interval = 15;
+  google.protobuf.Duration unhealthy_edge_interval = 15 [(validate.rules).duration.gt = {}];
 
   // The "healthy edge interval" is a special health check interval that is used for the first
   // health check right after a host is marked as healthy. For subsequent health checks
   // Envoy will shift back to using the standard health check interval that is defined.
   //
   // The default value for "healthy edge interval" is the same as the default interval.
-  google.protobuf.Duration healthy_edge_interval = 16;
+  google.protobuf.Duration healthy_edge_interval = 16 [(validate.rules).duration.gt = {}];
 
   // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
   // If empty, no event log will be written.

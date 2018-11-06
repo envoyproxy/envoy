@@ -36,6 +36,10 @@
 namespace Envoy {
 namespace Server {
 
+class AdminInternalAddressConfig : public Http::InternalAddressConfig {
+  bool isInternalAddress(const Network::Address::Instance&) const override { return false; }
+};
+
 /**
  * Implementation of Server::Admin.
  */
@@ -46,15 +50,12 @@ class AdminImpl : public Admin,
                   public Http::ConnectionManagerConfig,
                   Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminImpl(const std::string& access_log_path, const std::string& profiler_path,
-            const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
-            Server::Instance& server, Stats::ScopePtr&& listener_scope);
+  AdminImpl(const std::string& profile_path, Server::Instance& server);
 
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response, AdminStream& admin_stream);
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutable_socket() { return *socket_; }
-  Network::ListenerConfig& listener() { return listener_; }
 
   // Server::Admin
   // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.
@@ -65,6 +66,10 @@ public:
                   bool removable, bool mutates_server_state) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
+
+  void startHttpListener(const std::string& access_log_path, const std::string& address_out_path,
+                         Network::Address::InstanceConstSharedPtr address,
+                         Stats::ScopePtr&& listener_scope) override;
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -91,14 +96,19 @@ public:
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
+  bool reverseEncodeOrder() override { return false; }
   bool generateRequestId() override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
+  std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return Http::DefaultServerString::get(); }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return true; }
+  const Http::InternalAddressConfig& internalAddressConfig() const override {
+    return internal_address_config_;
+  }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
   const std::string& via() const override { return EMPTY_STRING; }
@@ -111,11 +121,13 @@ public:
   const Network::Address::Instance& localAddress() override;
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
-  Http::ConnectionManagerListenerStats& listenerStats() override { return listener_.stats_; }
+  Http::ConnectionManagerListenerStats& listenerStats() override { return listener_->stats_; }
   bool proxy100Continue() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::HeaderMap& response_headers, std::string& body) override;
+  void closeSocket();
+  void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
 private:
   /**
@@ -253,6 +265,7 @@ private:
     Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
   };
+  using AdminListenerPtr = std::unique_ptr<AdminListener>;
 
   class AdminFilterChain : public Network::FilterChain {
   public:
@@ -275,7 +288,6 @@ private:
   Server::Instance& server_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string profile_path_;
-  Network::SocketPtr socket_;
   Http::ConnectionManagerStats stats_;
   // Note: this is here to essentially blackhole the tracing stats since they aren't used in the
   // Admin case.
@@ -287,10 +299,12 @@ private:
   absl::optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
-  AdminListener listener_;
   Http::Http1Settings http1_settings_;
   ConfigTrackerImpl config_tracker_;
   const Network::FilterChainSharedPtr admin_filter_chain_;
+  Network::SocketPtr socket_;
+  AdminListenerPtr listener_;
+  const AdminInternalAddressConfig internal_address_config_;
 };
 
 /**

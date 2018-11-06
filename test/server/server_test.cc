@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/common/version.h"
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -14,12 +16,14 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Assign;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Property;
 using testing::Ref;
+using testing::Return;
 using testing::SaveArg;
 using testing::StrictMock;
 
@@ -51,7 +55,7 @@ TEST(ServerInstanceUtil, flushHelper) {
 
 class RunHelperTest : public testing::Test {
 public:
-  RunHelperTest() {
+  RunHelperTest() : shutdown_(false) {
     InSequence s;
 
     sigterm_ = new Event::MockSignalEvent(&dispatcher_);
@@ -59,14 +63,17 @@ public:
     sighup_ = new Event::MockSignalEvent(&dispatcher_);
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
     EXPECT_CALL(overload_manager_, start());
+    ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
 
-    helper_.reset(new RunHelper(dispatcher_, cm_, hot_restart_, access_log_manager_, init_manager_,
-                                overload_manager_, [this] { start_workers_.ready(); }));
+    helper_ = std::make_unique<RunHelper>(server_, options_, dispatcher_, cm_, access_log_manager_,
+                                          init_manager_, overload_manager_,
+                                          [this] { start_workers_.ready(); });
   }
 
+  NiceMock<MockInstance> server_;
+  testing::NiceMock<MockOptions> options_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<MockHotRestart> hot_restart_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   NiceMock<MockOverloadManager> overload_manager_;
   InitManagerImpl init_manager_;
@@ -76,6 +83,7 @@ public:
   Event::MockSignalEvent* sigterm_;
   Event::MockSignalEvent* sigusr1_;
   Event::MockSignalEvent* sighup_;
+  bool shutdown_ = false;
 };
 
 TEST_F(RunHelperTest, Normal) {
@@ -86,6 +94,7 @@ TEST_F(RunHelperTest, Normal) {
 TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
   EXPECT_CALL(start_workers_, ready()).Times(0);
   sigterm_->callback_();
+  EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   cm_init_callback_();
 }
 
@@ -96,6 +105,7 @@ TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
   EXPECT_CALL(target, initialize(_));
   cm_init_callback_();
   sigterm_->callback_();
+  EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   target.callback_();
 }
 
@@ -112,11 +122,11 @@ protected:
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
     }
-    server_.reset(new InstanceImpl(
+    server_ = std::make_unique<InstanceImpl>(
         options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_));
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_);
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
@@ -128,11 +138,11 @@ protected:
         {{"health_check_timeout", fmt::format("{}", timeout).c_str()},
          {"health_check_interval", fmt::format("{}", interval).c_str()}},
         TestEnvironment::PortMap{}, version_);
-    server_.reset(new InstanceImpl(
+    server_ = std::make_unique<InstanceImpl>(
         options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_));
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_);
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
@@ -248,13 +258,38 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckValidTimeoutAndInterva
                                                   0.25, 0.5));
 }
 
+// Test that a Bootstrap proto with no address specified in its Admin field can go through
+// initialization properly, but without starting an admin listener.
+TEST_P(ServerInstanceImplTest, BootstrapNodeNoAdmin) {
+  EXPECT_NO_THROW(initialize("test/server/node_bootstrap_no_admin_port.yaml"));
+  // Admin::addListenerToHandler() calls one of handler's methods after checking that the Admin
+  // has a listener. So, the fact that passing a nullptr doesn't cause a segfault establishes
+  // that there is no listener.
+  server_->admin().addListenerToHandler(/*handler=*/nullptr);
+}
+
+// Validate that an admin config with a server address but no access log path is rejected.
+TEST_P(ServerInstanceImplTest, BootstrapNodeWithoutAccessLog) {
+  EXPECT_THROW_WITH_MESSAGE(initialize("test/server/node_bootstrap_without_access_log.yaml"),
+                            EnvoyException,
+                            "An admin access log path is required for a listening server.");
+}
+
+// Empty bootstrap succeeeds.
+TEST_P(ServerInstanceImplTest, EmptyBootstrap) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.v2_config_only_ = true;
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+}
+
 // Negative test for protoc-gen-validate constraints.
 TEST_P(ServerInstanceImplTest, ValidateFail) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   options_.v2_config_only_ = true;
   try {
-    initialize("test/server/empty_bootstrap.yaml");
+    initialize("test/server/empty_runtime.yaml");
     FAIL();
   } catch (const EnvoyException& e) {
     EXPECT_THAT(e.what(), HasSubstr("Proto constraint validation failed"));
@@ -295,14 +330,14 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
   }
 }
 
+// When there are no bootstrap CLI options, either for content or path, we can load the server with
+// an empty config.
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
-  EXPECT_THROW_WITH_MESSAGE(
-      server_.reset(new InstanceImpl(
-          options_, test_time_.timeSystem(),
-          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-          hooks_, restart_, stats_store_, fakelock_, component_factory_,
-          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_)),
-      EnvoyException, "unable to read file: ");
+  EXPECT_NO_THROW(server_.reset(new InstanceImpl(
+      options_, test_time_.timeSystem(),
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+      hooks_, restart_, stats_store_, fakelock_, component_factory_,
+      std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_)));
 }
 
 // Validate that when std::exception is unexpectedly thrown, we exit safely.

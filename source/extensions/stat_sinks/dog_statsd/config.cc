@@ -1,5 +1,7 @@
 #include "extensions/stat_sinks/dog_statsd/config.h"
 
+#include <memory>
+
 #include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/config/metrics/v2/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -22,12 +24,11 @@ Stats::SinkPtr DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& co
       Network::Address::resolveProtoAddress(sink_config.address());
   ENVOY_LOG(debug, "dog_statsd UDP ip address: {}", address->asString());
   return std::make_unique<Common::Statsd::UdpStatsdSink>(server.threadLocal(), std::move(address),
-                                                         true);
+                                                         true, sink_config.prefix());
 }
 
 ProtobufTypes::MessagePtr DogStatsdSinkFactory::createEmptyConfigProto() {
-  return std::unique_ptr<envoy::config::metrics::v2::DogStatsdSink>(
-      new envoy::config::metrics::v2::DogStatsdSink());
+  return std::make_unique<envoy::config::metrics::v2::DogStatsdSink>();
 }
 
 std::string DogStatsdSinkFactory::name() { return StatsSinkNames::get().DogStatsd; }

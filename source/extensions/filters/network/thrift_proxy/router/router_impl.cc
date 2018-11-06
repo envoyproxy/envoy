@@ -1,5 +1,7 @@
 #include "extensions/filters/network/thrift_proxy/router/router_impl.h"
 
+#include <memory>
+
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
@@ -18,7 +20,7 @@ namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
-    : cluster_name_(route.route().cluster()) {
+    : cluster_name_(route.route().cluster()), rate_limit_policy_(route.route().rate_limits()) {
   for (const auto& header_map : route.match().headers()) {
     config_headers_.push_back(header_map);
   }
@@ -27,8 +29,8 @@ RouteEntryImplBase::RouteEntryImplBase(
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
     if (filter_it != route.route().metadata_match().filter_metadata().end()) {
-      metadata_match_criteria_.reset(
-          new Envoy::Router::MetadataMatchCriteriaImpl(filter_it->second));
+      metadata_match_criteria_ =
+          std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
     }
   }
 
@@ -52,26 +54,8 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value) cons
   if (weighted_clusters_.empty()) {
     return shared_from_this();
   }
-
-  uint64_t selected_value = random_value % total_cluster_weight_;
-  uint64_t begin = 0UL;
-  uint64_t end = 0UL;
-
-  // Find the right cluster to route to based on the interval in which
-  // the selected value falls. The intervals are determined as
-  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
-  for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
-    end = begin + cluster->clusterWeight();
-    ASSERT(end <= total_cluster_weight_);
-
-    if (selected_value >= begin && selected_value < end) {
-      return cluster;
-    }
-
-    begin = end;
-  }
-
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_, random_value,
+                                          false);
 }
 
 bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
@@ -92,8 +76,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
         metadata_match_criteria_ =
             parent.metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
       } else {
-        metadata_match_criteria_.reset(
-            new Envoy::Router::MetadataMatchCriteriaImpl(filter_it->second));
+        metadata_match_criteria_ =
+            std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
       }
     }
   }
@@ -195,12 +179,6 @@ void Router::setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& ca
   // TODO(zuercher): handle buffer limits
 }
 
-void Router::resetUpstreamConnection() {
-  if (upstream_request_ != nullptr) {
-    upstream_request_->resetStream();
-  }
-}
-
 FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   UNREFERENCED_PARAMETER(metadata);
   return FilterStatus::Continue;
@@ -225,7 +203,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                      metadata->methodName());
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::UnknownMethod,
-                     fmt::format("no route for method '{}'", metadata->methodName())));
+                     fmt::format("no route for method '{}'", metadata->methodName())),
+        true);
     return FilterStatus::StopIteration;
   }
 
@@ -236,7 +215,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
-                     fmt::format("unknown cluster '{}'", route_entry_->clusterName())));
+                     fmt::format("unknown cluster '{}'", route_entry_->clusterName())),
+        true);
     return FilterStatus::StopIteration;
   }
 
@@ -245,9 +225,10 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                    route_entry_->clusterName(), metadata->methodName());
 
   if (cluster_->maintenanceMode()) {
-    callbacks_->sendLocalReply(AppException(
-        AppExceptionType::InternalError,
-        fmt::format("maintenance mode for cluster '{}'", route_entry_->clusterName())));
+    callbacks_->sendLocalReply(
+        AppException(AppExceptionType::InternalError,
+                     fmt::format("maintenance mode for cluster '{}'", route_entry_->clusterName())),
+        true);
     return FilterStatus::StopIteration;
   }
 
@@ -269,13 +250,15 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   if (!conn_pool) {
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
-                     fmt::format("no healthy upstream for '{}'", route_entry_->clusterName())));
+                     fmt::format("no healthy upstream for '{}'", route_entry_->clusterName())),
+        true);
     return FilterStatus::StopIteration;
   }
 
   ENVOY_STREAM_LOG(debug, "router decoding request", *callbacks_);
 
-  upstream_request_.reset(new UpstreamRequest(*this, *conn_pool, metadata, transport, protocol));
+  upstream_request_ =
+      std::make_unique<UpstreamRequest>(*this, *conn_pool, metadata, transport, protocol);
   return upstream_request_->start();
 }
 
@@ -320,16 +303,22 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
       upstream_request_->response_started_ = true;
     }
 
-    if (callbacks_->upstreamData(data)) {
+    ThriftFilters::ResponseStatus status = callbacks_->upstreamData(data);
+    if (status == ThriftFilters::ResponseStatus::Complete) {
       ENVOY_STREAM_LOG(debug, "response complete", *callbacks_);
       upstream_request_->onResponseComplete();
       cleanup();
+      return;
+    } else if (status == ThriftFilters::ResponseStatus::Reset) {
+      ENVOY_STREAM_LOG(debug, "upstream reset", *callbacks_);
+      upstream_request_->resetStream();
       return;
     }
   }
 
   if (end_stream) {
     // Response is incomplete, but no more data is coming.
+    ENVOY_STREAM_LOG(debug, "response underflow", *callbacks_);
     upstream_request_->onResponseComplete();
     upstream_request_->onResetStream(
         Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
@@ -397,7 +386,7 @@ FilterStatus Router::UpstreamRequest::start() {
 
 void Router::UpstreamRequest::resetStream() {
   if (conn_pool_handle_) {
-    conn_pool_handle_->cancel();
+    conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
   }
 
   if (conn_data_ != nullptr) {
@@ -477,9 +466,11 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
 
   switch (reason) {
   case Tcp::ConnectionPool::PoolFailureReason::Overflow:
-    parent_.callbacks_->sendLocalReply(AppException(
-        AppExceptionType::InternalError,
-        fmt::format("too many connections to '{}'", upstream_host_->address()->asString())));
+    parent_.callbacks_->sendLocalReply(
+        AppException(
+            AppExceptionType::InternalError,
+            fmt::format("too many connections to '{}'", upstream_host_->address()->asString())),
+        true);
     break;
   case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     // Should only happen if we closed the connection, due to an error condition, in which case
@@ -490,9 +481,11 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
   case Tcp::ConnectionPool::PoolFailureReason::Timeout:
     // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
     if (!response_started_) {
-      parent_.callbacks_->sendLocalReply(AppException(
-          AppExceptionType::InternalError,
-          fmt::format("connection failure '{}'", upstream_host_->address()->asString())));
+      parent_.callbacks_->sendLocalReply(
+          AppException(
+              AppExceptionType::InternalError,
+              fmt::format("connection failure '{}'", upstream_host_->address()->asString())),
+          true);
       return;
     }
 

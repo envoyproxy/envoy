@@ -243,7 +243,9 @@ std::string SslSocket::uriSanLocalCertificate() const {
   if (!cert) {
     return "";
   }
-  return getUriSanFromCertificate(cert);
+  // TODO(PiotrSikora): Figure out if returning only one URI is valid limitation.
+  const std::vector<std::string>& san_uris = Utility::getSubjectAltNames(*cert, GEN_URI);
+  return (san_uris.size() > 0) ? san_uris[0] : "";
 }
 
 std::vector<std::string> SslSocket::dnsSansLocalCertificate() const {
@@ -251,7 +253,7 @@ std::vector<std::string> SslSocket::dnsSansLocalCertificate() const {
   if (!cert) {
     return {};
   }
-  return getDnsSansFromCertificate(cert);
+  return Utility::getSubjectAltNames(*cert, GEN_DNS);
 }
 
 const std::string& SslSocket::sha256PeerCertificateDigest() const {
@@ -299,7 +301,9 @@ std::string SslSocket::uriSanPeerCertificate() const {
   if (!cert) {
     return "";
   }
-  return getUriSanFromCertificate(cert.get());
+  // TODO(PiotrSikora): Figure out if returning only one URI is valid limitation.
+  const std::vector<std::string>& san_uris = Utility::getSubjectAltNames(*cert, GEN_URI);
+  return (san_uris.size() > 0) ? san_uris[0] : "";
 }
 
 std::vector<std::string> SslSocket::dnsSansPeerCertificate() const {
@@ -307,41 +311,7 @@ std::vector<std::string> SslSocket::dnsSansPeerCertificate() const {
   if (!cert) {
     return {};
   }
-  return getDnsSansFromCertificate(cert.get());
-}
-
-std::string SslSocket::getUriSanFromCertificate(X509* cert) const {
-  bssl::UniquePtr<GENERAL_NAMES> san_names(
-      static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
-  if (san_names == nullptr) {
-    return "";
-  }
-  // TODO(PiotrSikora): Figure out if returning only one URI is valid limitation.
-  for (const GENERAL_NAME* san : san_names.get()) {
-    if (san->type == GEN_URI) {
-      ASN1_STRING* str = san->d.uniformResourceIdentifier;
-      return std::string(reinterpret_cast<const char*>(ASN1_STRING_data(str)),
-                         ASN1_STRING_length(str));
-    }
-  }
-  return "";
-}
-
-std::vector<std::string> SslSocket::getDnsSansFromCertificate(X509* cert) const {
-  bssl::UniquePtr<GENERAL_NAMES> san_names(
-      static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
-  if (san_names == nullptr) {
-    return {};
-  }
-  std::vector<std::string> dns_sans = {};
-  for (const GENERAL_NAME* san : san_names.get()) {
-    if (san->type == GEN_DNS) {
-      ASN1_STRING* dns = san->d.dNSName;
-      dns_sans.emplace_back(reinterpret_cast<const char*>(ASN1_STRING_data(dns)),
-                            ASN1_STRING_length(dns));
-    }
-  }
-  return dns_sans;
+  return Utility::getSubjectAltNames(*cert, GEN_DNS);
 }
 
 void SslSocket::closeSocket(Network::ConnectionEvent) {
@@ -368,30 +338,12 @@ std::string SslSocket::serialNumberPeerCertificate() const {
   return Utility::getSerialNumberFromCertificate(*cert.get());
 }
 
-std::string SslSocket::getSubjectFromCertificate(X509* cert) const {
-  bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-  RELEASE_ASSERT(buf != nullptr, "");
-
-  // flags=XN_FLAG_RFC2253 is the documented parameter for single-line output in RFC 2253 format.
-  // Example from the RFC:
-  //   * Single value per Relative Distinguished Name (RDN): CN=Steve Kille,O=Isode Limited,C=GB
-  //   * Multivalue output in first RDN: OU=Sales+CN=J. Smith,O=Widget Inc.,C=US
-  //   * Quoted comma in Organization: CN=L. Eagle,O=Sue\, Grabbit and Runn,C=GB
-  X509_NAME_print_ex(buf.get(), X509_get_subject_name(cert), 0 /* indent */, XN_FLAG_RFC2253);
-
-  const uint8_t* data;
-  size_t data_len;
-  int rc = BIO_mem_contents(buf.get(), &data, &data_len);
-  ASSERT(rc == 1);
-  return std::string(reinterpret_cast<const char*>(data), data_len);
-}
-
 std::string SslSocket::subjectPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return "";
   }
-  return getSubjectFromCertificate(cert.get());
+  return Utility::getSubjectFromCertificate(*cert);
 }
 
 std::string SslSocket::subjectLocalCertificate() const {
@@ -399,7 +351,7 @@ std::string SslSocket::subjectLocalCertificate() const {
   if (!cert) {
     return "";
   }
-  return getSubjectFromCertificate(cert);
+  return Utility::getSubjectFromCertificate(*cert);
 }
 
 namespace {

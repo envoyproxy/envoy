@@ -42,6 +42,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -82,9 +83,10 @@ envoy_cc_test(
 envoy_cc_fuzz_test(
     name = "config_fuzz_test",
     srcs = ["config_fuzz_test.cc"],
-    corpus = "config_corpus",
+    corpus = "//test/server:server_fuzz_test_corpus",
     deps = [
         "//source/server/config_validation:server_lib",
+        "//source/server:proto_descriptors_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",

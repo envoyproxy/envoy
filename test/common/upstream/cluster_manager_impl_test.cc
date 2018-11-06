@@ -119,8 +119,8 @@ public:
       new NiceMock<Network::MockDnsResolver>};
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
   NiceMock<Event::MockDispatcher> dispatcher_;
+  Ssl::ContextManagerImpl ssl_context_manager_{dispatcher_.timeSystem()};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Secret::MockSecretManager> secret_manager_;
 };
@@ -167,9 +167,9 @@ public:
   ClusterManagerImplTest() { factory_.dispatcher_.setTimeSystem(time_system_); }
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-    cluster_manager_.reset(new ClusterManagerImpl(
+    cluster_manager_ = std::make_unique<ClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_));
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_);
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -199,9 +199,9 @@ public:
 
     const auto& bootstrap = parseBootstrapFromV2Yaml(yaml);
 
-    cluster_manager_.reset(new TestClusterManagerImpl(
+    cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, local_cluster_update_));
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, local_cluster_update_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -757,8 +757,9 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   EXPECT_EQ(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
             cluster_manager_->get("cluster_1")->loadBalancer().chooseHost(nullptr));
 
-  // Local reference, primary reference, thread local reference, host reference.
-  EXPECT_EQ(4U, cluster.info().use_count());
+  // Local reference, primary reference, thread local reference, host reference, async client
+  // reference.
+  EXPECT_EQ(5U, cluster.info().use_count());
 
   // Thread local reference should be gone.
   factory_.tls_.shutdownThread();

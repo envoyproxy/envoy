@@ -54,6 +54,8 @@ public:
   void removeListeners(uint64_t listener_tag) override;
   void stopListeners(uint64_t listener_tag) override;
   void stopListeners() override;
+  void disableListeners() override;
+  void enableListeners() override;
 
   Network::Listener* findListenerByAddress(const Network::Address::Instance& address) override;
 
@@ -167,6 +169,7 @@ private:
   Event::Dispatcher& dispatcher_;
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>> listeners_;
   std::atomic<uint64_t> num_connections_{};
+  bool disable_listeners_;
 };
 
 } // namespace Server

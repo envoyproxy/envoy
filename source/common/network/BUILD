@@ -59,6 +59,7 @@ envoy_cc_library(
         "//source/common/event:libevent_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/ssl:ssl_socket_lib",
+        "//source/common/stream_info:stream_info_lib",
     ],
 )
 
@@ -81,6 +82,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "filter_lib",
     hdrs = ["filter_impl.h"],
+    deps = [
+        "//include/envoy/network:filter_interface",
+    ],
 )
 
 envoy_cc_library(

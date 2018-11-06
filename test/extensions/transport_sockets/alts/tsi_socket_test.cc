@@ -89,10 +89,8 @@ protected:
     }));
 
     client_.tsi_socket_->setTransportSocketCallbacks(client_.callbacks_);
-    client_.tsi_socket_->onConnected();
 
     server_.tsi_socket_->setTransportSocketCallbacks(server_.callbacks_);
-    server_.tsi_socket_->onConnected();
   }
 
   void expectIoResult(Network::IoResult expected, Network::IoResult actual) {
@@ -119,6 +117,7 @@ protected:
 
   void doFakeInitHandshake() {
     EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+    client_.tsi_socket_->onConnected();
     expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                    client_.tsi_socket_->doWrite(client_.write_buffer_, false));
     EXPECT_EQ(makeFakeTsiFrame("CLIENT_INIT"), client_to_server_.toString());
@@ -243,6 +242,27 @@ TEST_F(TsiSocketTest, HandshakeValidationFail) {
   EXPECT_EQ(0, server_to_client_.length());
 }
 
+TEST_F(TsiSocketTest, HandshakerCreationFail) {
+  client_.handshaker_factory_ =
+      [](Event::Dispatcher&, const Network::Address::InstanceConstSharedPtr&,
+         const Network::Address::InstanceConstSharedPtr&) { return nullptr; };
+  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  initialize(validator, validator);
+
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, _)).Times(0);
+  EXPECT_CALL(client_.callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  client_.tsi_socket_->onConnected();
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 client_.tsi_socket_->doWrite(client_.write_buffer_, false));
+  EXPECT_EQ("", client_to_server_.toString());
+
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+  EXPECT_CALL(*server_.raw_socket_, doWrite(_, _)).Times(0);
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_));
+  EXPECT_EQ("", server_to_client_.toString());
+}
+
 TEST_F(TsiSocketTest, HandshakeWithUnusedData) {
   initialize(nullptr, nullptr);
 
@@ -357,8 +377,7 @@ TEST_F(TsiSocketTest, HandshakeWithInternalError) {
 
   EXPECT_CALL(client_.callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   // doWrite won't immediately fail, but it will result connection close.
-  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
-                 client_.tsi_socket_->doWrite(client_.write_buffer_, false));
+  client_.tsi_socket_->onConnected();
 
   raw_handshaker->vtable = vtable;
 }

@@ -90,8 +90,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
   const uint32_t overprovisioning_factor = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 
-  // Loop over existing priorities not present in the config. This will empty out any priorities
-  // the config update did not refer to
+  // Loop over all priorities that exist in the new configuration.
   auto& priority_state = priority_state_manager.priorityState();
   for (size_t i = 0; i < priority_state.size(); ++i) {
     if (priority_state[i].first != nullptr) {
@@ -151,6 +150,8 @@ bool EdsClusterImpl::updateHostsPerLocality(
       updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             updated_hosts) ||
       locality_weights_map != new_locality_weights_map) {
+    ASSERT(std::all_of(current_hosts_copy->begin(), current_hosts_copy->end(),
+                       [&](const auto& host) { return host->priority() == priority; }));
     locality_weights_map = new_locality_weights_map;
     ENVOY_LOG(debug, "EDS hosts or locality weights changed for cluster: {} ({}) priority {}",
               info_->name(), host_set.hosts().size(), host_set.priority());

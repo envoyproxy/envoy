@@ -1,9 +1,11 @@
 #pragma once
 
+#include "envoy/http/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
 
 #include "common/http/date_provider.h"
+#include "common/network/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -16,7 +18,7 @@ namespace Http {
   COUNTER  (downstream_cx_total)                                                                   \
   COUNTER  (downstream_cx_ssl_total)                                                               \
   COUNTER  (downstream_cx_http1_total)                                                             \
-  COUNTER  (downstream_cx_websocket_total)                                                         \
+  COUNTER  (downstream_cx_upgrades_total)                                                         \
   COUNTER  (downstream_cx_http2_total)                                                             \
   COUNTER  (downstream_cx_destroy)                                                                 \
   COUNTER  (downstream_cx_destroy_remote)                                                          \
@@ -27,7 +29,7 @@ namespace Http {
   GAUGE    (downstream_cx_active)                                                                  \
   GAUGE    (downstream_cx_ssl_active)                                                              \
   GAUGE    (downstream_cx_http1_active)                                                            \
-  GAUGE    (downstream_cx_websocket_active)                                                        \
+  GAUGE    (downstream_cx_upgrades_active)                                                        \
   GAUGE    (downstream_cx_http2_active)                                                            \
   COUNTER  (downstream_cx_protocol_error)                                                          \
   HISTOGRAM(downstream_cx_length_ms)                                                               \
@@ -37,6 +39,8 @@ namespace Http {
   GAUGE    (downstream_cx_tx_bytes_buffered)                                                       \
   COUNTER  (downstream_cx_drain_close)                                                             \
   COUNTER  (downstream_cx_idle_timeout)                                                            \
+  COUNTER  (downstream_cx_overload_disable_keepalive)                                              \
+  COUNTER  (downstream_cx_delayed_close_timeout)                                                   \
   COUNTER  (downstream_flow_control_paused_reading_total)                                          \
   COUNTER  (downstream_flow_control_resumed_reading_total)                                         \
   COUNTER  (downstream_rq_total)                                                                   \
@@ -146,6 +150,25 @@ enum class ForwardClientCertType {
 enum class ClientCertDetailsType { Cert, Subject, URI, DNS };
 
 /**
+ * Configuration for what addresses should be considered internal beyond the defaults.
+ */
+class InternalAddressConfig {
+public:
+  virtual ~InternalAddressConfig() {}
+  virtual bool isInternalAddress(const Network::Address::Instance& address) const PURE;
+};
+
+/**
+ * Determines if an address is internal based on whether it is an RFC1918 ip address.
+ */
+class DefaultInternalAddressConfig : public Http::InternalAddressConfig {
+public:
+  bool isInternalAddress(const Network::Address::Instance& address) const override {
+    return Network::Utility::isInternalAddress(address);
+  }
+};
+
+/**
  * Abstract configuration for the connection manager.
  */
 class ConnectionManagerConfig {
@@ -176,7 +199,7 @@ public:
   virtual DateProvider& dateProvider() PURE;
 
   /**
-   * @return the time in milliseconds the connection manager will wait betwen issuing a "shutdown
+   * @return the time in milliseconds the connection manager will wait between issuing a "shutdown
    *         notice" to the time it will issue a full GOAWAY and not accept any new streams.
    */
   virtual std::chrono::milliseconds drainTimeout() PURE;
@@ -186,6 +209,12 @@ public:
    *         chain.
    */
   virtual FilterChainFactory& filterFactory() PURE;
+
+  /**
+   * @return whether the connection manager will reverse the order of encoder
+   * filters in the HTTP filter chain.
+   */
+  virtual bool reverseEncodeOrder() PURE;
 
   /**
    * @return whether the connection manager will generate a fresh x-request-id if the request does
@@ -203,6 +232,12 @@ public:
    *         disabled idle timeout.
    */
   virtual std::chrono::milliseconds streamIdleTimeout() const PURE;
+
+  /**
+   * @return delayed close timeout for downstream HTTP connections. Zero indicates a disabled
+   *         timeout. See http_connection_manager.proto for a detailed description of this timeout.
+   */
+  virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
 
   /**
    * @return Router::RouteConfigProvider& the configuration provider used to acquire a route
@@ -230,6 +265,11 @@ public:
    *         status, etc. or to assume that XFF will already be populated with the remote address.
    */
   virtual bool useRemoteAddress() PURE;
+
+  /**
+   * @return InternalAddressConfig configuration for user defined internal addresses.
+   */
+  virtual const InternalAddressConfig& internalAddressConfig() const PURE;
 
   /**
    * @return uint32_t the number of trusted proxy hops in front of this Envoy instance, for

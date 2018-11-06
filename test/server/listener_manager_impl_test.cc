@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
@@ -20,6 +22,7 @@
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -53,8 +56,8 @@ class ListenerManagerImplTest : public testing::Test {
 public:
   ListenerManagerImplTest() {
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
-    manager_.reset(
-        new ListenerManagerImpl(server_, listener_factory_, worker_factory_, time_source_));
+    manager_ = std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
+                                                     time_system_);
   }
 
   /**
@@ -115,7 +118,7 @@ public:
   NiceMock<MockWorkerFactory> worker_factory_;
   std::unique_ptr<ListenerManagerImpl> manager_;
   NiceMock<MockGuardDog> guard_dog_;
-  NiceMock<MockTimeSource> time_source_;
+  Event::SimulatedTimeSystem time_system_;
 };
 
 class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
@@ -137,7 +140,7 @@ public:
               return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
                                                                                     context);
             }));
-    socket_.reset(new NiceMock<Network::MockConnectionSocket>());
+    socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
   }
 
@@ -468,8 +471,7 @@ TEST_F(ListenerManagerImplTest, AddListenerOnIpv6OnlySetups) {
 
 // Make sure that a listener that is not modifiable cannot be updated or removed.
 TEST_F(ListenerManagerImplTest, UpdateRemoveNotModifiableListener) {
-  ON_CALL(time_source_, systemTime())
-      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1001001001001))));
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
 
   InSequence s;
 
@@ -526,8 +528,7 @@ dynamic_draining_listeners:
 }
 
 TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
-  ON_CALL(time_source_, systemTime())
-      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1001001001001))));
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
 
   InSequence s;
 
@@ -594,8 +595,7 @@ filter_chains: {}
 per_connection_buffer_limit_bytes: 10
   )EOF";
 
-  ON_CALL(time_source_, systemTime())
-      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(2002002002002))));
+  time_system_.setSystemTime(std::chrono::milliseconds(2002002002002));
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(false);
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -634,8 +634,7 @@ dynamic_draining_listeners:
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
   checkStats(1, 1, 0, 0, 1, 0);
 
-  ON_CALL(time_source_, systemTime())
-      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(3003003003003))));
+  time_system_.setSystemTime(std::chrono::milliseconds(3003003003003));
 
   // Update foo. Should go into warming, have an immediate warming callback, and start immediate
   // removal.
@@ -686,8 +685,7 @@ dynamic_draining_listeners:
   worker_->callRemovalCompletion();
   checkStats(1, 2, 0, 0, 1, 0);
 
-  ON_CALL(time_source_, systemTime())
-      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(4004004004004))));
+  time_system_.setSystemTime(std::chrono::milliseconds(4004004004004));
 
   // Add bar listener.
   const std::string listener_bar_yaml = R"EOF(
@@ -708,8 +706,7 @@ filter_chains: {}
   worker_->callAddCompletion(true);
   checkStats(2, 2, 0, 0, 2, 0);
 
-  ON_CALL(time_source_, systemTime())
-      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(5005005005005))));
+  time_system_.setSystemTime(std::chrono::milliseconds(5005005005005));
 
   // Add baz listener, this time requiring initializing.
   const std::string listener_baz_yaml = R"EOF(

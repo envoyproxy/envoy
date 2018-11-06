@@ -66,7 +66,6 @@ envoy_cc_library(
     external_deps = ["ssl"],
     deps = [
         ":utility_lib",
-        "//include/envoy/runtime:runtime_interface",
         "//include/envoy/ssl:context_config_interface",
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
@@ -76,6 +75,8 @@ envoy_cc_library(
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/admin/v2alpha:certs_cc",
     ],
 )
 
@@ -109,5 +110,9 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     external_deps = [
         "ssl",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
     ],
 )

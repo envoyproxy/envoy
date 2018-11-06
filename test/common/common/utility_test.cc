@@ -8,6 +8,7 @@
 
 #include "common/common/utility.h"
 
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -126,12 +127,8 @@ TEST(StringUtil, atol) {
 
 TEST(DateUtil, All) {
   EXPECT_FALSE(DateUtil::timePointValid(SystemTime()));
-  EXPECT_TRUE(DateUtil::timePointValid(std::chrono::system_clock::now()));
-}
-
-TEST(ProdSystemTimeSourceTest, All) {
-  RealTimeSource source;
-  source.systemTime();
+  DangerousDeprecatedTestTime test_time;
+  EXPECT_TRUE(DateUtil::timePointValid(test_time.timeSystem().systemTime()));
 }
 
 TEST(InputConstMemoryStream, All) {
@@ -468,6 +465,33 @@ TEST(RegexUtil, parseRegex) {
     EXPECT_NE(0, regex.flags() & std::regex::icase);
     EXPECT_EQ(0, regex.flags() & std::regex::optimize);
   }
+}
+
+class WeightedClusterEntry {
+public:
+  WeightedClusterEntry(const std::string name, const uint64_t weight)
+      : name_(name), weight_(weight) {}
+
+  const std::string& clusterName() const { return name_; }
+  uint64_t clusterWeight() const { return weight_; }
+
+private:
+  const std::string name_;
+  const uint64_t weight_;
+};
+typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
+
+TEST(WeightedClusterUtil, pickCluster) {
+  std::vector<WeightedClusterEntrySharedPtr> clusters;
+
+  std::unique_ptr<WeightedClusterEntry> cluster1(new WeightedClusterEntry("cluster1", 10));
+  clusters.emplace_back(std::move(cluster1));
+
+  std::unique_ptr<WeightedClusterEntry> cluster2(new WeightedClusterEntry("cluster2", 90));
+  clusters.emplace_back(std::move(cluster2));
+
+  EXPECT_EQ("cluster1", WeightedClusterUtil::pickCluster(clusters, 100, 5, false)->clusterName());
+  EXPECT_EQ("cluster2", WeightedClusterUtil::pickCluster(clusters, 80, 79, true)->clusterName());
 }
 
 static std::string intervalSetIntToString(const IntervalSetImpl<int>& interval_set) {
@@ -812,10 +836,21 @@ TEST(DateFormatter, FromTime) {
   EXPECT_EQ("2018-04-03T23:06:09.000Z", DateFormatter("%Y-%m-%dT%H:%M:%S.000Z").fromTime(time1));
   EXPECT_EQ("aaa23", DateFormatter(std::string(3, 'a') + "%H").fromTime(time1));
   EXPECT_EQ("", DateFormatter(std::string(1022, 'a') + "%H").fromTime(time1));
-  const time_t time2 = 0;
+  const SystemTime time2(std::chrono::seconds(0));
   EXPECT_EQ("1970-01-01T00:00:00.000Z", DateFormatter("%Y-%m-%dT%H:%M:%S.000Z").fromTime(time2));
   EXPECT_EQ("aaa00", DateFormatter(std::string(3, 'a') + "%H").fromTime(time2));
   EXPECT_EQ("", DateFormatter(std::string(1022, 'a') + "%H").fromTime(time2));
+}
+
+// Verify that two DateFormatter patterns with the same ??? patterns but
+// different format strings don't false share cache entries. This is a
+// regression test for when they did.
+TEST(DateFormatter, FromTimeSameWildcard) {
+  const SystemTime time1(std::chrono::seconds(1522796769) + std::chrono::milliseconds(142));
+  EXPECT_EQ("2018-04-03T23:06:09.000Z142",
+            DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%3f").fromTime(time1));
+  EXPECT_EQ("2018-04-03T23:06:09.000Z114",
+            DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%1f%2f").fromTime(time1));
 }
 
 } // namespace Envoy

@@ -244,5 +244,44 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
+TEST_P(ListenerImplTest, DisableAndEnableListener) {
+  testing::InSequence s1;
+
+  TcpListenSocket socket(Network::Test::getAnyAddress(version_), nullptr, true);
+  MockListenerCallbacks listener_callbacks;
+  TestListenerImpl listener(dispatcher_, socket, listener_callbacks, true, true);
+
+  // When listener is disabled, the timer should fire before any connection is accepted.
+  listener.disable();
+
+  ClientConnectionPtr client_connection =
+      dispatcher_.createClientConnection(socket.localAddress(), Address::InstanceConstSharedPtr(),
+                                         Network::Test::createRawBufferSocket(), nullptr);
+  client_connection->connect();
+  Event::TimerPtr timer = dispatcher_.createTimer([&] {
+    client_connection->close(ConnectionCloseType::NoFlush);
+    dispatcher_.exit();
+  });
+  timer->enableTimer(std::chrono::milliseconds(2000));
+
+  EXPECT_CALL(listener_callbacks, onAccept_(_, _)).Times(0);
+
+  dispatcher_.run(Event::Dispatcher::RunType::Block);
+
+  // When the listener is re-enabled, the pending connection should be accepted.
+  listener.enable();
+
+  EXPECT_CALL(listener, getLocalAddress(_))
+      .WillOnce(Invoke(
+          [](int fd) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(fd); }));
+  EXPECT_CALL(listener_callbacks, onAccept_(_, _))
+      .WillOnce(Invoke([&](ConnectionSocketPtr&, bool) -> void {
+        client_connection->close(ConnectionCloseType::NoFlush);
+        dispatcher_.exit();
+      }));
+
+  dispatcher_.run(Event::Dispatcher::RunType::Block);
+}
+
 } // namespace Network
 } // namespace Envoy

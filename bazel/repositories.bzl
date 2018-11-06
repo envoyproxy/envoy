@@ -1,10 +1,5 @@
-load(
-    "@bazel_tools//tools/build_defs/repo:git.bzl",
-    "git_repository",
-    "new_git_repository",
-)
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":genrule_repository.bzl", "genrule_repository")
-load(":patched_http_archive.bzl", "patched_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
 load(":target_recipes.bzl", "TARGET_RECIPES")
 load(
@@ -17,6 +12,9 @@ load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
 
+# go version for rules_go
+GO_VERSION = "1.10.4"
+
 def _repository_impl(name, **kwargs):
     # `existing_rule_keys` contains the names of repositories that have already
     # been defined in the Bazel workspace. By skipping repos with existing keys,
@@ -28,7 +26,8 @@ def _repository_impl(name, **kwargs):
         # wants to override the version. Do nothing.
         return
 
-    location = REPOSITORY_LOCATIONS[name]
+    loc_key = kwargs.pop("repository_key", name)
+    location = REPOSITORY_LOCATIONS[loc_key]
 
     # Git tags are mutable. We want to depend on commit IDs instead. Give the
     # user a useful error if they accidentally specify a tag.
@@ -38,40 +37,14 @@ def _repository_impl(name, **kwargs):
             (location["tag"], name),
         )
 
-    if "commit" in location:
-        # Git repository at given commit ID. Add a BUILD file if requested.
-        if "build_file" in kwargs:
-            new_git_repository(
-                name = name,
-                remote = location["remote"],
-                commit = location["commit"],
-                **kwargs
-            )
-        else:
-            git_repository(
-                name = name,
-                remote = location["remote"],
-                commit = location["commit"],
-                **kwargs
-            )
-    else:  # HTTP
-        # HTTP tarball at a given URL. Add a BUILD file if requested.
-        if "build_file" in kwargs:
-            native.new_http_archive(
-                name = name,
-                urls = location["urls"],
-                sha256 = location["sha256"],
-                strip_prefix = location["strip_prefix"],
-                **kwargs
-            )
-        else:
-            native.http_archive(
-                name = name,
-                urls = location["urls"],
-                sha256 = location["sha256"],
-                strip_prefix = location["strip_prefix"],
-                **kwargs
-            )
+    # HTTP tarball at a given URL. Add a BUILD file if requested.
+    http_archive(
+        name = name,
+        urls = location["urls"],
+        sha256 = location["sha256"],
+        strip_prefix = location.get("strip_prefix", ""),
+        **kwargs
+    )
 
 def _build_recipe_repository_impl(ctxt):
     # modify the recipes list based on the build context
@@ -195,7 +168,7 @@ def _python_deps():
         build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
     )
 
-# Bazel native C++ dependencies. For the depedencies that doesn't provide autoconf/automake builds.
+# Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
     _repository_impl("grpc_httpjson_transcoding")
     native.bind(
@@ -211,7 +184,21 @@ def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
     # it to exclude the Go rules.
     if "io_bazel_rules_go" not in skip_targets:
+        _repository_impl(
+            name = "com_github_golang_protobuf",
+            # These patches are to add BUILD files to golang/protobuf.
+            # TODO(sesmith177): Remove this dependency when both:
+            #   1. There's a release of golang/protobuf that includes
+            #      https://github.com/golang/protobuf/commit/31e0d063dd98c052257e5b69eeb006818133f45c
+            #   2. That release is included in rules_go
+            patches = [
+                "@io_bazel_rules_go//third_party:com_github_golang_protobuf-gazelle.patch",
+                "@io_bazel_rules_go//third_party:com_github_golang_protobuf-extras.patch",
+            ],
+            patch_args = ["-p1"],
+        )
         _repository_impl("io_bazel_rules_go")
+        _repository_impl("bazel_gazelle")
 
 def _envoy_api_deps():
     # Treat the data plane API as an external repo, this simplifies exporting the API to
@@ -293,6 +280,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_google_libprotobuf_mutator()
     _io_opentracing_cpp()
     _com_lightstep_tracer_cpp()
+    _com_github_datadog_dd_opentracing_cpp()
     _com_github_grpc_grpc()
     _com_github_google_jwt_verify()
     _com_github_nanopb_nanopb()
@@ -414,6 +402,17 @@ def _com_lightstep_tracer_cpp():
         actual = "@com_lightstep_tracer_cpp//:lightstep_tracer",
     )
 
+def _com_github_datadog_dd_opentracing_cpp():
+    _repository_impl("com_github_datadog_dd_opentracing_cpp")
+    _repository_impl(
+        name = "com_github_msgpack_msgpack_c",
+        build_file = "@com_github_datadog_dd_opentracing_cpp//:bazel/external/msgpack.BUILD",
+    )
+    native.bind(
+        name = "dd_opentracing_cpp",
+        actual = "@com_github_datadog_dd_opentracing_cpp//:dd_opentracing_cpp",
+    )
+
 def _com_github_tencent_rapidjson():
     _repository_impl(
         name = "com_github_tencent_rapidjson",
@@ -448,8 +447,20 @@ def _com_google_googletest():
 def _com_google_absl():
     _repository_impl("com_google_absl")
     native.bind(
+        name = "abseil_any",
+        actual = "@com_google_absl//absl/types:any",
+    )
+    native.bind(
         name = "abseil_base",
         actual = "@com_google_absl//absl/base:base",
+    )
+    native.bind(
+        name = "abseil_flat_hash_map",
+        actual = "@com_google_absl//absl/container:flat_hash_map",
+    )
+    native.bind(
+        name = "abseil_flat_hash_set",
+        actual = "@com_google_absl//absl/container:flat_hash_set",
     )
     native.bind(
         name = "abseil_strings",
@@ -485,15 +496,32 @@ def _com_google_protobuf():
     # Needed for cc_proto_library, Bazel doesn't support aliases today for repos,
     # see https://groups.google.com/forum/#!topic/bazel-discuss/859ybHQZnuI and
     # https://github.com/bazelbuild/bazel/issues/3219.
-    location = REPOSITORY_LOCATIONS["com_google_protobuf"]
-    git_repository(name = "com_google_protobuf_cc", **location)
+    _repository_impl(
+        "com_google_protobuf_cc",
+        repository_key = "com_google_protobuf",
+    )
     native.bind(
         name = "protobuf",
         actual = "@com_google_protobuf//:protobuf",
     )
     native.bind(
+        name = "protobuf_clib",
+        actual = "@com_google_protobuf//:protoc_lib",
+    )
+    native.bind(
+        name = "protocol_compiler",
+        actual = "@com_google_protobuf//:protoc",
+    )
+    native.bind(
         name = "protoc",
         actual = "@com_google_protobuf_cc//:protoc",
+    )
+
+    # Needed for `bazel fetch` to work with @com_google_protobuf
+    # https://github.com/google/protobuf/blob/v3.6.1/util/python/BUILD#L6-L9
+    native.bind(
+        name = "python_headers",
+        actual = "@com_google_protobuf//util/python:python_headers",
     )
 
 def _com_github_grpc_grpc():
@@ -521,6 +549,11 @@ def _com_github_grpc_grpc():
     native.bind(
         name = "grpc_health_proto",
         actual = "@envoy//bazel:grpc_health_proto",
+    )
+
+    native.bind(
+        name = "grpc_alts_fake_handshaker_server",
+        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:fake_handshaker_lib",
     )
 
 def _com_github_nanopb_nanopb():

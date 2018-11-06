@@ -1,16 +1,16 @@
-references:
-  envoy-build-image: &envoy-build-image
-    envoyproxy/envoy-build:124303989f3a04d485c4f3de2c396367c9fa4214
+version: 2.1
 
-version: 2
+executors:
+  ubuntu-build:
+    description: "A regular build executor based on ubuntu image"
+    docker:
+      - image: envoyproxy/envoy-build:f60886c04253d9a096503b949696cbdc8f82fa4d
+    resource_class: xlarge
+    working_directory: /source
+
 jobs:
    release:
-     docker:
-       - image: *envoy-build-image
-     resource_class: xlarge
-     working_directory: /source
-     environment:
-       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
+     executor: ubuntu-build
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
@@ -19,12 +19,7 @@ jobs:
        - run: ci/docker_push.sh
        - run: ci/docker_tag.sh
    asan:
-     docker:
-       - image: *envoy-build-image
-     resource_class: xlarge
-     working_directory: /source
-     environment:
-       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
+     executor: ubuntu-build
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - run: echo $CIRCLE_SHA1
@@ -33,21 +28,13 @@ jobs:
        - checkout
        - run: ci/do_circle_ci.sh bazel.asan
    tsan:
-     docker:
-       - image: *envoy-build-image
-     resource_class: xlarge
-     working_directory: /source
-     environment:
-       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
+     executor: ubuntu-build
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh bazel.tsan
    api:
-     docker:
-       - image: *envoy-build-image
-     resource_class: xlarge
-     working_directory: /source
+     executor: ubuntu-build
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
@@ -57,10 +44,7 @@ jobs:
              - "fb:f3:fe:be:1c:b2:ec:b6:25:f9:7b:a6:87:54:02:8c"
        - run: ci/api_mirror.sh
    filter_example_mirror:
-     docker:
-       - image: *envoy-build-image
-     resource_class: xlarge
-     working_directory: /source
+     executor: ubuntu-build
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
@@ -70,20 +54,16 @@ jobs:
        - run: ci/filter_example_mirror.sh
    ipv6_tests:
      machine: true
-     environment:
-       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
      - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
      - checkout
      - run:
          name: enable ipv6
          command: |
-           cat <<'EOF' | sudo tee /etc/docker/daemon.json
-           {
+           echo '{
              "ipv6": true,
              "fixed-cidr-v6": "2001:db8:1::/64"
-           }
-           EOF
+           }' | sudo tee /etc/docker/daemon.json
 
            sudo service docker restart
      - run: dig go.googlesource.com A go.googlesource.com AAAA # Debug IPv6 network issues
@@ -94,10 +74,7 @@ jobs:
      - run: ./ci/do_circle_ci_ipv6_tests.sh
 
    coverage:
-     docker:
-       - image: *envoy-build-image
-     resource_class: xlarge
-     working_directory: /source
+     executor: ubuntu-build
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
@@ -105,15 +82,23 @@ jobs:
        - run: ci/coverage_publish.sh
        - store_artifacts:
            path: /build/envoy/generated/coverage
+
+   clang_tidy:
+     executor: ubuntu-build
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: ci/do_circle_ci.sh bazel.clang_tidy
+
    format:
-     docker:
-       - image: *envoy-build-image
+     executor: ubuntu-build
      resource_class: small
-     working_directory: /source
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh check_format
+       - run: ci/do_circle_ci.sh check_repositories
+       - run: ci/do_circle_ci.sh check_spelling
    build_image:
      docker:
        - image: circleci/python:2.7
@@ -127,10 +112,7 @@ jobs:
        - setup_remote_docker
        - run: ci/build_container/docker_push.sh
    docs:
-     docker:
-       - image: *envoy-build-image
-     resource_class: xlarge
-     working_directory: /source
+     executor: ubuntu-build
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
@@ -144,8 +126,6 @@ jobs:
    mac:
      macos:
        xcode: "9.3.0"
-     environment:
-       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
        - run: sudo ntpdate -vu time.apple.com
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
@@ -168,6 +148,7 @@ workflows:
       - ipv6_tests
       - coverage
       - format
+      - clang_tidy
       - build_image
       - docs:
           filters:
