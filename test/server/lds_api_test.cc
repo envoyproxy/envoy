@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/api/v2/lds.pb.h"
 
 #include "common/config/utility.h"
@@ -50,8 +52,8 @@ public:
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(init_, registerTarget(_));
-    lds_.reset(new LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_,
-                              local_info_, store_, listener_manager_));
+    lds_ = std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, dispatcher_, random_, init_,
+                                        local_info_, store_, listener_manager_);
 
     expectRequest();
     init_.initialize();
@@ -256,7 +258,7 @@ TEST_F(LdsApiTest, Basic) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response1_json));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
 
   makeListenersAndExpectCall({});
   expectAdd("listener1", "hash_d5b83398260abbbc", true);
@@ -287,9 +289,9 @@ TEST_F(LdsApiTest, Basic) {
   }
   )EOF";
 
-  message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response2_json));
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response2_json);
 
   makeListenersAndExpectCall({"listener1", "listener2"});
   EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
@@ -320,7 +322,7 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response1_json));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
 
   makeListenersAndExpectCall({});
   EXPECT_CALL(init_.initialized_, ready());
@@ -367,9 +369,9 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
                   TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"),
                   TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
 
-  message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response2_json));
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response2_json);
   makeListenersAndExpectCall({
       "listener-8080",
   });
@@ -393,7 +395,7 @@ TEST_F(LdsApiTest, Failure) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response_json));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
 
   EXPECT_CALL(init_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -437,7 +439,7 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response1_json));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
 
   makeListenersAndExpectCall({});
   expectAdd("listener1", "hash_d5b83398260abbbc", true);
@@ -468,9 +470,9 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   }
   )EOF";
 
-  message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response2_json));
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response2_json);
 
   makeListenersAndExpectCall({"listener1", "listener2"});
   EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));

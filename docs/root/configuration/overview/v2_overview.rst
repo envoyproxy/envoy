@@ -1,7 +1,7 @@
 .. _config_overview_v2:
 
-Overview (v2 API)
-=================
+Overview
+========
 
 The Envoy v2 APIs are defined as `proto3
 <https://developers.google.com/protocol-buffers/docs/proto3>`_ `Protocol Buffers
@@ -588,7 +588,9 @@ Management Server has a statistics tree rooted at *control_plane.* with the foll
    :widths: 1, 1, 2
 
    connected_state, Gauge, A boolan (1 for connected and 0 for disconnected) that indicates the current connection state with management server
-
+   rate_limit_enforced, Counter, Total number of times rate limit was enforced for management server requests
+   pending_requests, Gauge, Total number of pending requests when the rate limit was enforced
+   
 .. _config_overview_v2_status:
 
 Status

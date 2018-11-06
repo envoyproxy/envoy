@@ -101,6 +101,7 @@ TEST_F(OptionsImplTest, All) {
 TEST_F(OptionsImplTest, SetAll) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
   bool hot_restart_disabled = options->hotRestartDisabled();
+  bool signal_handling_enabled = options->signalHandlingEnabled();
   Stats::StatsOptionsImpl stats_options;
   stats_options.max_obj_name_length_ = 54321;
   stats_options.max_stat_suffix_length_ = 1234;
@@ -125,6 +126,7 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setMaxStats(12345);
   options->setStatsOptions(stats_options);
   options->setHotRestartDisabled(!options->hotRestartDisabled());
+  options->setSignalHandling(!options->signalHandlingEnabled());
 
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(42U, options->concurrency());
@@ -147,6 +149,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(stats_options.max_obj_name_length_, options->statsOptions().maxObjNameLength());
   EXPECT_EQ(stats_options.max_stat_suffix_length_, options->statsOptions().maxStatSuffixLength());
   EXPECT_EQ(!hot_restart_disabled, options->hotRestartDisabled());
+  EXPECT_EQ(!signal_handling_enabled, options->signalHandlingEnabled());
 }
 
 TEST_F(OptionsImplTest, DefaultParams) {

@@ -17,6 +17,7 @@ import "envoy/api/v2/eds.proto";
 import "envoy/type/percent.proto";
 
 import "google/api/annotations.proto";
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
@@ -46,7 +47,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 36]
+// [#comment:next free field: 37]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -231,6 +232,13 @@ message Cluster {
   // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on
   // specific options.
   map<string, google.protobuf.Struct> extension_protocol_options = 35;
+
+  // [#not-implemented-hide:]
+  // The extension_protocol_options field is used to provide extension-specific protocol options
+  // for upstream connections. The key should match the extension filter name, such as
+  // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on
+  // specific options.
+  map<string, google.protobuf.Any> typed_extension_protocol_options = 36;
 
   reserved 15;
 

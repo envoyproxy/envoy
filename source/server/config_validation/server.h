@@ -83,6 +83,7 @@ public:
   }
   Runtime::Loader& runtime() override { return *runtime_loader_; }
   void shutdown() override;
+  bool isShutdown() override { return false; }
   void shutdownAdmin() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
