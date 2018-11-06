@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/http/header_map_impl.h"
 
 #include "extensions/tracers/dynamic_ot/dynamic_opentracing_driver_impl.h"
@@ -21,7 +23,7 @@ namespace DynamicOt {
 class DynamicOpenTracingDriverTest : public Test {
 public:
   void setup(const std::string& library, const std::string& tracer_config) {
-    driver_.reset(new DynamicOpenTracingDriver{stats_, library, tracer_config});
+    driver_ = std::make_unique<DynamicOpenTracingDriver>(stats_, library, tracer_config);
   }
 
   void setupValidDriver() { setup(library_path_, tracer_config_); }
