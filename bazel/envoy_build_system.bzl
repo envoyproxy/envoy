@@ -236,6 +236,8 @@ def envoy_cc_binary(
         deps = deps,
     )
 
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
+
 # Envoy C++ fuzz test targes. These are not included in coverage runs.
 def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
     if not (corpus.startswith("//") or corpus.startswith(":")):
@@ -247,6 +249,11 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         )
     else:
         corpus_name = corpus
+    pkg_tar(
+        name = name + "_corpus_tar",
+        srcs = [corpus_name],
+        testonly = 1,
+    )
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
