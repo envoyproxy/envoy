@@ -219,6 +219,8 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
         make_stat(parent_.alloc_, truncated_name, std::move(tag_extracted_name), std::move(tags));
     if (stat == nullptr) {
       parent_.num_last_resort_stats_.inc();
+      std::vector<Tag> tags;
+      std::string tag_extracted_name = parent_.getTagsForName(name, tags);
       stat = make_stat(parent_.heap_allocator_, truncated_name, std::move(tag_extracted_name),
                        std::move(tags));
       ASSERT(stat != nullptr);

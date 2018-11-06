@@ -103,7 +103,7 @@ void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
     // grpc-status be used if available.
     if (end_stream && grpc_status) {
-      onTrailers(std::move(headers));
+      onTrailers(std::move(headers)); // NOLINT(bugprone-use-after-move)
       return;
     }
     // Technically this should be
