@@ -43,7 +43,7 @@ class MysqlCodec : public Logger::Loggable<Logger::Id::filter> {
 #define FILLER_1_SIZE 1
 #define FILLER_2_SIZE 2
 #define FILLER_3_SIZE 3
-#define MYSQL_DEAFULT 4
+#define MYSQL_DEFAULT 4
 #define CHARACTER_SET_SIZE 2
 
 #define MAX_TABLE_COLUMNS 64
