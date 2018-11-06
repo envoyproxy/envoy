@@ -167,9 +167,9 @@ public:
   ClusterManagerImplTest() { factory_.dispatcher_.setTimeSystem(time_system_); }
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-    cluster_manager_.reset(new ClusterManagerImpl(
+    cluster_manager_ = std::make_unique<ClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_));
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_);
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -199,9 +199,9 @@ public:
 
     const auto& bootstrap = parseBootstrapFromV2Yaml(yaml);
 
-    cluster_manager_.reset(new TestClusterManagerImpl(
+    cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, local_cluster_update_));
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, local_cluster_update_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,

@@ -147,19 +147,28 @@ private:
 
   typedef std::unique_ptr<ThreadLocalActiveClient> ThreadLocalActiveClientPtr;
 
-  struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
-                    const std::string& cluster_name);
+  struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
+                           public Upstream::ClusterUpdateCallbacks {
+    ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
     ~ThreadLocalPool();
     PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
                              PoolCallbacks& callbacks);
+    void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
+
+    // Upstream::ClusterUpdateCallbacks
+    void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override {
+      onClusterAddOrUpdateNonVirtual(cluster);
+    }
+    void onClusterRemoval(const std::string& cluster_name) override;
 
     InstanceImpl& parent_;
     Event::Dispatcher& dispatcher_;
-    Upstream::ThreadLocalCluster* cluster_;
+    const std::string cluster_name_;
+    Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_handle_;
+    Upstream::ThreadLocalCluster* cluster_{};
     std::unordered_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
-    Envoy::Common::CallbackHandle* local_host_set_member_update_cb_handle_;
+    Envoy::Common::CallbackHandle* host_set_member_update_cb_handle_{};
   };
 
   struct LbContextImpl : public Upstream::LoadBalancerContextBase {

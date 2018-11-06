@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "test/common/config/filesystem_subscription_test_harness.h"
 #include "test/common/config/grpc_subscription_test_harness.h"
 #include "test/common/config/http_subscription_test_harness.h"
@@ -18,13 +20,13 @@ public:
   SubscriptionImplTest() {
     switch (GetParam()) {
     case SubscriptionType::Grpc:
-      test_harness_.reset(new GrpcSubscriptionTestHarness());
+      test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>();
       break;
     case SubscriptionType::Http:
-      test_harness_.reset(new HttpSubscriptionTestHarness());
+      test_harness_ = std::make_unique<HttpSubscriptionTestHarness>();
       break;
     case SubscriptionType::Filesystem:
-      test_harness_.reset(new FilesystemSubscriptionTestHarness());
+      test_harness_ = std::make_unique<FilesystemSubscriptionTestHarness>();
       break;
     }
   }
