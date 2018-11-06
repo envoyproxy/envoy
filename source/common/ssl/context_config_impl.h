@@ -67,6 +67,13 @@ private:
   const std::string alpn_protocols_;
   const std::string cipher_suites_;
   const std::string ecdh_curves_;
+
+  Ssl::TlsCertificateConfigPtr tls_certificate_config_;
+  Ssl::CertificateValidationContextConfigPtr validation_context_config_;
+  // If certificate validation context type is combined_validation_context. default_cvc_
+  // holds a copy of CombinedCertificateValidationContext::default_validation_context.
+  // Otherwise, default_cvc_ is nullptr.
+  std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext> default_cvc_;
   Secret::TlsCertificateConfigProviderSharedPtr tls_certficate_provider_;
   // Handle for TLS certificate dyanmic secret callback.
   Common::CallbackHandle* tc_update_callback_handle_{};
@@ -77,10 +84,6 @@ private:
   Common::CallbackHandle* cvc_validation_callback_handle_{};
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
-
-  Ssl::TlsCertificateConfigPtr tls_certificate_config_;
-  Ssl::CertificateValidationContextConfigPtr validation_context_config_;
-  std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext> default_cvc_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {

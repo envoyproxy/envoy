@@ -30,6 +30,12 @@ Secret::TlsCertificateConfigProviderSharedPtr getTlsCertificateConfigProvider(
     }
     auto secret_provider = factory_context.secretManager().createInlineTlsCertificateProvider(
         config.tls_certificates(0));
+    if (secret_provider->secret() == nullptr) {
+      std::cout << "debug*** secret_provider->secret() is nullptr" << std::endl;
+    } else {
+      std::cout << "debug*** secret_provider->secret():" << secret_provider->secret()->DebugString()
+                << std::endl;
+    }
     *tls_config = std::make_unique<Ssl::TlsCertificateConfigImpl>(*secret_provider->secret());
     return secret_provider;
   }
@@ -171,8 +177,8 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
     if (tc_update_callback_handle_) {
       tc_update_callback_handle_->remove();
     }
-    // Once SdsApi gets updated, this callback updates ContextConfigImpl::tls_certificate_config_
-    // with new secret.
+    // Once tls_certificate_config_ receives new secret, this callback updates
+    // ContextConfigImpl::tls_certificate_config_ with new secret.
     tc_update_callback_handle_ = tls_certficate_provider_->addUpdateCallback([this, callback]() {
       tls_certificate_config_ =
           std::make_unique<Ssl::TlsCertificateConfigImpl>(*tls_certficate_provider_->secret());
@@ -184,7 +190,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
       cvc_update_callback_handle_->remove();
     }
     if (default_cvc_) {
-      // Once SdsApi gets updated, this callback updates
+      // Once certficate_validation_context_provider_ receives new secret, this callback updates
       // ContextConfigImpl::validation_context_config_ with a combined certificate validation
       // context. The combined certificate validation context is created by merging new secret into
       // default_cvc_.
@@ -195,7 +201,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
             callback();
           });
     } else {
-      // Once SdsApi gets updated, this callback updates
+      // Once certficate_validation_context_provider_ receives new secret, this callback updates
       // ContextConfigImpl::validation_context_config_ with new secret.
       cvc_update_callback_handle_ =
           certficate_validation_context_provider_->addUpdateCallback([this, callback]() {
