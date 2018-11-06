@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+#include <memory>
 #include <unordered_map>
 
 namespace Envoy {
@@ -16,10 +18,10 @@ const uint8_t END_METADATA_FLAG = 0x4;
 // TODO(soya3129): Respect max_frame_size after nghttp2 #1250 is resolved.
 const uint64_t METADATA_MAX_PAYLOAD_SIZE = 16384;
 
-typedef std::unordered_map<std::string, std::string> MetadataMap;
-typedef std::unique_ptr<MetadataMap> MetadataMapPtr;
+using MetadataMap = std::unordered_map<std::string, std::string>;
+using MetadataMapPtr = std::unique_ptr<MetadataMap>;
 
-typedef std::function<void(std::unique_ptr<MetadataMap>)> MetadataCallback;
+using MetadataCallback = std::function<void(std::unique_ptr<MetadataMap>)>;
 
 } // namespace Http
 } // namespace Envoy
