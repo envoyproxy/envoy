@@ -42,8 +42,7 @@ public:
     bool tls_is_ready = (!tls_certficate_provider_ || tls_certificate_config_);
     bool combined_cvc_is_ready = (!default_cvc_ || validation_context_config_);
     bool cvc_is_ready =
-        (!certficate_validation_context_provider_ ||
-         (!default_cvc_ && certficate_validation_context_provider_->secret() != nullptr));
+        (!certficate_validation_context_provider_ || default_cvc_ || validation_context_config_);
     return tls_is_ready && combined_cvc_is_ready && cvc_is_ready;
   }
 

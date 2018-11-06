@@ -293,8 +293,6 @@ public:
         default_validation_context->add_verify_certificate_hash(
             "E0:F3:C8:CE:5E:2E:A3:05:F0:70:1F:F5:12:E3:6E:2E:"
             "97:92:82:84:A2:28:BC:F7:73:32:D3:39:30:A1:B6:FD");
-        default_validation_context->add_verify_subject_alt_name("Test CA");
-
         auto* secret_config = combined_config->mutable_validation_context_sds_secret_config();
         setUpSdsConfig(secret_config, validation_secret_);
       } else {
@@ -339,10 +337,11 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicSuccess) {
   testRouterHeaderOnlyRequestAndResponse(true, &creator);
 }
 
-// A test that SDS server send a good certificate validation context for a static listener.
+// A test that SDS server sends a certificate validation context for a static listener.
 // Listener combines default certificate validation context and the dynamic one.
 // The first ssl request should be OK.
 TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedCertValidationContextSuccess) {
+  enableCombinedValidationContext(true);
   pre_worker_start_test_steps_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
     sendSdsResponse(getCvcSecretWithOnlyTrustedCa());

@@ -161,7 +161,7 @@ ContextConfigImpl::ContextConfigImpl(
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
     const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
-  envoy::api::v2::auth::CertificateValidationContext combined_cvc = *default_cvc_.get();
+  envoy::api::v2::auth::CertificateValidationContext combined_cvc = *default_cvc_;
   combined_cvc.MergeFrom(dynamic_cvc);
   return std::make_unique<CertificateValidationContextConfigImpl>(combined_cvc);
 }
