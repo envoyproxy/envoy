@@ -132,11 +132,14 @@ public:
    * @return Context extensions to add to the CheckRequest.
    */
   const ContextExtensionsMap& contextExtensions() const { return context_extensions_; }
+  // Allow moving the context extensions out of this object.
   ContextExtensionsMap&& takeContextExtensions() { return std::move(context_extensions_); }
 
   bool disabled() const { return disabled_; }
 
 private:
+  // We save the context extensions as a protobuf map instead of an std::map as this allows us to
+  // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
   bool disabled_;
 };
