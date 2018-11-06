@@ -272,7 +272,7 @@ envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
   envoy::api::v2::ClusterLoadAssignment load_assignment;
   envoy::api::v2::endpoint::LocalityLbEndpoints* locality_lb_endpoints =
       load_assignment.add_endpoints();
-  // Since this LocalityLbEndpoints is built from hosts list, set the default weight to 1.
+  // Since this LocalityLbEndp oints is built from hosts list, set the default weight to 1.
   locality_lb_endpoints->mutable_load_balancing_weight()->set_value(1);
   for (const envoy::api::v2::core::Address& host : hosts) {
     envoy::api::v2::endpoint::LbEndpoint* lb_endpoint = locality_lb_endpoints->add_lb_endpoints();
@@ -280,6 +280,37 @@ envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
     lb_endpoint->mutable_load_balancing_weight()->set_value(1);
   }
   return load_assignment;
+}
+
+void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+                                    const ProtobufWkt::Struct& config,
+                                    Protobuf::Message& out_proto) {
+  static const std::string struct_type =
+      ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
+
+  if (!typed_config.value().empty()) {
+
+    // Unpack methods will only use the fully qualified type name after the last '/'.
+    // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
+    absl::string_view type = typed_config.type_url();
+    size_t pos = type.find_last_of('/');
+    if (pos != absl::string_view::npos) {
+      type = type.substr(pos);
+    }
+
+    // out_proto is expecting Struct, unpack directly
+    if (type != struct_type || out_proto.GetDescriptor()->full_name() == struct_type) {
+      typed_config.UnpackTo(&out_proto);
+    } else {
+      ProtobufWkt::Struct struct_config;
+      typed_config.UnpackTo(&struct_config);
+      MessageUtil::jsonConvert(struct_config, out_proto);
+    }
+  }
+
+  if (!config.fields().empty()) {
+    MessageUtil::jsonConvert(config, out_proto);
+  }
 }
 
 } // namespace Config

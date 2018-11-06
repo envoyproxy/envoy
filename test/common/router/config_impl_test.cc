@@ -5218,8 +5218,51 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 };
 
+TEST_F(PerFilterConfigsTest, TypedConfigFilterError) {
+  {
+    const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+    per_filter_config: { unknown.filter: {} }
+    typed_per_filter_config:
+      unknown.filter:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+)EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+        EnvoyException, "Only one of typed_configs or configs can be specified");
+  }
+
+  {
+    const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        per_filter_config: { unknown.filter: {} }
+        typed_per_filter_config:
+          unknown.filter:
+            "@type": type.googleapis.com/google.protobuf.Timestamp
+)EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+        EnvoyException, "Only one of typed_configs or configs can be specified");
+  }
+}
+
 TEST_F(PerFilterConfigsTest, UnknownFilter) {
-  const std::string yaml = R"EOF(
+  {
+    const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -5230,15 +5273,36 @@ virtual_hosts:
     per_filter_config: { unknown.filter: {} }
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-      EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
+    EXPECT_THROW_WITH_MESSAGE(
+        TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+        EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
+  }
+
+  {
+    const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+    typed_per_filter_config:
+      unknown.filter:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+)EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+        EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
+  }
 }
 
 // Test that a trivially specified NamedHttpFilterConfigFactory ignores per_filter_config without
 // error.
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementation) {
-  const std::string yaml = R"EOF(
+  {
+    const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -5249,7 +5313,46 @@ virtual_hosts:
     per_filter_config: { test.default.filter: { seconds: 123} }
 )EOF";
 
-  checkNoPerFilterConfig(yaml);
+    checkNoPerFilterConfig(yaml);
+  }
+
+  {
+    const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+    typed_per_filter_config:
+      test.default.filter:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+        value:
+          seconds: 123
+)EOF";
+
+    checkNoPerFilterConfig(yaml);
+  }
+
+  {
+    const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+    typed_per_filter_config:
+      test.default.filter:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value:
+          seconds: 123
+)EOF";
+
+    checkNoPerFilterConfig(yaml);
+  }
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalConfig) {

@@ -3,6 +3,7 @@ Version history
 
 1.10.0 (pending)
 ================
+* config: added support of using google.protobuf.Any in opaque configs for extensions.
 
 1.9.0
 ===============
