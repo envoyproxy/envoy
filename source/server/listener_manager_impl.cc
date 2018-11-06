@@ -290,7 +290,7 @@ void ListenerImpl::addFilterChain(
     uint16_t destination_port, const std::vector<std::string>& destination_ips,
     const std::vector<std::string>& server_names, const std::string& transport_protocol,
     const std::vector<std::string>& application_protocols,
-    const envoy::api::v2::listener::FilterChainMatch_RequestSourceType source_type,
+    const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     Network::TransportSocketFactoryPtr&& transport_socket_factory,
     std::vector<Network::FilterFactoryCb> filters_factory) {
   const auto filter_chain = std::make_shared<FilterChainImpl>(std::move(transport_socket_factory),
@@ -304,7 +304,7 @@ void ListenerImpl::addFilterChainForDestinationPorts(
     DestinationPortsMap& destination_ports_map, uint16_t destination_port,
     const std::vector<std::string>& destination_ips, const std::vector<std::string>& server_names,
     const std::string& transport_protocol, const std::vector<std::string>& application_protocols,
-    const envoy::api::v2::listener::FilterChainMatch_RequestSourceType source_type,
+    const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (destination_ports_map.find(destination_port) == destination_ports_map.end()) {
     destination_ports_map[destination_port] =
@@ -319,7 +319,7 @@ void ListenerImpl::addFilterChainForDestinationIPs(
     DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
     const std::vector<std::string>& server_names, const std::string& transport_protocol,
     const std::vector<std::string>& application_protocols,
-    const envoy::api::v2::listener::FilterChainMatch_RequestSourceType source_type,
+    const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (destination_ips.empty()) {
     addFilterChainForServerNames(destination_ips_map[EMPTY_STRING], server_names,
@@ -337,7 +337,7 @@ void ListenerImpl::addFilterChainForDestinationIPs(
 void ListenerImpl::addFilterChainForServerNames(
     ServerNamesMap& server_names_map, const std::vector<std::string>& server_names,
     const std::string& transport_protocol, const std::vector<std::string>& application_protocols,
-    const envoy::api::v2::listener::FilterChainMatch_RequestSourceType source_type,
+    const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (server_names.empty()) {
     addFilterChainForApplicationProtocols(server_names_map[EMPTY_STRING][transport_protocol],
@@ -360,7 +360,7 @@ void ListenerImpl::addFilterChainForServerNames(
 void ListenerImpl::addFilterChainForApplicationProtocols(
     ApplicationProtocolsMap& application_protocols_map,
     const std::vector<std::string>& application_protocols,
-    const envoy::api::v2::listener::FilterChainMatch_RequestSourceType source_type,
+    const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (application_protocols.empty()) {
     application_protocols_map[EMPTY_STRING][source_type] = filter_chain;
@@ -514,20 +514,20 @@ const Network::FilterChain*
 ListenerImpl::findFilterChainForSourceTypes(const SourceTypesArray source_types,
                                             const Network::ConnectionSocket& socket) const {
 
-  envoy::api::v2::listener::FilterChainMatch_RequestSourceType source_type;
+  envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type;
 
   if (Network::Utility::isLocalConnection(socket)) {
-    source_type = envoy::api::v2::listener::FilterChainMatch_RequestSourceType::
-        FilterChainMatch_RequestSourceType_LOCAL;
+    source_type = envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
+        FilterChainMatch_ConnectionSourceType_LOCAL;
   } else {
-    source_type = envoy::api::v2::listener::FilterChainMatch_RequestSourceType::
-        FilterChainMatch_RequestSourceType_EXTERNAL;
+    source_type = envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
+        FilterChainMatch_ConnectionSourceType_EXTERNAL;
   }
 
   auto filter_chain = source_types[source_type];
   if (filter_chain.get() == nullptr) {
-    filter_chain = source_types[envoy::api::v2::listener::FilterChainMatch_RequestSourceType::
-                                    FilterChainMatch_RequestSourceType_ANY];
+    filter_chain = source_types[envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
+                                    FilterChainMatch_ConnectionSourceType_ANY];
   }
 
   return filter_chain.get();
