@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package envoy.config.filter.network.mysql_proxy.v2;
+option go_package = "v2";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Mysql proxy]
+// MysqlDB :ref:`configuration overview <config_network_filters_mysql_proxy>`.
+
+message MysqlProxy {
+  // The human readable prefix to use when emitting :ref:`statistics
+  // <config_network_filters_mysql_proxy_stats>`.
+  string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
+
+  // The optional path to use for writing Mysql access logs. If not access log
+  // path is specified no access logs will be written. Note that access log is
+  // also gated :ref:`runtime <config_network_filters_mysql_proxy_runtime>`.
+  string access_log = 2;
+}

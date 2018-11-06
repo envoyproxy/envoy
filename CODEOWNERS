@@ -14,3 +14,5 @@
 /*/extensions/transport_sockets/alts @htuch @yangminzhu
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
+# mysql_proxy extension
+/*/extensions/filters/network/mysql_proxy @rshriram @mattklein123
