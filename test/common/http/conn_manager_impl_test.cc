@@ -2716,14 +2716,17 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeaderOnly) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs(
-          [&]() -> FilterHeadersStatus { return FilterHeadersStatus::StopIterationAndEnd; }));
+          [&]() -> FilterHeadersStatus { return FilterHeadersStatus::ContinueHeadersOnly; }));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true)).WillOnce(Return(FilterHeadersStatus::Continue));
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::StopIterationAndEnd));
+      .WillOnce(Return(FilterHeadersStatus::ContinueHeadersOnly));
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
 
   expectOnDestroy();
