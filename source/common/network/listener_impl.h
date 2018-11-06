@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/os_sys_calls.h"
 #include "envoy/network/listener.h"
 
 #include "common/event/dispatcher_impl.h"
@@ -32,6 +33,7 @@ protected:
 private:
   void listenCallback(int fd, const sockaddr& remote_addr, socklen_t remote_addr_len);
 
+  Api::OsSysCalls& os_sys_calls_;
   Event::FileEventPtr file_event_;
 };
 

@@ -52,6 +52,9 @@ public:
   SysCallIntResult getsockopt(int sockfd, int level, int optname, void* optval,
                               socklen_t* optlen) override;
 
+  MOCK_METHOD2(listen, SysCallIntResult(int sockfd, int backlog));
+  MOCK_METHOD3(accept, SysCallIntResult(int sockfd, struct sockaddr* addr, socklen_t* addrlen));
+  MOCK_METHOD3(fcntlSetInt, SysCallIntResult(int fd, int cmd, int arg));
   MOCK_METHOD3(bind, SysCallIntResult(int sockfd, const sockaddr* addr, socklen_t addrlen));
   MOCK_METHOD3(ioctl, SysCallIntResult(int sockfd, unsigned long int request, void* argp));
   MOCK_METHOD1(close, SysCallIntResult(int));

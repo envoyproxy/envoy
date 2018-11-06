@@ -10,6 +10,9 @@ namespace Api {
 class OsSysCallsImpl : public OsSysCalls {
 public:
   // Api::OsSysCalls
+  SysCallIntResult listen(int sockfd, int backlog) override;
+  SysCallIntResult accept(int sockfd, struct sockaddr* addr, socklen_t* addrlen) override;
+  SysCallIntResult fcntlSetInt(int fd, int cmd, int arg) override;
   SysCallIntResult bind(int sockfd, const sockaddr* addr, socklen_t addrlen) override;
   SysCallIntResult ioctl(int sockfd, unsigned long int request, void* argp) override;
   SysCallIntResult open(const std::string& full_path, int flags, int mode) override;

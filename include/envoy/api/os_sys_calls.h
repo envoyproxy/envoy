@@ -39,6 +39,21 @@ public:
   virtual ~OsSysCalls() {}
 
   /**
+   * @see listen (man 2 listen)
+   */
+  virtual SysCallIntResult listen(int sockfd, int backlog) PURE;
+
+  /**
+   * @see accept (man 2 accept)
+   */
+  virtual SysCallIntResult accept(int sockfd, struct sockaddr* addr, socklen_t* addrlen) PURE;
+
+  /**
+   * @see fcntl (man 2 fcntl)
+   */
+  virtual SysCallIntResult fcntlSetInt(int fd, int cmd, int arg) PURE;
+
+  /**
    * @see bind (man 2 bind)
    */
   virtual SysCallIntResult bind(int sockfd, const sockaddr* addr, socklen_t addrlen) PURE;

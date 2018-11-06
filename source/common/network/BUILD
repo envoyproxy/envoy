@@ -140,6 +140,7 @@ envoy_cc_library(
         "//include/envoy/network:listener_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",

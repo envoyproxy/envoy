@@ -4,6 +4,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
@@ -43,7 +44,8 @@ void ListenerImpl::listenCallback(int fd, const sockaddr& remote_addr, socklen_t
 ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
                            bool bind_to_port, bool hand_off_restored_destination_connections)
     : local_address_(nullptr), cb_(cb),
-      hand_off_restored_destination_connections_(hand_off_restored_destination_connections) {
+      hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
+      os_sys_calls_(Api::OsSysCallsSingleton::get()) {
   const auto ip = socket.localAddress()->ip();
 
   // Only use the listen socket's local address for new connections if it is not the all hosts
@@ -53,11 +55,13 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, Li
   }
 
   if (bind_to_port) {
-    const int ret = ::listen(socket.fd(), 128);
+    // libevent uses 128 in evconnlistener, this seems a sane default.
+    const Api::SysCallIntResult ret = os_sys_calls_.listen(socket.fd(), 128);
 
-    if (ret == -1) {
-      throw CreateListenerException(
-          fmt::format("cannot listen on socket: {}", socket.localAddress()->asString()));
+    if (ret.rc_ == -1) {
+      throw CreateListenerException(fmt::format("cannot listen on socket: {} error {}",
+                                                socket.localAddress()->asString(),
+                                                strerror(ret.errno_)));
     }
 
     file_event_ = dispatcher.createFileEvent(
@@ -66,16 +70,24 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, Li
           while (true) {
             sockaddr_storage remote_addr;
             socklen_t remote_addr_len = sizeof(remote_addr);
-            const int ret =
-                ::accept(socket_fd, reinterpret_cast<sockaddr*>(&remote_addr), &remote_addr_len);
-            if (ret < 0 || ::fcntl(ret, F_SETFL, O_NONBLOCK) == -1) {
-              if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK ||
-                  errno == ECONNABORTED) {
+            // We could use accept4 here to avoid 2 syscalls (accept/fcntl)
+            // below, but this is Linux-only (e.g. no OS X support), so would
+            // need some #ifdef magic. TODO(htuch): add as dictated by
+            // performance concerns.
+            const Api::SysCallIntResult ret = os_sys_calls_.accept(
+                socket_fd, reinterpret_cast<sockaddr*>(&remote_addr), &remote_addr_len);
+            if (ret.rc_ < 0) {
+              if (ret.errno_ == EINTR || ret.errno_ == EAGAIN || ret.errno_ == EWOULDBLOCK ||
+                  ret.errno_ == ECONNABORTED) {
                 return;
               }
+              // We should never get a non-retriable accept failure. This can
+              // happen if we run out of FDs or memory. In those cases just
+              // crash.
               PANIC(fmt::format("listener accept failure: {}", strerror(errno)));
             }
-            listenCallback(ret, reinterpret_cast<sockaddr&>(remote_addr), remote_addr_len);
+            RELEASE_ASSERT(os_sys_calls_.fcntlSetInt(ret.rc_, F_SETFL, O_NONBLOCK).rc_ != -1, "");
+            listenCallback(ret.rc_, reinterpret_cast<sockaddr&>(remote_addr), remote_addr_len);
           }
         },
         Event::FileTriggerType::Level, Event::FileReadyType::Read);

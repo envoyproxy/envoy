@@ -8,6 +8,21 @@
 namespace Envoy {
 namespace Api {
 
+SysCallIntResult OsSysCallsImpl::listen(int sockfd, int backlog) {
+  const int rc = ::listen(sockfd, backlog);
+  return {rc, errno};
+}
+
+SysCallIntResult OsSysCallsImpl::accept(int sockfd, struct sockaddr* addr, socklen_t* addrlen) {
+  const int rc = ::accept(sockfd, addr, addrlen);
+  return {rc, errno};
+}
+
+SysCallIntResult OsSysCallsImpl::fcntlSetInt(int fd, int cmd, int arg) {
+  const int rc = ::fcntl(fd, cmd, arg);
+  return {rc, errno};
+}
+
 SysCallIntResult OsSysCallsImpl::bind(int sockfd, const sockaddr* addr, socklen_t addrlen) {
   const int rc = ::bind(sockfd, addr, addrlen);
   return {rc, errno};
