@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -240,11 +239,6 @@ int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned ch
   // Currently this uses the standard selection algorithm in priority order.
   const uint8_t* alpn_data = &parsed_alpn_protocols_[0];
   size_t alpn_data_size = parsed_alpn_protocols_.size();
-  if (!parsed_alt_alpn_protocols_.empty() &&
-      runtime_.snapshot().featureEnabled("ssl.alt_alpn", 0)) {
-    alpn_data = &parsed_alt_alpn_protocols_[0];
-    alpn_data_size = parsed_alt_alpn_protocols_.size();
-  }
 
   if (SSL_select_next_proto(const_cast<unsigned char**>(out), outlen, alpn_data, alpn_data_size, in,
                             inlen) != OPENSSL_NPN_NEGOTIATED) {
@@ -474,6 +468,10 @@ CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::str
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
   certificate_details->set_days_until_expiration(
       Utility::getDaysUntilExpiration(cert, time_source_));
+  ProtobufWkt::Timestamp* valid_from = certificate_details->mutable_valid_from();
+  TimestampUtil::systemClockToTimestamp(Utility::getValidFrom(*cert), *valid_from);
+  ProtobufWkt::Timestamp* expiration_time = certificate_details->mutable_expiration_time();
+  TimestampUtil::systemClockToTimestamp(Utility::getExpirationTime(*cert), *expiration_time);
 
   for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
     envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
@@ -517,9 +515,8 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
-                                     Runtime::Loader& runtime, TimeSource& time_source)
-    : ContextImpl(scope, config, time_source), runtime_(runtime),
-      session_ticket_keys_(config.sessionTicketKeys()) {
+                                     TimeSource& time_source)
+    : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()) {
   if (config.tlsCertificate() == nullptr) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
@@ -568,8 +565,6 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
       SSL_CTX_set_verify(ctx_.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
     }
   }
-
-  parsed_alt_alpn_protocols_ = parseAlpnProtocols(config.altAlpnProtocols());
 
   if (!parsed_alpn_protocols_.empty()) {
     SSL_CTX_set_alpn_select_cb(ctx_.get(),

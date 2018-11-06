@@ -339,7 +339,7 @@ protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
   virtual HostSetImplPtr createHostSet(uint32_t priority,
                                        absl::optional<uint32_t> overprovisioning_factor) {
-    return HostSetImplPtr{new HostSetImpl(priority, overprovisioning_factor)};
+    return std::make_unique<HostSetImpl>(priority, overprovisioning_factor);
   }
 
 private:

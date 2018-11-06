@@ -26,6 +26,7 @@ namespace Logger {
   FUNCTION(client)               \
   FUNCTION(config)               \
   FUNCTION(connection)           \
+  FUNCTION(dubbo)                \
   FUNCTION(file)                 \
   FUNCTION(filter)               \
   FUNCTION(grpc)                 \

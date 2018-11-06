@@ -82,6 +82,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "filter_lib",
     hdrs = ["filter_impl.h"],
+    deps = [
+        "//include/envoy/network:filter_interface",
+    ],
 )
 
 envoy_cc_library(

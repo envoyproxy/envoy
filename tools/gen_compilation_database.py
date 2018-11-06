@@ -13,12 +13,16 @@ def generateCompilationDatabase(args):
       "../bazel/gen_compilation_database.sh")
   subprocess.check_call([gen_compilation_database_sh] + args.bazel_targets)
 
+def isHeader(filename):
+  for ext in (".h", ".hh", ".hpp", ".hxx"):
+    if filename.endswith(ext):
+      return True
+  return False
+
 def isCompileTarget(target, args):
   filename = target["file"]
-  if not args.include_headers:
-    for ext in (".h", ".hh", ".hpp", ".hxx"):
-      if filename.endswith(".h") or filename.endswith(ext):
-        return False
+  if not args.include_headers and isHeader(filename):
+    return False
 
   if not args.include_genfiles:
     if filename.startswith("bazel-out/"):
@@ -37,6 +41,10 @@ def modifyCompileCommand(target):
   # clang-tidy will misinterpret them.
   options = options.replace("-std=c++0x ", "")
   options = options.replace("-std=c++11 ", "")
+
+  if isHeader(target["file"]):
+    options += " -Wno-pragma-once-outside-header -Wno-unused-const-variable"
+    options += " -Wno-unused-function"
 
   target["command"] = " ".join(["clang++", options])
   return target

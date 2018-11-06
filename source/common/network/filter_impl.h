@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/network/filter.h"
+
 namespace Envoy {
 namespace Network {
 

@@ -1,6 +1,7 @@
 #include "common/http/http2/conn_pool.h"
 
 #include <cstdint>
+#include <memory>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -86,7 +87,7 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
   }
 
   if (!primary_client_) {
-    primary_client_.reset(new ActiveClient(*this));
+    primary_client_ = std::make_unique<ActiveClient>(*this);
   }
 
   if (!host_->cluster().resourceManager(priority_).requests().canCreate()) {
@@ -219,8 +220,8 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : parent_(parent),
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })) {
 
-  parent_.conn_connect_ms_.reset(new Stats::Timespan(
-      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem()));
+  parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan>(
+      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem());
   Upstream::Host::CreateConnectionData data =
       parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_);
   real_host_description_ = data.host_description_;
@@ -235,8 +236,8 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.host_->cluster().stats().upstream_cx_total_.inc();
   parent_.host_->cluster().stats().upstream_cx_active_.inc();
   parent_.host_->cluster().stats().upstream_cx_http2_total_.inc();
-  conn_length_.reset(new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_length_ms_,
-                                         parent_.dispatcher_.timeSystem()));
+  conn_length_ = std::make_unique<Stats::Timespan>(
+      parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSystem());
 
   client_->setConnectionStats({parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
                                parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,

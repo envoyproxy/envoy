@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "common/buffer/buffer_impl.h"
@@ -116,7 +117,7 @@ TEST_F(AsyncClientImplTest, BasicStream) {
 }
 
 TEST_F(AsyncClientImplTest, Basic) {
-  message_->body().reset(new Buffer::OwnedImpl("test body"));
+  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
   Buffer::Instance& data = *message_->body();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -155,7 +156,7 @@ TEST_F(AsyncClientImplTest, Retry) {
       .WillByDefault(Return(true));
   Message* message_copy = message_.get();
 
-  message_->body().reset(new Buffer::OwnedImpl("test body"));
+  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
   Buffer::Instance& data = *message_->body();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -305,7 +306,7 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
 
 TEST_F(AsyncClientImplTest, MultipleRequests) {
   // Send request 1
-  message_->body().reset(new Buffer::OwnedImpl("test body"));
+  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
   Buffer::Instance& data = *message_->body();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -351,7 +352,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
 
 TEST_F(AsyncClientImplTest, StreamAndRequest) {
   // Send request
-  message_->body().reset(new Buffer::OwnedImpl("test body"));
+  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
   Buffer::Instance& data = *message_->body();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -441,7 +442,7 @@ TEST_F(AsyncClientImplTest, StreamWithTrailers) {
 }
 
 TEST_F(AsyncClientImplTest, Trailers) {
-  message_->body().reset(new Buffer::OwnedImpl("test body"));
+  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
   Buffer::Instance& data = *message_->body();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -700,7 +701,7 @@ TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
       }));
 
   expectSuccess(503);
-  message_->body().reset(new Buffer::OwnedImpl("hello"));
+  message_->body() = std::make_unique<Buffer::OwnedImpl>("hello");
   EXPECT_EQ(nullptr, client_.send(std::move(message_), callbacks_,
                                   absl::optional<std::chrono::milliseconds>()));
 

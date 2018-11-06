@@ -22,6 +22,8 @@ public:
 
   bool consume(uint64_t tokens = 1) override;
 
+  uint64_t nextTokenAvailableMs() override;
+
 private:
   const double max_tokens_;
   const double fill_rate_;

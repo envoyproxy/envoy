@@ -258,15 +258,7 @@ message CommonTlsContext {
   // There is no default for this parameter. If empty, Envoy will not expose ALPN.
   repeated string alpn_protocols = 4;
 
-  // These fields are deprecated and only are used during the interim v1 -> v2
-  // transition period for internal purposes. They should not be used outside of
-  // the Envoy binary. [#not-implemented-hide:]
-  message DeprecatedV1 {
-    string alt_alpn_protocols = 1;
-  }
-
-  // [#not-implemented-hide:]
-  DeprecatedV1 deprecated_v1 = 5 [deprecated = true];
+  reserved 5;
 }
 
 message UpstreamTlsContext {

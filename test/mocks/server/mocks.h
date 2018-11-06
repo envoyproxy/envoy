@@ -75,6 +75,7 @@ public:
   MOCK_CONST_METHOD0(maxStats, uint64_t());
   MOCK_CONST_METHOD0(statsOptions, const Stats::StatsOptions&());
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
+  MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
 
   std::string config_path_;
   std::string config_yaml_;
@@ -89,6 +90,7 @@ public:
   uint32_t concurrency_{1};
   uint64_t hot_restart_epoch_{};
   bool hot_restart_disabled_{};
+  bool signal_handling_enabled_{true};
 };
 
 class MockConfigTracker : public ConfigTracker {
@@ -329,6 +331,7 @@ public:
   MOCK_METHOD0(rateLimitClient_, RateLimit::Client*());
   MOCK_METHOD0(runtime, Runtime::Loader&());
   MOCK_METHOD0(shutdown, void());
+  MOCK_METHOD0(isShutdown, bool());
   MOCK_METHOD0(shutdownAdmin, void());
   MOCK_METHOD0(singletonManager, Singleton::Manager&());
   MOCK_METHOD0(startTimeCurrentEpoch, time_t());

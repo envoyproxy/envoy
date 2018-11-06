@@ -33,6 +33,7 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, statsOptions()).WillByDefault(ReturnRef(stats_options_));
   ON_CALL(*this, restartEpoch()).WillByDefault(ReturnPointee(&hot_restart_epoch_));
   ON_CALL(*this, hotRestartDisabled()).WillByDefault(ReturnPointee(&hot_restart_disabled_));
+  ON_CALL(*this, signalHandlingEnabled()).WillByDefault(ReturnPointee(&signal_handling_enabled_));
 }
 MockOptions::~MockOptions() {}
 
@@ -116,8 +117,7 @@ MockWorker::~MockWorker() {}
 
 MockInstance::MockInstance()
     : secret_manager_(new Secret::SecretManagerImpl()), cluster_manager_(timeSystem()),
-      ssl_context_manager_(runtime_loader_, timeSystem()),
-      singleton_manager_(new Singleton::ManagerImpl()) {
+      ssl_context_manager_(timeSystem()), singleton_manager_(new Singleton::ManagerImpl()) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, httpTracer()).WillByDefault(ReturnRef(http_tracer_));

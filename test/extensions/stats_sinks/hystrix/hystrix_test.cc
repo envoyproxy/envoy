@@ -118,7 +118,7 @@ private:
 
 class HystrixSinkTest : public testing::Test {
 public:
-  HystrixSinkTest() { sink_.reset(new HystrixSink(server_, window_size_)); }
+  HystrixSinkTest() { sink_ = std::make_unique<HystrixSink>(server_, window_size_); }
 
   Buffer::OwnedImpl createClusterAndCallbacks() {
     // Set cluster.
