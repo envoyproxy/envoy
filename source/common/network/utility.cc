@@ -210,7 +210,7 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 
 bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
 
-  auto remote_address = socket.remoteAddress();
+  const auto& remote_address = socket.remoteAddress();
   if (remote_address->type() == Envoy::Network::Address::Type::Pipe ||
       isLoopbackAddress(*remote_address)) {
     return true;
@@ -231,8 +231,7 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
     }
 
     if (ifa->ifa_addr->sa_family == af_look_up) {
-      const struct sockaddr_storage* addr =
-          reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
+      const auto* addr = reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
       auto local_address = Address::addressFromSockAddr(
           *addr, (af_look_up == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
 

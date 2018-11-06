@@ -365,7 +365,7 @@ private:
   findFilterChainForApplicationProtocols(const ApplicationProtocolsMap& application_protocols_map,
                                          const Network::ConnectionSocket& socket) const;
   const Network::FilterChain*
-  findFilterChainForSourceTypes(const SourceTypesArray source_types,
+  findFilterChainForSourceTypes(const SourceTypesArray& source_types,
                                 const Network::ConnectionSocket& socket) const;
 
   static bool isWildcardServerName(const std::string& name);

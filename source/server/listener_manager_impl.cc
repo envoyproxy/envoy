@@ -511,26 +511,25 @@ const Network::FilterChain* ListenerImpl::findFilterChainForApplicationProtocols
 }
 
 const Network::FilterChain*
-ListenerImpl::findFilterChainForSourceTypes(const SourceTypesArray source_types,
+ListenerImpl::findFilterChainForSourceTypes(const SourceTypesArray& source_types,
                                             const Network::ConnectionSocket& socket) const {
 
-  envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type;
+  auto filter_chain_local =
+      source_types[envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
+                       FilterChainMatch_ConnectionSourceType_LOCAL];
 
-  if (Network::Utility::isLocalConnection(socket)) {
-    source_type = envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
-        FilterChainMatch_ConnectionSourceType_LOCAL;
-  } else {
-    source_type = envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
-        FilterChainMatch_ConnectionSourceType_EXTERNAL;
+  if (filter_chain_local && Network::Utility::isLocalConnection(socket)) {
+    return filter_chain_local.get();
   }
 
-  auto filter_chain = source_types[source_type];
-  if (filter_chain.get() == nullptr) {
-    filter_chain = source_types[envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
-                                    FilterChainMatch_ConnectionSourceType_ANY];
-  }
+  auto filter_chain_external =
+      source_types[envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
+                       FilterChainMatch_ConnectionSourceType_EXTERNAL];
+  auto filter_chain_any =
+      source_types[envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
+                       FilterChainMatch_ConnectionSourceType_ANY];
 
-  return filter_chain.get();
+  return (filter_chain_external) ? filter_chain_external.get() : filter_chain_any.get();
 }
 
 bool ListenerImpl::createNetworkFilterChain(
