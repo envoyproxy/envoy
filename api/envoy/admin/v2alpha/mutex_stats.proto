@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.admin.v2alpha;
 
-// [#protodoc-title: Mutex Stats]
+// [#protodoc-title: MutexStats]
 
 // Proto representation of the statistics collected upon absl::Mutex contention, if Envoy is run
 // under :option:`--enable-mutex-tracing`. For more information, see the `absl::Mutex`
