@@ -48,8 +48,8 @@ envoy_cc_library(
     hdrs = ["mysql_config.h"],
     deps = [
         ":proxy_lib",
-        "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network:well_known_names",
+        "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/config/filter/network/mysql_proxy/v2:mysql_proxy_cc",
     ],
 )

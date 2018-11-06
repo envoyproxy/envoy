@@ -1,7 +1,8 @@
 #pragma once
+#include "envoy/common/platform.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
-#include "envoy/common/platform.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -124,8 +125,8 @@ public:
   };
 
   PACKED_STRUCT(struct header_fields {
-      uint32_t length:24;
-      uint32_t seq:8;
+    uint32_t length : 24;
+    uint32_t seq : 8;
   });
 
   union MysqlHeader {
