@@ -1128,8 +1128,10 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(
   ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n", *this);
   ENVOY_STREAM_LOG(error, "++++++++++++encoding metadata via codec:\n", *this);
 
-  // Now actually encode via the codec.
-  response_encoder_->encodeMetadata(metadata_map);
+  // Now encode metadata via the codec.
+  if (!metadata_map.empty()) {
+    response_encoder_->encodeMetadata(metadata_map);
+  }
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
