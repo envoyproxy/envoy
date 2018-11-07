@@ -20,7 +20,14 @@ public:
    */
   virtual bool rejects(const std::string& name) const PURE;
 
+  /**
+   * @return bool whether StatsMatcher trivially accepts all stats.
+   */
   virtual bool acceptsAll() const PURE;
+
+  /**
+   * @return bool whether StatsMatcher trivially rejects all stats.
+   */
   virtual bool rejectsAll() const PURE;
 };
 

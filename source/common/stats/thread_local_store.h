@@ -274,6 +274,7 @@ private:
   void clearScopeFromCaches(uint64_t scope_id);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
+  bool rejects(StatName name) const;
 
   const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;

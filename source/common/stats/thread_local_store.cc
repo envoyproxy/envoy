@@ -39,6 +39,23 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   stats_overflow_.free(symbolTable());
 }
 
+bool ThreadLocalStoreImpl::rejects(StatName stat_name) const {
+  // Don't both elaborating the StatName there are no pattern-based
+  // exclusions;/inclusions.
+  if (stats_matcher_->acceptsAll()) {
+    return false;
+  }
+
+  // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the
+  // hot path) could become prohibitively expensive. Revisit this usage in the
+  // future.
+  //
+  // Also note that the elaboration of the stat-name into a string is expensive,
+  // so I think it might be better to move the matcher test until after caching,
+  // unless its acceptsAll/rejectsAll.
+  return stats_matcher_->rejectsAll() || stats_matcher_->rejects(stat_name.toString(symbolTable()));
+}
+
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
@@ -300,18 +317,10 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterx(StatName name) {
   // strategy costs an extra hash lookup for each miss, but saves time
   // re-copying the string and significant memory overhead.
   StatNameJoiner final_name(prefix_.statName(), name);
+  StatName final_stat_name = final_name.statName();
 
-  // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the hot path) could
-  // become prohibitively expensive. Revisit this usage in the future.
-  //
-  // Also note that the elaboration of the stat-name into a string is expensive,
-  // so I think it might be better to move the matcher test until after caching,
-  // unless its acceptsAll/rejectsAll.
-  const StatsMatcher& matcher = *parent_.stats_matcher_;
-  if (!matcher.acceptsAll()) {
-    if (matcher.rejectsAll() || matcher.rejects(final_name.statName().toString(symbolTable()))) {
-      return parent_.null_counter_;
-    }
+  if (parent_.rejects(final_stat_name)) {
+    return parent_.null_counter_;
   }
 
   // We now find the TLS cache. This might remain null if we don't have TLS
@@ -321,7 +330,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterx(StatName name) {
     tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].counters_;
   }
 
-  return safeMakeStat<Counter>(final_name.statName(), central_cache_.counters_,
+  return safeMakeStat<Counter>(final_stat_name, central_cache_.counters_,
                                [](StatDataAllocator& allocator, StatName name,
                                   absl::string_view tag_extracted_name,
                                   const std::vector<Tag>& tags) -> CounterSharedPtr {
@@ -356,9 +365,9 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugex(StatName name) {
   // do a find() first, using tha if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
   StatNameJoiner final_name(prefix_.statName(), name);
+  StatName final_stat_name = final_name.statName();
 
-  // See warning/comments in counter().
-  if (parent_.stats_matcher_->rejects(final_name.statName().toString(symbolTable()))) {
+  if (parent_.rejects(final_stat_name)) {
     return parent_.null_gauge_;
   }
 
@@ -367,7 +376,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugex(StatName name) {
     tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].gauges_;
   }
 
-  return safeMakeStat<Gauge>(final_name.statName(), central_cache_.gauges_,
+  return safeMakeStat<Gauge>(final_stat_name, central_cache_.gauges_,
                              [](StatDataAllocator& allocator, StatName name,
                                 absl::string_view tag_extracted_name,
                                 const std::vector<Tag>& tags) -> GaugeSharedPtr {
@@ -388,8 +397,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramx(StatName name) {
   StatNameJoiner final_name(prefix_.statName(), name);
   StatName final_stat_name = final_name.statName();
 
-  // See warning/comments in counterx().
-  if (parent_.stats_matcher_->rejects(final_stat_name.toString(symbolTable()))) {
+  if (parent_.rejects(final_stat_name)) {
     return parent_.null_histogram_;
   }
 
