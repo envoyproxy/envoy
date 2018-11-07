@@ -23,7 +23,8 @@ uint64_t Stats::totalCurrentlyReserved() {
 
 uint64_t Stats::totalThreadCacheBytes() {
   size_t value = 0;
-  MallocExtension::instance()->GetNumericProperty("tcmalloc.current_total_thread_cache_bytes", &value);
+  MallocExtension::instance()->GetNumericProperty("tcmalloc.current_total_thread_cache_bytes",
+                                                  &value);
   return value;
 }
 
