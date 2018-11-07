@@ -118,6 +118,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                                              cmd);
   TCLAP::SwitchArg disable_hot_restart("", "disable-hot-restart",
                                        "Disable hot restart functionality", cmd, false);
+  TCLAP::SwitchArg enable_mutex_tracing(
+      "", "enable-mutex-tracing", "Enable mutex contention tracing functionality", cmd, false);
 
   cmd.setExceptionHandling(false);
   try {
@@ -152,6 +154,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   // TODO(jmarantz): should we also multiply these to bound the total amount of memory?
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
+
+  mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
 
   log_level_ = default_log_level;
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
@@ -258,6 +262,6 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       service_cluster_(service_cluster), service_node_(service_node), service_zone_(service_zone),
       file_flush_interval_msec_(10000), drain_time_(600), parent_shutdown_time_(900),
       mode_(Server::Mode::Serve), max_stats_(ENVOY_DEFAULT_MAX_STATS), hot_restart_disabled_(false),
-      signal_handling_enabled_(true) {}
+      signal_handling_enabled_(true), mutex_tracing_enabled_(false) {}
 
 } // namespace Envoy
