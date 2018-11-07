@@ -306,11 +306,12 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
     encoders.push_back(&encoder_decoder.first);
     responses.push_back(std::move(encoder_decoder.second));
 
-    // Ensure we've established a connection before issuing the resets. This is necessary
-    // in order to know a priori that all requests will create a stream on the connection,
-    // regardless of whether they are reset or not. Resets that occur before a connection
-    // has been established does not create a stream on the connection.
-    if (!fake_upstream_connection_) {
+    // Ensure that we're establishing a connection after the first request, before we issue
+    // any of the resets. This is necessary in order to know a priori that all requests will
+    // create a stream on the connection, regardless of whether they are reset or not. Resets
+    // that occur before a connection has been established does not create a stream on the
+    // connection.
+    if (i == 0) {
       ASSERT_TRUE(
           fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     }
