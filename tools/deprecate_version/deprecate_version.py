@@ -68,8 +68,7 @@ def GetConfirmation():
   return False
 
 
-def CreateIssues(deprecate_for_version, deprecate_by_version, access_token,
-                 commits):
+def CreateIssues(deprecate_for_version, deprecate_by_version, access_token, commits):
   """Create issues in GitHub corresponding to a set of commits.
 
   Args:
@@ -94,26 +93,23 @@ def CreateIssues(deprecate_for_version, deprecate_by_version, access_token,
     if label.name in LABELS:
       labels.append(label)
   if len(labels) != len(LABELS):
-    raise DeprecateVersionError(
-        'Unknown labels (expected %s, got %s)' % (LABELS, labels))
+    raise DeprecateVersionError('Unknown labels (expected %s, got %s)' % (LABELS, labels))
   # What are the PRs corresponding to the commits?
   prs = (int(re.search('\(#(\d+)\)', c.message).group(1)) for c in commits)
   issues = []
   for pr in sorted(prs):
     # Who is the author?
     pr_info = repo.get_pull(pr)
-    title = '[v%s deprecation] Remove features marked deprecated in #%d' % (
-        deprecate_for_version, pr)
+    title = '[v%s deprecation] Remove features marked deprecated in #%d' % (deprecate_for_version,
+                                                                            pr)
     body = ('#%d (%s) introduced a deprecation notice for v%s. This issue '
-            'tracks source code cleanup.') % (pr, pr_info.title,
-                                              deprecate_for_version)
+            'tracks source code cleanup.') % (pr, pr_info.title, deprecate_for_version)
     print title
     print body
     print '  >> Assigning to %s' % pr_info.user.login
     # TODO(htuch): Figure out how to do this without legacy and faster.
-    exists = repo.legacy_search_issues(
-        'open', '"%s"' % title) or repo.legacy_search_issues(
-            'closed', '"%s"' % title)
+    exists = repo.legacy_search_issues('open', '"%s"' % title) or repo.legacy_search_issues(
+        'closed', '"%s"' % title)
     if exists:
       print '  >> Issue already exists, not posting!'
     else:
@@ -123,15 +119,11 @@ def CreateIssues(deprecate_for_version, deprecate_by_version, access_token,
     for title, body, user in issues:
       try:
         repo.create_issue(
-            title,
-            body=body,
-            assignees=[user.login],
-            milestone=milestone,
-            labels=labels)
+            title, body=body, assignees=[user.login], milestone=milestone, labels=labels)
       except github.GithubException as e:
-        print ('GithubException while creating issue. This is typically because'
-               ' a user is not a member of envoyproxy org. Check that %s is in '
-               'the org.') % user.login
+        print('GithubException while creating issue. This is typically because'
+              ' a user is not a member of envoyproxy org. Check that %s is in '
+              'the org.') % user.login
         raise
 
 
@@ -147,7 +139,6 @@ if __name__ == '__main__':
   deprecate_by_version = sys.argv[2]
   history = GetHistory()
   if deprecate_for_version not in history:
-    print 'Unknown version: %s (valid versions: %s)' % (deprecate_for_version,
-                                                        history.keys())
+    print 'Unknown version: %s (valid versions: %s)' % (deprecate_for_version, history.keys())
   CreateIssues(deprecate_for_version, deprecate_by_version, access_token,
                history[deprecate_for_version])

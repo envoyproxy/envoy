@@ -113,9 +113,10 @@ public:
  */
 class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
-  RunHelper(Instance& instance, Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
-            AccessLog::AccessLogManager& access_log_manager, InitManagerImpl& init_manager,
-            OverloadManager& overload_manager, std::function<void()> workers_start_cb);
+  RunHelper(Instance& instance, Options& options, Event::Dispatcher& dispatcher,
+            Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
+            InitManagerImpl& init_manager, OverloadManager& overload_manager,
+            std::function<void()> workers_start_cb);
 
 private:
   Event::SignalEventPtr sigterm_;
@@ -157,6 +158,7 @@ public:
   Init::Manager& initManager() override { return init_manager_; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
+  Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
   Runtime::RandomGenerator& random() override { return *random_generator_; }
   RateLimit::ClientPtr
@@ -232,6 +234,7 @@ private:
   Upstream::HdsDelegatePtr hds_delegate_;
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
   std::unique_ptr<RunHelper> run_helper_;
+  Envoy::MutexTracer* mutex_tracer_;
 };
 
 } // namespace Server

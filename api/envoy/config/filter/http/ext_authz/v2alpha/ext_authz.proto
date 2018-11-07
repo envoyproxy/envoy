@@ -7,6 +7,8 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/grpc_service.proto";
 import "envoy/api/v2/core/http_uri.proto";
 
+import "validate/validate.proto";
+
 // [#protodoc-title: External Authorization ]
 // The external authorization service configuration
 // :ref:`configuration overview <config_http_filters_ext_authz>`.
@@ -87,4 +89,37 @@ message HttpService {
   // Sets a list of headers and their values that will be added to the request to external
   // authorization server. Note that these will override the headers coming from the downstream.
   repeated envoy.api.v2.core.HeaderValue authorization_headers_to_add = 6;
+}
+
+// Extra settings on a per virtualhost/route/weighter-cluster level.
+message ExtAuthzPerRoute {
+  oneof override {
+    option (validate.required) = true;
+
+    // Disable the ext auth filter for this particular vhost or route.
+    // If disabled is specified in multiple per-filter-configs, the most specific one will be used.
+    bool disabled = 1 [(validate.rules).bool.const = true];
+
+    // Check request settings for this route.
+    CheckSettings check_settings = 2 [(validate.rules).message.required = true];
+  }
+}
+
+// Extra settings for the check request. You can use this to provide extra context for the
+// ext-authz server on specific virtual hosts \ routes. For example, adding a context extension on
+// the virtual host level can give the ext-authz server information on what virtual host is used
+// without needing to parse the host header.
+// If CheckSettings is specified in multiple per-filter-configs, they will be merged in order,
+// and the result will be be used.
+message CheckSettings {
+  // Context extensions to set on the CheckRequest's
+  // :ref:`AttributeContext.context_extensions<envoy_api_field_service.auth.v2alpha.AttributeContext.context_extensions>`
+  //
+  // Merge semantics for this field are such that keys from more specific configs override.
+  //
+  // .. note::
+  //
+  //   These settings are only applied to a filter configured with a
+  //   :ref:`grpc_service<envoy_api_field_config.filter.http.ext_authz.v2alpha.ExtAuthz.grpc_service>`.
+  map<string, string> context_extensions = 1;
 }

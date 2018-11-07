@@ -45,9 +45,11 @@ public:
    * @param request is the reference to the check request that will be filled up.
    *
    */
-  static void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                              const Envoy::Http::HeaderMap& headers,
-                              envoy::service::auth::v2alpha::CheckRequest& request);
+  static void
+  createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+                  const Envoy::Http::HeaderMap& headers,
+                  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>&& context_extensions,
+                  envoy::service::auth::v2alpha::CheckRequest& request);
 
   /**
    * createTcpCheck is used to extract the attributes from the network layer and fill them up

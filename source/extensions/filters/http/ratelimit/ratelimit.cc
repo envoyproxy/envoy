@@ -144,7 +144,8 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
     callbacks_->sendLocalReply(Http::Code::TooManyRequests, "",
-                               [this](Http::HeaderMap& headers) { addHeaders(headers); });
+                               [this](Http::HeaderMap& headers) { addHeaders(headers); },
+                               config_->rateLimitedGrpcStatus());
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
   } else if (status == RateLimit::LimitStatus::Error) {
     if (config_->failureModeAllow()) {
@@ -154,7 +155,7 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
       }
     } else {
       state_ = State::Responded;
-      callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr);
+      callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt);
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
     }
   } else if (!initiating_call_) {
