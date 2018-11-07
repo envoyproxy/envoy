@@ -67,7 +67,7 @@ public:
   void decodeTrailers(HeaderMapPtr&& trailers) override { decodeTrailers_(trailers); }
 
   void decodeMetadata(MetadataMapPtr&& metadata_map) override {
-    decodeMetadata_(std::move(metadata_map));
+    decodeMetadata_(metadata_map);
   }
 
   // Http::StreamDecoder
@@ -75,7 +75,7 @@ public:
   MOCK_METHOD1(decode100ContinueHeaders_, void(HeaderMapPtr& headers));
   MOCK_METHOD2(decodeData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(decodeTrailers_, void(HeaderMapPtr& trailers));
-  MOCK_METHOD1(decodeMetadata_, void(MetadataMapPtr metadata_map));
+  MOCK_METHOD1(decodeMetadata_, void(MetadataMapPtr& metadata_map));
 };
 
 class MockStreamCallbacks : public StreamCallbacks {
