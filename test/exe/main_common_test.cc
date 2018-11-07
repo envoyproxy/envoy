@@ -1,6 +1,7 @@
 #include <unistd.h>
 
 #include "common/common/lock_guard.h"
+#include "common/common/mutex_tracer_impl.h"
 #include "common/common/thread.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -8,6 +9,7 @@
 
 #include "server/options_impl.h"
 
+#include "test/test_common/contention.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -217,6 +219,31 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
   startEnvoy();
   started_.WaitForNotification();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  kill(getpid(), SIGTERM);
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_P(AdminRequestTest, AdminRequestContentionDisabled) {
+  startEnvoy();
+  started_.WaitForNotification();
+  EXPECT_THAT(adminRequest("/contention", "GET"), HasSubstr("not enabled"));
+  kill(getpid(), SIGTERM);
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_P(AdminRequestTest, AdminRequestContentionEnabled) {
+  addArg("--enable-mutex-tracing");
+  startEnvoy();
+  started_.WaitForNotification();
+
+  // Induce contention to guarantee a non-zero num_contentions count.
+  Thread::TestUtil::ContentionGenerator::generateContention(MutexTracerImpl::getOrCreateTracer());
+
+  std::string response = adminRequest("/contention", "GET");
+  EXPECT_THAT(response, Not(HasSubstr("not enabled")));
+  EXPECT_THAT(response, HasSubstr("\"num_contentions\":"));
+  EXPECT_THAT(response, Not(HasSubstr("\"num_contentions\": \"0\"")));
+
   kill(getpid(), SIGTERM);
   EXPECT_TRUE(waitForEnvoyToExit());
 }

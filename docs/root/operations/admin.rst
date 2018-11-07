@@ -128,6 +128,11 @@ modify different aspects of the server:
   The underlying proto is marked v2alpha and hence its contents, including the JSON representation,
   are not guaranteed to be stable.
 
+.. http:get:: /contention
+
+  Dump current Envoy mutex contention stats (:ref:`MutexStats <envoy_api_msg_admin.v2alpha.MutexStats>`) in JSON
+  format, if mutex tracing is enabled. See :option:`--enable-mutex-tracing`.
+
 .. http:post:: /cpuprofiler
 
   Enable or disable the CPU profiler. Requires compiling with gperftools.

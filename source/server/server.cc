@@ -20,6 +20,7 @@
 
 #include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/config/bootstrap_json.h"
@@ -60,7 +61,9 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks, time_system),
       dns_resolver_(dispatcher_->createDnsResolver({})),
-      access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false) {
+      access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false),
+      mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
+                                                  : nullptr) {
 
   try {
     if (!options.logPath().empty()) {

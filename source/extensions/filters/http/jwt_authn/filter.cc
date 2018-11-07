@@ -58,8 +58,8 @@ void Filter::onComplete(const Status& status) {
     // verification failed
     Http::Code code = Http::Code::Unauthorized;
     // return failure reason as message body
-    decoder_callbacks_->sendLocalReply(code, ::google::jwt_verify::getStatusString(status),
-                                       nullptr);
+    decoder_callbacks_->sendLocalReply(code, ::google::jwt_verify::getStatusString(status), nullptr,
+                                       absl::nullopt);
     return;
   }
   stats_.allowed_.inc();
