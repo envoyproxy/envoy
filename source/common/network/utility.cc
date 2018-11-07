@@ -211,7 +211,7 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
   const auto& remote_address = socket.remoteAddress();
   if (remote_address->type() == Envoy::Network::Address::Type::Pipe ||
-      isLoopbackAddress(*remote_address)) {
+      remote_address == socket.localAddress() || isLoopbackAddress(*remote_address)) {
     return true;
   }
 

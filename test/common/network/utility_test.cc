@@ -134,21 +134,38 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
 TEST(NetworkUtility, GetOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
 
 TEST(NetworkUtility, LocalConnection) {
+  Network::Address::InstanceConstSharedPtr local_addr;
   Network::Address::InstanceConstSharedPtr remote_addr;
 
   testing::NiceMock<Network::MockConnectionSocket> socket;
 
+  EXPECT_CALL(socket, remoteAddress()).WillRepeatedly(testing::ReturnRef(local_addr));
   EXPECT_CALL(socket, remoteAddress()).WillRepeatedly(testing::ReturnRef(remote_addr));
 
+  local_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
   remote_addr.reset(new Network::Address::PipeInstance("/pipe/path"));
   EXPECT_TRUE(Utility::isLocalConnection(socket));
 
+  local_addr.reset(new Network::Address::PipeInstance("/pipe/path"));
+  remote_addr.reset(new Network::Address::PipeInstance("/pipe/path"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
   remote_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
   EXPECT_TRUE(Utility::isLocalConnection(socket));
 
+  local_addr.reset(new Network::Address::Ipv4Instance("127.0.0.2"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4"));
   remote_addr.reset(new Network::Address::Ipv4Instance("8.8.8.8"));
   EXPECT_FALSE(Utility::isLocalConnection(socket));
 
+  local_addr.reset(new Network::Address::Ipv6Instance("::1"));
+  remote_addr.reset(new Network::Address::Ipv6Instance("::1"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv6Instance("::2"));
   remote_addr.reset(new Network::Address::Ipv6Instance("::1"));
   EXPECT_TRUE(Utility::isLocalConnection(socket));
 
