@@ -209,7 +209,6 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 }
 
 bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
-
   const auto& remote_address = socket.remoteAddress();
   if (remote_address->type() == Envoy::Network::Address::Type::Pipe ||
       isLoopbackAddress(*remote_address)) {
@@ -217,7 +216,6 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
   }
 
   struct ifaddrs* ifaddr;
-  struct ifaddrs* ifa;
 
   int rc = getifaddrs(&ifaddr);
   RELEASE_ASSERT(!rc, "");
@@ -225,7 +223,7 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
   auto af_look_up =
       (remote_address->ip()->version() == Address::IpVersion::v4) ? AF_INET : AF_INET6;
 
-  for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+  for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
     if (ifa->ifa_addr == nullptr) {
       continue;
     }

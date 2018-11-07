@@ -103,7 +103,7 @@ message FilterChainMatch {
     EXTERNAL = 2;
   }
 
-  // Specifies the connection source IP match type. Can be any, same or distinct network
+  // Specifies the connection source IP match type. Can be any, local or external network
   ConnectionSourceType source_type = 12 [(validate.rules).enum.defined_only = true];
 
   // The criteria is satisfied if the source IP address of the downstream
