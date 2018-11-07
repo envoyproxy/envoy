@@ -139,6 +139,19 @@ public:
 typedef std::unique_ptr<TransportSocket> TransportSocketPtr;
 
 /**
+ * Options for creating transport sockets.
+ */
+class TransportSocketOptions {
+public:
+  virtual ~TransportSocketOptions() {}
+  virtual absl::optional<std::string> overrideServerName() const PURE;
+  virtual void hashKey(std::vector<uint8_t>& key) const PURE;
+};
+
+typedef std::shared_ptr<TransportSocketOptions>
+    TransportSocketOptionsSharedPtr;
+
+/**
  * A factory for creating transport socket. It will be associated to filter chains and clusters.
  */
 class TransportSocketFactory {
@@ -151,12 +164,11 @@ public:
   virtual bool implementsSecureTransport() const PURE;
 
   /**
-   * @param override_server_name set server name, disregard the value the factory was
-   * configured with
+   * @param options for creating the transport socket
    * @return Network::TransportSocketPtr a transport socket to be passed to connection.
    */
   virtual TransportSocketPtr
-  createTransportSocket(absl::optional<std::string> override_server_name) const PURE;
+  createTransportSocket(TransportSocketOptionsSharedPtr options) const PURE;
 };
 
 typedef std::unique_ptr<TransportSocketFactory> TransportSocketFactoryPtr;

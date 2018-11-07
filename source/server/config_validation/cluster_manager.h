@@ -53,7 +53,7 @@ public:
                                                          Http::Protocol,
                                                          LoadBalancerContext*) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string&, LoadBalancerContext*,
-                                               absl::optional<std::string>) override;
+                                               Network::TransportSocketOptionsSharedPtr) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string&) override;
 
 private:

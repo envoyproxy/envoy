@@ -17,6 +17,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
+#include "common/network/transport_socket_options_impl.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/stream_info/forward_requested_server_name.h"
 
@@ -360,7 +361,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  absl::optional<std::string> override_server_name;
+  Network::TransportSocketOptionsSharedPtr transport_socket_options;
 
   if (downstreamConnection() &&
       downstreamConnection()->streamInfo().filterState().hasData<ForwardRequestedServerName>(
@@ -370,11 +371,12 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
             ->streamInfo()
             .filterState()
             .getDataReadOnly<ForwardRequestedServerName>(ForwardRequestedServerName::Key);
-    override_server_name = original_requested_server_name.value();
+    transport_socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(original_requested_server_name.value());
   }
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      cluster_name, Upstream::ResourcePriority::Default, this, override_server_name);
+      cluster_name, Upstream::ResourcePriority::Default, this, transport_socket_options);
   if (!conn_pool) {
     // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
     // cluster->stats().upstream_cx_none_healthy in the latter case.

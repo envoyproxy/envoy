@@ -399,7 +399,7 @@ protected:
 };
 
 TEST_F(TsiSocketFactoryTest, CreateTransportSocket) {
-  EXPECT_NE(nullptr, socket_factory_->createTransportSocket(absl::nullopt));
+  EXPECT_NE(nullptr, socket_factory_->createTransportSocket(nullptr));
 }
 
 TEST_F(TsiSocketFactoryTest, ImplementsSecureTransport) {

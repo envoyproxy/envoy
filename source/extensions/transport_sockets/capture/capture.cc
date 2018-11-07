@@ -100,10 +100,10 @@ CaptureSocketFactory::CaptureSocketFactory(
       transport_socket_factory_(std::move(transport_socket_factory)), time_system_(time_system) {}
 
 Network::TransportSocketPtr
-CaptureSocketFactory::createTransportSocket(absl::optional<std::string>) const {
-  return std::make_unique<CaptureSocket>(
-      path_prefix_, format_, transport_socket_factory_->createTransportSocket(absl::nullopt),
-      time_system_);
+CaptureSocketFactory::createTransportSocket(Network::TransportSocketOptionsSharedPtr) const {
+  return std::make_unique<CaptureSocket>(path_prefix_, format_,
+                                         transport_socket_factory_->createTransportSocket(nullptr),
+                                         time_system_);
 }
 
 bool CaptureSocketFactory::implementsSecureTransport() const {

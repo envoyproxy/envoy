@@ -98,7 +98,7 @@ public:
   Network::ClientConnectionPtr makeAltsConnection() {
     Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               client_alts_->createTransportSocket(absl::nullopt),
+                                               client_alts_->createTransportSocket(nullptr),
                                                nullptr);
   }
 

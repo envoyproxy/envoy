@@ -232,8 +232,8 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
   }
 
   if (!connection_) {
-    Upstream::Host::CreateConnectionData info = parent_.cluster_manager_.tcpConnForCluster(
-        parent_.cluster_info_->name(), nullptr, absl::nullopt);
+    Upstream::Host::CreateConnectionData info =
+        parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_info_->name(), nullptr, nullptr);
     if (!info.connection_) {
       return;
     }

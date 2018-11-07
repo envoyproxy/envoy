@@ -134,7 +134,7 @@ public:
   virtual Tcp::ConnectionPool::Instance*
   tcpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
                         LoadBalancerContext* context,
-                        absl::optional<std::string> override_server_name) PURE;
+                        Network::TransportSocketOptionsSharedPtr transport_socket_options) PURE;
 
   /**
    * Allocate a load balanced TCP connection for a cluster. The created connection is already
@@ -146,7 +146,7 @@ public:
    */
   virtual Host::CreateConnectionData
   tcpConnForCluster(const std::string& cluster, LoadBalancerContext* context,
-                    absl::optional<std::string> override_server_name) PURE;
+                    Network::TransportSocketOptionsSharedPtr transport_socket_options) PURE;
 
   /**
    * Returns a client that can be used to make async HTTP calls against the given cluster. The
@@ -274,7 +274,7 @@ public:
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                      absl::optional<std::string> override_server_name) PURE;
+                      Network::TransportSocketOptionsSharedPtr transport_socket_options) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

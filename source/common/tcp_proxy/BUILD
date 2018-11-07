@@ -34,6 +34,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:filter_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:metadatamatchcriteria_lib",
         "//source/common/stream_info:forward_requested_server_name_lib",

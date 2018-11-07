@@ -7,6 +7,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/network/address_impl.h"
+#include "common/network/transport_socket_options_impl.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/stream_info/forward_requested_server_name.h"
 #include "common/tcp_proxy/tcp_proxy.h"
@@ -1180,19 +1181,20 @@ TEST_F(TcpProxyRoutingTest, ForwardRequestedServerName) {
 
   // Expect filter to try to open a connection to a cluster with the override_server_name
   EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _, _))
-      .WillOnce(Invoke(
-          [](const std::string& cluster, Upstream::ResourcePriority priority,
-             Upstream::LoadBalancerContext* context,
-             absl::optional<std::string> override_server_name) -> Tcp::ConnectionPool::Instance* {
-            EXPECT_EQ(cluster, "fake_cluster");
-            EXPECT_TRUE(override_server_name.has_value());
-            EXPECT_EQ(override_server_name.value(), "www.example.com");
+      .WillOnce(Invoke([](const std::string& cluster, Upstream::ResourcePriority priority,
+                          Upstream::LoadBalancerContext* context,
+                          Network::TransportSocketOptionsSharedPtr transport_socket_options)
+                           -> Tcp::ConnectionPool::Instance* {
+        EXPECT_EQ(cluster, "fake_cluster");
+        EXPECT_NE(transport_socket_options);
+        EXPECT_TRUE(transport_socket_options->overrideServerName().has_value());
+        EXPECT_EQ(transport_socket_options->overrideServerName().value(), "www.example.com");
 
-            (void)priority; // suppress unused warning
-            (void)context;  // suppress unused warning
+        (void)priority; // suppress unused warning
+        (void)context;  // suppress unused warning
 
-            return nullptr;
-          }));
+        return nullptr;
+      }));
 
   // Port 9999 is within the specified destination port range.
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);

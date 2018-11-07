@@ -50,7 +50,7 @@ ValidationClusterManager::httpConnPoolForCluster(const std::string&, ResourcePri
 
 Host::CreateConnectionData
 ValidationClusterManager::tcpConnForCluster(const std::string&, LoadBalancerContext*,
-                                            absl::optional<std::string>) {
+                                            Network::TransportSocketOptionsSharedPtr) {
   return Host::CreateConnectionData{nullptr, nullptr};
 }
 
