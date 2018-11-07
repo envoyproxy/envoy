@@ -21,7 +21,11 @@ envoy_cc_library(
 envoy_cc_mock(
     name = "mock_lib",
     hdrs = ["mock.h"],
-    deps = ["//test/mocks/server:server_mocks"],
+    deps = [
+        "//source/extensions/filters/http/jwt_authn:authenticator_lib",
+        "//source/extensions/filters/http/jwt_authn:verifier_lib",
+        "//test/mocks/server:server_mocks",
+    ],
 )
 
 envoy_extension_cc_test(

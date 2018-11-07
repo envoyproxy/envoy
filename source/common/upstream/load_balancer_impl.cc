@@ -1,14 +1,15 @@
 #include "common/upstream/load_balancer_impl.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
-#include "envoy/common/platform.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/common/stack_array.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
@@ -244,10 +245,10 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   //
   // Basically, fariness across localities within a priority is guaranteed. Fairness across
   // localities across priorities is not.
-  STACK_ALLOC_ARRAY(local_percentage, uint64_t, num_localities);
-  calculateLocalityPercentage(localHostSet().healthyHostsPerLocality(), local_percentage);
-  STACK_ALLOC_ARRAY(upstream_percentage, uint64_t, num_localities);
-  calculateLocalityPercentage(host_set.healthyHostsPerLocality(), upstream_percentage);
+  STACK_ARRAY(local_percentage, uint64_t, num_localities);
+  calculateLocalityPercentage(localHostSet().healthyHostsPerLocality(), local_percentage.begin());
+  STACK_ARRAY(upstream_percentage, uint64_t, num_localities);
+  calculateLocalityPercentage(host_set.healthyHostsPerLocality(), upstream_percentage.begin());
 
   // If we have lower percent of hosts in the local cluster in the same locality,
   // we can push all of the requests directly to upstream cluster in the same locality.
@@ -300,7 +301,7 @@ void ZoneAwareLoadBalancerBase::resizePerPriorityState() {
   const uint32_t size = priority_set_.hostSetsPerPriority().size();
   while (per_priority_state_.size() < size) {
     // Note for P!=0, PerPriorityState is created with NoLocalityRouting and never changed.
-    per_priority_state_.push_back(PerPriorityStatePtr{new PerPriorityState});
+    per_priority_state_.push_back(std::make_unique<PerPriorityState>());
   }
 }
 

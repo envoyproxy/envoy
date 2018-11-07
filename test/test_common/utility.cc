@@ -23,12 +23,12 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/platform.h"
 #include "envoy/http/codec.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
+#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/config/bootstrap_json.h"
 #include "common/json/json_loader.h"
@@ -101,10 +101,10 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
     return false;
   }
 
-  STACK_ALLOC_ARRAY(lhs_slices, Buffer::RawSlice, lhs_num_slices);
-  lhs.getRawSlices(lhs_slices, lhs_num_slices);
-  STACK_ALLOC_ARRAY(rhs_slices, Buffer::RawSlice, rhs_num_slices);
-  rhs.getRawSlices(rhs_slices, rhs_num_slices);
+  STACK_ARRAY(lhs_slices, Buffer::RawSlice, lhs_num_slices);
+  lhs.getRawSlices(lhs_slices.begin(), lhs_num_slices);
+  STACK_ARRAY(rhs_slices, Buffer::RawSlice, rhs_num_slices);
+  rhs.getRawSlices(rhs_slices.begin(), rhs_num_slices);
   for (size_t i = 0; i < lhs_num_slices; i++) {
     if (lhs_slices[i].len_ != rhs_slices[i].len_) {
       return false;

@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/stats/scope.h"
@@ -27,7 +29,8 @@ namespace Config {
 class SubscriptionFactoryTest : public ::testing::Test {
 public:
   SubscriptionFactoryTest() : http_request_(&cm_.async_client_) {
-    legacy_subscription_.reset(new MockSubscription<envoy::api::v2::ClusterLoadAssignment>());
+    legacy_subscription_ =
+        std::make_unique<MockSubscription<envoy::api::v2::ClusterLoadAssignment>>();
   }
 
   std::unique_ptr<Subscription<envoy::api::v2::ClusterLoadAssignment>>

@@ -9,7 +9,6 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/ssl/context_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
 #include "openssl/ssl.h"

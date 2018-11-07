@@ -1,6 +1,7 @@
 #include "extensions/filters/http/cors/cors_filter.h"
 
 #include "envoy/http/codes.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -12,7 +13,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cors {
 
-CorsFilter::CorsFilter() : policies_({{nullptr, nullptr}}), is_cors_request_(false) {}
+CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope)
+    : stats_(generateStats(stats_prefix + "cors.", scope)) {}
+
+CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config)
+    : policies_({{nullptr, nullptr}}), config_(std::move(config)) {}
 
 // This handles the CORS preflight request as described in
 // https://www.w3.org/TR/cors/#resource-preflight-requests
@@ -37,10 +42,12 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
   }
 
   if (!isOriginAllowed(origin_->value())) {
+    config_->stats().origin_invalid_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
 
   is_cors_request_ = true;
+  config_->stats().origin_valid_.inc();
 
   const auto method = headers.Method();
   if (method == nullptr || method->value().c_str() != Http::Headers::get().MethodValues.Options) {

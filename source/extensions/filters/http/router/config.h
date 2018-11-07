@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/filter/http/router/v2/router.pb.h"
+#include "envoy/config/filter/http/router/v2/router.pb.validate.h"
 
 #include "common/protobuf/protobuf.h"
 

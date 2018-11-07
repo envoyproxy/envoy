@@ -55,6 +55,8 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/tracing:http_tracer_lib",
+        "//source/extensions/tracers:well_known_names",
+        "//source/server:configuration_lib",
     ],
 )
 

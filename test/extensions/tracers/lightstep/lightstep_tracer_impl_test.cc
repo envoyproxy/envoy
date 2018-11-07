@@ -58,8 +58,8 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
     }
 
-    driver_.reset(new LightStepDriver{lightstep_config, cm_, stats_, tls_, runtime_,
-                                      std::move(opts), propagation_mode});
+    driver_ = std::make_unique<LightStepDriver>(lightstep_config, cm_, stats_, tls_, runtime_,
+                                                std::move(opts), propagation_mode);
   }
 
   void setupValidDriver(Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =

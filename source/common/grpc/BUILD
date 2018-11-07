@@ -43,6 +43,7 @@ envoy_cc_library(
         "//include/envoy/buffer:buffer_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:stack_array",
     ],
 )
 
@@ -50,6 +51,7 @@ envoy_cc_library(
     name = "status_lib",
     srcs = ["status.cc"],
     hdrs = ["status.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/grpc:status",
     ],

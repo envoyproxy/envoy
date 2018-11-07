@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+
 // NOLINT(namespace-envoy)
 
 #ifdef __APPLE__
