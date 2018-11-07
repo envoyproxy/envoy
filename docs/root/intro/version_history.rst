@@ -26,6 +26,7 @@ Version history
 * rate-limit: added :ref:`configuration <envoy_api_field_config.filter.http.rate_limit.v2.RateLimit.rate_limited_as_resource_exhausted>`
   to specify whether the `GrpcStatus` status returned should be `RESOURCE_EXHAUSTED` or
   `UNAVAILABLE` when a gRPC call is rate limited.
+* rbac: added dynamic metadata to the network level filter.
 * rbac: added support for permission matching by :ref:`requested server name <envoy_api_field_config.rbac.v2alpha.Permission.requested_server_name>`.
 * redis: static cluster configuration is no longer required. Redis proxy will work with clusters
   delivered via CDS.
