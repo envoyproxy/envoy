@@ -233,6 +233,109 @@ void transformUpgradeRequestFromH2toH1(HeaderMap& headers);
  */
 void transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade);
 
+/**
+ * The non template implementation of resolveMostSpecificPerFilterConfig. see
+ * resolveMostSpecificPerFilterConfig for docs.
+ */
+const Router::RouteSpecificFilterConfig*
+resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
+                                          const Router::RouteConstSharedPtr& route);
+
+/**
+ * Retreives the route specific config. Route specific config can be in a few
+ * places, that are checked in order. The first config found is returned. The
+ * order is:
+ * - the routeEntry() (for config that's applied on weighted clusters)
+ * - the route
+ * - and finally from the virtual host object (routeEntry()->virtualhost()).
+ *
+ * To use, simply:
+ *
+ *     const auto* config =
+ *         Utility::resolveMostSpecificPerFilterConfig<ConcreteType>(FILTER_NAME,
+ * stream_callbacks_.route());
+ *
+ * See notes about config's lifetime below.
+ *
+ * @param filter_name The name of the filter who's route config should be
+ * fetched.
+ * @param route The route to check for route configs. nullptr routes will
+ * result in nullptr being returned.
+ *
+ * @return The route config if found. nullptr if not found. The returned
+ * pointer's lifetime is the same as the route parameter.
+ */
+template <class ConfigType>
+const ConfigType* resolveMostSpecificPerFilterConfig(const std::string& filter_name,
+                                                     const Router::RouteConstSharedPtr& route) {
+  static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
+                "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
+  const Router::RouteSpecificFilterConfig* generic_config =
+      resolveMostSpecificPerFilterConfigGeneric(filter_name, route);
+  return dynamic_cast<const ConfigType*>(generic_config);
+}
+
+/**
+ * The non template implementation of traversePerFilterConfig. see
+ * traversePerFilterConfig for docs.
+ */
+void traversePerFilterConfigGeneric(
+    const std::string& filter_name, const Router::RouteConstSharedPtr& route,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb);
+
+/**
+ * Fold all the available per route filter configs, invoking the callback with each config (if
+ * it is present). Iteration of the configs is in order of specificity. That means that the callback
+ * will be called first for a config on a Virtual host, then a route, and finally a route entry
+ * (weighted cluster). If a config is not present, the callback will not be invoked.
+ */
+template <class ConfigType>
+void traversePerFilterConfig(const std::string& filter_name,
+                             const Router::RouteConstSharedPtr& route,
+                             std::function<void(const ConfigType&)> cb) {
+  static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
+                "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
+
+  traversePerFilterConfigGeneric(
+      filter_name, route, [&cb](const Router::RouteSpecificFilterConfig& cfg) {
+        const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
+        if (typed_cfg != nullptr) {
+          cb(*typed_cfg);
+        }
+      });
+}
+
+/**
+ * Merge all the available per route filter configs into one. To perform the merge,
+ * the reduce function will be called on each two configs until a single merged config is left.
+ *
+ * @param reduce The first argument for this function will be the config from the previous level
+ * and the second argument is the config from the current level (the more specific one). The
+ * function should merge the second argument into the first argument.
+ *
+ * @return The merged config.
+ */
+template <class ConfigType>
+absl::optional<ConfigType>
+getMergedPerFilterConfig(const std::string& filter_name, const Router::RouteConstSharedPtr& route,
+                         std::function<void(ConfigType&, const ConfigType&)> reduce) {
+  static_assert(std::is_copy_constructible<ConfigType>::value,
+                "ConfigType must be copy constructible");
+
+  absl::optional<ConfigType> merged;
+
+  traversePerFilterConfig<ConfigType>(filter_name, route,
+                                      [&reduce, &merged](const ConfigType& cfg) {
+                                        if (!merged) {
+                                          merged.emplace(cfg);
+                                        } else {
+                                          reduce(merged.value(), cfg);
+                                        }
+                                      });
+
+  return merged;
+}
+
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy
