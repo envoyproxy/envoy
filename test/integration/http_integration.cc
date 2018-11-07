@@ -1063,6 +1063,44 @@ void HttpIntegrationTest::testHittingEncoderFilterLimit() {
   EXPECT_STREQ("500", response->headers().Status()->value().c_str());
 }
 
+void HttpIntegrationTest::testEnvoyHandlingMetadata() {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/dynamo/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"},
+                                                          {"expect", "100-continue"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  // The continue headers should arrive immediately.
+  response->waitForContinueHeaders();
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  // Send the rest of the request.
+  codec_client_->sendData(*request_encoder_, 10, true);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  // Verify the Expect header is stripped.
+  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::Headers::get().Expect));
+  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::Headers::get().Via));
+
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(12, true);
+  Http::MetadataMap metadata_map = {{"key", "value"}};
+  upstream_request_->encodeMetadata(metadata_map);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  ASSERT(response->continue_headers() != nullptr);
+  EXPECT_STREQ("100", response->continue_headers()->Status()->value().c_str());
+  EXPECT_EQ(nullptr, response->continue_headers()->Via());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ(nullptr, response->headers().Via());
+}
+
 void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_from_upstream,
                                                        const std::string& via) {
   initialize();

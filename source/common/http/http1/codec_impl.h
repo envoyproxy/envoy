@@ -17,6 +17,7 @@
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/http2/metadata_encoder.h"
 
 namespace Envoy {
 namespace Http {
@@ -37,7 +38,7 @@ public:
   void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(const HeaderMap& trailers) override;
-  void encodeMetadata(const MetadataMap&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void encodeMetadata(const MetadataMap& metadata_map) override;
   Stream& getStream() override { return *this; }
 
   // Http::Stream

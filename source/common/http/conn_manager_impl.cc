@@ -1111,6 +1111,27 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   }
 }
 
+void ConnectionManagerImpl::ActiveStream::encodeMetadata(
+    ActiveStreamEncoderFilter* filter, MetadataMap& metadata_map) {
+  resetIdleTimer();
+
+  std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, false);
+  for (; entry != encoder_filters_.end(); entry++) {
+    // TODO(yasong): Add filters here.
+    // +++++++++++++++++++++++++++++
+  }
+
+  // Count both the 1xx and follow-up response code in stats.
+  // +++++++++++++++++++++++++++++ end of stream!!!!!
+  //chargeStats(headers);
+
+  ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n", *this);
+  ENVOY_STREAM_LOG(error, "++++++++++++encoding metadata via codec:\n", *this);
+
+  // Now actually encode via the codec.
+  response_encoder_->encodeMetadata(metadata_map);
+}
+
 HeaderMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
   // Trailers can only be added during the last data frame (i.e. end_stream = true).
   ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
@@ -1520,6 +1541,12 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeData(Buffer::Instan
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeTrailers(HeaderMapPtr&& trailers) {
   parent_.response_trailers_ = std::move(trailers);
+  parent_.encodeTrailers(nullptr, *parent_.response_trailers_);
+}
+
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeMetadata(
+    std::unique_ptr<MetadataMap> metadata_map) {
+  parent_.metadata_map_ = std::move(metadata_map);
   parent_.encodeTrailers(nullptr, *parent_.response_trailers_);
 }
 

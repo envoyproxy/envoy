@@ -232,6 +232,9 @@ public:
     encodeHeaders_(*headers, end_stream);
   }
   void encodeTrailers(HeaderMapPtr&& trailers) override { encodeTrailers_(*trailers); }
+  void encodeMetadata(std::unique_ptr<MetadataMap> metadata_map) override {
+    encodeMetadata_(std::move(metadata_map));
+  }
 
   MOCK_METHOD0(continueDecoding, void());
   MOCK_METHOD2(addDecodedData, void(Buffer::Instance& data, bool streaming));
@@ -241,6 +244,7 @@ public:
   MOCK_METHOD2(encodeHeaders_, void(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers_, void(HeaderMap& trailers));
+  MOCK_METHOD1(encodeMetadata_, void(std::unique_ptr<MetadataMap> metadata_map));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};

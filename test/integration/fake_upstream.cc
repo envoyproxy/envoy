@@ -114,6 +114,15 @@ void FakeStream::encodeResetStream() {
       [this]() -> void { encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset); });
 }
 
+void FakeStream::encodeMetadata(const Http::MetadataMap& metadata_map) {
+  // ++++++++++++++++++++++ is this the way to make a shared pointer??
+  std::shared_ptr<Http::MetadataMap> metadata_map_copy(
+      new Http::MetadataMap(static_cast<const Http::MetadataMap&>(metadata_map)));
+  parent_.connection().dispatcher().post([this, metadata_map_copy]() -> void {
+    encoder_.encodeMetadata(*metadata_map_copy);
+  });
+}
+
 void FakeStream::onResetStream(Http::StreamResetReason) {
   Thread::LockGuard lock(lock_);
   saw_reset_ = true;
