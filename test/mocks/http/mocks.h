@@ -66,9 +66,7 @@ public:
   }
   void decodeTrailers(HeaderMapPtr&& trailers) override { decodeTrailers_(trailers); }
 
-  void decodeMetadata(MetadataMapPtr&& metadata_map) override {
-    decodeMetadata_(metadata_map);
-  }
+  void decodeMetadata(MetadataMapPtr&& metadata_map) override { decodeMetadata_(metadata_map); }
 
   // Http::StreamDecoder
   MOCK_METHOD2(decodeHeaders_, void(HeaderMapPtr& headers, bool end_stream));
