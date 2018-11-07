@@ -324,30 +324,34 @@ private:
                  const std::vector<std::string>& server_names,
                  const std::string& transport_protocol,
                  const std::vector<std::string>& application_protocols,
-                 const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType request_type,
+                 const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
                  Network::TransportSocketFactoryPtr&& transport_socket_factory,
                  std::vector<Network::FilterFactoryCb> filters_factory);
   void addFilterChainForDestinationPorts(
       DestinationPortsMap& destination_ports_map, uint16_t destination_port,
       const std::vector<std::string>& destination_ips, const std::vector<std::string>& server_names,
       const std::string& transport_protocol, const std::vector<std::string>& application_protocols,
-      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType request_type,
+      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForDestinationIPs(
       DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
       const std::vector<std::string>& server_names, const std::string& transport_protocol,
       const std::vector<std::string>& application_protocols,
-      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType request_type,
+      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForServerNames(
       ServerNamesMap& server_names_map, const std::vector<std::string>& server_names,
       const std::string& transport_protocol, const std::vector<std::string>& application_protocols,
-      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType request_type,
+      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForApplicationProtocols(
       ApplicationProtocolsMap& application_protocol_map,
       const std::vector<std::string>& application_protocols,
-      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType request_type,
+      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+      const Network::FilterChainSharedPtr& filter_chain);
+  void addFilterChainForSourceTypes(
+      SourceTypesArray& source_types_array,
+      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
       const Network::FilterChainSharedPtr& filter_chain);
 
   void convertDestinationIPsMapToTrie();

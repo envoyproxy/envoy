@@ -363,12 +363,21 @@ void ListenerImpl::addFilterChainForApplicationProtocols(
     const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (application_protocols.empty()) {
-    application_protocols_map[EMPTY_STRING][source_type] = filter_chain;
+    addFilterChainForSourceTypes(application_protocols_map[EMPTY_STRING], source_type,
+                                 filter_chain);
   } else {
     for (const auto& application_protocol : application_protocols) {
-      application_protocols_map[application_protocol][source_type] = filter_chain;
+      addFilterChainForSourceTypes(application_protocols_map[application_protocol], source_type,
+                                   filter_chain);
     }
   }
+}
+
+void ListenerImpl::addFilterChainForSourceTypes(
+    SourceTypesArray& source_types_array,
+    const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+    const Network::FilterChainSharedPtr& filter_chain) {
+  source_types_array[source_type] = filter_chain;
 }
 
 void ListenerImpl::convertDestinationIPsMapToTrie() {
@@ -518,18 +527,28 @@ ListenerImpl::findFilterChainForSourceTypes(const SourceTypesArray& source_types
       source_types[envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
                        FilterChainMatch_ConnectionSourceType_LOCAL];
 
-  if (filter_chain_local && Network::Utility::isLocalConnection(socket)) {
-    return filter_chain_local.get();
-  }
-
   auto filter_chain_external =
       source_types[envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
                        FilterChainMatch_ConnectionSourceType_EXTERNAL];
+
+  // isLocalConnection can be expensive. Call it only if LOCAL ot EXTERNAL are defined
+  auto is_local_connection = (filter_chain_local || filter_chain_external)
+                                 ? Network::Utility::isLocalConnection(socket)
+                                 : false;
+
+  if (filter_chain_local && is_local_connection) {
+    return filter_chain_local.get();
+  }
+
+  if (filter_chain_external && !is_local_connection) {
+    return filter_chain_external.get();
+  }
+
   auto filter_chain_any =
       source_types[envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
                        FilterChainMatch_ConnectionSourceType_ANY];
 
-  return (filter_chain_external) ? filter_chain_external.get() : filter_chain_any.get();
+  return filter_chain_any.get();
 }
 
 bool ListenerImpl::createNetworkFilterChain(
