@@ -838,7 +838,10 @@ TEST_P(AdminInstanceTest, Memory) {
   envoy::admin::v2alpha::Memory output_proto;
   MessageUtil::loadFromJson(output_json, output_proto);
   EXPECT_THAT(output_proto, AllOf(Property(&envoy::admin::v2alpha::Memory::allocated, Ge(0)),
-                                  Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0))));
+                                  Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0)),
+                                  Property(&envoy::admin::v2alpha::Memory::pageheap_unmapped, Ge(0)),
+                                  Property(&envoy::admin::v2alpha::Memory::pageheap_free, Ge(0)),
+                                  Property(&envoy::admin::v2alpha::Memory::total_thread_cache, Ge(0))));
 }
 
 TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
