@@ -15,17 +15,9 @@ namespace Common {
 template <class ConfigProto> class FactoryBase : public Server::Configuration::TracerFactory {
 public:
   // Server::Configuration::TracerFactory
-  virtual Tracing::HttpTracerPtr
-  createHttpTracer(const envoy::config::trace::v2::Tracing& configuration,
-                   Server::Instance& server) override {
-
-    ProtobufTypes::MessagePtr config_ptr = createEmptyConfigProto();
-
-    if (configuration.http().has_config()) {
-      MessageUtil::jsonConvert(configuration.http().config(), *config_ptr);
-    }
-
-    return createHttpTracerTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(*config_ptr),
+  virtual Tracing::HttpTracerPtr createHttpTracer(const Protobuf::Message& config,
+                                                  Server::Instance& server) override {
+    return createHttpTracerTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(config),
                                  server);
   }
 
