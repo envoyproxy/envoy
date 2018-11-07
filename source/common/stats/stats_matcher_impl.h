@@ -23,12 +23,10 @@ public:
   // Default constructor simply allows everything.
   StatsMatcherImpl() : is_inclusive_(true) {}
 
-  /**
-   * Take a metric name and report whether or not it should be disallowed.
-   * @param the name of a Stats::Metric.
-   * @return bool true if that stat should not be instantiated.
-   */
+  // StatsMatcher
   bool rejects(const std::string& name) const override;
+  bool acceptsAll() const override { return is_inclusive_ && matchers_.empty(); }
+  bool rejectsAll() const override { return !is_inclusive_ && matchers_.empty(); }
 
 private:
   // Bool indicating whether or not the StatsMatcher is including or excluding stats by default. See

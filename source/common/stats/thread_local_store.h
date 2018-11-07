@@ -31,7 +31,7 @@ class ThreadLocalHistogramImpl : public Histogram, public MetricImpl {
 public:
   ThreadLocalHistogramImpl(StatName name, absl::string_view tag_extracted_name,
                            const std::vector<Tag>& tags, SymbolTable& symbol_table);
-  ~ThreadLocalHistogramImpl();
+  ~ThreadLocalHistogramImpl() override;
 
   void merge(histogram_t* target);
 
@@ -64,7 +64,7 @@ private:
   SymbolTable& symbol_table_;
 };
 
-typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
+using TlsHistogramSharedPtr = std::shared_ptr<ThreadLocalHistogramImpl>;
 
 class TlsScope;
 
@@ -75,7 +75,7 @@ class ParentHistogramImpl : public ParentHistogram, public MetricImpl {
 public:
   ParentHistogramImpl(StatName name, Store& parent, TlsScope& tlsScope,
                       absl::string_view tag_extracted_name, const std::vector<Tag>& tags);
-  ~ParentHistogramImpl();
+  ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
   bool used() const override;
@@ -115,7 +115,7 @@ private:
   StatNameStorage name_;
 };
 
-typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;
+using ParentHistogramImplSharedPtr = std::shared_ptr<ParentHistogramImpl>;
 
 /**
  * Class used to create ThreadLocalHistogram in the scope.
@@ -139,7 +139,7 @@ public:
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
   ThreadLocalStoreImpl(const Stats::StatsOptions& stats_options, StatDataAllocator& alloc);
-  ~ThreadLocalStoreImpl();
+  ~ThreadLocalStoreImpl() override;
 
   // Stats::Scope
   Counter& counterx(StatName name) override { return default_scope_->counterx(name); }
@@ -198,7 +198,7 @@ private:
 
   struct ScopeImpl : public TlsScope {
     ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix);
-    ~ScopeImpl();
+    ~ScopeImpl() override;
 
     // Stats::Scope
     Counter& counterx(StatName name) override;

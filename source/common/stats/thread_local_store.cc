@@ -303,8 +303,15 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterx(StatName name) {
 
   // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the hot path) could
   // become prohibitively expensive. Revisit this usage in the future.
-  if (parent_.stats_matcher_->rejects(final_name.statName().toString(symbolTable()))) {
-    return parent_.null_counter_;
+  //
+  // Also note that the elaboration of the stat-name into a string is expensive,
+  // so I think it might be better to move the matcher test until after caching,
+  // unless its acceptsAll/rejectsAll.
+  const StatsMatcher& matcher = *parent_.stats_matcher_;
+  if (!matcher.acceptsAll()) {
+    if (matcher.rejectsAll() || matcher.rejects(final_name.statName().toString(symbolTable()))) {
+      return parent_.null_counter_;
+    }
   }
 
   // We now find the TLS cache. This might remain null if we don't have TLS

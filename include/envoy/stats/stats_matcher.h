@@ -19,6 +19,9 @@ public:
    * @return bool true if that stat should not be instantiated.
    */
   virtual bool rejects(const std::string& name) const PURE;
+
+  virtual bool acceptsAll() const PURE;
+  virtual bool rejectsAll() const PURE;
 };
 
 typedef std::unique_ptr<const StatsMatcher> StatsMatcherPtr;
