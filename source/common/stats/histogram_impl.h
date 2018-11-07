@@ -45,16 +45,24 @@ private:
 class HistogramImpl : public Histogram, public MetricImpl {
 public:
   HistogramImpl(StatName name, Store& parent, const std::string& tag_extracted_name,
-                const std::vector<Tag>& tags, StatDataAllocator& alloc)
-      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), name_(name), parent_(parent) {}
+                const std::vector<Tag>& tags)
+      : MetricImpl(tag_extracted_name, tags, parent.symbolTable()),
+        name_(name, parent.symbolTable()), parent_(parent) {}
+  ~HistogramImpl() {
+    name_.free(symbolTable());
+    MetricImpl::clear();
+  }
 
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
   bool used() const override { return true; }
+  StatName statName() const override { return name_.statName(); }
+  const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
+  SymbolTable& symbolTable() override { return parent_.symbolTable(); }
 
 private:
-  StatName name_;
+  StatNameStorage name_;
 
   // This is used for delivering the histogram data to sinks.
   Store& parent_;
@@ -64,16 +72,12 @@ private:
  * Null histogram implementation.
  * No-ops on all calls and requires no underlying metric or data.
  */
-class NullHistogramImpl : public Histogram {
+class NullHistogramImpl : public Histogram, NullMetricImpl {
 public:
-  NullHistogramImpl() {}
-  ~NullHistogramImpl() {}
-  std::string name() const override { return ""; }
-  StatName statName() const override { return StatName(); }
-  std::string tagExtractedName() const override { return ""; }
-  std::vector<Tag> tags() const override { return std::vector<Tag>(); }
+  explicit NullHistogramImpl(SymbolTable& symbol_table): NullMetricImpl(symbol_table) {}
+  ~NullHistogramImpl() { MetricImpl::clear(); }
+
   void recordValue(uint64_t) override {}
-  bool used() const override { return false; }
 };
 
 } // namespace Stats

@@ -407,8 +407,7 @@ namespace Stats {
 class TestAllocator : public RawStatDataAllocator {
 public:
   TestAllocator(const StatsOptions& stats_options)
-      : RawStatDataAllocator(symbol_table_),
-        stats_options_(stats_options) {}
+      : RawStatDataAllocator(symbol_table_), stats_options_(stats_options) {}
   ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
 
   RawStatData* alloc(absl::string_view name) override {

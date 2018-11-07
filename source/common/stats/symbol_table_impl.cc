@@ -1,5 +1,6 @@
 #include "common/stats/symbol_table_impl.h"
 
+#include <iostream>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -12,15 +13,34 @@ namespace Stats {
 static const uint32_t SpilloverMask = 0x80;
 static const uint32_t Low7Bits = 0x7f;
 
-StatName::StatName(const StatName& src, SymbolStorage memory)
-    : symbol_array_(memory) {
+StatName::StatName(const StatName& src, SymbolStorage memory) : symbol_array_(memory) {
   memcpy(memory, src.symbolArray(), src.numBytesIncludingLength());
-  //src.symbol_array_ = nullptr;  // transfers ownership.
+  // src.symbol_array_ = nullptr;  // transfers ownership.
 }
 
 std::string StatName::toString(const SymbolTable& table) const {
   return table.decode(data(), numBytes());
 }
+
+#ifndef ENVOY_CONFIG_COVERAGE
+void StatName::debugPrint() {
+  if (symbol_array_ == nullptr) {
+    std::cout << "Null StatName" << std::endl << std::flush;
+  } else {
+    uint64_t nbytes = numBytes();
+    std::cout << "numBytes=" << nbytes << ":";
+    for (uint64_t i = 0; i < nbytes; ++i) {
+      std::cout << " " << static_cast<uint64_t>(data()[i]);
+    }
+    SymbolVec encoding = SymbolEncoding::decodeSymbols(data(), numBytes());
+    std::cout << ", numSymbols=" << encoding.size() << ":";
+    for (Symbol symbol : encoding) {
+      std::cout << " " << symbol;
+    }
+    std::cout << std::endl << std::flush;
+  }
+}
+#endif
 
 SymbolEncoding::~SymbolEncoding() { ASSERT(vec_.empty()); }
 
@@ -228,16 +248,34 @@ bool SymbolTable::lessThan(const StatName& a, const StatName& b) const {
   return av.size() < bv.size();
 }
 
+#ifndef ENVOY_CONFIG_COVERAGE
+void SymbolTable::debugPrint() const {
+  Thread::LockGuard lock(lock_);
+  std::vector<Symbol> symbols;
+  for (auto p : decode_map_) {
+    symbols.push_back(p.first);
+  }
+  std::sort(symbols.begin(), symbols.end());
+  for (Symbol symbol : symbols) {
+    const std::string& token = decode_map_.find(symbol)->second;
+    const SharedSymbol& shared_symbol = encode_map_.find(token)->second;
+    std::cout << symbol << ": '" << token << "' (" << shared_symbol.ref_count_ << ")" << std::endl;
+  }
+  std::cout << std::flush;
+}
+#endif
+
 StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table) {
   SymbolEncoding encoding = table.encode(name);
   bytes_ = std::make_unique<uint8_t[]>(encoding.bytesRequired());
   encoding.moveToStorage(bytes_.get());
 }
 
-StatNameStorage::StatNameStorage(StatName src, SymbolTable& /*table*/) {
+StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
   uint64_t size = src.numBytesIncludingLength();
   bytes_ = std::make_unique<uint8_t[]>(size);
-  memcpy(bytes_.get(), src.data(), size);
+  src.copyToStorage(bytes_.get());
+  table.incRefCount(statName());
 }
 
 StatNameStorage::~StatNameStorage() {

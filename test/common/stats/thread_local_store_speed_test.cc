@@ -19,7 +19,7 @@ namespace Envoy {
 
 class ThreadLocalStorePerf {
 public:
-  ThreadLocalStorePerf() : store_(options_, heap_alloc_) {
+  ThreadLocalStorePerf() : heap_alloc_(symbol_table_), store_(options_, heap_alloc_) {
     store_.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config_));
   }
 
@@ -42,6 +42,7 @@ public:
   }
 
 private:
+  Stats::SymbolTable symbol_table_;
   Stats::StatsOptionsImpl options_;
   Event::SimulatedTimeSystem time_system_;
   Stats::HeapStatDataAllocator heap_alloc_;

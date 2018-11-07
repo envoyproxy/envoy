@@ -74,6 +74,10 @@ public:
     memcpy(storage, symbol_array_, numBytesIncludingLength());
   }
 
+#ifndef ENVOY_CONFIG_COVERAGE
+  void debugPrint();
+#endif
+
 protected:
   friend SymbolTable;
   friend class StatNameTest;
@@ -83,9 +87,7 @@ protected:
   /**
    * @return uint8_t* A pointer to the first byte of data (skipping over size bytes).
    */
-  const uint8_t* data() const {
-    return symbol_array_ + 2;
-  }
+  const uint8_t* data() const { return symbol_array_ + 2; }
 
   const uint8_t* symbol_array_;
 };

@@ -4,14 +4,14 @@
 #include <string>
 #include <unordered_set>
 
+#include "envoy/stats/stats.h"
+
 #include "common/common/hash.h"
 #include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
 #include "common/stats/metric_impl.h"
 #include "common/stats/stat_data_allocator_impl.h"
 #include "common/stats/symbol_table_impl.h"
-
-#include "envoy/stats/stats.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -23,10 +23,10 @@ namespace Stats {
  * so that it can be allocated efficiently from the heap on demand.
  */
 struct HeapStatData {
- private:
+private:
   explicit HeapStatData(StatName stat_name) { stat_name.copyToStorage(symbol_storage_); }
 
- public:
+public:
   static HeapStatData* alloc(StatName stat_name, SymbolTable& symbol_table);
 
   void free(SymbolTable& symbol_table);
@@ -42,8 +42,7 @@ struct HeapStatData {
   SymbolStorage symbol_storage_;
 };
 
-template<class Stat>
-class HeapStat : public Stat {
+template <class Stat> class HeapStat : public Stat {
 public:
   HeapStat(HeapStatData& data, StatDataAllocatorImpl<HeapStatData>& alloc,
            absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
@@ -78,18 +77,17 @@ public:
 
   CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
                                const std::vector<Tag>& tags) override {
-    return std::make_shared<HeapStat<CounterImpl<HeapStatData>>>(
-        alloc(name), *this, tag_extracted_name, tags);
+    return std::make_shared<HeapStat<CounterImpl<HeapStatData>>>(alloc(name), *this,
+                                                                 tag_extracted_name, tags);
   }
 
   GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
                            const std::vector<Tag>& tags) override {
-    return std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(
-        alloc(name), *this, tag_extracted_name, tags);
+    return std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(alloc(name), *this,
+                                                               tag_extracted_name, tags);
   }
 
-
- private:
+private:
   struct HeapStatHash {
     size_t operator()(const HeapStatData* a) const { return a->hash(); }
   };

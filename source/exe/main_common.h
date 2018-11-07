@@ -60,7 +60,7 @@ public:
 
 protected:
   Envoy::OptionsImpl& options_;
-
+  Stats::SymbolTable symbol_table_;
   Server::ComponentFactory& component_factory_;
 
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;

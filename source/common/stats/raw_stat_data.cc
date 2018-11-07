@@ -22,8 +22,7 @@ uint64_t roundUpMultipleNaturalAlignment(uint64_t val) {
 
 } // namespace
 
-RawStatDataAllocator::~RawStatDataAllocator() {
-}
+RawStatDataAllocator::~RawStatDataAllocator() {}
 
 // Normally the compiler would do this, but because name_ is a flexible-array-length
 // element, the compiler can't. RawStatData is put into an array in HotRestartImpl, so

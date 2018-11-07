@@ -38,7 +38,7 @@ public:
    *         by name if one already exists with the same name. This is used for intra-process
    *         scope swapping as well as inter-process hot restart.
    */
-  //virtual StatData* alloc(StatName name) PURE;
+  // virtual StatData* alloc(StatName name) PURE;
 
   /**
    * Free a raw stat data block. The allocator should handle reference counting and only truly
@@ -50,7 +50,7 @@ public:
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& symbolTable() const override { return symbol_table_; }
 
- private:
+private:
   // SymbolTable encodes encodes stat names as back into strings. This does not
   // get guarded by a mutex, since it has its own internal mutex to guarantee
   // thread safety.
@@ -69,7 +69,10 @@ public:
   CounterImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
               absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
       : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {}
-  ~CounterImpl() { alloc_.free(data_); }
+  ~CounterImpl() {
+    alloc_.free(data_);
+    MetricImpl::clear();
+  }
 
   // Stats::Counter
   void add(uint64_t amount) override {
@@ -84,8 +87,8 @@ public:
   bool used() const override { return data_.flags_ & Flags::Used; }
   uint64_t value() const override { return data_.value_; }
 
-  StatDataAllocator& allocator() override { return alloc_; }
-  const StatDataAllocator& allocator() const override { return alloc_; }
+  const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
+  SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
 
 protected:
   StatData& data_;
@@ -96,22 +99,15 @@ protected:
  * Null counter implementation.
  * No-ops on all calls and requires no underlying metric or data.
  */
-class NullCounterImpl : public Counter {
+class NullCounterImpl : public Counter, NullMetricImpl {
 public:
-  NullCounterImpl() {}
-  ~NullCounterImpl() {}
+  explicit NullCounterImpl(SymbolTable& symbol_table): NullMetricImpl(symbol_table) {}
+  ~NullCounterImpl() { MetricImpl::clear(); }
 
-  // Stats::Metric
-  std::string name() const override { return ""; }
-  StatName statName() const override { return StatName(); }
-
-  std::string tagExtractedName() const override { return ""; }
-  std::vector<Tag> tags() const override { return std::vector<Tag>(); }
   void add(uint64_t) override {}
   void inc() override {}
   uint64_t latch() override { return 0; }
   void reset() override {}
-  bool used() const override { return false; }
   uint64_t value() const override { return 0; }
 };
 
@@ -123,7 +119,10 @@ public:
   GaugeImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
             absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
       : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {}
-  ~GaugeImpl() { alloc_.free(data_); }
+  ~GaugeImpl() {
+    alloc_.free(data_);
+    MetricImpl::clear();
+  }
 
   // Stats::Gauge
   virtual void add(uint64_t amount) override {
@@ -144,8 +143,8 @@ public:
   virtual uint64_t value() const override { return data_.value_; }
   bool used() const override { return data_.flags_ & Flags::Used; }
 
-  StatDataAllocator& allocator() override { return alloc_; }
-  const StatDataAllocator& allocator() const override { return alloc_; }
+  const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
+  SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
 
 protected:
   StatData& data_;
@@ -156,20 +155,16 @@ protected:
  * Null gauge implementation.
  * No-ops on all calls and requires no underlying metric or data.
  */
-class NullGaugeImpl : public Gauge {
+class NullGaugeImpl : public Gauge, NullMetricImpl {
 public:
-  NullGaugeImpl() {}
-  ~NullGaugeImpl() {}
-  std::string name() const override { return ""; }
-  StatName statName() const override { return StatName(); }
-  std::string tagExtractedName() const override { return ""; }
-  std::vector<Tag> tags() const override { return std::vector<Tag>(); }
+  explicit NullGaugeImpl(SymbolTable& symbol_table): NullMetricImpl(symbol_table) {}
+  ~NullGaugeImpl() { MetricImpl::clear(); }
+
   void add(uint64_t) override {}
   void inc() override {}
   void dec() override {}
   void set(uint64_t) override {}
   void sub(uint64_t) override {}
-  bool used() const override { return false; }
   uint64_t value() const override { return 0; }
 };
 

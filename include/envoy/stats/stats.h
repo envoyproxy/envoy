@@ -7,6 +7,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/symbol_table.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -53,8 +54,8 @@ public:
    */
   virtual bool used() const PURE;
 
-  virtual StatDataAllocator& allocator() PURE;
-  virtual const StatDataAllocator& allocator() const PURE;
+  virtual SymbolTable& symbolTable() PURE;
+  virtual const SymbolTable& symbolTable() const PURE;
 };
 
 /**

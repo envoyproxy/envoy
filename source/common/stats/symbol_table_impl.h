@@ -83,6 +83,8 @@ public:
    */
   uint64_t moveToStorage(SymbolStorage array);
 
+  void swap(SymbolEncoding& src) { vec_.swap(src.vec_); }
+
 private:
   std::vector<uint8_t> vec_;
 };
@@ -186,6 +188,10 @@ public:
    */
   void incRefCount(StatName stat_name) { adjustRefCount(stat_name, 1); };
 
+#ifndef ENVOY_CONFIG_COVERAGE
+  void debugPrint() const;
+#endif
+
 private:
   friend class StatName;
   friend class StatNameTest;
@@ -255,9 +261,48 @@ private:
 };
 
 /**
+ * Joins two or more StatNames. For example if we have StatNames for {"a.b",
+ * "c.d", "e.f"} then the joined stat-name matches "a.b.c.d.e.f". The advantage
+ * of using this representation is that it avoids having to decode/encode
+ * into the elaborted form, and does not require locking the SymbolTable.
+ *
+ * The caveat is that this representation does not bump reference counts on
+ * for the referenced Symbols in the SymbolTable, so it's only valid as long
+ * for the lifetime of the joined StatNames.
+ *
+ * This is intended for use doing cached name lookups of scoped stats, where
+ * the scope prefix and the names to combine it with are already in StatName
+ * form. Using this class, they can be combined without acessingm the
+ * SymbolTable or, in particular, taking its lock.
+ */
+class StatNameJoiner {
+public:
+  StatNameJoiner(StatName a, StatName b);
+  StatNameJoiner(const std::vector<StatName>& stat_names);
+
+  /**
+   * @return StatName a reference to the joined StatName.
+   */
+  StatName statName() const { return StatName(bytes_.get()); }
+
+private:
+  uint8_t* alloc(uint64_t num_bytes);
+
+  std::unique_ptr<SymbolStorage> bytes_;
+};
+
+/**
  * Holds backing storage for a StatName. Usage of this is not required, as some
  * applications may want to hold multiple StatName objects in one contiguous
  * uint8_t array, or embed the characters directly in another structure.
+ *
+ * This is intended for embedding in other data structures that have access
+ * to a SymbolTable. StatNameStorage::free(symbol_table) must be called prior
+ * to allowing the StatNameStorage object to be destructed, otherwise an assert
+ * will fire to guard against symbol-table leaks.
+ *
+ * Thus this class is inconvenient to directly use as temp storage for building
+ * a StatName from a string. Instead it should be used via StatNameTempStorage.
  */
 class StatNameStorage {
 public:
@@ -284,35 +329,29 @@ public:
    */
   StatName statName() const { return StatName(bytes_.get()); }
 
+  /*
+  template<class T> T append(StatName suffix, std::function<T(StatName)> f) {
+    StatNameStorage joiner(statName(), suffix);
+    f(joiner.statName());
+  }
+  */
+
 private:
   std::unique_ptr<SymbolStorage> bytes_;
 };
 
-/**
- * Joins two or more StatNames. For example if we have StatNames for {"a.b",
- * "c.d", "e.f"} then the joined stat-name matches "a.b.c.d.e.f". The advantage
- * of using this representation is that it avoids having to decode/encode
- * into the elaborted form, and does not require locking the SymbolTable.
- *
- * The caveat is that this representation does not bump reference counts on
- * for the referenced Symbols in the SymbolTable, so it's only valid as long
- * as the joined StatNames.
- */
-class StatNameJoiner {
-public:
-  StatNameJoiner(StatName a, StatName b);
-  StatNameJoiner(const std::vector<StatName>& stat_names);
+class StatNameTempStorage : public StatNameStorage {
+ public:
+  StatNameTempStorage(absl::string_view name, SymbolTable& table)
+      : StatNameStorage(name, table), symbol_table_(table) {}
+  StatNameTempStorage(StatName src, SymbolTable& table)
+      : StatNameStorage(src, table), symbol_table_(table) {}
+  ~StatNameTempStorage() { free(symbol_table_); }
 
-  /**
-   * @return StatName a reference to the joined StatName.
-   */
-  StatName statName() const { return StatName(bytes_.get()); }
-
-private:
-  uint8_t* alloc(uint64_t num_bytes);
-
-  std::unique_ptr<SymbolStorage> bytes_;
+ private:
+  SymbolTable& symbol_table_;
 };
+
 
 // Helper class for constructing hash-tables with StatName keys.
 struct StatNameHash {
@@ -327,6 +366,9 @@ struct StatNameCompare {
 // Value-templatized hash-map with StatName key.
 template <class T>
 using StatNameHashMap = absl::flat_hash_map<StatName, T, StatNameHash, StatNameCompare>;
+
+// Hash-set of StatNames
+using StatNameHashSet = absl::flat_hash_set<StatName, StatNameHash, StatNameCompare>;
 
 // Helper class for sorting StatNames.
 struct StatNameLessThan {

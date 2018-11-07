@@ -341,8 +341,7 @@ bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nul
 namespace Stats {
 
 MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options)
-    : RawStatDataAllocator(symbol_table_),
-      alloc_(stats_options) {
+    : RawStatDataAllocator(symbol_table_), alloc_(stats_options) {
   ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
     return alloc_.alloc(name);
   }));

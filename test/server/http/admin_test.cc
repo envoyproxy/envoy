@@ -1122,18 +1122,18 @@ TEST_P(AdminInstanceTest, PostRequest) {
 
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
-  PrometheusStatsFormatterTest() /*: alloc_(stats_options_)*/ {}
+  PrometheusStatsFormatterTest() : alloc_(symbol_table_) {}
   void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    std::string tname = std::string(name);
-    counters_.push_back(alloc_.makeCounter(name, std::move(tname), std::move(cluster_tags)));
+    Stats::StatNameTempStorage storage(name, symbol_table_);
+    counters_.push_back(alloc_.makeCounter(storage.statName(), name, cluster_tags));
   }
 
   void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    std::string tname = std::string(name);
-    gauges_.push_back(alloc_.makeGauge(name, std::move(tname), std::move(cluster_tags)));
+    Stats::StatNameTempStorage storage(name, symbol_table_);
+    gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags));
   }
 
-  Stats::StatsOptionsImpl stats_options_;
+  Stats::SymbolTable symbol_table_;
   Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;

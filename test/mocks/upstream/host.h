@@ -164,6 +164,7 @@ public:
 
   testing::NiceMock<MockClusterInfo> cluster_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
+  Stats::SymbolTable symbol_table_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
 };

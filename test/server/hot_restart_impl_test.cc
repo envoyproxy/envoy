@@ -38,10 +38,11 @@ public:
     EXPECT_CALL(options_, statsOptions()).WillRepeatedly(ReturnRef(stats_options_));
 
     // Test we match the correct stat with empty-slots before, after, or both.
-    hot_restart_.reset(new HotRestartImpl(options_));
+    hot_restart_.reset(new HotRestartImpl(options_, symbol_table_));
     hot_restart_->drainParentListeners();
   }
 
+  Stats::SymbolTable symbol_table_;
   Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<MockOptions> options_;
@@ -145,7 +146,7 @@ TEST_F(HotRestartImplTest, crossAlloc) {
   EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _))
       .WillOnce(Return(Api::SysCallPtrResult{buffer_.data(), 0}));
   EXPECT_CALL(os_sys_calls_, bind(_, _, _));
-  HotRestartImpl hot_restart2(options_);
+  HotRestartImpl hot_restart2(options_, symbol_table_);
   Stats::RawStatData* stat1_prime = hot_restart2.alloc("stat1");
   Stats::RawStatData* stat3_prime = hot_restart2.alloc("stat3");
   Stats::RawStatData* stat5_prime = hot_restart2.alloc("stat5");

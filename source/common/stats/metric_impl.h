@@ -38,12 +38,29 @@ protected:
     static const uint8_t Used = 0x1;
   };
 
+  void clear();
+
 private:
   StatName tagExtractedStatName() const;
-  const SymbolTable& symbolTable() const { return allocator().symbolTable(); }
-  SymbolTable& symbolTable() { return allocator().symbolTable(); }
 
   std::unique_ptr<uint8_t[]> storage_;
+};
+
+class NullMetricImpl : public MetricImpl {
+ public:
+  explicit NullMetricImpl(SymbolTable& symbol_table) :
+      MetricImpl("", std::vector<Tag>(), symbol_table), symbol_table_(symbol_table),
+      stat_name_storage_("", symbol_table) {}
+  ~NullMetricImpl() { stat_name_storage_.free(symbol_table_); }
+
+  const SymbolTable& symbolTable() const override { return symbol_table_; }
+  SymbolTable& symbolTable() override { return symbol_table_; }
+  bool used() const override { return false; }
+  StatName statName() const override { return stat_name_storage_.statName(); }
+
+ private:
+  SymbolTable& symbol_table_;
+  StatNameStorage stat_name_storage_;
 };
 
 } // namespace Stats

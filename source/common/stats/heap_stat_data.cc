@@ -7,11 +7,9 @@
 namespace Envoy {
 namespace Stats {
 
-HeapStatDataAllocator::~HeapStatDataAllocator() {
-  ASSERT(stats_.empty());
-}
+HeapStatDataAllocator::~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 
-HeapStatData*  HeapStatData::alloc(StatName stat_name, SymbolTable& symbol_table) {
+HeapStatData* HeapStatData::alloc(StatName stat_name, SymbolTable& symbol_table) {
   void* memory = ::malloc(sizeof(HeapStatData) + stat_name.numBytesIncludingLength());
   ASSERT(memory);
   symbol_table.incRefCount(stat_name);
@@ -24,19 +22,17 @@ void HeapStatData::free(SymbolTable& symbol_table) {
   ::free(this); // matches malloc() call above.
 }
 
-
 HeapStatData& HeapStatDataAllocator::alloc(StatName name) {
   std::unique_ptr<HeapStatData, std::function<void(HeapStatData * d)>> data_ptr(
-      HeapStatData::alloc(name, symbolTable()), [this](HeapStatData* d) {
-                                                  d->free(symbolTable());
-                                                });
+      HeapStatData::alloc(name, symbolTable()),
+      [this](HeapStatData* d) { d->free(symbolTable()); });
   Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data_ptr.get());
   HeapStatData* existing_data = *ret.first;
   lock.release();
 
   if (ret.second) {
-    //symbolTable().incRefCount(existing_data->statName());
+    // symbolTable().incRefCount(existing_data->statName());
     return *data_ptr.release();
   }
   ++existing_data->ref_count_;

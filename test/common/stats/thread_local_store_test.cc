@@ -45,6 +45,7 @@ public:
     store_->addSink(sink_);
   }
 
+  Stats::SymbolTable symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatsOptionsImpl options_;
@@ -616,6 +617,8 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
 
 class HeapStatsThreadLocalStoreTest : public StatsThreadLocalStoreTest {
 public:
+  HeapStatsThreadLocalStoreTest() : heap_alloc_(symbol_table_) {}
+
   void SetUp() override {
     resetStoreWithAlloc(heap_alloc_);
     // Note: we do not call StatsThreadLocalStoreTest::SetUp here as that

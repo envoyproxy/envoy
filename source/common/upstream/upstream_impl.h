@@ -77,8 +77,9 @@ public:
                                                 Config::MetadataEnvoyLbKeys::get().CANARY)
                     .bool_value()),
         metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)),
-        locality_(locality), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
-                                                   POOL_GAUGE(stats_store_))},
+        locality_(locality),
+        stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
+                              POOL_GAUGE(stats_store_))},
         priority_(priority) {}
 
   // Upstream::HostDescription

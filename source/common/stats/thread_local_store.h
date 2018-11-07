@@ -12,6 +12,7 @@
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/source_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -28,8 +29,8 @@ namespace Stats {
  */
 class ThreadLocalHistogramImpl : public Histogram, public MetricImpl {
 public:
-  ThreadLocalHistogramImpl(const std::string& name, std::string&& tag_extracted_name,
-                           std::vector<Tag>&& tags);
+  ThreadLocalHistogramImpl(StatName name, absl::string_view tag_extracted_name,
+                           const std::vector<Tag>& tags, SymbolTable& symbol_table);
   ~ThreadLocalHistogramImpl();
 
   void merge(histogram_t* target);
@@ -49,8 +50,9 @@ public:
   bool used() const override { return flags_ & Flags::Used; }
 
   // Stats::Metric
-  std::string name() const override { return name_; }
-  const char* nameCStr() const override { return name_.c_str(); }
+  StatName statName() const override { return name_.statName(); }
+  SymbolTable& symbolTable() override { return symbol_table_; }
+  const SymbolTable& symbolTable() const override { return symbol_table_; }
 
 private:
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
@@ -58,7 +60,8 @@ private:
   histogram_t* histograms_[2];
   std::atomic<uint16_t> flags_;
   std::thread::id created_thread_id_;
-  const std::string name_;
+  StatNameStorage name_;
+  SymbolTable& symbol_table_;
 };
 
 typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
@@ -70,8 +73,8 @@ class TlsScope;
  */
 class ParentHistogramImpl : public ParentHistogram, public MetricImpl {
 public:
-  ParentHistogramImpl(const std::string& name, Store& parent, TlsScope& tlsScope,
-                      std::string&& tag_extracted_name, std::vector<Tag>&& tags);
+  ParentHistogramImpl(StatName name, Store& parent, TlsScope& tlsScope,
+                      absl::string_view tag_extracted_name, const std::vector<Tag>& tags);
   ~ParentHistogramImpl();
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
@@ -93,8 +96,9 @@ public:
   const std::string summary() const override;
 
   // Stats::Metric
-  std::string name() const override { return name_; }
-  const char* nameCStr() const override { return name_.c_str(); }
+  StatName statName() const override { return name_.statName(); }
+  SymbolTable& symbolTable() override { return parent_.symbolTable(); }
+  const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
 
 private:
   bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
@@ -108,7 +112,7 @@ private:
   mutable Thread::MutexBasicLockable merge_lock_;
   std::list<TlsHistogramSharedPtr> tls_histograms_ GUARDED_BY(merge_lock_);
   bool merged_;
-  const std::string name_;
+  StatNameStorage name_;
 };
 
 typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;
@@ -125,7 +129,7 @@ public:
    * @return a ThreadLocalHistogram within the scope's namespace.
    * @param name name of the histogram with scope prefix attached.
    */
-  virtual Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) PURE;
+  virtual Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) PURE;
 };
 
 /**
@@ -138,15 +142,19 @@ public:
   ~ThreadLocalStoreImpl();
 
   // Stats::Scope
+  Counter& counterx(StatName name) override { return default_scope_->counterx(name); }
   Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
+  Gauge& gaugex(StatName name) override { return default_scope_->gaugex(name); }
   Gauge& gauge(const std::string& name) override { return default_scope_->gauge(name); }
-  Histogram& histogram(const std::string& name) override {
-    return default_scope_->histogram(name);
-  };
+  Histogram& histogramx(StatName name) override { return default_scope_->histogramx(name); }
+  Histogram& histogram(const std::string& name) override { return default_scope_->histogram(name); }
+  const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
+  SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
+  const TagProducer& tagProducer() const { return *tag_producer_; }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
@@ -170,9 +178,10 @@ public:
   Source& source() override { return source_; }
 
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
+  absl::string_view truncateStatNameIfNeeded(absl::string_view name);
 
 private:
-  template <class Stat> using StatMap = CharStarHashMap<Stat>;
+  template <class Stat> using StatMap = StatNameHashMap<Stat>;
 
   struct TlsCacheEntry {
     StatMap<CounterSharedPtr> counters_;
@@ -188,27 +197,40 @@ private:
   };
 
   struct ScopeImpl : public TlsScope {
-    ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
-        : scope_id_(next_scope_id_++), parent_(parent),
-          prefix_(Utility::sanitizeStatsName(prefix)) {}
+    ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix);
     ~ScopeImpl();
 
     // Stats::Scope
-    Counter& counter(const std::string& name) override;
-    ScopePtr createScope(const std::string& name) override {
-      return parent_.createScope(prefix_ + name);
-    }
+    Counter& counterx(StatName name) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
-    Gauge& gauge(const std::string& name) override;
-    Histogram& histogram(const std::string& name) override;
-    Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
+    Gauge& gaugex(StatName name) override;
+    Histogram& histogramx(StatName name) override;
+    Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
+    ScopePtr createScope(const std::string& name) override {
+      return parent_.createScope(prefix_.statName().toString(symbolTable()) + "." + name);
+    }
+    const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
+    SymbolTable& symbolTable() override { return parent_.symbolTable(); }
+
+    Counter& counter(const std::string& name) override {
+      StatNameTempStorage storage(name, symbolTable());
+      return counterx(storage.statName());
+    }
+    Gauge& gauge(const std::string& name) override {
+      StatNameTempStorage storage(name, symbolTable());
+      return gaugex(storage.statName());
+    }
+    Histogram& histogram(const std::string& name) override {
+      StatNameTempStorage storage(name, symbolTable());
+      return histogramx(storage.statName());
+    }
 
     template <class StatType>
     using MakeStatFn =
-        std::function<std::shared_ptr<StatType>(StatDataAllocator&, absl::string_view name,
-                                                std::string&& tag_extracted_name,
-                                                std::vector<Tag>&& tags)>;
+        std::function<std::shared_ptr<StatType>(StatDataAllocator&, StatName name,
+                                                absl::string_view tag_extracted_name,
+                                                const std::vector<Tag>& tags)>;
 
     /**
      * Makes a stat either by looking it up in the central cache,
@@ -223,19 +245,20 @@ private:
      */
     template <class StatType>
     StatType&
-    safeMakeStat(const std::string& name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
+    safeMakeStat(StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
                  MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache);
+
+    void extractTagsAndTruncate(
+        StatName& name, std::unique_ptr<StatNameTempStorage>& truncated_name_storage,
+        std::vector<Tag>& tags,
+        std::string& tag_extracted_name);
 
     static std::atomic<uint64_t> next_scope_id_;
 
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
-    const std::string prefix_;
+    StatNameStorage prefix_;
     CentralCacheEntry central_cache_;
-
-    NullCounterImpl null_counter_;
-    NullGaugeImpl null_gauge_;
-    NullHistogramImpl null_histogram_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
@@ -253,7 +276,6 @@ private:
   void clearScopeFromCaches(uint64_t scope_id);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
-  absl::string_view truncateStatNameIfNeeded(absl::string_view name);
 
   const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
@@ -267,9 +289,14 @@ private:
   StatsMatcherPtr stats_matcher_;
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
+  StatNameStorage stats_overflow_;
   Counter& num_last_resort_stats_;
   HeapStatDataAllocator heap_allocator_;
   SourceImpl source_;
+
+  NullCounterImpl null_counter_;
+  NullGaugeImpl null_gauge_;
+  NullHistogramImpl null_histogram_;
 };
 
 } // namespace Stats

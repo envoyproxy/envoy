@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Stats {
 
 class HeapStatDataTest : public testing::Test {
- protected:
+protected:
   HeapStatDataTest() : alloc_(symbol_table_) {}
   ~HeapStatDataTest() { clearStorage(); }
 
@@ -32,8 +32,6 @@ class HeapStatDataTest : public testing::Test {
     stat_name_storage_.clear();
     EXPECT_EQ(0, symbol_table_.numSymbols());
   }
-
-
 
   SymbolTable symbol_table_;
   HeapStatDataAllocator alloc_;

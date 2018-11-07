@@ -119,7 +119,7 @@ class HotRestartImpl : public HotRestart,
                        public Stats::RawStatDataAllocator,
                        Logger::Loggable<Logger::Id::main> {
 public:
-  HotRestartImpl(Options& options);
+  HotRestartImpl(Options& options, Stats::SymbolTable& symbol_table);
 
   // Server::HotRestart
   void drainParentListeners() override;

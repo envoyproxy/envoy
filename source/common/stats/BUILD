@@ -44,6 +44,7 @@ envoy_cc_library(
     hdrs = ["isolated_store_impl.h"],
     deps = [
         ":histogram_lib",
+        ":scope_prefixer_lib",
         ":stats_lib",
         ":stats_options_lib",
         "//include/envoy/stats:stats_macros",
@@ -71,6 +72,17 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "scope_prefixer_lib",
+    srcs = ["scope_prefixer.cc"],
+    hdrs = ["scope_prefixer.h"],
+    deps = [
+        ":symbol_table_lib",
+        ":utility_lib",
+        "//include/envoy/stats:stats_interface",
     ],
 )
 
@@ -185,6 +197,7 @@ envoy_cc_library(
     hdrs = ["thread_local_store.h"],
     deps = [
         ":heap_stat_data_lib",
+        ":scope_prefixer_lib",
         ":stats_lib",
         ":stats_matcher_lib",
         ":tag_producer_lib",
@@ -196,4 +209,5 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    deps = [":symbol_table_lib"],
 )
