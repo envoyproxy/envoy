@@ -1230,6 +1230,26 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
     "definitions" : {
+      "xray_driver" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["xray"]
+          },
+          "config" : {
+            "type" : "object",
+            "properties" : {
+              "collector_cluster" : {"type" : "string"},
+              "collector_endpoint": {"type": "string"}
+            },
+            "required": ["collector_cluster", "collector_endpoint"],
+            "additionalProperties" : false
+          }
+        },
+        "required" : ["type", "config"],
+        "additionalProperties" : false
+      },
       "lightstep_driver" : {
         "type" : "object",
         "properties" : {
@@ -1325,6 +1345,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
               "driver" : {
                 "type" : "object",
                 "oneOf" : [
+                  {"$ref" : "#/definitions/xray_driver"},
                   {"$ref" : "#/definitions/lightstep_driver"},
                   {"$ref" : "#/definitions/zipkin_driver"}
                 ]

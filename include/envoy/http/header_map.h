@@ -298,7 +298,10 @@ private:
   HEADER_FUNC(XB3SpanId)                                                                           \
   HEADER_FUNC(XB3ParentSpanId)                                                                     \
   HEADER_FUNC(XB3Sampled)                                                                          \
-  HEADER_FUNC(XB3Flags)
+  HEADER_FUNC(XB3Flags)                                                                            \
+  HEADER_FUNC(XRayTraceId)                                                                         \
+  HEADER_FUNC(XRayParentId)                                                                        \
+  HEADER_FUNC(XRaySampled)
 
 /**
  * The following functions are defined for each inline header above. E.g., for ContentLength we

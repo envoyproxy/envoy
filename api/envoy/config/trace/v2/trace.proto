@@ -47,6 +47,14 @@ message LightstepConfig {
   string access_token_file = 2 [(validate.rules).string.min_bytes = 1];
 }
 
+message XRayConfig {
+  // The cluster manager cluster that hosts the XRay collectors.
+  string collector_cluster = 1 [(validate.rules).string.min_bytes = 1];
+
+  // The API endpoint of the XRay service where the spans will be sent.
+  string collector_endpoint = 2 [(validate.rules).string.min_bytes = 1];
+}
+
 message ZipkinConfig {
   // The cluster manager cluster that hosts the Zipkin collectors. Note that the
   // Zipkin cluster must be defined in the :ref:`Bootstrap static cluster

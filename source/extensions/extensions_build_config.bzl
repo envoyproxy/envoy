@@ -101,6 +101,7 @@ EXTENSIONS = {
     "envoy.tracers.dynamic_ot":                         "//source/extensions/tracers/dynamic_ot:config",
     "envoy.tracers.lightstep":                          "//source/extensions/tracers/lightstep:config",
     "envoy.tracers.zipkin":                             "//source/extensions/tracers/zipkin:config",
+    "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
 
     #
     # Transport sockets
@@ -202,6 +203,7 @@ WINDOWS_EXTENSIONS = {
     #"envoy.tracers.dynamic_ot":                         "//source/extensions/tracers/dynamic_ot:config",
     #"envoy.tracers.lightstep":                          "//source/extensions/tracers/lightstep:config",
     #"envoy.tracers.zipkin":                             "//source/extensions/tracers/zipkin:config",
+    #"envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
 
     #
     # Transport sockets

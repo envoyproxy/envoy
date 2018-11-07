@@ -18,6 +18,8 @@ public:
   const std::string Zipkin = "envoy.zipkin";
   // Dynamic tracer
   const std::string DynamicOt = "envoy.dynamic.ot";
+  // XRay tracer
+  const std::string XRay = "envoy.xray";
 };
 
 typedef ConstSingleton<TracerNameValues> TracerNames;

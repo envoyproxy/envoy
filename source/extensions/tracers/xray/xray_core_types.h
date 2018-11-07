@@ -1,0 +1,316 @@
+#pragma once
+
+#include <memory>
+
+#include "envoy/common/pure.h"
+#include "envoy/network/address.h"
+
+#include "common/common/hex.h"
+#include "absl/types/optional.h"
+
+#include "extensions/tracers/xray/tracer_interface.h"
+
+namespace Envoy {
+    namespace Extensions {
+        namespace Tracers {
+            namespace XRay {
+
+                /**
+                 * Base class to be inherited by all classes that represent XRay-related concepts, namely:
+                 * endpoint, annotation, binary annotation, and span.
+                 */
+                class XRayBase {
+                public:
+                    /**
+                     * Destructor.
+                     */
+                    virtual ~XRayBase() {}
+
+                    /**
+                     * All classes defining XRay abstractions need to implement this method to convert
+                     * the corresponding abstraction to a XRay-compliant JSON.
+                     */
+                    virtual const std::string toJson() PURE;
+                };
+
+                /**
+                 * Enum representing valid types of Zipkin binary annotations.
+                 */
+                enum AnnotationType { BOOL = 0, STRING = 1 };
+
+                /**
+                 * Represents a Zipkin binary annotation. This class is based on Zipkin's Thrift definition of
+                 * a binary annotation. A binary annotation allows arbitrary key-value pairs to be associated
+                 * with a Zipkin span.
+                 */
+                class BinaryAnnotation : public XRayBase {
+                public:
+                    /**
+                     * Copy constructor.
+                     */
+                    BinaryAnnotation(const BinaryAnnotation&);
+
+                    /**
+                     * Assignment operator.
+                     */
+                    BinaryAnnotation& operator=(const BinaryAnnotation&);
+
+                    /**
+                     * Default constructor. Creates an empty binary annotation.
+                     */
+                    BinaryAnnotation() : key_(), value_(), annotation_type_(STRING) {}
+
+                    /**
+                     * Constructor that creates a binary annotation based on the given parameters.
+                     *
+                     * @param key The key name of the annotation.
+                     * @param value The value associated with the key.
+                     */
+                    BinaryAnnotation(const std::string& key, const std::string& value) : key_(key), value_(value), annotation_type_(STRING) {}
+
+                    /**
+                     * @return the type of the binary annotation.
+                     */
+                    AnnotationType annotationType() const { return annotation_type_; }
+
+                    /**
+                     * Sets the binary's annotation type.
+                     */
+                    void setAnnotationType(AnnotationType annotationType) { annotation_type_ = annotationType; }
+
+                    /**
+                     * @return the key attribute.
+                     */
+                    const std::string& key() const { return key_; }
+
+                    /**
+                     * Sets the key attribute.
+                     */
+                    void setKey(const std::string& key) { key_ = key; }
+
+                    /**
+                     * @return the value attribute.
+                     */
+                    const std::string& value() const { return value_; }
+
+                    /**
+                     * Sets the value attribute.
+                     */
+                    void setValue(const std::string& value) { value_ = value; }
+
+                    /**
+                     * Serializes the binary annotation as a Zipkin-compliant JSON representation as a string.
+                     *
+                     * @return a stringified JSON.
+                     */
+                    const std::string toJson() override;
+
+                private:
+                    std::string key_;
+                    std::string value_;
+                    AnnotationType annotation_type_;
+                };
+
+                typedef std::unique_ptr<Span> SpanPtr;
+
+                class Span : public XRayBase {
+                public:
+                    /**
+                     * Copy constructor.
+                     */
+                    Span(const Span &);
+
+                    /**
+                     * Default constructor. Creates an empty span.
+                     */
+                    Span() : trace_id_(), name_(), id_(0), debug_(false), sampled_(false), start_time_(0) {}
+
+                    /**
+                     * Sets the span's trace id attribute.
+                     */
+                    void setTraceId(const std::string& val) { trace_id_ = val; }
+
+                    /**
+                     * Sets the span's name attribute.
+                     */
+                    void setName(const std::string& val) { name_ = val; }
+
+                    /**
+                     * Sets the span's id.
+                     */
+                    void setId(const uint64_t val) { id_ = val; }
+
+                    /**
+                     * Sets the span's parent id.
+                     */
+                    void setParentId(const uint64_t val) { parent_id_ = val; }
+
+                    /**
+                     * @return Whether or not the parent_id attribute is set.
+                     */
+                    bool isSetParentId() const { return parent_id_.has_value(); }
+
+                    /**
+                     * Set the span's sampled flag.
+                     */
+                    void setSampled(bool val) { sampled_ = val; }
+
+                    /**
+                     * Sets the span's debug attribute.
+                     */
+                    void setDebug() { debug_ = true; }
+
+                    /**
+                     * Sets the span's binary annotations all at once.
+                     */
+                    void setBinaryAnnotations(const std::vector<BinaryAnnotation>& val) { binary_annotations_ = val; }
+
+                    /**
+                     * Adds a binary annotation to the span (copy semantics).
+                     */
+                    void addBinaryAnnotation(const BinaryAnnotation& bann) { binary_annotations_.push_back(bann); }
+
+                    /**
+                     * Adds a binary annotation to the span (move semantics).
+                     */
+                    void addBinaryAnnotation(const BinaryAnnotation&& bann) { binary_annotations_.push_back(bann); }
+
+                    const std::vector<BinaryAnnotation>& binaryAnnotations() const { return binary_annotations_; }
+
+                    /**
+                     * Sets the span's timestamp attribute.
+                     */
+                    void setTimestamp(const int64_t val) { timestamp_ = val; }
+
+                    /**
+                     * @return Whether or not the timestamp attribute is set.
+                     */
+                    bool isSetTimestamp() const { return timestamp_.has_value(); }
+
+                    /**
+                     * Sets the span's duration attribute.
+                     */
+                    void setDuration(const int64_t val) { duration_ = val; }
+
+                    /**
+                     * @return Whether or not the duration attribute is set.
+                     */
+                    bool isSetDuration() const { return duration_.has_value(); }
+
+                    /**
+                     * Sets the span start-time attribute (monotonic, used to calculate duration).
+                     */
+                    void setStartTime(const double time) { start_time_ = time; }
+
+                    void setServiceName(const std::string& service_name);
+
+                    /**
+                     * @return the span's duration attribute.
+                     */
+                    int64_t duration() const { return duration_.value(); }
+
+                    /**
+                     * @return the span's id as an integer.
+                     */
+                    uint64_t id() const { return id_; }
+
+                    /**
+                     * @return the span's id as a hexadecimal string.
+                     */
+                    const std::string idAsHexString() const { return Hex::uint64ToHex(id_); }
+
+                    const std::string parentIdAsHexString() const {
+                        return parent_id_ ? Hex::uint64ToHex(parent_id_.value()) : EMPTY_HEX_STRING_;
+                    }
+
+                    /**
+                     * @return the span's name.
+                     */
+                    const std::string& name() const { return name_; }
+
+                    /**
+                     * @return the span's parent id as an integer.
+                     */
+                    uint64_t parentId() const { return parent_id_.value(); }
+
+                    /**
+                     * @return whether or not the debug attribute is set
+                     */
+                    bool debug() const { return debug_; }
+
+                    /**
+                     * @return whether or not the sampled attribute is set
+                     */
+                    bool sampled() const { return sampled_; }
+
+                    /**
+                     * @return the span's timestamp (clock time for user presentation: microseconds since epoch).
+                     */
+                    int64_t timestamp() const { return timestamp_.value(); }
+
+                    /**
+                     * @return the span's trace id as a string.
+                     */
+                    const std::string traceId() const { return trace_id_; }
+
+                    /**
+                     * @return the span's start time (monotonic, used to calculate duration).
+                     */
+                    double startTime() const { return start_time_; }
+
+                    /**
+                     * Serializes the span as a XRay-compliant JSON representation as a string.
+                     * The resulting JSON string can be used as part of an HTTP POST call to
+                     * send the span to XRay.
+                     *
+                     * @return a stringified JSON.
+                     */
+                    const std::string toJson() override;
+
+                    /**
+                     * Associates a Tracer object with the span. The tracer's reportSpan() method is invoked
+                     * by the span's finish() method so that the tracer can decide what to do with the span
+                     * when it is finished.
+                     *
+                     * @param tracer Represents the Tracer object to be associated with the span.
+                     */
+                    void setTracer(TracerInterface* tracer) { tracer_ = tracer; }
+
+                    /**
+                     * @return the Tracer object associated with the span.
+                     */
+                    TracerInterface* tracer() const { return tracer_; }
+
+                    /**
+                     * Marks a successful end of the span. This method will:
+                     *
+                     * (1) determine if it needs to add more annotations to the span (e.g., a span containing a CS
+                     * annotation will need to add a CR annotation) and add them;
+                     * (2) compute and set the span's duration; and
+                     * (3) invoke the tracer's reportSpan() method if a tracer has been associated with the span.
+                     */
+                    void finish();
+
+                    void setTag(const std::string& name, const std::string& value);
+
+                private:
+                    static const std::string EMPTY_HEX_STRING_;
+                    static const std::string VERSION_;
+                    static const std::string FORMAT_;
+
+                    std::string trace_id_;
+                    std::string name_;
+                    uint64_t id_;
+                    absl::optional<uint64_t> parent_id_;
+                    bool debug_;
+                    bool sampled_;
+                    std::vector<BinaryAnnotation> binary_annotations_;
+                    absl::optional<int64_t> timestamp_;
+                    absl::optional<int64_t> duration_;
+                    double start_time_;
+                    TracerInterface* tracer_;
+                };
+            }
+        }
+    }
+}

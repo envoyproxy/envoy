@@ -97,6 +97,9 @@ public:
   const LowerCaseString XB3Flags{"x-b3-flags"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
   const LowerCaseString XSquashDebug{"x-squash-debug"};
+  const LowerCaseString XRayTraceId{"xray-traceid"};
+  const LowerCaseString XRayParentId{"xray-parentid"};
+  const LowerCaseString XRaySampled{"xray-sampled"};
 
   struct {
     const std::string Close{"close"};
