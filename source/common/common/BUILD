@@ -106,6 +106,17 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "mutex_tracer_lib",
+    srcs = ["mutex_tracer_impl.cc"],
+    hdrs = ["mutex_tracer_impl.h"],
+    external_deps = ["abseil_synchronization"],
+    deps = [
+        ":assert_lib",
+        "//include/envoy/common:mutex_tracer",
+    ],
+)
+
 # All non-essential logger delegates should go here to reduce dependencies that
 # minimal_logger_lib maintains.
 envoy_cc_library(

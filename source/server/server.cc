@@ -20,6 +20,7 @@
 
 #include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/config/bootstrap_json.h"
@@ -60,7 +61,9 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks, time_system),
       dns_resolver_(dispatcher_->createDnsResolver({})),
-      access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false) {
+      access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false),
+      mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
+                                                  : nullptr) {
 
   try {
     if (!options.logPath().empty()) {
@@ -388,25 +391,27 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
 
 uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
-RunHelper::RunHelper(Instance& instance, Event::Dispatcher& dispatcher,
+RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
                      InitManagerImpl& init_manager, OverloadManager& overload_manager,
                      std::function<void()> workers_start_cb) {
 
   // Setup signals.
-  sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
-    ENVOY_LOG(warn, "caught SIGTERM");
-    instance.shutdown();
-  });
+  if (options.signalHandlingEnabled()) {
+    sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
+      ENVOY_LOG(warn, "caught SIGTERM");
+      instance.shutdown();
+    });
 
-  sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
-    ENVOY_LOG(warn, "caught SIGUSR1");
-    access_log_manager.reopen();
-  });
+    sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
+      ENVOY_LOG(warn, "caught SIGUSR1");
+      access_log_manager.reopen();
+    });
 
-  sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
-    ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
-  });
+    sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
+      ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
+    });
+  }
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
@@ -446,7 +451,7 @@ RunHelper::RunHelper(Instance& instance, Event::Dispatcher& dispatcher,
 void InstanceImpl::run() {
   // We need the RunHelper to be available to call from InstanceImpl::shutdown() below, so
   // we save it as a member variable.
-  run_helper_ = std::make_unique<RunHelper>(*this, *dispatcher_, clusterManager(),
+  run_helper_ = std::make_unique<RunHelper>(*this, options_, *dispatcher_, clusterManager(),
                                             access_log_manager_, init_manager_, overloadManager(),
                                             [this]() -> void { startWorkers(); });
 

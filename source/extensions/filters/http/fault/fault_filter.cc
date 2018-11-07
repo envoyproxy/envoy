@@ -257,7 +257,7 @@ void FaultFilter::postDelayInjection() {
 void FaultFilter::abortWithHTTPStatus() {
   callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
   callbacks_->sendLocalReply(static_cast<Http::Code>(abortHttpStatus()), "fault filter abort",
-                             nullptr);
+                             nullptr, absl::nullopt);
   recordAbortsInjectedStats();
 }
 

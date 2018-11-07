@@ -298,6 +298,7 @@ envoy_cc_library(
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/api:api_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:mutex_tracer_lib",
         "//source/common/common:utility_lib",
         "//source/common/common:version_lib",
         "//source/common/config:bootstrap_json_lib",
