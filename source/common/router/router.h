@@ -399,7 +399,6 @@ private:
   Http::HeaderMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;
   uint32_t buffer_limit_{0};
-  bool stream_destroyed_{};
   MetadataMatchCriteriaConstPtr metadata_match_;
 
   // list of cookies to add to upstream headers
