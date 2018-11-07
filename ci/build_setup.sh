@@ -108,6 +108,19 @@ mkdir -p "${ENVOY_COVERAGE_DIR}"
 # This is where we build for bazel.release* and bazel.dev.
 export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci
 
+function cleanup() {
+  # Remove build artifacts. This doesn't mess with incremental builds as these
+  # are just symlinks.
+  rm -rf "${ENVOY_SRCDIR}"/bazel-*
+  rm -rf "${ENVOY_CI_DIR}"/bazel-*
+  rm -rf "${ENVOY_CI_DIR}"/bazel
+  rm -rf "${ENVOY_CI_DIR}"/tools
+  rm -f "${ENVOY_CI_DIR}"/.bazelrc
+}
+
+cleanup
+trap cleanup EXIT
+
 # Hack due to https://github.com/envoyproxy/envoy/issues/838 and the need to have
 # .bazelrc available for build linkstamping.
 mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
@@ -123,13 +136,3 @@ ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools/
 ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CI_DIR}"/tools/
 
 export BUILDIFIER_BIN="/usr/local/bin/buildifier"
-
-function cleanup() {
-  # Remove build artifacts. This doesn't mess with incremental builds as these
-  # are just symlinks.
-  rm -rf "${ENVOY_SRCDIR}"/bazel-*
-  rm -rf "${ENVOY_CI_DIR}"/bazel-*
-  rm -rf "${ENVOY_CI_DIR}"/bazel
-  rm -rf "${ENVOY_CI_DIR}"/tools
-}
-trap cleanup EXIT
