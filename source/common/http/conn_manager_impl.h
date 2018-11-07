@@ -301,7 +301,7 @@ private:
     void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(HeaderMapPtr&& trailers) override;
-    void decodeMetadata(std::unique_ptr<MetadataMap>) override { NOT_REACHED_GCOVR_EXCL_LINE; }
+    void decodeMetadata(MetadataMapPtr&&) override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
     // Http::FilterChainFactoryCallbacks
     void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
