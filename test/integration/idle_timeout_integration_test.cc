@@ -280,6 +280,21 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsDisarmedByPrematureEncodeHead
   EXPECT_NE("request timeout", response->body());
 }
 
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsNotDisarmedByEncode100ContinueHeaders) {
+  enable_request_timeout_ = true;
+
+  auto response = setupPerStreamIdleTimeoutTest("POST");
+  upstream_request_->encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", "100"}});
+
+  waitForTimeout(*response, "downstream_rq_timeout");
+
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("408", response->headers().Status()->value().c_str());
+  EXPECT_EQ("request timeout", response->body());
+}
+
 // TODO(auni53) create a test filter that hangs and does not send data upstream, which would
 // trigger a configured request_timer
 
