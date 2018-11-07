@@ -261,7 +261,7 @@ message CommonTlsContext {
     // for validation. This merge is done by Message::MergeFrom(), so dynamic
     // CertificateValidationContext overwrites singular fields in default
     // CertificateValidationContext, and concatenates repeated fields to default
-    // CertificateValidationContext.
+    // CertificateValidationContext, and logical OR is applied to boolean fields.
     CombinedCertificateValidationContext combined_validation_context = 8;
   }
 

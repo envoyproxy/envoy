@@ -35,10 +35,12 @@ public:
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
 
   bool isReady() const override {
-    bool tls_is_ready = (tls_certficate_provider_ == nullptr || tls_certificate_config_ != nullptr);
-    bool combined_cvc_is_ready = (default_cvc_ == nullptr || validation_context_config_ != nullptr);
-    bool cvc_is_ready = (certficate_validation_context_provider_ == nullptr ||
-                         default_cvc_ != nullptr || validation_context_config_ != nullptr);
+    const bool tls_is_ready =
+        (tls_certficate_provider_ == nullptr || tls_certificate_config_ != nullptr);
+    const bool combined_cvc_is_ready =
+        (default_cvc_ == nullptr || validation_context_config_ != nullptr);
+    const bool cvc_is_ready = (certficate_validation_context_provider_ == nullptr ||
+                               default_cvc_ != nullptr || validation_context_config_ != nullptr);
     return tls_is_ready && combined_cvc_is_ready && cvc_is_ready;
   }
 
