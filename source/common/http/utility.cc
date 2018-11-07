@@ -243,6 +243,7 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
 
 void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks,
                              const bool& is_reset, Code response_code, const std::string& body_text,
+                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                              bool is_head_request) {
   sendLocalReply(is_grpc,
                  [&](HeaderMapPtr&& headers, bool end_stream) -> void {
@@ -251,13 +252,14 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
                  [&](Buffer::Instance& data, bool end_stream) -> void {
                    callbacks.encodeData(data, end_stream);
                  },
-                 is_reset, response_code, body_text, is_head_request);
+                 is_reset, response_code, body_text, grpc_status, is_head_request);
 }
 
 void Utility::sendLocalReply(
     bool is_grpc, std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
-    Code response_code, const std::string& body_text, bool is_head_request) {
+    Code response_code, const std::string& body_text,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request) {
   // encode_headers() may reset the stream, so the stream must not be reset before calling it.
   ASSERT(!is_reset);
   // Respond with a gRPC trailers-only response if the request is gRPC
@@ -266,7 +268,9 @@ void Utility::sendLocalReply(
         {Headers::get().Status, std::to_string(enumToInt(Code::OK))},
         {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
         {Headers::get().GrpcStatus,
-         std::to_string(enumToInt(Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
+         std::to_string(
+             enumToInt(grpc_status ? grpc_status.value()
+                                   : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
     if (!body_text.empty() && !is_head_request) {
       // TODO: GrpcMessage should be percent-encoded
       response_headers->insertGrpcMessage().value(body_text);

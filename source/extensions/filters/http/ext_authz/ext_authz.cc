@@ -142,7 +142,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                                    ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks,
                                                     header.first.get(), header.second);
                                  }
-                               });
+                               },
+                               absl::nullopt);
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService);
   } else {
     ENVOY_STREAM_LOG(debug, "ext_authz accepted the request", *callbacks_);

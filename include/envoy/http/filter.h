@@ -7,12 +7,15 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -221,9 +224,11 @@ public:
    *                  type, or encoded in the grpc-message header.
    * @param modify_headers supplies an optional callback function that can modify the
    *                       response headers.
+   * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
    */
   virtual void sendLocalReply(Code response_code, const std::string& body_text,
-                              std::function<void(HeaderMap& headers)> modify_headers) PURE;
+                              std::function<void(HeaderMap& headers)> modify_headers,
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status) PURE;
 
   /**
    * Called with 100-Continue headers to be encoded.
