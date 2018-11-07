@@ -529,6 +529,9 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response
   envoy::admin::v2alpha::Memory memory;
   memory.set_allocated(Memory::Stats::totalCurrentlyAllocated());
   memory.set_heap_size(Memory::Stats::totalCurrentlyReserved());
+  memory.set_total_thread_cache(Memory::Stats::totalThreadCacheBytes());
+  memory.set_pageheap_unmapped(Memory::Stats::totalPageHeapUnmapped());
+  memory.set_pageheap_free(Memory::Stats::totalPageHeapFree());
   response.add(MessageUtil::getJsonStringFromMessage(memory, true)); // pretty-print
   return Http::Code::OK;
 }

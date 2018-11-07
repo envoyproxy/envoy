@@ -404,13 +404,16 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  Http::TestHeaderMapImpl response_headers{{":status", "429"}};
+  Http::HeaderMapPtr h{new Http::TestHeaderMapImpl()};
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "429"},
+      {"x-envoy-ratelimited", Http::Headers::get().EnvoyRateLimitedValues.True}};
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
 
-  request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, nullptr);
+  request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, std::move(h));
 
   EXPECT_EQ(1U,
             filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.over_limit").value());
@@ -441,6 +444,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
       {"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "0"}, {"retry-after", "33"}}};
   Http::TestHeaderMapImpl expected_headers(*rl_headers);
   expected_headers.addCopy(":status", "429");
+  expected_headers.addCopy("x-envoy-ratelimited", Http::Headers::get().EnvoyRateLimitedValues.True);
 
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
@@ -473,7 +477,8 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("ratelimit.http_filter_enforcing", 100))
       .WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-  request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, nullptr);
+  Http::HeaderMapPtr h{new Http::TestHeaderMapImpl()};
+  request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, std::move(h));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
