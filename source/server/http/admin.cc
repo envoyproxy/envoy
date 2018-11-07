@@ -14,6 +14,7 @@
 #include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/admin/v2alpha/memory.pb.h"
+#include "envoy/admin/v2alpha/mutex_stats.pb.h"
 #include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
@@ -31,6 +32,7 @@
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/html/utility.h"
@@ -429,6 +431,26 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& resp
   return Http::Code::OK;
 }
 
+// TODO(ambuc) Export this as a server (?) stat for monitoring.
+Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap& response_headers,
+                                        Buffer::Instance& response, AdminStream&) {
+
+  if (server_.options().mutexTracingEnabled() && server_.mutexTracer() != nullptr) {
+    response_headers.insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.Json);
+
+    envoy::admin::v2alpha::MutexStats mutex_stats;
+    mutex_stats.set_num_contentions(server_.mutexTracer()->numContentions());
+    mutex_stats.set_current_wait_cycles(server_.mutexTracer()->currentWaitCycles());
+    mutex_stats.set_lifetime_wait_cycles(server_.mutexTracer()->lifetimeWaitCycles());
+    response.add(MessageUtil::getJsonStringFromMessage(mutex_stats, true, true));
+  } else {
+    response.add("Mutex contention tracing is not enabled. To enable, run Envoy with flag "
+                 "--enable-mutex-tracing.");
+  }
+  return Http::Code::OK;
+}
+
 Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::HeaderMap&,
                                          Buffer::Instance& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
@@ -500,8 +522,10 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
 }
 
 // TODO(ambuc): Add more tcmalloc stats, export proto details based on allocator.
-Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
-                                    AdminStream&) {
+Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response_headers,
+                                    Buffer::Instance& response, AdminStream&) {
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
   envoy::admin::v2alpha::Memory memory;
   memory.set_allocated(Memory::Stats::totalCurrentlyAllocated());
   memory.set_heap_size(Memory::Stats::totalCurrentlyReserved());
@@ -948,6 +972,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            false},
           {"/config_dump", "dump current Envoy configs (experimental)",
            MAKE_ADMIN_HANDLER(handlerConfigDump), false, false},
+          {"/contention", "dump current Envoy mutex contention stats (if enabled)",
+           MAKE_ADMIN_HANDLER(handlerContention), false, false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
            MAKE_ADMIN_HANDLER(handlerCpuProfiler), false, true},
           {"/healthcheck/fail", "cause the server to fail health checks",
