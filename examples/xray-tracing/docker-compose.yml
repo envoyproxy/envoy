@@ -1,0 +1,75 @@
+version: '2'
+services:
+  front-envoy:
+    build:
+      context: ../
+      dockerfile: front-proxy/Dockerfile-frontenvoy
+    volumes:
+      - ./front-envoy-xray.yaml:/etc/front-envoy.yaml
+    networks:
+      envoymesh:
+        ipv4_address: 172.19.0.5
+    expose:
+      - "80"
+      - "8001"
+      - "2000/udp"
+    ports:
+      - "8000:80"
+      - "8001:8001"
+
+  service1:
+    build:
+      context: ../front-proxy
+      dockerfile: Dockerfile-service
+    volumes:
+      - ./service1-envoy-xray.yaml:/etc/service-envoy.yaml
+    networks:
+      envoymesh:
+        ipv4_address: 172.19.0.4
+        aliases:
+          - service1
+    environment:
+      - SERVICE_NAME=1
+    expose:
+      - "80"
+      - "2000/udp"
+
+  service2:
+    build:
+      context: ../front-proxy
+      dockerfile: Dockerfile-service
+    volumes:
+      - ./service2-envoy-xray.yaml:/etc/service-envoy.yaml
+    networks:
+      envoymesh:
+        ipv4_address: 172.19.0.3
+        aliases:
+          - service2
+    environment:
+      - SERVICE_NAME=2
+    expose:
+      - "80"
+      - "2000/udp"
+
+  xray:
+    image: amazon/aws-xray-daemon
+    networks:
+      envoymesh:
+        ipv4_address: 172.19.0.2
+        aliases:
+          - xray
+    environment:
+      - AWS_REGION=You_defined_region
+      - AWS_ACCESS_KEY_ID=Your_Key
+      - AWS_SECRET_ACCESS_KEY=Your_key
+    expose:
+      - "2000/udp"
+    ports:
+      - "2000:2000/udp"
+
+networks:
+  envoymesh:
+    ipam:
+      config:
+        - subnet: "172.19.0.0/16"
+          gateway: "172.19.0.1"

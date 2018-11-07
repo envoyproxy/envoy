@@ -21,6 +21,8 @@ public:
   const std::string DynamicOt = "envoy.dynamic.ot";
   // Datadog tracer
   const std::string Datadog = "envoy.tracers.datadog";
+  // XRay tracer
+  const std::string XRay = "envoy.xray";
 };
 
 typedef ConstSingleton<TracerNameValues> TracerNames;
