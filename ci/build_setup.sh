@@ -114,8 +114,8 @@ mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
 mkdir -p "${ENVOY_CI_DIR}"/bazel
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CI_DIR}"/bazel/
-ln -sf "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
-ln -sf "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_CI_DIR}"/
+cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
+cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_CI_DIR}"/
 # TODO(PiotrSikora): remove once we deprecate tools/bazel.rc in favor of .bazelrc.
 mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools
 mkdir -p "${ENVOY_CI_DIR}"/tools
@@ -131,5 +131,6 @@ function cleanup() {
   rm -rf "${ENVOY_CI_DIR}"/bazel-*
   rm -rf "${ENVOY_CI_DIR}"/bazel
   rm -rf "${ENVOY_CI_DIR}"/tools
+  rm -f "${ENVOY_CI_DIR}"/.bazelrc
 }
 trap cleanup EXIT
