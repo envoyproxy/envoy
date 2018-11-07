@@ -14,8 +14,6 @@ namespace Config {
 
 template <class ResourceType> class IncrementalSubscriptionCallbacks {
 public:
-  typedef Protobuf::RepeatedPtrField<ResourceType> ResourceVector;
-
   virtual ~IncrementalSubscriptionCallbacks() {}
 
   /**
@@ -27,9 +25,10 @@ public:
    *        changes are accepted. Accepted changes have their version_info reflected in subsequent
    *        requests.
    */
-  virtual void onIncrementalConfig(const ResourceVector& added_resources,
-                                   const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                                   const std::string& version_info) PURE;
+  virtual void
+  onIncrementalConfig(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string& version_info) PURE;
 
   /**
    * Called when either the IncrementalSubscription is unable to fetch a config update or when
