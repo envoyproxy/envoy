@@ -48,14 +48,22 @@ void StderrSinkDelegate::flush() {
   std::cerr << std::flush;
 }
 
+void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatter) {
+  absl::MutexLock lock(&format_mutex_);
+  formatter_ = std::move(formatter);
+}
+
 void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
+  absl::ReleasableMutexLock lock(&format_mutex_);
   if (!formatter_) {
+    lock.Release();
     sink_->log(fmt::to_string(msg.raw));
     return;
   }
 
   fmt::memory_buffer formatted;
   formatter_->format(msg, formatted);
+  lock.Release();
   sink_->log(fmt::to_string(formatted));
 }
 
