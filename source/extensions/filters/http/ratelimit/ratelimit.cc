@@ -137,6 +137,8 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
                                              EMPTY_STRING,
                                              false};
     Http::CodeUtility::chargeResponseStat(info);
+    headers_to_add_->insertEnvoyRateLimited().value(
+        Http::Headers::get().EnvoyRateLimitedValues.True);
     break;
   }
 
