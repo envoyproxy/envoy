@@ -60,8 +60,9 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
   EXPECT_CALL(callbacks_, streamInfo()).Times(3).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
+  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> empty;
 
-  CheckRequestUtils::createHttpCheck(&callbacks_, headers, request);
+  CheckRequestUtils::createHttpCheck(&callbacks_, headers, std::move(empty), request);
 }
 
 // Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest
@@ -80,11 +81,16 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return("source"));
   EXPECT_CALL(ssl_, uriSanLocalCertificate()).WillOnce(Return("destination"));
 
-  CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, request);
+  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> context_extensions;
+  context_extensions["key"] = "value";
+
+  CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
+                                     request);
 
   EXPECT_EQ("source", request.attributes().source().principal());
   EXPECT_EQ("destination", request.attributes().destination().principal());
   EXPECT_EQ("foo", request.attributes().source().service());
+  EXPECT_EQ("value", request.attributes().context_extensions().at("key"));
 }
 
 } // namespace ExtAuthz

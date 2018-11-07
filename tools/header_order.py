@@ -88,8 +88,7 @@ def ReorderHeaders(path):
   if len(misc_headers) > 0:
     blocks.append(misc_headers)
 
-  reordered_includes_lines = '\n\n'.join(
-      ['\n'.join(sorted(block)) for block in blocks])
+  reordered_includes_lines = '\n\n'.join(['\n'.join(sorted(block)) for block in blocks])
 
   if reordered_includes_lines:
     reordered_includes_lines += '\n'

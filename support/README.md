@@ -44,7 +44,7 @@ affected files manually or run the provided formatting script.
 To run the format fix script directly:
 
 ```
-./tools/check_format.py fix
+./tools/check_format.py fix && ./tools/format_python_tools.sh fix
 ```
 
 To run the format fix script under Docker:

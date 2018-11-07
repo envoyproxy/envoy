@@ -143,7 +143,7 @@ void HealthCheckFilter::onComplete() {
     }
   }
 
-  callbacks_->sendLocalReply(final_status, "", nullptr);
+  callbacks_->sendLocalReply(final_status, "", nullptr, absl::nullopt);
 }
 
 } // namespace HealthCheck

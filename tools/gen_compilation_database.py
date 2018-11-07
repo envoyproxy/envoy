@@ -5,19 +5,22 @@ import os
 import json
 import subprocess
 
+
 def generateCompilationDatabase(args):
   if args.run_bazel_build:
     subprocess.check_call(["bazel", "build"] + args.bazel_targets)
 
-  gen_compilation_database_sh = os.path.join(os.path.realpath(os.path.dirname(__file__)),
-      "../bazel/gen_compilation_database.sh")
+  gen_compilation_database_sh = os.path.join(
+      os.path.realpath(os.path.dirname(__file__)), "../bazel/gen_compilation_database.sh")
   subprocess.check_call([gen_compilation_database_sh] + args.bazel_targets)
+
 
 def isHeader(filename):
   for ext in (".h", ".hh", ".hpp", ".hxx"):
     if filename.endswith(ext):
       return True
   return False
+
 
 def isCompileTarget(target, args):
   filename = target["file"]
@@ -34,6 +37,7 @@ def isCompileTarget(target, args):
 
   return True
 
+
 def modifyCompileCommand(target):
   cxx, options = target["command"].split(" ", 1)
 
@@ -49,6 +53,7 @@ def modifyCompileCommand(target):
   target["command"] = " ".join(["clang++", options])
   return target
 
+
 def fixCompilationDatabase(args):
   with open("compile_commands.json", "r") as db_file:
     db = json.load(db_file)
@@ -60,13 +65,15 @@ def fixCompilationDatabase(args):
   with open("compile_commands.json", "w") as db_file:
     json.dump(db, db_file, indent=2)
 
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Generate JSON compilation database')
   parser.add_argument('--run_bazel_build', action='store_true')
   parser.add_argument('--include_external', action='store_true')
   parser.add_argument('--include_genfiles', action='store_true')
   parser.add_argument('--include_headers', action='store_true')
-  parser.add_argument('bazel_targets', nargs='*', default=["//source/...", "//test/...", "//tools/..."])
+  parser.add_argument(
+      'bazel_targets', nargs='*', default=["//source/...", "//test/...", "//tools/..."])
   args = parser.parse_args()
   generateCompilationDatabase(args)
   fixCompilationDatabase(args)
