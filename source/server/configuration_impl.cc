@@ -10,6 +10,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 
 #include "common/common/assert.h"

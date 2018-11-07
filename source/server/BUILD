@@ -32,6 +32,7 @@ envoy_cc_library(
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:instance_interface",
+        "//include/envoy/server:tracer_config_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
@@ -45,7 +46,6 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/api/v2:lds_cc",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
-        "@envoy_api//envoy/config/trace/v2:trace_cc",
     ],
 )
 
