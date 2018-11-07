@@ -23,7 +23,7 @@ namespace Envoy {
 namespace Stats {
 
 class MockMetric : public virtual Metric {
- public:
+public:
   explicit MockMetric(SymbolTable& symbol_table);
   MockMetric();
   ~MockMetric();
@@ -32,7 +32,7 @@ class MockMetric : public virtual Metric {
   // do metric->name_ = "foo" even though names are more complex now. Note
   // that the statName is only populated if there is a symbol table.
   class MetricName {
-   public:
+  public:
     explicit MetricName(MockMetric& mock_metric) : mock_metric_(mock_metric) {}
     ~MetricName();
 
@@ -41,7 +41,7 @@ class MockMetric : public virtual Metric {
     std::string name() const { return name_; }
     StatName statName() const { return stat_name_storage_->statName(); }
 
-   private:
+  private:
     MockMetric& mock_metric_;
     std::string name_;
     std::unique_ptr<StatNameStorage> stat_name_storage_;
@@ -54,12 +54,12 @@ class MockMetric : public virtual Metric {
   // creates a deadlock in gmock and is an unintended use of mock functions.
   std::string name() const override { return name_.name(); }
   StatName statName() const override { return name_.statName(); }
-  //MOCK_CONST_METHOD0(tags, std::vector<Tag>());
+  // MOCK_CONST_METHOD0(tags, std::vector<Tag>());
   std::vector<Tag> tags() const override { return tags_; }
   std::string tagExtractedName() const override {
     return tag_extracted_name_.empty() ? name() : tag_extracted_name_;
   }
-  //MOCK_CONST_METHOD0(tagExtractedName, std::string());
+  // MOCK_CONST_METHOD0(tagExtractedName, std::string());
 
   SymbolTable* symbol_table_;
   MetricName name_;

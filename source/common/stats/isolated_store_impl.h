@@ -92,8 +92,6 @@ public:
     return histogramx(storage.statName());
   }
 
-
-
 private:
   SymbolTable symbol_table_;
   HeapStatDataAllocator alloc_;

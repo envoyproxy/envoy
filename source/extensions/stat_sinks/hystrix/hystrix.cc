@@ -330,10 +330,9 @@ void HystrixSink::flush(Stats::Source& source) {
     if (histogram->tagExtractedName() == "cluster.upstream_rq_time") {
       // TODO(mrice32): add an Envoy utility function to look up and return a tag for a metric.
       auto tags = histogram->tags();
-      auto it = std::find_if(tags.begin(), tags.end(),
-                             [](const Stats::Tag& tag) {
-                               return (tag.name_ == Config::TagNames::get().CLUSTER_NAME);
-                             });
+      auto it = std::find_if(tags.begin(), tags.end(), [](const Stats::Tag& tag) {
+        return (tag.name_ == Config::TagNames::get().CLUSTER_NAME);
+      });
 
       // Make sure we found the cluster name tag
       ASSERT(it != histogram->tags().end());

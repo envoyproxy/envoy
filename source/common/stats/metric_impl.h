@@ -47,10 +47,10 @@ private:
 };
 
 class NullMetricImpl : public MetricImpl {
- public:
-  explicit NullMetricImpl(SymbolTable& symbol_table) :
-      MetricImpl("", std::vector<Tag>(), symbol_table), symbol_table_(symbol_table),
-      stat_name_storage_("", symbol_table) {}
+public:
+  explicit NullMetricImpl(SymbolTable& symbol_table)
+      : MetricImpl("", std::vector<Tag>(), symbol_table), symbol_table_(symbol_table),
+        stat_name_storage_("", symbol_table) {}
   ~NullMetricImpl() { stat_name_storage_.free(symbol_table_); }
 
   const SymbolTable& symbolTable() const override { return symbol_table_; }
@@ -58,7 +58,7 @@ class NullMetricImpl : public MetricImpl {
   bool used() const override { return false; }
   StatName statName() const override { return stat_name_storage_.statName(); }
 
- private:
+private:
   SymbolTable& symbol_table_;
   StatNameStorage stat_name_storage_;
 };

@@ -1,8 +1,9 @@
 #include "common/stats/scope_prefixer.h"
 
+#include "envoy/stats/scope.h"
+
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
-#include "envoy/stats/scope.h"
 
 namespace Envoy {
 namespace Stats {
@@ -10,15 +11,13 @@ namespace Stats {
 // Variant of ScopePrefixer that owns the scope being prefixed, and will
 // delete it upon destruction.
 ScopePrefixer::ScopePrefixer(absl::string_view prefix, Scope* scope)
-    : prefix_(Utility::sanitizeStatsName(prefix), scope->symbolTable()),
-      scope_(scope),
+    : prefix_(Utility::sanitizeStatsName(prefix), scope->symbolTable()), scope_(scope),
       owns_scope_(true) {}
 
 // Variant of ScopePrefixer that references the scope being prefixed, but does
 // not own it.
 ScopePrefixer::ScopePrefixer(absl::string_view prefix, Scope& scope)
-    : prefix_(Utility::sanitizeStatsName(prefix), scope.symbolTable()),
-      scope_(&scope),
+    : prefix_(Utility::sanitizeStatsName(prefix), scope.symbolTable()), scope_(&scope),
       owns_scope_(false) {}
 
 ScopePrefixer::~ScopePrefixer() {
@@ -29,8 +28,8 @@ ScopePrefixer::~ScopePrefixer() {
 }
 
 ScopePtr ScopePrefixer::createScope(const std::string& name) {
-  //StatNameStorage scope_stat_name(name, symbolTable());  // Takes a lock.
-  //StatNameStorage joiner(prefix_.statName(), scope_stat_name.statName());
+  // StatNameStorage scope_stat_name(name, symbolTable());  // Takes a lock.
+  // StatNameStorage joiner(prefix_.statName(), scope_stat_name.statName());
   return std::make_unique<ScopePrefixer>(prefix_.statName().toString(symbolTable()) + "." + name,
                                          *scope_);
 }

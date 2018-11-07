@@ -341,17 +341,16 @@ private:
 };
 
 class StatNameTempStorage : public StatNameStorage {
- public:
+public:
   StatNameTempStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
   StatNameTempStorage(StatName src, SymbolTable& table)
       : StatNameStorage(src, table), symbol_table_(table) {}
   ~StatNameTempStorage() { free(symbol_table_); }
 
- private:
+private:
   SymbolTable& symbol_table_;
 };
-
 
 // Helper class for constructing hash-tables with StatName keys.
 struct StatNameHash {

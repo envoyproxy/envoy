@@ -74,7 +74,7 @@ private:
  */
 class NullHistogramImpl : public Histogram, NullMetricImpl {
 public:
-  explicit NullHistogramImpl(SymbolTable& symbol_table): NullMetricImpl(symbol_table) {}
+  explicit NullHistogramImpl(SymbolTable& symbol_table) : NullMetricImpl(symbol_table) {}
   ~NullHistogramImpl() { MetricImpl::clear(); }
 
   void recordValue(uint64_t) override {}

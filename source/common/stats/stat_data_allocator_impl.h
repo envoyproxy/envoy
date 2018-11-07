@@ -101,7 +101,7 @@ protected:
  */
 class NullCounterImpl : public Counter, NullMetricImpl {
 public:
-  explicit NullCounterImpl(SymbolTable& symbol_table): NullMetricImpl(symbol_table) {}
+  explicit NullCounterImpl(SymbolTable& symbol_table) : NullMetricImpl(symbol_table) {}
   ~NullCounterImpl() { MetricImpl::clear(); }
 
   void add(uint64_t) override {}
@@ -157,7 +157,7 @@ protected:
  */
 class NullGaugeImpl : public Gauge, NullMetricImpl {
 public:
-  explicit NullGaugeImpl(SymbolTable& symbol_table): NullMetricImpl(symbol_table) {}
+  explicit NullGaugeImpl(SymbolTable& symbol_table) : NullMetricImpl(symbol_table) {}
   ~NullGaugeImpl() { MetricImpl::clear(); }
 
   void add(uint64_t) override {}

@@ -29,11 +29,8 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(const StatsOptions& stats_options,
       stats_matcher_(std::make_unique<StatsMatcherImpl>()),
       stats_overflow_("stats.overflow", alloc.symbolTable()),
       num_last_resort_stats_(default_scope_->counterx(stats_overflow_.statName())),
-      heap_allocator_(alloc.symbolTable()),
-      source_(*this),
-      null_counter_(alloc.symbolTable()),
-      null_gauge_(alloc.symbolTable()),
-      null_histogram_(alloc.symbolTable()) {}
+      heap_allocator_(alloc.symbolTable()), source_(*this), null_counter_(alloc.symbolTable()),
+      null_gauge_(alloc.symbolTable()), null_histogram_(alloc.symbolTable()) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_);
@@ -226,14 +223,14 @@ void ThreadLocalStoreImpl::ScopeImpl::extractTagsAndTruncate(
 // on the original, untruncated name so the extraction can complete properly,
 // even if the tag values are partially truncated.
 class TruncationExtraction {
- public:
+public:
   TruncationExtraction(ThreadLocalStoreImpl& tls, StatName name) : stat_name_(name) {
     std::string name_str = name.toString(tls.symbolTable());
     tag_extracted_name_ = tls.tagProducer().produceTags(name_str, tags_);
     absl::string_view truncated_name = tls.truncateStatNameIfNeeded(name_str);
     if (truncated_name.size() < name_str.size()) {
-      truncated_name_storage_ = std::make_unique<StatNameTempStorage>(
-          truncated_name, tls.symbolTable());
+      truncated_name_storage_ =
+          std::make_unique<StatNameTempStorage>(truncated_name, tls.symbolTable());
       stat_name_ = truncated_name_storage_->statName();
     }
   }
@@ -242,7 +239,7 @@ class TruncationExtraction {
   const std::string& tagExtractedName() { return tag_extracted_name_; }
   StatName truncatedStatName() { return stat_name_; }
 
- private:
+private:
   std::vector<Tag> tags_;
   std::string tag_extracted_name_;
   std::unique_ptr<StatNameTempStorage> truncated_name_storage_;
@@ -317,13 +314,13 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterx(StatName name) {
     tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].counters_;
   }
 
-  return safeMakeStat<Counter>(
-      final_name.statName(), central_cache_.counters_,
-      [](StatDataAllocator& allocator, StatName name, absl::string_view tag_extracted_name,
-         const std::vector<Tag>& tags) -> CounterSharedPtr {
-        return allocator.makeCounter(name, tag_extracted_name, tags);
-      },
-      tls_cache);
+  return safeMakeStat<Counter>(final_name.statName(), central_cache_.counters_,
+                               [](StatDataAllocator& allocator, StatName name,
+                                  absl::string_view tag_extracted_name,
+                                  const std::vector<Tag>& tags) -> CounterSharedPtr {
+                                 return allocator.makeCounter(name, tag_extracted_name, tags);
+                               },
+                               tls_cache);
 }
 
 void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& histogram,
@@ -363,13 +360,13 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugex(StatName name) {
     tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].gauges_;
   }
 
-  return safeMakeStat<Gauge>(
-      final_name.statName(), central_cache_.gauges_,
-      [](StatDataAllocator& allocator, StatName name, absl::string_view tag_extracted_name,
-         const std::vector<Tag>& tags) -> GaugeSharedPtr {
-        return allocator.makeGauge(name, tag_extracted_name, tags);
-      },
-      tls_cache);
+  return safeMakeStat<Gauge>(final_name.statName(), central_cache_.gauges_,
+                             [](StatDataAllocator& allocator, StatName name,
+                                absl::string_view tag_extracted_name,
+                                const std::vector<Tag>& tags) -> GaugeSharedPtr {
+                               return allocator.makeGauge(name, tag_extracted_name, tags);
+                             },
+                             tls_cache);
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramx(StatName name) {
@@ -406,9 +403,9 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramx(StatName name) {
     central_ref = &p->second;
   } else {
     TruncationExtraction extraction(parent_, final_stat_name);
-    auto stat = std::make_shared<ParentHistogramImpl>(
-        extraction.truncatedStatName(), parent_, *this, extraction.tagExtractedName(),
-        extraction.tags());
+    auto stat =
+        std::make_shared<ParentHistogramImpl>(extraction.truncatedStatName(), parent_, *this,
+                                              extraction.tagExtractedName(), extraction.tags());
     central_ref = &central_cache_.histograms_[stat->statName()];
     *central_ref = stat;
   }
@@ -437,10 +434,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
   }
 
   std::vector<Tag> tags;
-  std::string tag_extracted_name = parent_.tagProducer().produceTags(
-      name.toString(symbolTable()), tags);
-  TlsHistogramSharedPtr hist_tls_ptr = std::make_shared<ThreadLocalHistogramImpl>(
-      name, tag_extracted_name, tags, symbolTable());
+  std::string tag_extracted_name =
+      parent_.tagProducer().produceTags(name.toString(symbolTable()), tags);
+  TlsHistogramSharedPtr hist_tls_ptr =
+      std::make_shared<ThreadLocalHistogramImpl>(name, tag_extracted_name, tags, symbolTable());
 
   parent.addTlsHistogram(hist_tls_ptr);
 
@@ -480,8 +477,8 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
   hist_clear(*other_histogram);
 }
 
-ParentHistogramImpl::ParentHistogramImpl(StatName name, Store& parent,
-                                         TlsScope& tls_scope, absl::string_view tag_extracted_name,
+ParentHistogramImpl::ParentHistogramImpl(StatName name, Store& parent, TlsScope& tls_scope,
+                                         absl::string_view tag_extracted_name,
                                          const std::vector<Tag>& tags)
     : MetricImpl(tag_extracted_name, tags, parent.symbolTable()), parent_(parent),
       tls_scope_(tls_scope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),

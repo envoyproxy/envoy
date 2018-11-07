@@ -14,17 +14,15 @@ namespace Envoy {
 namespace Stats {
 
 IsolatedStoreImpl::IsolatedStoreImpl()
-    : alloc_(symbol_table_),
-      counters_([this](StatName name) -> CounterSharedPtr {
-                  return alloc_.makeCounter(name, name.toString(alloc_.symbolTable()),
-                                            std::vector<Tag>());
+    : alloc_(symbol_table_), counters_([this](StatName name) -> CounterSharedPtr {
+        return alloc_.makeCounter(name, name.toString(alloc_.symbolTable()), std::vector<Tag>());
       }),
       gauges_([this](StatName name) -> GaugeSharedPtr {
         return alloc_.makeGauge(name, name.toString(alloc_.symbolTable()), std::vector<Tag>());
       }),
       histograms_([this](StatName name) -> HistogramSharedPtr {
-                    return std::make_shared<HistogramImpl>(
-                        name, *this, name.toString(alloc_.symbolTable()), std::vector<Tag>());
+        return std::make_shared<HistogramImpl>(name, *this, name.toString(alloc_.symbolTable()),
+                                               std::vector<Tag>());
       }) {}
 
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {

@@ -1,5 +1,6 @@
-#include "common/stats/symbol_table_impl.h"
 #include "envoy/stats/scope.h"
+
+#include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Stats {
@@ -7,7 +8,7 @@ namespace Stats {
 // Implements a Scope that delegates to a passed-in scope, prefixing all names
 // prior to creation.
 class ScopePrefixer : public Scope {
- public:
+public:
   // Variant of ScopePrefixer that owns the scope being prefixed, and will
   // delete it upon destruction.
   ScopePrefixer(absl::string_view prefix, Scope* scope);
@@ -42,7 +43,7 @@ class ScopePrefixer : public Scope {
   const SymbolTable& symbolTable() const override { return scope_->symbolTable(); }
   virtual SymbolTable& symbolTable() override { return scope_->symbolTable(); }
 
- private:
+private:
   StatNameStorage prefix_;
   Scope* scope_;
   const bool owns_scope_;

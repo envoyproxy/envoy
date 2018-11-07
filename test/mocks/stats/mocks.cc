@@ -14,12 +14,12 @@ namespace Envoy {
 namespace Stats {
 
 MockMetric::MockMetric() : symbol_table_(nullptr), name_(*this) {
-  //ON_CALL(*this, tags()).WillByDefault(ReturnPointee(&tags_));
-  //ON_CALL(*this, tagExtractedName()).WillByDefault(Return(tag_extracted_name_));
+  // ON_CALL(*this, tags()).WillByDefault(ReturnPointee(&tags_));
+  // ON_CALL(*this, tagExtractedName()).WillByDefault(Return(tag_extracted_name_));
 }
 MockMetric::MockMetric(SymbolTable& symbol_table) : symbol_table_(&symbol_table), name_(*this) {
-  //ON_CALL(*this, tags()).WillByDefault(ReturnPointee(&tags_));
-  //ON_CALL(*this, tagExtractedName()).WillByDefault(Return(tag_extracted_name_));
+  // ON_CALL(*this, tags()).WillByDefault(ReturnPointee(&tags_));
+  // ON_CALL(*this, tagExtractedName()).WillByDefault(Return(tag_extracted_name_));
 }
 MockMetric::~MockMetric() {}
 
@@ -84,8 +84,7 @@ MockParentHistogram::MockParentHistogram() {
   ON_CALL(*this, cumulativeStatistics()).WillByDefault(ReturnRef(*histogram_stats_));
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
 }
-MockParentHistogram::MockParentHistogram(SymbolTable& symbol_table)
-    : MockMetric(symbol_table) {
+MockParentHistogram::MockParentHistogram(SymbolTable& symbol_table) : MockMetric(symbol_table) {
   ON_CALL(*this, recordValue(_)).WillByDefault(Invoke([this](uint64_t value) {
     if (store_ != nullptr) {
       store_->deliverHistogramToSinks(*this, value);

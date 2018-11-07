@@ -227,10 +227,9 @@ private:
     }
 
     template <class StatType>
-    using MakeStatFn =
-        std::function<std::shared_ptr<StatType>(StatDataAllocator&, StatName name,
-                                                absl::string_view tag_extracted_name,
-                                                const std::vector<Tag>& tags)>;
+    using MakeStatFn = std::function<std::shared_ptr<StatType>(StatDataAllocator&, StatName name,
+                                                               absl::string_view tag_extracted_name,
+                                                               const std::vector<Tag>& tags)>;
 
     /**
      * Makes a stat either by looking it up in the central cache,
@@ -244,14 +243,13 @@ private:
      *     used if non-empty, or filled in if empty (and non-null).
      */
     template <class StatType>
-    StatType&
-    safeMakeStat(StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
-                 MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache);
+    StatType& safeMakeStat(StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
+                           MakeStatFn<StatType> make_stat,
+                           StatMap<std::shared_ptr<StatType>>* tls_cache);
 
-    void extractTagsAndTruncate(
-        StatName& name, std::unique_ptr<StatNameTempStorage>& truncated_name_storage,
-        std::vector<Tag>& tags,
-        std::string& tag_extracted_name);
+    void extractTagsAndTruncate(StatName& name,
+                                std::unique_ptr<StatNameTempStorage>& truncated_name_storage,
+                                std::vector<Tag>& tags, std::string& tag_extracted_name);
 
     static std::atomic<uint64_t> next_scope_id_;
 
