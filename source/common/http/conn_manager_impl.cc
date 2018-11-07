@@ -518,10 +518,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // Drop new requests when overloaded as soon as we have decoded the headers.
   if (connection_manager_.overload_stop_accepting_requests_ref_ ==
       Server::OverloadActionState::Active) {
-    // TODO(alyssawilk) should we special case this or no?  On the one hand it's important
-    // to minimize memory use when in this type of overload. On the other hand
-    // it may be important for auditing purposes to have access logs of
-    // overload-rejected requests.
+    // In this one special case, do not create the filter chain. If there is a risk of memory
+    // overload it is more important to avoid unnecessary allocation than to create the filters.
     state_.created_filter_chain_ = true;
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
