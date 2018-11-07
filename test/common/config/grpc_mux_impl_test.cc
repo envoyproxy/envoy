@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 
@@ -42,19 +44,19 @@ public:
   }
 
   void setup() {
-    grpc_mux_.reset(new GrpcMuxImpl(
+    grpc_mux_ = std::make_unique<GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, rate_limit_settings_));
+        random_, stats_, rate_limit_settings_);
   }
 
   void setup(const RateLimitSettings& custom_rate_limit_settings) {
-    grpc_mux_.reset(new GrpcMuxImpl(
+    grpc_mux_ = std::make_unique<GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, custom_rate_limit_settings));
+        random_, stats_, custom_rate_limit_settings);
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -197,11 +199,11 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
     invalid_response->mutable_resources()->Add()->set_type_url("bar");
     EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)).WillOnce(Invoke([](const EnvoyException* e) {
       EXPECT_TRUE(
-          IsSubstring("", "", "bar does not match foo type URL is DiscoveryResponse", e->what()));
+          IsSubstring("", "", "bar does not match foo type URL in DiscoveryResponse", e->what()));
     }));
 
     expectSendMessage("foo", {"x", "y"}, "", "", Grpc::Status::GrpcStatus::Internal,
-                      fmt::format("bar does not match foo type URL is DiscoveryResponse {}",
+                      fmt::format("bar does not match foo type URL in DiscoveryResponse {}",
                                   invalid_response->DebugString()));
     grpc_mux_->onReceiveMessage(std::move(invalid_response));
   }
@@ -370,8 +372,9 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
   // Exhausts the limit.
   onReceiveMessage(99);
 
-  // API calls go over the limit but we do not get any message.
-  EXPECT_LOG_NOT_CONTAINS("warning", "Too many sendDiscoveryRequest calls", onReceiveMessage(1));
+  // API calls go over the limit but we do not see the stat incremented.
+  onReceiveMessage(1);
+  EXPECT_EQ(0, stats_.counter("control_plane.rate_limit_enforced").value());
 }
 
 //  Verifies that default rate limiting is enforced with empty RateLimitSettings.
@@ -421,7 +424,9 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSetti
 
   // Validate that drain_request_timer is enabled when there are no tokens.
   EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(100)));
-  EXPECT_LOG_CONTAINS("warning", "Too many sendDiscoveryRequest calls", onReceiveMessage(99));
+  onReceiveMessage(99);
+  EXPECT_EQ(1, stats_.counter("control_plane.rate_limit_enforced").value());
+  EXPECT_EQ(1, stats_.gauge("control_plane.pending_requests").value());
 }
 
 //  Verifies that rate limiting is enforced with custom RateLimitSettings.
@@ -471,12 +476,15 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   expectSendMessage("foo", {"x"}, "");
   grpc_mux_->start();
 
-  // Validate that rate limit log does not appear for 100 requests.
-  EXPECT_LOG_NOT_CONTAINS("warning", "Too many sendDiscoveryRequest calls", onReceiveMessage(100));
+  // Validate that rate limit is not enforced for 100 requests.
+  onReceiveMessage(100);
+  EXPECT_EQ(0, stats_.counter("control_plane.rate_limit_enforced").value());
 
   // Validate that drain_request_timer is enabled when there are no tokens.
   EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(500))).Times(AtLeast(1));
-  EXPECT_LOG_CONTAINS("warning", "Too many sendDiscoveryRequest calls", onReceiveMessage(160));
+  onReceiveMessage(160);
+  EXPECT_EQ(12, stats_.counter("control_plane.rate_limit_enforced").value());
+  EXPECT_EQ(12, stats_.counter("control_plane.pending_requests").value());
 
   // Validate that drain requests call when there are multiple requests in queue.
   time_system_.setMonotonicTime(std::chrono::seconds(10));

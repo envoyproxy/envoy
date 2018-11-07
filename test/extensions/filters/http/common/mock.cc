@@ -1,5 +1,7 @@
 #include "test/extensions/filters/http/common/mock.h"
 
+#include <memory>
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -14,7 +16,7 @@ MockUpstream::MockUpstream(Upstream::MockClusterManager& mock_cm, const std::str
             Http::MessagePtr response_message(new Http::ResponseMessageImpl(
                 Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", status_}}}));
             if (response_body_.length()) {
-              response_message->body().reset(new Buffer::OwnedImpl(response_body_));
+              response_message->body() = std::make_unique<Buffer::OwnedImpl>(response_body_);
             } else {
               response_message->body().reset(nullptr);
             }

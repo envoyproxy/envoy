@@ -69,7 +69,8 @@ void GrpcMuxImpl::drainRequests() {
     } else {
       ASSERT(rate_limiting_enabled_);
       ASSERT(drain_request_timer_ != nullptr);
-      ENVOY_LOG(warn, "Too many sendDiscoveryRequest calls :");
+      control_plane_stats_.rate_limit_enforced_.inc();
+      control_plane_stats_.pending_requests_.set(request_queue_.size());
       // Enable the drain request timer.
       drain_request_timer_->enableTimer(
           std::chrono::milliseconds(limit_request_->nextTokenAvailableMs()));
@@ -224,7 +225,7 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     GrpcMuxCallbacks& callbacks = api_state_[type_url].watches_.front()->callbacks_;
     for (const auto& resource : message->resources()) {
       if (type_url != resource.type_url()) {
-        throw EnvoyException(fmt::format("{} does not match {} type URL is DiscoveryResponse {}",
+        throw EnvoyException(fmt::format("{} does not match {} type URL in DiscoveryResponse {}",
                                          resource.type_url(), type_url, message->DebugString()));
       }
       const std::string resource_name = callbacks.resourceName(resource);

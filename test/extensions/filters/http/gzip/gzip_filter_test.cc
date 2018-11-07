@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/compressor/zlib_compressor_impl.h"
 #include "common/decompressor/zlib_decompressor_impl.h"
 #include "common/protobuf/utility.h"
@@ -63,7 +65,7 @@ protected:
     envoy::config::filter::http::gzip::v2::Gzip gzip;
     MessageUtil::loadFromJson(json, gzip);
     config_.reset(new GzipFilterConfig(gzip, "test.", stats_, runtime_));
-    filter_.reset(new GzipFilter(config_));
+    filter_ = std::make_unique<GzipFilter>(config_);
   }
 
   void verifyCompressedData() {

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/event/dispatcher.h"
@@ -316,7 +317,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
-  upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));
+  upstream_request_ = std::make_unique<UpstreamRequest>(*this, *conn_pool);
   upstream_request_->encodeHeaders(end_stream);
   if (end_stream) {
     onRequestComplete();
@@ -411,7 +412,7 @@ void Filter::maybeDoShadowing() {
   Http::MessagePtr request(new Http::RequestMessageImpl(
       Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_headers_)}));
   if (callbacks_->decodingBuffer()) {
-    request->body().reset(new Buffer::OwnedImpl(*callbacks_->decodingBuffer()));
+    request->body() = std::make_unique<Buffer::OwnedImpl>(*callbacks_->decodingBuffer());
   }
   if (downstream_trailers_) {
     request->trailers(Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_trailers_)});
@@ -432,7 +433,6 @@ void Filter::onRequestComplete() {
     // seems unnecessary right now.
     maybeDoShadowing();
 
-    upstream_request_->setupPerTryTimeout();
     if (timeout_.global_timeout_.count() > 0) {
       response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
       response_timeout_->enableTimer(timeout_.global_timeout_);
@@ -783,7 +783,7 @@ void Filter::doRetry() {
 
   ASSERT(response_timeout_ || timeout_.global_timeout_.count() == 0);
   ASSERT(!upstream_request_);
-  upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));
+  upstream_request_ = std::make_unique<UpstreamRequest>(*this, *conn_pool);
   upstream_request_->encodeHeaders(!callbacks_->decodingBuffer() && !downstream_trailers_);
   // It's possible we got immediately reset.
   if (upstream_request_) {
@@ -796,8 +796,6 @@ void Filter::doRetry() {
     if (downstream_trailers_) {
       upstream_request_->encodeTrailers(*downstream_trailers_);
     }
-
-    upstream_request_->setupPerTryTimeout();
   }
 }
 
@@ -891,9 +889,9 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
   if (!request_encoder_) {
     ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks_, data.length());
     if (!buffered_request_body_) {
-      buffered_request_body_.reset(
-          new Buffer::WatermarkBuffer([this]() -> void { this->enableDataFromDownstream(); },
-                                      [this]() -> void { this->disableDataFromDownstream(); }));
+      buffered_request_body_ = std::make_unique<Buffer::WatermarkBuffer>(
+          [this]() -> void { this->enableDataFromDownstream(); },
+          [this]() -> void { this->disableDataFromDownstream(); });
       buffered_request_body_->setWatermarks(parent_.buffer_limit_);
     }
 
@@ -1004,6 +1002,8 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
+
+  setupPerTryTimeout();
 
   conn_pool_stream_handle_ = nullptr;
   setRequestEncoder(request_encoder);

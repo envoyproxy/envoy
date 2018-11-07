@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package envoy.admin.v2alpha;
+
+import "google/protobuf/duration.proto";
+
+// [#protodoc-title: Server State]
+
+// Proto representation of the value returned by /server_info, containing
+// server version/server status information.
+message ServerInfo {
+  // Server version.
+  string version = 1;
+
+  enum State {
+    // Server is live and serving traffic.
+    LIVE = 0;
+    // Server is draining listeners in response to external health checks failing.
+    DRAINING = 1;
+  }
+
+  // State of the server.
+  State state = 2;
+
+  // Uptime since current epoch was started.
+  google.protobuf.Duration uptime_current_epoch = 3;
+  // Uptime since the start of the first epoch.
+  google.protobuf.Duration uptime_all_epochs = 4;
+  // Which restart epoch the server is currently in.
+  uint32 epoch = 5;
+}

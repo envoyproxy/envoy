@@ -1,6 +1,7 @@
 #include "common/upstream/load_balancer_impl.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -300,7 +301,7 @@ void ZoneAwareLoadBalancerBase::resizePerPriorityState() {
   const uint32_t size = priority_set_.hostSetsPerPriority().size();
   while (per_priority_state_.size() < size) {
     // Note for P!=0, PerPriorityState is created with NoLocalityRouting and never changed.
-    per_priority_state_.push_back(PerPriorityStatePtr{new PerPriorityState});
+    per_priority_state_.push_back(std::make_unique<PerPriorityState>());
   }
 }
 

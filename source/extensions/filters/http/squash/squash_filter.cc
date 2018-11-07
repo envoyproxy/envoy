@@ -1,5 +1,7 @@
 #include "extensions/filters/http/squash/squash_filter.h"
 
+#include <memory>
+
 #include "envoy/http/codes.h"
 
 #include "common/common/empty_string.h"
@@ -146,7 +148,7 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::HeaderMap& headers, 
   request->headers().insertPath().value().setReference(POST_ATTACHMENT_PATH);
   request->headers().insertHost().value().setReference(SERVER_AUTHORITY);
   request->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-  request->body().reset(new Buffer::OwnedImpl(config_->attachmentJson()));
+  request->body() = std::make_unique<Buffer::OwnedImpl>(config_->attachmentJson());
 
   is_squashing_ = true;
   in_flight_request_ =

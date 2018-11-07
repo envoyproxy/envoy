@@ -53,14 +53,22 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
   case Server::Mode::Serve: {
 #ifdef ENVOY_HOT_RESTART
     if (!options.hotRestartDisabled()) {
+<<<<<<< HEAD
       restarter_.reset(new Server::HotRestartImpl(options_, symbol_table_));
     }
 #endif
     if (restarter_.get() == nullptr) {
       restarter_.reset(new Server::HotRestartNopImpl(symbol_table_));
+=======
+      restarter_ = std::make_unique<Server::HotRestartImpl>(options_);
+    }
+#endif
+    if (restarter_ == nullptr) {
+      restarter_ = std::make_unique<Server::HotRestartNopImpl>();
+>>>>>>> master
     }
 
-    tls_.reset(new ThreadLocal::InstanceImpl);
+    tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
@@ -75,10 +83,11 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
     server_ = std::make_unique<Server::InstanceImpl>(
         options_, time_system, local_address, test_hooks, *restarter_, *stats_store_,
         access_log_lock, component_factory, std::move(random_generator), *tls_);
+
     break;
   }
   case Server::Mode::Validate:
-    restarter_.reset(new Server::HotRestartNopImpl(symbol_table_));
+    restarter_ = std::make_unique<Server::HotRestartNopImpl>(symbol_table_);
     logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
                                                          restarter_->logLock());
     break;
