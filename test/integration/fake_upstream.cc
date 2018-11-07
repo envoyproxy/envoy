@@ -119,6 +119,9 @@ void FakeStream::encodeMetadata(const Http::MetadataMap& metadata_map) {
   std::shared_ptr<Http::MetadataMap> metadata_map_copy(
       new Http::MetadataMap(static_cast<const Http::MetadataMap&>(metadata_map)));
   parent_.connection().dispatcher().post([this, metadata_map_copy]() -> void {
+    ENVOY_LOG_MISC(error, "+++++++ call encode100 ");
+    encoder_.encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", "100"}});
+    ENVOY_LOG_MISC(error, "+++++++ call encodeMetadata");
     encoder_.encodeMetadata(*metadata_map_copy);
   });
 }
@@ -219,6 +222,7 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
   } else {
     auto settings = Http::Http2Settings();
     settings.allow_connect_ = true;
+    settings.allow_metadata_ = true;
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(shared_connection_.connection(),
                                                                  *this, store, settings);
     ASSERT(type == Type::HTTP2);

@@ -38,7 +38,7 @@ public:
   void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(const HeaderMap& trailers) override;
-  void encodeMetadata(const MetadataMap& metadata_map) override;
+  void encodeMetadata(const MetadataMap&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Stream& getStream() override { return *this; }
 
   // Http::Stream

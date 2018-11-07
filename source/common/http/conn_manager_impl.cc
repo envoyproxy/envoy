@@ -1547,7 +1547,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeTrailers(HeaderMapP
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeMetadata(
     std::unique_ptr<MetadataMap> metadata_map) {
   parent_.metadata_map_ = std::move(metadata_map);
-  parent_.encodeTrailers(nullptr, *parent_.response_trailers_);
+  parent_.encodeMetadata(nullptr, *parent_.metadata_map_);
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::

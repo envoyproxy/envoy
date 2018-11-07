@@ -30,4 +30,12 @@ public:
   std::vector<FakeHttpConnectionPtr> fake_upstream_connections_;
   int num_upstreams_ = 5;
 };
+
+class Http2MetadataIntegrationTest : public Http2IntegrationTest {
+public:
+  void SetUp() override {
+    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  }
+};
 } // namespace Envoy

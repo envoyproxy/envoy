@@ -332,6 +332,7 @@ MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
 }
 
 void ConnectionImpl::StreamImpl::onMetadataDecoded(std::unique_ptr<MetadataMap> metadata_map) {
+  ENVOY_LOG_MISC(error, "++++++++++++ onMetadataDecoded");
   decoder_->decodeMetadata(std::move(metadata_map));
 }
 
@@ -594,6 +595,7 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
 }
 
 int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len) {
+  ENVOY_LOG_MISC(error, "+++++++++ onMetadataReceived");
   ENVOY_CONN_LOG(trace, "recv {} bytes METADATA", connection_, len);
 
   StreamImpl* stream = getStream(stream_id);
@@ -618,6 +620,7 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
 
 ssize_t ConnectionImpl::packMetadata(int32_t stream_id, uint8_t* buf, size_t len) {
   ENVOY_CONN_LOG(trace, "pack METADATA frame on stream {}", connection_, stream_id);
+  ENVOY_CONN_LOG(error, "++++++++++pack METADATA frame on stream {}", connection_, stream_id);
 
   StreamImpl* stream = getStream(stream_id);
   ASSERT(stream != nullptr);

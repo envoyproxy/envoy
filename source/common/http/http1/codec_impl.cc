@@ -50,11 +50,6 @@ void StreamEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
   processing_100_continue_ = false;
 }
 
-void StreamEncoderImpl::encodeMetadata(const MetadataMap& metadata_map) {
-  Envoy::Http::Http2::MetadataEncoder metadata_encoder;
-  metadata_encoder.createPayload(metadata_map);
-}
-
 void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   bool saw_content_length = false;
   headers.iterate(
