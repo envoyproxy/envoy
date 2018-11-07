@@ -225,7 +225,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequests) {
   EXPECT_CALL(r3.inner_encoder_, encodeHeaders(_, true));
   r3.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
 
-  // Since we now have an active connection, subsequent requets should connect immediately.
+  // Since we now have an active connection, subsequent requests should connect immediately.
   ActiveTestRequest r4(*this, 0, true);
 
   // Clean up everything.
@@ -234,7 +234,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequests) {
   dispatcher_.clearDeferredDeleteList();
 }
 
-// Verifies that reuqests are queued up in the conn pool and fail when the connection
+// Verifies that requests are queued up in the conn pool and fail when the connection
 // fails to be established.
 TEST_F(Http2ConnPoolImplTest, PendingRequestsFailure) {
   InSequence s;
@@ -264,7 +264,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsFailure) {
   dispatcher_.clearDeferredDeleteList();
 }
 
-// Verifies that reuqests are queued up in the conn pool and respect max request circuit breaking
+// Verifies that requests are queued up in the conn pool and respect max request circuit breaking
 // when the connection is established.
 TEST_F(Http2ConnPoolImplTest, PendingRequestsRequestOverflow) {
   InSequence s;
