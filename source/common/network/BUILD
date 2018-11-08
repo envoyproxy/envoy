@@ -250,7 +250,6 @@ envoy_cc_library(
     ],
 )
 
-
 envoy_cc_library(
     name = "upstream_server_name_lib",
     srcs = ["upstream_server_name.cc"],

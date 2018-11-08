@@ -367,10 +367,8 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
       downstreamConnection()->streamInfo().filterState().hasData<UpstreamServerName>(
           UpstreamServerName::Key)) {
     const auto& original_requested_server_name =
-        downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .getDataReadOnly<UpstreamServerName>(UpstreamServerName::Key);
+        downstreamConnection()->streamInfo().filterState().getDataReadOnly<UpstreamServerName>(
+            UpstreamServerName::Key);
     transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
         original_requested_server_name.value());
   }
