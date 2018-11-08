@@ -16,7 +16,7 @@ message FindAndReplace {
   // Optional string to find in data from the downstream side (read filter).
   // Finding the string is currently only supported from the very beginning of the data on a given
   // connection, meaning the string has to match the beginning of the data. If empty (or not
-  // specified), then it will simply match the beginning of the data and :ref:`input_rewrite_to
+  // specified), then :ref:`input_rewrite_to
   // <envoy_api_field_config.filter.network.find_and_replace.v2alpha1.FindAndReplace.input_rewrite_to>`
   // effectively becomes an insertion instead of a replacement string. Defaults to empty.
   string input_rewrite_from = 1;
