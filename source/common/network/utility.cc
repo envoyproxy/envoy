@@ -210,13 +210,17 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 
 bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
   const auto& remote_address = socket.remoteAddress();
+  // Before calling getifaddrs, verify the obvious checks.
+  // Note that there are corner cases, where remote and local address will be the same
+  // while the client is not actually local. Example could be an iptables intercepted
+  // connection. However, this is a rare exception and such assumption results in big
+  // performance optimization.
   if (remote_address->type() == Envoy::Network::Address::Type::Pipe ||
       remote_address == socket.localAddress() || isLoopbackAddress(*remote_address)) {
     return true;
   }
 
   struct ifaddrs* ifaddr;
-
   int rc = getifaddrs(&ifaddr);
   RELEASE_ASSERT(!rc, "");
 
