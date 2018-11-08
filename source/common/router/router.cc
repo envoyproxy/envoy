@@ -866,7 +866,7 @@ void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   parent_.onUpstreamTrailers(std::move(trailers));
 }
 
-void Filter::UpstreamRequest::decodeMetadata(std::unique_ptr<Http::MetadataMap> metadata_map) {
+void Filter::UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
   // ++++++++++++++ verify allow_metadata.
   parent_.onUpstreamMetadata(std::move(metadata_map));
 }

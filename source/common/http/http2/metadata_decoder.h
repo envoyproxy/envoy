@@ -21,7 +21,8 @@ class MetadataEncoderDecoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test
 class MetadataDecoder : Logger::Loggable<Logger::Id::http2> {
 public:
   /**
-   * @param metadata_map is where to save the decoded metadata.
+   * @param cb is the decoder's callback function. The callback function is called when the decoder
+   * finishes decoding metadata.
    */
   MetadataDecoder(MetadataCallback cb);
 
@@ -59,8 +60,8 @@ private:
    */
   bool decodeMetadataPayloadUsingNghttp2(bool end_metadata);
 
-  // Metadata that is currently under decoding.
-  std::unique_ptr<MetadataMap> metadata_map_;
+  // Metadata that is currently being decoded.
+  MetadataMapPtr metadata_map_;
 
   // Metadata event callback function.
   MetadataCallback callback_;

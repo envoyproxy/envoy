@@ -116,7 +116,7 @@ void IntegrationStreamDecoder::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   }
 }
 
-void IntegrationStreamDecoder::decodeMetadata(std::unique_ptr<Http::MetadataMap> metadata_map) {
+void IntegrationStreamDecoder::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
   metadata_map_ = std::move(metadata_map);
 }
 
