@@ -21,6 +21,19 @@ uint64_t Stats::totalCurrentlyReserved() {
   return value;
 }
 
+uint64_t Stats::totalThreadCacheBytes() {
+  size_t value = 0;
+  MallocExtension::instance()->GetNumericProperty("tcmalloc.current_total_thread_cache_bytes",
+                                                  &value);
+  return value;
+}
+
+uint64_t Stats::totalPageHeapFree() {
+  size_t value = 0;
+  MallocExtension::instance()->GetNumericProperty("tcmalloc.pageheap_free_bytes", &value);
+  return value;
+}
+
 uint64_t Stats::totalPageHeapUnmapped() {
   size_t value = 0;
   MallocExtension::instance()->GetNumericProperty("tcmalloc.pageheap_unmapped_bytes", &value);
@@ -36,8 +49,10 @@ namespace Envoy {
 namespace Memory {
 
 uint64_t Stats::totalCurrentlyAllocated() { return 0; }
+uint64_t Stats::totalThreadCacheBytes() { return 0; }
 uint64_t Stats::totalCurrentlyReserved() { return 0; }
 uint64_t Stats::totalPageHeapUnmapped() { return 0; }
+uint64_t Stats::totalPageHeapFree() { return 0; }
 
 } // namespace Memory
 } // namespace Envoy

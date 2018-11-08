@@ -64,6 +64,11 @@ do
         exit 1
       fi
     done
+    "$SCRIPT_DIR"/format_python_tools.sh check
+    if [[ $? -ne 0 ]]; then
+      exit 1
+    fi
+
 
     # Check correctness of repositories definitions.
     echo "  Checking repositories definitions"

@@ -14,6 +14,7 @@
 #include "common/common/linked_object.h"
 #include "common/http/codec_client.h"
 #include "common/http/codec_wrappers.h"
+#include "common/http/conn_pool_base.h"
 
 #include "absl/types/optional.h"
 
@@ -27,7 +28,7 @@ namespace Http1 {
  *       address. Higher layer code should handle resolving DNS on error and creating a new pool
  *       bound to a different IP address.
  */
-class ConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::Instance {
+class ConnPoolImpl : public ConnectionPool::Instance, public ConnPoolImplBase {
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
@@ -41,6 +42,9 @@ public:
   void drainConnections() override;
   ConnectionPool::Cancellable* newStream(StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
+
+  // ConnPoolImplBase
+  void checkForDrained() override;
 
 protected:
   struct ActiveClient;
@@ -98,41 +102,21 @@ protected:
 
   typedef std::unique_ptr<ActiveClient> ActiveClientPtr;
 
-  struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
-    PendingRequest(ConnPoolImpl& parent, StreamDecoder& decoder,
-                   ConnectionPool::Callbacks& callbacks);
-    ~PendingRequest();
-
-    // Cancellable
-    void cancel() override { parent_.onPendingRequestCancel(*this); }
-
-    ConnPoolImpl& parent_;
-    StreamDecoder& decoder_;
-    ConnectionPool::Callbacks& callbacks_;
-  };
-
-  typedef std::unique_ptr<PendingRequest> PendingRequestPtr;
-
   void attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
                              ConnectionPool::Callbacks& callbacks);
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
-  void checkForDrained();
   void createNewConnection();
   void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event);
   void onDownstreamReset(ActiveClient& client);
-  void onPendingRequestCancel(PendingRequest& request);
   void onResponseComplete(ActiveClient& client);
   void onUpstreamReady();
   void processIdleClient(ActiveClient& client, bool delay);
 
   Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
-  Upstream::HostConstSharedPtr host_;
   std::list<ActiveClientPtr> ready_clients_;
   std::list<ActiveClientPtr> busy_clients_;
-  std::list<PendingRequestPtr> pending_requests_;
   std::list<DrainedCb> drained_callbacks_;
-  Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   Event::TimerPtr upstream_ready_timer_;
   bool upstream_ready_enabled_{false};

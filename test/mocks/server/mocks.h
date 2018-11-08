@@ -5,6 +5,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/common/mutex_tracer.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
@@ -75,6 +76,8 @@ public:
   MOCK_CONST_METHOD0(maxStats, uint64_t());
   MOCK_CONST_METHOD0(statsOptions, const Stats::StatsOptions&());
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
+  MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
+  MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
 
   std::string config_path_;
   std::string config_yaml_;
@@ -89,6 +92,8 @@ public:
   uint32_t concurrency_{1};
   uint64_t hot_restart_epoch_{};
   bool hot_restart_disabled_{};
+  bool signal_handling_enabled_{true};
+  bool mutex_tracing_enabled_{};
 };
 
 class MockConfigTracker : public ConfigTracker {
@@ -323,6 +328,7 @@ public:
   MOCK_METHOD0(hotRestart, HotRestart&());
   MOCK_METHOD0(initManager, Init::Manager&());
   MOCK_METHOD0(listenerManager, ListenerManager&());
+  MOCK_METHOD0(mutexTracer, Envoy::MutexTracer*());
   MOCK_METHOD0(options, Options&());
   MOCK_METHOD0(overloadManager, OverloadManager&());
   MOCK_METHOD0(random, Runtime::RandomGenerator&());
