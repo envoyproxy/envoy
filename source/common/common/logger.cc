@@ -57,14 +57,14 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   absl::ReleasableMutexLock lock(&format_mutex_);
   if (!formatter_) {
     lock.Release();
-    sink_->log(fmt::to_string(msg.raw));
+    sink_->log(absl::string_view(msg.raw.data(), msg.raw.size()));
     return;
   }
 
   fmt::memory_buffer formatted;
   formatter_->format(msg, formatted);
   lock.Release();
-  sink_->log(fmt::to_string(formatted));
+  sink_->log(absl::string_view(formatted.data(), formatted.size()));
 }
 
 DelegatingLogSinkPtr DelegatingLogSink::init() {
