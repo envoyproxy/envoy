@@ -21,6 +21,7 @@
 #include "envoy/stats/stats_options.h"
 #include "envoy/thread/thread.h"
 
+#include "common/http/codes.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
@@ -344,10 +345,10 @@ public:
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
-  // MOCK_METHOD0(timeSystem, Event::TestTimeSystem&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
   Event::TestTimeSystem& timeSystem() override { return test_time_.timeSystem(); }
+  Http::CodeStats& codeStats() override { return code_stats_; }
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -373,6 +374,7 @@ public:
   testing::NiceMock<MockListenerManager> listener_manager_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Singleton::ManagerPtr singleton_manager_;
+  Http::CodeStatsImpl code_stats_;
 };
 
 namespace Configuration {
@@ -429,6 +431,8 @@ public:
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
+  Http::CodeStats& codeStats() override { return code_stats_; }
+
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
@@ -445,6 +449,7 @@ public:
   Stats::IsolatedStoreImpl listener_scope_;
   Event::SimulatedTimeSystem time_system_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
+  Http::CodeStatsImpl code_stats_;
 };
 
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {

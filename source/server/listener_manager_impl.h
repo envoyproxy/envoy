@@ -289,6 +289,7 @@ public:
     ensureSocketOptions();
     Network::Socket::appendOptions(listen_socket_options_, options);
   }
+  Http::CodeStats& codeStats() override { return parent_.server_.codeStats(); }
 
   // Network::DrainDecision
   bool drainClose() const override;

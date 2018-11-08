@@ -142,6 +142,7 @@ envoy_cc_library(
     deps = [
         ":admin_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/init:init_interface",
         "//include/envoy/json:json_object_interface",

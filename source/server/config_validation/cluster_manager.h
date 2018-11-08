@@ -28,7 +28,8 @@ public:
   clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin) override;
+                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin,
+                          Http::CodeStats& code_stats) override;
 
   // Delegates to ProdClusterManagerFactory::createCds, but discards the result and returns nullptr
   // unconditionally.
@@ -47,7 +48,7 @@ public:
                            ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                            AccessLog::AccessLogManager& log_manager, Event::Dispatcher& dispatcher,
-                           Server::Admin& admin);
+                           Server::Admin& admin, Http::CodeStats& code_stats);
 
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string&, ResourcePriority,
                                                          Http::Protocol,

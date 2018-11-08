@@ -174,11 +174,11 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                                        const LocalInfo::LocalInfo& local_info,
                                        AccessLog::AccessLogManager& log_manager,
                                        Event::Dispatcher& main_thread_dispatcher,
-                                       Server::Admin& admin)
+                                       Server::Admin& admin, Http::CodeStats& code_stats)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), log_manager_(log_manager),
       bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
-      cm_stats_(generateStats(stats)),
+      cm_stats_(generateStats(stats)), code_stats_(code_stats),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
@@ -1020,7 +1020,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
       http_async_client_(cluster, parent.parent_.stats_, parent.thread_local_dispatcher_,
                          parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
                          parent.parent_.random_,
-                         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)}) {
+                         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)},
+                         parent_.parent_.code_stats_) {
   priority_set_.getOrCreateHostSet(0);
 
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
@@ -1170,10 +1171,10 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v2::Bootstrap& bootstrap, Stats::Store& stats,
     ThreadLocal::Instance& tls, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
-    Server::Admin& admin) {
+    Server::Admin& admin, Http::CodeStats& code_stats) {
   return ClusterManagerPtr{new ClusterManagerImpl(bootstrap, *this, stats, tls, runtime, random,
                                                   local_info, log_manager, main_thread_dispatcher_,
-                                                  admin)};
+                                                  admin, code_stats)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(

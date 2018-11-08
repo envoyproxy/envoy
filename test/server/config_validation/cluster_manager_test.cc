@@ -1,6 +1,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/http/codes.h"
 #include "common/ssl/context_manager_impl.h"
 
 #include "server/config_validation/cluster_manager.h"
@@ -40,8 +41,9 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
 
   AccessLog::MockAccessLogManager log_manager;
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  Http::CodeStatsImpl code_stats;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(
-      bootstrap, stats, tls, runtime, random, local_info, log_manager, admin);
+      bootstrap, stats, tls, runtime, random, local_info, log_manager, admin, code_stats);
   EXPECT_EQ(nullptr, cluster_manager->httpConnPoolForCluster("cluster", ResourcePriority::Default,
                                                              Http::Protocol::Http11, nullptr));
   Host::CreateConnectionData data = cluster_manager->tcpConnForCluster("cluster", nullptr);

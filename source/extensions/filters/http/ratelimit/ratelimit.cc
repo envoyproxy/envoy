@@ -126,17 +126,17 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
     break;
   case RateLimit::LimitStatus::OverLimit:
     cluster_->statsScope().counter("ratelimit.over_limit").inc();
-    Http::CodeUtility::ResponseStatInfo info{config_->scope(),
-                                             cluster_->statsScope(),
-                                             EMPTY_STRING,
-                                             enumToInt(Http::Code::TooManyRequests),
-                                             true,
-                                             EMPTY_STRING,
-                                             EMPTY_STRING,
-                                             EMPTY_STRING,
-                                             EMPTY_STRING,
-                                             false};
-    Http::CodeUtility::chargeResponseStat(info);
+    Http::CodeStats::ResponseStatInfo info{config_->scope(),
+                                           cluster_->statsScope(),
+                                           EMPTY_STRING,
+                                           enumToInt(Http::Code::TooManyRequests),
+                                           true,
+                                           EMPTY_STRING,
+                                           EMPTY_STRING,
+                                           EMPTY_STRING,
+                                           EMPTY_STRING,
+                                           false};
+    codeStats().chargeResponseStat(info);
     headers_to_add_->insertEnvoyRateLimited().value(
         Http::Headers::get().EnvoyRateLimitedValues.True);
     break;
