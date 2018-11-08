@@ -13,7 +13,7 @@ namespace Http {
 
 class CodeStatsImpl : public CodeStats {
 public:
-  CodeStatsImpl();
+  explicit CodeStatsImpl(Stats::SymbolTable& symbol_table);
   ~CodeStatsImpl() override;
 
   // CodeStats
@@ -25,25 +25,49 @@ public:
 private:
   static absl::string_view stripTrailingDot(absl::string_view prefix);
   static std::string join(const std::vector<absl::string_view>& v);
+  Stats::StatName makeStatName(absl::string_view name);
+  Stats::StatName upstreamRqGroup(Code response_code) const;
 
-  const absl::string_view canary_upstream_rq_completed_{"canary.upstream_rq_completed"};
-  const absl::string_view canary_upstream_rq_time_{"canary.upstream_rq_time"};
-  const absl::string_view canary_upstream_rq_{"canary.upstream_rq_"};
-  const absl::string_view external_rq_time_{"external.upstream_rq_time"};
-  const absl::string_view external_upstream_rq_completed_{"external.upstream_rq_completed"};
-  const absl::string_view external_upstream_rq_time_{"external.upstream_rq_time"};
-  const absl::string_view external_upstream_rq_{"external.upstream_rq_"};
-  const absl::string_view internal_rq_time_{"internal.upstream_rq_time"};
-  const absl::string_view internal_upstream_rq_completed_{"internal.upstream_rq_completed"};
-  const absl::string_view internal_upstream_rq_time_{"internal.upstream_rq_time"};
-  const absl::string_view internal_upstream_rq_{"internal.upstream_rq_"};
-  const absl::string_view upstream_rq_completed_{"upstream_rq_completed"};
-  const absl::string_view upstream_rq_time_{"upstream_rq_time"};
-  const absl::string_view upstream_rq_time{"upstream_rq_time"};
-  const absl::string_view upstream_rq_{"upstream_rq_"};
-  const absl::string_view vcluster_{"vcluster"};
-  const absl::string_view vhost_{"vhost"};
-  const absl::string_view zone_{"zone"};
+  // We have to actively free the StatNameStorage with the symbol_table_, so
+  // it's easiest to accumulate the StatNameStorage objects in a vector, in
+  // addition to having discrete member variables. That saves having to
+  // enumerate the stat-names in both the member-variables listed below
+  // and the destructor.
+  //
+  // TODO(jmarantz): consider a new variant in stats_macros.h to enumerate stats
+  // names and manage their storage.
+  std::vector<Stats::StatNameStorage> storage_;
+
+  Stats::SymbolTable& symbol_table_;
+  Stats::StatName canary_upstream_rq_completed_;
+  Stats::StatName canary_upstream_rq_time_;
+  Stats::StatName external_rq_time_;
+  Stats::StatName external_upstream_rq_completed_;
+  Stats::StatName external_upstream_rq_time_;
+  Stats::StatName internal_rq_time_;
+  Stats::StatName internal_upstream_rq_completed_;
+  Stats::StatName internal_upstream_rq_time_;
+  Stats::StatName upstream_rq_completed_;
+  Stats::StatName upstream_rq_time_;
+  Stats::StatName upstream_rq_time;
+  Stats::StatName vcluster_;
+  Stats::StatName vhost_;
+  Stats::StatName zone_;
+  Stats::StatName response_code_2xx_;
+  Stats::StatName response_code_3xx_;
+  Stats::StatName response_code_4xx_;
+  Stats::StatName response_code_5xx_;
+
+  // We keep several stats for each HTTP response codes, created lazily -- as
+  // most response-codes are never seen. We do a poor man's locking here by
+  // keeping them in an array. To minimize contention generally, we'll just have
+  // a r/w lock per response-code.
+  using LockedStatName = std::pair<absl::Mutex, std::unique_ptr<Stats::StatNameStorage>>;
+  constexpr MaxResponseCode = 600;
+  LockedStat[MaxResponseCode] canary_upstream_rq_;
+  LockedStat[MaxResponseCode] external_upstream_rq_;
+  LockedStat[MaxResponseCode] internal_upstream_rq_;
+  LockedStat[MaxResponseCode] upstream_rq_;
 };
 
 /**
