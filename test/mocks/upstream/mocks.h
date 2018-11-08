@@ -201,12 +201,13 @@ public:
 
   Secret::MockSecretManager& secretManager() override { return secret_manager_; };
 
-  MOCK_METHOD8(clusterManagerFromProto,
+  MOCK_METHOD9(clusterManagerFromProto,
                ClusterManagerPtr(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                                  Stats::Store& stats, ThreadLocal::Instance& tls,
                                  Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info,
-                                 AccessLog::AccessLogManager& log_manager, Server::Admin& admin));
+                                 AccessLog::AccessLogManager& log_manager, Server::Admin& admin,
+                                 Http::CodeStats&));
 
   MOCK_METHOD5(allocateConnPool, Http::ConnectionPool::InstancePtr(
                                      Event::Dispatcher& dispatcher, HostConstSharedPtr host,

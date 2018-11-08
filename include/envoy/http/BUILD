@@ -31,6 +31,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "codes_interface",
     hdrs = ["codes.h"],
+    deps = ["//include/envoy/stats:stats_interface"],
 )
 
 envoy_cc_library(

@@ -37,7 +37,7 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime, Upstream::ClusterManager& cm)
+               Runtime::Loader& runtime, Upstream::ClusterManager& cm, Http::CodeStats& code_stats)
       : local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm),
         cluster_name_(config.grpc_service().envoy_grpc().cluster_name()),
         allowed_authorization_headers_(
@@ -45,7 +45,8 @@ public:
         allowed_request_headers_(toRequestHeaders(config.http_service().allowed_request_headers())),
         failure_mode_allow_(config.failure_mode_allow()),
         authorization_headers_to_add_(
-            toAuthorizationHeadersToAdd(config.http_service().authorization_headers_to_add())) {}
+            toAuthorizationHeadersToAdd(config.http_service().authorization_headers_to_add())),
+        code_stats_(code_stats) {}
 
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
@@ -62,6 +63,8 @@ public:
   const Filters::Common::ExtAuthz::HeaderKeyValueVector& authorizationHeadersToAdd() const {
     return authorization_headers_to_add_;
   }
+
+  Http::CodeStats& codeStats() { return code_stats_; }
 
 private:
   static Http::LowerCaseStrUnorderedSet toRequestHeaders(
@@ -107,6 +110,7 @@ private:
   Http::LowerCaseStrUnorderedSet allowed_request_headers_;
   bool failure_mode_allow_;
   const Filters::Common::ExtAuthz::HeaderKeyValueVector authorization_headers_to_add_;
+  Http::CodeStats& code_stats_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;

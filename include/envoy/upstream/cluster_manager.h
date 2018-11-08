@@ -253,7 +253,8 @@ public:
   clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin) PURE;
+                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin,
+                          Http::CodeStats& code_stats) PURE;
 
   /**
    * Allocate an HTTP connection pool for the host. Pools are separated by 'priority',

@@ -20,6 +20,7 @@
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/common/logger_delegates.h"
 #include "common/grpc/async_client_manager_impl.h"
+#include "common/http/codes.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
@@ -180,6 +181,7 @@ public:
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   Event::TimeSystem& timeSystem() override { return time_system_; }
+  Http::CodeStats& codeStats() override { return code_stats_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_->statsFlushInterval();
@@ -203,6 +205,7 @@ private:
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
+  Http::CodeStatsImpl code_stats_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
