@@ -144,7 +144,7 @@ typedef std::unique_ptr<TransportSocket> TransportSocketPtr;
 class TransportSocketOptions {
 public:
   virtual ~TransportSocketOptions() {}
-  virtual absl::optional<std::string> overrideServerName() const PURE;
+  virtual const absl::optional<std::string>& overrideServerName() const PURE;
   virtual void hashKey(std::vector<uint8_t>& key) const PURE;
 };
 
