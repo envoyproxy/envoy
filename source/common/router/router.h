@@ -289,6 +289,9 @@ private:
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
+    void decodeMetadata(Http::MetadataMapPtr&&) override {
+      // TODO(soya3129): Implement this when adding metadata filter.
+    }
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;

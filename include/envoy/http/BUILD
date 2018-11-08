@@ -23,6 +23,7 @@ envoy_cc_library(
     hdrs = ["codec.h"],
     deps = [
         ":header_map_interface",
+        ":metadata_interface",
         ":protocol_interface",
         "//include/envoy/buffer:buffer_interface",
     ],
@@ -82,4 +83,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "query_params_interface",
     hdrs = ["query_params.h"],
+)
+
+envoy_cc_library(
+    name = "metadata_interface",
+    hdrs = ["metadata_interface.h"],
 )
