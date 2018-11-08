@@ -42,7 +42,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace TcpProxy {
 
-using ::Envoy::StreamInfo::ForwardRequestedServerName;
+using ::Envoy::Network::UpstreamServerName;
 
 namespace {
 Config constructConfigFromJson(const Json::Object& json,
@@ -1168,12 +1168,12 @@ TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
 }
 
 // Test that the tcp proxy forwards the requested server name from FilterState if set
-TEST_F(TcpProxyRoutingTest, ForwardRequestedServerName) {
+TEST_F(TcpProxyRoutingTest, UpstreamServerName) {
   setup();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filterState().setData("envoy.stream_info.forward_requested_server_name",
-                                    std::make_unique<ForwardRequestedServerName>("www.example.com"),
+  stream_info.filterState().setData("envoy.network.upstream_server_name",
+                                    std::make_unique<UpstreamServerName>("www.example.com"),
                                     StreamInfo::FilterState::StateType::ReadOnly);
 
   ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));

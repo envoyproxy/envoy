@@ -25,7 +25,7 @@ namespace Envoy {
 namespace TcpProxy {
 
 const std::string PerConnectionCluster::Key = "envoy.tcp_proxy.cluster";
-using ::Envoy::StreamInfo::ForwardRequestedServerName;
+using ::Envoy::Network::UpstreamServerName;
 
 Config::Route::Route(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute& config) {
@@ -364,13 +364,13 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   Network::TransportSocketOptionsSharedPtr transport_socket_options;
 
   if (downstreamConnection() &&
-      downstreamConnection()->streamInfo().filterState().hasData<ForwardRequestedServerName>(
-          ForwardRequestedServerName::Key)) {
+      downstreamConnection()->streamInfo().filterState().hasData<UpstreamServerName>(
+          UpstreamServerName::Key)) {
     const auto& original_requested_server_name =
         downstreamConnection()
             ->streamInfo()
             .filterState()
-            .getDataReadOnly<ForwardRequestedServerName>(ForwardRequestedServerName::Key);
+            .getDataReadOnly<UpstreamServerName>(UpstreamServerName::Key);
     transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
         original_requested_server_name.value());
   }

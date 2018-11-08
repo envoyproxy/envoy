@@ -1,10 +1,10 @@
 #include "common/network/upstream_server_name.h"
 
 namespace Envoy {
-namespace StreamInfo {
+namespace Network {
 
-const std::string ForwardRequestedServerName::Key =
-    "envoy.stream_info.forward_requested_server_name";
+const std::string UpstreamServerName::Key =
+    "envoy.network.upstream_server_name";
 
-} // namespace StreamInfo
+} // namespace Network
 } // namespace Envoy
