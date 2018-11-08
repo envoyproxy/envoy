@@ -27,7 +27,7 @@ Version history
   to specify whether the `GrpcStatus` status returned should be `RESOURCE_EXHAUSTED` or
   `UNAVAILABLE` when a gRPC call is rate limited.
 * rate-limit: removed support for the legacy ratelimit service and made the data-plane-api
-  proto (:repo:`api/envoy/service/ratelimit/v2/rls.proto`) based implementation default.
+  :ref:`rls.proto <envoy_api_file_envoy/service/ratelimit/v2/rls.proto>` based implementation default.
 * rbac: added dynamic metadata to the network level filter.
 * rbac: added support for permission matching by :ref:`requested server name <envoy_api_field_config.rbac.v2alpha.Permission.requested_server_name>`.
 * redis: static cluster configuration is no longer required. Redis proxy will work with clusters
@@ -130,7 +130,7 @@ Version history
   Lyft's reference implementation of the `ratelimit <https://github.com/lyft/ratelimit>`_ service also supports the data-plane-api proto as of v1.1.0.
   Envoy can use either proto to send client requests to a ratelimit server with the use of the
   `use_data_plane_proto` boolean flag in the ratelimit configuration.
-  Support for the legacy proto :repo:`source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
+  Support for the legacy proto `source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
 * ratelimit: added :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in
   case of rate limit service error.
 * rbac config: added a :ref:`principal_name <envoy_api_field_config.rbac.v2alpha.Principal.Authenticated.principal_name>` field and

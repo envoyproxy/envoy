@@ -8,6 +8,8 @@ import "envoy/api/v2/ratelimit/ratelimit.proto";
 
 import "validate/validate.proto";
 
+// [#protodoc-title: RateLimitService]
+
 service RateLimitService {
   // Determine whether rate limiting should take place.
   rpc ShouldRateLimit(RateLimitRequest) returns (RateLimitResponse) {
