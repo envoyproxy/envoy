@@ -62,6 +62,7 @@ namespace Http {
   HISTOGRAM(downstream_rq_time)                                                                    \
   COUNTER  (downstream_rq_idle_timeout)                                                            \
   COUNTER  (downstream_rq_overload_close)                                                          \
+  COUNTER  (downstream_rq_timeout)                                                            \
   COUNTER  (rs_too_large)
 // clang-format on
 
@@ -232,6 +233,12 @@ public:
    *         disabled idle timeout.
    */
   virtual std::chrono::milliseconds streamIdleTimeout() const PURE;
+
+  /**
+   * @return request timeout for incoming connection manager connections. Zero indicates
+   *         a disabled request timeout.
+   */
+  virtual std::chrono::milliseconds requestTimeout() const PURE;
 
   /**
    * @return delayed close timeout for downstream HTTP connections. Zero indicates a disabled
