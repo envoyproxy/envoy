@@ -10,6 +10,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 
 #include "common/common/assert.h"
@@ -104,7 +105,9 @@ void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& config
 
   // Now see if there is a factory that will accept the config.
   auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(type);
-  http_tracer_ = factory.createHttpTracer(configuration, server);
+  ProtobufTypes::MessagePtr message =
+      Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+  http_tracer_ = factory.createHttpTracer(*message, server);
 }
 
 void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,

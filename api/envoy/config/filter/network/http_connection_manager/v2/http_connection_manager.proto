@@ -20,7 +20,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 28]
+// [#comment:next free field: 29]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -164,6 +164,12 @@ message HttpConnectionManager {
   // A value of 0 will completely disable the connection manager stream idle
   // timeout, although per-route idle timeout overrides will continue to apply.
   google.protobuf.Duration stream_idle_timeout = 24 [(gogoproto.stdduration) = true];
+
+  // A timeout for idle requests managed by the connection manager.
+  // The timer is activated when the request is initiated, and is disarmed when the last byte of the
+  // request is sent upstream (i.e. all decoding filters have processed the request), OR when the
+  // response is initiated. If not specified or set to 0, this timeout is disabled.
+  google.protobuf.Duration request_timeout = 28 [(gogoproto.stdduration) = true];
 
   // The time that Envoy will wait between sending an HTTP/2 “shutdown
   // notification” (GOAWAY frame with max stream ID) and a final GOAWAY frame.
