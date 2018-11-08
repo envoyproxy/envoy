@@ -2903,7 +2903,7 @@ TEST_P(SslSocketTest, OverrideRequestedServerNameWithoutSniInUpstreamTlsContext)
   Network::TransportSocketOptionsSharedPtr transport_socket_options(
       new Network::TransportSocketOptionsImpl("example.com"));
   testUtilV2(listener, client, "", true, "", "", "", "example.com", "", "ssl.handshake",
-             "ssl.handshake", GetParam(), override_server_name);
+             "ssl.handshake", GetParam(), transport_socket_options);
 }
 
 // Validate that if downstream secrets are not yet downloaded from SDS server, Envoy creates
