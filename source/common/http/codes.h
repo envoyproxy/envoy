@@ -22,29 +22,29 @@ public:
   void chargeResponseStat(const ResponseStatInfo& info) override;
   void chargeResponseTiming(const ResponseTimingInfo& info) override;
 
- private:
-  std::string upstream_rq_completed_{"upstream_rq_completed"};
-  std::string upstream_rq_{"upstream_rq_"};
-  std::string canary_upstream_rq_completed_{"canary.upstream_rq_completed"};
-  std::string canary_upstream_rq_{"canary.upstream_rq_"};
-  std::string internal_upstream_rq_completed_{"internal.upstream_rq_completed"};
-  std::string internal_upstream_rq_{"internal.upstream_rq_"};
-  std::string internal_upstream_rq_time_{"internal.upstream_rq_time"};
-  std::string external_upstream_rq_completed_{"external.upstream_rq_completed"};
-  std::string external_upstream_rq_{"external.upstream_rq_"};
-  std::string external_upstream_rq_time_{"external.upstream_rq_time"};
-  std::string vhost_vcluster_upstream_rq_completed_{"vhost.{}.vcluster.{}.upstream_rq_completed"};
-  std::string vhost_vcluster_upstream_rq_{"vhost.{}.vcluster.{}.upstream_rq_{}"};
-  std::string zone_upstream_rq_completed_{"{}zone.{}.{}.upstream_rq_completed"};
-  std::string zone_upstream_rq_{"{}zone.{}.{}.upstream_rq_{}"};
-  std::string upstream_rq_time_{"upstream_rq_time"};
-  std::string canary_upstream_rq_time_{"canary.upstream_rq_time"};
-  std::string internal_rq_time_{"internal.upstream_rq_time"};
-  std::string external_rq_time_{"external.upstream_rq_time"};
-  std::string vhost_{"vhost"};
-  std::string vcluster_{"vcluster"};
-  std::string zone_{"zone"};
-  std::string upstream_rq_time{"upstream_rq_time"};
+  static std::string join(const std::vector<absl::string_view>& v);
+
+private:
+  absl::string_view stripTrailingDot(absl::string_view prefix);
+
+  absl::string_view canary_upstream_rq_completed_{"canary.upstream_rq_completed"};
+  absl::string_view canary_upstream_rq_time_{"canary.upstream_rq_time"};
+  absl::string_view canary_upstream_rq_{"canary.upstream_rq_"};
+  absl::string_view external_rq_time_{"external.upstream_rq_time"};
+  absl::string_view external_upstream_rq_completed_{"external.upstream_rq_completed"};
+  absl::string_view external_upstream_rq_time_{"external.upstream_rq_time"};
+  absl::string_view external_upstream_rq_{"external.upstream_rq_"};
+  absl::string_view internal_rq_time_{"internal.upstream_rq_time"};
+  absl::string_view internal_upstream_rq_completed_{"internal.upstream_rq_completed"};
+  absl::string_view internal_upstream_rq_time_{"internal.upstream_rq_time"};
+  absl::string_view internal_upstream_rq_{"internal.upstream_rq_"};
+  absl::string_view upstream_rq_completed_{"upstream_rq_completed"};
+  absl::string_view upstream_rq_time_{"upstream_rq_time"};
+  absl::string_view upstream_rq_time{"upstream_rq_time"};
+  absl::string_view upstream_rq_{"upstream_rq_"};
+  absl::string_view vcluster_{"vcluster"};
+  absl::string_view vhost_{"vhost"};
+  absl::string_view zone_{"zone"};
 };
 
 /**
