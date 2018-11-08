@@ -1179,7 +1179,8 @@ TEST_F(TcpProxyRoutingTest, ForwardRequestedServerName) {
   ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 
-  // Expect filter to try to open a connection to a cluster with the override_server_name
+  // Expect filter to try to open a connection to a cluster with the transport socket options with
+  // override-server-name
   EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _, _))
       .WillOnce(Invoke([](const std::string& cluster, Upstream::ResourcePriority priority,
                           Upstream::LoadBalancerContext* context,
