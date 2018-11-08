@@ -77,6 +77,8 @@ public:
    * @return bool indicates whether write filters should be in the reversed order of the filter
    *         chain config.
    */
+  // TODO(qiannawang): this method is deprecated and to be moved soon. See
+  // https://github.com/envoyproxy/envoy/pull/4889 for more details.
   virtual bool reverseWriteFilterOrder() const PURE;
 };
 
