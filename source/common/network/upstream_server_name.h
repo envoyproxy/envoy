@@ -10,7 +10,7 @@ namespace Network {
 /**
  * Original Requested Server Name
  */
-class UpstreamServerName : public FilterState::Object {
+class UpstreamServerName : public StreamInfo::FilterState::Object {
 public:
   UpstreamServerName(absl::string_view server_name) : server_name_(server_name) {}
   const std::string& value() const { return server_name_; }
