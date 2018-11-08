@@ -269,11 +269,11 @@ public:
                Http::ConnectionPool::Instance*(const std::string& cluster,
                                                ResourcePriority priority, Http::Protocol protocol,
                                                LoadBalancerContext* context));
-  MOCK_METHOD4(
-      tcpConnPoolForCluster,
-      Tcp::ConnectionPool::Instance*(const std::string& cluster, ResourcePriority priority,
-                                     LoadBalancerContext* context,
-                                     Network::TransportSocketOptionsSharedPtr transport_socket_options));
+  MOCK_METHOD4(tcpConnPoolForCluster,
+               Tcp::ConnectionPool::Instance*(
+                   const std::string& cluster, ResourcePriority priority,
+                   LoadBalancerContext* context,
+                   Network::TransportSocketOptionsSharedPtr transport_socket_options));
   MOCK_METHOD2(tcpConnForCluster_,
                MockHost::MockCreateConnectionData(const std::string& cluster,
                                                   LoadBalancerContext* context));

@@ -214,7 +214,8 @@ const std::string testUtilV2(
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        std::string sni = transport_socket_options != NULL && transport_socket_options->overrideServerName().has_value()
+        std::string sni = transport_socket_options != NULL &&
+                                  transport_socket_options->overrideServerName().has_value()
                               ? transport_socket_options->overrideServerName().value()
                               : client_ctx_proto.sni();
         socket->setRequestedServerName(sni);
@@ -2880,7 +2881,8 @@ TEST_P(SslSocketTest, OverrideRequestedServerName) {
   envoy::api::v2::auth::UpstreamTlsContext client;
   client.set_sni("lyft.com");
 
-  Network::TransportSocketOptionsSharedPtr transport_socket_options(new Network::TransportSocketOptionsImpl("example.com"));
+  Network::TransportSocketOptionsSharedPtr transport_socket_options(
+      new Network::TransportSocketOptionsImpl("example.com"));
 
   testUtilV2(listener, client, "", true, "", "", "", "example.com", "", "ssl.handshake",
              "ssl.handshake", GetParam(), transport_socket_options);
@@ -2898,8 +2900,8 @@ TEST_P(SslSocketTest, OverrideRequestedServerNameWithoutSniInUpstreamTlsContext)
 
   envoy::api::v2::auth::UpstreamTlsContext client;
 
-  Network::TransportSocketOptionsSharedPtr transport_socket_options(new
-    Network::TransportSocketOptionsImpl("example.com"));
+  Network::TransportSocketOptionsSharedPtr transport_socket_options(
+      new Network::TransportSocketOptionsImpl("example.com"));
   testUtilV2(listener, client, "", true, "", "", "", "example.com", "", "ssl.handshake",
              "ssl.handshake", GetParam(), override_server_name);
 }

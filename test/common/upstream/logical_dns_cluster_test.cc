@@ -135,8 +135,7 @@ public:
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-    Host::CreateConnectionData data =
-        logical_host->createConnection(dispatcher_, nullptr, nullptr);
+    Host::CreateConnectionData data = logical_host->createConnection(dispatcher_, nullptr, nullptr);
     EXPECT_FALSE(data.host_description_->canary());
     EXPECT_EQ(&cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->cluster(),
               &data.host_description_->cluster());

@@ -706,9 +706,9 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
       [this, host] { ThreadLocalClusterManagerImpl::onHostHealthFailure(host, *tls_); });
 }
 
-Host::CreateConnectionData
-ClusterManagerImpl::tcpConnForCluster(const std::string& cluster, LoadBalancerContext* context,
-                                      Network::TransportSocketOptionsSharedPtr transport_socket_options) {
+Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(
+    const std::string& cluster, LoadBalancerContext* context,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);

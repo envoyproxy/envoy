@@ -99,7 +99,7 @@ public:
 
   bool implementsSecureTransport() const override;
   Network::TransportSocketPtr
-    createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
 
 private:
   HandshakerFactory handshaker_factory_;

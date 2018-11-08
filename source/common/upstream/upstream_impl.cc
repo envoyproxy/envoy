@@ -146,10 +146,9 @@ parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
 
 } // namespace
 
-Host::CreateConnectionData
-HostImpl::createConnection(Event::Dispatcher& dispatcher,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
+Host::CreateConnectionData HostImpl::createConnection(
+    Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
   return {createConnection(dispatcher, *cluster_, address_, options, transport_socket_options),
           shared_from_this()};
 }

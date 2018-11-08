@@ -371,8 +371,8 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
             ->streamInfo()
             .filterState()
             .getDataReadOnly<ForwardRequestedServerName>(ForwardRequestedServerName::Key);
-    transport_socket_options =
-      std::make_shared<Network::TransportSocketOptionsImpl>(original_requested_server_name.value());
+    transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+        original_requested_server_name.value());
   }
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(

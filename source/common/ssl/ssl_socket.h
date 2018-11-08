@@ -89,7 +89,7 @@ public:
                          Stats::Scope& stats_scope);
 
   Network::TransportSocketPtr
-    createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
 
   // Secret::SecretCallbacks
@@ -112,7 +112,7 @@ public:
                          Stats::Scope& stats_scope, const std::vector<std::string>& server_names);
 
   Network::TransportSocketPtr
-    createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
 
   // Secret::SecretCallbacks

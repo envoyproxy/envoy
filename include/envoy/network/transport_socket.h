@@ -148,8 +148,7 @@ public:
   virtual void hashKey(std::vector<uint8_t>& key) const PURE;
 };
 
-typedef std::shared_ptr<TransportSocketOptions>
-    TransportSocketOptionsSharedPtr;
+typedef std::shared_ptr<TransportSocketOptions> TransportSocketOptionsSharedPtr;
 
 /**
  * A factory for creating transport socket. It will be associated to filter chains and clusters.

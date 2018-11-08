@@ -375,7 +375,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(ClientContextConfigPtr config,
 }
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
-                                                                          Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
@@ -426,8 +426,7 @@ ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsSha
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Server,
-                                            nullptr);
+    return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Server, nullptr);
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();
