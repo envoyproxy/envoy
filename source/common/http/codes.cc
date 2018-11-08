@@ -33,10 +33,6 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, const std::stri
   scope.counter(absl::StrCat(prefix, upstream_rq_, enumToInt(response_code))).inc();
 }
 
-std::string CodeStatsImpl::join(const std::vector<absl::string_view>& v) {
-  return absl::StrJoin(v, ".");
-}
-
 void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) {
   const uint64_t response_code = info.response_status_code_;
   chargeBasicResponseStat(info.cluster_scope_, info.prefix_, static_cast<Code>(response_code));
@@ -139,6 +135,15 @@ absl::string_view CodeStatsImpl::stripTrailingDot(absl::string_view str) {
     str.remove_suffix(1);
   }
   return str;
+}
+
+std::string CodeStatsImpl::join(const std::vector<absl::string_view>& v) {
+  ASSERT(!v.empty());
+  auto iter = v.begin();
+  if (iter->empty()) {
+    ++iter; // Skip any initial empty prefix.
+  }
+  return absl::StrJoin(iter, v.end(), ".");
 }
 
 std::string CodeUtility::groupStringForResponseCode(Code response_code) {
