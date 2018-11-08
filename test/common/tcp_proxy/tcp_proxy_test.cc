@@ -1182,18 +1182,14 @@ TEST_F(TcpProxyRoutingTest, UpstreamServerName) {
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-server-name
   EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _, _))
-      .WillOnce(Invoke([](const std::string& cluster, Upstream::ResourcePriority priority,
-                          Upstream::LoadBalancerContext* context,
+      .WillOnce(Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+                          Upstream::LoadBalancerContext*,
                           Network::TransportSocketOptionsSharedPtr transport_socket_options)
                            -> Tcp::ConnectionPool::Instance* {
         EXPECT_EQ(cluster, "fake_cluster");
         EXPECT_NE(transport_socket_options, nullptr);
         EXPECT_TRUE(transport_socket_options->overrideServerName().has_value());
         EXPECT_EQ(transport_socket_options->overrideServerName().value(), "www.example.com");
-
-        (void)priority; // suppress unused warning
-        (void)context;  // suppress unused warning
-
         return nullptr;
       }));
 
