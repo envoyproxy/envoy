@@ -26,7 +26,7 @@ MetricImpl::MetricImpl(absl::string_view tag_extracted_name, const std::vector<T
     vecs.second.swap(y);
     total_size += vecs.first.bytesRequired() + vecs.second.bytesRequired();
   }
-  storage_.reset(new uint8_t[total_size]);
+  storage_ = std::make_unique<uint8_t[]>(total_size);
   uint8_t* p = &storage_[0];
   *p++ = tags.size();
   p += tag_extracted_stat_name.moveToStorage(p);
