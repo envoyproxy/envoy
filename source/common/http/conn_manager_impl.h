@@ -408,7 +408,7 @@ private:
     // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
     bool has_continue_headers_{};
-    bool is_head_request_{false};
+    bool is_head_request_{};
     bool decoding_headers_only_{};
     bool encoding_headers_only_{};
   };
