@@ -1668,7 +1668,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
           "cluster_1", ResourcePriority::Default, nullptr, nullptr));
   Tcp::ConnectionPool::MockInstance* tcp2 =
       dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
-          "cluster_1", ResourcePriority::Default, nullptr, nullpr));
+          "cluster_1", ResourcePriority::Default, nullptr, nullptr));
   Tcp::ConnectionPool::MockInstance* tcp1_high =
       dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
           "cluster_1", ResourcePriority::High, nullptr, nullptr));
