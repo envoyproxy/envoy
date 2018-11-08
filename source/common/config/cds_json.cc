@@ -154,6 +154,8 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
   JSON_UTIL_SET_DURATION(json_cluster, cluster, cleanup_interval);
   JSON_UTIL_SET_DURATION(json_cluster, cluster, connect_timeout);
   JSON_UTIL_SET_INTEGER(json_cluster, cluster, per_connection_buffer_limit_bytes);
+  JSON_UTIL_SET_BOOL(json_cluster, cluster, src_transparent);
+  JSON_UTIL_SET_INTEGER(json_cluster, cluster, mark);
 
   const std::string lb_type = json_cluster.getString("lb_type");
   if (lb_type == "round_robin") {

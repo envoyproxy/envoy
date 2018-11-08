@@ -1615,7 +1615,15 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
           }
         },
         "additionalProperties" : false
-     }
+      },
+      "src_transparent": {
+        "type" : "boolean"
+      },
+      "mark": {
+       "type" : "integer",
+       "minimum" : 0,
+       "maximum" : 4294967295
+      }
     },
     "required" : ["name", "type", "connect_timeout_ms", "lb_type"],
     "additionalProperties" : false

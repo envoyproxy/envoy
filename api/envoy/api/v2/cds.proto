@@ -47,7 +47,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 37]
+// [#comment:next free field: 39]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -531,6 +531,14 @@ message Cluster {
   // If this flag is not set to true, Envoy will wait until the hosts fail active health
   // checking before removing it from the cluster.
   bool drain_connections_on_host_removal = 32;
+
+  // If true, the source address of the origin is spoofed on the connection to the upstream.
+  // [#not-implemented-hide:] Hide from docs.
+  google.protobuf.BoolValue src_transparent = 37;
+
+  // if non-zero, set the MARK field. Allows matching on e.g. 'ip rule' or 'iptables'.
+  // [#proto-status: draft] Still working on this.
+  google.protobuf.UInt32Value mark = 38;
 }
 
 // An extensible structure containing the address Envoy should bind to when

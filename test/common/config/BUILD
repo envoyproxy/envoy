@@ -10,6 +10,19 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "cds_json_test",
+    srcs = ["cds_json_test.cc"],
+    deps = [
+        "//source/common/config:cds_json_lib",
+        "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/stats:stats_options_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/grpc:grpc_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "filesystem_subscription_impl_test",
     srcs = ["filesystem_subscription_impl_test.cc"],
     deps = [
