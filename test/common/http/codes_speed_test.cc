@@ -10,13 +10,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
 #include "common/stats/isolated_store_impl.h"
-
-#include "test/test_common/utility.h"
-
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 #include "testing/base/public/benchmark.h"
 
@@ -30,12 +24,10 @@ public:
                    const std::string& request_vcluster_name = EMPTY_STRING,
                    const std::string& from_az = EMPTY_STRING,
                    const std::string& to_az = EMPTY_STRING) {
-    //Http::CodeStats::ResponseStatInfo info{
     Http::CodeUtility::ResponseStatInfo info{
         global_store_,      cluster_scope_,        "prefix.", code,  internal_request,
         request_vhost_name, request_vcluster_name, from_az,   to_az, canary};
 
-    //code_stats_.chargeResponseStat(info);
     Http::CodeUtility::chargeResponseStat(info);
   }
 
@@ -52,18 +44,15 @@ public:
   }
 
   void responseTiming() {
-    //Http::CodeStats::ResponseTimingInfo info{
     Http::CodeUtility::ResponseTimingInfo info{
-      global_store_, cluster_scope_, "prefix.",    std::chrono::milliseconds(5),
-      true,          true,           "vhost_name", "req_vcluster_name",
-      "from_az",     "to_az"};
-    //code_stats_.chargeResponseTiming(info);
+        global_store_, cluster_scope_, "prefix.",    std::chrono::milliseconds(5),
+        true,          true,           "vhost_name", "req_vcluster_name",
+        "from_az",     "to_az"};
     Http::CodeUtility::chargeResponseTiming(info);
   }
 
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
-  //Http::CodeStatsImpl code_stats_;
 };
 
 } // namespace Http
@@ -91,7 +80,6 @@ BENCHMARK(BM_ResponseTiming);
 int main(int argc, char** argv) {
   benchmark::Initialize(&argc, argv);
 
-  Envoy::Event::Libevent::Global::initialize();
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
     return 1;
   }
