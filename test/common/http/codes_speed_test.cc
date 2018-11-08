@@ -10,13 +10,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
 #include "common/stats/isolated_store_impl.h"
-
-#include "test/test_common/utility.h"
-
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 #include "testing/base/public/benchmark.h"
 
@@ -51,9 +45,9 @@ public:
 
   void responseTiming() {
     Http::CodeStats::ResponseTimingInfo info{
-      global_store_, cluster_scope_, "prefix.",    std::chrono::milliseconds(5),
-      true,          true,           "vhost_name", "req_vcluster_name",
-      "from_az",     "to_az"};
+        global_store_, cluster_scope_, "prefix.",    std::chrono::milliseconds(5),
+        true,          true,           "vhost_name", "req_vcluster_name",
+        "from_az",     "to_az"};
     code_stats_.chargeResponseTiming(info);
   }
 
@@ -87,7 +81,6 @@ BENCHMARK(BM_ResponseTiming);
 int main(int argc, char** argv) {
   benchmark::Initialize(&argc, argv);
 
-  Envoy::Event::Libevent::Global::initialize();
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
     return 1;
   }

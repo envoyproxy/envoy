@@ -90,10 +90,8 @@ envoy_cc_test_binary(
     deps = [
         "//source/common/common:empty_string",
         "//source/common/http:codes_lib",
-        "//source/common/http:header_map_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
-        "//test/test_common:utility_lib",
     ],
 )
 
