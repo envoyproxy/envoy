@@ -1186,7 +1186,7 @@ TEST_F(TcpProxyRoutingTest, ForwardRequestedServerName) {
                           Network::TransportSocketOptionsSharedPtr transport_socket_options)
                            -> Tcp::ConnectionPool::Instance* {
         EXPECT_EQ(cluster, "fake_cluster");
-        EXPECT_NE(transport_socket_options);
+        EXPECT_NE(transport_socket_options, nullptr);
         EXPECT_TRUE(transport_socket_options->overrideServerName().has_value());
         EXPECT_EQ(transport_socket_options->overrideServerName().value(), "www.example.com");
 
