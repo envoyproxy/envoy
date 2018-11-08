@@ -161,6 +161,45 @@ def envoy_include_prefix(path):
 def envoy_basic_cc_library(name, **kargs):
     native.cc_library(name = name, **kargs)
 
+# Used to select a dependency that has different implementations on POSIX vs Windows.
+# The platform-specific implementations should be specified with envoy_cc_posix_library
+# and envoy_cc_win32_library respectively
+def envoy_cc_platform_dep(name):
+    return select({
+        "@envoy//bazel:windows_x86_64": [name + "_win32"],
+        "//conditions:default": [name + "_posix"],
+    })
+
+# Used to specify a library that only builds on POSIX
+def envoy_cc_posix_library(name, srcs = [], hdrs = [], **kargs):
+    envoy_cc_library(
+        name = name + "_posix",
+        srcs = select({
+            "@envoy//bazel:windows_x86_64": [],
+            "//conditions:default": srcs,
+        }),
+        hdrs = select({
+            "@envoy//bazel:windows_x86_64": [],
+            "//conditions:default": hdrs,
+        }),
+        **kargs
+    )
+
+# Used to specify a library that only builds on Windows
+def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
+    envoy_cc_library(
+        name = name + "_win32",
+        srcs = select({
+            "@envoy//bazel:windows_x86_64": srcs,
+            "//conditions:default": [],
+        }),
+        hdrs = select({
+            "@envoy//bazel:windows_x86_64": hdrs,
+            "//conditions:default": [],
+        }),
+        **kargs
+    )
+
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(
         name,
