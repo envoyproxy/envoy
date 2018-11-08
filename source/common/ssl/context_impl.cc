@@ -275,7 +275,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   return out;
 }
 
-bssl::UniquePtr<SSL> ContextImpl::newSsl(absl::optional<std::string>) const {
+bssl::UniquePtr<SSL> ContextImpl::newSsl(const absl::optional<std::string>&) const {
   return bssl::UniquePtr<SSL>(SSL_new(ctx_.get()));
 }
 
@@ -499,7 +499,7 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
 }
 
 bssl::UniquePtr<SSL>
-ClientContextImpl::newSsl(absl::optional<std::string> override_server_name) const {
+ClientContextImpl::newSsl(const absl::optional<std::string>& override_server_name) const {
   bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(absl::nullopt));
 
   std::string server_name_indication =
