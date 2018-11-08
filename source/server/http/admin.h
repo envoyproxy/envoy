@@ -100,6 +100,7 @@ public:
   bool generateRequestId() override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
+  std::chrono::milliseconds requestTimeout() const override { return {}; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return Http::DefaultServerString::get(); }
@@ -203,6 +204,8 @@ private:
                              Buffer::Instance& response, AdminStream&);
   Http::Code handlerConfigDump(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&) const;
+  Http::Code handlerContention(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                               Buffer::Instance& response, AdminStream&);
   Http::Code handlerCpuProfiler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                 Buffer::Instance& response, AdminStream&);
   Http::Code handlerHealthcheckFail(absl::string_view path_and_query,

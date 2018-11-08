@@ -173,9 +173,10 @@ private:
       return parent_.buffered_request_data_.get();
     }
     void sendLocalReply(Code code, const std::string& body,
-                        std::function<void(HeaderMap& headers)> modify_headers) override {
-      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers,
-                             parent_.is_head_request_);
+                        std::function<void(HeaderMap& headers)> modify_headers,
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
+      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, parent_.is_head_request_,
+                             grpc_status);
     }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -278,12 +279,14 @@ private:
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
+    void disarmRequestTimeout();
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, const std::string& body,
                         std::function<void(HeaderMap& headers)> modify_headers,
-                        bool is_head_request);
+                        bool is_head_request,
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
@@ -377,6 +380,8 @@ private:
     void onIdleTimeout();
     // Reset per-stream idle timer.
     void resetIdleTimer();
+    // Per-stream request timeout callback
+    void onRequestTimeout();
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
@@ -393,9 +398,11 @@ private:
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
-    Stats::TimespanPtr request_timer_;
+    Stats::TimespanPtr request_response_timespan_;
     // Per-stream idle timeout.
     Event::TimerPtr idle_timer_;
+    // Per-stream request timeout.
+    Event::TimerPtr request_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
     StreamInfo::StreamInfoImpl stream_info_;

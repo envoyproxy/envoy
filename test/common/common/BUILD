@@ -107,6 +107,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "mutex_tracer_test",
+    srcs = ["mutex_tracer_test.cc"],
+    deps = [
+        "//source/common/common:mutex_tracer_lib",
+        "//test/test_common:contention_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     external_deps = [

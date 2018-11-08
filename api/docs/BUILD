@@ -16,6 +16,7 @@ proto_library(
         "//envoy/admin/v2alpha:clusters",
         "//envoy/admin/v2alpha:config_dump",
         "//envoy/admin/v2alpha:memory",
+        "//envoy/admin/v2alpha:mutex_stats",
         "//envoy/admin/v2alpha:server_info",
         "//envoy/api/v2:cds",
         "//envoy/api/v2:discovery",

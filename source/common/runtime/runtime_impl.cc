@@ -1,8 +1,5 @@
 #include "common/runtime/runtime_impl.h"
 
-#include <fcntl.h>
-#include <unistd.h>
-
 #include <cstdint>
 #include <random>
 #include <string>
@@ -15,6 +12,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/filesystem/directory.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/utility.h"
 
@@ -277,9 +275,7 @@ void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>&
   stats_.admin_overrides_active_.set(values_.empty() ? 0 : 1);
 }
 
-DiskLayer::DiskLayer(const std::string& name, const std::string& path,
-                     Api::OsSysCalls& os_sys_calls)
-    : OverrideLayerImpl{name}, os_sys_calls_(os_sys_calls) {
+DiskLayer::DiskLayer(const std::string& name, const std::string& path) : OverrideLayerImpl{name} {
   walkDirectory(path, "", 1);
 }
 
@@ -292,36 +288,21 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
   if (Filesystem::illegalPath(path)) {
     throw EnvoyException(fmt::format("Invalid path: {}", path));
   }
-  Directory current_dir(path);
-  while (true) {
-    errno = 0;
-    dirent* entry = readdir(current_dir.dir_);
-    if (entry == nullptr && errno != 0) {
-      throw EnvoyException(fmt::format("unable to iterate directory: {}", path));
-    }
 
-    if (entry == nullptr) {
-      break;
-    }
-
-    std::string full_path = path + "/" + entry->d_name;
+  Filesystem::Directory directory(path);
+  for (const Filesystem::DirectoryEntry& entry : directory) {
+    std::string full_path = path + "/" + entry.name_;
     std::string full_prefix;
     if (prefix.empty()) {
-      full_prefix = entry->d_name;
+      full_prefix = entry.name_;
     } else {
-      full_prefix = prefix + "." + entry->d_name;
+      full_prefix = prefix + "." + entry.name_;
     }
 
-    struct stat stat_result;
-    const Api::SysCallIntResult result = os_sys_calls_.stat(full_path.c_str(), &stat_result);
-    if (result.rc_ != 0) {
-      throw EnvoyException(fmt::format("unable to stat file: '{}'", full_path));
-    }
-
-    if (S_ISDIR(stat_result.st_mode) && std::string(entry->d_name) != "." &&
-        std::string(entry->d_name) != "..") {
+    if (entry.type_ == Filesystem::FileType::Directory && entry.name_ != "." &&
+        entry.name_ != "..") {
       walkDirectory(full_path, full_prefix, depth + 1);
-    } else if (S_ISREG(stat_result.st_mode)) {
+    } else if (entry.type_ == Filesystem::FileType::Regular) {
       // Suck the file into a string. This is not very efficient but it should be good enough
       // for small files. Also, as noted elsewhere, none of this is non-blocking which could
       // theoretically lead to issues.
@@ -387,12 +368,10 @@ DiskBackedLoaderImpl::DiskBackedLoaderImpl(Event::Dispatcher& dispatcher,
                                            const std::string& root_symlink_path,
                                            const std::string& subdir,
                                            const std::string& override_dir, Stats::Store& store,
-                                           RandomGenerator& generator,
-                                           Api::OsSysCallsPtr os_sys_calls)
+                                           RandomGenerator& generator)
     : LoaderImpl(DoNotLoadSnapshot{}, generator, store, tls),
       watcher_(dispatcher.createFilesystemWatcher()), root_path_(root_symlink_path + "/" + subdir),
-      override_path_(root_symlink_path + "/" + override_dir),
-      os_sys_calls_(std::move(os_sys_calls)) {
+      override_path_(root_symlink_path + "/" + override_dir) {
   watcher_->addWatch(root_symlink_path, Filesystem::Watcher::Events::MovedTo,
                      [this](uint32_t) -> void { loadNewSnapshot(); });
 
@@ -409,9 +388,9 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
 std::unique_ptr<SnapshotImpl> DiskBackedLoaderImpl::createNewSnapshot() {
   std::vector<Snapshot::OverrideLayerConstPtr> layers;
   try {
-    layers.push_back(std::make_unique<DiskLayer>("root", root_path_, *os_sys_calls_));
+    layers.push_back(std::make_unique<DiskLayer>("root", root_path_));
     if (Filesystem::directoryExists(override_path_)) {
-      layers.push_back(std::make_unique<DiskLayer>("override", override_path_, *os_sys_calls_));
+      layers.push_back(std::make_unique<DiskLayer>("override", override_path_));
       stats_.override_dir_exists_.inc();
     } else {
       stats_.override_dir_not_exists_.inc();
