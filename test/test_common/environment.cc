@@ -103,6 +103,9 @@ void TestEnvironment::removePath(const std::string& path) {
 #ifdef __cpp_lib_experimental_filesystem
   // We don't want to rely on rm etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
+  if (!std::experimental::filesystem::exists(path)) {
+    return;
+  }
   std::experimental::filesystem::remove_all(std::experimental::filesystem::path(path));
 #else
   // No support on this system for std::experimental::filesystem.

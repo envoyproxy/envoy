@@ -29,7 +29,8 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   MessageUtil::loadFromYaml(yaml_string, configuration);
 
   ZipkinTracerFactory factory;
-  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(configuration, server);
+  auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 

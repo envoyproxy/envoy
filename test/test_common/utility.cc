@@ -1,9 +1,6 @@
 #include "utility.h"
 
-#if !defined(WIN32)
-#include <dirent.h>
-#include <unistd.h>
-#else
+#if defined(WIN32)
 #include <windows.h>
 // <windows.h> uses macros to #define a ton of symbols, two of which (DELETE and GetMessage)
 // interfere with our code. DELETE shows up in the base.pb.h header generated from
@@ -35,6 +32,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/stats_options_impl.h"
+#include "common/filesystem/directory.h"
 
 #include "test/test_common/printers.h"
 
@@ -148,32 +146,19 @@ TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
 }
 
 std::vector<std::string> TestUtility::listFiles(const std::string& path, bool recursive) {
-  DIR* dir = opendir(path.c_str());
-  if (!dir) {
-    throw std::runtime_error(fmt::format("Directory not found '{}'", path));
-  }
-
   std::vector<std::string> file_names;
-  dirent* entry;
-  while ((entry = readdir(dir)) != nullptr) {
-    std::string file_name = fmt::format("{}/{}", path, std::string(entry->d_name));
-    struct stat stat_result;
-    int rc = ::stat(file_name.c_str(), &stat_result);
-    EXPECT_EQ(rc, 0);
-
-    if (recursive && S_ISDIR(stat_result.st_mode) && std::string(entry->d_name) != "." &&
-        std::string(entry->d_name) != "..") {
-      std::vector<std::string> more_file_names = listFiles(file_name, recursive);
-      file_names.insert(file_names.end(), more_file_names.begin(), more_file_names.end());
-      continue;
-    } else if (S_ISDIR(stat_result.st_mode)) {
-      continue;
+  Filesystem::Directory directory(path);
+  for (const Filesystem::DirectoryEntry& entry : directory) {
+    std::string file_name = fmt::format("{}/{}", path, entry.name_);
+    if (entry.type_ == Filesystem::FileType::Directory) {
+      if (recursive && entry.name_ != "." && entry.name_ != "..") {
+        std::vector<std::string> more_file_names = listFiles(file_name, recursive);
+        file_names.insert(file_names.end(), more_file_names.begin(), more_file_names.end());
+      }
+    } else { // regular file
+      file_names.push_back(file_name);
     }
-
-    file_names.push_back(file_name);
   }
-
-  closedir(dir);
   return file_names;
 }
 
