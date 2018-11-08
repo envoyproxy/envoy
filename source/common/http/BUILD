@@ -93,6 +93,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "conn_pool_base_lib",
+    srcs = ["conn_pool_base.cc"],
+    hdrs = ["conn_pool_base.h"],
+    deps = [
+        "//include/envoy/http:conn_pool_interface",
+        "//source/common/common:linked_object",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_manager_config_interface",
     hdrs = ["conn_manager_config.h"],
     deps = [

@@ -53,6 +53,7 @@ envoy_cc_library(
         "//include/envoy/stats:timespan",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/http:codec_client_lib",
+        "//source/common/http:conn_pool_base_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_lib",
     ],
