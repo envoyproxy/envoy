@@ -1589,10 +1589,10 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   create(parseBootstrapFromJson(json));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
-  Network:: : TransportSocketOptionsSharedPtr transport_socket_options_example_com(
-                  Network::TransportSocketOptionsImpl("example.com"));
+  Network::TransportSocketOptionsSharedPtr transport_socket_options_example_com(
+      new Network::TransportSocketOptionsImpl("example.com"));
   Network::TransportSocketOptionsSharedPtr transport_socket_options_ibm_com(
-      Network::TransportSocketOptionsImpl("ibm.com"));
+      new Network::TransportSocketOptionsImpl("ibm.com"));
 
   // Test for no hosts returning the correct values before we have hosts.
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster(
