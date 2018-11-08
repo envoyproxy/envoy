@@ -18,8 +18,8 @@
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/network/transport_socket_options_impl.h"
+#include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
-#include "common/stream_info/forward_requested_server_name.h"
 
 namespace Envoy {
 namespace TcpProxy {

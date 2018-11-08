@@ -1,4 +1,4 @@
-#include "common/stream_info/forward_requested_server_name.h"
+#include "common/network/upstream_server_name.h"
 
 namespace Envoy {
 namespace StreamInfo {

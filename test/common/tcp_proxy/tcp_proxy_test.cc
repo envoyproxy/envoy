@@ -8,8 +8,8 @@
 #include "common/config/filter_json.h"
 #include "common/network/address_impl.h"
 #include "common/network/transport_socket_options_impl.h"
+#include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
-#include "common/stream_info/forward_requested_server_name.h"
 #include "common/tcp_proxy/tcp_proxy.h"
 #include "common/upstream/upstream_impl.h"
 

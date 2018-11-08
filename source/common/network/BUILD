@@ -249,3 +249,13 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
     ],
 )
+
+
+envoy_cc_library(
+    name = "upstream_server_name_lib",
+    srcs = ["upstream_server_name.cc"],
+    hdrs = ["upstream_server_name.h"],
+    deps = [
+        "//include/envoy/stream_info:filter_state_interface",
+    ],
+)
