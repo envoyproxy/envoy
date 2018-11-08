@@ -57,6 +57,7 @@ Remote JWKS config example
 .. code-block:: yaml
 
           http_filters:
+
           - name: envoy.filters.http.jwt_authn
             config:
              providers:
@@ -72,7 +73,7 @@ Remote JWKS config example
                      timeout:
                        seconds: 5
                    cache_duration:
-                     seconds: 10
+                     seconds: 300
              rules:
              - match:                 
                  prefix: /
@@ -90,15 +91,21 @@ Following cluster **example_jwks_cluster** is needed to fetch JWKS.
   - name: googleapis_cluster
     connect_timeout: 0.25s
     type: LOGICAL_DNS
-    # Comment out the following line to test on v6 networks
-    dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
-    hosts:
-      - socket_address:
-          address: googleapis.com
-          port_value: 443
-    tls_context: { sni: www.googleapis.com }
-    
+    load_assignment:
+      cluster_name: googleapis_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: googleapis.com
+                port_value: 443
+    tls_context:
+      common_tls_context:
+        validation_context:
+          trusted_ca:
+            filename: /etc/ssl/certs/ca-certificates.crt
 
 
 Inline JWKS config example
