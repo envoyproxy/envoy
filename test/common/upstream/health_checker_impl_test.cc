@@ -2147,7 +2147,6 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   EXPECT_CALL(*connection_, write(_, _));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
 
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks(
       {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {});
@@ -2158,6 +2157,8 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   add_uint8(response, 1);
   read_filter_->onData(response, false);
 
+  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   timeout_timer_->callback_();
