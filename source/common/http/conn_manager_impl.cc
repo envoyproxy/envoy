@@ -975,7 +975,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     bool is_grpc_request, Code code, const std::string& body,
-    std::function<void(HeaderMap& headers)> modify_headers, bool is_head_request,
+    const std::function<void(HeaderMap& headers)>& modify_headers, bool is_head_request,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
   ASSERT(response_headers_ == nullptr);
   // For early error handling, do a best-effort attempt to create a filter chain
