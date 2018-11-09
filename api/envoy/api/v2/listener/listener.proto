@@ -99,7 +99,7 @@ message FilterChainMatch {
     ANY = 0;
     // Match a connection originating from the same host
     LOCAL = 1;
-    // Match a connetion originating from a different host
+    // Match a connection originating from a different host
     EXTERNAL = 2;
   }
 

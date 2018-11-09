@@ -1333,6 +1333,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }
 
+// Define a source_type filter chain match and test against it
 TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMatch) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -1377,6 +1378,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
   EXPECT_EQ(filter_chain, nullptr);
 }
 
+// Define multiple source_type filter chain matches and test against them
 TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceTypeMatch) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
