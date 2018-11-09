@@ -26,6 +26,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
+#include "common/common/cleanup.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/protobuf.h"
@@ -221,8 +222,13 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
   }
 
   struct ifaddrs* ifaddr;
-  int rc = getifaddrs(&ifaddr);
-  RELEASE_ASSERT(!rc, "");
+  const int rc = getifaddrs(&ifaddr);
+  Cleanup ifaddr_cleanup([ifaddr] {
+    if (ifaddr) {
+      freeifaddrs(ifaddr);
+    }
+  });
+  RELEASE_ASSERT(rc == 0, "");
 
   auto af_look_up =
       (remote_address->ip()->version() == Address::IpVersion::v4) ? AF_INET : AF_INET6;
@@ -238,14 +244,9 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
           *addr, (af_look_up == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
 
       if (remote_address == local_address) {
-        freeifaddrs(ifaddr);
         return true;
       }
     }
-  }
-
-  if (ifaddr) {
-    freeifaddrs(ifaddr);
   }
 
   return false;

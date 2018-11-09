@@ -532,9 +532,9 @@ ListenerImpl::findFilterChainForSourceTypes(const SourceTypesArray& source_types
                        FilterChainMatch_ConnectionSourceType_EXTERNAL];
 
   // isLocalConnection can be expensive. Call it only if LOCAL or EXTERNAL are defined
-  auto is_local_connection = (filter_chain_local || filter_chain_external)
-                                 ? Network::Utility::isLocalConnection(socket)
-                                 : false;
+  const bool is_local_connection = (filter_chain_local || filter_chain_external)
+                                       ? Network::Utility::isLocalConnection(socket)
+                                       : false;
 
   if (is_local_connection) {
     if (filter_chain_local) {
