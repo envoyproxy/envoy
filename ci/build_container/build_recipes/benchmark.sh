@@ -12,14 +12,27 @@ mkdir build
 
 cd build
 
+build_type=Release
+if [[ "${OS}" == "Windows_NT" && "${BAZEL_WINDOWS_BUILD_TYPE}" == "dbg" ]]; then
+  # On Windows, every object file in the final executable needs to be compiled to use the
+  # same version of the C Runtime Library -- there are different versions for debug and
+  # release builds. The script "ci/do_ci.ps1" will pass BAZEL_WINDOWS_BUILD_TYPE=dbg
+  # to bazel when performing a debug build.
+  build_type=Debug
+fi
+
 cmake -G "Ninja" ../benchmark \
-  -DCMAKE_BUILD_TYPE=RELEASE \
+  -DCMAKE_BUILD_TYPE="$build_type" \
   -DBENCHMARK_ENABLE_GTEST_TESTS=OFF
 ninja
 
 benchmark_lib="libbenchmark.a"
 if [[ "${OS}" == "Windows_NT" ]]; then
   benchmark_lib="benchmark.lib"
+  if [[ "${BAZEL_WINDOWS_BUILD_TYPE}" == "dbg" ]]; then
+    # .pdb files are not generated for release builds
+    cp "src/CMakeFiles/benchmark.dir/benchmark.pdb" "$THIRDPARTY_BUILD/lib/benchmark.pdb"
+  fi
 fi
 
 cp "src/$benchmark_lib" "$THIRDPARTY_BUILD"/lib

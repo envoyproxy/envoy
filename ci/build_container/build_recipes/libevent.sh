@@ -16,12 +16,11 @@ cd build
 
 # libevent defaults CMAKE_BUILD_TYPE to Release
 build_type=Release
-if [[ "${OS}" == "Windows_NT" ]]; then
+if [[ "${OS}" == "Windows_NT" && "${BAZEL_WINDOWS_BUILD_TYPE}" == "dbg" ]]; then
   # On Windows, every object file in the final executable needs to be compiled to use the
-  # same version of the C Runtime Library. If Envoy is built with '-c dbg', then it will
-  # use the Debug C Runtime Library. Setting CMAKE_BUILD_TYPE to Debug will cause libevent
-  # to use the debug version as well
-  # TODO: when '-c fastbuild' and '-c opt' work for Windows builds, set this appropriately
+  # same version of the C Runtime Library -- there are different versions for debug and
+  # release builds. The script "ci/do_ci.ps1" will pass BAZEL_WINDOWS_BUILD_TYPE=dbg
+  # to bazel when performing a debug build.
   build_type=Debug
 fi
 
@@ -34,6 +33,7 @@ cmake -G "Ninja" \
 ninja
 ninja install
 
-if [[ "${OS}" == "Windows_NT" ]]; then
+if [[ "${OS}" == "Windows_NT" && "${BAZEL_WINDOWS_BUILD_TYPE}" == "dbg" ]]; then
+  # .pdb files are not generated for release builds
   cp "CMakeFiles/event.dir/event.pdb" "$THIRDPARTY_BUILD/lib/event.pdb"
 fi

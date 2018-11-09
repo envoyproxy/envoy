@@ -12,10 +12,11 @@ CXX ?= g++
 CXXFLAGS ?= -ggdb3 -fno-omit-frame-pointer -O2
 CFLAGS ?= -ggdb3 -fno-omit-frame-pointer -O2
 CPPFLAGS ?= -DNDEBUG
+BAZEL_WINDOWS_BUILD_TYPE ?= opt
 
 # Keep track of the env vars we depend upon for $(THIRDPARTY_DEPS)/%.dep.env. If the list (captured
 # above) of flags changes, this should be updated.
-ENV_STR := $(CC) $(CXX) $(CXXFLAGS) $(CFLAGS) $(CPPFLAGS)
+ENV_STR := $(CC) $(CXX) $(CXXFLAGS) $(CFLAGS) $(CPPFLAGS) $(BAZEL_WINDOWS_BUILD_TYPE)
 
 # If $(BUILD_DISTINCT) is set in the make environment, the artifacts are built and installed in
 # distinct directories under $(THIRDPARTY_BUILD) and $(THIRDPARTY_SRC). They end up looking like
@@ -47,6 +48,7 @@ build-recipe = cd "$(THIRDPARTY_SRC)" && \
 	   CFLAGS="$(CFLAGS)" \
 	   CXXFLAGS="$(CXXFLAGS)" \
 	   CPPFLAGS="$(CPPFLAGS)" \
+	   BAZEL_WINDOWS_BUILD_TYPE="$(BAZEL_WINDOWS_BUILD_TYPE)" \
 	   $(1) \
 	   bash -c "time $(CURDIR)/recipe_wrapper.sh $(realpath $<)" 2>&1) > $@.log) || (cat $@.log; exit 1)) && \
 	$(build-complete)

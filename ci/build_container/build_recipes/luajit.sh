@@ -61,12 +61,23 @@ EOF
 
 if [[ "${OS}" == "Windows_NT" ]]; then
   cd src
-  ./msvcbuild.bat debug
+  build_type="release"
+  if [[ "${BAZEL_WINDOWS_BUILD_TYPE}" == "dbg" ]]; then
+    # On Windows, every object file in the final executable needs to be compiled to use the
+    # same version of the C Runtime Library -- there are different versions for debug and
+    # release builds. The script "ci/do_ci.ps1" will pass BAZEL_WINDOWS_BUILD_TYPE=dbg
+    # to bazel when performing a debug build.
+    build_type=debug
+  fi
+  ./msvcbuild.bat $build_type
 
   mkdir -p "$THIRDPARTY_BUILD/include/luajit-2.0"
   cp *.h* "$THIRDPARTY_BUILD/include/luajit-2.0"
   cp luajit.lib "$THIRDPARTY_BUILD/lib"
-  cp *.pdb "$THIRDPARTY_BUILD/lib"
+  if [[ "${BAZEL_WINDOWS_BUILD_TYPE}" == "dbg" ]]; then
+    # .pdb files are not generated for release builds
+    cp *.pdb "$THIRDPARTY_BUILD/lib"
+  fi
 else
   patch -p1 < ../luajit_make.diff
 

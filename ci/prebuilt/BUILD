@@ -7,6 +7,30 @@ config_setting(
     values = {"cpu": "x64_windows"},
 )
 
+config_setting(
+    name = "windows_dbg_build",
+    values = {
+        "cpu": "x64_windows",
+        "compilation_mode": "dbg",
+    },
+)
+
+config_setting(
+    name = "windows_fastbuild_build",
+    values = {
+        "cpu": "x64_windows",
+        "compilation_mode": "fastbuild",
+    },
+)
+
+config_setting(
+    name = "windows_opt_build",
+    values = {
+        "cpu": "x64_windows",
+        "compilation_mode": "opt",
+    },
+)
+
 cc_library(
     name = "ares",
     srcs = select({
@@ -52,7 +76,7 @@ cc_library(
 cc_library(
     name = "nghttp2",
     srcs = select({
-        ":windows_x86_64": ["thirdparty_build/lib/nghttp2.lib"],
+        ":windows_x86_64": ["thirdparty_build/lib/nghttp2_static.lib"],
         "//conditions:default": ["thirdparty_build/lib/libnghttp2.a"],
     }),
     hdrs = glob(["thirdparty_build/include/nghttp2/**/*.h"]),
@@ -69,7 +93,9 @@ cc_library(
 cc_library(
     name = "yaml_cpp",
     srcs = select({
-        ":windows_x86_64": glob(["thirdparty_build/lib/libyaml-cpp*.lib"]),
+        ":windows_dbg_build": ["thirdparty_build/lib/libyaml-cppmdd.lib"],
+        ":windows_fastbuild_build": ["thirdparty_build/lib/libyaml-cppmd.lib"],
+        ":windows_opt_build": ["thirdparty_build/lib/libyaml-cppmd.lib"],
         "//conditions:default": ["thirdparty_build/lib/libyaml-cpp.a"],
     }),
     hdrs = glob(["thirdparty_build/include/yaml-cpp/**/*.h"]),
@@ -79,7 +105,9 @@ cc_library(
 cc_library(
     name = "zlib",
     srcs = select({
-        ":windows_x86_64": glob(["thirdparty_build/lib/zlibstaticd.lib"]),
+        ":windows_dbg_build": ["thirdparty_build/lib/zlibstaticd.lib"],
+        ":windows_fastbuild_build": ["thirdparty_build/lib/zlibstatic.lib"],
+        ":windows_opt_build": ["thirdparty_build/lib/zlibstatic.lib"],
         "//conditions:default": ["thirdparty_build/lib/libz.a"],
     }),
     hdrs = [
