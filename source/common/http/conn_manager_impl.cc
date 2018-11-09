@@ -507,28 +507,41 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
   return &connection_manager_.read_callbacks_->connection();
 }
 
+// Ordering in this function is complicated, but important.
+//
+// We want to do minimal work before selecting route and creating a filter
+// chain to maximize the number of requests which get custom filter behavior,
+// e.g. registering access logging.
+//
+// This must be balanced by doing sanity checking for invalid requests (one
+// can't route select properly without full headers), checking state required to
+// serve error responses (connection close, head requests, etc), and
+// modifications which may themselves affect route selection.
+//
+// TODO(alyssawilk) all the calls here should be audited for order priority,
+// e.g. many early returns do not currently handle connection: close properly.
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   request_headers_ = std::move(headers);
   if (Http::Headers::get().MethodValues.Head == request_headers_->Method()->value().c_str()) {
     is_head_request_ = true;
   }
+  ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
+                   *request_headers_);
 
   maybeEndDecode(end_stream);
 
   // Drop new requests when overloaded as soon as we have decoded the headers.
   if (connection_manager_.overload_stop_accepting_requests_ref_ ==
       Server::OverloadActionState::Active) {
+    // In this one special case, do not create the filter chain. If there is a risk of memory
+    // overload it is more important to avoid unnecessary allocation than to create the filters.
+    state_.created_filter_chain_ = true;
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
                    Http::Code::ServiceUnavailable, "envoy overloaded", nullptr, is_head_request_,
                    absl::nullopt);
     return;
   }
-
-  const bool upgrade_rejected = createFilterChain() == false;
-
-  ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
-                   *request_headers_);
 
   if (!connection_manager_.config_.proxy100Continue() && request_headers_->Expect() &&
       request_headers_->Expect()->value() == Headers::get().ExpectValues._100Continue.c_str()) {
@@ -624,6 +637,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   ASSERT(!cached_route_);
   refreshCachedRoute();
+  const bool upgrade_rejected = createFilterChain() == false;
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
@@ -962,9 +976,14 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     bool is_grpc_request, Code code, const std::string& body,
-    std::function<void(HeaderMap& headers)> modify_headers, bool is_head_request,
+    const std::function<void(HeaderMap& headers)>& modify_headers, bool is_head_request,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
   ASSERT(response_headers_ == nullptr);
+  // For early error handling, do a best-effort attempt to create a filter chain
+  // to ensure access logging.
+  if (!state_.created_filter_chain_) {
+    createFilterChain();
+  }
   Utility::sendLocalReply(is_grpc_request,
                           [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
                             if (modify_headers != nullptr) {
@@ -1315,8 +1334,12 @@ void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
 }
 
 bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
+  if (state_.created_filter_chain_) {
+    return false;
+  }
   bool upgrade_rejected = false;
-  auto upgrade = request_headers_->Upgrade();
+  auto upgrade = request_headers_ ? request_headers_->Upgrade() : nullptr;
+  state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
     if (connection_manager_.config_.filterFactory().createUpgradeFilterChain(
             upgrade->value().c_str(), *this)) {

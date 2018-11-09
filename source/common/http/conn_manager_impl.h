@@ -284,7 +284,7 @@ private:
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, const std::string& body,
-                        std::function<void(HeaderMap& headers)> modify_headers,
+                        const std::function<void(HeaderMap& headers)>& modify_headers,
                         bool is_head_request,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
@@ -358,7 +358,7 @@ private:
     struct State {
       State()
           : remote_complete_(false), local_complete_(false), saw_connection_close_(false),
-            successful_upgrade_(false) {}
+            successful_upgrade_(false), created_filter_chain_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -371,6 +371,7 @@ private:
       bool local_complete_ : 1;
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
+      bool created_filter_chain_ : 1;
     };
 
     // Possibly increases buffer_limit_ to the value of limit.
