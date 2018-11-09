@@ -56,7 +56,6 @@ Remote JWKS config example
 
 .. code-block:: yaml
 
-          http_filters:
           - name: envoy.filters.http.jwt_authn
             config:
              providers:
