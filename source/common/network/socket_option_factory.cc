@@ -49,6 +49,15 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpTransparentOptions(
   return options;
 }
 
+std::unique_ptr<Socket::Options> SocketOptionFactory::buildSocketMarkOptions(uint32_t mark) {
+  std::unique_ptr<Socket::Options> options = absl::make_unique<Socket::Options>();
+  // we need this to happen prior to binding or prior to connecting. In both cases, PREBIND will
+  // fire.
+  options->push_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::api::v2::core::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_MARK, mark));
+  return options;
+}
+
 std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
     const Protobuf::RepeatedPtrField<envoy::api::v2::core::SocketOption>& socket_options) {
   auto options = absl::make_unique<Socket::Options>();
