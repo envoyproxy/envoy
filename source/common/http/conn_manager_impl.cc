@@ -94,9 +94,9 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
   if (config_.idleTimeout()) {
-    idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+    connection_idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onIdleTimeout(); });
-    idle_timer_->enableTimer(config_.idleTimeout().value());
+    connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
 
   read_callbacks_->connection().setDelayedCloseTimeout(config_.delayedCloseTimeout());
@@ -167,15 +167,15 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
     }
   }
 
-  if (idle_timer_ && streams_.empty()) {
-    idle_timer_->enableTimer(config_.idleTimeout().value());
+  if (connection_idle_timer_ && streams_.empty()) {
+    connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
-  if (stream.idle_timer_ != nullptr) {
-    stream.idle_timer_->disableTimer();
-    stream.idle_timer_ = nullptr;
+  if (stream.stream_idle_timer_ != nullptr) {
+    stream.stream_idle_timer_->disableTimer();
+    stream.stream_idle_timer_ = nullptr;
   }
   stream.state_.destroyed_ = true;
   for (auto& filter : stream.decoder_filters_) {
@@ -193,8 +193,8 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 }
 
 StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder) {
-  if (idle_timer_) {
-    idle_timer_->disableTimer();
+  if (connection_idle_timer_) {
+    connection_idle_timer_->disableTimer();
   }
 
   ENVOY_CONN_LOG(debug, "new stream", read_callbacks_->connection());
@@ -283,9 +283,9 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    if (idle_timer_) {
-      idle_timer_->disableTimer();
-      idle_timer_.reset();
+    if (connection_idle_timer_) {
+      connection_idle_timer_->disableTimer();
+      connection_idle_timer_.reset();
     }
 
     if (drain_timer_) {
@@ -378,7 +378,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
-    idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+    stream_idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onIdleTimeout(); });
     resetIdleTimer();
   }
@@ -423,11 +423,11 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
 }
 
 void ConnectionManagerImpl::ActiveStream::resetIdleTimer() {
-  if (idle_timer_ != nullptr) {
+  if (stream_idle_timer_ != nullptr) {
     // TODO(htuch): If this shows up in performance profiles, optimize by only
     // updating a timestamp here and doing periodic checks for idle timeouts
     // instead, or reducing the accuracy of timers.
-    idle_timer_->enableTimer(idle_timeout_ms_);
+    stream_idle_timer_->enableTimer(idle_timeout_ms_);
   }
 }
 
@@ -644,15 +644,16 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       idle_timeout_ms_ = route_entry->idleTimeout().value();
       if (idle_timeout_ms_.count()) {
         // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
-        if (idle_timer_ == nullptr) {
-          idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
-              [this]() -> void { onIdleTimeout(); });
+        if (stream_idle_timer_ == nullptr) {
+          stream_idle_timer_ =
+              connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+                  [this]() -> void { onIdleTimeout(); });
         }
-      } else if (idle_timer_ != nullptr) {
+      } else if (stream_idle_timer_ != nullptr) {
         // If we had a global stream idle timeout but the route-level idle timeout is set to zero
         // (to override), we disable the idle timer.
-        idle_timer_->disableTimer();
-        idle_timer_ = nullptr;
+        stream_idle_timer_->disableTimer();
+        stream_idle_timer_ = nullptr;
       }
     }
   }
