@@ -56,27 +56,28 @@ Remote JWKS config example
 
 .. code-block:: yaml
 
-          - name: envoy.filters.http.jwt_authn
-            config:
-             providers:
-               example_provider:
-                 issuer: http://your-issuer/uaa/oauth/token
-                 audiences:                 
-                 - your_audience 
-                 - openid
-                 remote_jwks:
-                   http_uri:
-                     uri: https://www.googleapis.com/oauth2/v3/certs 
-                     cluster: googleapis_cluster
-                     timeout:
-                       seconds: 5
-                   cache_duration:
-                     seconds: 300
-             rules:
-             - match:                 
-                 prefix: /
-               requires:
-                 provider_name: example_provider
+  http_filters:
+  - name: envoy.filters.http.jwt_authn
+    config:
+      providers:
+        example_provider:
+          issuer: http://your-issuer/uaa/oauth/token
+          audiences:                 
+          - your_audience 
+          - openid
+          remote_jwks:
+            http_uri:
+              uri: https://www.googleapis.com/oauth2/v3/certs 
+              cluster: googleapis_cluster
+              timeout:
+                seconds: 5
+            cache_duration:
+              seconds: 300
+      rules:
+      - match:                 
+          prefix: /
+        requires:
+          provider_name: example_provider
 
 
 Above example fetches JWSK from a remote server with URL https://example.com/jwks.json. The token will be extracted from the default extract locations. The token will not be forwarded to upstream. JWT payload will not be added to the request header.
