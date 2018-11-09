@@ -4,6 +4,28 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
 
+# A genrule variant that can output a directory. This is useful when doing things like
+# generating a fuzz corpus mechanically.
+def _envoy_directory_genrule_impl(ctx):
+    tree = ctx.actions.declare_directory(ctx.attr.name + ".outputs")
+    ctx.actions.run_shell(
+        inputs = ctx.files.srcs,
+        tools = ctx.files.tools,
+        outputs = [tree],
+        command = "mkdir -p " + tree.path + " && " + ctx.expand_location(ctx.attr.cmd),
+        env = {"GENRULE_OUTPUT_DIR": tree.path},
+    )
+    return [DefaultInfo(files = depset([tree]))]
+
+envoy_directory_genrule = rule(
+    implementation = _envoy_directory_genrule_impl,
+    attrs = {
+        "srcs": attr.label_list(),
+        "cmd": attr.string(),
+        "tools": attr.label_list(),
+    },
+)
+
 # Compute the final copts based on various options.
 def envoy_copts(repository, test = False):
     posix_options = [
