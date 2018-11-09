@@ -58,6 +58,7 @@ private:
 class IsolatedStoreImpl : public Store {
 public:
   IsolatedStoreImpl();
+  explicit IsolatedStoreImpl(SymbolTable& synbol_table);
 
   // Stats::Scope
   Counter& counterx(StatName name) override { return counters_.get(name); }
@@ -93,7 +94,8 @@ public:
   }
 
 private:
-  SymbolTable symbol_table_;
+  std::unique_ptr<SymbolTable> owned_symbol_table_;
+  SymbolTable& symbol_table_;
   HeapStatDataAllocator alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;

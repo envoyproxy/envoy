@@ -107,9 +107,11 @@ MockSource::~MockSource() {}
 MockSink::MockSink() {}
 MockSink::~MockSink() {}
 
-MockStore::MockStore() : counter_(symbol_table_) {
+MockStore::MockStore() : MockStore(owned_symbol_table_) {}
+
+MockStore::MockStore(SymbolTable& symbol_table)
+    : symbol_table_(symbol_table), counter_(symbol_table_) {
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
-  ON_CALL(*this, counterx(_)).WillByDefault(ReturnRef(counter_));
   ON_CALL(*this, histogram(_)).WillByDefault(Invoke([this](const std::string& name) -> Histogram& {
     auto* histogram = new NiceMock<MockHistogram>(symbol_table_);
     histogram->name_ = name;

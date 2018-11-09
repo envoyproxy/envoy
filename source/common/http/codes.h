@@ -27,8 +27,10 @@ public:
   void chargeResponseTiming(const ResponseTimingInfo& info) override;
 
 private:
+  using Join = Stats::StatNameJoiner;
+
   class RequestCodeGroup {
-   public:
+  public:
     RequestCodeGroup(absl::string_view prefix, CodeStatsImpl& code_stats)
         : code_stats_(code_stats), prefix_(std::string(prefix)) {}
     ~RequestCodeGroup();
@@ -47,7 +49,7 @@ private:
     LockStatName[MaxResponseCode] locked_stat_names_;
     */
 
-   private:
+  private:
     using RCStatNameMap = absl::flat_hash_map<Code, std::unique_ptr<Stats::StatNameStorage>>;
 
     CodeStatsImpl& code_stats_;
@@ -74,17 +76,15 @@ private:
   Stats::SymbolTable& symbol_table_;
 
   Stats::StatName canary_;
-  Stats::StatName canary_upstream_rq_completed_;
   Stats::StatName canary_upstream_rq_time_;
   Stats::StatName external_;
   Stats::StatName external_rq_time_;
-  Stats::StatName external_upstream_rq_completed_;
   Stats::StatName external_upstream_rq_time_;
   Stats::StatName internal_;
   Stats::StatName internal_rq_time_;
-  Stats::StatName internal_upstream_rq_completed_;
   Stats::StatName internal_upstream_rq_time_;
   Stats::StatName upstream_;
+  Stats::StatName upstream_rq_1xx_;
   Stats::StatName upstream_rq_2xx_;
   Stats::StatName upstream_rq_3xx_;
   Stats::StatName upstream_rq_4xx_;

@@ -19,32 +19,24 @@ namespace Envoy {
 namespace Http {
 
 CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
-    : symbol_table_(symbol_table),
-      canary_(makeStatName("canary")),
-      canary_upstream_rq_completed_(makeStatName("canary.upstream_rq_completed")),
+    : symbol_table_(symbol_table), canary_(makeStatName("canary")),
       canary_upstream_rq_time_(makeStatName("canary.upstream_rq_time")),
       external_(makeStatName("external")),
       external_rq_time_(makeStatName("external.upstream_rq_time")),
-      external_upstream_rq_completed_(makeStatName("external.upstream_rq_completed")),
       external_upstream_rq_time_(makeStatName("external.upstream_rq_time")),
       internal_(makeStatName("internal")),
       internal_rq_time_(makeStatName("internal.upstream_rq_time")),
-      internal_upstream_rq_completed_(makeStatName("internal.upstream_rq_completed")),
       internal_upstream_rq_time_(makeStatName("internal.upstream_rq_time")),
       upstream_rq_2xx_(makeStatName("upstream_rq_2xx")),
       upstream_rq_3xx_(makeStatName("upstream_rq_3xx")),
       upstream_rq_4xx_(makeStatName("upstream_rq_4xx")),
       upstream_rq_5xx_(makeStatName("upstream_rq_5xx")),
       upstream_rq_completed_(makeStatName("upstream_rq_completed")),
-      upstream_rq_time_(makeStatName("upstream_rq_time")),
-      vcluster_(makeStatName("vcluster")),
-      vhost_(makeStatName("vhost")),
-      zone_(makeStatName("zone")),
+      upstream_rq_time_(makeStatName("upstream_rq_time")), vcluster_(makeStatName("vcluster")),
+      vhost_(makeStatName("vhost")), zone_(makeStatName("zone")),
       canary_upstream_rq_("canary_upstream_rq_", *this),
       external_upstream_rq_("external_upstream_rq_", *this),
-      internal_upstream_rq_("internal_upstream_rq_", *this),
-      upstream_rq_("upstream_rq_rq_", *this) {}
-
+      internal_upstream_rq_("internal_upstream_rq_", *this), upstream_rq_("upstream_rq_", *this) {}
 
 CodeStatsImpl::~CodeStatsImpl() {
   for (Stats::StatNameStorage& stat_name_storage : storage_) {
@@ -59,7 +51,7 @@ Stats::StatName CodeStatsImpl::makeStatName(absl::string_view name) {
 
 void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
                                             Code response_code) {
-  using Join = Stats::StatNameJoiner;
+  ASSERT(&scope.symbolTable() == &symbol_table_);
 
   // Build a dynamic stat for the response code and increment it.
   scope.counterx(Join(prefix, upstream_rq_completed_).statName()).inc();
@@ -78,97 +70,105 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) {
   Stats::StatName prefix = prefix_storage.statName();
   Code code = static_cast<Code>(info.response_status_code_);
 
+  ASSERT(&info.cluster_scope_.symbolTable() == &symbol_table_);
   chargeBasicResponseStat(info.cluster_scope_, prefix, code);
 
-  using Join = Stats::StatNameJoiner;
+  Stats::StatName rq_group = upstreamRqGroup(code);
+  Stats::StatName rq_code = upstream_rq_.statName(code);
+
+  auto write_category = [this, prefix, rq_group, rq_code, &info](Stats::StatName category) {
+    info.cluster_scope_.counterx(Join({prefix, category, upstream_rq_completed_}).statName()).inc();
+    info.cluster_scope_.counterx(Join({prefix, category, rq_group}).statName()).inc();
+    info.cluster_scope_.counterx(Join({prefix, category, rq_code}).statName()).inc();
+  };
 
   // If the response is from a canary, also create canary stats.
   if (info.upstream_canary_) {
-    info.cluster_scope_.counterx(Join(
-        prefix, canary_upstream_rq_completed_).statName())
-        .inc();
-    info.cluster_scope_.counterx(Join(
-        {prefix, canary_, upstreamRqGroup(code)}).statName())
-        .inc();
-    info.cluster_scope_.counterx(Join({prefix, canary_, upstream_rq_.statName(code)}).statName())
-        .inc();
+    write_category(canary_);
   }
 
   // Split stats into external vs. internal.
   if (info.internal_request_) {
-    info.cluster_scope_.counterx(Join(prefix, internal_upstream_rq_completed_).statName()).inc();
-    info.cluster_scope_.counterx(Join({prefix, internal_, upstreamRqGroup(code)}).statName())
-        .inc();
-    info.cluster_scope_.counterx(Join({prefix, internal_, upstream_rq_.statName(code)})
-                                 .statName()).inc();
+    write_category(internal_);
   } else {
-    info.cluster_scope_.counterx(Join(prefix, external_upstream_rq_completed_).statName()).inc();
-    info.cluster_scope_.counterx(Join({prefix, external_, upstreamRqGroup(code)}).statName()).inc();
-    info.cluster_scope_.counterx(Join(prefix, external_, upstream_rq_.statName(code)).statName())
-        .inc();
+    write_category(external_);
   }
 
   // Handle request virtual cluster.
   if (!info.request_vcluster_name_.empty()) {
+    Stats::StatNameTempStorage vhost_storage(info.request_vhost_name_, symbol_table_);
+    Stats::StatName vhost_name = vhost_storage.statName();
+    Stats::StatNameTempStorage vcluster_storage(info.request_vcluster_name_, symbol_table_);
+    Stats::StatName vcluster_name = vcluster_storage.statName();
+
     info.global_scope_
-        .counter(Join({vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_,
-                       upstream_rq_completed_}))
+        .counterx(
+            Join({vhost_, vhost_name, vcluster_, vcluster_name, upstream_rq_completed_}).statName())
         .inc();
     info.global_scope_
-        .counter(join({vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_,
-                       absl::StrCat(upstream_rq_, rc_group)}))
+        .counterx(Join({vhost_, vhost_name, vcluster_, vcluster_name, rq_group}).statName())
         .inc();
     info.global_scope_
-        .counter(join({vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_,
-                       absl::StrCat(upstream_rq_, response_code)}))
+        .counterx(Join({vhost_, vhost_name, vcluster_, vcluster_name, rq_code}).statName())
         .inc();
   }
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
+    Stats::StatNameTempStorage from_zone_storage(info.from_zone_, symbol_table_);
+    Stats::StatName from_zone = from_zone_storage.statName();
+    Stats::StatNameTempStorage to_zone_storage(info.to_zone_, symbol_table_);
+    Stats::StatName to_zone = to_zone_storage.statName();
+
     info.cluster_scope_
-        .counter(join({prefix_without_trailing_dot, zone_, info.from_zone_, info.to_zone_,
-                       upstream_rq_completed_}))
+        .counterx(Join({prefix, zone_, from_zone, to_zone, upstream_rq_completed_}).statName())
         .inc();
-    info.cluster_scope_
-        .counter(join({prefix_without_trailing_dot, zone_, info.from_zone_, info.to_zone_,
-                       absl::StrCat(upstream_rq_, rc_group)}))
+    info.cluster_scope_.counterx(Join({prefix, zone_, from_zone, to_zone, rq_group}).statName())
         .inc();
-    info.cluster_scope_
-        .counter(join({prefix_without_trailing_dot, zone_, info.from_zone_, info.to_zone_,
-                       absl::StrCat(upstream_rq_, response_code)}))
+    info.cluster_scope_.counterx(Join({prefix, zone_, from_zone, to_zone, rq_code}).statName())
         .inc();
   }
 }
 
 void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) {
-  info.cluster_scope_.histogram(absl::StrCat(info.prefix_, upstream_rq_time_))
+  Stats::StatNameTempStorage prefix_storage(stripTrailingDot(info.prefix_), symbol_table_);
+  Stats::StatName prefix = prefix_storage.statName();
+
+  info.cluster_scope_.histogramx(Join(prefix, upstream_rq_time_).statName())
       .recordValue(info.response_time_.count());
   if (info.upstream_canary_) {
-    info.cluster_scope_.histogram(absl::StrCat(info.prefix_, canary_upstream_rq_time_))
+    info.cluster_scope_.histogramx(Join(prefix, canary_upstream_rq_time_).statName())
         .recordValue(info.response_time_.count());
   }
 
   if (info.internal_request_) {
-    info.cluster_scope_.histogram(absl::StrCat(info.prefix_, internal_upstream_rq_time_))
+    info.cluster_scope_.histogramx(Join(prefix, internal_upstream_rq_time_).statName())
         .recordValue(info.response_time_.count());
   } else {
-    info.cluster_scope_.histogram(absl::StrCat(info.prefix_, external_upstream_rq_time_))
+    info.cluster_scope_.histogramx(Join(prefix, external_upstream_rq_time_).statName())
         .recordValue(info.response_time_.count());
   }
 
   if (!info.request_vcluster_name_.empty()) {
+    Stats::StatNameTempStorage vhost_storage(info.request_vhost_name_, symbol_table_);
+    Stats::StatName vhost_name = vhost_storage.statName();
+    Stats::StatNameTempStorage vcluster_storage(info.request_vcluster_name_, symbol_table_);
+    Stats::StatName vcluster_name = vcluster_storage.statName();
     info.global_scope_
-        .histogram(join({vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_,
-                         upstream_rq_time_}))
+        .histogramx(
+            Join({vhost_, vhost_name, vcluster_, vcluster_name, upstream_rq_time_}).statName())
         .recordValue(info.response_time_.count());
   }
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
+    Stats::StatNameTempStorage from_zone_storage(info.from_zone_, symbol_table_);
+    Stats::StatName from_zone = from_zone_storage.statName();
+    Stats::StatNameTempStorage to_zone_storage(info.to_zone_, symbol_table_);
+    Stats::StatName to_zone = to_zone_storage.statName();
+
     info.cluster_scope_
-        .histogram(join({stripTrailingDot(info.prefix_), zone_, info.from_zone_, info.to_zone_,
-                         upstream_rq_time_}))
+        .histogramx(Join({prefix, zone_, from_zone, to_zone, upstream_rq_time_}).statName())
         .recordValue(info.response_time_.count());
   }
 }
@@ -189,20 +189,25 @@ std::string CodeStatsImpl::join(const std::vector<absl::string_view>& v) {
   return absl::StrJoin(iter, v.end(), ".");
 }
 
-StatName CodeStatsImpl::upstreamRq(Code response_code) {
+Stats::StatName CodeStatsImpl::upstreamRqGroup(Code response_code) const {
   switch (enumToInt(response_code) / 100) {
-    case 1: return response_code_1xx_;
-    case 2: return response_code_2xx_;
-    case 3: return response_code_3xx_;
-    case 4: return response_code_3xx_;
-    case 5: return response_code_3xx_;
+  case 1:
+    return upstream_rq_1xx_;
+  case 2:
+    return upstream_rq_2xx_;
+  case 3:
+    return upstream_rq_3xx_;
+  case 4:
+    return upstream_rq_4xx_;
+  case 5:
+    return upstream_rq_5xx_;
   }
-  return StatName();
+  return Stats::StatName();
 }
 
 CodeStatsImpl::RequestCodeGroup::~RequestCodeGroup() {
-  for (auto p : rc_stat_name_map_) {
-    std::unique_ptr<StatNameStorage>& storage = p->second;
+  for (auto& p : rc_stat_name_map_) {
+    std::unique_ptr<Stats::StatNameStorage>& storage = p.second;
     storage->free(code_stats_.symbol_table_);
   }
 }
@@ -212,7 +217,7 @@ Stats::StatName CodeStatsImpl::RequestCodeGroup::statName(Code response_code) {
     absl::ReaderMutexLock lock(&mutex_);
     auto p = rc_stat_name_map_.find(response_code);
     if (p != rc_stat_name_map_.end()) {
-      return p->second;
+      return p->second->statName();
     }
   }
 
@@ -221,11 +226,10 @@ Stats::StatName CodeStatsImpl::RequestCodeGroup::statName(Code response_code) {
 
   {
     absl::MutexLock lock(&mutex_);
-    mutex_.WriterLock();
-    std::unique_ptr<StatNameStorage>& stat_name_storage = rc_stat_name_map_[response_code];
+    std::unique_ptr<Stats::StatNameStorage>& stat_name_storage = rc_stat_name_map_[response_code];
     if (stat_name_storage == nullptr) {
-      stat_name_storage = std::make_unique<StatNameStorage>(
-          absl::StrCat(prefix_, enumToInt(reesponse_code)));
+      stat_name_storage = std::make_unique<Stats::StatNameStorage>(
+          absl::StrCat(prefix_, enumToInt(response_code)), code_stats_.symbol_table_);
     }
     return stat_name_storage->statName();
   }

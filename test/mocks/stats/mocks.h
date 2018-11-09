@@ -161,6 +161,7 @@ public:
 
 class MockStore : public Store {
 public:
+  explicit MockStore(SymbolTable& symbol_table);
   MockStore();
   ~MockStore();
 
@@ -168,21 +169,23 @@ public:
 
   MOCK_METHOD2(deliverHistogramToSinks, void(const Histogram& histogram, uint64_t value));
   MOCK_METHOD1(counter, Counter&(const std::string&));
-  MOCK_METHOD1(counterx, Counter&(StatName));
   MOCK_CONST_METHOD0(counters, std::vector<CounterSharedPtr>());
   MOCK_METHOD1(createScope_, Scope*(const std::string& name));
   MOCK_METHOD1(gauge, Gauge&(const std::string&));
-  MOCK_METHOD1(gaugex, Gauge&(StatName));
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
-  MOCK_METHOD1(histogramx, Histogram&(StatName));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
   MOCK_CONST_METHOD0(statsOptions, const StatsOptions&());
+
+  Counter& counterx(StatName name) { return counter(name.toString(symbol_table_)); }
+  Gauge& gaugex(StatName name) { return gauge(name.toString(symbol_table_)); }
+  Histogram& histogramx(StatName name) { return histogram(name.toString(symbol_table_)); }
 
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& symbolTable() const override { return symbol_table_; }
 
-  SymbolTable symbol_table_;
+  SymbolTable owned_symbol_table_;
+  SymbolTable& symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
   StatsOptionsImpl stats_options_;

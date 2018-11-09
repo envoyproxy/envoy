@@ -24,6 +24,9 @@ namespace Http {
 
 class CodeUtilityTest : public testing::Test {
 public:
+  CodeUtilityTest()
+      : global_store_(symbol_table_), cluster_scope_(symbol_table_), code_stats_(symbol_table_) {}
+
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    const std::string& request_vhost_name = EMPTY_STRING,
                    const std::string& request_vcluster_name = EMPTY_STRING,
@@ -36,6 +39,7 @@ public:
     code_stats_.chargeResponseStat(info);
   }
 
+  Stats::SymbolTable symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
@@ -197,9 +201,9 @@ TEST_F(CodeUtilityTest, PerZoneStats) {
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.zone.from_az.to_az.upstream_rq_2xx").value());
 }
 
-TEST(CodeUtilityResponseTimingTest, All) {
-  Stats::MockStore global_store;
-  Stats::MockStore cluster_scope;
+TEST_F(CodeUtilityTest, ResponseTimingTest) {
+  Stats::MockStore global_store(symbol_table_);
+  Stats::MockStore cluster_scope(symbol_table_);
 
   Http::CodeStats::ResponseTimingInfo info{
       global_store, cluster_scope, "prefix.",    std::chrono::milliseconds(5),
@@ -231,8 +235,7 @@ TEST(CodeUtilityResponseTimingTest, All) {
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name, "prefix.zone.from_az.to_az.upstream_rq_time"), 5));
-  Http::CodeStatsImpl code_stats;
-  code_stats.chargeResponseTiming(info);
+  code_stats_.chargeResponseTiming(info);
 }
 
 } // namespace Http
