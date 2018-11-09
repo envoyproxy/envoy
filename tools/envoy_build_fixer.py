@@ -5,10 +5,10 @@
 import sys
 
 LICENSE_STRING = 'licenses(["notice"])  # Apache 2\n'
-ENVOY_PACKAGE_STRING = (
-    'load("//bazel:envoy_build_system.bzl", "envoy_package")\n'
-    '\n'
-    'envoy_package()\n')
+ENVOY_PACKAGE_STRING = ('load("//bazel:envoy_build_system.bzl", "envoy_package")\n'
+                        '\n'
+                        'envoy_package()\n')
+
 
 def FixBuild(path):
   with open(path, 'r') as f:
@@ -24,10 +24,9 @@ def FixBuild(path):
         if line != '\n':
           outlines.append('\n')
         first = False
-      if line.startswith('package(') and not path.endswith(
-          'bazel/BUILD') and not path.endswith(
-          'ci/prebuilt/BUILD') and not path.endswith(
-          'bazel/osx/BUILD') and not path.endswith('bazel/osx/crosstool/BUILD'):
+      if line.startswith('package(') and not path.endswith('bazel/BUILD') and not path.endswith(
+          'ci/prebuilt/BUILD') and not path.endswith('bazel/osx/BUILD') and not path.endswith(
+              'bazel/osx/crosstool/BUILD'):
         continue
       if in_load == False and line.startswith('load('):
         in_load = True

@@ -106,6 +106,7 @@ public:
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
+  bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
 
 private:
   void parseComponentLogLevels(const std::string& component_log_levels);
@@ -134,6 +135,7 @@ private:
   Stats::StatsOptionsImpl stats_options_;
   bool hot_restart_disabled_;
   bool signal_handling_enabled_;
+  bool mutex_tracing_enabled_;
 
   friend class OptionsImplTest;
 };

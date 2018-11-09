@@ -368,5 +368,12 @@ TEST_P(ServerInstanceImplTest, UnknownExceptionThrowInConstructor) {
   EXPECT_THROW_WITH_MESSAGE(initialize("test/server/node_bootstrap.yaml"), FakeException, "foobar");
 }
 
+TEST_P(ServerInstanceImplTest, MutexContentionEnabled) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.mutex_tracing_enabled_ = true;
+  EXPECT_NO_THROW(initialize(std::string()));
+}
+
 } // namespace Server
 } // namespace Envoy
