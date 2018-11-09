@@ -20,10 +20,10 @@ envoy_cc_library(
     ],
     external_deps = ["dd_opentracing_cpp"],
     deps = [
+        "//source/common/config:utility_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common/ot:opentracing_driver_lib",
-        "//source/server:configuration_lib",
     ],
 )
 
@@ -34,6 +34,6 @@ envoy_cc_library(
     deps = [
         ":datadog_tracer_lib",
         "//source/extensions/tracers:well_known_names",
-        "//source/server:configuration_lib",
+        "//source/extensions/tracers/common:factory_base_lib",
     ],
 )

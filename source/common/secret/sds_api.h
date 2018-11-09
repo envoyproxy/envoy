@@ -48,6 +48,7 @@ public:
 protected:
   // Creates new secrets.
   virtual void setSecret(const envoy::api::v2::auth::Secret&) PURE;
+  virtual void validateConfig(const envoy::api::v2::auth::Secret&) PURE;
   Common::CallbackManager<> update_callback_manager_;
 
 private:
@@ -99,7 +100,7 @@ public:
                sds_config_name, destructor_cb) {}
 
   // SecretProvider
-  const Ssl::TlsCertificateConfig* secret() const override {
+  const envoy::api::v2::auth::TlsCertificate* secret() const override {
     return tls_certificate_secrets_.get();
   }
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
@@ -109,11 +110,12 @@ public:
 protected:
   void setSecret(const envoy::api::v2::auth::Secret& secret) override {
     tls_certificate_secrets_ =
-        std::make_unique<Ssl::TlsCertificateConfigImpl>(secret.tls_certificate());
+        std::make_unique<envoy::api::v2::auth::TlsCertificate>(secret.tls_certificate());
   }
+  void validateConfig(const envoy::api::v2::auth::Secret&) override {}
 
 private:
-  Ssl::TlsCertificateConfigPtr tls_certificate_secrets_;
+  TlsCertificatePtr tls_certificate_secrets_;
 };
 
 /**
@@ -145,21 +147,33 @@ public:
                sds_config_name, destructor_cb) {}
 
   // SecretProvider
-  const Ssl::CertificateValidationContextConfig* secret() const override {
+  const envoy::api::v2::auth::CertificateValidationContext* secret() const override {
     return certificate_validation_context_secrets_.get();
   }
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
     return update_callback_manager_.add(callback);
   }
 
+  Common::CallbackHandle* addValidationCallback(
+      std::function<void(const envoy::api::v2::auth::CertificateValidationContext&)> callback) {
+    return validation_callback_manager_.add(callback);
+  }
+
 protected:
   void setSecret(const envoy::api::v2::auth::Secret& secret) override {
     certificate_validation_context_secrets_ =
-        std::make_unique<Ssl::CertificateValidationContextConfigImpl>(secret.validation_context());
+        std::make_unique<envoy::api::v2::auth::CertificateValidationContext>(
+            secret.validation_context());
+  }
+
+  void validateConfig(const envoy::api::v2::auth::Secret& secret) override {
+    validation_callback_manager_.runCallbacks(secret.validation_context());
   }
 
 private:
-  Ssl::CertificateValidationContextConfigPtr certificate_validation_context_secrets_;
+  CertificateValidationContextPtr certificate_validation_context_secrets_;
+  Common::CallbackManager<const envoy::api::v2::auth::CertificateValidationContext&>
+      validation_callback_manager_;
 };
 
 } // namespace Secret

@@ -4,7 +4,6 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -74,25 +73,16 @@ public:
   void setup() {
     EXPECT_CALL(dispatcher, createFilesystemWatcher_())
         .WillOnce(ReturnNew<NiceMock<Filesystem::MockWatcher>>());
-
-    os_sys_calls_ = new NiceMock<Api::MockOsSysCalls>;
-    ON_CALL(*os_sys_calls_, stat(_, _))
-        .WillByDefault(Invoke([](const char* filename, struct stat* stat) {
-          const int rc = ::stat(filename, stat);
-          return Api::SysCallIntResult{rc, errno};
-        }));
   }
 
   void run(const std::string& primary_dir, const std::string& override_dir) {
-    Api::OsSysCallsPtr os_sys_calls(os_sys_calls_);
-    loader = std::make_unique<DiskBackedLoaderImpl>(
-        dispatcher, tls, TestEnvironment::temporaryPath(primary_dir), "envoy", override_dir, store,
-        generator, std::move(os_sys_calls));
+    loader = std::make_unique<DiskBackedLoaderImpl>(dispatcher, tls,
+                                                    TestEnvironment::temporaryPath(primary_dir),
+                                                    "envoy", override_dir, store, generator);
   }
 
   Event::MockDispatcher dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
-  NiceMock<Api::MockOsSysCalls>* os_sys_calls_{};
 
   Stats::IsolatedStoreImpl store;
   MockRandomGenerator generator;
@@ -190,17 +180,6 @@ TEST_F(DiskBackedLoaderImplTest, BadDirectory) {
   run("/baddir", "/baddir");
 }
 
-TEST_F(DiskBackedLoaderImplTest, BadStat) {
-  setup();
-  EXPECT_CALL(*os_sys_calls_, stat(_, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
-  run("test/common/runtime/test_data/current", "envoy_override");
-  EXPECT_EQ(store.counter("runtime.load_error").value(), 1);
-  // We should still have the admin layer
-  const auto& layers = loader->snapshot().getLayers();
-  EXPECT_EQ(1, layers.size());
-  EXPECT_NE(nullptr, dynamic_cast<const AdminLayer*>(layers.back().get()));
-}
-
 TEST_F(DiskBackedLoaderImplTest, OverrideFolderDoesNotExist) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override_does_not_exist");
@@ -279,18 +258,18 @@ TEST(LoaderImplTest, All) {
 }
 
 TEST(DiskLayer, IllegalPath) {
-  Api::MockOsSysCalls mock_os_syscalls;
-  EXPECT_THROW_WITH_MESSAGE(DiskLayer("test", "/dev", mock_os_syscalls), EnvoyException,
-                            "Invalid path: /dev");
+#if defined(WIN32)
+  // no illegal paths on Windows at the moment
+  return;
+#endif
+  EXPECT_THROW_WITH_MESSAGE(DiskLayer("test", "/dev"), EnvoyException, "Invalid path: /dev");
 }
 
 // Validate that we catch recursion that goes too deep in the runtime filesystem
 // walk.
 TEST(DiskLayer, Loop) {
-  Api::OsSysCallsImpl os_syscalls;
   EXPECT_THROW_WITH_MESSAGE(
-      DiskLayer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop"),
-                os_syscalls),
+      DiskLayer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop")),
       EnvoyException, "Walk recursion depth exceded 16");
 }
 
