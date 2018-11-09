@@ -144,7 +144,19 @@ typedef std::unique_ptr<TransportSocket> TransportSocketPtr;
 class TransportSocketOptions {
 public:
   virtual ~TransportSocketOptions() {}
+
+  /**
+   * @return the const optional server name to set in the transport socket, for example SNI for
+   *         SSL, regardless of the upstream cluster configuration. The filters like tcp_proxy
+   *         should override the server name in the upstream cluster configuration with that value.
+   */
   virtual const absl::optional<std::string>& overrideServerName() const PURE;
+
+  /**
+   * @param vector of bytes to which the option should append hash key data that will be used
+   *        to separate connections based on the option. Any data already in the key vector must
+   *        not be modified.
+   */
   virtual void hashKey(std::vector<uint8_t>& key) const PURE;
 };
 

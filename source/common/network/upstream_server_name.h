@@ -8,7 +8,9 @@ namespace Envoy {
 namespace Network {
 
 /**
- * Original Requested Server Name
+ * Server name to set in the upstream connection. The filters like tcp_proxy should use this
+ * value to override the server name specified in the upstream cluster, for example to override
+ * the SNI value in the upstream TLS context.
  */
 class UpstreamServerName : public StreamInfo::FilterState::Object {
 public:

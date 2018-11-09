@@ -8,6 +8,8 @@ namespace Network {
 class TransportSocketOptionsImpl : public TransportSocketOptions {
 public:
   TransportSocketOptionsImpl(std::string override_server_name = "");
+
+  // Network::TransportSocketOptions
   const absl::optional<std::string>& overrideServerName() const override {
     return override_server_name_;
   }
