@@ -46,12 +46,9 @@ public:
   ~AsyncClientImpl();
 
   // Http::AsyncClient
-  Request* send(MessagePtr&& request, Callbacks& callbacks,
-                const absl::optional<std::chrono::milliseconds>& timeout) override;
+  Request* send(MessagePtr&& request, Callbacks& callbacks, const SendArgs& args) override;
 
-  Stream* start(StreamCallbacks& callbacks,
-                const absl::optional<std::chrono::milliseconds>& timeout,
-                bool buffer_body_for_retry) override;
+  Stream* start(StreamCallbacks& callbacks, const StartArgs& args) override;
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
@@ -77,7 +74,7 @@ class AsyncStreamImpl : public AsyncClient::Stream,
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const absl::optional<std::chrono::milliseconds>& timeout,
-                  bool buffer_body_for_retry);
+                  bool buffer_body_for_retry, bool send_xff);
 
   // Http::AsyncClient::Stream
   void sendHeaders(HeaderMap& headers, bool end_stream) override;
@@ -324,6 +321,7 @@ private:
   Buffer::InstancePtr buffered_body_;
   bool is_grpc_request_{};
   bool is_head_request_{false};
+  bool send_xff_{true};
   friend class AsyncClientImpl;
 };
 
@@ -332,7 +330,7 @@ class AsyncRequestImpl final : public AsyncClient::Request,
                                AsyncClient::StreamCallbacks {
 public:
   AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
-                   const absl::optional<std::chrono::milliseconds>& timeout);
+                   const absl::optional<std::chrono::milliseconds>& timeout, bool send_xff);
 
   // AsyncClient::Request
   virtual void cancel() override;

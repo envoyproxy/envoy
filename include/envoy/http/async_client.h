@@ -140,8 +140,11 @@ public:
    *         onFailure() has already been called inline. The client owns the request and the
    *         handle should just be used to cancel.
    */
-  virtual Request* send(MessagePtr&& request, Callbacks& callbacks,
-                        const absl::optional<std::chrono::milliseconds>& timeout) PURE;
+  struct SendArgs {
+    absl::optional<std::chrono::milliseconds> timeout;
+    bool send_xff{true};
+  };
+  virtual Request* send(MessagePtr&& request, Callbacks& callbacks, const SendArgs& args) PURE;
 
   /**
    * Start an HTTP stream asynchronously.
@@ -156,9 +159,12 @@ public:
    *         onResetStream() has already been called inline. The client owns the stream and
    *         the handle can be used to send more messages or close the stream.
    */
-  virtual Stream* start(StreamCallbacks& callbacks,
-                        const absl::optional<std::chrono::milliseconds>& timeout,
-                        bool buffer_body_for_retry) PURE;
+  struct StartArgs {
+    absl::optional<std::chrono::milliseconds> timeout;
+    bool buffer_body_for_retry;
+    bool send_xff{true};
+  };
+  virtual Stream* start(StreamCallbacks& callbacks, const StartArgs& args) PURE;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this client.

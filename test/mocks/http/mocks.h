@@ -351,17 +351,13 @@ public:
   MOCK_METHOD0(onRequestDestroy, void());
 
   // Http::AsyncClient
-  Request* send(MessagePtr&& request, Callbacks& callbacks,
-                const absl::optional<std::chrono::milliseconds>& timeout) override {
-    return send_(request, callbacks, timeout);
+  Request* send(MessagePtr&& request, Callbacks& callbacks, const SendArgs& args) override {
+    return send_(request, callbacks, args);
   }
 
-  MOCK_METHOD3(send_, Request*(MessagePtr& request, Callbacks& callbacks,
-                               const absl::optional<std::chrono::milliseconds>& timeout));
+  MOCK_METHOD3(send_, Request*(MessagePtr& request, Callbacks& callbacks, const SendArgs& args));
 
-  MOCK_METHOD3(start, Stream*(StreamCallbacks& callbacks,
-                              const absl::optional<std::chrono::milliseconds>& timeout,
-                              bool buffer_body_for_retry));
+  MOCK_METHOD3(start, Stream*(StreamCallbacks& callbacks, const StartArgs& args));
 
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
 
