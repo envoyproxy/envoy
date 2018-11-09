@@ -265,7 +265,7 @@ public:
    *
    * @param metadata_map supplies the unique_ptr of the metadata to be encoded.
    */
-  virtual void encodeMetadata(std::unique_ptr<MetadataMap>) {fprintf(stderr, "+++++ pure");}
+  virtual void encodeMetadata(MetadataMapPtr&& metadata_map) PURE;
 
   /**
    * Called when the buffer for a decoder filter or any buffers the filter sends data to go over

@@ -199,6 +199,7 @@ IntegrationCodecClientPtr
 HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->http2_settings_.allow_connect_ = true;
+  cluster->http2_settings_.allow_metadata_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
   return std::make_unique<IntegrationCodecClient>(*dispatcher_, std::move(conn), host_description,
@@ -1063,32 +1064,139 @@ void HttpIntegrationTest::testHittingEncoderFilterLimit() {
   EXPECT_STREQ("500", response->headers().Status()->value().c_str());
 }
 
-void HttpIntegrationTest::testEnvoyHandlingMetadata() {
+// Verifies metadata can be sent at different locations of the responses.
+void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                          {":path", "/dynamo/url"},
-                                                          {":scheme", "http"},
-                                                          {":authority", "host"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  // Sends the first request.
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         10);
+  waitForNextUpstreamRequest();
 
-  // Send the rest of the request.
-  codec_client_->sendData(*request_encoder_, 10, true);
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  Http::MetadataMap metadata_map = {{"key", "value"}};
+  // Sends metadata before response header.
+  const std::string key = "key";
+  std::string value = std::string(80 * 1024, '1');
+  Http::MetadataMap metadata_map = {{key, value}};
   upstream_request_->encodeMetadata(metadata_map);
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(12, true);
 
+  // Verifies metadata is received by the client.
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(response->metadata_map().find("key")->second, "value");
+  EXPECT_EQ(response->metadata_map().find(key)->second, value);
+
+  // Sends the second request.
+  response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         10);
+  waitForNextUpstreamRequest();
+
+  // Sends metadata after response header followed by an empty data frame with end_stream true.
+  value = std::string(80 * 1024, '2');
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  metadata_map = {{key, value}};
+  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeData(0, true);
+
+  // Verifies metadata is received by the client.
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(response->metadata_map().find(key)->second, value);
+
+  // Sends the third request.
+  response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         10);
+  waitForNextUpstreamRequest();
+
+  // Sends metadata after response header and before data.
+  value = std::string(80 * 1024, '3');
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  metadata_map = {{key, value}};
+  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeData(10, true);
+
+  // Verifies metadata is received by the client.
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(response->metadata_map().find(key)->second, value);
+
+  // Sends the fourth request.
+  response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         10);
+  waitForNextUpstreamRequest();
+
+  // Sends metadata between data frames.
+  value = std::string(80 * 1024, '4');
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(10, false);
+  metadata_map = {{key, value}};
+  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeData(10, true);
+
+  // Verifies metadata is received by the client.
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(response->metadata_map().find(key)->second, value);
+
+  // Sends the fifth request.
+  response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         10);
+  waitForNextUpstreamRequest();
+
+  // Sends metadata after the last non-empty data frames.
+  value = std::string(80 * 1024, '5');
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(10, false);
+  metadata_map = {{key, value}};
+  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeData(0, true);
+
+  // Verifies metadata is received by the client.
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(response->metadata_map().find(key)->second, value);
+
+  // Sends the sixth request.
+  response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         10);
+  waitForNextUpstreamRequest();
+
+  // Sends metadata before reset.
+  value = std::string(80 * 1024, '6');
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(10, false);
+  metadata_map = {{key, value}};
+  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeResetStream();
+
+  // Verifies stream is reset.
+  response->waitForReset();
+  ASSERT_FALSE(response->complete());
 }
 
 void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_from_upstream,

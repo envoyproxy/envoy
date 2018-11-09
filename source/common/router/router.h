@@ -373,7 +373,7 @@ private:
   void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamTrailers(Http::HeaderMapPtr&& trailers);
-  void onUpstreamMetadata(std::unique_ptr<Http::MetadataMap> metadata_map);
+  void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map);
   void onUpstreamComplete();
   void onUpstreamReset(UpstreamResetType type,
                        const absl::optional<Http::StreamResetReason>& reset_reason);

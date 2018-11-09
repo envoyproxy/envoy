@@ -260,7 +260,7 @@ struct Http2Settings {
   // By default both nghttp2 and Envoy do not allow CONNECT over H2.
   static const bool DEFAULT_ALLOW_CONNECT = false;
   // By default Envoy does not allow METADATA support.
-  static const bool DEFAULT_ALLOW_METADATA = true;
+  static const bool DEFAULT_ALLOW_METADATA = false;
 };
 
 /**

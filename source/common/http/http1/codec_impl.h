@@ -17,7 +17,6 @@
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
-#include "common/http/http2/metadata_encoder.h"
 
 namespace Envoy {
 namespace Http {

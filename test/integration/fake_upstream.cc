@@ -115,13 +115,9 @@ void FakeStream::encodeResetStream() {
 }
 
 void FakeStream::encodeMetadata(const Http::MetadataMap& metadata_map) {
-  // ++++++++++++++++++++++ is this the way to make a shared pointer??
   std::shared_ptr<Http::MetadataMap> metadata_map_copy(
       new Http::MetadataMap(static_cast<const Http::MetadataMap&>(metadata_map)));
   parent_.connection().dispatcher().post([this, metadata_map_copy]() -> void {
-    ENVOY_LOG_MISC(error, "+++++++ call encode100 ");
-    encoder_.encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", "100"}});
-    ENVOY_LOG_MISC(error, "+++++++ call encodeMetadata");
     encoder_.encodeMetadata(*metadata_map_copy);
   });
 }

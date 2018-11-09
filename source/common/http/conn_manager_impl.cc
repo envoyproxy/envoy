@@ -1117,16 +1117,10 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(
 
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, false);
   for (; entry != encoder_filters_.end(); entry++) {
-    // TODO(yasong): Add filters here.
-    // +++++++++++++++++++++++++++++
+    // TODO(soya3129): Add filters here.
   }
 
-  // Count both the 1xx and follow-up response code in stats.
-  // +++++++++++++++++++++++++++++ end of stream!!!!!
-  //chargeStats(headers);
-
   ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n", *this);
-  ENVOY_STREAM_LOG(error, "++++++++++++encoding metadata via codec:\n", *this);
 
   // Now encode metadata via the codec.
   if (!metadata_map.empty()) {
@@ -1547,9 +1541,9 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeTrailers(HeaderMapP
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeMetadata(
-    std::unique_ptr<MetadataMap> metadata_map) {
-  parent_.metadata_map_ = std::move(metadata_map);
-  parent_.encodeMetadata(nullptr, *parent_.metadata_map_);
+    MetadataMapPtr&& metadata_map) {
+  parent_.response_metadata_map_ = std::move(metadata_map);
+  parent_.encodeMetadata(nullptr, *parent_.response_metadata_map_);
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::

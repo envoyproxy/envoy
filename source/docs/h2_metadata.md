@@ -11,11 +11,23 @@ are represented by a map.
 Note: the metadata implementation is still in progress, and the doc is in draft
 version.
 
-### Limitation
+### Limitation and conditions.
 
 For ease of implementation and compatibility purposes, metadata will only be
 supported in HTTP/2. Metadata sent in any other protocol should result in protocol
 errors or be ignored.
+
+To simplify the implementation, we don't allow metadata frames to carry end of
+stream flag. Because metadata frames must be associated with an existing frame, users must
+ensure metadata frames to be received before the end of stream is received by the
+peer.
+
+For metadata associated with a response, we recommend to send metadata before
+response headers. If metadata will not be ready until the full or part of the response
+finishes sending, users can send metadata after headers, between data or after
+data. If metadata frames have to be sent last, users must put the end of stream in an empty
+data frame and send the empty data frame after metadata frames.
+TODO(soya3129): add more conditions for metadata in requests.
 
 ### Envoy metadata handling
 
@@ -24,7 +36,8 @@ Envoy provides the functionality to proxy, process and add metadata.
 ## Proxying metadata
 
 (To be implemented)
-
+TODO(soya3129): Check if we can remove the order limitation after
+implementation.
 If not specified, all the metadata received by Envoy is proxied to the next hop
 unmodified. Note that, we do not guarantee the same frame order will be preserved from
 hop by hop. That is, metadata from upstream at the beginning of a stream can be

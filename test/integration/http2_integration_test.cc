@@ -95,7 +95,9 @@ TEST_P(Http2IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader();
 
 TEST_P(Http2IntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
 
-TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) { testEnvoyHandlingMetadata(); }
+TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
+  testEnvoyProxyMetadataInResponse();
+}
 
 TEST_P(Http2IntegrationTest, EnvoyHandlingDuplicate100Continue) {
   testEnvoyHandling100Continue(true);
