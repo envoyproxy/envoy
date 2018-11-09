@@ -176,6 +176,8 @@ public:
                                          const Network::Address::IpVersion version,
                                          std::function<void()> pre_worker_start_test_steps,
                                          bool deterministic, Event::TestTimeSystem& time_system);
+  // Note that the derived class is responsible for tearing down the server in its
+  // destructor.
   ~IntegrationTestServer();
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
