@@ -18,91 +18,100 @@
 namespace Envoy {
 namespace Http {
 
-CodeStatsImpl::CodeStatsImpl(SymbolTable& symbol_table)
+CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
     : symbol_table_(symbol_table),
+      canary_(makeStatName("canary")),
       canary_upstream_rq_completed_(makeStatName("canary.upstream_rq_completed")),
       canary_upstream_rq_time_(makeStatName("canary.upstream_rq_time")),
-      canary_upstream_rq_(makeStatName("canary.upstream_rq_")),
+      external_(makeStatName("external")),
       external_rq_time_(makeStatName("external.upstream_rq_time")),
       external_upstream_rq_completed_(makeStatName("external.upstream_rq_completed")),
       external_upstream_rq_time_(makeStatName("external.upstream_rq_time")),
-      external_upstream_rq_(makeStatName("external.upstream_rq_")),
+      internal_(makeStatName("internal")),
       internal_rq_time_(makeStatName("internal.upstream_rq_time")),
       internal_upstream_rq_completed_(makeStatName("internal.upstream_rq_completed")),
       internal_upstream_rq_time_(makeStatName("internal.upstream_rq_time")),
-      internal_upstream_rq_(makeStatName("internal.upstream_rq_")),
-      upstream_rq_completed_(makeStatName("upstream_rq_completed")),
-      upstream_rq_time_(makeStatName("upstream_rq_time")),
-      upstream_rq_time(makeStatName("upstream_rq_time")),
-      upstream_rq_(makeStatName("upstream_rq_")),
-      vcluster_(makeStatName("vcluster")),
-      vhost_(makeStatName("vhost")),
-      zone_(makeStatName("zone")),
       upstream_rq_2xx_(makeStatName("upstream_rq_2xx")),
       upstream_rq_3xx_(makeStatName("upstream_rq_3xx")),
       upstream_rq_4xx_(makeStatName("upstream_rq_4xx")),
-      upstream_rq_5xx_(makeStatName("upstream_rq_5xx")) {
-}
+      upstream_rq_5xx_(makeStatName("upstream_rq_5xx")),
+      upstream_rq_completed_(makeStatName("upstream_rq_completed")),
+      upstream_rq_time_(makeStatName("upstream_rq_time")),
+      vcluster_(makeStatName("vcluster")),
+      vhost_(makeStatName("vhost")),
+      zone_(makeStatName("zone")),
+      canary_upstream_rq_("canary_upstream_rq_", *this),
+      external_upstream_rq_("external_upstream_rq_", *this),
+      internal_upstream_rq_("internal_upstream_rq_", *this),
+      upstream_rq_("upstream_rq_rq_", *this) {}
+
 
 CodeStatsImpl::~CodeStatsImpl() {
-  for (StatNameStorage& stat_name_storage : storage_) {
+  for (Stats::StatNameStorage& stat_name_storage : storage_) {
     stat_name_storage.free(symbol_table_);
   }
 }
 
 Stats::StatName CodeStatsImpl::makeStatName(absl::string_view name) {
-  storage_.push_back(StatNameStorage(name, symbol_table_));
+  storage_.push_back(Stats::StatNameStorage(name, symbol_table_));
   return storage_.back().statName();
+}
+
+void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
+                                            Code response_code) {
+  using Join = Stats::StatNameJoiner;
+
+  // Build a dynamic stat for the response code and increment it.
+  scope.counterx(Join(prefix, upstream_rq_completed_).statName()).inc();
+  scope.counterx(Join(prefix, upstreamRqGroup(response_code)).statName()).inc();
+  scope.counterx(Join(prefix, upstream_rq_.statName(response_code)).statName()).inc();
 }
 
 void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
                                             Code response_code) {
-  // TODO(jmarantz): consider passing prefix by StatName.
-  StatNameTempStorage prefix_storage(prefix, symbol_table_);
-  StatName prefix_stat_name = prefix_storage.statName();
-
-  // Build a dynamic stat for the response code and increment it.
-  scope.counter(StatNameJoiner(prefix_stat_name, upstream_rq_completed_).statName()).inc();
-  scope.counter(StatNameJoiner(prefix_stat_name_, upstreamRqGroup(response_code))).inc();
-  scope.counter(absl::StrCat(prefix, upstream_rq_, enumToInt(response_code))).inc();
+  Stats::StatNameTempStorage prefix_storage(stripTrailingDot(prefix), symbol_table_);
+  return chargeBasicResponseStat(scope, prefix_storage.statName(), response_code);
 }
 
 void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) {
-  StatNameTempStorage prefix_storage(prefix, symbol_table_);
-  StatName prefix_stat_name = prefix_storage.statName();
+  Stats::StatNameTempStorage prefix_storage(stripTrailingDot(info.prefix_), symbol_table_);
+  Stats::StatName prefix = prefix_storage.statName();
+  Code code = static_cast<Code>(info.response_status_code_);
 
-  const uint64_t response_code = info.response_status_code_;
-  chargeBasicResponseStat(info.cluster_scope_, info.prefix_, static_cast<Code>(response_code));
+  chargeBasicResponseStat(info.cluster_scope_, prefix, code);
 
-  absl::string_view prefix = stripTrailingDot(info.prefix_);
+  using Join = Stats::StatNameJoiner;
 
   // If the response is from a canary, also create canary stats.
   if (info.upstream_canary_) {
-    info.cluster_scope_.counter(join(prefix, canary_upstream_rq_completed_)).inc();
-    info.cluster_scope_.counter(join(info.prefix, canary_, upstreamRqGroup(response_code)).inc();
-    info.cluster_scope_.counter(prefix, canary_upstream_rq_, response_code))
+    info.cluster_scope_.counterx(Join(
+        prefix, canary_upstream_rq_completed_).statName())
+        .inc();
+    info.cluster_scope_.counterx(Join(
+        {prefix, canary_, upstreamRqGroup(code)}).statName())
+        .inc();
+    info.cluster_scope_.counterx(Join({prefix, canary_, upstream_rq_.statName(code)}).statName())
         .inc();
   }
 
   // Split stats into external vs. internal.
   if (info.internal_request_) {
-    info.cluster_scope_.counter(absl::StrCat(info.prefix_, internal_upstream_rq_completed_)).inc();
-    info.cluster_scope_.counter(absl::StrCat(info.prefix_, internal_upstream_rq_, rc_group))
+    info.cluster_scope_.counterx(Join(prefix, internal_upstream_rq_completed_).statName()).inc();
+    info.cluster_scope_.counterx(Join({prefix, internal_, upstreamRqGroup(code)}).statName())
         .inc();
-    info.cluster_scope_.counter(absl::StrCat(info.prefix_, internal_upstream_rq_, response_code))
-        .inc();
+    info.cluster_scope_.counterx(Join({prefix, internal_, upstream_rq_.statName(code)})
+                                 .statName()).inc();
   } else {
-    info.cluster_scope_.counter(absl::StrCat(info.prefix_, external_upstream_rq_completed_)).inc();
-    info.cluster_scope_.counter(absl::StrCat(info.prefix_, external_upstream_rq_, rc_group))
-        .inc();
-    info.cluster_scope_.counter(absl::StrCat(info.prefix_, external_upstream_rq_, response_code))
+    info.cluster_scope_.counterx(Join(prefix, external_upstream_rq_completed_).statName()).inc();
+    info.cluster_scope_.counterx(Join({prefix, external_, upstreamRqGroup(code)}).statName()).inc();
+    info.cluster_scope_.counterx(Join(prefix, external_, upstream_rq_.statName(code)).statName())
         .inc();
   }
 
   // Handle request virtual cluster.
   if (!info.request_vcluster_name_.empty()) {
     info.global_scope_
-        .counter(join({vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_,
+        .counter(Join({vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_,
                        upstream_rq_completed_}))
         .inc();
     info.global_scope_
@@ -189,6 +198,37 @@ StatName CodeStatsImpl::upstreamRq(Code response_code) {
     case 5: return response_code_3xx_;
   }
   return StatName();
+}
+
+CodeStatsImpl::RequestCodeGroup::~RequestCodeGroup() {
+  for (auto p : rc_stat_name_map_) {
+    std::unique_ptr<StatNameStorage>& storage = p->second;
+    storage->free(code_stats_.symbol_table_);
+  }
+}
+
+Stats::StatName CodeStatsImpl::RequestCodeGroup::statName(Code response_code) {
+  {
+    absl::ReaderMutexLock lock(&mutex_);
+    auto p = rc_stat_name_map_.find(response_code);
+    if (p != rc_stat_name_map_.end()) {
+      return p->second;
+    }
+  }
+
+  // Note -- another thread may swap in here and allocate the lock so we
+  // have to re-check after acquiring the write-lock.
+
+  {
+    absl::MutexLock lock(&mutex_);
+    mutex_.WriterLock();
+    std::unique_ptr<StatNameStorage>& stat_name_storage = rc_stat_name_map_[response_code];
+    if (stat_name_storage == nullptr) {
+      stat_name_storage = std::make_unique<StatNameStorage>(
+          absl::StrCat(prefix_, enumToInt(reesponse_code)));
+    }
+    return stat_name_storage->statName();
+  }
 }
 
 std::string CodeUtility::groupStringForResponseCode(Code response_code) {

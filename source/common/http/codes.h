@@ -8,6 +8,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
+#include "common/stats/symbol_table_impl.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -19,10 +21,41 @@ public:
   // CodeStats
   void chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
                                Code response_code) override;
+  void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
+                               Code response_code) override;
   void chargeResponseStat(const ResponseStatInfo& info) override;
   void chargeResponseTiming(const ResponseTimingInfo& info) override;
 
 private:
+  class RequestCodeGroup {
+   public:
+    RequestCodeGroup(absl::string_view prefix, CodeStatsImpl& code_stats)
+        : code_stats_(code_stats), prefix_(std::string(prefix)) {}
+    ~RequestCodeGroup();
+
+    Stats::StatName statName(Code response_code);
+
+    /*
+    using LockedStatName = std::pair<absl::Mutex, std::unique_ptr<Stats::StatNameStorage>>;
+
+    // We'll cover known HTTP status codes in a mapped array, which we'll
+    // discover by calling CodeUtility::toString(). Of course the response-code
+    // can be any 64-bit integer as far as we can tell from this class, so
+    // we'll have a fallback flast hash map for those.
+
+    constexpr MaxResponseCode = 600;
+    LockStatName[MaxResponseCode] locked_stat_names_;
+    */
+
+   private:
+    using RCStatNameMap = absl::flat_hash_map<Code, std::unique_ptr<Stats::StatNameStorage>>;
+
+    CodeStatsImpl& code_stats_;
+    std::string prefix_;
+    absl::Mutex mutex_;
+    RCStatNameMap rc_stat_name_map_ GUARDED_BY(mutex_);
+  };
+
   static absl::string_view stripTrailingDot(absl::string_view prefix);
   static std::string join(const std::vector<absl::string_view>& v);
   Stats::StatName makeStatName(absl::string_view name);
@@ -39,35 +72,34 @@ private:
   std::vector<Stats::StatNameStorage> storage_;
 
   Stats::SymbolTable& symbol_table_;
+
+  Stats::StatName canary_;
   Stats::StatName canary_upstream_rq_completed_;
   Stats::StatName canary_upstream_rq_time_;
+  Stats::StatName external_;
   Stats::StatName external_rq_time_;
   Stats::StatName external_upstream_rq_completed_;
   Stats::StatName external_upstream_rq_time_;
+  Stats::StatName internal_;
   Stats::StatName internal_rq_time_;
   Stats::StatName internal_upstream_rq_completed_;
   Stats::StatName internal_upstream_rq_time_;
+  Stats::StatName upstream_;
+  Stats::StatName upstream_rq_2xx_;
+  Stats::StatName upstream_rq_3xx_;
+  Stats::StatName upstream_rq_4xx_;
+  Stats::StatName upstream_rq_5xx_;
   Stats::StatName upstream_rq_completed_;
-  Stats::StatName upstream_rq_time_;
   Stats::StatName upstream_rq_time;
+  Stats::StatName upstream_rq_time_;
   Stats::StatName vcluster_;
   Stats::StatName vhost_;
   Stats::StatName zone_;
-  Stats::StatName response_code_2xx_;
-  Stats::StatName response_code_3xx_;
-  Stats::StatName response_code_4xx_;
-  Stats::StatName response_code_5xx_;
 
-  // We keep several stats for each HTTP response codes, created lazily -- as
-  // most response-codes are never seen. We do a poor man's locking here by
-  // keeping them in an array. To minimize contention generally, we'll just have
-  // a r/w lock per response-code.
-  using LockedStatName = std::pair<absl::Mutex, std::unique_ptr<Stats::StatNameStorage>>;
-  constexpr MaxResponseCode = 600;
-  LockedStat[MaxResponseCode] canary_upstream_rq_;
-  LockedStat[MaxResponseCode] external_upstream_rq_;
-  LockedStat[MaxResponseCode] internal_upstream_rq_;
-  LockedStat[MaxResponseCode] upstream_rq_;
+  RequestCodeGroup canary_upstream_rq_;
+  RequestCodeGroup external_upstream_rq_;
+  RequestCodeGroup internal_upstream_rq_;
+  RequestCodeGroup upstream_rq_;
 };
 
 /**
