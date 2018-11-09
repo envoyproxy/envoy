@@ -401,7 +401,7 @@ private:
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_response_timespan_;
     // Per-stream idle timeout.
-    Event::TimerPtr idle_timer_;
+    Event::TimerPtr stream_idle_timer_;
     // Per-stream request timeout.
     Event::TimerPtr request_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
@@ -454,7 +454,10 @@ private:
   const Network::DrainDecision& drain_close_;
   DrainState drain_state_{DrainState::NotDraining};
   UserAgent user_agent_;
-  Event::TimerPtr idle_timer_;
+  // An idle timer for the connection. This is only armed when there are no streams on the
+  // connection. When there are active streams it is disarmed in favor of each stream's
+  // stream_idle_timer_.
+  Event::TimerPtr connection_idle_timer_;
   Event::TimerPtr drain_timer_;
   Runtime::RandomGenerator& random_generator_;
   Tracing::HttpTracer& tracer_;
