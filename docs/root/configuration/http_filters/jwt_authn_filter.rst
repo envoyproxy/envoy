@@ -57,7 +57,6 @@ Remote JWKS config example
 .. code-block:: yaml
 
           http_filters:
-
           - name: envoy.filters.http.jwt_authn
             config:
              providers:
@@ -79,8 +78,7 @@ Remote JWKS config example
                  prefix: /
                requires:
                  provider_name: example_provider
-                 
-                 
+
 
 Above example fetches JWSK from a remote server with URL https://example.com/jwks.json. The token will be extracted from the default extract locations. The token will not be forwarded to upstream. JWT payload will not be added to the request header.
 
