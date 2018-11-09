@@ -190,7 +190,7 @@ public:
         });
   }
 
-  void setupNoServiceValidationHCLogError() {
+  void setupNoServiceValidationHCAlwaysLogFailure() {
     const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -1151,7 +1151,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirst) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirstLogError) {
-  setupNoServiceValidationHCLogError();
+  setupNoServiceValidationHCAlwaysLogFailure();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
@@ -1241,7 +1241,7 @@ TEST_F(HttpHealthCheckerImplTest, HttpFail) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, HttpFailLogError) {
-  setupNoServiceValidationHCLogError();
+  setupNoServiceValidationHCAlwaysLogFailure();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();

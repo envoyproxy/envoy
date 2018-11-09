@@ -53,7 +53,7 @@ public:
                                Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
   }
 
-  void setupLogError() {
+  void setupAlwaysLogHealthCheckFailures() {
     const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -233,7 +233,7 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
 
 TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   InSequence s;
-  setupLogError();
+  setupAlwaysLogHealthCheckFailures();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};

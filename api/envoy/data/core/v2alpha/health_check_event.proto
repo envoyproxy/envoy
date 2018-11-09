@@ -62,8 +62,8 @@ message HealthCheckAddHealthy {
 }
 
 message HealthCheckFailure {
-  // The type of failure that caused this failure.
+  // The type of failure that caused this event.
   HealthCheckFailureType failure_type = 1 [(validate.rules).enum.defined_only = true];
-  // Whether this addition is the result of the first ever health check on a host.
+  // Whether this event is the result of the first ever health check on a host.
   bool first_check = 2;
 }

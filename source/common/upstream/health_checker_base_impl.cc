@@ -15,8 +15,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger)
-    : always_log_health_check_failures_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, always_log_health_check_failures, false)),
+    : always_log_health_check_failures_(config.always_log_health_check_failures()),
       cluster_(cluster), dispatcher_(dispatcher),
       timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),

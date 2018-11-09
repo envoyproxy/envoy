@@ -213,8 +213,9 @@ message HealthCheck {
   // If empty, no event log will be written.
   string event_log_path = 17;
 
-  // If set, health check failure events will always be logged
-  google.protobuf.BoolValue always_log_health_check_failures = 19;
+  // If set to true, health check failure events will always be logged.
+  // The default to value for "Always_log_health_check_failures" is false.
+  bool always_log_health_check_failures = 19;
 }
 
 // Endpoint health status.
