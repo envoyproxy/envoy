@@ -30,7 +30,7 @@ enum class FilterHeadersStatus {
   StopIteration,
   // Continue iteration to remaining filters, but ignore and subsequent data or trailers. This
   // results in creating a header only request/response.
-  ContinueHeadersOnly
+  ContinueAndEndStream
 };
 
 /**

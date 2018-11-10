@@ -720,9 +720,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
-    FilterHeadersStatus status = (*entry)->decodeHeaders(
-        headers,
-        decoding_headers_only_ || (end_stream && continue_data_entry == decoder_filters_.end()));
+    const auto current_filter_end_stream =
+        decoding_headers_only_ || (end_stream && continue_data_entry == decoder_filters_.end());
+    FilterHeadersStatus status = (*entry)->decodeHeaders(headers, current_filter_end_stream);
+
+    ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && current_filter_end_stream));
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -1393,7 +1395,7 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterHeadersCall
   if (status == FilterHeadersStatus::StopIteration) {
     stopped_ = true;
     return false;
-  } else if (status == FilterHeadersStatus::ContinueHeadersOnly) {
+  } else if (status == FilterHeadersStatus::ContinueAndEndStream) {
     // Set headers_only to true so we know to end early if necessary,
     // but continue filter iteration so we actually write the headers/run the cleanup code.
     headers_only = true;
