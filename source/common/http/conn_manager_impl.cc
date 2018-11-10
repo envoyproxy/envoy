@@ -1163,12 +1163,13 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
 
 void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* filter,
                                                      Buffer::Instance& data, bool end_stream) {
+  resetIdleTimer();
+
   // If we previously decided to encode only the headers, do nothing here.
   if (encoding_headers_only_) {
     return;
   }
 
-  resetIdleTimer();
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   auto trailers_added_entry = encoder_filters_.end();
 
@@ -1220,12 +1221,13 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
 
 void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilter* filter,
                                                          HeaderMap& trailers) {
+  resetIdleTimer();
+
   // If we previously decided to encode only the headers, do nothing here.
   if (encoding_headers_only_) {
     return;
   }
 
-  resetIdleTimer();
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, true);
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeTrailers));
