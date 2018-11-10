@@ -134,17 +134,18 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const Http::AsyncClient::SendArgs timeout(std::chrono::seconds(5));
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
+  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs& args) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/api/v1/spans", message->headers().Path()->value().c_str());
             EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
             EXPECT_STREQ("application/json", message->headers().ContentType()->value().c_str());
+	    EXPECT_EQ(args.timeout, timeout);
 
             return &request;
           }));
@@ -183,17 +184,18 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const Http::AsyncClient::SendArgs timeout(std::chrono::seconds(5));
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
+  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs& args) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/api/v1/spans", message->headers().Path()->value().c_str());
             EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
             EXPECT_STREQ("application/json", message->headers().ContentType()->value().c_str());
+	    EXPECT_EQ(args.timeout, timeout);
 
             return &request;
           }));
@@ -221,8 +223,7 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
 TEST_F(ZipkinDriverTest, FlushSpansTimer) {
   setupValidDriver();
 
-  const Http::AsyncClient::SendArgs timeout(std::chrono::seconds(5));
-  EXPECT_CALL(cm_.async_client_, send_(_, _, timeout));
+  EXPECT_CALL(cm_.async_client_, send_(_, _, _));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
       .WillOnce(Return(5));

@@ -141,7 +141,7 @@ TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZero) {
   EXPECT_CALL(async_client_, send_(_, _, _))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks&,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
             const auto* length_header_entry =
                 message->headers().get(Http::Headers::get().ContentLength);
             EXPECT_EQ(length_header_entry->value().getStringView(), "0");

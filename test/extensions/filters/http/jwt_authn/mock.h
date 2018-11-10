@@ -59,7 +59,7 @@ public:
       : request_(&mock_cm.async_client_), response_body_(response_body) {
     ON_CALL(mock_cm.async_client_, send_(_, _, _))
         .WillByDefault(Invoke([this](Http::MessagePtr&, Http::AsyncClient::Callbacks& cb,
-                                     const absl::optional<std::chrono::milliseconds>&)
+                                     const Http::AsyncClient::SendArgs&)
                                   -> Http::AsyncClient::Request* {
           Http::MessagePtr response_message(new Http::ResponseMessageImpl(
               Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));

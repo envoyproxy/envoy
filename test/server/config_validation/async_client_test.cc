@@ -19,7 +19,7 @@ TEST(ValidationAsyncClientTest, MockedMethods) {
   DangerousDeprecatedTestTime test_time;
   ValidationAsyncClient client(test_time.timeSystem());
   EXPECT_EQ(nullptr, client.send(std::move(message), callbacks,
-                                 absl::optional<std::chrono::milliseconds>()));
+                                 AsyncClient::SendArgs()));
   EXPECT_EQ(nullptr,
             client.start(stream_callbacks, AsyncClient::StartArgs());
 }
