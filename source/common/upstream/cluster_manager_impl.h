@@ -403,7 +403,9 @@ private:
   using ClusterUpdatesMap = std::unordered_map<std::string, PendingUpdatesByPriorityMapPtr>;
 
   void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdates& updates);
-  bool scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable);
+  bool scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable,
+                      const uint64_t timeout);
+  uint64_t mergeTimeout(const Cluster& cluster) const;
   void createOrUpdateThreadLocalCluster(ClusterData& cluster);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
   static ClusterManagerStats generateStats(Stats::Scope& scope);
