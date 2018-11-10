@@ -68,7 +68,7 @@ void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& reques
 
   active_request_ = driver_.clusterManager()
                         .httpAsyncClientForCluster(driver_.cluster()->name())
-                        .send(std::move(message), *this, std::chrono::milliseconds(timeout));
+    .send(std::move(message), *this, Http::AsyncClient::SendArgs(absl::optional<std::chrono::milliseconds>(timeout)));
 }
 
 void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& response) {

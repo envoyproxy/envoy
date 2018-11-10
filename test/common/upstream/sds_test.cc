@@ -107,10 +107,10 @@ protected:
     EXPECT_CALL(cm_, httpAsyncClientForCluster("sds")).WillOnce(ReturnRef(cm_.async_client_));
     EXPECT_CALL(
         cm_.async_client_,
-        send_(_, _, absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(1000))))
+        send_(_, _, Http::AsyncClient::SendArgs(absl::optional<std::milliseconds>(1000)))
         .WillOnce(
             Invoke([](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                      absl::optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
+                      Http::AsyncClient::SendArgs) -> Http::AsyncClient::Request* {
               callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
                   Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
               return nullptr;
@@ -121,7 +121,7 @@ protected:
     EXPECT_CALL(cm_, httpAsyncClientForCluster("sds")).WillOnce(ReturnRef(cm_.async_client_));
     EXPECT_CALL(
         cm_.async_client_,
-        send_(_, _, absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(1000))))
+        send_(_, _, Http::AsyncClient::SendArgs(absl::optional<std::chrono::milliseconds>(1000))))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callbacks_)), Return(&request_)));
   }
 
@@ -159,7 +159,7 @@ TEST_F(SdsTest, RequestTimeout) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("sds")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(
       cm_.async_client_,
-      send_(_, _, absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(5000))))
+      send_(_, _, Http::AsyncClient::SendArgs(absl::optional<std::chrono::milliseconds>(5000))))
       .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callbacks_)), Return(&request_)));
 
   cluster_->initialize([] {});

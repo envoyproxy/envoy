@@ -357,12 +357,18 @@ public:
 
   MOCK_METHOD3(send_, Request*(MessagePtr& request, Callbacks& callbacks, const SendArgs& args));
 
-  MOCK_METHOD3(start, Stream*(StreamCallbacks& callbacks, const StartArgs& args));
+  MOCK_METHOD2(start, Stream*(StreamCallbacks& callbacks, const StartArgs& args));
 
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
 
   NiceMock<Event::MockDispatcher> dispatcher_;
 };
+
+#if 0
+ bool operator()(const AsyncClient::SendArgs& a, const AsyncClient::SendArgs& b) {
+   return a.timeout == b.timeout && a.send_xff == b.send_xff;
+ }
+#endif
 
 class MockAsyncClientCallbacks : public AsyncClient::Callbacks {
 public:

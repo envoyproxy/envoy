@@ -40,7 +40,7 @@ public:
     request_ =
         cm_.httpAsyncClientForCluster(uri.cluster())
             .send(std::move(message), *this,
-                  std::chrono::milliseconds(DurationUtil::durationToMilliseconds(uri.timeout())));
+                  Http::AsyncClient::SendArgs(absl::optional<std::chrono::milliseconds>(DurationUtil::durationToMilliseconds(uri.timeout()))));
   }
 
   // HTTP async receive methods

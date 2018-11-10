@@ -55,7 +55,7 @@ public:
     EXPECT_CALL(factory_context_.cluster_manager_.async_client_, send_(_, _, _))
         .WillOnce(Invoke(
             [&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+                const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
               EXPECT_EQ((Http::TestHeaderMapImpl{
                             {":method", "GET"},
                             {":path", "/v1/routes/foo_route_config/cluster_name/node_name"},

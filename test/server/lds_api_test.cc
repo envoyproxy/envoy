@@ -83,7 +83,7 @@ public:
     EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
         .WillOnce(Invoke(
             [&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+                const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
               EXPECT_EQ(
                   (Http::TestHeaderMapImpl{
                       {":method", v2_rest_ ? "POST" : "GET"},

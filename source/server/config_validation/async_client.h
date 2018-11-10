@@ -22,11 +22,9 @@ public:
   ValidationAsyncClient(Event::TimeSystem& time_system);
 
   // Http::AsyncClient
-  AsyncClient::Request* send(MessagePtr&& request, Callbacks& callbacks,
-                             const absl::optional<std::chrono::milliseconds>& timeout) override;
-  AsyncClient::Stream* start(StreamCallbacks& callbacks,
-                             const absl::optional<std::chrono::milliseconds>& timeout,
-                             bool buffer_body_for_retry) override;
+  AsyncClient::Request* send(MessagePtr&& request, Callbacks& callbacks, const SendArgs&) override;
+  AsyncClient::Stream* start(StreamCallbacks& callbacks, const StartArgs&) override;
+
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
 private:

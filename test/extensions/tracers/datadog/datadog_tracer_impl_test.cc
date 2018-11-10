@@ -125,11 +125,11 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(1));
+  const Http::AsyncClient::SendArgs timeout(std::chrono::seconds(1));
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());

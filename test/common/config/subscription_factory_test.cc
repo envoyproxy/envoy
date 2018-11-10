@@ -252,10 +252,8 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke([this](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                              const absl::optional<std::chrono::milliseconds>& timeout) {
-        UNREFERENCED_PARAMETER(callbacks);
-        UNREFERENCED_PARAMETER(timeout);
+      .WillOnce(Invoke([this](Http::MessagePtr& request, Http::AsyncClient::Callbacks&,
+                              const Http::AsyncClient::SendArgs&) {
         EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));
         EXPECT_EQ("static_cluster", std::string(request->headers().Host()->value().c_str()));
         EXPECT_EQ("/v2/discovery:endpoints",

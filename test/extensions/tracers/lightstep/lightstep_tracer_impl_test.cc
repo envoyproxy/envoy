@@ -159,12 +159,12 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const Http::AsyncClient::SendArgs timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
@@ -220,12 +220,12 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const Http::AsyncClient::SendArgs timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
@@ -263,12 +263,12 @@ TEST_F(LightStepDriverTest, FlushOneInvalidResponse) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const Http::AsyncClient::SendArgs timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
@@ -310,7 +310,7 @@ TEST_F(LightStepDriverTest, FlushOneInvalidResponse) {
 TEST_F(LightStepDriverTest, FlushSpansTimer) {
   setupValidDriver();
 
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const Http::AsyncClient::SendArgs timeout(std::chrono::seconds(5));
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
@@ -339,12 +339,12 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const Http::AsyncClient::SendArgs timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
@@ -384,12 +384,12 @@ TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const Http::AsyncClient::SendArgs timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& /*message*/, Http::AsyncClient::Callbacks& callbacks,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             return &request;

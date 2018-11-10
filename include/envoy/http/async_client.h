@@ -141,6 +141,9 @@ public:
    *         handle should just be used to cancel.
    */
   struct SendArgs {
+    SendArgs() {}
+    SendArgs(const absl::optional<std::chrono::milliseconds>& timeout) : timeout(timeout) {}
+    
     absl::optional<std::chrono::milliseconds> timeout;
     bool send_xff{true};
   };
@@ -160,8 +163,15 @@ public:
    *         the handle can be used to send more messages or close the stream.
    */
   struct StartArgs {
+    StartArgs() {}
+    StartArgs(const absl::optional<std::chrono::milliseconds>& timeout, bool buffer_body)
+    : timeout(timeout), buffer_body_for_retry(buffer_body) {}
+    StartArgs(const absl::optional<std::chrono::milliseconds>& timeout, bool buffer_body, bool send_xff)
+    : timeout(timeout), buffer_body_for_retry(buffer_body), send_xff(send_xff) {}
+    StartArgs(bool buffer_body, bool send_xff) : buffer_body_for_retry(buffer_body), send_xff(send_xff) {}
+    
     absl::optional<std::chrono::milliseconds> timeout;
-    bool buffer_body_for_retry;
+    bool buffer_body_for_retry{false};
     bool send_xff{true};
   };
   virtual Stream* start(StreamCallbacks& callbacks, const StartArgs& args) PURE;

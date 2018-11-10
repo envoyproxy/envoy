@@ -219,7 +219,7 @@ protected:
   void expectAsyncClientSend() {
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
-                             const absl::optional<std::chrono::milliseconds>&)
+                             const Http::AsyncClient::SendArgs&)
                              -> Envoy::Http::AsyncClient::Request* {
           callbacks_.push_back(&cb);
           return &request_;
@@ -270,7 +270,7 @@ TEST_F(SquashFilterTest, DecodeHeaderContinuesOnClientFail) {
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& callbacks,
-                           const absl::optional<std::chrono::milliseconds>&)
+                           const Http::AsyncClient::SendArgs&)
                            -> Envoy::Http::AsyncClient::Request* {
         callbacks.onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
         return nullptr;
@@ -435,7 +435,7 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks&,
-                           const absl::optional<std::chrono::milliseconds>&)
+                           const Http::AsyncClient::SendArgs&)
                            -> Envoy::Http::AsyncClient::Request* { return &request_; }));
 
   EXPECT_CALL(request_, cancel());

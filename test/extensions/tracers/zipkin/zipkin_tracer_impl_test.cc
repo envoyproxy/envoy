@@ -134,12 +134,12 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const Http::AsyncClient::SendArgs timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/api/v1/spans", message->headers().Path()->value().c_str());
@@ -183,12 +183,12 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const Http::AsyncClient::SendArgs timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/api/v1/spans", message->headers().Path()->value().c_str());
@@ -221,7 +221,7 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
 TEST_F(ZipkinDriverTest, FlushSpansTimer) {
   setupValidDriver();
 
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const Http::AsyncClient::SendArgs timeout(std::chrono::seconds(5));
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
