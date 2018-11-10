@@ -216,15 +216,14 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     std::string tag_extracted_name = parent_.getTagsForName(name, tags);
     absl::string_view truncated_name = parent_.truncateStatNameIfNeeded(name);
     std::shared_ptr<StatType> stat =
-        make_stat(parent_.alloc_, truncated_name, std::move(tag_extracted_name),
-                  std::move(tags));
+        make_stat(parent_.alloc_, truncated_name, std::move(tag_extracted_name), std::move(tags));
     if (stat == nullptr) {
       // TODO(jmarantz): If make_stat fails, the actual move does not actually occur
       // for tag_extracted_name and tags, so there is no use-after-move problem.
       // In order to increase the readability of the code, refactoring is done here.
       parent_.num_last_resort_stats_.inc();
-      stat = make_stat(parent_.heap_allocator_, truncated_name,
-                       std::move(tag_extracted_name), std::move(tags)); // NOLINT(bugprone-use-after-move)
+      stat = make_stat(parent_.heap_allocator_, truncated_name, std::move(tag_extracted_name),
+                       std::move(tags)); // NOLINT(bugprone-use-after-move)
       ASSERT(stat != nullptr);
     }
     central_ref = &central_cache_map[stat->nameCStr()];
