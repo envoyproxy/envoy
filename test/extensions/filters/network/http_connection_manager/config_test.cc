@@ -168,6 +168,50 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   EXPECT_EQ(0, config.streamIdleTimeout().count());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, ConfiguredRequestTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  request_timeout: 53s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(53 * 1000, config.requestTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DisabledRequestTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  request_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(0, config.requestTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(0, config.requestTimeout().count());
+}
+
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
   const std::string json_string = R"EOF(
   {
