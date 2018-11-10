@@ -20,11 +20,6 @@ class FindAndReplaceConfigFactory
 public:
   FindAndReplaceConfigFactory() : FactoryBase(NetworkFilterNames::get().FindAndReplace) {}
 
-  // // NamedNetworkFilterConfigFactory
-  // Network::FilterFactoryCb
-  // createFilterFactory(const Json::Object& json_config,
-  //                     Server::Configuration::FactoryContext& context) override;
-
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::find_and_replace::v2alpha1::FindAndReplace&
