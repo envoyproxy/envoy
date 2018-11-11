@@ -2715,8 +2715,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamHeaders) {
   setupFilterChain(2, 2);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
-      .WillOnce(InvokeWithoutArgs(
-          [&]() -> FilterHeadersStatus { return FilterHeadersStatus::ContinueAndEndStream; }));
+      .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::Continue));
 
@@ -2756,8 +2755,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamData) {
   setupFilterChain(2, 2);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
-      .WillOnce(InvokeWithoutArgs(
-          [&]() -> FilterHeadersStatus { return FilterHeadersStatus::ContinueAndEndStream; }));
+      .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::Continue));
 
@@ -2800,8 +2798,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamTrailers) {
   setupFilterChain(2, 2);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
-      .WillOnce(InvokeWithoutArgs(
-          [&]() -> FilterHeadersStatus { return FilterHeadersStatus::ContinueAndEndStream; }));
+      .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::Continue));
 
