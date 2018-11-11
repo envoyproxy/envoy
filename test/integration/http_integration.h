@@ -140,6 +140,9 @@ protected:
   void testIdleTimeoutWithTwoRequests();
   void testIdleTimerDisabled();
   void testUpstreamDisconnectWithTwoRequests();
+  void testHeadersOnlyFilterEncoding();
+  void testHeadersOnlyFilterDecoding();
+  void testHeadersOnlyFilterInterleaved();
   // HTTP/1 tests
   void testBadFirstline();
   void testMissingDelimiter();
