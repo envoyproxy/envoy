@@ -222,8 +222,9 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
       // for tag_extracted_name and tags, so there is no use-after-move problem.
       // In order to increase the readability of the code, refactoring is done here.
       parent_.num_last_resort_stats_.inc();
-      stat = make_stat(parent_.heap_allocator_, truncated_name, std::move(tag_extracted_name), // NOLINT(bugprone-use-after-move)
-                       std::move(tags)); // NOLINT(bugprone-use-after-move)
+      stat = make_stat(parent_.heap_allocator_, truncated_name,
+                       std::move(tag_extracted_name), // NOLINT(bugprone-use-after-move)
+                       std::move(tags));              // NOLINT(bugprone-use-after-move)
       ASSERT(stat != nullptr);
     }
     central_ref = &central_cache_map[stat->nameCStr()];
