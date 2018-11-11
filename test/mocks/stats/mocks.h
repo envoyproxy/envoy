@@ -177,18 +177,43 @@ public:
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
   MOCK_CONST_METHOD0(statsOptions, const StatsOptions&());
 
-  Counter& counterx(StatName name) { return counter(name.toString(symbol_table_)); }
-  Gauge& gaugex(StatName name) { return gauge(name.toString(symbol_table_)); }
-  Histogram& histogramx(StatName name) { return histogram(name.toString(symbol_table_)); }
+  Counter& counterx(StatName name) override { return counter(name.toString(symbol_table_)); }
+  Gauge& gaugex(StatName name) override { return gauge(name.toString(symbol_table_)); }
+  Histogram& histogramx(StatName name) override { return histogram(name.toString(symbol_table_)); }
 
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& symbolTable() const override { return symbol_table_; }
 
-  SymbolTable owned_symbol_table_;
+  SymbolTableImpl owned_symbol_table_;
   SymbolTable& symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
   StatsOptionsImpl stats_options_;
+};
+
+// The MockSymbolTable behaves like SymbolTableImpl, except that you can
+// have SymbolEncodings from multiple symbol tables interact. This is
+// achieved with unity encoding.
+//
+// The reason this is desirable for tests is that it is very difficult to
+// inject the right SymbolTable& everywhere it needs to go in the test
+// infratsructure, since all the existing mocks have no context.
+class MockSymbolTable : public SymbolTable {
+public:
+  MockSymbolTable();
+  ~MockSymbolTable();
+
+  SymbolEncoding encode(absl::string_view name) override;
+  uint64_t numSymbols() const override;
+  bool lessThan(const StatName& a, const StatName& b) const override;
+  void free(StatName stat_name) override;
+  void incRefCount(StatName stat_name) override;
+  std::string decode(const SymbolStorage symbol_vec, uint64_t size) const override;
+  bool interoperable(const SymbolTable&) const override { return true; }
+
+#ifndef ENVOY_CONFIG_COVERAGE
+  void debugPrint() const override;
+#endif
 };
 
 /**

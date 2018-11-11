@@ -103,12 +103,12 @@ uint64_t SymbolEncoding::moveToStorage(SymbolStorage symbol_array) {
   return sz + 2;
 }
 
-SymbolTable::SymbolTable()
+SymbolTableImpl::SymbolTableImpl()
     // Have to be explicitly initialized, if we want to use the GUARDED_BY macro.
     : next_symbol_(0), monotonic_counter_(0) {}
 
-SymbolTable::~SymbolTable() {
-  // To avoid leaks into the symbol table, we expect all StatNames to be freed.
+SymbolTableImpl::~SymbolTableImpl() {
+  // to avoid leaks into the symbol table, we expect all StatNames to be freed.
   // Note: this could potentially be short-circuited if we decide a fast exit
   // is needed in production. But it would be good to ensure clean up during
   // tests.
@@ -118,7 +118,7 @@ SymbolTable::~SymbolTable() {
 // TODO(ambuc): There is a possible performance optimization here for avoiding
 // the encoding of IPs / numbers if they appear in stat names. We don't want to
 // waste time symbolizing an integer as an integer, if we can help it.
-SymbolEncoding SymbolTable::encode(const absl::string_view name) {
+SymbolEncoding SymbolTableImpl::encode(const absl::string_view name) {
   SymbolEncoding encoding;
 
   if (name.empty()) {
@@ -147,11 +147,11 @@ SymbolEncoding SymbolTable::encode(const absl::string_view name) {
   return encoding;
 }
 
-std::string SymbolTable::decode(const SymbolStorage symbol_array, uint64_t size) const {
-  return decode(SymbolEncoding::decodeSymbols(symbol_array, size));
+std::string SymbolTableImpl::decode(const SymbolStorage symbol_array, uint64_t size) const {
+  return decodeSymbolVec(SymbolEncoding::decodeSymbols(symbol_array, size));
 }
 
-std::string SymbolTable::decode(const SymbolVec& symbols) const {
+std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
   std::vector<absl::string_view> name_tokens;
   name_tokens.reserve(symbols.size());
   {
@@ -164,7 +164,7 @@ std::string SymbolTable::decode(const SymbolVec& symbols) const {
   return absl::StrJoin(name_tokens, ".");
 }
 
-void SymbolTable::adjustRefCount(StatName stat_name, int adjustment) {
+void SymbolTableImpl::adjustRefCount(StatName stat_name, int adjustment) {
   // Before taking the lock, decode the array of symbols from the SymbolStorage.
   SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.numBytes());
 
@@ -188,7 +188,7 @@ void SymbolTable::adjustRefCount(StatName stat_name, int adjustment) {
   }
 }
 
-Symbol SymbolTable::toSymbol(absl::string_view sv) EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+Symbol SymbolTableImpl::toSymbol(absl::string_view sv) EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   Symbol result;
   auto encode_find = encode_map_.find(sv);
   // If the string segment doesn't already exist,
@@ -214,14 +214,14 @@ Symbol SymbolTable::toSymbol(absl::string_view sv) EXCLUSIVE_LOCKS_REQUIRED(lock
   return result;
 }
 
-absl::string_view SymbolTable::fromSymbol(const Symbol symbol) const
+absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const
     EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
   ASSERT(search != decode_map_.end());
   return search->second;
 }
 
-void SymbolTable::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+void SymbolTableImpl::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   if (pool_.empty()) {
     next_symbol_ = ++monotonic_counter_;
   } else {
@@ -232,7 +232,7 @@ void SymbolTable::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   ASSERT(monotonic_counter_ != 0);
 }
 
-bool SymbolTable::lessThan(const StatName& a, const StatName& b) const {
+bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
   // Constructing two temp vectors during lessThan is not strictly necessary.
   // If this becomes a performance bottleneck (e.g. during sorting), we could
   // provide an iterator-like interface for incrementally decoding the symbols
@@ -249,7 +249,7 @@ bool SymbolTable::lessThan(const StatName& a, const StatName& b) const {
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
-void SymbolTable::debugPrint() const {
+void SymbolTableImpl::debugPrint() const {
   Thread::LockGuard lock(lock_);
   std::vector<Symbol> symbols;
   for (auto p : decode_map_) {

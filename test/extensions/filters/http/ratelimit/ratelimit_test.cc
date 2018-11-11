@@ -38,7 +38,7 @@ namespace RateLimitFilter {
 
 class HttpRateLimitFilterTest : public testing::Test {
 public:
-  HttpRateLimitFilterTest() {
+  HttpRateLimitFilterTest() : code_stats_(stats_store_.symbolTable()) {
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.http_filter_enabled", 100))
         .WillByDefault(Return(true));
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.http_filter_enforcing", 100))
@@ -83,7 +83,7 @@ public:
   Http::TestHeaderMapImpl response_headers_;
   Buffer::OwnedImpl data_;
   Buffer::OwnedImpl response_data_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Router::MockRateLimitPolicyEntry> route_rate_limit_;
   NiceMock<Router::MockRateLimitPolicyEntry> vh_rate_limit_;

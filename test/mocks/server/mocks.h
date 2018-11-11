@@ -193,7 +193,7 @@ public:
   MOCK_METHOD0(statsAllocator, Stats::StatDataAllocator&());
 
 private:
-  Stats::SymbolTable symbol_table_;
+  Stats::MockSymbolTable symbol_table_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
   Stats::HeapStatDataAllocator stats_allocator_;
@@ -349,11 +349,12 @@ public:
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
   Event::TestTimeSystem& timeSystem() override { return test_time_.timeSystem(); }
+  Stats::SymbolTable& symbolTable() override { return stats_store_.symbolTable(); }
   Http::CodeStats& codeStats() override { return code_stats_; }
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::MockIsolatedStatsStore stats_store_;
   testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
   std::shared_ptr<testing::NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new testing::NiceMock<Network::MockDnsResolver>()};
@@ -430,8 +431,8 @@ public:
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
   MOCK_METHOD0(timeSource, TimeSource&());
-  Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
+  Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
   Http::CodeStats& codeStats() override { return code_stats_; }
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
@@ -443,11 +444,11 @@ public:
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
-  Stats::IsolatedStoreImpl scope_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
-  Stats::IsolatedStoreImpl listener_scope_;
+  Stats::MockIsolatedStatsStore listener_scope_;
   Event::SimulatedTimeSystem time_system_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Http::CodeStatsImpl code_stats_;

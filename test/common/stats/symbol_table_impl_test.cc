@@ -27,7 +27,9 @@ protected:
   SymbolVec getSymbols(StatName stat_name) {
     return SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.numBytes());
   }
-  std::string decodeSymbolVec(const SymbolVec& symbol_vec) { return table_.decode(symbol_vec); }
+  std::string decodeSymbolVec(const SymbolVec& symbol_vec) {
+    return table_.decodeSymbolVec(symbol_vec);
+  }
   Symbol monotonicCounter() { return table_.monotonicCounter(); }
   std::string encodeDecode(absl::string_view stat_name) {
     return makeStat(stat_name).toString(table_);
@@ -40,7 +42,7 @@ protected:
     return stat_name_storage_.back().statName();
   }
 
-  SymbolTable table_;
+  SymbolTableImpl table_;
 
   std::vector<StatNameStorage> stat_name_storage_;
 };
@@ -337,7 +339,7 @@ TEST(SymbolTableTest, Memory) {
     string_mem_used = test_memory_usage(record_stat);
   }
   {
-    SymbolTable table;
+    SymbolTableImpl table;
     std::vector<StatNameStorage> names;
     auto record_stat = [&names, &table](absl::string_view stat) {
       names.emplace_back(StatNameStorage(stat, table));

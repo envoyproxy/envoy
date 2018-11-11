@@ -94,7 +94,7 @@ public:
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   testing::NiceMock<MockHealthCheckHostMonitor> health_checker_;
   testing::NiceMock<MockClusterInfo> cluster_;
-  Stats::IsolatedStoreImpl stats_store_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
 };
 
@@ -164,8 +164,7 @@ public:
 
   testing::NiceMock<MockClusterInfo> cluster_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
-  Stats::SymbolTable symbol_table_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
 };
 

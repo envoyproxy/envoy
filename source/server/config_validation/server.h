@@ -96,6 +96,7 @@ public:
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   Event::TimeSystem& timeSystem() override { return time_system_; }
+  Stats::SymbolTable& symbolTable() override { return stats_store_.symbolTable(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   Http::CodeStats& codeStats() override { return code_stats_; }
 

@@ -208,7 +208,7 @@ class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        dispatcher_(test_time_.timeSystem()) {}
+        dispatcher_(test_time_.timeSystem()), code_stats_(stats_store_->symbolTable()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -402,7 +402,8 @@ public:
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   DispatcherHelper dispatcher_helper_{dispatcher_};
-  Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
+  NiceMock<Stats::MockIsolatedStatsStore>* stats_store_ =
+      new NiceMock<Stats::MockIsolatedStatsStore>();
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
   TestMetadata service_wide_initial_metadata_;
 #ifdef ENVOY_GOOGLE_GRPC

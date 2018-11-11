@@ -23,7 +23,7 @@ TEST(SourceImplTest, Caching) {
   ON_CALL(store, histograms()).WillByDefault(ReturnPointee(&stored_histograms));
 
   SourceImpl source(store);
-  SymbolTable symbol_table;
+  SymbolTableImpl symbol_table;
 
   // Once cached, new values should not be reflected by the return value.
   stored_counters.push_back(std::make_shared<MockCounter>(symbol_table));

@@ -75,7 +75,7 @@ public:
 class RouterTestBase : public testing::Test {
 public:
   RouterTestBase(bool start_child_span, bool suppress_envoy_headers)
-      : shadow_writer_(new MockShadowWriter()),
+      : code_stats_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
         config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
                 ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
                 test_time_.timeSystem(), code_stats_),
@@ -185,7 +185,7 @@ public:
   DangerousDeprecatedTestTime test_time_;
   std::string upstream_zone_{"to_az"};
   envoy::api::v2::core::Locality upstream_locality_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;

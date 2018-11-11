@@ -27,10 +27,12 @@ CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
       internal_(makeStatName("internal")),
       internal_rq_time_(makeStatName("internal.upstream_rq_time")),
       internal_upstream_rq_time_(makeStatName("internal.upstream_rq_time")),
+      upstream_rq_1xx_(makeStatName("upstream_rq_1xx")),
       upstream_rq_2xx_(makeStatName("upstream_rq_2xx")),
       upstream_rq_3xx_(makeStatName("upstream_rq_3xx")),
       upstream_rq_4xx_(makeStatName("upstream_rq_4xx")),
       upstream_rq_5xx_(makeStatName("upstream_rq_5xx")),
+      upstream_rq_unknown_(makeStatName("upstream_rq_Unknown")),
       upstream_rq_completed_(makeStatName("upstream_rq_completed")),
       upstream_rq_time_(makeStatName("upstream_rq_time")), vcluster_(makeStatName("vcluster")),
       vhost_(makeStatName("vhost")), zone_(makeStatName("zone")),
@@ -51,7 +53,8 @@ Stats::StatName CodeStatsImpl::makeStatName(absl::string_view name) {
 
 void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
                                             Code response_code) {
-  ASSERT(&scope.symbolTable() == &symbol_table_);
+  ASSERT(scope.symbolTable().interoperable(symbol_table_));
+  ASSERT(symbol_table_.interoperable(scope.symbolTable()));
 
   // Build a dynamic stat for the response code and increment it.
   scope.counterx(Join(prefix, upstream_rq_completed_).statName()).inc();
@@ -70,7 +73,9 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) {
   Stats::StatName prefix = prefix_storage.statName();
   Code code = static_cast<Code>(info.response_status_code_);
 
-  ASSERT(&info.cluster_scope_.symbolTable() == &symbol_table_);
+  ASSERT(info.cluster_scope_.symbolTable().interoperable(symbol_table_));
+  ASSERT(symbol_table_.interoperable(info.cluster_scope_.symbolTable()));
+
   chargeBasicResponseStat(info.cluster_scope_, prefix, code);
 
   Stats::StatName rq_group = upstreamRqGroup(code);
@@ -202,7 +207,7 @@ Stats::StatName CodeStatsImpl::upstreamRqGroup(Code response_code) const {
   case 5:
     return upstream_rq_5xx_;
   }
-  return Stats::StatName();
+  return upstream_rq_unknown_;
 }
 
 CodeStatsImpl::RequestCodeGroup::~RequestCodeGroup() {
@@ -238,7 +243,9 @@ Stats::StatName CodeStatsImpl::RequestCodeGroup::statName(Code response_code) {
 std::string CodeUtility::groupStringForResponseCode(Code response_code) {
   // Note: this is only used in the unit test and in dynamo_filter.cc, which
   // needs the same sort of symbloziation treatment we are doing here.
-  if (CodeUtility::is2xx(enumToInt(response_code))) {
+  if (CodeUtility::is1xx(enumToInt(response_code))) {
+    return "1xx";
+  } else if (CodeUtility::is2xx(enumToInt(response_code))) {
     return "2xx";
   } else if (CodeUtility::is3xx(enumToInt(response_code))) {
     return "3xx";

@@ -118,10 +118,10 @@ private:
  * same string is re-encoded, it may or may not encode to the same underlying
  * symbol.
  */
-class SymbolTable {
+class SymbolTableImpl : public SymbolTable {
 public:
-  SymbolTable();
-  ~SymbolTable();
+  SymbolTableImpl();
+  ~SymbolTableImpl() override;
 
   /**
    * Encodes a stat name using the symbol table, returning a SymbolEncoding. The
@@ -138,12 +138,12 @@ public:
    * @param name The name to encode.
    * @return SymbolEncoding the encoded symbols.
    */
-  SymbolEncoding encode(absl::string_view name);
+  SymbolEncoding encode(absl::string_view name) override;
 
   /**
    * @return uint64_t the number of symbols in the symbol table.
    */
-  uint64_t numSymbols() const {
+  uint64_t numSymbols() const override {
     Thread::LockGuard lock(lock_);
     ASSERT(encode_map_.size() == decode_map_.size());
     return encode_map_.size();
@@ -165,7 +165,7 @@ public:
    * @param b the second stat name
    * @return bool true if a lexically precedes b.
    */
-  bool lessThan(const StatName& a, const StatName& b) const;
+  bool lessThan(const StatName& a, const StatName& b) const override;
 
   /**
    * Since SymbolTable does manual reference counting, a client of SymbolTable
@@ -175,7 +175,7 @@ public:
    *
    * @param symbol_vec the vector of symbols to be freed.
    */
-  void free(StatName stat_name) { adjustRefCount(stat_name, -1); }
+  void free(StatName stat_name) override { adjustRefCount(stat_name, -1); }
 
   /**
    * StatName backing-store can be managed by callers in a variety of ways
@@ -186,11 +186,23 @@ public:
    *
    * @param symbol_vec the vector of symbols to be freed.
    */
-  void incRefCount(StatName stat_name) { adjustRefCount(stat_name, 1); };
+  void incRefCount(StatName stat_name) override { adjustRefCount(stat_name, 1); };
 
 #ifndef ENVOY_CONFIG_COVERAGE
-  void debugPrint() const;
+  void debugPrint() const override;
 #endif
+
+  /**
+   * Decodes a vector of symbols back into its period-delimited stat name.
+   * If decoding fails on any part of the symbol_vec, we release_assert and crash hard, since this
+   * should never happen, and we don't want to continue running with a corrupt stats set.
+   *
+   * @param symbol_vec the vector of symbols to decode.
+   * @return std::string the retrieved stat name.
+   */
+  std::string decode(const SymbolStorage symbol_vec, uint64_t size) const override;
+
+  bool interoperable(const SymbolTable& other) const override { return &other == this; }
 
 private:
   friend class StatName;
@@ -204,16 +216,7 @@ private:
   // This must be called during both encode() and free().
   mutable Thread::MutexBasicLockable lock_;
 
-  /**
-   * Decodes a vector of symbols back into its period-delimited stat name.
-   * If decoding fails on any part of the symbol_vec, we release_assert and crash hard, since this
-   * should never happen, and we don't want to continue running with a corrupt stats set.
-   *
-   * @param symbol_vec the vector of symbols to decode.
-   * @return std::string the retrieved stat name.
-   */
-  std::string decode(const SymbolStorage symbol_vec, uint64_t size) const;
-  std::string decode(const SymbolVec& symbols) const;
+  std::string decodeSymbolVec(const SymbolVec& symbols) const;
 
   void adjustRefCount(StatName stat_name, int adjustment);
 

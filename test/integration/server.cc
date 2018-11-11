@@ -132,7 +132,12 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic) {
   OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version));
-  Stats::SymbolTable symbol_table;
+
+  // TODO(jmarantz): Sadly, we use a mock symbol table here, as plumbing the
+  // real symbol table through the mocking hierarchy -- which generally
+  // constructs hierarchies of objects with no context, is too daunting. I think
+  // the right thing to do is to avoid mocks in integration tests.
+  Stats::MockSymbolTable symbol_table;
   Server::HotRestartNopImpl restarter(symbol_table);
   Thread::MutexBasicLockable lock;
 

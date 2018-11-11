@@ -45,7 +45,7 @@ public:
     store_->addSink(sink_);
   }
 
-  Stats::SymbolTable symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatsOptionsImpl options_;

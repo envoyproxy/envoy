@@ -210,6 +210,11 @@ public:
   virtual Event::TimeSystem& timeSystem() PURE;
 
   /**
+   * @return the statistics symbol table.
+   */
+  virtual Stats::SymbolTable& symbolTable() PURE;
+
+  /**
    * @return the flush interval of stats sinks.
    */
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;

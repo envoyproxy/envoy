@@ -87,6 +87,10 @@ public:
                                                                tag_extracted_name, tags);
   }
 
+#ifndef ENVOY_CONFIG_COVERAGE
+  void debugPrint();
+#endif
+
 private:
   struct HeapStatHash {
     size_t operator()(const HeapStatData* a) const { return a->hash(); }

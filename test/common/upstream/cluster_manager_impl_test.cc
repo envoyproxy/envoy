@@ -167,7 +167,9 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 
 class ClusterManagerImplTest : public testing::Test {
 public:
-  ClusterManagerImplTest() { factory_.dispatcher_.setTimeSystem(time_system_); }
+  ClusterManagerImplTest() : code_stats_(factory_.stats_.symbolTable()) {
+    factory_.dispatcher_.setTimeSystem(time_system_);
+  }
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<ClusterManagerImpl>(

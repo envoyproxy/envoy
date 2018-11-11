@@ -89,6 +89,7 @@ private:
   Stats::StatName upstream_rq_3xx_;
   Stats::StatName upstream_rq_4xx_;
   Stats::StatName upstream_rq_5xx_;
+  Stats::StatName upstream_rq_unknown_;
   Stats::StatName upstream_rq_completed_;
   Stats::StatName upstream_rq_time;
   Stats::StatName upstream_rq_time_;

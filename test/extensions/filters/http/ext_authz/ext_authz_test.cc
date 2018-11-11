@@ -82,7 +82,7 @@ TEST(HttpExtAuthzFilterConfigPerRouteTest, MergeConfig) {
 
 class HttpExtAuthzFilterTestBase {
 public:
-  HttpExtAuthzFilterTestBase() {}
+  HttpExtAuthzFilterTestBase() : code_stats_(stats_store_.symbolTable()) {}
 
   void initConfig(envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& proto_config) {
     config_ = std::make_unique<FilterConfig>(proto_config, local_info_, stats_store_, runtime_, cm_,
@@ -96,7 +96,7 @@ public:
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
   Http::TestHeaderMapImpl request_headers_;
   Buffer::OwnedImpl data_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

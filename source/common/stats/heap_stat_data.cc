@@ -1,5 +1,7 @@
 #include "common/stats/heap_stat_data.h"
 
+#include <iostream>
+
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
@@ -53,6 +55,16 @@ void HeapStatDataAllocator::free(HeapStatData& data) {
 
   data.free(symbolTable());
 }
+
+#ifndef ENVOY_CONFIG_COVERAGE
+void HeapStatDataAllocator::debugPrint() {
+  Thread::LockGuard lock(mutex_);
+  for (HeapStatData* heap_stat_data : stats_) {
+    std::cout << heap_stat_data->statName().toString(symbolTable()) << std::endl;
+  }
+  std::cout << std::flush;
+}
+#endif
 
 template class StatDataAllocatorImpl<HeapStatData>;
 

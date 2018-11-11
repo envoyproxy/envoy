@@ -1,5 +1,7 @@
 #include "mocks.h"
 
+#include "common/stats/symbol_table_impl.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -123,7 +125,53 @@ MockStore::MockStore(SymbolTable& symbol_table)
 }
 MockStore::~MockStore() {}
 
-MockIsolatedStatsStore::MockIsolatedStatsStore() {}
+MockSymbolTable::MockSymbolTable() {}
+MockSymbolTable::~MockSymbolTable() {}
+
+SymbolEncoding MockSymbolTable::encode(absl::string_view name) {
+  SymbolEncoding encoding;
+  if (name.empty()) {
+    return encoding;
+  }
+  std::vector<absl::string_view> tokens = absl::StrSplit(name, '.');
+  for (absl::string_view token : tokens) {
+    encoding.addSymbol(static_cast<Symbol>(token.size()));
+    ;
+    for (char c : token) {
+      encoding.addSymbol(static_cast<Symbol>(c));
+    }
+  }
+  return encoding;
+}
+
+std::string MockSymbolTable::decode(const SymbolStorage symbol_vec, uint64_t size) const {
+  std::string out;
+  SymbolVec symbols = SymbolEncoding::decodeSymbols(symbol_vec, size);
+  for (size_t i = 0; i < symbols.size();) {
+    if (!out.empty()) {
+      out += ".";
+    }
+    size_t end = static_cast<size_t>(symbols[i]) + i + 1;
+    while (++i < end) {
+      out += static_cast<char>(symbols[i]);
+    }
+  }
+  return out;
+}
+
+bool MockSymbolTable::lessThan(const StatName& a, const StatName& b) const {
+  return a.toString(*this) < b.toString(*this);
+}
+
+uint64_t MockSymbolTable::numSymbols() const { return 0; }
+void MockSymbolTable::free(StatName) {}
+void MockSymbolTable::incRefCount(StatName) {}
+#ifndef ENVOY_CONFIG_COVERAGE
+void MockSymbolTable::debugPrint() const {}
+#endif
+
+MockIsolatedStatsStore::MockIsolatedStatsStore()
+    : IsolatedStoreImpl(std::make_shared<MockSymbolTable>()) {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() {}
 
 } // namespace Stats
