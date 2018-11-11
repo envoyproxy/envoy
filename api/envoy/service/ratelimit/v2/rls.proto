@@ -8,6 +8,8 @@ import "envoy/api/v2/ratelimit/ratelimit.proto";
 
 import "validate/validate.proto";
 
+// [#protodoc-title: Rate Limit Service (RLS)]
+
 service RateLimitService {
   // Determine whether rate limiting should take place.
   rpc ShouldRateLimit(RateLimitRequest) returns (RateLimitResponse) {
@@ -21,7 +23,6 @@ service RateLimitService {
 // are provided, the server will limit on *ALL* of them and return an OVER_LIMIT response if any
 // of them are over limit. This enables more complex application level rate limiting scenarios
 // if desired.
-// [#not-implemented-hide:] Hiding API for now.
 message RateLimitRequest {
   // All rate limit requests must specify a domain. This enables the configuration to be per
   // application without fear of overlap. E.g., "envoy".
@@ -38,25 +39,34 @@ message RateLimitRequest {
 }
 
 // A response from a ShouldRateLimit call.
-// [#not-implemented-hide:] Hiding API for now.
 message RateLimitResponse {
   enum Code {
+    // The response code is not known.
     UNKNOWN = 0;
+    // The response code to notify that the number of requests are under limit.
     OK = 1;
+    // The response code to notify that the number of requests are over limit.
     OVER_LIMIT = 2;
   }
 
   // Defines an actual rate limit in terms of requests per unit of time and the unit itself.
   message RateLimit {
     enum Unit {
+      // The time unit is not known.
       UNKNOWN = 0;
+      // The time unit representing a second.
       SECOND = 1;
+      // The time unit representing a minute.
       MINUTE = 2;
+      // The time unit representing an hour.
       HOUR = 3;
+      // The time unit representing a day.
       DAY = 4;
     }
 
+    // The number of requests per unit of time.
     uint32 requests_per_unit = 1;
+    // The unit of time.
     Unit unit = 2;
   }
 

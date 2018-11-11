@@ -284,7 +284,7 @@ private:
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, const std::string& body,
-                        std::function<void(HeaderMap& headers)> modify_headers,
+                        const std::function<void(HeaderMap& headers)>& modify_headers,
                         bool is_head_request,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
@@ -304,6 +304,7 @@ private:
     void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(HeaderMapPtr&& trailers) override;
+    void decodeMetadata(MetadataMapPtr&&) override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
     // Http::FilterChainFactoryCallbacks
     void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
@@ -357,7 +358,7 @@ private:
     struct State {
       State()
           : remote_complete_(false), local_complete_(false), saw_connection_close_(false),
-            successful_upgrade_(false) {}
+            successful_upgrade_(false), created_filter_chain_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -370,6 +371,7 @@ private:
       bool local_complete_ : 1;
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
+      bool created_filter_chain_ : 1;
     };
 
     // Possibly increases buffer_limit_ to the value of limit.
@@ -400,7 +402,7 @@ private:
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_response_timespan_;
     // Per-stream idle timeout.
-    Event::TimerPtr idle_timer_;
+    Event::TimerPtr stream_idle_timer_;
     // Per-stream request timeout.
     Event::TimerPtr request_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
@@ -453,7 +455,10 @@ private:
   const Network::DrainDecision& drain_close_;
   DrainState drain_state_{DrainState::NotDraining};
   UserAgent user_agent_;
-  Event::TimerPtr idle_timer_;
+  // An idle timer for the connection. This is only armed when there are no streams on the
+  // connection. When there are active streams it is disarmed in favor of each stream's
+  // stream_idle_timer_.
+  Event::TimerPtr connection_idle_timer_;
   Event::TimerPtr drain_timer_;
   Runtime::RandomGenerator& random_generator_;
   Tracing::HttpTracer& tracer_;

@@ -610,6 +610,32 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
 }
 
+TEST_F(HttpHealthCheckerImplTest, SuccessWithSpuriousMetadata) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+
+  std::unique_ptr<Http::MetadataMap> metadata_map(new Http::MetadataMap());
+  metadata_map->insert(std::make_pair<std::string, std::string>("key", "value"));
+  test_sessions_[0]->stream_response_callbacks_->decodeMetadata(std::move(metadata_map));
+
+  respond(0, "200", false, true);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+}
+
 // Test host check success with multiple hosts.
 TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHosts) {
   setupNoServiceValidationHC();
