@@ -109,8 +109,8 @@ FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
 }
 
 void FileImpl::open() {
-  Api::SysCallIntResult result = os_sys_calls_.open(path_.c_str(), O_RDWR | O_APPEND | O_CREAT,
-                                                    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+  Api::SysCallIntResult result =
+      os_sys_calls_.open(path_, O_RDWR | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
   fd_ = result.rc_;
   if (-1 == fd_) {
     throw EnvoyException(
