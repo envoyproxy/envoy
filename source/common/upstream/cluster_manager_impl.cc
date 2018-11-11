@@ -317,15 +317,6 @@ ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-uint64_t ClusterManagerImpl::mergeTimeout(const Cluster& cluster) const {
-  if (cluster.info()->lbConfig().has_update_merge_window()) {
-    const auto& update_merge_window = cluster.info()->lbConfig().update_merge_window();
-    return DurationUtil::durationToMilliseconds(update_merge_window);
-  }
-
-  return 1000;
-}
-
 void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // This routine is called when a cluster has finished initializing. The cluster has not yet
   // been setup for cross-thread updates to avoid needless updates during initialization. The order
@@ -356,7 +347,8 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     //
     // See https://github.com/envoyproxy/envoy/pull/3941 for more context.
     bool scheduled = false;
-    const auto merge_timeout = mergeTimeout(cluster);
+    const auto merge_timeout =
+        PROTOBUF_GET_MS_OR_DEFAULT(cluster.info()->lbConfig(), update_merge_window, 1000);
     // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
     const bool is_mergeable = !hosts_added.size() && !hosts_removed.size();
 
