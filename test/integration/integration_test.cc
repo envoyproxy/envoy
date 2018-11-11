@@ -139,17 +139,11 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   testUpstreamDisconnectWithTwoRequests();
 }
 
-TEST_P(IntegrationTest, EncodingHeaderOnlyResponse) {
-  testHeadersOnlyFilterEncoding();
-}
+TEST_P(IntegrationTest, EncodingHeaderOnlyResponse) { testHeadersOnlyFilterEncoding(); }
 
-TEST_P(IntegrationTest, DecodingHeaderOnlyResponse) {
-  testHeadersOnlyFilterDecoding();
-}
+TEST_P(IntegrationTest, DecodingHeaderOnlyResponse) { testHeadersOnlyFilterDecoding(); }
 
-TEST_P(IntegrationTest, DecodingHeaderOnlyInterleaved) {
-  testHeadersOnlyFilterDecoding();
-}
+TEST_P(IntegrationTest, DecodingHeaderOnlyInterleaved) { testHeadersOnlyFilterDecoding(); }
 
 TEST_P(IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
 

@@ -1763,7 +1763,7 @@ name: decode-headers-only
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  
+
   // First send the request headers. The filter should turn this into a header-only
   // request.
   auto encoder_decoder =
