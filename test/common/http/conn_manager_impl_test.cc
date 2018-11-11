@@ -2708,7 +2708,8 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamHeaders) {
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     auto headers = std::make_unique<TestHeaderMapImpl>(
-        {{":authority", "host"}, {":path", "/"}, {":method", "GET"}});
+        std::initializer_list<std::pair<std::string, std::string>>(
+            {{":authority", "host"}, {":path", "/"}, {":method", "GET"}}));
     decoder->decodeHeaders(std::move(headers), false);
   }));
 
@@ -2732,7 +2733,9 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamHeaders) {
   expectOnDestroy();
 
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      std::make_unique<TestHeaderMapImpl>({{":status", "200"}}), true);
+      std::make_unique<TestHeaderMapImpl>(
+          std::initializer_list<std::pair<std::string, std::string>>({{":status", "200"}})),
+      true);
 
   Buffer::OwnedImpl response_body("response");
   decoder_filters_[1]->callbacks_->encodeData(response_body, true);
@@ -2745,7 +2748,8 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamData) {
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     auto headers = std::make_unique<TestHeaderMapImpl>(
-        {{":authority", "host"}, {":path", "/"}, {":method", "GET"}});
+        std::initializer_list<std::pair<std::string, std::string>>(
+            {{":authority", "host"}, {":path", "/"}, {":method", "GET"}}));
     decoder->decodeHeaders(std::move(headers), false);
 
     Buffer::OwnedImpl fake_data("hello");
@@ -2772,7 +2776,9 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamData) {
   expectOnDestroy();
 
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      std::make_unique<TestHeaderMapImpl>({{":status", "200"}}), false);
+      std::make_unique<TestHeaderMapImpl>(
+          std::initializer_list<std::pair<std::string, std::string>>({{":status", "200"}})),
+      false);
 
   Buffer::OwnedImpl response_body("response");
   decoder_filters_[1]->callbacks_->encodeData(response_body, true);
@@ -2784,13 +2790,16 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamTrailers) {
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
-    auto headers = std::make_unique<TestHeaderMapImpl>{{":authority", "host"}, {":path", "/"}, {":method", "GET"}});
+    auto headers = std::make_unique<TestHeaderMapImpl>(
+        std::initializer_list<std::pair<std::string, std::string>>(
+            {{":authority", "host"}, {":path", "/"}, {":method", "GET"}}));
     decoder->decodeHeaders(std::move(headers), false);
 
     Buffer::OwnedImpl fake_data("hello");
     decoder->decodeData(fake_data, false);
 
-    auto trailers = std::make_unique<TestHeaderMapImpl>({{"foo", "bar"}});
+    auto trailers = std::make_unique<TestHeaderMapImpl>(
+        std::initializer_list<std::pair<std::string, std::string>>({{"foo", "bar"}}));
     decoder->decodeTrailers(std::move(trailers));
   }));
 
@@ -2814,12 +2823,15 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamTrailers) {
   expectOnDestroy();
 
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      std::make_unique<TestHeaderMapImpl>({{":status", "200"}}), false);
+      std::make_unique<TestHeaderMapImpl>(
+          std::initializer_list<std::pair<std::string, std::string>>({{":status", "200"}})),
+      false);
 
   Buffer::OwnedImpl response_body("response");
   decoder_filters_[1]->callbacks_->encodeData(response_body, false);
 
-  auto response_trailers = std::make_unique<TestHeaderMapImpl>({{"x-trailer", "1"}});
+  auto response_trailers = std::make_unique<TestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>({{"x-trailer", "1"}}));
   decoder_filters_[1]->callbacks_->encodeTrailers(std::move(response_trailers));
 }
 
