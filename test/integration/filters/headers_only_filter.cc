@@ -14,7 +14,7 @@ namespace Envoy {
 template <class T>
 class SimpleFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
-  SimpleFilterConfig() : EmptyHttpFilterConfig(FilterT::name) {}
+  SimpleFilterConfig() : EmptyHttpFilterConfig(T::name) {}
 
   Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
