@@ -15,8 +15,8 @@ def _kick(get_secret):
   print(statuses)
   
   for status in statuses:
-    m = match(text=status['target_url'], pattern='/[0-9]+\?')
-    print(m)
+    m = match(text=status['target_url'], pattern='/([0-9]+)\?')
+    print(m, status['state'])
   
   github_issue_create_comment(state)
   
