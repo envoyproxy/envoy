@@ -5,27 +5,24 @@ use("github.com/repokitteh/modules/review.star")
 use("github.com/repokitteh/modules/wait.star")
 
 
-def _circleci_retry(n):
-  pass
+def _circle(id, op):
+    url = 'https://circleci.com/api/v1.1/project/github/envoyproxy/envoy/%d/%s?circle-token=%s' % (
+      n,
+      op,
+      get_secret('circle_token'),
+    )        
+      
+    return http(
+      secret_url=url,
+      method='POST',
+    )
 
 
 def _cancel(get_secret, command):  
   ns = [int(a) for a in command.args]
   
   for n in ns:
-    url = 'https://circleci.com/api/v1.1/project/github/envoyproxy/envoy/%d/cancel?circle-token=%s' % (
-      n,
-      get_secret('circle_token'),
-    )        
-      
-    r = http(
-      secret_url=url,
-      method='POST',
-    )
-    
-    print(url, r)
-    
-  github_issue_create_comment('%s: %s' % (r['status'], ','.join(command.args)))
+    _circle(n, 'cancel')
   
 
 def _list():
@@ -64,7 +61,7 @@ def _kick(command, get_secret):
       
     m = match(text=status['target_url'], pattern='/([0-9]+)\?')
     if m and len(m) == 2:
-      failed_jobs.append(int(m[1]))  
+      failed_jobs.append(int(m[1]))
   
   github_issue_create_comment('%s %s' % (state, ','.join([str(j) for j in failed_jobs])))
   
