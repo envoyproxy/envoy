@@ -1027,6 +1027,13 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     }
   }
 
+  // If we're encoding a headers only response, then the HTTP/1 codec will reset the request
+  // when we encode the headers, so set this to prevent us from attempting to reset it again
+  // in doEndStream.
+  if (encoding_headers_only_) {
+    state_.local_complete_ = true;
+  }
+
   // Base headers.
   connection_manager_.config_.dateProvider().setDateHeader(headers);
   // Following setReference() is safe because serverName() is constant for the life of the listener.

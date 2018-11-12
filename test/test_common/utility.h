@@ -396,10 +396,13 @@ public:
   bool has(const LowerCaseString& key);
 };
 
-// Helper method to create a header map from an initializer list. Useful due to make_unique's inability
-// to infer the initalizer list type.
-inline HeaderMapPtr makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& values) {
-  return std::make_unique<TestHeaderMapImpl, const std::initializer_list<std::pair<std::string, std::string>>&>(values);
+// Helper method to create a header map from an initializer list. Useful due to make_unique's
+// inability to infer the initalizer list type.
+inline HeaderMapPtr
+makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& values) {
+  return std::make_unique<TestHeaderMapImpl,
+                          const std::initializer_list<std::pair<std::string, std::string>>&>(
+      values);
 }
 
 } // namespace Http
