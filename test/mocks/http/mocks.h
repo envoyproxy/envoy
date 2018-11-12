@@ -351,13 +351,14 @@ public:
   MOCK_METHOD0(onRequestDestroy, void());
 
   // Http::AsyncClient
-  Request* send(MessagePtr&& request, Callbacks& callbacks, const SendArgs& args) override {
+  Request* send(MessagePtr&& request, Callbacks& callbacks, const RequestOptions& args) override {
     return send_(request, callbacks, args);
   }
 
-  MOCK_METHOD3(send_, Request*(MessagePtr& request, Callbacks& callbacks, const SendArgs& args));
+  MOCK_METHOD3(send_,
+               Request*(MessagePtr& request, Callbacks& callbacks, const RequestOptions& args));
 
-  MOCK_METHOD2(start, Stream*(StreamCallbacks& callbacks, const StartArgs& args));
+  MOCK_METHOD2(start, Stream*(StreamCallbacks& callbacks, const StreamOptions& args));
 
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
 

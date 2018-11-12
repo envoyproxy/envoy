@@ -77,9 +77,9 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(Invoke(
-          [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                          const Http::AsyncClient::StartArgs&) {
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
             http_callbacks = &callbacks;
             return &http_stream;
           }));
@@ -103,9 +103,9 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(Invoke(
-          [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                          const Http::AsyncClient::StartArgs&) {
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
             http_callbacks = &callbacks;
             return &http_stream;
           }));

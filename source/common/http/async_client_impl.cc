@@ -49,9 +49,9 @@ AsyncClientImpl::~AsyncClientImpl() {
 }
 
 AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
-                                            const SendArgs& args) {
+                                            const AsyncClient::RequestOptions& options) {
   AsyncRequestImpl* async_request =
-      new AsyncRequestImpl(std::move(request), *this, callbacks, args.timeout, args.send_xff);
+      new AsyncRequestImpl(std::move(request), *this, callbacks, options);
   async_request->initialize();
   std::unique_ptr<AsyncStreamImpl> new_request{async_request};
 
@@ -66,21 +66,20 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
 }
 
 AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
-                                            const StartArgs& args) {
-  std::unique_ptr<AsyncStreamImpl> new_stream{new AsyncStreamImpl(
-      *this, callbacks, args.timeout, args.buffer_body_for_retry, args.send_xff)};
+                                            const AsyncClient::StreamOptions& options) {
+  std::unique_ptr<AsyncStreamImpl> new_stream{new AsyncStreamImpl(*this, callbacks, options)};
   new_stream->moveIntoList(std::move(new_stream), active_streams_);
   return active_streams_.front().get();
 }
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
-                                 const absl::optional<std::chrono::milliseconds>& timeout,
-                                 bool buffer_body_for_retry, bool send_xff)
+                                 const AsyncClient::StreamOptions& options)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
       router_(parent.config_), stream_info_(Protocol::Http11, parent.dispatcher().timeSystem()),
       tracing_config_(Tracing::EgressConfig::get()),
-      route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), timeout)), send_xff_(send_xff) {
-  if (buffer_body_for_retry) {
+      route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), options.timeout)),
+      send_xff_(options.send_xff) {
+  if (options.buffer_body_for_retry) {
     buffered_body_ = std::make_unique<Buffer::OwnedImpl>();
   }
 
@@ -180,12 +179,9 @@ void AsyncStreamImpl::resetStream() {
 
 AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent,
                                    AsyncClient::Callbacks& callbacks,
-                                   const absl::optional<std::chrono::milliseconds>& timeout,
-                                   bool send_xff)
-    // We tell the underlying stream to not buffer because we already have the full request and
-    // and can handle any buffered body requests.
-    : AsyncStreamImpl(parent, *this, timeout, false, send_xff), request_(std::move(request)),
-      callbacks_(callbacks) {}
+                                   const AsyncClient::RequestOptions& options)
+    : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
+}
 
 void AsyncRequestImpl::initialize() {
   sendHeaders(request_->headers(), !request_->body());

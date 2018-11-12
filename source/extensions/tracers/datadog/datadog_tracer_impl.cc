@@ -91,7 +91,8 @@ void TraceReporter::flushTraces() {
 
     driver_.clusterManager()
         .httpAsyncClientForCluster(driver_.cluster()->name())
-      .send(std::move(message), *this, Http::AsyncClient::SendArgs(absl::optional<std::chrono::milliseconds>(1000U)));
+        .send(std::move(message), *this,
+              Http::AsyncClient::RequestOptions(absl::optional<std::chrono::milliseconds>(1000U)));
 
     encoder_->clearTraces();
   }

@@ -86,7 +86,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
 
   request_ = cm_.httpAsyncClientForCluster(cluster_name_)
                  .send(std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers)), *this,
-                       Http::AsyncClient::SendArgs(timeout_));
+                       timeout_);
 }
 
 ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {

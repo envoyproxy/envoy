@@ -59,9 +59,9 @@ public:
                          const std::string& version) override {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([this, cluster_names, version](
-                             Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                             const Http::AsyncClient::SendArgs&) {
+        .WillOnce(Invoke([this, cluster_names, version](Http::MessagePtr& request,
+                                                        Http::AsyncClient::Callbacks& callbacks,
+                                                        const Http::AsyncClient::RequestOptions&) {
           http_callbacks_ = &callbacks;
           EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,

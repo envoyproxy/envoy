@@ -50,8 +50,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
 
   Http::AsyncClient& client = cluster_manager->httpAsyncClientForCluster("cluster");
   Http::MockAsyncClientStreamCallbacks stream_callbacks;
-  EXPECT_EQ(nullptr,
-            client.start(stream_callbacks, Http::AsyncClient::StartArgs()));
+  EXPECT_EQ(nullptr, client.start(stream_callbacks, Http::AsyncClient::StreamOptions()));
 }
 
 } // namespace Upstream

@@ -185,9 +185,13 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
     message->headers().insertContentLength().value(body_size);
   }
 
+  absl::optional<std::chrono::milliseconds> timeout;
+  if (timeout_ms > 0) {
+    timeout = std::chrono::milliseconds(timeout_ms);
+  }
+
   http_request_ = filter_.clusterManager().httpAsyncClientForCluster(cluster).send(
-   std::move(message), *this,
-   Http::AsyncClient::SendArgs(absl::optional<std::chrono::milliseconds>(timeout_ms)));
+      std::move(message), *this, timeout);
   if (http_request_) {
     state_ = State::HttpCall;
     return lua_yield(state, 0);
