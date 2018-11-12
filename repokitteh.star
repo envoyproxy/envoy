@@ -5,6 +5,9 @@ use("github.com/repokitteh/modules/review.star")
 use("github.com/repokitteh/modules/wait.star")
 
 
+def _circleci_retry(n):
+
+
 def _kick(command, get_secret):
   force = command.name[-1] == '!'
 
@@ -21,7 +24,7 @@ def _kick(command, get_secret):
       
     m = match(text=status['target_url'], pattern='/([0-9]+)\?')
     if m and len(m) == 2:
-      failed_jobs.append(m[1])
+      failed_jobs.append(int(m[1]))
   
   github_issue_create_comment('%s %s' % (state, ','.join([str(j) for j in failed_jobs])))
   
