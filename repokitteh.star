@@ -7,7 +7,7 @@ use("github.com/repokitteh/modules/wait.star")
 
 def _circle(id, op):
     url = 'https://circleci.com/api/v1.1/project/github/envoyproxy/envoy/%d/%s?circle-token=%s' % (
-      n,
+      id,
       op,
       get_secret('circle_token'),
     )        
