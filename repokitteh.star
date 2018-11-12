@@ -7,7 +7,7 @@ load('text', 'match')
 def _kick(get_secret):
   statuses = [
     s for s in github_get_statuses() 
-    if s['context'] = 'ci/circleci' and s['state'] in ['error', 'failure']
+    if (s['context'] == 'ci/circleci') and (s['state'] in ['error', 'failure'])
   ]
   
   print(statuses)
