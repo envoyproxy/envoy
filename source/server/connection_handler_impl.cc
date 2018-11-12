@@ -217,6 +217,7 @@ void ConnectionHandlerImpl::ActiveListener::newConnection(Network::ConnectionSoc
   Network::ConnectionPtr new_connection =
       parent_.dispatcher_.createServerConnection(std::move(socket), std::move(transport_socket));
   new_connection->setBufferLimits(config_.perConnectionBufferLimitBytes());
+  new_connection->setWriteFilterOrder(config_.reverseWriteFilterOrder());
 
   const bool empty_filter_chain = !config_.filterChainFactory().createNetworkFilterChain(
       *new_connection, filter_chain->networkFilterFactories());

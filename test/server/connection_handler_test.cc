@@ -51,6 +51,7 @@ public:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
+    bool reverseWriteFilterOrder() const override { return true; }
 
     ConnectionHandlerTest& parent_;
     Network::MockListenSocket socket_;
