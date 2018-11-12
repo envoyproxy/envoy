@@ -5,11 +5,11 @@ use("github.com/repokitteh/modules/review.star")
 use("github.com/repokitteh/modules/wait.star")
 
 
-def _circle(id, op):
+def _circle(id, op, token):
     url = 'https://circleci.com/api/v1.1/project/github/envoyproxy/envoy/%d/%s?circle-token=%s' % (
       id,
       op,
-      get_secret('circle_token'),
+      token,
     )        
       
     return http(
@@ -22,7 +22,7 @@ def _cancel(get_secret, command):
   ns = [int(a) for a in command.args]
   
   for n in ns:
-    _circle(n, 'cancel')
+    _circle(n, 'cancel', get_secret('circle_token'))
   
 
 def _list():
