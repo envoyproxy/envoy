@@ -9,6 +9,21 @@ def _circleci_retry(n):
   pass
 
 
+def _cancel(get_secret, command):  
+  ns = [int(a) for a in command.args]
+  
+  for n in ns:
+    r = http(
+      secret_url='https://circleci.com/api/v1.1/%d/cancel?circle_token=%s' % (
+        n,
+        get_secret('circle_token'),
+      )        
+    )
+    print(r)
+    
+  github_issue_create_comment(','.join(command.args))
+  
+
 def _list():
   state, statuses = github_get_statuses()
 
@@ -52,3 +67,4 @@ def _kick(command, get_secret):
   
 command(names=['kick', 'kick!'], func=_kick)
 command(names='list', func=_list)
+command(names='cancel', func=_cancel)
