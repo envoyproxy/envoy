@@ -472,6 +472,9 @@ message Cluster {
     // or metadata updates. By default, this is not configured and updates apply immediately. Also,
     // the first set of updates to be seen apply immediately as well (e.g.: a new cluster).
     //
+    // If this is not set, we default to a merge window of 1000ms. To disable it, set the merge
+    // window to 0.
+    //
     // Note: merging does not apply to cluster membership changes (e.g.: adds/removes); this is
     // because merging those updates isn't currently safe. See
     // https://github.com/envoyproxy/envoy/pull/3941.

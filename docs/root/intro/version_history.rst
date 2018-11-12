@@ -9,6 +9,7 @@ Version history
 * admin: :http:get:`/server_info` now responds with a JSON object instead of a single string.
 * circuit-breaker: added cx_open, rq_pending_open, rq_open and rq_retry_open gauges to expose live
   state via :ref:`circuit breakers statistics <config_cluster_manager_cluster_stats_circuit_breakers>`.
+* cluster: set a default of 1s for :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>`.
 * config: removed support for the v1 API.
 * config: added support for :ref:`rate limiting<envoy_api_msg_core.RateLimitSettings>` discovery request calls.
 * cors: added :ref: `invalid/valid stats <cors-statistics>` to filter.

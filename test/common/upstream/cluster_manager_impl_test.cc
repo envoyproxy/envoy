@@ -188,14 +188,16 @@ public:
           address: "127.0.0.1"
           port_value: 11002
   )EOF";
-    const std::string merge_window = R"EOF(
+    const std::string merge_window_enabled = R"EOF(
       common_lb_config:
         update_merge_window: 3s
   )EOF";
+    const std::string merge_window_disabled = R"EOF(
+      common_lb_config:
+        update_merge_window: 0s
+  )EOF";
 
-    if (enable_merge_window) {
-      yaml += merge_window;
-    }
+    yaml += enable_merge_window ? merge_window_enabled : merge_window_disabled;
 
     const auto& bootstrap = parseBootstrapFromV2Yaml(yaml);
 
