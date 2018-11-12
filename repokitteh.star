@@ -68,7 +68,7 @@ def _kick(command, get_secret):
   for j in failed_jobs:
     rs[j] = _circle(j, 'retry', get_secret('circle_token'))['status']
   
-  github_issue_create_comment('%s %v' % (state, rs))
+  github_issue_create_comment('%s %s' % (state, rs))
   
   
 command(names=['kick', 'kick!'], func=_kick)
