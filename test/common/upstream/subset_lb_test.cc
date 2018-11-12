@@ -110,6 +110,7 @@ class SubsetLoadBalancerTest : public testing::TestWithParam<UpdateOrder> {
 public:
   SubsetLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
     stats_.max_host_weight_.set(1UL);
+    least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
 
   typedef std::map<std::string, std::string> HostMetadata;
