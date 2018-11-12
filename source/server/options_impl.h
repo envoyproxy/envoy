@@ -118,7 +118,7 @@ private:
   uint32_t concurrency_;
   std::string config_path_;
   std::string config_yaml_;
-  bool allow_unknown_fields_;
+  bool allow_unknown_fields_{false};
   bool v2_config_only_;
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
