@@ -15,7 +15,7 @@ def _cancel(get_secret, command):
   for n in ns:
     url = 'https://circleci.com/api/v1.1/project/github/envoyproxy/envoy/%d/cancel?circle_token=%s' % (
       n,
-      get_secret('circle_token'),
+      get_secret('htuch-envoy'),
     )        
       
     r = http(
