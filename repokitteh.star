@@ -9,7 +9,7 @@ def _kick(get_secret):
   
   statuses = [
     s for s in statuses 
-    if s['context'].startswith'ci/circleci'
+    if s['context'].startswith('ci/circleci')
   ]
   
   print(statuses)
