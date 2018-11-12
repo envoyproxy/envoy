@@ -13,7 +13,7 @@ def _cancel(get_secret, command):
   ns = [int(a) for a in command.args]
   
   for n in ns:
-    url = 'https://circleci.com/api/v1.1/gh/envoyproxy/envoy/%d/cancel?circle_token=%s' % (
+    url = 'https://circleci.com/api/v1.1/project/github/envoyproxy/envoy/%d/cancel?circle_token=%s' % (
       n,
       get_secret('circle_token'),
     )        
@@ -25,7 +25,7 @@ def _cancel(get_secret, command):
     
     print(url, r)
     
-  github_issue_create_comment(','.join(command.args))
+  github_issue_create_comment('%s: %s' % (r['status'], ','.join(command.args)))
   
 
 def _list():
