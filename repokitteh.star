@@ -13,14 +13,17 @@ def _cancel(get_secret, command):
   ns = [int(a) for a in command.args]
   
   for n in ns:
+    url = 'https://circleci.com/api/v1.1/%d/cancel?circle_token=%s' % (
+      n,
+      get_secret('circle_token'),
+    )        
+      
     r = http(
+      secret_url=url,
       method='POST',
-      secret_url='https://circleci.com/api/v1.1/%d/cancel?circle_token=%s' % (
-        n,
-        get_secret('circle_token'),
-      )        
     )
-    print(r)
+    
+    print(url, r)
     
   github_issue_create_comment(','.join(command.args))
   
@@ -40,7 +43,7 @@ def _list():
     else:
       job_id = 0
       
-    lines.append('%d %s %s' % (job_id, status['state'], status['description']))
+    lines.append('%d %s %s' % (job_id, status['state'], status['context']))
     
   github_issue_create_comment('```\n%s\n```' % '\n'.join(lines))
     
