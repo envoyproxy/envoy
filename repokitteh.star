@@ -10,10 +10,10 @@ def _kick(command, get_secret):
   failed_jobs = []
   
   for status in statuses:
-    if not s['context'].startswith('ci/circleci'):
+    if not status['context'].startswith('ci/circleci'):
       continue
     
-    if not (s['state'] in ['error', 'failure']):
+    if not (status['state'] in ['error', 'failure']):
       continue
       
     m = match(text=status['target_url'], pattern='/([0-9]+)\?')
