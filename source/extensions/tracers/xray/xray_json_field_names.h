@@ -30,11 +30,13 @@ namespace Envoy {
                     const std::string SPAN_CLIENT_IP = "client_ip";
                     const std::string SPAN_USER_AGENT = "user_agent";
                     const std::string SPAN_STATUS = "status";
+                    const std::string SPAN_NAMESPACE = "namespace";
+                    const std::string SPAN_REMOTE = "remote";
+                    const std::string SPAN_ORIGIN = "origin";
+                    const std::string SPAN_ORIGIN_VALUE = "ServiceMesh::Envoy";
 
-                    const std::string BINARY_ANNOTATION_KEY = "";
-                    const std::string BINARY_ANNOTATION_VALUE = "value";
+                    const std::string CHILD_SPAN = "subsegments";
 
-                    const std::string ENDPOINT_SERVICE_NAME = "serviceName";
                     const std::string ENDPOINT_PORT = "port";
                     const std::string ENDPOINT_IPV4 = "ipv4";
                     const std::string ENDPOINT_IPV6 = "ipv6";

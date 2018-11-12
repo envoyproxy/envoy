@@ -111,6 +111,45 @@ namespace Envoy {
                     AnnotationType annotation_type_;
                 };
 
+                class ChildSpan : public XRayBase {
+                public:
+                    ChildSpan(const ChildSpan&);
+
+                    ChildSpan& operator=(const ChildSpan&);
+
+                    ChildSpan() : name_(), id_(0), start_time_(0) {}
+
+                    void setName(const std::string& val) { name_ = val; }
+
+                    void setId(const uint64_t val) { id_ = val; }
+
+                    void setBinaryAnnotations(const std::vector<BinaryAnnotation>& val) { binary_annotations_ = val; }
+
+                    void addBinaryAnnotation(const BinaryAnnotation& bann) { binary_annotations_.push_back(bann); }
+
+                    void addBinaryAnnotation(const BinaryAnnotation&& bann) { binary_annotations_.push_back(bann); }
+
+                    const std::vector<BinaryAnnotation>& binaryAnnotations() const { return binary_annotations_; }
+
+                    void setStartTime(const double time) { start_time_ = time; }
+
+                    uint64_t id() const { return id_; }
+
+                    const std::string idAsHexString() const { return Hex::uint64ToHex(id_); }
+
+                    const std::string& name() const { return name_; }
+
+                    double startTime() const { return start_time_; }
+
+                    const std::string toJson() override;
+
+                private:
+                    std::string name_;
+                    uint64_t id_;
+                    std::vector<BinaryAnnotation> binary_annotations_;
+                    double start_time_;
+                };
+
                 typedef std::unique_ptr<Span> SpanPtr;
 
                 class Span : public XRayBase {
@@ -176,6 +215,18 @@ namespace Envoy {
                     void addBinaryAnnotation(const BinaryAnnotation&& bann) { binary_annotations_.push_back(bann); }
 
                     const std::vector<BinaryAnnotation>& binaryAnnotations() const { return binary_annotations_; }
+
+                    void setChildSpans(const std::vector<ChildSpan>& val) { child_span_ = val; }
+
+                    void addChildSpan(const ChildSpan& child) {
+                        child_span_.push_back(child);
+                    }
+
+                    void addChildSpan(const ChildSpan&& child) {
+                        child_span_.push_back(child);
+                    }
+
+                    const std::vector<ChildSpan>& childSpans() const { return child_span_; }
 
                     /**
                      * Sets the span's timestamp attribute.
@@ -260,8 +311,6 @@ namespace Envoy {
 
                     /**
                      * Serializes the span as a XRay-compliant JSON representation as a string.
-                     * The resulting JSON string can be used as part of an HTTP POST call to
-                     * send the span to XRay.
                      *
                      * @return a stringified JSON.
                      */
@@ -282,12 +331,7 @@ namespace Envoy {
                     TracerInterface* tracer() const { return tracer_; }
 
                     /**
-                     * Marks a successful end of the span. This method will:
-                     *
-                     * (1) determine if it needs to add more annotations to the span (e.g., a span containing a CS
-                     * annotation will need to add a CR annotation) and add them;
-                     * (2) compute and set the span's duration; and
-                     * (3) invoke the tracer's reportSpan() method if a tracer has been associated with the span.
+                     * Marks a successful end of the span. This method will: invoke the tracer's reportSpan() method if a tracer has been associated with the span.
                      */
                     void finish();
 
@@ -309,6 +353,7 @@ namespace Envoy {
                     absl::optional<int64_t> duration_;
                     double start_time_;
                     TracerInterface* tracer_;
+                    std::vector<ChildSpan> child_span_;
                 };
             }
         }

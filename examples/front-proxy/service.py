@@ -18,6 +18,10 @@ TRACE_HEADERS_TO_PROPAGATE = [
     'X-B3-Sampled',
     'X-B3-Flags',
 
+    'XRay-Sampled',
+    'XRay-TraceId',
+    'XRay-ParentId',
+
     # Jaeger header (for native client)
     "uber-trace-id"
 ]

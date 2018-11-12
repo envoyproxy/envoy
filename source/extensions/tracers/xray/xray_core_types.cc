@@ -49,6 +49,37 @@ namespace Envoy {
                     return json_string;
                 }
 
+                ChildSpan::ChildSpan(const ChildSpan &child) {
+                    name_ = child.name();
+                    id_ = child.id();
+                    binary_annotations_ = child.binaryAnnotations();
+                    start_time_ = child.startTime();
+                }
+
+                const std::string ChildSpan::toJson() {
+                    std::cout << "start child json" << std::endl;
+                    rapidjson::StringBuffer s;
+                    rapidjson::Writer<rapidjson::StringBuffer> writer(s);
+                    writer.StartObject();
+                    writer.Key(XRayJsonFieldNames::get().SPAN_NAME.c_str());
+                    writer.String(name_.c_str());
+                    writer.Key(XRayJsonFieldNames::get().SPAN_ID.c_str());
+                    writer.String(idAsHexString().c_str());
+                    writer.Key(XRayJsonFieldNames::get().SPAN_START_TIME.c_str());
+                    writer.Double(start_time_);
+                    writer.Key(XRayJsonFieldNames::get().SPAN_END_TIME.c_str());
+                    const double stop_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                    writer.Double(stop_time);
+                    writer.Key(XRayJsonFieldNames::get().SPAN_NAMESPACE.c_str());
+                    writer.String(XRayJsonFieldNames::get().SPAN_REMOTE.c_str());
+
+                    writer.EndObject();
+
+                    std::string json_string = s.GetString();
+
+                    return json_string;
+                }
+
                 Span::Span(const Span &span) {
                     trace_id_ = span.traceId();
                     name_ = span.name();
@@ -67,6 +98,7 @@ namespace Envoy {
                     }
                     start_time_ = span.startTime();
                     tracer_ = span.tracer();
+                    child_span_ = span.childSpans();
                 }
 
 //                void Span::setServiceName(const std::string& service_name) {
@@ -106,6 +138,9 @@ namespace Envoy {
                     writer.Key(XRayJsonFieldNames::get().SPAN_END_TIME.c_str());
 		            const double stop_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
                     writer.Double(stop_time);
+
+                    writer.Key(XRayJsonFieldNames::get().SPAN_ORIGIN.c_str());
+                    writer.String(XRayJsonFieldNames::get().SPAN_ORIGIN_VALUE.c_str());
 
                     std::vector<BinaryAnnotation> http_request_annotation_json_vector;
                     std::vector<BinaryAnnotation> http_response_annotation_json_vector;
@@ -157,6 +192,17 @@ namespace Envoy {
                     writer.EndObject();
 
                     std::string json_string = s.GetString();
+
+                    std::vector<std::string> child_json_vector;
+
+                    std::cout << "child span size: " << child_span_.size() << std::endl;
+
+                    for (auto it = child_span_.begin(); it != child_span_.end(); it++) {
+                        std::cout << "child span: " << it->toJson() << std::endl;
+                        child_json_vector.push_back(it->toJson());
+                    }
+                    Util::addArrayToJson(json_string, child_json_vector, XRayJsonFieldNames::get().CHILD_SPAN.c_str());
+
                     std::string json_doc = header_json_string + "\n" + json_string;
 
                     std::cout << json_doc << std::endl;
@@ -173,7 +219,7 @@ namespace Envoy {
                 void Span::setTag(const std::string& name, const std::string& value) {
                     if (name.size() > 0 && value.size() > 0) {
                         addBinaryAnnotation(BinaryAnnotation(name, value));
-                        std::cout << name << std::endl;
+                        std::cout << name << ": " << value << std::endl;
                     }
                 }
             }

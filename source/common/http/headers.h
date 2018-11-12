@@ -100,6 +100,7 @@ public:
   const LowerCaseString XRayTraceId{"xray-traceid"};
   const LowerCaseString XRayParentId{"xray-parentid"};
   const LowerCaseString XRaySampled{"xray-sampled"};
+  const LowerCaseString XAmznTraceId{"x-amzn-trace-id"};
 
   struct {
     const std::string Close{"close"};

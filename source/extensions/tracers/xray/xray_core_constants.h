@@ -2,8 +2,6 @@
 
 #include <string>
 
-#include "envoy/http/header_map.h"
-
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -35,9 +33,9 @@ namespace Envoy {
                     const std::string UNKNOWN = "";
 
                     // XRay headers
-                    const Http::LowerCaseString XRAY_TRACE_ID{"XRay-TraceId"};
-                    const Http::LowerCaseString XRAY_PARENT_ID{"XRay-ParentId"};
-                    const Http::LowerCaseString XRAY_SAMPLED{"XRay-Sampled"};
+                    const std::string XRAY_TRACE_ID = "XRay-TraceId";
+                    const std::string XRAY_PARENT_ID = "XRay-ParentId";
+                    const std::string XRAY_SAMPLED = "XRay-Sampled";
 
                     const std::string DEFAULT_DAEMON_ENDPOINT = "127.0.0.1:2000";
                 };

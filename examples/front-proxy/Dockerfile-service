@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy-alpine:latest
+FROM envoy-alpine1:latest
 
 RUN apk update && apk add python3 bash
 RUN python3 --version && pip3 --version

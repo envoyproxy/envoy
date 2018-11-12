@@ -47,6 +47,18 @@ namespace Envoy {
                     double start_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
                     span_ptr->setStartTime(start_time);
 
+                    ChildSpan childSpan;
+                    childSpan.setName(span_name);
+                    uint64_t random_number1 = random_generator_.random();
+                    childSpan.setId(random_number1);
+                    double child_start_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                    childSpan.setStartTime(child_start_time);
+                    std::cout << "before call add child" << std::endl;
+
+                    // std::cout << childSpan.toJson() << std::endl;
+                    
+                    span_ptr->addChildSpan(std::move(childSpan));
+
                     span_ptr->setTracer(this);
 
                     return span_ptr;
@@ -60,6 +72,7 @@ namespace Envoy {
                     span_ptr->setName(span_name);
 
                     if (config.operationName() == Tracing::OperationName::Egress) {
+                        std::cout << "enter egress" << std::endl;
                         // We need to create a new span that is a child of the previous span; no shared context
 
                         // Create a new span id
@@ -70,6 +83,7 @@ namespace Envoy {
                         span_ptr->setParentId(previous_context.id());
                     } else if (config.operationName() == Tracing::OperationName::Ingress) {
                         // We need to create a new span and use previous span's id as it's parent id
+                        std::cout << "enter ingress" << std::endl;
                         uint64_t random_number = random_generator_.random();
                         span_ptr->setId(random_number);
 

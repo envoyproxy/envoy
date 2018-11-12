@@ -34,6 +34,8 @@ namespace Envoy {
                      * @param field_name The key name (added to target's JSON) whose value will be a stringified.
                      * JSON array derived from json_array.
                      */
+                    static void addArrayToJson(std::string& target, const std::vector<std::string>& json_array, const std::string& field_name);
+
                     static std::string addArrayToJsonWithKey(const std::vector<std::string>& json_array, const std::string& field_name);
 
 
