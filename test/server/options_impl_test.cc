@@ -211,9 +211,9 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // If an option is added/removed, please update server_info proto as well to keep it in sync.
   // Currently the following 4 options are not defined in proto, hence the count differs by 4.
   // 1. v2-config-only - being deprecated.
-  // 2. version - default TCLAP argument.
-  // 3. help - default TCLAP argument.
-  // 4. ignore_rest - default TCLAP argument.
+  // 2. version        - default TCLAP argument.
+  // 3. help           - default TCLAP argument.
+  // 4. ignore_rest    - default TCLAP argument.
   EXPECT_EQ(count(options) - 4, command_line_options->GetDescriptor()->field_count());
 }
 
