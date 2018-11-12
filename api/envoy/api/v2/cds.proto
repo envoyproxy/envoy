@@ -385,7 +385,7 @@ message Cluster {
   message LeastRequestLbConfig {
     // The number of random healthy hosts from which the host with the fewest active requests will
     // be chosen. Defaults to 2 so that we perform P2C selection if the field is not set.
-    google.protobuf.UInt64Value choice_count = 1 [(validate.rules).uint64.gte = 2];
+    google.protobuf.UInt32Value choice_count = 1 [(validate.rules).uint32.gte = 2];
   }
 
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`

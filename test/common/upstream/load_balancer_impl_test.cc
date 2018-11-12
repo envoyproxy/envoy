@@ -29,7 +29,10 @@ protected:
   // all the load balancers have equivalent functonality for failover host sets.
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
-  LoadBalancerTestBase() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
+  LoadBalancerTestBase() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
+    least_request_lb_config_.mutable_choice_count()->set_value(2);
+  }
+
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -1066,11 +1069,11 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   EXPECT_CALL(random_, random())
       .Times(6)
       .WillOnce(Return(0))
-      .WillOnce(Return(0))
-      .WillOnce(Return(1))
-      .WillOnce(Return(2))
       .WillOnce(Return(3))
-      .WillOnce(Return(3));
+      .WillOnce(Return(0))
+      .WillOnce(Return(3))
+      .WillOnce(Return(2))
+      .WillOnce(Return(1));
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_5.chooseHost(nullptr));
 }
 
