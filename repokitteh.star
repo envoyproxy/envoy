@@ -6,7 +6,7 @@ use("github.com/repokitteh/modules/wait.star")
 
 
 def _circleci_retry(n):
-
+  pass
 
 def _kick(command, get_secret):
   force = command.name[-1] == '!'
