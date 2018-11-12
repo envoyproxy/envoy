@@ -143,7 +143,12 @@ public:
   struct SendArgs {
     SendArgs() {}
     SendArgs(const absl::optional<std::chrono::milliseconds>& timeout) : timeout(timeout) {}
-    
+
+    // Needed for gmock test
+    bool operator==(const SendArgs& src) const {
+      return timeout == src.timeout && send_xff == src.send_xff;
+    }
+
     absl::optional<std::chrono::milliseconds> timeout;
     bool send_xff{true};
   };
@@ -170,6 +175,12 @@ public:
     : timeout(timeout), buffer_body_for_retry(buffer_body), send_xff(send_xff) {}
     StartArgs(bool buffer_body, bool send_xff) : buffer_body_for_retry(buffer_body), send_xff(send_xff) {}
     
+    // Needed for gmock test
+    bool operator==(const StartArgs& src) const {
+      return timeout == src.timeout &&
+	buffer_body_for_retry == src.buffer_body_for_retry && send_xff == src.send_xff;
+    }
+
     absl::optional<std::chrono::milliseconds> timeout;
     bool buffer_body_for_retry{false};
     bool send_xff{true};

@@ -290,7 +290,7 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
   expectResponseHeaders(stream_callbacks2, 503, true);
 
   AsyncClient::Stream* stream2 =
-      client_.start(stream_callbacks2, AsyncClient::StartArgs(), false);
+      client_.start(stream_callbacks2, AsyncClient::StartArgs());
   stream2->sendHeaders(headers2, false);
   stream2->sendData(*body2, true);
 
@@ -541,7 +541,7 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
 
   AsyncClient::Stream* stream =
-      client_.start(stream_callbacks_, AsyncClient::StartArgs(), false);
+      client_.start(stream_callbacks_, AsyncClient::StartArgs());
 
   TestHeaderMapImpl expected_headers{{":status", "200"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false))
@@ -657,7 +657,7 @@ TEST_F(AsyncClientImplTest, DestroyWithActiveStream) {
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
   EXPECT_CALL(stream_callbacks_, onReset());
   AsyncClient::Stream* stream =
-      client_.start(stream_callbacks_, AsyncClient::StartArgs(), false);
+      client_.start(stream_callbacks_, AsyncClient::StartArgs());
   stream->sendHeaders(message_->headers(), false);
 }
 
@@ -729,7 +729,7 @@ TEST_F(AsyncClientImplTest, StreamTimeout) {
   EXPECT_CALL(stream_callbacks_, onData(_, true));
 
   AsyncClient::Stream* stream =
-      client_.start(stream_callbacks_, std::chrono::milliseconds(40), false);
+    client_.start(stream_callbacks_, AsyncClient::StartArgs(std::chrono::milliseconds(40)));
   stream->sendHeaders(message_->headers(), true);
   timer_->callback_();
 
@@ -762,7 +762,7 @@ TEST_F(AsyncClientImplTest, StreamTimeoutHeadReply) {
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_timeout), true));
 
   AsyncClient::Stream* stream =
-      client_.start(stream_callbacks_, std::chrono::milliseconds(40), false);
+    client_.start(stream_callbacks_, AsyncClient::StartArgs(std::chrono::milliseconds(40)));
   stream->sendHeaders(message->headers(), true);
   timer_->callback_();
 }
@@ -826,7 +826,7 @@ TEST_F(AsyncClientImplTest, DisableTimerWithStream) {
   EXPECT_CALL(stream_callbacks_, onReset());
 
   AsyncClient::Stream* stream =
-      client_.start(stream_callbacks_, std::chrono::milliseconds(40), false);
+    client_.start(stream_callbacks_, AsyncClient::StartArgs(std::chrono::milliseconds(40)));
   stream->sendHeaders(message_->headers(), true);
   stream->reset();
 }

@@ -61,9 +61,8 @@ public:
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(Invoke([this, cluster_names, version](
                              Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                             const absl::optional<std::chrono::milliseconds>& timeout) {
+                             const Http::AsyncClient::SendArgs&) {
           http_callbacks_ = &callbacks;
-          UNREFERENCED_PARAMETER(timeout);
           EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
                     std::string(request->headers().ContentType()->value().c_str()));

@@ -107,10 +107,10 @@ protected:
     EXPECT_CALL(cm_, httpAsyncClientForCluster("sds")).WillOnce(ReturnRef(cm_.async_client_));
     EXPECT_CALL(
         cm_.async_client_,
-        send_(_, _, Http::AsyncClient::SendArgs(absl::optional<std::milliseconds>(1000)))
+        send_(_, _, Http::AsyncClient::SendArgs(std::chrono::milliseconds(1000))))
         .WillOnce(
             Invoke([](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                      Http::AsyncClient::SendArgs) -> Http::AsyncClient::Request* {
+                      const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
               callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
                   Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
               return nullptr;

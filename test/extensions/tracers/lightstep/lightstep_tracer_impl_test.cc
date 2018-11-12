@@ -161,17 +161,16 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
   Http::AsyncClient::Callbacks* callback;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cm_.async_client_, send_(_, _, Http::AsyncClient::SendArgs(timeout)))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::SendArgs& args) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
                          message->headers().Path()->value().c_str());
             EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
             EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
-	    EXPECT_EQ(args.timeout, timeout);
 
             return &request;
           }));
@@ -223,17 +222,16 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
   Http::AsyncClient::Callbacks* callback;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cm_.async_client_, send_(_, _, Http::AsyncClient::SendArgs(timeout)))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::SendArgs& args) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
                          message->headers().Path()->value().c_str());
             EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
             EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
-            EXPECT_EQ(args.timeout, timeout);
 
             return &request;
           }));
@@ -267,17 +265,16 @@ TEST_F(LightStepDriverTest, FlushOneInvalidResponse) {
   Http::AsyncClient::Callbacks* callback;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cm_.async_client_, send_(_, _, Http::AsyncClient::SendArgs(timeout)))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::SendArgs& args) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
                          message->headers().Path()->value().c_str());
             EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
             EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
-            EXPECT_EQ(args.timeout, timeout);
 
             return &request;
           }));
@@ -314,7 +311,7 @@ TEST_F(LightStepDriverTest, FlushSpansTimer) {
   setupValidDriver();
 
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _));
+  EXPECT_CALL(cm_.async_client_, send_(_, _, Http::AsyncClient::SendArgs(timeout)));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
                                              LightStepDriver::DefaultMinFlushSpans))
@@ -344,17 +341,16 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
   Http::AsyncClient::Callbacks* callback;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cm_.async_client_, send_(_, _, Http::AsyncClient::SendArgs(timeout)))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::SendArgs& args) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
                          message->headers().Path()->value().c_str());
             EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
             EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
-            EXPECT_EQ(args.timeout, timeout);
 
             return &request;
           }));
@@ -390,12 +386,11 @@ TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
   Http::AsyncClient::Callbacks* callback;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cm_.async_client_, send_(_, _, Http::AsyncClient::SendArgs(timeout)))
       .WillOnce(Invoke(
           [&](Http::MessagePtr& /*message*/, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::SendArgs& args) -> Http::AsyncClient::Request* {
+              const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
-            EXPECT_EQ(args.timeout, timeout);
 
             return &request;
           }));

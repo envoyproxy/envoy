@@ -28,13 +28,12 @@ public:
     Http::MockAsyncClientRequest request(&cm_.async_client_);
     EXPECT_CALL(
         cm_.async_client_,
-        send_(_, _, _))
+        send_(_, _, Http::AsyncClient::SendArgs(std::chrono::milliseconds(5))))
         .WillOnce(Invoke(
             [&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
-                const Http::AsyncClient::SendArgs& args) -> Http::AsyncClient::Request* {
+                const Http::AsyncClient::SendArgs&) -> Http::AsyncClient::Request* {
               EXPECT_EQ(message, inner_message);
               EXPECT_EQ(shadowed_host, message->headers().Host()->value().c_str());
-	      EXPECT_EQ(args.timeout.value(), std::chrono::milliseconds(5));
               callback_ = &callbacks;
               return &request;
             }));
