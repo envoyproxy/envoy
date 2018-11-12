@@ -115,6 +115,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/network:address_interface",
         "//include/envoy/stats:stats_interface",
+        "@envoy_api//envoy/admin/v2alpha:server_info_cc",
     ],
 )
 

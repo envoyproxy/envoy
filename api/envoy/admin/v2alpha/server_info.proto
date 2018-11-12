@@ -24,8 +24,107 @@ message ServerInfo {
 
   // Uptime since current epoch was started.
   google.protobuf.Duration uptime_current_epoch = 3;
+
   // Uptime since the start of the first epoch.
   google.protobuf.Duration uptime_all_epochs = 4;
+
+  // Command line options the server is currently running with.
+  CommandLineOptions command_line_options = 6;
+}
+
+message CommandLineOptions {
+  // Value of "base-id" option that specifies the base ID so that multiple envoys can run on the
+  // same host if needed.
+  uint64 base_id = 1;
+
+  // Value of "concurrency" option that specifies the number of worker threads to run.
+  uint32 concurrency = 2;
+
+  // Value of "config-path" option that specifies the path to configuration file.
+  string config_path = 3;
+
+  // Value of "config-yaml" option that specifies the inline YAML configuration, merges with the
+  // contents of --config-path.
+  string config_yaml = 4;
+
+  // Value of "allow-unknown-fields" that specifies whether to allow unknown fields in the
+  // configuration.
+  bool allow_unknown_fields = 5;
+
+  // Value of "admin-address-path" that specifies the admin address path.
+  string admin_address_path = 6;
+
+  enum IpVersion {
+    v4 = 0;
+    v6 = 1;
+  }
+  // Value of "local_address_ip_version" that specifies the local IP address version (v4 or v6).
+  IpVersion local_address_ip_version = 7;
+
+  // Value of "log_level" that specifies the log level.
+  string log_level = 8;
+
+  // Value of "component_log_level" that specifies comma separated list of component log levels.
+  string component_log_level = 9;
+
+  // Value of "log_format" that specifies the log message format.
+  string log_format = 10;
+
+  // Value of "log_path" that specifies the path to log file.
+  string log_path = 11;
+
+  // Value of "hot-restart-version" that specifies the hot restart compatibility version.
+  bool hot_restart_version = 12;
+
+  // Value of "service-cluster" that specifies the cluster name.
+  string service_cluster = 13;
+
+  // Value of "service-node" that specifies the node name.
+  string service_node = 14;
+
+  // Value of "service-zone" that specifies the zone name.
+  string service_zone = 15;
+
+  // Value of "file-flush-interval-msec" that specifies the interval for log flushing in milli
+  // seconds.
+  google.protobuf.Duration file_flush_interval = 16;
+
+  // Value of "drain-time-s" that specifies the hot restart drain time in seconds.
+  google.protobuf.Duration drain_time = 17;
+
+  // Value of "parent-shutdown-time-s" that specifies the hot restart parent shutdown time in
+  // seconds.
+  google.protobuf.Duration parent_shutdown_time = 18;
+
+  enum Mode {
+    // Validate configs and then serve traffic normally.
+    Serve = 0;
+
+    // Validate configs and exit.
+    Validate = 1;
+
+    // Completely load and initialize the config, and then exit without running the listener loop.
+    InitOnly = 2;
+  }
+
+  // Value of "mode" that specifies the mode in which the server is running.
+  Mode mode = 19;
+
+  // Value of "max-stats" that specifies the maximum number of stats gauges and counters that can be
+  // allocated in shared memory.
+  uint64 max_stats = 20;
+
+  // Value of "max-obj-name-len" that specifies the maximum name length for a field in the config.
+  // Applies to listener name, route config name and cluster name.
+  uint64 max_obj_name_len = 21;
+
+  // Value of "disable-hot-restart" that specifies whether the hot restart functionality has been
+  // disabled.
+  bool disable_hot_restart = 22;
+
+  // Value of "enable-mutex-tracing" that specifies whether the mutex contention has been enabled.
+  bool enable_mutex_tracing = 23;
+
   // Which restart epoch the server is currently in.
-  uint32 epoch = 5;
+  uint32 restart_epoch = 24;
 }
