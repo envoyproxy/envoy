@@ -13,8 +13,8 @@ def _kick(command, get_secret):
     if not status['context'].startswith('ci/circleci'):
       continue
     
-    if not (status['state'] in ['error', 'failure']):
-      continue
+    #if not (status['state'] in ['error', 'failure']):
+    #  continue
       
     m = match(text=status['target_url'], pattern='/([0-9]+)\?')
     if m and len(m) == 2:
