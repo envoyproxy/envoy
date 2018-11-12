@@ -598,6 +598,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
   if (least_request_config_.has_value()) {
     choice_count = least_request_config_.value().choice_count().value();
   }
+  ASSERT(choice_count >= 2);
 
   HostSharedPtr candidate_host = nullptr;
   for (uint32_t ii = 0; ii < choice_count; ++ii) {
