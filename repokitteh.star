@@ -14,6 +14,7 @@ def _cancel(get_secret, command):
   
   for n in ns:
     r = http(
+      method='POST',
       secret_url='https://circleci.com/api/v1.1/%d/cancel?circle_token=%s' % (
         n,
         get_secret('circle_token'),
