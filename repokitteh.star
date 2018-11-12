@@ -14,10 +14,13 @@ def _kick(get_secret):
   
   print(statuses)
   
+  jobs = []
+  
   for status in statuses:
     m = match(text=status['target_url'], pattern='/([0-9]+)\?')
-    print(m, status['state'])
+    if m and (len(m) == 2):
+      jobs.append(m[1])
   
-  github_issue_create_comment(state)
+  github_issue_create_comment('%s %s' % (state, ','.join([str(j) for j in jobs])))
   
 command(name="kick", func=_kick)
