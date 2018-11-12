@@ -4,23 +4,22 @@ use("github.com/repokitteh/modules/wait.star")
 
 load('text', 'match')
 
-def _kick(get_secret):
+def _kick(command, get_secret):
   state, statuses = github_get_statuses()
-  
-  statuses = [
-    s for s in statuses 
-    if s['context'].startswith('ci/circleci')
-  ]
-  
-  print(statuses)
-  
-  jobs = []
+    
+  failed_jobs = []
   
   for status in statuses:
+    if not s['context'].startswith('ci/circleci'):
+      continue
+    
+    if not (s['state'] in ['error', 'failure']):
+      continue
+      
     m = match(text=status['target_url'], pattern='/([0-9]+)\?')
-    if m and (len(m) == 2):
-      jobs.append(m[1])
+    if m and len(m) == 2:
+      failed_jobs.append(m[1])
   
-  github_issue_create_comment('%s %s' % (state, ','.join([str(j) for j in jobs])))
+  github_issue_create_comment('%s %s' % (state, ','.join([str(j) for j in failed_jobs])))
   
-command(name="kick", func=_kick)
+command(name='kick', func=_kick)
