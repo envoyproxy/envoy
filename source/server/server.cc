@@ -366,11 +366,9 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
         config.runtime()->overrideSubdirectory() + "/" + server.localInfo().clusterName();
     ENVOY_LOG(info, "runtime override subdirectory: {}", override_subdirectory);
 
-    Api::OsSysCallsPtr os_sys_calls(new Api::OsSysCallsImpl);
     return std::make_unique<Runtime::DiskBackedLoaderImpl>(
         server.dispatcher(), server.threadLocal(), config.runtime()->symlinkRoot(),
-        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random(),
-        std::move(os_sys_calls));
+        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random());
   } else {
     return std::make_unique<Runtime::LoaderImpl>(server.random(), server.stats(),
                                                  server.threadLocal());

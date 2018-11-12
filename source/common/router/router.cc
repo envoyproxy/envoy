@@ -449,7 +449,6 @@ void Filter::onDestroy() {
   if (upstream_request_) {
     upstream_request_->resetStream();
   }
-  stream_destroyed_ = true;
   cleanup();
 }
 

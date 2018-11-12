@@ -218,3 +218,13 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
     ],
 )
+
+envoy_cc_library(
+    name = "tracer_config_interface",
+    hdrs = ["tracer_config.h"],
+    deps = [
+        ":instance_interface",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/config/trace/v2:trace_cc",
+    ],
+)

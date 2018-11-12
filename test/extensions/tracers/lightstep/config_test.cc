@@ -32,7 +32,8 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
   MessageUtil::loadFromYaml(yaml_string, configuration);
 
   LightstepTracerFactory factory;
-  Tracing::HttpTracerPtr lightstep_tracer = factory.createHttpTracer(configuration, server);
+  auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+  Tracing::HttpTracerPtr lightstep_tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, lightstep_tracer);
 }
 
