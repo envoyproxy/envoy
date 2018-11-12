@@ -66,7 +66,7 @@ protected:
 class TcpListenSocket : public ListenSocketImpl {
 public:
   TcpListenSocket(const Address::InstanceConstSharedPtr& address,
-                  const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
+                  const Network::Socket::OptionsSharedPtr& options);
   TcpListenSocket(int fd, const Address::InstanceConstSharedPtr& address,
                   const Network::Socket::OptionsSharedPtr& options);
 };

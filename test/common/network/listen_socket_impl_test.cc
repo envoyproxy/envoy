@@ -49,7 +49,7 @@ TEST_P(ListenSocketImplTest, BindSpecificPort) {
   EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
       .WillOnce(Return(true));
   options->emplace_back(std::move(option));
-  TcpListenSocket socket1(addr, options, true);
+  TcpListenSocket socket1(addr, options);
   EXPECT_EQ(0, listen(socket1.fd(), 0));
   EXPECT_EQ(addr->ip()->port(), socket1.localAddress()->ip()->port());
   EXPECT_EQ(addr->ip()->addressAsString(), socket1.localAddress()->ip()->addressAsString());
@@ -60,7 +60,7 @@ TEST_P(ListenSocketImplTest, BindSpecificPort) {
       .WillOnce(Return(true));
   options2->emplace_back(std::move(option2));
   // The address and port are bound already, should throw exception.
-  EXPECT_THROW(Network::TcpListenSocket socket2(addr, options2, true), EnvoyException);
+  EXPECT_THROW(Network::TcpListenSocket socket2(addr, options2), EnvoyException);
 
   // Test the case of a socket with fd and given address and port.
   TcpListenSocket socket3(dup(socket1.fd()), addr, nullptr);
@@ -70,7 +70,7 @@ TEST_P(ListenSocketImplTest, BindSpecificPort) {
 // Validate that we get port allocation when binding to port zero.
 TEST_P(ListenSocketImplTest, BindPortZero) {
   auto loopback = Network::Test::getCanonicalLoopbackAddress(version_);
-  TcpListenSocket socket(loopback, nullptr, true);
+  TcpListenSocket socket(loopback, nullptr);
   EXPECT_EQ(Address::Type::Ip, socket.localAddress()->type());
   EXPECT_EQ(version_, socket.localAddress()->ip()->version());
   EXPECT_EQ(loopback->ip()->addressAsString(), socket.localAddress()->ip()->addressAsString());

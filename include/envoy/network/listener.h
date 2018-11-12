@@ -38,13 +38,6 @@ public:
   virtual Socket& socket() PURE;
 
   /**
-   * @return bool specifies whether the listener should actually listen on the port.
-   *         A listener that doesn't listen on a port can only receive connections
-   *         redirected from other listeners.
-   */
-  virtual bool bindToPort() PURE;
-
-  /**
    * @return bool if a connection should be handed off to another Listener after the original
    *         destination address has been restored. 'true' when 'use_original_dst' flag in listener
    *         configuration is set, false otherwise. Note that this flag is deprecated and will be

@@ -37,8 +37,7 @@ void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsShar
 }
 
 TcpListenSocket::TcpListenSocket(const Address::InstanceConstSharedPtr& address,
-                                 const Network::Socket::OptionsSharedPtr& options,
-                                 bool bind_to_port)
+                                 const Network::Socket::OptionsSharedPtr& options)
     : ListenSocketImpl(address->socket(Address::SocketType::Stream), address) {
   RELEASE_ASSERT(fd_ != -1, "");
 
@@ -49,9 +48,7 @@ TcpListenSocket::TcpListenSocket(const Address::InstanceConstSharedPtr& address,
 
   setListenSocketOptions(options);
 
-  if (bind_to_port) {
-    doBind();
-  }
+  doBind();
 }
 
 TcpListenSocket::TcpListenSocket(int fd, const Address::InstanceConstSharedPtr& address,
