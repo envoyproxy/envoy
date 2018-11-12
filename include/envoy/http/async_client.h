@@ -181,9 +181,7 @@ public:
     RequestOptions(bool buffer_body, bool send_xff) : StreamOptions(buffer_body, send_xff) {}
 
     // For gmock test
-    bool operator==(const RequestOptions& src) const {
-      return *dynamic_cast<const StreamOptions*>(this) == *dynamic_cast<const StreamOptions*>(&src);
-    }
+    bool operator==(const RequestOptions& src) const { return StreamOptions::operator==(src); }
   };
 
   /**
