@@ -531,7 +531,7 @@ ListenerImpl::findFilterChainForSourceTypes(const SourceTypesArray& source_types
       source_types[envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
                        FilterChainMatch_ConnectionSourceType_EXTERNAL];
 
-  // isLocalConnection can be expensive. Call it only if LOCAL or EXTERNAL are defined
+  // isLocalConnection can be expensive. Call it only if LOCAL or EXTERNAL are defined.
   const bool is_local_connection = (filter_chain_local || filter_chain_external)
                                        ? Network::Utility::isLocalConnection(socket)
                                        : false;

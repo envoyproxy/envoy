@@ -112,8 +112,8 @@ public:
   static Address::InstanceConstSharedPtr getLocalAddress(const Address::IpVersion version);
 
   /**
-   * Determine whether this is a local address.
-   * @return bool the address is a local address.
+   * Determine whether this is a local connection.
+   * @return bool the address is a local connection.
    */
   static bool isLocalConnection(const Network::ConnectionSocket& socket);
 

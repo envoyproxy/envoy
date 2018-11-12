@@ -1333,7 +1333,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }
 
-// Define a source_type filter chain match and test against it
+// Define a source_type filter chain match and test against it.
 TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMatch) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -1357,12 +1357,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
-  // TLS client without ALPN - no match.
+  // EXTERNAL IPv4 client without "http/1.1" ALPN - no match.
   auto filter_chain =
       findFilterChain(1234, 3, "8.8.8.8", "127.0.0.1", true, "", true, "tls", true, {});
   EXPECT_EQ(filter_chain, nullptr);
 
-  // TLS client with "http/1.1" ALPN - using 1st filter chain.
+  // LOCAL IPv4 client with "http/1.1" ALPN - using 1st filter chain.
   filter_chain = findFilterChain(1234, 3, "127.0.0.1", "127.0.0.1", true, "", true, "tls", true,
                                  {"h2", "http/1.1"});
   ASSERT_NE(filter_chain, nullptr);
@@ -1373,12 +1373,19 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
-  // No filter chain defined for EXTERNAL match
-  filter_chain = findFilterChain(1234, 3, "4.4.4.4", "8.8.8.8", true, "", true, "tls", true, {});
-  EXPECT_EQ(filter_chain, nullptr);
+  // LOCAL UDS client with "http/1.1" ALPN - using 1st filter chain.
+  filter_chain = findFilterChain(1234, 2, "/tmp/test.sock", "/tmp/test.sock", true, "", true, "tls",
+                                 true, {"h2", "http/1.1"});
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket();
+  ssl_socket = dynamic_cast<Ssl::SslSocket*>(transport_socket.get());
+  server_names = ssl_socket->dnsSansLocalCertificate();
+  EXPECT_EQ(server_names.size(), 1);
+  EXPECT_EQ(server_names.front(), "server1.example.com");
 }
 
-// Define multiple source_type filter chain matches and test against them
+// Define multiple source_type filter chain matches and test against them.
 TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceTypeMatch) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -1417,8 +1424,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
-  // Using 1st filter chain.
-  auto filter_chain =
+  // LOCAL TLS client with "http/1.1" ALPN - no match.
+  auto filter_chain = findFilterChain(1234, 3, "127.0.0.1", "127.0.0.1", true, "", true, "tls",
+                                      true, {"h2", "http/1.1"});
+  EXPECT_EQ(filter_chain, nullptr);
+
+  // LOCAL TLS client without "http/1.1" ALPN - using 1st filter chain.
+  filter_chain =
       findFilterChain(1234, 3, "127.0.0.1", "127.0.0.1", true, "", true, "tls", true, {});
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
@@ -1428,7 +1440,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
-  // TLS client with "http/1.1" ALPN and EXTERNAL source - using 2nd filter chain.
+  // EXTERNAL TLS client with "http/1.1" ALPN - using 2nd filter chain.
   filter_chain = findFilterChain(1234, 3, "8.8.8.8", "8.8.8.8", true, "", true, "tls", true,
                                  {"h2", "http/1.1"});
   ASSERT_NE(filter_chain, nullptr);
@@ -1438,7 +1450,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
   auto uri = ssl_socket->uriSanLocalCertificate();
   EXPECT_EQ(uri, "spiffe://lyft.com/test-team");
 
-  // // TLS client without "http/1.1" ALPN and EXTERNAL source - using 3nd filter chain.
+  // EXTERNAL TLS client without "http/1.1" ALPN - using 3nd filter chain.
   filter_chain = findFilterChain(1234, 3, "4.4.4.4", "8.8.8.8", true, "", true, "tls", true, {});
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
