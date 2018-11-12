@@ -261,6 +261,12 @@ private:
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
+
+  //#define TRACK_ENCODES
+#ifdef TRACK_ENCODES
+  using Histogram = absl::flat_hash_map<std::string, uint64_t>;
+  Histogram histogram_;
+#endif
 };
 
 /**

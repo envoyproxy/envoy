@@ -218,6 +218,16 @@ CodeStatsImpl::RequestCodeGroup::~RequestCodeGroup() {
 }
 
 Stats::StatName CodeStatsImpl::RequestCodeGroup::statName(Code response_code) {
+  switch (response_code) {
+    case Code::OK:        return upstream_rq_200_;
+    case Code::NotFound:  return upstream_rq_404_;
+    default:              break;
+  }
+  RELEASE_ASSERT(false, absl::StrCat("need to optimize code ", response_code));
+  return makeStatName(response_code);
+}
+
+Stats::StatName CodeStatsImpl::RequestCodeGroup::makeStatName(Code response_code) {
   {
     absl::ReaderMutexLock lock(&mutex_);
     auto p = rc_stat_name_map_.find(response_code);

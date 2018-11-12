@@ -82,7 +82,7 @@ bool illegalPath(const std::string& path);
 class FileImpl : public File {
 public:
   FileImpl(const std::string& path, Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
-           Stats::Store& stats_store, std::chrono::milliseconds flush_interval_msec);
+           FileSystemStats& stats_, std::chrono::milliseconds flush_interval_msec);
   ~FileImpl();
 
   // Filesystem::File
@@ -149,7 +149,7 @@ private:
   const std::chrono::milliseconds flush_interval_msec_; // Time interval buffer gets flushed no
                                                         // matter if it reached the MIN_FLUSH_SIZE
                                                         // or not.
-  FileSystemStats stats_;
+  FileSystemStats& stats_;
 };
 
 } // namespace Filesystem

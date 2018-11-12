@@ -32,7 +32,9 @@ private:
   class RequestCodeGroup {
   public:
     RequestCodeGroup(absl::string_view prefix, CodeStatsImpl& code_stats)
-        : code_stats_(code_stats), prefix_(std::string(prefix)) {}
+        : code_stats_(code_stats), prefix_(std::string(prefix)),
+          upstream_rq_200_(makeStatName(Code::OK)),
+          upstream_rq_404_(makeStatName(Code::NotFound)) {}
     ~RequestCodeGroup();
 
     Stats::StatName statName(Code response_code);
@@ -52,10 +54,14 @@ private:
   private:
     using RCStatNameMap = absl::flat_hash_map<Code, std::unique_ptr<Stats::StatNameStorage>>;
 
+    Stats::StatName makeStatName(Code response_code);
+
     CodeStatsImpl& code_stats_;
     std::string prefix_;
     absl::Mutex mutex_;
     RCStatNameMap rc_stat_name_map_ GUARDED_BY(mutex_);
+    Stats::StatName upstream_rq_200_;
+    Stats::StatName upstream_rq_404_;
   };
 
   static absl::string_view stripTrailingDot(absl::string_view prefix);

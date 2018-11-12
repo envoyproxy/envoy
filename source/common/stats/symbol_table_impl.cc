@@ -113,6 +113,19 @@ SymbolTableImpl::~SymbolTableImpl() {
   // is needed in production. But it would be good to ensure clean up during
   // tests.
   ASSERT(numSymbols() == 0);
+
+#ifdef TRACK_ENCODES
+  using CountNamePair = std::pair<uint64_t, std::string>;
+  std::vector<CountNamePair> hist;
+  for (const auto& p : histogram_) {
+    hist.push_back(CountNamePair(p.second, p.first));
+  }
+  std::sort(hist.begin(), hist.end());
+  for (auto p : hist) {
+    std::cerr << absl::StrCat(p.first, "\t", p.second) << std::endl;
+  }
+  std::cerr << std::flush;
+#endif
 }
 
 // TODO(ambuc): There is a possible performance optimization here for avoiding
@@ -135,6 +148,9 @@ SymbolEncoding SymbolTableImpl::encode(const absl::string_view name) {
   // ref-counts in this.
   {
     Thread::LockGuard lock(lock_);
+#ifdef TRACK_ENCODES
+    ++histogram_[std::string(name)];
+#endif
     for (absl::string_view token : tokens) {
       symbols.push_back(toSymbol(token));
     }
