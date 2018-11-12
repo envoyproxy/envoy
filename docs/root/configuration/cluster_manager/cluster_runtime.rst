@@ -47,6 +47,11 @@ outlier_detection.consecutive_connect_failure
   <envoy_api_field_cluster.OutlierDetection.consecutive_connect_failure>`
   setting in outlier detection
 
+outlier_detection.consecutive_server_request_failure
+  :ref:`consecutive_server_request_failure
+  <envoy_api_field_cluster.OutlierDetection.consecutive_server_request_failure>`
+  setting in outlier detection
+
 outlier_detection.interval_ms
   :ref:`interval_ms
   <envoy_api_field_cluster.OutlierDetection.interval>`
@@ -75,6 +80,11 @@ outlier_detection.enforcing_consecutive_gateway_failure
 outlier_detection.enforcing_consecutive_connect_failure
   :ref:`enforcing_consecutive_connect_failure
   <envoy_api_field_cluster.OutlierDetection.enforcing_consecutive_connect_failure>`
+  setting in outlier detection
+
+outlier_detection.enforcing_consecutive_server_request_failure
+  :ref:`enforcing_consecutive_server_request_failure
+  <envoy_api_field_cluster.OutlierDetection.enforcing_consecutive_server_request_failure>`
   setting in outlier detection
 
 outlier_detection.enforcing_success_rate

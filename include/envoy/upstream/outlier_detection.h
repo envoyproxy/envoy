@@ -25,15 +25,16 @@ namespace Outlier {
  * Non-HTTP result of requests/operations.
  */
 enum class Result {
-  SUCCESS,        // Successfully established a connection or completed a request.
-  TIMEOUT,        // Timed out while connecting or executing a request.
-  CONNECT_FAILED, // Remote host rejected the connection.
+  CONNECT_SUCCESS, // Successfully established a connection or completed a request.
+  TIMEOUT,         // Timed out while connecting or executing a request.
+  CONNECT_FAILED,  // Remote host rejected the connection.
 
   // The entries below only make sense when Envoy understands requests/responses for the
   // protocol being proxied. They do not make sense for TcpProxy, for example.
 
-  REQUEST_FAILED, // Request was not completed successfully.
-  SERVER_FAILURE, // The server indicated it cannot process a request.
+  REQUEST_FAILED,  // Request was not completed successfully.
+  REQUEST_SUCCESS, // Received response from server was correct
+  SERVER_FAILURE,  // The server indicated it cannot process a request.
 };
 
 /**
@@ -82,9 +83,6 @@ public:
    *         or the cluster did not have enough hosts to run through success rate outlier ejection.
    */
   virtual double successRate() const PURE;
-
-  virtual void connectFailure() PURE;
-  virtual void connectSuccess() PURE;
 };
 
 typedef std::unique_ptr<DetectorHostMonitor> DetectorHostMonitorPtr;
@@ -131,7 +129,8 @@ enum class EjectionType {
   Consecutive5xx,
   SuccessRate,
   ConsecutiveGatewayFailure,
-  ConsecutiveConnectFailure
+  ConsecutiveConnectFailure,
+  ConsecutiveServerRequestFailure
 };
 
 /**

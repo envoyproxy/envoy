@@ -28,8 +28,6 @@ public:
   MOCK_METHOD0(lastUnejectionTime, const absl::optional<MonotonicTime>&());
   MOCK_CONST_METHOD0(successRate, double());
   MOCK_METHOD1(successRate, void(double new_success_rate));
-  MOCK_METHOD0(connectFailure, void());
-  MOCK_METHOD0(connectSuccess, void());
 };
 
 class MockEventLogger : public EventLogger {

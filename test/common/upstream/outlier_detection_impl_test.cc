@@ -148,7 +148,7 @@ TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
       cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  loadRq(hosts_[0], 4, Result::REQUEST_FAILED);
+  loadRq(hosts_[0], 4, 500);
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
@@ -368,7 +368,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowConnectFailure) {
   uint32_t n = runtime_.snapshot_.getInteger("outlier_detection.consecutive_connect_failure",
                                              detector->config().consecutiveConnectFailure());
   while (n--) {
-    hosts_[0]->outlierDetector().connectFailure();
+    hosts_[0]->outlierDetector().putResult(Result::CONNECT_FAILED);
   }
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
@@ -396,12 +396,12 @@ TEST_F(OutlierDetectorImplTest, BasicFlowConnectFailure) {
                                     detector->config().consecutiveConnectFailure());
   n--; // make sure that this is not enough for ejection.
   while (n--) {
-    hosts_[0]->outlierDetector().connectFailure();
+    hosts_[0]->outlierDetector().putResult(Result::CONNECT_FAILED);
   }
   // now success and few failures
-  hosts_[0]->outlierDetector().connectSuccess();
-  hosts_[0]->outlierDetector().connectFailure();
-  hosts_[0]->outlierDetector().connectFailure();
+  hosts_[0]->outlierDetector().putResult(Result::CONNECT_SUCCESS);
+  hosts_[0]->outlierDetector().putResult(Result::CONNECT_FAILED);
+  hosts_[0]->outlierDetector().putResult(Result::CONNECT_FAILED);
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
@@ -896,17 +896,6 @@ TEST(OutlierUtility, SRThreshold) {
   Utility::EjectionPair ejection_pair = Utility::successRateEjectionThreshold(sum, data, 1.9);
   EXPECT_EQ(52.0, ejection_pair.ejection_threshold_);
   EXPECT_EQ(90.0, ejection_pair.success_rate_average_);
-}
-
-TEST(DetectorHostMonitorImpl, resultToHttpCode) {
-  EXPECT_EQ(Http::Code::OK, DetectorHostMonitorImpl::resultToHttpCode(Result::SUCCESS));
-  EXPECT_EQ(Http::Code::GatewayTimeout, DetectorHostMonitorImpl::resultToHttpCode(Result::TIMEOUT));
-  EXPECT_EQ(Http::Code::ServiceUnavailable,
-            DetectorHostMonitorImpl::resultToHttpCode(Result::CONNECT_FAILED));
-  EXPECT_EQ(Http::Code::InternalServerError,
-            DetectorHostMonitorImpl::resultToHttpCode(Result::REQUEST_FAILED));
-  EXPECT_EQ(Http::Code::ServiceUnavailable,
-            DetectorHostMonitorImpl::resultToHttpCode(Result::SERVER_FAILURE));
 }
 
 } // namespace Outlier

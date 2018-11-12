@@ -514,7 +514,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     read_callbacks_->connection().readDisable(false);
 
     read_callbacks_->upstreamHost()->outlierDetector().putResult(
-        Upstream::Outlier::Result::SUCCESS);
+        Upstream::Outlier::Result::CONNECT_SUCCESS);
     onConnectionSuccess();
 
     getStreamInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());

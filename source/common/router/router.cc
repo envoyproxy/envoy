@@ -475,7 +475,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
   if (upstream_request_) {
     upstream_host = upstream_request_->upstream_host_;
     if (upstream_host) {
-      upstream_host->outlierDetector().connectFailure();
+      upstream_host->outlierDetector().putResult(Upstream::Outlier::Result::CONNECT_FAILED);
     }
   }
 
@@ -997,7 +997,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host) {
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
 
-  host->outlierDetector().connectSuccess();
+  host->outlierDetector().putResult(Upstream::Outlier::Result::CONNECT_SUCCESS);
 
   // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);

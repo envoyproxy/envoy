@@ -10,6 +10,17 @@ such as consecutive failures, temporal success rate, temporal latency, etc. Outl
 form of *passive* health checking. Envoy also supports :ref:`active health checking
 <arch_overview_health_checking>`. *Passive* and *active* health checking can be enabled together or
 independently, and form the basis for an overall upstream health checking solution.
+Outlier detection is part of :ref:`cluster configuration <envoy_api_msg_cluster.OutlierDetection>`, 
+but it needs network filters to report errors, timeouts, resets. Currently the following filters support
+outlier detection: :ref: `http router <config_http_filters_router>`, 
+:ref: `tcp proxy <config_network_filters_tcp_proxy>`  and :ref: `redis proxy <config_network_filters_redis_proxy>`.
+There are several types of outlier detection and not each filter supports all types. For example, 
+:ref: `http router <config_http_filters_router>` checks HTTP error codes and will eject a host returning 
+5xx HTTP error codes, but :ref: `tcp proxy <config_network_filters_tcp_proxy>` only checks for connection errors
+and will not eject such host because it does not check payload above TCP level. 
+It is important to understand that a cluster may be shared among several filter chains. If one filter chain
+ejects a host based on its outlier detection type, other filter chains will be also affected even though their
+outlier detection type would not eject that host.
 
 Ejection algorithm
 ------------------
@@ -45,7 +56,9 @@ Consecutive 5xx
 If an upstream host returns some number of consecutive 5xx, it will be ejected. 
 The number of consecutive 5xx required for ejection is controlled by 
 the :ref:`outlier_detection.consecutive_5xx
-<envoy_api_field_cluster.OutlierDetection.consecutive_5xx>` value.
+<envoy_api_field_cluster.OutlierDetection.consecutive_5xx>` value. Certain error status codes 
+(502, 503 and 504) are considered Gateway Failures not as 5xx error codes. This detection type 
+is supported only by :ref: `http router <config_http_filters_router>`.
 
 Consecutive Gateway Failure
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -55,6 +68,7 @@ code), it will be ejected.
 The number of consecutive gateway failures required for ejection is controlled by
 the :ref:`outlier_detection.consecutive_gateway_failure
 <envoy_api_field_cluster.OutlierDetection.consecutive_gateway_failure>` value.
+This detection type is supported only by :ref: `http router <config_http_filters_router>`.
 
 Consecutive Connect Failure
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -62,8 +76,10 @@ Consecutive Connect Failure
 If Envoy repeatedly cannot connect to an upstream host because of a network problem, it will be ejected.
 Various network problems are detected: timeout, TCP reset, ICMP errors, etc. The number of consecutive
 connect failures required for ejection is controlled 
-by the :ref:`outlier_detection.consecutive_connect_failure 
+by the :ref: `outlier_detection.consecutive_connect_failure 
 <envoy_api_field_cluster.OutlierDetection.consecutive_connect_failure>` value.
+This detection type is supported by :ref: `http router <config_http_filters_router>`, 
+:ref: `tcp proxy <config_network_filters_tcp_proxy>`  and :ref: `redis proxy <config_network_filters_redis_proxy>`.
 
 Success Rate
 ^^^^^^^^^^^^
@@ -75,7 +91,17 @@ calculated for a host if its request volume over the aggregation interval is les
 value. Moreover, detection will not be performed for a cluster if the number of hosts
 with the minimum required request volume in an interval is less than the
 :ref:`outlier_detection.success_rate_minimum_hosts<envoy_api_field_cluster.OutlierDetection.success_rate_minimum_hosts>`
-value.
+value. This detection type is supported by :ref: `http router <config_http_filters_router>`.
+
+Consecutive Server Request Failure 
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If Envoy is able to connect to an upstream host, but server transaction repeatedly fails with that  
+host, it will be ejected. The number of consecutive server transaction failures required for ejection 
+is controlled by :ref: `outlier_detection.consecutive_server_request_failure
+<envoy_api_field_cluster.OutlierDetection.consecutive_server_request_failure>`. 
+This detection type is supported by :ref: `redis proxy <config_network_filters_redis_proxy>`.
+
 
 Ejection event logging
 ----------------------
@@ -120,7 +146,7 @@ action
 
 type
   If ``action`` is ``eject``, specifies the type of ejection that took place. Currently type can
-  be one of ``5xx``, ``GatewayFailure`` or ``SuccessRate``.
+  be one of ``5xx``, ``GatewayFailure``, ``SuccessRate``, ``ConnectFailure`` or ``MalformedPayload``.
 
 num_ejections
   If ``action`` is ``eject``, specifies the number of times the host has been ejected
