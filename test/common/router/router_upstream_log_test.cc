@@ -174,8 +174,9 @@ public:
     HttpTestUtility::addDefaultHeaders(headers);
     router_->decodeHeaders(headers, true);
 
+    EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
+                putResult(Upstream::Outlier::Result::CONNECT_FAILED));
     router_->retry_state_->expectRetry();
-    EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_, connectFailure());
     per_try_timeout_->callback_();
 
     // We expect this reset to kick off a new request.
@@ -185,6 +186,8 @@ public:
             [&](Http::StreamDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
+              EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
+                          putResult(Upstream::Outlier::Result::CONNECT_SUCCESS));
               callbacks.onPoolReady(encoder2, context_.cluster_manager_.conn_pool_.host_);
               return nullptr;
             }));
