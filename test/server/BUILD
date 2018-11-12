@@ -94,6 +94,7 @@ envoy_cc_test(
     deps = [
         "//include/envoy/common:time_interface",
         "//source/common/common:utility_lib",
+        "//source/common/event:dispatcher_lib",
         "//source/common/stats:stats_lib",
         "//source/server:guarddog_lib",
         "//test/mocks:common_lib",

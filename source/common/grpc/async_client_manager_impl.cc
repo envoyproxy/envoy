@@ -35,8 +35,9 @@ AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
     : cm_(cm), tls_(tls), time_source_(time_source) {
 #ifdef ENVOY_GOOGLE_GRPC
   google_tls_slot_ = tls.allocateSlot();
-  google_tls_slot_->set(
-      [](Event::Dispatcher&) { return std::make_shared<GoogleAsyncClientThreadLocal>(); });
+  google_tls_slot_->set([](Event::Dispatcher& dispatcher) {
+    return std::make_shared<GoogleAsyncClientThreadLocal>(dispatcher);
+  });
 #endif
 }
 

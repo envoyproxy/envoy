@@ -22,15 +22,15 @@ namespace Event {
 class DispatchedThreadTest : public testing::Test {
 protected:
   DispatchedThreadTest()
-      : config_(1000, 1000, 1000, 1000), guard_dog_(fakestats_, config_, test_time_.timeSystem()),
-        thread_(test_time_.timeSystem()) {}
+      : config_(1000, 1000, 1000, 1000), thread_(test_time_.timeSystem()),
+        guard_dog_(fakestats_, config_, test_time_.timeSystem(), thread_.dispatcher()) {}
 
   void SetUp() { thread_.start(guard_dog_); }
   NiceMock<Server::Configuration::MockMain> config_;
   NiceMock<Stats::MockStore> fakestats_;
   DangerousDeprecatedTestTime test_time_;
-  Envoy::Server::GuardDogImpl guard_dog_;
   DispatchedThreadImpl thread_;
+  Envoy::Server::GuardDogImpl guard_dog_;
 };
 
 TEST_F(DispatchedThreadTest, PostCallbackTest) {

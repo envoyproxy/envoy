@@ -110,6 +110,7 @@ private:
 
   int fd_;
   std::string path_;
+  Event::Dispatcher& dispatcher_;
 
   // These locks are always acquired in the following order if multiple locks are held:
   //    1) write_lock_

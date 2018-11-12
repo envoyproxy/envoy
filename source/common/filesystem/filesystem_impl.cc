@@ -14,13 +14,13 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/thread/thread.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
 #include "common/common/stack_array.h"
-#include "common/common/thread.h"
 
 #include "absl/strings/match.h"
 
@@ -97,7 +97,8 @@ bool illegalPath(const std::string& path) {
 FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
                    Thread::BasicLockable& lock, Stats::Store& stats_store,
                    std::chrono::milliseconds flush_interval_msec)
-    : path_(path), file_lock_(lock), flush_timer_(dispatcher.createTimer([this]() -> void {
+    : path_(path), dispatcher_(dispatcher), file_lock_(lock),
+      flush_timer_(dispatcher.createTimer([this]() -> void {
         stats_.flushed_by_timer_.inc();
         flush_event_.notifyOne();
         flush_timer_->enableTimer(flush_interval_msec_);
@@ -249,7 +250,7 @@ void FileImpl::write(absl::string_view data) {
 }
 
 void FileImpl::createFlushStructures() {
-  flush_thread_ = std::make_unique<Thread::Thread>([this]() -> void { flushThreadFunc(); });
+  flush_thread_ = dispatcher_.createThread([this]() -> void { flushThreadFunc(); });
   flush_timer_->enableTimer(flush_interval_msec_);
 }
 

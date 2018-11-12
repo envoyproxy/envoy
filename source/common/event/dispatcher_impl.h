@@ -51,6 +51,7 @@ public:
                                       bool bind_to_port,
                                       bool hand_off_restored_destination_connections) override;
   TimerPtr createTimer(TimerCb cb) override;
+  Thread::ThreadPtr createThread(std::function<void()> thread_routine) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
   SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override;
@@ -64,9 +65,7 @@ private:
   // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
   // dispatcher run loop is executing on. We allow run_tid_ == 0 for tests where we don't invoke
   // run().
-  bool isThreadSafe() const {
-    return run_tid_ == 0 || run_tid_ == Thread::Thread::currentThreadId();
-  }
+  bool isThreadSafe() const { return run_tid_ == 0 || run_tid_ == Thread::currentThreadId(); }
 
   TimeSystem& time_system_;
   Thread::ThreadId run_tid_{};

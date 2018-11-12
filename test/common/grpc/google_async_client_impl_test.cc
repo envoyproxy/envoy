@@ -51,7 +51,7 @@ public:
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_target_uri("fake_address");
     google_grpc->set_stat_prefix("test_cluster");
-    tls_ = std::make_unique<GoogleAsyncClientThreadLocal>();
+    tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(dispatcher_);
     grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *tls_, stub_factory_,
                                                            stats_store_, config);
   }

@@ -6,13 +6,13 @@
 #include <memory>
 #include <string>
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"
-#include "common/common/thread.h"
 #include "common/stats/source_impl.h"
 
 #include "server/options_impl.h"
@@ -172,7 +172,8 @@ public:
   static IntegrationTestServerPtr create(const std::string& config_path,
                                          const Network::Address::IpVersion version,
                                          std::function<void()> pre_worker_start_test_steps,
-                                         bool deterministic, Event::TestTimeSystem& time_system);
+                                         bool deterministic, Event::TestTimeSystem& time_system,
+                                         Event::Dispatcher& dispatcher);
   ~IntegrationTestServer();
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
@@ -238,8 +239,9 @@ public:
   }
 
 protected:
-  IntegrationTestServer(Event::TestTimeSystem& time_system, const std::string& config_path)
-      : time_system_(time_system), config_path_(config_path) {}
+  IntegrationTestServer(Event::TestTimeSystem& time_system, Event::Dispatcher& dispatcher,
+                        const std::string& config_path)
+      : time_system_(time_system), dispatcher_(dispatcher), config_path_(config_path) {}
 
 private:
   /**
@@ -248,6 +250,7 @@ private:
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic);
 
   Event::TestTimeSystem& time_system_;
+  Event::Dispatcher& dispatcher_;
   const std::string config_path_;
   Thread::ThreadPtr thread_;
   Thread::CondVar listeners_cv_;

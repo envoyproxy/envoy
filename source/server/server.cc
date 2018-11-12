@@ -344,7 +344,8 @@ void InstanceImpl::initialize(Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, *config_, time_system_);
+  guard_dog_ =
+      std::make_unique<Server::GuardDogImpl>(stats_store_, *config_, time_system_, *dispatcher_);
 }
 
 void InstanceImpl::startWorkers() {
@@ -455,7 +456,7 @@ void InstanceImpl::run() {
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
-  auto watchdog = guard_dog_->createWatchDog(Thread::Thread::currentThreadId());
+  auto watchdog = guard_dog_->createWatchDog(Thread::currentThreadId());
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");

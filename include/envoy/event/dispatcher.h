@@ -17,6 +17,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Event {
@@ -114,6 +115,12 @@ public:
    * @param cb supplies the callback to invoke when the timer fires.
    */
   virtual Event::TimerPtr createTimer(TimerCb cb) PURE;
+
+  /**
+   * Create a thread.
+   * @param thread_routine supplies the function to invoke in the thread.
+   */
+  virtual Thread::ThreadPtr createThread(std::function<void()> thread_routine) PURE;
 
   /**
    * Submit an item for deferred delete. @see DeferredDeletable.

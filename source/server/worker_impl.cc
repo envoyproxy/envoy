@@ -70,8 +70,7 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
 
 void WorkerImpl::start(GuardDog& guard_dog) {
   ASSERT(!thread_);
-  thread_ =
-      std::make_unique<Thread::Thread>([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
+  thread_ = dispatcher_->createThread([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
 }
 
 void WorkerImpl::stop() {
@@ -96,7 +95,7 @@ void WorkerImpl::stopListeners() {
 
 void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   ENVOY_LOG(debug, "worker entering dispatch loop");
-  auto watchdog = guard_dog.createWatchDog(Thread::Thread::currentThreadId());
+  auto watchdog = guard_dog.createWatchDog(Thread::currentThreadId());
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(debug, "worker exited dispatch loop");

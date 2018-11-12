@@ -42,7 +42,7 @@ public:
 class AddTen {
 public:
   AddTen() {
-    thread_ = std::make_unique<Thread::Thread>([this]() -> void { threadRoutine(); });
+    thread_ = std::make_unique<Thread::ThreadImpl>([this]() -> void { threadRoutine(); });
   }
   ~AddTen() {
     thread_->join();

@@ -26,6 +26,7 @@ envoy_cc_library(
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/network:listener_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:thread_lib",
         "//source/common/filesystem:watcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:dns_lib",

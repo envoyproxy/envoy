@@ -293,7 +293,7 @@ public:
 
   AsyncClientPtr createGoogleAsyncClientImpl() {
 #ifdef ENVOY_GOOGLE_GRPC
-    google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>();
+    google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(dispatcher_);
     GoogleGenericStubFactory stub_factory;
     return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stub_factory,
                                                    stats_scope_, createGoogleGrpcConfig());
