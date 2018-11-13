@@ -3,7 +3,8 @@
 Mysql proxy
 ===========
 
-- :ref:`v2 API reference <envoy_api_msg_config.filter.network.mysql_proxy.v2.MysqlProxy>`
+The Mysql proxy filter decodes the wire protocol between the Mysql client
+and server. It does not decode the SQL queries in the payload, as of today.
 
 .. _config_network_filters_mysql_proxy_stats:
 
