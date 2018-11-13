@@ -76,7 +76,7 @@ TEST_P(MysqlIntegrationTest, MysqlStatsNewSessionTest) {
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/stats?format=json", "", Http::CodecClient::Type::HTTP1,
-      Envoy::Network::Address::IpVersion::v4);
+      version_);
 
   int ret = 0;
   int counter = 0;
@@ -123,7 +123,7 @@ TEST_P(MysqlIntegrationTest, MysqLoginTest) {
   /* Verify counters */
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/stats?format=json", "", Http::CodecClient::Type::HTTP1,
-      Envoy::Network::Address::IpVersion::v4);
+      version_);
   int ret = 0;
   int counter = 0;
   std::string mysql_stat = "mysql.mysql_stats.login_attempts";
@@ -178,7 +178,7 @@ TEST_P(MysqlIntegrationTest, MysqlUnitTestMultiClientsLoop) {
   /* Verify counters: CLIENT_NUM login attempts, no failures */
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/stats?format=json", "", Http::CodecClient::Type::HTTP1,
-      Envoy::Network::Address::IpVersion::v4);
+      version_);
   int ret = 0;
   int counter = 0;
   std::string mysql_stat = "mysql.mysql_stats.login_attempts";
