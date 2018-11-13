@@ -39,6 +39,7 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
+#include "common/upstream/eds_subscription_factory.h"
 
 #include "server/init_manager_impl.h"
 
@@ -490,7 +491,8 @@ public:
          Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
          Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api);
+         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
+         Upstream::EdsSubscriptionFactory& eds_subscription_factory);
   // From Upstream::Cluster
   virtual PrioritySet& prioritySet() override { return priority_set_; }
   virtual const PrioritySet& prioritySet() const override { return priority_set_; }
