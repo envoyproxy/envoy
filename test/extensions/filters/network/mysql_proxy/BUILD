@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "mysql_codec_tests",
     srcs = [
         "mysql_codec_test.cc",
-        "mysql_test_utils.h",
+        "mysql_test_utils.cc"
     ],
     data = [
         "//test/config/integration:mysql_test_config.yaml",
@@ -33,7 +33,7 @@ envoy_extension_cc_test(
     name = "mysql_filter_tests",
     srcs = [
         "mysql_filter_test.cc",
-        "mysql_test_utils.h",
+        "mysql_test_utils.cc",
     ],
     extension_name = "envoy.filters.network.mysql_proxy",
     deps = [
@@ -47,7 +47,7 @@ envoy_extension_cc_test(
     name = "mysql_integration_test",
     srcs = [
         "mysql_integration_test.cc",
-        "mysql_test_utils.h",
+        "mysql_test_utils.cc",
     ],
     data = [
         "//test/config/integration:mysql_test_config.yaml",
