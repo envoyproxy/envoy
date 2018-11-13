@@ -105,8 +105,9 @@ protected:
 
   void setupPoolFailure() {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("sds")).WillOnce(ReturnRef(cm_.async_client_));
-    EXPECT_CALL(cm_.async_client_,
-                send_(_, _, Http::AsyncClient::RequestOptions(std::chrono::milliseconds(1000))))
+    EXPECT_CALL(cm_.async_client_, send_(_, _,
+                                         Http::AsyncClient::RequestOptions().setTimeout(
+                                             std::chrono::milliseconds(1000))))
         .WillOnce(
             Invoke([](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
@@ -119,8 +120,8 @@ protected:
   void setupRequest() {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("sds")).WillOnce(ReturnRef(cm_.async_client_));
     EXPECT_CALL(cm_.async_client_, send_(_, _,
-                                         Http::AsyncClient::RequestOptions(
-                                             absl::optional<std::chrono::milliseconds>(1000))))
+                                         Http::AsyncClient::RequestOptions().setTimeout(
+                                             std::chrono::milliseconds(1000))))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callbacks_)), Return(&request_)));
   }
 
@@ -156,9 +157,9 @@ TEST_F(SdsTest, RequestTimeout) {
   resetCluster(true);
 
   EXPECT_CALL(cm_, httpAsyncClientForCluster("sds")).WillOnce(ReturnRef(cm_.async_client_));
-  EXPECT_CALL(cm_.async_client_, send_(_, _,
-                                       Http::AsyncClient::RequestOptions(
-                                           absl::optional<std::chrono::milliseconds>(5000))))
+  EXPECT_CALL(
+      cm_.async_client_,
+      send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(5000))))
       .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callbacks_)), Return(&request_)));
 
   cluster_->initialize([] {});

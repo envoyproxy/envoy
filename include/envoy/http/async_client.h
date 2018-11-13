@@ -135,16 +135,22 @@ public:
    * A structure to hold the options for AsyncStream object.
    */
   struct StreamOptions {
-    StreamOptions() {}
-    StreamOptions(const absl::optional<std::chrono::milliseconds>& timeout) : timeout(timeout) {}
-    StreamOptions(const absl::optional<std::chrono::milliseconds>& timeout, bool buffer_body)
-        : timeout(timeout), buffer_body_for_retry(buffer_body) {}
-    StreamOptions(const absl::optional<std::chrono::milliseconds>& timeout, bool buffer_body,
-                  bool send_xff)
-        : timeout(timeout), buffer_body_for_retry(buffer_body), send_xff(send_xff) {}
-    StreamOptions(bool buffer_body) : buffer_body_for_retry(buffer_body) {}
-    StreamOptions(bool buffer_body, bool send_xff)
-        : buffer_body_for_retry(buffer_body), send_xff(send_xff) {}
+    StreamOptions& setTimeout(const absl::optional<std::chrono::milliseconds>& v) {
+      timeout = v;
+      return *this;
+    }
+    StreamOptions& setTimeout(const std::chrono::milliseconds& v) {
+      timeout = v;
+      return *this;
+    }
+    StreamOptions& setBufferBodyForRetry(bool v) {
+      buffer_body_for_retry = v;
+      return *this;
+    }
+    StreamOptions& setSendXff(bool v) {
+      send_xff = v;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const StreamOptions& src) const {
@@ -170,15 +176,22 @@ public:
    * A structure to hold the options for AsyncRequest object.
    */
   struct RequestOptions : public StreamOptions {
-    RequestOptions() {}
-    RequestOptions(const absl::optional<std::chrono::milliseconds>& timeout)
-        : StreamOptions(timeout) {}
-    RequestOptions(const absl::optional<std::chrono::milliseconds>& timeout, bool buffer_body)
-        : StreamOptions(timeout, buffer_body) {}
-    RequestOptions(const absl::optional<std::chrono::milliseconds>& timeout, bool buffer_body,
-                   bool send_xff)
-        : StreamOptions(timeout, buffer_body, send_xff) {}
-    RequestOptions(bool buffer_body, bool send_xff) : StreamOptions(buffer_body, send_xff) {}
+    RequestOptions& setTimeout(const absl::optional<std::chrono::milliseconds>& v) {
+      timeout = v;
+      return *this;
+    }
+    RequestOptions& setTimeout(const std::chrono::milliseconds& v) {
+      timeout = v;
+      return *this;
+    }
+    RequestOptions& setBufferBodyForRetry(bool v) {
+      buffer_body_for_retry = v;
+      return *this;
+    }
+    RequestOptions& setSendXff(bool v) {
+      send_xff = v;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const RequestOptions& src) const { return StreamOptions::operator==(src); }
@@ -188,7 +201,7 @@ public:
    * Send an HTTP request asynchronously
    * @param request the request to send.
    * @param callbacks the callbacks to be notified of request status.
-   * @param the options to control the request sending.
+   * @param options the data struct to control the request sending.
    * @return a request handle or nullptr if no request could be created. NOTE: In this case
    *         onFailure() has already been called inline. The client owns the request and the
    *         handle should just be used to cancel.
@@ -200,7 +213,7 @@ public:
   /**
    * Start an HTTP stream asynchronously.
    * @param callbacks the callbacks to be notified of stream status.
-   * @param the options to control the stream.
+   * @param options the data struct to control the stream.
    * @return a stream handle or nullptr if no stream could be started. NOTE: In this case
    *         onResetStream() has already been called inline. The client owns the stream and
    *         the handle can be used to send more messages or close the stream.

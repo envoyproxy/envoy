@@ -39,8 +39,8 @@ public:
     ENVOY_LOG(debug, "fetch pubkey from [uri = {}]: start", uri_->uri());
     request_ = cm_.httpAsyncClientForCluster(uri.cluster())
                    .send(std::move(message), *this,
-                         absl::optional<std::chrono::milliseconds>(
-                             DurationUtil::durationToMilliseconds(uri.timeout())));
+                         Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(
+                             DurationUtil::durationToMilliseconds(uri.timeout()))));
   }
 
   // HTTP async receive methods

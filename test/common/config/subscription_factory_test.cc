@@ -231,9 +231,9 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
-  EXPECT_CALL(cm_.async_client_, send_(_, _,
-                                       Http::AsyncClient::RequestOptions(
-                                           absl::optional<std::chrono::milliseconds>(5000))));
+  EXPECT_CALL(
+      cm_.async_client_,
+      send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(5000))));
   subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_);
 }
 

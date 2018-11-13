@@ -26,8 +26,9 @@ public:
     EXPECT_CALL(cm_, get("foo"));
     EXPECT_CALL(cm_, httpAsyncClientForCluster("foo")).WillOnce(ReturnRef(cm_.async_client_));
     Http::MockAsyncClientRequest request(&cm_.async_client_);
-    EXPECT_CALL(cm_.async_client_,
-                send_(_, _, Http::AsyncClient::RequestOptions(std::chrono::milliseconds(5))))
+    EXPECT_CALL(
+        cm_.async_client_,
+        send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(5))))
         .WillOnce(
             Invoke([&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
