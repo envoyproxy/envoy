@@ -22,9 +22,9 @@
 
 #include "common/config/grpc_mux_impl.h"
 #include "common/http/async_client_impl.h"
+#include "common/upstream/eds_subscription_factory.h"
 #include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/upstream_impl.h"
-#include "common/upstream/eds_subscription_factory.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -44,7 +44,7 @@ public:
       : main_thread_dispatcher_(main_thread_dispatcher), api_(api), runtime_(runtime),
         stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
         ssl_context_manager_(ssl_context_manager), local_info_(local_info),
-        secret_manager_(secret_manager), eds_subscription_factory_() {}
+        secret_manager_(secret_manager) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr

@@ -494,8 +494,9 @@ ClusterSharedPtr ClusterImplBase::create(
     }
 
     // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
-    new_cluster = std::make_unique<EdsClusterImpl>(cluster, runtime, factory_context,
-                                                   std::move(stats_scope), added_via_api, eds_subscription_factory);
+    new_cluster =
+        std::make_unique<EdsClusterImpl>(cluster, runtime, factory_context, std::move(stats_scope),
+                                         added_via_api, eds_subscription_factory);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

@@ -22,13 +22,15 @@ namespace Upstream {
 EdsClusterImpl::EdsClusterImpl(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api, EdsSubscriptionFactory& eds_subscription_factory)
+    Stats::ScopePtr&& stats_scope, bool added_via_api,
+    EdsSubscriptionFactory& eds_subscription_factory)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api),
       cm_(factory_context.clusterManager()), local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
-                        : cluster.eds_cluster_config().service_name()), eds_subscription_factory_(eds_subscription_factory) {
+                        : cluster.eds_cluster_config().service_name()),
+      eds_subscription_factory_(eds_subscription_factory) {
   Config::Utility::checkLocalInfo("eds", local_info_);
 
   const auto& eds_config = cluster.eds_cluster_config().eds_config();

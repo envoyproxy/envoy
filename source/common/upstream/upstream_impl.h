@@ -36,10 +36,10 @@
 #include "common/config/well_known_names.h"
 #include "common/network/utility.h"
 #include "common/stats/isolated_store_impl.h"
+#include "common/upstream/eds_subscription_factory.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
-#include "common/upstream/eds_subscription_factory.h"
 
 #include "server/init_manager_impl.h"
 
