@@ -86,13 +86,13 @@ int ClientLogin::Decode(Buffer::Instance& buffer) {
     ENVOY_LOG(info, "error skipping unset bytes in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
-  std::string username = "";
+  std::string username;
   if (BufStringDrain(buffer, username) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing username in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
   SetUsername(username);
-  std::string auth_resp = "";
+  std::string auth_resp;
   if (IsClientAuthLenClData()) {
     int auth_resp_len = 0;
     if (ReadLengthEncodedIntegerDrain(buffer, auth_resp_len) != MYSQL_SUCCESS) {
@@ -121,7 +121,7 @@ int ClientLogin::Decode(Buffer::Instance& buffer) {
   }
   SetAuthResp(auth_resp);
   if (IsConnectWithDb()) {
-    std::string db = "";
+    std::string db;
     if (BufStringDrain(buffer, db) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp in mysql ClientLogin msg");
       return MYSQL_FAILURE;

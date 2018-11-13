@@ -29,7 +29,8 @@ class MysqlIntegrationTest : public MysqlTestUtils,
   }
 
 public:
-  MysqlIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()) {}
+  MysqlIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()) {};
+
   /**
    * Initializer for an individual integration test.
    */
@@ -44,7 +45,8 @@ public:
   }
 };
 
-int mysqlGetCounterValueFromStats(std::string msg, std::string mysql_stat, int& counter) {
+int mysqlGetCounterValueFromStats(const std::string& msg, const std::string& mysql_stat,
+                                  int& counter) {
   Json::ObjectSharedPtr stats = Json::Factory::loadFromString(msg);
   for (const Json::ObjectSharedPtr& stat : stats->getObjectArray("stats")) {
     std::string entry = stat->getString("name");
@@ -74,9 +76,9 @@ TEST_P(MysqlIntegrationTest, MysqlStatsNewSessionTest) {
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   }
 
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/stats?format=json", "", Http::CodecClient::Type::HTTP1,
-      version_);
+  BufferingStreamDecoderPtr response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json", "",
+                                         Http::CodecClient::Type::HTTP1, version_);
 
   int ret = 0;
   int counter = 0;
@@ -93,8 +95,8 @@ TEST_P(MysqlIntegrationTest, MysqlStatsNewSessionTest) {
  * - no failures
  */
 TEST_P(MysqlIntegrationTest, MysqLoginTest) {
-  std::string str = "";
-  std::string rcvd_data = "";
+  std::string str;
+  std::string rcvd_data;
   std::string user = "user1";
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -121,9 +123,9 @@ TEST_P(MysqlIntegrationTest, MysqLoginTest) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   /* Verify counters */
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/stats?format=json", "", Http::CodecClient::Type::HTTP1,
-      version_);
+  BufferingStreamDecoderPtr response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json", "",
+                                         Http::CodecClient::Type::HTTP1, version_);
   int ret = 0;
   int counter = 0;
   std::string mysql_stat = "mysql.mysql_stats.login_attempts";
@@ -144,8 +146,8 @@ TEST_P(MysqlIntegrationTest, MysqLoginTest) {
  */
 TEST_P(MysqlIntegrationTest, MysqlUnitTestMultiClientsLoop) {
   int idx;
-  std::string rcvd_data = "";
-  std::string str = "";
+  std::string rcvd_data;
+  std::string str;
 
   for (idx = 0; idx < CLIENT_NUM; idx++) {
     std::string user("user");
@@ -176,9 +178,9 @@ TEST_P(MysqlIntegrationTest, MysqlUnitTestMultiClientsLoop) {
   }
 
   /* Verify counters: CLIENT_NUM login attempts, no failures */
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/stats?format=json", "", Http::CodecClient::Type::HTTP1,
-      version_);
+  BufferingStreamDecoderPtr response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json", "",
+                                         Http::CodecClient::Type::HTTP1, version_);
   int ret = 0;
   int counter = 0;
   std::string mysql_stat = "mysql.mysql_stats.login_attempts";

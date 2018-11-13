@@ -91,7 +91,7 @@ class MysqlCodec : public Logger::Loggable<Logger::Id::filter> {
 #define LENENCODINT_8BYTES 0xfe
 
 #define MYSQL_SUCCESS 0
-#define MYSQL_FAILURE -1
+#define MYSQL_FAILURE (-1)
 #define MYSQL_STR_END '\0'
 
 public:
@@ -145,12 +145,12 @@ public:
   void BufUint8Add(Buffer::Instance& buffer, uint8_t val) { buffer.add(&val, sizeof(uint8_t)); }
   void BufUint16Add(Buffer::Instance& buffer, uint16_t val) { buffer.add(&val, sizeof(uint16_t)); }
   void BufUint32Add(Buffer::Instance& buffer, uint32_t val) { buffer.add(&val, sizeof(uint32_t)); }
-  void BufStringAdd(Buffer::Instance& buffer, std::string str) { buffer.add(str); }
+  void BufStringAdd(Buffer::Instance& buffer, const std::string& str) { buffer.add(str); }
   int DrainBytes(Buffer::Instance& buffer, int skip_bytes);
   int BufStringDrain(Buffer::Instance& buffer, std::string& str);
   int BufStringDrainBySize(Buffer::Instance& buffer, std::string& str, int len);
   std::string BufToString(Buffer::Instance& buffer);
-  std::string EncodeHdr(std::string& cmd_str, int seq);
+  std::string EncodeHdr(const std::string& cmd_str, int seq);
   int HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq);
   int GetSeq() { return seq_; }
   void SetSeq(int seq);

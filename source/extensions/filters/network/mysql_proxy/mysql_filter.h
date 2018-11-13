@@ -74,8 +74,11 @@ typedef std::shared_ptr<MysqlFilterConfig> MysqlFilterConfigSharedPtr;
  */
 class MysqlFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
  public:
+   MysqlFilter(MysqlFilterConfigSharedPtr config);
+   MysqlSession& getSession() { return session_; }
+  ~MysqlFilter() = default;
+
   // Network::ReadFilter
-  MysqlFilter(MysqlFilterConfigSharedPtr config);
   Network::FilterStatus onData(Buffer::Instance& data,
                                bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
@@ -83,17 +86,11 @@ class MysqlFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter>
       Network::ReadFilterCallbacks& callbacks) override;
   Network::FilterStatus onWrite(Buffer::Instance& data,
                                 bool end_stream) override;
-  MysqlSession& getSession() { return session_; }
-
-  ~MysqlFilter() {}
 
  private:
   Network::FilterStatus Process(Buffer::Instance& data, bool end_stream);
-
   Network::ReadFilterCallbacks* read_callbacks_{};
-
   MysqlFilterConfigSharedPtr config_;
-
   MysqlSession session_;
 };
 

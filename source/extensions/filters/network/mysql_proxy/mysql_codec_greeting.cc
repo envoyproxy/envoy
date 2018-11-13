@@ -40,7 +40,7 @@ int ServerGreeting::Decode(Buffer::Instance& buffer) {
     return MYSQL_FAILURE;
   }
   SetProtocol(protocol);
-  std::string version = "";
+  std::string version;
   if (BufStringDrain(buffer, version) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing version in mysql Greeting msg");
     return MYSQL_FAILURE;
@@ -52,7 +52,7 @@ int ServerGreeting::Decode(Buffer::Instance& buffer) {
     return MYSQL_FAILURE;
   }
   SetThreadId(thread_id);
-  std::string salt = "";
+  std::string salt;
   if (BufStringDrain(buffer, salt) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing salt in mysql Greeting msg");
     return MYSQL_FAILURE;

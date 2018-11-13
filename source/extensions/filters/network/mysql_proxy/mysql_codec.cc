@@ -73,14 +73,15 @@ int MysqlCodec::ReadLengthEncodedIntegerDrain(Buffer::Instance& buffer, int& val
     val = byte_val;
     return MYSQL_SUCCESS;
   }
-  if (byte_val == LENENCODINT_2BYTES)
+  if (byte_val == LENENCODINT_2BYTES) {
     size = sizeof(uint16_t);
-  else if (byte_val == LENENCODINT_3BYTES)
+  } else if (byte_val == LENENCODINT_3BYTES) {
     size = sizeof(uint8_t) * 3;
-  else if (byte_val == LENENCODINT_8BYTES)
+  } else if (byte_val == LENENCODINT_8BYTES) {
     size = sizeof(uint64_t);
-  else
+  } else {
     return MYSQL_FAILURE;
+  }
 
   if (BufReadBySizeDrain(buffer, size, val) == MYSQL_FAILURE) {
     return MYSQL_FAILURE;
@@ -121,7 +122,7 @@ std::string MysqlCodec::BufToString(Buffer::Instance& buffer) {
 
 void MysqlCodec::SetSeq(int seq) { seq_ = seq; }
 
-std::string MysqlCodec::EncodeHdr(std::string& cmd_str, int seq) {
+std::string MysqlCodec::EncodeHdr(const std::string& cmd_str, int seq) {
   MysqlCodec::MysqlHeader mysqlhdr;
   Buffer::OwnedImpl buffer;
 
