@@ -91,7 +91,7 @@ class MysqlCodec : public Logger::Loggable<Logger::Id::filter> {
 #define LENENCODINT_8BYTES 0xfe
 
 #define MYSQL_SUCCESS 0
-#define MYSQL_FAILURE (-1)
+#define MYSQL_FAILURE -1
 #define MYSQL_STR_END '\0'
 
 public:

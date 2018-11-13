@@ -12,7 +12,7 @@ namespace MysqlProxy {
 MysqlFilterConfig::MysqlFilterConfig(const std::string& stat_prefix, Stats::Scope& scope)
     : scope_(scope), stat_prefix_(stat_prefix), stats_(generateStats(stat_prefix, scope)) {}
 
-MysqlFilter::MysqlFilter(MysqlFilterConfigSharedPtr config) : config_(std::move(config)) {}
+MysqlFilter::MysqlFilter(MysqlFilterConfigSharedPtr config) : config_(config) {}
 
 void MysqlFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
