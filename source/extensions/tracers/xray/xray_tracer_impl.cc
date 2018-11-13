@@ -17,6 +17,55 @@ namespace Envoy {
     namespace Extensions {
         namespace Tracers {
             namespace XRay {
+                XRayHeader::XRayHeader(std::string trace_id, std::string parent_id, std::string sample_decision) :
+                trace_id_(trace_id), parent_id_(parent_id), sample_decision_(sample_decision) {}
+
+                void XRayHeader::fromString(std::string s) {
+                    std::cout << "enter from string" << std::endl;
+                    std::cout << "before erase white space " << s << std::endl;
+                    s.erase(std::remove(s.begin(), s.end(), ' '), s.end());
+
+                    std::cout << "erase white space " << s << std::endl;
+                    std::vector<std::string> parts;
+                    std::string token;
+                    std::istringstream tokenStream(s);
+                    while (std::getline(tokenStream, token, ';')) {
+                        std::cout << token << std::endl;
+                        parts.push_back(token);
+                    }
+
+                    for (auto it = parts.begin(); it != parts.end() ; it++) {
+                        std::string key = keyFromKeyEqualsValue(*it);
+                        std::string value = valueFromKeyEqualsValue(*it);
+                        if (key == XRayCoreConstants::get().ROOT_KEY) {
+                            std::cout << value << std::endl;
+                            trace_id_ = value;
+                        } else if (key == XRayCoreConstants::get().PARENT_KEY) {
+                            std::cout << value << std::endl;
+                            parent_id_ = value;
+                        } else if (key == XRayCoreConstants::get().SAMPLED_KEY) {
+                            std::cout << value << std::endl;
+                            sample_decision_ = value;
+                        }
+                    }
+                }
+
+                std::string XRayHeader::keyFromKeyEqualsValue(std::string pair) {
+                    size_t key;
+                    if ((key = pair.find("=")) != std::string::npos) {
+                        return pair.substr(0, key);
+                    };
+                    return NULL;
+                }
+
+                std::string XRayHeader::valueFromKeyEqualsValue(std::string pair) {
+                    size_t key;
+                    if ((key = pair.find("=")) != std::string::npos) {
+                        return pair.substr(key+1, std::string::npos);
+                    };
+                    return NULL;
+                }
+
                 XRaySpan::XRaySpan(XRay::Span& span, XRay::Tracer& tracer) : span_(span), tracer_(tracer) {}
 
                 void XRaySpan::finishSpan() {
@@ -33,20 +82,6 @@ namespace Envoy {
                 void XRaySpan::injectContext(Http::HeaderMap& request_headers) {
                     // Set the trace-id and span-id headers properly, based on the newly-created span structure.
                     request_headers.size();
-//
-//		            std::cout << "enter inject context" << std::endl;
-//		            std::cout << "span has parent id " << span_.isSetParentId() << std::endl;
-//
-//                    // Set the parent-span header properly, based on the newly-created span structure.
-//                    if (span_.isSetParentId()) {
-//			            std::cout << "set parent id" << std::endl;
-//                        request_headers.insertXRayParentId().value(span_.parentIdAsHexString());
-//                    }
-//
-//                    // Set the sampled header.
-//                    request_headers.insertXRaySampled().value().setReference(
-//                            span_.sampled() ? XRayCoreConstants::get().SAMPLED
-//                                            : XRayCoreConstants::get().NOT_SAMPLED);
                 }
 
                 void XRaySpan::setSampled(bool sampled) { span_.setSampled(sampled); }
@@ -74,7 +109,6 @@ namespace Envoy {
                     }
                     cluster_ = cluster->info();
 
-                    std::cout << "local info cluster name: " << local_info_.clusterName();
                     random_generator.uuid();
 
                     std::string collector_endpoint = XRayCoreConstants::get().DEFAULT_DAEMON_ENDPOINT;
@@ -101,44 +135,53 @@ namespace Envoy {
                     SpanPtr new_xray_span;
                     bool sampled(true);
 
-                    if (request_headers.XRaySampled()) {
-                        // Checking if sampled flag has been specified. Also checking for 'true' value, as some old
-                        // xray tracers may still use that value, although should be 0 or 1.
-                        absl::string_view xray_sampled = request_headers.XRaySampled()->value().getStringView();
-                        sampled = xray_sampled == XRayCoreConstants::get().SAMPLED || xray_sampled == "true";
-                    } else {
-                        sampled = tracing_decision.traced;
+                    XRayHeader xrayHeader;
+                    if (request_headers.XAmznTraceId()) {
+                        std::string traceHeader = request_headers.XAmznTraceId()->value().c_str();
+                        xrayHeader.fromString(traceHeader);
+                        if (!xrayHeader.sampleDecision().empty()) {
+                            sampled = xrayHeader.sampleDecision() == XRayCoreConstants::get().SAMPLED;
+                        } else {
+                            sampled = tracing_decision.traced;
+                        }
                     }
 
                     std::cout << "Hello from xray service!" << "\n";
                     std::cout << "Get sampling decision for upstream: " << tracing_decision.traced << "\n";
+                    std::cout << "Trace Header: " << xrayHeader.traceId() << ", " << xrayHeader.parentId() << ", " << xrayHeader.sampleDecision() << std::endl;
 
-		            if (request_headers.XRayTraceId() && request_headers.XRayParentId()) {
+		            if (!xrayHeader.traceId().empty() || !xrayHeader.parentId().empty()) {
 			            std::cout << "create a span based on downstream traceid and parentid" << std::endl;
                         uint64_t span_id(0);
                         uint64_t parent_id(0);
 
-                        if (request_headers.XRayParentId() && !StringUtil::atoul(request_headers.XRayParentId()->value().c_str(), parent_id, 16)) {
+                        if (!xrayHeader.parentId().empty() && !StringUtil::atoul(xrayHeader.parentId().c_str(), parent_id, 16)) {
+                            std::cout << "something went wrong in parse parent id" << std::endl;
                             return Tracing::SpanPtr(new Tracing::NullSpan());
                         }
 
-                        std::string trace_id = request_headers.XRayTraceId()->value().c_str();
+                        std::string trace_id = xrayHeader.traceId();
                         SpanContext context(trace_id, span_id, parent_id, sampled);
                         new_xray_span = tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
+
+                        std::string s = new_xray_span->sampled() ? XRayCoreConstants::get().SAMPLED : XRayCoreConstants::get().NOT_SAMPLED;
+                        std::string xray_header = XRayCoreConstants::get().ROOT_PREFIX + new_xray_span->traceId() + "; " +
+                                                  XRayCoreConstants::get().PARENT_PREFIX + new_xray_span->childSpans()[0].idAsHexString()
+                                                  + "; " + XRayCoreConstants::get().SAMPLED_PREFIX + s;
+                        std::cout << "This is the trace header for upstream: " << xray_header << std::endl;
+                        request_headers.insertXAmznTraceId().value(xray_header);
+
                     } else {
                         // Create a root XRay span. No context was found in the headers.
                         std::cout << "start create root span." << "\n";
                         new_xray_span = tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time);
                         new_xray_span->setSampled(sampled);
-                        request_headers.insertXRayTraceId().value(new_xray_span->traceId());
-                        request_headers.insertXRaySampled().value().setReference(
-                                new_xray_span->sampled() ? XRayCoreConstants::get().SAMPLED
-                                                : XRayCoreConstants::get().NOT_SAMPLED);
-                        request_headers.insertXRayParentId().value(new_xray_span->childSpans()[0].idAsHexString());
+
+                        std::string s = new_xray_span->sampled() ? XRayCoreConstants::get().SAMPLED : XRayCoreConstants::get().NOT_SAMPLED;
                         std::string xray_header = XRayCoreConstants::get().ROOT_PREFIX + new_xray_span->traceId() + "; " +
                                 XRayCoreConstants::get().PARENT_PREFIX + new_xray_span->childSpans()[0].idAsHexString()
-                                                  + "; " + XRayCoreConstants::get().SAMPLED_PREFIX + XRayCoreConstants::get().SAMPLED;
-                        std::cout << xray_header << std::endl;
+                                                  + "; " + XRayCoreConstants::get().SAMPLED_PREFIX + s;
+                        std::cout << "This is the trace header for upstream: " << xray_header << std::endl;
                         request_headers.insertXAmznTraceId().value(xray_header);
                     }
 

@@ -19,7 +19,7 @@ namespace Envoy {
                     const std::string HTTP_REQUEST_SIZE = "request.size";
                     const std::string HTTP_RESPONSE_SIZE = "response.size";
                     const std::string HTTP_USER_AGENT = "user_agent";
-
+                    const std::string UPSTREAM_CLUSTER = "upstream_cluster";
                     const std::string ERROR = "error";
 
                     // XRay trace header
@@ -31,11 +31,10 @@ namespace Envoy {
                     const std::string SAMPLED = "1";
                     const std::string NOT_SAMPLED = "0";
                     const std::string UNKNOWN = "";
-
-                    // XRay headers
-                    const std::string XRAY_TRACE_ID = "XRay-TraceId";
-                    const std::string XRAY_PARENT_ID = "XRay-ParentId";
-                    const std::string XRAY_SAMPLED = "XRay-Sampled";
+                    const std::string ROOT_KEY = "Root";
+                    const std::string PARENT_KEY = "Parent";
+                    const std::string SAMPLED_KEY = "Sampled";
+                    const std::string SELF_KEY = "Self";
 
                     const std::string DEFAULT_DAEMON_ENDPOINT = "127.0.0.1:2000";
                 };

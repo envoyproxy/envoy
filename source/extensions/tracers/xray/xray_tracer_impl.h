@@ -23,6 +23,36 @@ namespace Envoy {
                     XRAY_TRACER_STATS(GENERATE_COUNTER_STRUCT)
                 };
 
+                class XRayHeader {
+                public:
+                    XRayHeader(std::string trace_id, std::string parent_id, std::string sample_decision);
+
+                    void fromString(std::string s);
+
+                    XRayHeader() : trace_id_(), parent_id_(), sample_decision_() {}
+
+                    void setTraceId(std::string& val) { trace_id_ = val; }
+
+                    void setParentId(std::string& val) { parent_id_ = val; }
+
+                    void setSampleDecision(std::string& val) { sample_decision_ = val; }
+
+                    std::string& traceId() { return trace_id_; }
+
+                    std::string& parentId() { return parent_id_; }
+
+                    std::string& sampleDecision() { return sample_decision_; }
+
+                    std::string keyFromKeyEqualsValue(std::string pair);
+
+                    std::string valueFromKeyEqualsValue(std::string pair);
+
+                private:
+                    std::string trace_id_;
+                    std::string parent_id_;
+                    std::string sample_decision_;
+                };
+
                 class XRaySpan : public Tracing::Span {
                 public:
                     /**

@@ -73,6 +73,56 @@ namespace Envoy {
                     writer.Key(XRayJsonFieldNames::get().SPAN_NAMESPACE.c_str());
                     writer.String(XRayJsonFieldNames::get().SPAN_REMOTE.c_str());
 
+                    std::vector<BinaryAnnotation> http_request_annotation_json_vector;
+                    std::vector<BinaryAnnotation> http_response_annotation_json_vector;
+
+                    for (auto it = binary_annotations_.begin(); it != binary_annotations_.end(); it++) {
+                        if (it->key() == XRayCoreConstants::get().HTTP_URL) {
+                            it->setKey(XRayJsonFieldNames::get().SPAN_URL);
+                            http_request_annotation_json_vector.push_back(*it);
+                        } else if (it->key() == XRayCoreConstants::get().HTTP_METHOD) {
+                            it->setKey(XRayJsonFieldNames::get().SPAN_METHOD);
+                            http_request_annotation_json_vector.push_back(*it);
+                        } else if (it->key() == XRayCoreConstants::get().HTTP_USER_AGENT) {
+                            it->setKey(XRayJsonFieldNames::get().SPAN_USER_AGENT);
+                            http_request_annotation_json_vector.push_back(*it);
+                        } else if (it->key() == XRayCoreConstants::get().HTTP_STATUS_CODE) {
+                            it->setKey(XRayJsonFieldNames::get().SPAN_STATUS);
+                            http_response_annotation_json_vector.push_back(*it);
+                        } else if (it->key() == XRayCoreConstants::get().UPSTREAM_CLUSTER) {
+                            writer.Key(XRayJsonFieldNames::get().SPAN_NAME.c_str());
+                            writer.String(it->value().c_str());
+                        }
+                    }
+
+                    if (http_request_annotation_json_vector.size() != 0 || http_response_annotation_json_vector.size() != 0) {
+                        writer.Key(XRayJsonFieldNames::get().SPAN_HTTP_ANNOTATIONS.c_str());
+                        writer.StartObject();
+
+                        if (http_request_annotation_json_vector.size() != 0) {
+                            writer.Key(XRayJsonFieldNames::get().SPAN_REQUEST.c_str());
+                            writer.StartObject();
+                            for (auto it = http_request_annotation_json_vector.begin(); it != http_request_annotation_json_vector.end(); it++) {
+                                writer.Key(it->key().c_str());
+                                writer.String(it->value().c_str());
+                            }
+                            writer.EndObject();
+                        }
+
+                        if (http_response_annotation_json_vector.size() != 0) {
+                            writer.Key(XRayJsonFieldNames::get().SPAN_RESPONSE.c_str());
+                            writer.StartObject();
+                            for (auto it = http_response_annotation_json_vector.begin(); it != http_response_annotation_json_vector.end(); it++) {
+                                writer.Key(it->key().c_str());
+                                writer.Int(std::stoi(it->value()));
+                            }
+                            writer.EndObject();
+                        }
+
+                        // end http
+                        writer.EndObject();
+                    }
+
                     writer.EndObject();
 
                     std::string json_string = s.GetString();
@@ -100,10 +150,6 @@ namespace Envoy {
                     tracer_ = span.tracer();
                     child_span_ = span.childSpans();
                 }
-
-//                void Span::setServiceName(const std::string& service_name) {
-//
-//                }
 
                 const std::string Span::toJson() {
                     // Header information contains Tracing Daemon Wire Protocol in order to send span to daemon.
@@ -158,6 +204,9 @@ namespace Envoy {
                         } else if (it->key() == XRayCoreConstants::get().HTTP_STATUS_CODE) {
                             it->setKey(XRayJsonFieldNames::get().SPAN_STATUS);
                             http_response_annotation_json_vector.push_back(*it);
+                        } else if (it->key() == XRayCoreConstants::get().UPSTREAM_CLUSTER) {
+                            writer.Key(XRayJsonFieldNames::get().SPAN_NAME.c_str());
+                            writer.String(it->value().c_str());
                         }
                     }
 

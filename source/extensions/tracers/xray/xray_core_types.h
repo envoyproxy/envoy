@@ -115,8 +115,6 @@ namespace Envoy {
                 public:
                     ChildSpan(const ChildSpan&);
 
-                    ChildSpan& operator=(const ChildSpan&);
-
                     ChildSpan() : name_(), id_(0), start_time_(0) {}
 
                     void setName(const std::string& val) { name_ = val; }

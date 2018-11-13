@@ -299,9 +299,6 @@ private:
   HEADER_FUNC(XB3ParentSpanId)                                                                     \
   HEADER_FUNC(XB3Sampled)                                                                          \
   HEADER_FUNC(XB3Flags)                                                                            \
-  HEADER_FUNC(XRayTraceId)                                                                         \
-  HEADER_FUNC(XRayParentId)                                                                        \
-  HEADER_FUNC(XRaySampled)                                                                         \
   HEADER_FUNC(XAmznTraceId)
 
 /**

@@ -36,10 +36,6 @@ namespace Envoy {
                     const std::string SPAN_ORIGIN_VALUE = "ServiceMesh::Envoy";
 
                     const std::string CHILD_SPAN = "subsegments";
-
-                    const std::string ENDPOINT_PORT = "port";
-                    const std::string ENDPOINT_IPV4 = "ipv4";
-                    const std::string ENDPOINT_IPV6 = "ipv6";
                 };
 
                 typedef ConstSingleton<XRayJsonFieldNameValues> XRayJsonFieldNames;
