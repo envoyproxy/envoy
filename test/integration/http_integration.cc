@@ -1092,12 +1092,11 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   EXPECT_EQ(response->metadata_map().find(key)->second, value);
 
   // Sends the second request.
-  response =
-      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}},
-                                         10);
+  response = codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":scheme", "http"},
+                                                                        {":authority", "host"}},
+                                                10);
   waitForNextUpstreamRequest();
 
   // Sends metadata after response header followed by an empty data frame with end_stream true.
@@ -1113,12 +1112,11 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   EXPECT_EQ(response->metadata_map().find(key)->second, value);
 
   // Sends the third request.
-  response =
-      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}},
-                                         10);
+  response = codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":scheme", "http"},
+                                                                        {":authority", "host"}},
+                                                10);
   waitForNextUpstreamRequest();
 
   // Sends metadata after response header and before data.
@@ -1134,12 +1132,11 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   EXPECT_EQ(response->metadata_map().find(key)->second, value);
 
   // Sends the fourth request.
-  response =
-      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}},
-                                         10);
+  response = codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":scheme", "http"},
+                                                                        {":authority", "host"}},
+                                                10);
   waitForNextUpstreamRequest();
 
   // Sends metadata between data frames.
@@ -1156,12 +1153,11 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   EXPECT_EQ(response->metadata_map().find(key)->second, value);
 
   // Sends the fifth request.
-  response =
-      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}},
-                                         10);
+  response = codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":scheme", "http"},
+                                                                        {":authority", "host"}},
+                                                10);
   waitForNextUpstreamRequest();
 
   // Sends metadata after the last non-empty data frames.
@@ -1178,12 +1174,11 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   EXPECT_EQ(response->metadata_map().find(key)->second, value);
 
   // Sends the sixth request.
-  response =
-      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}},
-                                         10);
+  response = codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":scheme", "http"},
+                                                                        {":authority", "host"}},
+                                                10);
   waitForNextUpstreamRequest();
 
   // Sends metadata before reset.

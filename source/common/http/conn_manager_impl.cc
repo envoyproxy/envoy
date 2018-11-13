@@ -1165,8 +1165,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::encodeMetadata(
-    ActiveStreamEncoderFilter* filter, MetadataMap& metadata_map) {
+void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilter* filter,
+                                                         MetadataMap& metadata_map) {
   resetIdleTimer();
 
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, false);
