@@ -30,18 +30,18 @@ void ZipkinSpan::setTag(const std::string& name, const std::string& value) {
 
 void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
-  request_headers.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
+  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                   span_.traceIdAsHexString());
-  request_headers.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_.idAsHexString());
+  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_.idAsHexString());
 
   // Set the parent-span header properly, based on the newly-created span structure.
   if (span_.isSetParentId()) {
-    request_headers.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
+    request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
                                     span_.parentIdAsHexString());
   }
 
   // Set the sampled header.
-  request_headers.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
+  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
                                   span_.sampled() ? ZipkinCoreConstants::get().SAMPLED
                                                   : ZipkinCoreConstants::get().NOT_SAMPLED);
 }
