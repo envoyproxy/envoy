@@ -93,6 +93,15 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
     Network::Socket::appendOptions(cluster_options,
                                    Network::SocketOptionFactory::buildIpFreebindOptions());
   }
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, src_transparent, false)) {
+    Network::Socket::appendOptions(cluster_options,
+                                   Network::SocketOptionFactory::buildIpTransparentOptions());
+  }
+  const uint32_t mark = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, mark, 0);
+  if (mark != 0) {
+    Network::Socket::appendOptions(cluster_options,
+                                   Network::SocketOptionFactory::buildSocketMarkOptions(mark));
+  }
   if (config.upstream_connection_options().has_tcp_keepalive()) {
     Network::Socket::appendOptions(
         cluster_options,
