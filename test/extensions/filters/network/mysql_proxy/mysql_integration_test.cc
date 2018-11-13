@@ -29,7 +29,7 @@ class MysqlIntegrationTest : public MysqlTestUtils,
   }
 
 public:
-  MysqlIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()) {};
+  MysqlIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()){};
 
   /**
    * Initializer for an individual integration test.
