@@ -30,41 +30,20 @@ void ZipkinSpan::setTag(const std::string& name, const std::string& value) {
 
 void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
-  auto trace_id = request_headers.get(ZipkinCoreConstants::get().X_B3_TRACE_ID);
-  if (!trace_id) {
-    request_headers.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
-                                    span_.traceIdAsHexString());
-  } else {
-    trace_id->value(span_.traceIdAsHexString());
-  }
-
-  auto span_id = request_headers.get(ZipkinCoreConstants::get().X_B3_SPAN_ID);
-  if (!span_id) {
-    request_headers.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_.idAsHexString());
-  } else {
-    span_id->value(span_.idAsHexString());
-  }
+  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
+                                  span_.traceIdAsHexString());
+  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_.idAsHexString());
 
   // Set the parent-span header properly, based on the newly-created span structure.
   if (span_.isSetParentId()) {
-    auto parent_span_id = request_headers.get(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID);
-    if (!parent_span_id) {
-      request_headers.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
-                                      span_.parentIdAsHexString());
-    } else {
-      parent_span_id->value(span_.parentIdAsHexString());
-    }
+    request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
+                                    span_.parentIdAsHexString());
   }
 
   // Set the sampled header.
-  auto sampled = request_headers.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
-  std::string sampled_str =
-      span_.sampled() ? ZipkinCoreConstants::get().SAMPLED : ZipkinCoreConstants::get().NOT_SAMPLED;
-  if (!sampled) {
-    request_headers.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED, sampled_str);
-  } else {
-    sampled->value(sampled_str);
-  }
+  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
+                                  span_.sampled() ? ZipkinCoreConstants::get().SAMPLED
+                                                  : ZipkinCoreConstants::get().NOT_SAMPLED);
 }
 
 void ZipkinSpan::setSampled(bool sampled) { span_.setSampled(sampled); }
