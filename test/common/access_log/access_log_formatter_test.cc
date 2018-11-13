@@ -386,7 +386,8 @@ void verifyJsonOutput(std::string json_string,
                       std::unordered_map<std::string, std::string> expected_map) {
   const auto parsed = Json::Factory::loadFromString(json_string);
 
-  // Every json log line should have only one newline character, and it should be the last character in the string
+  // Every json log line should have only one newline character, and it should be the last character
+  // in the string
   auto newline_pos = json_string.find('\n');
   EXPECT_NE(newline_pos, std::string::npos);
   EXPECT_EQ(newline_pos, json_string.length() - 1);
