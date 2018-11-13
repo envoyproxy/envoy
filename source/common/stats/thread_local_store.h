@@ -212,7 +212,7 @@ private:
     SymbolTable& symbolTable() override { return parent_.symbolTable(); }
 
     Counter& counter(const std::string& name) override {
-      //std::cerr << "counter(" << name << ")" << std::endl;
+      // std::cerr << "counter(" << name << ")" << std::endl;
       StatNameTempStorage storage(name, symbolTable());
       return counterx(storage.statName());
     }
@@ -274,8 +274,8 @@ private:
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
   bool rejects(StatName name) const;
-  template <class StatMapClass, class StatListClass> void removeRejectedStats(
-      StatMapClass& map, StatListClass& list);
+  template <class StatMapClass, class StatListClass>
+  void removeRejectedStats(StatMapClass& map, StatListClass& list);
 
   const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;

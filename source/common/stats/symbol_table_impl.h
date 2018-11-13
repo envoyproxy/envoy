@@ -226,11 +226,11 @@ private:
 
     Symbol symbol_;
     std::atomic<uint32_t> ref_count_;
-    //uint32_t ref_count_;
+    // uint32_t ref_count_;
   };
 
   // This must be called during both encode() and free().
-  //mutable Thread::MutexBasicLockable lock_;]
+  // mutable Thread::MutexBasicLockable lock_;]
   mutable absl::Mutex lock_;
 
   std::string decodeSymbolVec(const SymbolVec& symbols) const;
@@ -271,8 +271,8 @@ private:
   // Bimap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
   // Using absl::string_view lets us only store the complete string once, in the decode map.
-  using EncodeMap = absl::flat_hash_map<absl::string_view, std::unique_ptr<SharedSymbol>,
-                                        StringViewHash>;
+  using EncodeMap =
+      absl::flat_hash_map<absl::string_view, std::unique_ptr<SharedSymbol>, StringViewHash>;
   using DecodeMap = absl::flat_hash_map<Symbol, std::unique_ptr<char[]>>;
   EncodeMap encode_map_ GUARDED_BY(lock_);
   DecodeMap decode_map_ GUARDED_BY(lock_);

@@ -32,7 +32,7 @@ struct FileSystemStats {
 namespace Filesystem {
 
 class Instance {
- public:
+public:
   explicit Instance(std::chrono::milliseconds file_flush_interval_msec, Stats::Store& store);
 
   FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
@@ -43,7 +43,7 @@ class Instance {
     return createFile(path, dispatcher, lock, file_flush_interval_msec_);
   }
 
- private:
+private:
   std::chrono::milliseconds file_flush_interval_msec_;
   FileSystemStats file_stats_;
 };

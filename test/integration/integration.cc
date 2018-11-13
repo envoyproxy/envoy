@@ -213,12 +213,11 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
                                          TestTimeSystemPtr time_system, const std::string& config)
-    : mock_buffer_factory_(new NiceMock<MockBufferFactory>),
-      time_system_(std::move(time_system)),
+    : mock_buffer_factory_(new NiceMock<MockBufferFactory>), time_system_(std::move(time_system)),
       dispatcher_(new Event::DispatcherImpl(*time_system_,
                                             Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
-      api_(new Api::Impl(std::chrono::milliseconds(10000), stats_store_)),
-      version_(version), config_helper_(version, config),
+      api_(new Api::Impl(std::chrono::milliseconds(10000), stats_store_)), version_(version),
+      config_helper_(version, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
@@ -391,7 +390,8 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
           client.close(Network::ConnectionCloseType::NoFlush);
         }
       },
-      version_, stats_store_);;
+      version_, stats_store_);
+  ;
 
   connection.run();
 }

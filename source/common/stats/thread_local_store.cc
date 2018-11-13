@@ -57,8 +57,8 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   }
 }
 
-template<class StatMapClass, class StatListClass> void ThreadLocalStoreImpl::removeRejectedStats(
-    StatMapClass& map, StatListClass& list) {
+template <class StatMapClass, class StatListClass>
+void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass& list) {
   std::vector<StatName> remove_list;
   for (auto& stat : map) {
     if (rejects(stat.first)) {
@@ -68,7 +68,7 @@ template<class StatMapClass, class StatListClass> void ThreadLocalStoreImpl::rem
   for (StatName stat_name : remove_list) {
     auto p = map.find(stat_name);
     ASSERT(p != map.end());
-    list.push_back(p->second);  // Save SharedPtr to the list to avoid invalidating refs to stat.
+    list.push_back(p->second); // Save SharedPtr to the list to avoid invalidating refs to stat.
     map.erase(p);
   }
 }

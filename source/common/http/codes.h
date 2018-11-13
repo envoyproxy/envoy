@@ -33,8 +33,7 @@ private:
   public:
     RequestCodeGroup(absl::string_view prefix, CodeStatsImpl& code_stats)
         : code_stats_(code_stats), prefix_(std::string(prefix)),
-          upstream_rq_200_(makeStatName(Code::OK)),
-          upstream_rq_404_(makeStatName(Code::NotFound)),
+          upstream_rq_200_(makeStatName(Code::OK)), upstream_rq_404_(makeStatName(Code::NotFound)),
           upstream_rq_503_(makeStatName(Code::ServiceUnavailable)) {}
     ~RequestCodeGroup();
 

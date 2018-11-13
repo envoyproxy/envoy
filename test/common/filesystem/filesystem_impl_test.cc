@@ -29,7 +29,7 @@ using testing::Throw;
 namespace Envoy {
 
 class FileSystemImplTest : public testing::Test {
- protected:
+protected:
   FileSystemImplTest() : file_system_(std::chrono::milliseconds(10000), stats_store_) {}
 
   const std::chrono::milliseconds timeout_40ms_{40};
@@ -120,8 +120,7 @@ TEST_F(FileSystemImplTest, flushToLogFilePeriodically) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).WillOnce(Return(5));
-  Filesystem::FileSharedPtr file = file_system_.createFile("", dispatcher, mutex,
-                                                           timeout_40ms_);
+  Filesystem::FileSharedPtr file = file_system_.createFile("", dispatcher, mutex, timeout_40ms_);
 
   EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
   EXPECT_CALL(os_sys_calls, write_(_, _, _))

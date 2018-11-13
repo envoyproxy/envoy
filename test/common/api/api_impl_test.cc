@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Api {
 
 class ApiImplTest : public testing::Test {
- protected:
+protected:
   ApiImplTest() : api_(std::chrono::milliseconds(10000), store_) {}
 
   Stats::IsolatedStoreImpl store_;

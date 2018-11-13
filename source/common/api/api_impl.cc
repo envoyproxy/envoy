@@ -14,8 +14,7 @@ Event::DispatcherPtr Impl::allocateDispatcher(Event::TimeSystem& time_system) {
 }
 
 Impl::Impl(std::chrono::milliseconds file_flush_interval_msec, Stats::Store& stats_store)
-    : file_system_(file_flush_interval_msec, stats_store) {
-}
+    : file_system_(file_flush_interval_msec, stats_store) {}
 
 Filesystem::FileSharedPtr Impl::createFile(const std::string& path, Event::Dispatcher& dispatcher,
                                            Thread::BasicLockable& lock) {

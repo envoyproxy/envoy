@@ -221,7 +221,7 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   // this window of time with the lock released, so we need to check again
   // under write-lock, which we do by proactively allocating the string and
   // attempting to insert it into the encode_map. If that worked, we also
-  // write the decode-map, transfering the ownership of the string to the
+  // write the decode-map, transferring the ownership of the string to the
   // decode-map value.
   absl::MutexLock lock(&lock_);
 
@@ -233,8 +233,8 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   std::unique_ptr<char[]> str = std::make_unique<char[]>(size);
   StringUtil::strlcpy(str.get(), sv.data(), size);
 
-  auto encode_insert = encode_map_.insert({str.get(),
-                                           std::make_unique<SharedSymbol>(next_symbol_)});
+  auto encode_insert =
+      encode_map_.insert({str.get(), std::make_unique<SharedSymbol>(next_symbol_)});
   SharedSymbol& shared_symbol = *encode_insert.first->second;
 
   if (encode_insert.second) {
@@ -293,8 +293,7 @@ void SymbolTableImpl::debugPrint() const {
   for (Symbol symbol : symbols) {
     const char* token = decode_map_.find(symbol)->second.get();
     const SharedSymbol& shared_symbol = *encode_map_.find(token)->second;
-    std::cout << symbol << ": '" << token << "' (" << shared_symbol.ref_count_ << ")"
-              << std::endl;
+    std::cout << symbol << ": '" << token << "' (" << shared_symbol.ref_count_ << ")" << std::endl;
   }
   std::cout << std::flush;
 }

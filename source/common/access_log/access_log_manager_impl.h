@@ -23,7 +23,7 @@ private:
   Api::Api& api_;
   Event::Dispatcher& dispatcher_;
   Thread::BasicLockable& lock_;
-  //Stats::Store& stats_store_;
+  // Stats::Store& stats_store_;
   std::unordered_map<std::string, Filesystem::FileSharedPtr> access_logs_;
 };
 
