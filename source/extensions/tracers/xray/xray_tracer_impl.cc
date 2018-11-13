@@ -21,11 +21,7 @@ namespace Envoy {
                 trace_id_(trace_id), parent_id_(parent_id), sample_decision_(sample_decision) {}
 
                 void XRayHeader::fromString(std::string s) {
-                    std::cout << "enter from string" << std::endl;
-                    std::cout << "before erase white space " << s << std::endl;
                     s.erase(std::remove(s.begin(), s.end(), ' '), s.end());
-
-                    std::cout << "erase white space " << s << std::endl;
                     std::vector<std::string> parts;
                     std::string token;
                     std::istringstream tokenStream(s);
@@ -69,7 +65,6 @@ namespace Envoy {
                 XRaySpan::XRaySpan(XRay::Span& span, XRay::Tracer& tracer) : span_(span), tracer_(tracer) {}
 
                 void XRaySpan::finishSpan() {
-                    std::cout << "called finishSpan" << std::endl;
                     span_.finish();
                 }
 
@@ -88,7 +83,6 @@ namespace Envoy {
 
                 Tracing::SpanPtr XRaySpan::spawnChild(const Tracing::Config& config, const std::string& name,
                                                         SystemTime start_time) {
-		            std::cout << "enter spawnchild" << std::endl;
                     SpanContext context(span_);
                     return Tracing::SpanPtr{
                             new XRaySpan(*tracer_.startSpan(config, name, start_time, context), tracer_)};
@@ -115,7 +109,6 @@ namespace Envoy {
                     if (xray_config.collector_endpoint().size() > 0) {
                         collector_endpoint = xray_config.collector_endpoint();
                     }
-		            std::cout << "send to daemon on " << collector_endpoint << std::endl;
 
                     tls_->set([this, collector_endpoint, &random_generator](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
                         TracerPtr tracer(new Tracer(local_info_.clusterName(), random_generator));
@@ -146,17 +139,11 @@ namespace Envoy {
                         }
                     }
 
-                    std::cout << "Hello from xray service!" << "\n";
-                    std::cout << "Get sampling decision for upstream: " << tracing_decision.traced << "\n";
-                    std::cout << "Trace Header: " << xrayHeader.traceId() << ", " << xrayHeader.parentId() << ", " << xrayHeader.sampleDecision() << std::endl;
-
 		            if (!xrayHeader.traceId().empty() || !xrayHeader.parentId().empty()) {
-			            std::cout << "create a span based on downstream traceid and parentid" << std::endl;
                         uint64_t span_id(0);
                         uint64_t parent_id(0);
 
                         if (!xrayHeader.parentId().empty() && !StringUtil::atoul(xrayHeader.parentId().c_str(), parent_id, 16)) {
-                            std::cout << "something went wrong in parse parent id" << std::endl;
                             return Tracing::SpanPtr(new Tracing::NullSpan());
                         }
 
@@ -168,12 +155,10 @@ namespace Envoy {
                         std::string xray_header = XRayCoreConstants::get().ROOT_PREFIX + new_xray_span->traceId() + "; " +
                                                   XRayCoreConstants::get().PARENT_PREFIX + new_xray_span->childSpans()[0].idAsHexString()
                                                   + "; " + XRayCoreConstants::get().SAMPLED_PREFIX + s;
-                        std::cout << "This is the trace header for upstream: " << xray_header << std::endl;
                         request_headers.insertXAmznTraceId().value(xray_header);
 
                     } else {
                         // Create a root XRay span. No context was found in the headers.
-                        std::cout << "start create root span." << "\n";
                         new_xray_span = tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time);
                         new_xray_span->setSampled(sampled);
 
@@ -181,7 +166,6 @@ namespace Envoy {
                         std::string xray_header = XRayCoreConstants::get().ROOT_PREFIX + new_xray_span->traceId() + "; " +
                                 XRayCoreConstants::get().PARENT_PREFIX + new_xray_span->childSpans()[0].idAsHexString()
                                                   + "; " + XRayCoreConstants::get().SAMPLED_PREFIX + s;
-                        std::cout << "This is the trace header for upstream: " << xray_header << std::endl;
                         request_headers.insertXAmznTraceId().value(xray_header);
                     }
 
@@ -216,7 +200,6 @@ namespace Envoy {
                 }
 
                 void ReporterImpl::reportSpan(const Span& span) {
-                    std::cout << "report span been called" << std::endl;
                     std::vector<Span> span_buffer_;
                     span_buffer_.push_back(std::move(span));
                     writer_.write(span_buffer_[0].toJson());

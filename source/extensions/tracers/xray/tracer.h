@@ -92,6 +92,8 @@ namespace Envoy {
 
                     std::string random_24bits_string();
 
+                    std::string generateTraceId();
+
                 private:
                     static const std::string VERSION_;
                     static const std::string DELIMITER_;

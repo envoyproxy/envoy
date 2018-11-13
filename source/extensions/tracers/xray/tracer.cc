@@ -25,6 +25,15 @@ namespace Envoy {
                     return values;
                 }
 
+                std::string Tracer::generateTraceId() {
+                    time_t epoch = time(nullptr);
+                    std::stringstream stream;
+                    stream << std::hex << epoch;
+                    std::string result(stream.str());
+                    std::string trace_id = VERSION_ + DELIMITER_ + result + DELIMITER_ + random_24bits_string();
+                    return trace_id;
+                }
+
                 SpanPtr Tracer::startSpan(const Tracing::Config &config, const std::string &span_name, SystemTime timestamp) {
                     config.operationName();
                     timestamp.time_since_epoch();
@@ -34,26 +43,20 @@ namespace Envoy {
                     span_ptr->setName(span_name);
 
                     // generate a trace id
-                    time_t epoch = time(nullptr);
-                    std::stringstream stream;
-                    stream << std::hex << epoch;
-                    std::string result(stream.str());
-                    std::string trace_id = VERSION_ + DELIMITER_ + result + DELIMITER_ + random_24bits_string();
-                    span_ptr->setTraceId(trace_id);
+                    span_ptr->setTraceId(generateTraceId());
 
-                    uint64_t random_number = random_generator_.random();
-                    span_ptr->setId(random_number);
+                    uint64_t span_id = random_generator_.random();
+                    span_ptr->setId(span_id);
 
                     double start_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
                     span_ptr->setStartTime(start_time);
 
                     ChildSpan childSpan;
                     childSpan.setName(span_name);
-                    uint64_t random_number1 = random_generator_.random();
-                    childSpan.setId(random_number1);
+                    uint64_t child_span_id = random_generator_.random();
+                    childSpan.setId(child_span_id);
                     double child_start_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
                     childSpan.setStartTime(child_start_time);
-                    std::cout << "before call add child" << std::endl;
                     
                     span_ptr->addChildSpan(std::move(childSpan));
 
@@ -63,27 +66,24 @@ namespace Envoy {
                 }
 
                 SpanPtr Tracer::startSpan(const Tracing::Config &config, const std::string &span_name, SystemTime timestamp, SpanContext &previous_context) {
-                    std::cout << "start span with shared context" << std::endl;
                     timestamp.time_since_epoch();
 		            SpanPtr span_ptr(new Span());
 
                     span_ptr->setName(span_name);
 
                     if (config.operationName() == Tracing::OperationName::Egress) {
-                        std::cout << "enter egress" << std::endl;
                         // We need to create a new span that is a child of the previous span; no shared context
 
                         // Create a new span id
-                        uint64_t random_number = random_generator_.random();
-                        span_ptr->setId(random_number);
+                        uint64_t span_id = random_generator_.random();
+                        span_ptr->setId(span_id);
 
                         // Set the parent id to the id of the previous span
                         span_ptr->setParentId(previous_context.parent_id());
                     } else if (config.operationName() == Tracing::OperationName::Ingress) {
                         // We need to create a new span and use previous span's id as it's parent id
-                        std::cout << "enter ingress" << std::endl;
-                        uint64_t random_number = random_generator_.random();
-                        span_ptr->setId(random_number);
+                        uint64_t span_id = random_generator_.random();
+                        span_ptr->setId(span_id);
 
                         if (previous_context.parent_id()) {
                             span_ptr->setParentId(previous_context.parent_id());
@@ -98,16 +98,15 @@ namespace Envoy {
                     // Keep the same sampled flag
                     span_ptr->setSampled(previous_context.sampled());
 
-                    double start_time_micro = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-                    span_ptr->setStartTime(start_time_micro);
+                    double start_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                    span_ptr->setStartTime(start_time);
 
                     ChildSpan childSpan;
                     childSpan.setName(span_name);
-                    uint64_t random_number1 = random_generator_.random();
-                    childSpan.setId(random_number1);
+                    uint64_t child_span_id = random_generator_.random();
+                    childSpan.setId(child_span_id);
                     double child_start_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
                     childSpan.setStartTime(child_start_time);
-                    std::cout << "before call add child (context version)" << std::endl;
                     span_ptr->addChildSpan(std::move(childSpan));
 
                     span_ptr->setTracer(this);
