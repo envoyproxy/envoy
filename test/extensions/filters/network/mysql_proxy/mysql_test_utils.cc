@@ -5,15 +5,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 
-std::string MysqlTestUtils::GetVersion() {
-  std::string ver(std::to_string(MYSQL_VER_MAJOR));
-  ver.append(".");
-  ver.append(std::to_string(MYSQL_VER_MINOR));
-  ver.append(".");
-  ver.append(std::to_string(MYSQL_VER_VAR));
-  return ver;
-}
-
 std::string MysqlTestUtils::EncodeServerGreeting(int protocol) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.SetProtocol(protocol);
