@@ -2,6 +2,7 @@
 
 #include <queue>
 
+#include "envoy/api/api.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread/thread.h"
@@ -62,7 +63,7 @@ struct GoogleAsyncTag {
 class GoogleAsyncClientThreadLocal : public ThreadLocal::ThreadLocalObject,
                                      Logger::Loggable<Logger::Id::grpc> {
 public:
-  GoogleAsyncClientThreadLocal(Event::Dispatcher& dispatcher);
+  GoogleAsyncClientThreadLocal(Api::Api& api);
   ~GoogleAsyncClientThreadLocal();
 
   grpc::CompletionQueue& completionQueue() { return cq_; }

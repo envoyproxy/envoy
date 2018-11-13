@@ -69,8 +69,6 @@ public:
     return Event::TimerPtr{createTimer_(cb)};
   }
 
-  Thread::ThreadPtr createThread(std::function<void()> thread_routine) override;
-
   void deferredDelete(DeferredDeletablePtr&& to_delete) override {
     deferredDelete_(to_delete.get());
     if (to_delete) {

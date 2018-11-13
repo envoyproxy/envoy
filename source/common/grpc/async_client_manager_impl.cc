@@ -31,13 +31,13 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
 }
 
 AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
-                                               ThreadLocal::Instance& tls, TimeSource& time_source)
+                                               ThreadLocal::Instance& tls, TimeSource& time_source,
+                                               Api::Api& api)
     : cm_(cm), tls_(tls), time_source_(time_source) {
 #ifdef ENVOY_GOOGLE_GRPC
   google_tls_slot_ = tls.allocateSlot();
-  google_tls_slot_->set([](Event::Dispatcher& dispatcher) {
-    return std::make_shared<GoogleAsyncClientThreadLocal>(dispatcher);
-  });
+  google_tls_slot_->set(
+      [&api](Event::Dispatcher&) { return std::make_shared<GoogleAsyncClientThreadLocal>(api); });
 #endif
 }
 

@@ -24,6 +24,7 @@ public:
                                        Stats::Store& stats_store) override;
   bool fileExists(const std::string& path) override;
   std::string fileReadToEnd(const std::string& path) override;
+  Thread::ThreadPtr createThread(std::function<void()> thread_routine) override;
 
 private:
   std::chrono::milliseconds file_flush_interval_msec_;

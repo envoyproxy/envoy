@@ -343,9 +343,8 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
-  test_server_ =
-      IntegrationTestServer::create(bootstrap_path, version_, pre_worker_start_test_steps_,
-                                    deterministic_, *time_system_, *dispatcher_);
+  test_server_ = IntegrationTestServer::create(
+      bootstrap_path, version_, pre_worker_start_test_steps_, deterministic_, *time_system_, *api_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0) {
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.
@@ -375,7 +374,7 @@ void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(
       TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_, nullptr,
-      deterministic_, *time_system_, *dispatcher_);
+      deterministic_, *time_system_, *api_);
   registerTestServerPorts(port_names);
 }
 

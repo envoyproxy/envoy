@@ -1,5 +1,6 @@
 #include <unistd.h>
 
+#include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/thread.h"
@@ -135,8 +136,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, MainCommonTest,
 class AdminRequestTest : public MainCommonTest {
 protected:
   AdminRequestTest()
-      : envoy_return_(false), envoy_started_(false), envoy_finished_(false),
-        pause_before_run_(false), pause_after_run_(false) {
+      : api_(std::chrono::milliseconds(1000)), envoy_return_(false), envoy_started_(false),
+        envoy_finished_(false), pause_before_run_(false), pause_after_run_(false) {
     addArg("--disable-hot-restart");
   }
 
@@ -157,7 +158,7 @@ protected:
 
   // Initiates Envoy running in its own thread.
   void startEnvoy() {
-    envoy_thread_ = std::make_unique<Thread::ThreadImpl>([this]() {
+    envoy_thread_ = api_.createThread([this]() {
       // Note: main_common_ is accesesed in the testing thread, but
       // is race-free, as MainCommon::run() does not return until
       // triggered with an adminRequest POST to /quitquitquit, which
@@ -192,6 +193,7 @@ protected:
     return envoy_return_;
   }
 
+  Api::Impl api_;
   std::unique_ptr<Thread::Thread> envoy_thread_;
   std::unique_ptr<MainCommon> main_common_;
   absl::Notification started_;

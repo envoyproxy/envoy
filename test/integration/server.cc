@@ -48,8 +48,8 @@ IntegrationTestServerPtr
 IntegrationTestServer::create(const std::string& config_path,
                               const Network::Address::IpVersion version,
                               std::function<void()> pre_worker_start_test_steps, bool deterministic,
-                              Event::TestTimeSystem& time_system, Event::Dispatcher& dispatcher) {
-  IntegrationTestServerPtr server{new IntegrationTestServer(time_system, dispatcher, config_path)};
+                              Event::TestTimeSystem& time_system, Api::Api& api) {
+  IntegrationTestServerPtr server{new IntegrationTestServer(time_system, api, config_path)};
   server->start(version, pre_worker_start_test_steps, deterministic);
   return server;
 }
@@ -59,7 +59,7 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
                                   bool deterministic) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_ = dispatcher_.createThread(
+  thread_ = api_.createThread(
       [version, deterministic, this]() -> void { threadRoutine(version, deterministic); });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.

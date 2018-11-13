@@ -6,7 +6,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/event/dispatcher.h"
+#include "envoy/api/api.h"
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
@@ -173,7 +173,7 @@ public:
                                          const Network::Address::IpVersion version,
                                          std::function<void()> pre_worker_start_test_steps,
                                          bool deterministic, Event::TestTimeSystem& time_system,
-                                         Event::Dispatcher& dispatcher);
+                                         Api::Api& api);
   ~IntegrationTestServer();
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
@@ -239,9 +239,9 @@ public:
   }
 
 protected:
-  IntegrationTestServer(Event::TestTimeSystem& time_system, Event::Dispatcher& dispatcher,
+  IntegrationTestServer(Event::TestTimeSystem& time_system, Api::Api& api,
                         const std::string& config_path)
-      : time_system_(time_system), dispatcher_(dispatcher), config_path_(config_path) {}
+      : time_system_(time_system), api_(api), config_path_(config_path) {}
 
 private:
   /**
@@ -250,7 +250,7 @@ private:
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic);
 
   Event::TestTimeSystem& time_system_;
-  Event::Dispatcher& dispatcher_;
+  Api::Api& api_;
   const std::string config_path_;
   Thread::ThreadPtr thread_;
   Thread::CondVar listeners_cv_;

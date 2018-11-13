@@ -94,6 +94,7 @@ envoy_cc_library(
     ],
     deps = [
         ":dispatcher_lib",
+        "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",

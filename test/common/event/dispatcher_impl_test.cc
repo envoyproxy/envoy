@@ -2,6 +2,7 @@
 
 #include "envoy/thread/thread.h"
 
+#include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/event/dispatcher_impl.h"
 
@@ -59,9 +60,10 @@ TEST(DeferredDeleteTest, DeferredDelete) {
 class DispatcherImplTest : public ::testing::Test {
 protected:
   DispatcherImplTest()
-      : dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSystem())),
+      : api_(std::chrono::milliseconds(1000)),
+        dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSystem())),
         work_finished_(false) {
-    dispatcher_thread_ = dispatcher_->createThread([this]() {
+    dispatcher_thread_ = api_.createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);
       keepalive_timer_ = dispatcher_->createTimer(
@@ -79,6 +81,7 @@ protected:
 
   DangerousDeprecatedTestTime test_time_;
 
+  Api::Impl api_;
   Thread::ThreadPtr dispatcher_thread_;
   DispatcherPtr dispatcher_;
   Thread::MutexBasicLockable mu_;

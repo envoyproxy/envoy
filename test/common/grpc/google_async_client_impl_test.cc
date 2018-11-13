@@ -1,5 +1,6 @@
 #include "envoy/stats/scope.h"
 
+#include "common/api/api_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/google_async_client_impl.h"
 #include "common/stats/isolated_store_impl.h"
@@ -45,19 +46,20 @@ public:
 class EnvoyGoogleAsyncClientImplTest : public testing::Test {
 public:
   EnvoyGoogleAsyncClientImplTest()
-      : dispatcher_(test_time_.timeSystem()),
+      : dispatcher_(test_time_.timeSystem()), api_(std::chrono::milliseconds(1000)),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     envoy::api::v2::core::GrpcService config;
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_target_uri("fake_address");
     google_grpc->set_stat_prefix("test_cluster");
-    tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(dispatcher_);
+    tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(api_);
     grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *tls_, stub_factory_,
                                                            stats_store_, config);
   }
 
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
+  Api::Impl api_;
   std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
   MockStubFactory stub_factory_;
   const Protobuf::MethodDescriptor* method_descriptor_;

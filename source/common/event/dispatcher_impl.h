@@ -51,7 +51,6 @@ public:
                                       bool bind_to_port,
                                       bool hand_off_restored_destination_connections) override;
   TimerPtr createTimer(TimerCb cb) override;
-  Thread::ThreadPtr createThread(std::function<void()> thread_routine) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
   SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override;

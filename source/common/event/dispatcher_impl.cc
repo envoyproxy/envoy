@@ -121,10 +121,6 @@ TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   return scheduler_->createTimer(cb);
 }
 
-Thread::ThreadPtr DispatcherImpl::createThread(std::function<void()> thread_routine) {
-  return std::make_unique<Thread::ThreadImpl>(thread_routine);
-}
-
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   ASSERT(isThreadSafe());
   current_to_delete_->emplace_back(std::move(to_delete));

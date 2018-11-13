@@ -117,12 +117,6 @@ public:
   virtual Event::TimerPtr createTimer(TimerCb cb) PURE;
 
   /**
-   * Create a thread.
-   * @param thread_routine supplies the function to invoke in the thread.
-   */
-  virtual Thread::ThreadPtr createThread(std::function<void()> thread_routine) PURE;
-
-  /**
    * Submit an item for deferred delete. @see DeferredDeletable.
    */
   virtual void deferredDelete(DeferredDeletablePtr&& to_delete) PURE;

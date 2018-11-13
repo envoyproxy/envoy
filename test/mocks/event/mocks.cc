@@ -1,7 +1,5 @@
 #include "mocks.h"
 
-#include "common/common/thread.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -24,10 +22,6 @@ MockDispatcher::MockDispatcher() : time_system_(&test_time_.timeSystem()) {
 }
 
 MockDispatcher::~MockDispatcher() {}
-
-Thread::ThreadPtr MockDispatcher::createThread(std::function<void()> thread_routine) {
-  return std::make_unique<Thread::ThreadImpl>(thread_routine);
-}
 
 MockTimer::MockTimer() {}
 

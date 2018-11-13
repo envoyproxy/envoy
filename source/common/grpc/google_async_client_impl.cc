@@ -13,8 +13,8 @@
 namespace Envoy {
 namespace Grpc {
 
-GoogleAsyncClientThreadLocal::GoogleAsyncClientThreadLocal(Event::Dispatcher& dispatcher)
-    : completion_thread_(dispatcher.createThread([this] { completionThread(); })) {}
+GoogleAsyncClientThreadLocal::GoogleAsyncClientThreadLocal(Api::Api& api)
+    : completion_thread_(api.createThread([this] { completionThread(); })) {}
 
 GoogleAsyncClientThreadLocal::~GoogleAsyncClientThreadLocal() {
   // Force streams to shutdown and invoke TryCancel() to start the drain of
