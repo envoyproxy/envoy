@@ -98,7 +98,7 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
         fmt::format("Error serializing access log to JSON: {}", conversion_status.ToString());
   }
 
-  return log_line;
+  return fmt::format("{}\n", log_line);
 }
 
 std::unordered_map<std::string, std::string> JsonFormatterImpl::toMap(
