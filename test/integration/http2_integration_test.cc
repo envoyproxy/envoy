@@ -145,7 +145,7 @@ TEST_P(Http2IntegrationTest, BadMagic) {
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
       },
-      version_);
+      version_, stats_store_);
 
   connection.run();
   EXPECT_EQ("", response);
@@ -160,7 +160,7 @@ TEST_P(Http2IntegrationTest, BadFrame) {
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
       },
-      version_);
+      version_, stats_store_);
 
   connection.run();
   EXPECT_TRUE(response.find("SETTINGS expected") != std::string::npos);
@@ -405,7 +405,7 @@ TEST_P(Http2IntegrationTest, DelayedCloseAfterBadFrame) {
         response.append(data.toString());
         connection.dispatcher().exit();
       },
-      version_);
+      version_, stats_store_);
 
   connection.run();
   EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
@@ -436,7 +436,7 @@ TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
         response.append(data.toString());
         connection.dispatcher().exit();
       },
-      version_);
+      version_, stats_store_);
 
   connection.run();
   EXPECT_THAT(response, HasSubstr("SETTINGS expected"));

@@ -205,6 +205,7 @@ public:
   ~IntegrationTestServer();
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
+  Stats::Store* statsStore() { return stat_store_; }
   Server::InstanceImpl& server() {
     RELEASE_ASSERT(server_ != nullptr, "");
     return *server_;

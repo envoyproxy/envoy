@@ -31,6 +31,23 @@ struct FileSystemStats {
 
 namespace Filesystem {
 
+class Instance {
+ public:
+  explicit Instance(std::chrono::milliseconds file_flush_interval_msec, Stats::Store& store);
+
+  FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
+                           Thread::BasicLockable& lock,
+                           std::chrono::milliseconds file_flush_interval_msec);
+  FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
+                           Thread::BasicLockable& lock) {
+    return createFile(path, dispatcher, lock, file_flush_interval_msec_);
+  }
+
+ private:
+  std::chrono::milliseconds file_flush_interval_msec_;
+  FileSystemStats file_stats_;
+};
+
 /**
  * @return bool whether a file exists on disk and can be opened for read.
  */

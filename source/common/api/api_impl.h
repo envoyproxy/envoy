@@ -27,8 +27,7 @@ public:
   std::string fileReadToEnd(const std::string& path) override;
 
 private:
-  std::chrono::milliseconds file_flush_interval_msec_;
-  FileSystemStats stats_;
+  Filesystem::Instance file_system_;
 };
 
 } // namespace Api

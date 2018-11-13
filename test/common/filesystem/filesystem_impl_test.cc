@@ -28,13 +28,20 @@ using testing::Throw;
 
 namespace Envoy {
 
-TEST(FileSystemImpl, BadFile) {
+class FileSystemImplTest : public testing::Test {
+ protected:
+  FileSystemImplTest() : file_system_(std::chrono::milliseconds(10000), stats_store_) {}
+
+  const std::chrono::milliseconds timeout_40ms_{40};
+  Stats::IsolatedStoreImpl stats_store_;
+  Filesystem::Instance file_system_;
+};
+
+TEST_F(FileSystemImplTest, BadFile) {
   Event::MockDispatcher dispatcher;
   Thread::MutexBasicLockable lock;
-  Stats::IsolatedStoreImpl store;
   EXPECT_CALL(dispatcher, createTimer_(_));
-  EXPECT_THROW(Filesystem::FileImpl("", dispatcher, lock, store, std::chrono::milliseconds(10000)),
-               EnvoyException);
+  EXPECT_THROW(file_system_.createFile("", dispatcher, lock), EnvoyException);
 }
 
 TEST(FileSystemImpl, fileExists) {
@@ -104,19 +111,19 @@ TEST(FilesystemImpl, IllegalPath) {
   EXPECT_TRUE(Filesystem::illegalPath("/_some_non_existent_file"));
 }
 
-TEST(FileSystemImpl, flushToLogFilePeriodically) {
+TEST_F(FileSystemImplTest, flushToLogFilePeriodically) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);
 
   Thread::MutexBasicLockable mutex;
-  Stats::IsolatedStoreImpl stats_store;
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).WillOnce(Return(5));
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
+  Filesystem::FileSharedPtr file = file_system_.createFile("", dispatcher, mutex,
+                                                           timeout_40ms_);
 
-  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
   EXPECT_CALL(os_sys_calls, write_(_, _, _))
       .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
         std::string written = std::string(reinterpret_cast<const char*>(buffer), num_bytes);
@@ -126,7 +133,7 @@ TEST(FileSystemImpl, flushToLogFilePeriodically) {
         return num_bytes;
       }));
 
-  file.write("test");
+  file->write("test");
 
   {
     Thread::LockGuard lock(os_sys_calls.write_mutex_);
@@ -145,8 +152,8 @@ TEST(FileSystemImpl, flushToLogFilePeriodically) {
       }));
 
   // make sure timer is re-enabled on callback call
-  file.write("test2");
-  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
+  file->write("test2");
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
   timer->callback_();
 
   {
@@ -157,27 +164,26 @@ TEST(FileSystemImpl, flushToLogFilePeriodically) {
   }
 }
 
-TEST(FileSystemImpl, flushToLogFileOnDemand) {
+TEST_F(FileSystemImplTest, flushToLogFileOnDemand) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);
 
   Thread::MutexBasicLockable mutex;
-  Stats::IsolatedStoreImpl stats_store;
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).WillOnce(Return(5));
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
+  Filesystem::FileSharedPtr file = file_system_.createFile("", dispatcher, mutex, timeout_40ms_);
 
-  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
 
   // The first write to a given file will start the flush thread, which can flush
   // immediately (race on whether it will or not). So do a write and flush to
   // get that state out of the way, then test that small writes don't trigger a flush.
   EXPECT_CALL(os_sys_calls, write_(_, _, _))
       .WillOnce(Invoke([](int, const void*, size_t num_bytes) -> ssize_t { return num_bytes; }));
-  file.write("prime-it");
-  file.flush();
+  file->write("prime-it");
+  file->flush();
   uint32_t expected_writes = 1;
   {
     Thread::LockGuard lock(os_sys_calls.write_mutex_);
@@ -193,14 +199,14 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
         return num_bytes;
       }));
 
-  file.write("test");
+  file->write("test");
 
   {
     Thread::LockGuard lock(os_sys_calls.write_mutex_);
     EXPECT_EQ(expected_writes, os_sys_calls.num_writes_);
   }
 
-  file.flush();
+  file->flush();
   expected_writes++;
   {
     Thread::LockGuard lock(os_sys_calls.write_mutex_);
@@ -217,8 +223,8 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
       }));
 
   // make sure timer is re-enabled on callback call
-  file.write("test2");
-  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
+  file->write("test2");
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
   timer->callback_();
   expected_writes++;
 
@@ -230,18 +236,17 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
   }
 }
 
-TEST(FileSystemImpl, reopenFile) {
+TEST_F(FileSystemImplTest, reopenFile) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);
 
   Thread::MutexBasicLockable mutex;
-  Stats::IsolatedStoreImpl stats_store;
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   Sequence sq;
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).InSequence(sq).WillOnce(Return(5));
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
+  Filesystem::FileSharedPtr file = file_system_.createFile("", dispatcher, mutex, timeout_40ms_);
 
   EXPECT_CALL(os_sys_calls, write_(_, _, _))
       .InSequence(sq)
@@ -253,7 +258,7 @@ TEST(FileSystemImpl, reopenFile) {
         return num_bytes;
       }));
 
-  file.write("before");
+  file->write("before");
   timer->callback_();
 
   {
@@ -278,8 +283,8 @@ TEST(FileSystemImpl, reopenFile) {
 
   EXPECT_CALL(os_sys_calls, close(10)).InSequence(sq);
 
-  file.reopen();
-  file.write("reopened");
+  file->reopen();
+  file->write("reopened");
   timer->callback_();
 
   {
@@ -290,7 +295,7 @@ TEST(FileSystemImpl, reopenFile) {
   }
 }
 
-TEST(FilesystemImpl, reopenThrows) {
+TEST_F(FileSystemImplTest, reopenThrows) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);
 
@@ -310,11 +315,11 @@ TEST(FilesystemImpl, reopenThrows) {
   Sequence sq;
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).InSequence(sq).WillOnce(Return(5));
 
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
+  Filesystem::FileSharedPtr file = file_system_.createFile("", dispatcher, mutex, timeout_40ms_);
   EXPECT_CALL(os_sys_calls, close(5)).InSequence(sq);
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).InSequence(sq).WillOnce(Return(-1));
 
-  file.write("test write");
+  file->write("test write");
   timer->callback_();
   {
     Thread::LockGuard lock(os_sys_calls.write_mutex_);
@@ -322,9 +327,9 @@ TEST(FilesystemImpl, reopenThrows) {
       os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
     }
   }
-  file.reopen();
+  file->reopen();
 
-  file.write("this is to force reopen");
+  file->write("this is to force reopen");
   timer->callback_();
 
   {
@@ -335,18 +340,18 @@ TEST(FilesystemImpl, reopenThrows) {
   }
 
   // write call should not cause any exceptions
-  file.write("random data");
+  file->write("random data");
   timer->callback_();
 }
 
-TEST(FilesystemImpl, bigDataChunkShouldBeFlushedWithoutTimer) {
+TEST_F(FileSystemImplTest, bigDataChunkShouldBeFlushedWithoutTimer) {
   NiceMock<Event::MockDispatcher> dispatcher;
   Thread::MutexBasicLockable mutex;
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
+  Filesystem::FileSharedPtr file = file_system_.createFile("", dispatcher, mutex, timeout_40ms_);
 
   EXPECT_CALL(os_sys_calls, write_(_, _, _))
       .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
@@ -359,7 +364,7 @@ TEST(FilesystemImpl, bigDataChunkShouldBeFlushedWithoutTimer) {
         return num_bytes;
       }));
 
-  file.write("a");
+  file->write("a");
 
   {
     Thread::LockGuard lock(os_sys_calls.write_mutex_);
@@ -382,7 +387,7 @@ TEST(FilesystemImpl, bigDataChunkShouldBeFlushedWithoutTimer) {
       }));
 
   std::string big_string(1024 * 64 + 1, 'b');
-  file.write(big_string);
+  file->write(big_string);
 
   {
     Thread::LockGuard lock(os_sys_calls.write_mutex_);

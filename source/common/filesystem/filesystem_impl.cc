@@ -94,6 +94,18 @@ bool illegalPath(const std::string& path) {
   }
 }
 
+Instance::Instance(std::chrono::milliseconds file_flush_interval_msec, Stats::Store& stats_store)
+    : file_flush_interval_msec_(file_flush_interval_msec),
+      file_stats_{FILESYSTEM_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
+                                   POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {}
+
+FileSharedPtr Instance::createFile(const std::string& path, Event::Dispatcher& dispatcher,
+                                   Thread::BasicLockable& lock,
+                                   std::chrono::milliseconds file_flush_interval_msec) {
+  return std::make_shared<Filesystem::FileImpl>(path, dispatcher, lock, file_stats_,
+                                                file_flush_interval_msec);
+};
+
 FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
                    Thread::BasicLockable& lock, FileSystemStats& stats,
                    std::chrono::milliseconds flush_interval_msec)

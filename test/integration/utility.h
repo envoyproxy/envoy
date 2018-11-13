@@ -60,7 +60,7 @@ public:
   typedef std::function<void(Network::ClientConnection&, const Buffer::Instance&)> ReadCallback;
 
   RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
-                      Network::Address::IpVersion version);
+                      Network::Address::IpVersion version, Stats::Store& stat_store);
   ~RawConnectionDriver();
   const Network::Connection& connection() { return *client_; }
   bool connecting() { return callbacks_->connecting_; }
@@ -124,7 +124,8 @@ public:
   static BufferingStreamDecoderPtr
   makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr, const std::string& method,
                     const std::string& url, const std::string& body, Http::CodecClient::Type type,
-                    const std::string& host = "host", const std::string& content_type = "");
+                    const std::string& host = "host", const std::string& content_type = "",
+                    Stats::Store* stats_store = nullptr);
 
   /**
    * Make a new connection, issues a request, and then disconnect when the request is complete.
@@ -143,7 +144,7 @@ public:
   makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
                     const std::string& body, Http::CodecClient::Type type,
                     Network::Address::IpVersion ip_version, const std::string& host = "host",
-                    const std::string& content_type = "");
+                    const std::string& content_type = "", Stats::Store* stats_store = nullptr);
 
   // TODO(jmarantz): this should be injectable.
   static DangerousDeprecatedTestTime evil_singleton_test_time_;

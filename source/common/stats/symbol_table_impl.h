@@ -144,7 +144,7 @@ public:
    * @return uint64_t the number of symbols in the symbol table.
    */
   uint64_t numSymbols() const override {
-    Thread::LockGuard lock(lock_);
+    absl::ReaderMutexLock lock(&lock_);
     ASSERT(encode_map_.size() == decode_map_.size());
     return encode_map_.size();
   }
@@ -209,12 +209,29 @@ private:
   friend class StatNameTest;
 
   struct SharedSymbol {
+    SharedSymbol(Symbol symbol) : symbol_(symbol), ref_count_(1) {}
+    /*
+    SharedSymbol(const SharedSymbol& src) : symbol_(src.symbol_), ref_count_(1) {
+      ASSERT(src.ref_count_ == 1);
+    }
+    SharedSymbol& operator=(const SharedSymbol& src) {
+      if (&src != this) {
+        ASSERT(src.ref_count_ == 1);
+        symbol_ = src.symbol_;
+        ref_count_ = 1;
+      }
+      return *this;
+    }
+    */
+
     Symbol symbol_;
-    uint32_t ref_count_;
+    std::atomic<uint32_t> ref_count_;
+    //uint32_t ref_count_;
   };
 
   // This must be called during both encode() and free().
-  mutable Thread::MutexBasicLockable lock_;
+  //mutable Thread::MutexBasicLockable lock_;]
+  mutable absl::Mutex lock_;
 
   std::string decodeSymbolVec(const SymbolVec& symbols) const;
 
@@ -240,7 +257,7 @@ private:
   void newSymbol();
 
   Symbol monotonicCounter() {
-    Thread::LockGuard lock(lock_);
+    absl::ReaderMutexLock lock(&lock_);
     return monotonic_counter_;
   }
 
@@ -254,8 +271,11 @@ private:
   // Bimap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
   // Using absl::string_view lets us only store the complete string once, in the decode map.
-  std::unordered_map<absl::string_view, SharedSymbol, StringViewHash> encode_map_ GUARDED_BY(lock_);
-  std::unordered_map<Symbol, std::string> decode_map_ GUARDED_BY(lock_);
+  using EncodeMap = absl::flat_hash_map<absl::string_view, std::unique_ptr<SharedSymbol>,
+                                        StringViewHash>;
+  using DecodeMap = absl::flat_hash_map<Symbol, std::unique_ptr<char[]>>;
+  EncodeMap encode_map_ GUARDED_BY(lock_);
+  DecodeMap decode_map_ GUARDED_BY(lock_);
 
   // Free pool of symbols for re-use.
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols

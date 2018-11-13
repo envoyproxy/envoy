@@ -39,6 +39,40 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   stats_overflow_.free(symbolTable());
 }
 
+void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
+  stats_matcher_ = std::move(stats_matcher);
+  if (stats_matcher_->acceptsAll()) {
+    return;
+  }
+
+  // The Filesystem and potentially other stat-registering objects are
+  // constructed prior to the stat-matcher, and those add stats
+  // in the default_scope. There should be no requests, so there will
+  // be no copies in TLS caches.
+  Thread::LockGuard lock(lock_);
+  for (ScopeImpl* scope : scopes_) {
+    removeRejectedStats(scope->central_cache_.counters_, deleted_counters_);
+    removeRejectedStats(scope->central_cache_.gauges_, deleted_gauges_);
+    removeRejectedStats(scope->central_cache_.histograms_, deleted_histograms_);
+  }
+}
+
+template<class StatMapClass, class StatListClass> void ThreadLocalStoreImpl::removeRejectedStats(
+    StatMapClass& map, StatListClass& list) {
+  std::vector<StatName> remove_list;
+  for (auto& stat : map) {
+    if (rejects(stat.first)) {
+      remove_list.push_back(stat.first);
+    }
+  }
+  for (StatName stat_name : remove_list) {
+    auto p = map.find(stat_name);
+    ASSERT(p != map.end());
+    list.push_back(p->second);  // Save SharedPtr to the list to avoid invalidating refs to stat.
+    map.erase(p);
+  }
+}
+
 bool ThreadLocalStoreImpl::rejects(StatName stat_name) const {
   // Don't both elaborating the StatName there are no pattern-based
   // exclusions;/inclusions.

@@ -463,7 +463,8 @@ public:
   }
   void makeRequest() {
     response_ = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
-                                                   downstreamProtocol(), version_);
+                                                   downstreamProtocol(), version_,
+                                                   "host", "", test_server_->statsStore());
     ASSERT_TRUE(response_->complete());
     EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
   }
@@ -519,8 +520,7 @@ TEST_P(StatsMatcherIntegrationTest, IncludeExact) {
       "listener_manager.listener_create_success");
   initialize();
   makeRequest();
-  EXPECT_THAT(response_->body(),
-              testing::Eq("listener_manager.listener_create_success: 1\nstats.overflow: 0\n"));
+  EXPECT_EQ(response_->body(), "listener_manager.listener_create_success: 1\n");
 }
 
 } // namespace Envoy
