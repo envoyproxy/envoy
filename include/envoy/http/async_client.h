@@ -177,19 +177,19 @@ public:
    */
   struct RequestOptions : public StreamOptions {
     RequestOptions& setTimeout(const absl::optional<std::chrono::milliseconds>& v) {
-      timeout = v;
+      StreamOptions::setTimeout(v);
       return *this;
     }
     RequestOptions& setTimeout(const std::chrono::milliseconds& v) {
-      timeout = v;
+      StreamOptions::setTimeout(v);
       return *this;
     }
     RequestOptions& setBufferBodyForRetry(bool v) {
-      buffer_body_for_retry = v;
+      StreamOptions::setBufferBodyForRetry(v);
       return *this;
     }
     RequestOptions& setSendXff(bool v) {
-      send_xff = v;
+      StreamOptions::seSendXff(v);
       return *this;
     }
 
