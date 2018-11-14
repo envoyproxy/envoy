@@ -17,6 +17,8 @@
 #include "extensions/filters/network/mongo_proxy/codec_impl.h"
 #include "extensions/filters/network/well_known_names.h"
 
+#include "absl/strings/str_split.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -24,22 +26,17 @@ namespace MongoProxy {
 
 class DynamicMetadataKeys {
 public:
-  const std::string CursorIdField{"cursor_id"};
-  const std::string CursorIdsField{"cursor_ids"};
-  const std::string DocumentIdsField{"document_ids"};
-  const std::string FlagsField{"flags"};
-  const std::string FullCollectionNameField{"full_collection_name"};
-  const std::string NumberOfCursorIdsField{"number_of_cursor_ids"};
-  const std::string NumberReturnedField{"number_returned"};
-  const std::string NumberToSkipField{"number_to_skip"};
-  const std::string NumberToReturnField{"number_to_return"};
+  const std::string CollectionField{"collection"};
+  const std::string CommandNameField{"command_name"};
+  const std::string DatabaseField{"database"};
   const std::string OperationField{"operation"};
+  const std::string OperationCommand{"OP_COMMAND"};
+  const std::string OperationCommandReply{"OP_COMMANDREPLY"};
   const std::string OperationGetMore{"OP_GET_MORE"};
   const std::string OperationInsert{"OP_INSERT"};
   const std::string OperationKillCursors{"OP_KILL_CURSORS"};
   const std::string OperationQuery{"OP_QUERY"};
   const std::string OperationReply{"OP_REPLY"};
-  const std::string StartingFromField{"starting_from"};
 };
 
 typedef ConstSingleton<DynamicMetadataKeys> DynamicMetadataKeysSingleton;
@@ -81,14 +78,6 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
 
 ProxyFilter::~ProxyFilter() { ASSERT(!delay_timer_); }
 
-void ProxyFilter::setDynamicMetadata(std::string field, double value) {
-  ProtobufWkt::Struct metadata;
-  auto& fields = *metadata.mutable_fields();
-  fields[field].set_number_value(value);
-  read_callbacks_->connection().streamInfo().setDynamicMetadata(
-      NetworkFilterNames::get().MongoProxy, metadata);
-}
-
 void ProxyFilter::setDynamicMetadata(std::string field, std::string value) {
   ProtobufWkt::Struct metadata;
   auto& fields = *metadata.mutable_fields();
@@ -97,37 +86,12 @@ void ProxyFilter::setDynamicMetadata(std::string field, std::string value) {
       NetworkFilterNames::get().MongoProxy, metadata);
 }
 
-void ProxyFilter::setDynamicMetadata(std::string field, const std::vector<int64_t>& values) {
-  ProtobufWkt::Struct metadata;
-  auto& fields = *metadata.mutable_fields();
-  auto& list_value = *fields[field].mutable_list_value();
-  for (std::vector<int64_t>::const_iterator it = values.begin(); it != values.end(); ++it) {
-    list_value.add_values()->set_number_value(*it);
-  }
-  read_callbacks_->connection().streamInfo().setDynamicMetadata(
-      NetworkFilterNames::get().MongoProxy, metadata);
-}
-
-void ProxyFilter::setDynamicMetadata(std::string field,
-                                     std::list<Bson::DocumentSharedPtr>& values) {
-  ProtobufWkt::Struct metadata;
-  auto& fields = *metadata.mutable_fields();
-  auto& list_value = *fields[field].mutable_list_value();
-  for (std::list<Bson::DocumentSharedPtr>::iterator it = values.begin(); it != values.end(); ++it) {
-    list_value.add_values()->set_string_value(it->get()->find("_id")->asString());
-  }
-  read_callbacks_->connection().streamInfo().setDynamicMetadata(
-      NetworkFilterNames::get().MongoProxy, metadata);
-}
-
 void ProxyFilter::decodeGetMore(GetMoreMessagePtr&& message) {
   tryInjectDelay();
 
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().CursorIdField, message->cursorId());
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().FullCollectionNameField,
-                     message->fullCollectionName());
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().NumberToReturnField,
-                     message->numberToReturn());
+  std::vector<std::string> names = absl::StrSplit(message->fullCollectionName(), '.');
+  setDynamicMetadata(DynamicMetadataKeysSingleton::get().DatabaseField, names[0]);
+  setDynamicMetadata(DynamicMetadataKeysSingleton::get().CollectionField, names[1]);
   setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationField,
                      DynamicMetadataKeysSingleton::get().OperationGetMore);
 
@@ -139,9 +103,9 @@ void ProxyFilter::decodeGetMore(GetMoreMessagePtr&& message) {
 void ProxyFilter::decodeInsert(InsertMessagePtr&& message) {
   tryInjectDelay();
 
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().FlagsField, message->flags());
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().FullCollectionNameField,
-                     message->fullCollectionName());
+  std::vector<std::string> names = absl::StrSplit(message->fullCollectionName(), '.');
+  setDynamicMetadata(DynamicMetadataKeysSingleton::get().DatabaseField, names[0]);
+  setDynamicMetadata(DynamicMetadataKeysSingleton::get().CollectionField, names[1]);
   setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationField,
                      DynamicMetadataKeysSingleton::get().OperationInsert);
 
@@ -153,9 +117,6 @@ void ProxyFilter::decodeInsert(InsertMessagePtr&& message) {
 void ProxyFilter::decodeKillCursors(KillCursorsMessagePtr&& message) {
   tryInjectDelay();
 
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().CursorIdsField, message->cursorIds());
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().NumberOfCursorIdsField,
-                     message->numberOfCursorIds());
   setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationField,
                      DynamicMetadataKeysSingleton::get().OperationKillCursors);
 
@@ -167,13 +128,9 @@ void ProxyFilter::decodeKillCursors(KillCursorsMessagePtr&& message) {
 void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
   tryInjectDelay();
 
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().FlagsField, message->flags());
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().FullCollectionNameField,
-                     message->fullCollectionName());
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().NumberToSkipField,
-                     message->numberToSkip());
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().NumberToReturnField,
-                     message->numberToReturn());
+  std::vector<std::string> names = absl::StrSplit(message->fullCollectionName(), '.');
+  setDynamicMetadata(DynamicMetadataKeysSingleton::get().DatabaseField, names[0]);
+  setDynamicMetadata(DynamicMetadataKeysSingleton::get().CollectionField, names[1]);
   setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationField,
                      DynamicMetadataKeysSingleton::get().OperationQuery);
 
@@ -239,15 +196,8 @@ void ProxyFilter::chargeQueryStats(const std::string& prefix,
 }
 
 void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().CursorIdField, message->cursorId());
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().DocumentIdsField, message->documents());
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().FlagsField, message->flags());
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().NumberReturnedField,
-                     message->numberReturned());
   setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationField,
                      DynamicMetadataKeysSingleton::get().OperationReply);
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().StartingFromField,
-                     message->startingFrom());
 
   stats_.op_reply_.inc();
   logMessage(*message, false);
@@ -315,6 +265,11 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
 void ProxyFilter::decodeCommand(CommandMessagePtr&& message) {
   tryInjectDelay();
 
+  setDynamicMetadata(DynamicMetadataKeysSingleton::get().DatabaseField, message->database());
+  setDynamicMetadata(DynamicMetadataKeysSingleton::get().CommandNameField, message->commandName());
+  setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationField,
+                     DynamicMetadataKeysSingleton::get().OperationCommand);
+
   stats_.op_command_.inc();
   logMessage(*message, true);
   ENVOY_LOG(debug, "decoded COMMAND: {}", message->toString(true));
@@ -322,6 +277,9 @@ void ProxyFilter::decodeCommand(CommandMessagePtr&& message) {
 
 void ProxyFilter::decodeCommandReply(CommandReplyMessagePtr&& message) {
   tryInjectDelay();
+
+  setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationField,
+                     DynamicMetadataKeysSingleton::get().OperationCommandReply);
 
   stats_.op_command_reply_.inc();
   logMessage(*message, true);
