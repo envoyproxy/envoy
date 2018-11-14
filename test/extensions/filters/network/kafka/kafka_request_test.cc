@@ -29,7 +29,7 @@ TEST(RequestParserResolver, ShouldReturnSentinelIfRequestTypeIsNotRegistered) {
 TEST(RequestParserResolver, ShouldReturnSentinelIfRequestVersionIsNotRegistered) {
   // given
   GeneratorFunction generator = [](RequestContextSharedPtr arg) -> ParserSharedPtr {
-    return std::make_shared<FatProduceRequestV0Parser>(arg);
+    return std::make_shared<OffsetCommitRequestV0Parser>(arg);
   };
   RequestParserResolver testee{{{0, {0, 1}, generator}}};
   RequestContextSharedPtr context{new RequestContext{}};
@@ -46,7 +46,7 @@ TEST(RequestParserResolver, ShouldReturnSentinelIfRequestVersionIsNotRegistered)
 TEST(RequestParserResolver, ShouldInvokeGeneratorFunctionOnMatch) {
   // given
   GeneratorFunction generator = [](RequestContextSharedPtr arg) -> ParserSharedPtr {
-    return std::make_shared<FatProduceRequestV0Parser>(arg);
+    return std::make_shared<OffsetCommitRequestV0Parser>(arg);
   };
   RequestParserResolver testee{{{0, {0, 1, 2, 3}, generator}}};
   RequestContextSharedPtr context{new RequestContext{}};
@@ -56,7 +56,7 @@ TEST(RequestParserResolver, ShouldInvokeGeneratorFunctionOnMatch) {
 
   // then
   ASSERT_NE(result, nullptr);
-  ASSERT_NE(std::dynamic_pointer_cast<FatProduceRequestV0Parser>(result), nullptr);
+  ASSERT_NE(std::dynamic_pointer_cast<OffsetCommitRequestV0Parser>(result), nullptr);
 }
 
 class BufferBasedTest : public testing::Test {
@@ -104,7 +104,7 @@ public:
 TEST_F(BufferBasedTest, RequestHeaderParserShouldExtractHeaderDataAndResolveNextParser) {
   // given
   const MockRequestParserResolver parser_resolver;
-  const ParserSharedPtr parser{new ApiVersionsRequestV0Parser{nullptr}};
+  const ParserSharedPtr parser{new OffsetCommitRequestV0Parser{nullptr}};
   EXPECT_CALL(parser_resolver, createParser(_, _, _)).WillOnce(Return(parser));
 
   const INT32 request_len = 1000;
