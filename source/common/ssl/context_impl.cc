@@ -275,9 +275,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   return out;
 }
 
-bssl::UniquePtr<SSL> ContextImpl::newSsl() const {
-  return bssl::UniquePtr<SSL>(SSL_new(ctx_.get()));
-}
+bssl::UniquePtr<SSL> ContextImpl::newSsl() { return bssl::UniquePtr<SSL>(SSL_new(ctx_.get())); }
 
 int ContextImpl::ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* ctx) {
   if (!ok) {
@@ -510,7 +508,7 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
   }
 }
 
-bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
+bssl::UniquePtr<SSL> ClientContextImpl::newSsl() {
   bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl());
 
   if (!server_name_indication_.empty()) {

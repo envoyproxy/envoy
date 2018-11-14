@@ -43,7 +43,7 @@ struct SslStats {
 
 class ContextImpl : public virtual Context {
 public:
-  virtual bssl::UniquePtr<SSL> newSsl() const;
+  virtual bssl::UniquePtr<SSL> newSsl();
 
   /**
    * Logs successful TLS handshake and updates stats.
@@ -144,7 +144,7 @@ public:
   ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config,
                     TimeSource& time_source);
 
-  bssl::UniquePtr<SSL> newSsl() const override;
+  bssl::UniquePtr<SSL> newSsl() override;
 
 private:
   int newSessionKey(SSL_SESSION* session);
@@ -152,8 +152,8 @@ private:
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
   const size_t max_session_keys_;
-  mutable absl::Mutex session_keys_mu_;
-  mutable std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ GUARDED_BY(session_keys_mu_);
+  absl::Mutex session_keys_mu_;
+  std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ GUARDED_BY(session_keys_mu_);
 };
 
 class ServerContextImpl : public ContextImpl, public ServerContext {
