@@ -49,6 +49,17 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "contention_lib",
+    srcs = ["contention.cc"],
+    hdrs = ["contention.h"],
+    deps = [
+        "//source/common/common:mutex_tracer_lib",
+        "//source/common/common:thread_lib",
+        "//test/test_common:test_time_lib",
+    ],
+)
+
 envoy_cc_library(
     name = "printers_lib",
     srcs = ["printers.cc"],
@@ -82,6 +93,7 @@ envoy_cc_test_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:bootstrap_json_lib",
+        "//source/common/filesystem:directory_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",

@@ -238,12 +238,31 @@ message CommonTlsContext {
   // Configs for fetching TLS certificates via SDS API.
   repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6;
 
+  message CombinedCertificateValidationContext {
+    // How to validate peer certificates.
+    CertificateValidationContext default_validation_context = 1
+        [(validate.rules).message.required = true];
+
+    // Config for fetching validation context via SDS API.
+    SdsSecretConfig validation_context_sds_secret_config = 2
+        [(validate.rules).message.required = true];
+  };
+
   oneof validation_context_type {
     // How to validate peer certificates.
     CertificateValidationContext validation_context = 3;
 
     // Config for fetching validation context via SDS API.
     SdsSecretConfig validation_context_sds_secret_config = 7;
+
+    // Combined certificate validation context holds a default CertificateValidationContext
+    // and SDS config. When SDS server returns dynamic CertificateValidationContext, both dynamic
+    // and default CertificateValidationContext are merged into a new CertificateValidationContext
+    // for validation. This merge is done by Message::MergeFrom(), so dynamic
+    // CertificateValidationContext overwrites singular fields in default
+    // CertificateValidationContext, and concatenates repeated fields to default
+    // CertificateValidationContext, and logical OR is applied to boolean fields.
+    CombinedCertificateValidationContext combined_validation_context = 8;
   }
 
   // Supplies the list of ALPN protocols that the listener should expose. In

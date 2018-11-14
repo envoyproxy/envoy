@@ -65,12 +65,13 @@ public:
     EXPECT_CALL(overload_manager_, start());
     ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
 
-    helper_ =
-        std::make_unique<RunHelper>(server_, dispatcher_, cm_, access_log_manager_, init_manager_,
-                                    overload_manager_, [this] { start_workers_.ready(); });
+    helper_ = std::make_unique<RunHelper>(server_, options_, dispatcher_, cm_, access_log_manager_,
+                                          init_manager_, overload_manager_,
+                                          [this] { start_workers_.ready(); });
   }
 
   NiceMock<MockInstance> server_;
+  testing::NiceMock<MockOptions> options_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
@@ -365,6 +366,13 @@ TEST_P(ServerInstanceImplTest, UnknownExceptionThrowInConstructor) {
     throw(FakeException("foobar"));
   }));
   EXPECT_THROW_WITH_MESSAGE(initialize("test/server/node_bootstrap.yaml"), FakeException, "foobar");
+}
+
+TEST_P(ServerInstanceImplTest, MutexContentionEnabled) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.mutex_tracing_enabled_ = true;
+  EXPECT_NO_THROW(initialize(std::string()));
 }
 
 } // namespace Server

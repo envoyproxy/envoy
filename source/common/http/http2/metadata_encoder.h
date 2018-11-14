@@ -3,9 +3,10 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/http/codec.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
-#include "common/http/http2/metadata_interface.h"
 
 #include "nghttp2/nghttp2.h"
 
@@ -19,7 +20,7 @@ namespace Http2 {
  */
 class MetadataEncoder : Logger::Loggable<Logger::Id::http2> {
 public:
-  MetadataEncoder(uint64_t stream_id);
+  MetadataEncoder();
 
   /**
    * Creates wire format HTTP/2 header block from metadata_map. Only after previous payload is
@@ -28,7 +29,7 @@ public:
    * @param metadata_map supplies METADATA to encode.
    * @return whether encoding is successful.
    */
-  bool createPayload(MetadataMap& metadata_map);
+  bool createPayload(const MetadataMap& metadata_map);
 
   /**
    * Called in nghttp2 callback function after METADATA is submitted. The function releases len data
@@ -48,37 +49,19 @@ public:
    */
   Buffer::OwnedImpl& payload() { return payload_; }
 
-  /**
-   * TODO(soya3129): move those functions to MetadataHandler, since it's session level parameter.
-   * Set max payload size for METADATA frame.
-   * @param size supplies max frame size.
-   */
-  void setMaxMetadataSize(size_t size) { max_frame_size_ = size; }
-  /**
-   * Get max payload size for METADATA frame.
-   * @return max frame size.
-   */
-  uint64_t getMaxMetadataSize() { return max_frame_size_; }
-
 private:
   /**
    * Creates wired format header blocks using nghttp2.
    * @param metadata_map supplies METADATA to encode.
    * @return true if the creation succeeds.
    */
-  bool createHeaderBlockUsingNghttp2(MetadataMap& metadata_map);
+  bool createHeaderBlockUsingNghttp2(const MetadataMap& metadata_map);
 
   // The METADATA payload to be sent.
   Buffer::OwnedImpl payload_;
 
-  // Max payload size for METADATA frame.
-  uint64_t max_frame_size_ = 16384;
-
   // Max payload size bound.
   const uint64_t max_payload_size_bound_ = 1024 * 1024;
-
-  // The stream id the encoder is associated with.
-  const uint64_t stream_id_;
 
   // Default HPACK table size.
   const size_t header_table_size_ = 4096;

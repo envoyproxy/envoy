@@ -23,6 +23,7 @@ envoy_cc_library(
     hdrs = ["codec.h"],
     deps = [
         ":header_map_interface",
+        ":metadata_interface",
         ":protocol_interface",
         "//include/envoy/buffer:buffer_interface",
     ],
@@ -46,11 +47,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":codec_interface",
         ":header_map_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/grpc:status",
         "//include/envoy/router:router_interface",
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/tracing:http_tracer_interface",
@@ -80,4 +83,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "query_params_interface",
     hdrs = ["query_params.h"],
+)
+
+envoy_cc_library(
+    name = "metadata_interface",
+    hdrs = ["metadata_interface.h"],
 )

@@ -39,6 +39,8 @@ envoy_cc_library(
         "ssl",
     ],
     deps = [
+        ":certificate_validation_context_config_impl_lib",
+        ":tls_certificate_config_impl_lib",
         "//include/envoy/secret:secret_callbacks_interface",
         "//include/envoy/secret:secret_provider_interface",
         "//include/envoy/server:transport_socket_config_interface",
@@ -49,6 +51,7 @@ envoy_cc_library(
         "//source/common/config:tls_context_json_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/secret:sds_api_lib",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )

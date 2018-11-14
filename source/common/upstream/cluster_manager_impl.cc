@@ -347,14 +347,15 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     //
     // See https://github.com/envoyproxy/envoy/pull/3941 for more context.
     bool scheduled = false;
-    const bool merging_enabled = cluster.info()->lbConfig().has_update_merge_window();
+    const auto merge_timeout =
+        PROTOBUF_GET_MS_OR_DEFAULT(cluster.info()->lbConfig(), update_merge_window, 1000);
     // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
     const bool is_mergeable = !hosts_added.size() && !hosts_removed.size();
 
-    if (merging_enabled) {
+    if (merge_timeout > 0) {
       // If this is not mergeable, we should cancel any scheduled updates since
       // we'll deliver it immediately.
-      scheduled = scheduleUpdate(cluster, priority, is_mergeable);
+      scheduled = scheduleUpdate(cluster, priority, is_mergeable, merge_timeout);
     }
 
     // If an update was not scheduled for later, deliver it immediately.
@@ -374,10 +375,8 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 }
 
-bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable) {
-  const auto& update_merge_window = cluster.info()->lbConfig().update_merge_window();
-  const auto timeout = DurationUtil::durationToMilliseconds(update_merge_window);
-
+bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable,
+                                        const uint64_t timeout) {
   // Find pending updates for this cluster.
   auto& updates_by_prio = updates_map_[cluster.info()->name()];
   if (!updates_by_prio) {

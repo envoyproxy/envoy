@@ -17,6 +17,8 @@ envoy_cc_library(
         "abseil_optional",
     ],
     deps = [
+        ":metadata_decoder_lib",
+        ":metadata_encoder_lib",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codec_interface",
@@ -53,6 +55,7 @@ envoy_cc_library(
         "//include/envoy/stats:timespan",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/http:codec_client_lib",
+        "//source/common/http:conn_pool_base_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_lib",
     ],
@@ -66,7 +69,7 @@ envoy_cc_library(
         "nghttp2",
     ],
     deps = [
-        ":metadata_interface_lib",
+        "//include/envoy/http:codec_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
@@ -82,15 +85,10 @@ envoy_cc_library(
         "nghttp2",
     ],
     deps = [
-        ":metadata_interface_lib",
+        "//include/envoy/http:codec_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:stack_array",
     ],
-)
-
-envoy_cc_library(
-    name = "metadata_interface_lib",
-    hdrs = ["metadata_interface.h"],
 )
