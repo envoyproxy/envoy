@@ -182,10 +182,6 @@ public:
   ~IntegrationTestServer();
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
-  Server::InstanceImpl& server() {
-    RELEASE_ASSERT(server_ != nullptr, "");
-    return *server_;
-  }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
     on_worker_listener_added_cb_ = on_worker_listener_added;
   }
@@ -275,15 +271,14 @@ private:
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic);
 
   Event::TestTimeSystem& time_system_;
+  Api::Api& api_;
   const std::string config_path_;
   Thread::ThreadPtr thread_;
   Thread::CondVar listeners_cv_;
   Thread::MutexBasicLockable listeners_mutex_;
   uint64_t pending_listeners_;
   ConditionalInitializer server_set_;
-  std::unique_ptr<Server::InstanceImpl> server_;
   Server::TestDrainManager* drain_manager_{};
-  Stats::Store* stat_store_{};
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
   TcpDumpPtr tcp_dump_;
@@ -292,8 +287,9 @@ private:
 // Default implementation of IntegrationTestServer
 class IntegrationTestServerImpl : public IntegrationTestServer {
 public:
-  IntegrationTestServerImpl(Event::TestTimeSystem& time_system, const std::string& config_path)
-      : IntegrationTestServer(time_system, config_path) {}
+  IntegrationTestServerImpl(Event::TestTimeSystem& time_system, Api::Api& api,
+                            const std::string& config_path)
+      : IntegrationTestServer(time_system, api, config_path) {}
 
   ~IntegrationTestServerImpl() override;
 

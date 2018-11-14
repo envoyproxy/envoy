@@ -48,7 +48,7 @@ IntegrationTestServerPtr
 IntegrationTestServer::create(const std::string& config_path,
                               const Network::Address::IpVersion version,
                               std::function<void()> pre_worker_start_test_steps, bool deterministic,
-                              Event::TestTimeSystem& time_system) {
+                              Event::TestTimeSystem& time_system, Api::Api& api) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
   server->start(version, pre_worker_start_test_steps, deterministic);
@@ -131,14 +131,8 @@ void IntegrationTestServer::serverReady() {
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic) {
   OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version));
-  Server::HotRestartNopImpl restarter;
   Thread::MutexBasicLockable lock;
 
-  ThreadLocal::InstanceImpl tls;
-  Stats::HeapStatDataAllocator stats_allocator;
-  Stats::StatsOptionsImpl stats_options;
-  Stats::ThreadLocalStoreImpl stats_store(stats_options, stats_allocator);
-  stat_store_ = &stats_store;
   Runtime::RandomGeneratorPtr random_generator;
   if (deterministic) {
     random_generator = std::make_unique<testing::NiceMock<Runtime::MockRandomGenerator>>();
