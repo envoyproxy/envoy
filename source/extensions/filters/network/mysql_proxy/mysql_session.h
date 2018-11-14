@@ -26,7 +26,7 @@ public:
     MYSQL_ERROR = 12,
   };
 
-  MysqlSession() { cinfo_ = {}; };
+  MysqlSession() = default;
   uint64_t GetId() { return cinfo_.id; }
   void SetId(uint64_t id) { cinfo_.id = id; }
   void SetState(MysqlSession::State state) { cinfo_.state = state; }

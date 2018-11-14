@@ -72,7 +72,7 @@ class MysqlFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter>
  public:
    MysqlFilter(MysqlFilterConfigSharedPtr config);
    MysqlSession& getSession() { return session_; }
-   ~MysqlFilter() {};
+  ~MysqlFilter() = default;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data,
