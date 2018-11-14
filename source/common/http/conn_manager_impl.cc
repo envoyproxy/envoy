@@ -1027,9 +1027,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     }
   }
 
-  // If we're encoding a headers only response, then the HTTP/1 codec will reset the request
-  // when we encode the headers, so set this to prevent us from attempting to reset it again
-  // in doEndStream.
+
+  // If we're encoding a headers only response, then mark the local as complete. This ensures
+  // that we don't attempt to reset the downstream request in doEndStream.
   if (encoding_headers_only_) {
     state_.local_complete_ = true;
   }

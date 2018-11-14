@@ -143,6 +143,10 @@ TEST_P(IntegrationTest, EncodingHeaderOnlyResponse) { testHeadersOnlyFilterEncod
 
 TEST_P(IntegrationTest, DecodingHeaderOnlyResponse) { testHeadersOnlyFilterDecoding(); }
 
+TEST_P(IntegrationTest, EncodingHeaderOnlyResponseIntermediateFilters) { testHeadersOnlyFilterEncodingIntermediateFilters(); }
+
+TEST_P(IntegrationTest, DecodingHeaderOnlyResponseIntermediateFilters) { testHeadersOnlyFilterDecodingIntermediateFilters(); }
+
 TEST_P(IntegrationTest, DecodingHeaderOnlyInterleaved) { testHeadersOnlyFilterInterleaved(); }
 
 TEST_P(IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }

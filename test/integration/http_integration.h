@@ -142,6 +142,8 @@ protected:
   void testUpstreamDisconnectWithTwoRequests();
   void testHeadersOnlyFilterEncoding();
   void testHeadersOnlyFilterDecoding();
+  void testHeadersOnlyFilterEncodingIntermediateFilters();
+  void testHeadersOnlyFilterDecodingIntermediateFilters();
   void testHeadersOnlyFilterInterleaved();
   // HTTP/1 tests
   void testBadFirstline();
