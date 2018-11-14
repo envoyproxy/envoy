@@ -388,7 +388,7 @@ void verifyJsonOutput(std::string json_string,
 
   // Every json log line should have only one newline character, and it should be the last character
   // in the string
-  auto newline_pos = json_string.find('\n');
+  const auto newline_pos = json_string.find('\n');
   EXPECT_NE(newline_pos, std::string::npos);
   EXPECT_EQ(newline_pos, json_string.length() - 1);
 
