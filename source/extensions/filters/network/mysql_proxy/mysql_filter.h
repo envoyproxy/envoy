@@ -63,7 +63,7 @@ private:
   }
 };
 
-typedef std::shared_ptr<MysqlFilterConfig> MysqlFilterConfigSharedPtr;
+using MysqlFilterConfigSharedPtr = std::shared_ptr<MysqlFilterConfig>;
 
 /**
  * Implementation of mysql network filter.
@@ -72,7 +72,7 @@ class MysqlFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter>
  public:
    MysqlFilter(MysqlFilterConfigSharedPtr config);
    MysqlSession& getSession() { return session_; }
-  ~MysqlFilter() = default;
+  ~MysqlFilter() override = default;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data,
