@@ -110,9 +110,8 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
 
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
                                          ReadCallback data_callback,
-                                         Network::Address::IpVersion version,
-                                         Stats::Store& stats_store) {
-  api_ = std::make_unique<Api::Impl>(std::chrono::milliseconds(10000), stats_store);
+                                         Network::Address::IpVersion version) {
+  api_ = std::make_unique<Api::Impl>(std::chrono::milliseconds(10000), stats_store_);
   dispatcher_ = api_->allocateDispatcher(IntegrationUtil::evil_singleton_test_time_.timeSystem());
   callbacks_ = std::make_unique<ConnectionCallbacks>();
   client_ = dispatcher_->createClientConnection(

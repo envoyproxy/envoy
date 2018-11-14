@@ -13,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/http/codec_client.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
@@ -60,7 +61,7 @@ public:
   typedef std::function<void(Network::ClientConnection&, const Buffer::Instance&)> ReadCallback;
 
   RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
-                      Network::Address::IpVersion version, Stats::Store& stat_store);
+                      Network::Address::IpVersion version);
   ~RawConnectionDriver();
   const Network::Connection& connection() { return *client_; }
   bool connecting() { return callbacks_->connecting_; }
@@ -99,6 +100,7 @@ private:
   };
 
   Api::ApiPtr api_;
+  Stats::IsolatedStoreImpl stats_store_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;
