@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "mocks.h"
 
 #include "common/stats/symbol_table_impl.h"
@@ -171,7 +173,7 @@ void MockSymbolTable::debugPrint() const {}
 #endif
 
 MockIsolatedStatsStore::MockIsolatedStatsStore()
-    : IsolatedStoreImpl(std::make_shared<MockSymbolTable>()) {}
+    : IsolatedStoreImpl(std::make_unique<MockSymbolTable>()) {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() {}
 
 } // namespace Stats

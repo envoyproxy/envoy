@@ -58,7 +58,8 @@ private:
 class IsolatedStoreImpl : public Store {
 public:
   IsolatedStoreImpl();
-  explicit IsolatedStoreImpl(const SharedSymbolTable& symbol_table);
+  explicit IsolatedStoreImpl(std::unique_ptr<SymbolTable> symbol_table);
+  explicit IsolatedStoreImpl(SymbolTable& symbol_table);
 
   // Stats::Scope
   Counter& counterx(StatName name) override { return counters_.get(name); }
@@ -70,8 +71,8 @@ public:
     return histogram;
   }
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
-  const SymbolTable& symbolTable() const override { return *symbol_table_; }
-  virtual SymbolTable& symbolTable() override { return *symbol_table_; }
+  const SymbolTable& symbolTable() const override { return symbol_table_; }
+  virtual SymbolTable& symbolTable() override { return symbol_table_; }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
@@ -94,7 +95,8 @@ public:
   }
 
 private:
-  SharedSymbolTable symbol_table_;
+  std::unique_ptr<SymbolTable> symbol_table_storage_;
+  SymbolTable& symbol_table_;
   HeapStatDataAllocator alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;

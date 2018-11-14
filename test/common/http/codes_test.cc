@@ -25,8 +25,7 @@ namespace Http {
 class CodeUtilityTest : public testing::Test {
 public:
   CodeUtilityTest()
-      : symbol_table_(std::make_shared<Stats::SymbolTableImpl>()), global_store_(symbol_table_),
-        cluster_scope_(symbol_table_), code_stats_(*symbol_table_) {}
+      : global_store_(symbol_table_), cluster_scope_(symbol_table_), code_stats_(symbol_table_) {}
 
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    const std::string& request_vhost_name = EMPTY_STRING,
@@ -40,7 +39,7 @@ public:
     code_stats_.chargeResponseStat(info);
   }
 
-  Stats::SharedSymbolTable symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
@@ -203,8 +202,8 @@ TEST_F(CodeUtilityTest, PerZoneStats) {
 }
 
 TEST_F(CodeUtilityTest, ResponseTimingTest) {
-  Stats::MockStore global_store(*symbol_table_);
-  Stats::MockStore cluster_scope(*symbol_table_);
+  Stats::MockStore global_store(symbol_table_);
+  Stats::MockStore cluster_scope(symbol_table_);
 
   Http::CodeStats::ResponseTimingInfo info{
       global_store, cluster_scope, "prefix.",    std::chrono::milliseconds(5),

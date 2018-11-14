@@ -267,6 +267,8 @@ public:
     return Server::InstanceUtil::createRuntime(server, config);
   }
 
+  Stats::Store& stats() { return server_->stats(); }
+
 protected:
   IntegrationTestServer(Event::TestTimeSystem& time_system, const std::string& config_path)
       : time_system_(time_system), config_path_(config_path) {}

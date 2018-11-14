@@ -183,15 +183,16 @@ public:
                            const std::vector<std::string>& port_names);
 
   Event::TestTimeSystem& timeSystem() { return *time_system_; }
+  //Stats::Store& stats() { return *stats_; }
 
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
+
 private:
   TestTimeSystemPtr time_system_;
 
 public:
   Event::DispatcherPtr dispatcher_;
-  Stats::MockIsolatedStatsStore stats_store_;
-  Api::ApiPtr api_;
+  //Api::ApiPtr api_;
 
   /**
    * Open a connection to Envoy, send a series of bytes, and return the
@@ -222,6 +223,8 @@ protected:
   uint32_t fake_upstreams_count_{1};
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;
+  //std::unique_ptr<Stats::IsolatedStoreImpl> stats_;
+
   // A map of keys to port names. Generally the names are pulled from the v2 listener name
   // but if a listener is created via ADS, it will be from whatever key is used with registerPort.
   TestEnvironment::PortMap port_map_;

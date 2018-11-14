@@ -13,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/http/codec_client.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
@@ -60,7 +61,7 @@ public:
   typedef std::function<void(Network::ClientConnection&, const Buffer::Instance&)> ReadCallback;
 
   RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
-                      Network::Address::IpVersion version, Stats::Store& stat_store);
+                      Network::Address::IpVersion version);
   ~RawConnectionDriver();
   const Network::Connection& connection() { return *client_; }
   bool connecting() { return callbacks_->connecting_; }
@@ -98,6 +99,7 @@ private:
     Network::ConnectionEvent last_connection_event_;
   };
 
+  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<ConnectionCallbacks> callbacks_;
@@ -124,8 +126,7 @@ public:
   static BufferingStreamDecoderPtr
   makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr, const std::string& method,
                     const std::string& url, const std::string& body, Http::CodecClient::Type type,
-                    const std::string& host = "host", const std::string& content_type = "",
-                    Stats::Store* stats_store = nullptr);
+                    const std::string& host = "host", const std::string& content_type = "");
 
   /**
    * Make a new connection, issues a request, and then disconnect when the request is complete.
@@ -144,7 +145,7 @@ public:
   makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
                     const std::string& body, Http::CodecClient::Type type,
                     Network::Address::IpVersion ip_version, const std::string& host = "host",
-                    const std::string& content_type = "", Stats::Store* stats_store = nullptr);
+                    const std::string& content_type = "");
 
   // TODO(jmarantz): this should be injectable.
   static DangerousDeprecatedTestTime evil_singleton_test_time_;

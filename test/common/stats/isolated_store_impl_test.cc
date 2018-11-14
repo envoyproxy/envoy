@@ -11,11 +11,14 @@
 namespace Envoy {
 namespace Stats {
 
-TEST(StatsIsolatedStoreImplTest, All) {
-  IsolatedStoreImpl store;
+class StatsIsolatedStoreImplTest: public testing::Test {
+ protected:
+  IsolatedStoreImpl store_;
+};
 
-  ScopePtr scope1 = store.createScope("scope1.");
-  Counter& c1 = store.counter("c1");
+TEST_F(StatsIsolatedStoreImplTest, All) {
+  ScopePtr scope1 = store_.createScope("scope1.");
+  Counter& c1 = store_.counter("c1");
   Counter& c2 = scope1->counter("c2");
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
@@ -24,7 +27,7 @@ TEST(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
 
-  Gauge& g1 = store.gauge("g1");
+  Gauge& g1 = store_.gauge("g1");
   Gauge& g2 = scope1->gauge("g2");
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
@@ -33,7 +36,7 @@ TEST(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(0, g1.tags().size());
   EXPECT_EQ(0, g1.tags().size());
 
-  Histogram& h1 = store.histogram("h1");
+  Histogram& h1 = store_.histogram("h1");
   Histogram& h2 = scope1->histogram("h2");
   scope1->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
@@ -52,16 +55,15 @@ TEST(StatsIsolatedStoreImplTest, All) {
   ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counter("bar").name());
 
-  EXPECT_EQ(4UL, store.counters().size());
-  EXPECT_EQ(2UL, store.gauges().size());
+  EXPECT_EQ(4UL, store_.counters().size());
+  EXPECT_EQ(2UL, store_.gauges().size());
 }
 
-TEST(StatsIsolatedStoreImplTest, LongStatName) {
-  IsolatedStoreImpl store;
+TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
   Stats::StatsOptionsImpl stats_options;
   const std::string long_string(stats_options.maxNameLength() + 1, 'A');
 
-  ScopePtr scope = store.createScope("scope.");
+  ScopePtr scope = store_.createScope("scope.");
   Counter& counter = scope->counter(long_string);
   EXPECT_EQ(absl::StrCat("scope.", long_string), counter.name());
 }
@@ -80,11 +82,10 @@ struct TestStats {
   ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
-TEST(StatsMacros, All) {
-  IsolatedStoreImpl stats_store;
-  TestStats test_stats{ALL_TEST_STATS(POOL_COUNTER_PREFIX(stats_store, "test."),
-                                      POOL_GAUGE_PREFIX(stats_store, "test."),
-                                      POOL_HISTOGRAM_PREFIX(stats_store, "test."))};
+TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
+  TestStats test_stats{ALL_TEST_STATS(POOL_COUNTER_PREFIX(store_, "test."),
+                                      POOL_GAUGE_PREFIX(store_, "test."),
+                                      POOL_HISTOGRAM_PREFIX(store_, "test."))};
 
   Counter& counter = test_stats.test_counter_;
   EXPECT_EQ("test.test_counter", counter.name());

@@ -13,10 +13,15 @@
 namespace Envoy {
 namespace Stats {
 
-IsolatedStoreImpl::IsolatedStoreImpl() : IsolatedStoreImpl(std::make_shared<SymbolTableImpl>()) {}
+IsolatedStoreImpl::IsolatedStoreImpl() : IsolatedStoreImpl(std::make_unique<SymbolTableImpl>()) {}
 
-IsolatedStoreImpl::IsolatedStoreImpl(const SharedSymbolTable& symbol_table)
-    : symbol_table_(symbol_table), alloc_(*symbol_table_),
+IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable> symbol_table)
+    : IsolatedStoreImpl(*symbol_table) {
+  symbol_table_storage_ = std::move(symbol_table);
+}
+
+IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
+    : symbol_table_(symbol_table), alloc_(symbol_table_),
       counters_([this](StatName name) -> CounterSharedPtr {
         return alloc_.makeCounter(name, name.toString(alloc_.symbolTable()), std::vector<Tag>());
       }),

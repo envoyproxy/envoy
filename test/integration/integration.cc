@@ -216,7 +216,7 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
     : mock_buffer_factory_(new NiceMock<MockBufferFactory>), time_system_(std::move(time_system)),
       dispatcher_(new Event::DispatcherImpl(*time_system_,
                                             Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
-      api_(new Api::Impl(std::chrono::milliseconds(10000), stats_store_)), version_(version),
+      /*api_(new Api::Impl(std::chrono::milliseconds(10000), stats_store_))*,*/ version_(version),
       config_helper_(version, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
@@ -351,6 +351,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
     test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
     registerTestServerPorts(port_names);
   }
+  //stats_ = std::make_unique<Stats::IsolatedStoreImpl>(test_server_->stats().symbolTable());
 }
 
 void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
@@ -390,8 +391,7 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
           client.close(Network::ConnectionCloseType::NoFlush);
         }
       },
-      version_, stats_store_);
-  ;
+      version_);
 
   connection.run();
 }

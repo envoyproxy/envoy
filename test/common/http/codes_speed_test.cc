@@ -20,8 +20,7 @@ namespace Http {
 class CodeUtilitySpeedTest {
 public:
   CodeUtilitySpeedTest()
-      : symbol_table_(std::make_shared<Stats::SymbolTableImpl>()), global_store_(symbol_table_),
-        cluster_scope_(symbol_table_), code_stats_(*symbol_table_) {}
+      : global_store_(symbol_table_), cluster_scope_(symbol_table_), code_stats_(symbol_table_) {}
 
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    const std::string& request_vhost_name = EMPTY_STRING,
@@ -55,7 +54,7 @@ public:
     code_stats_.chargeResponseTiming(info);
   }
 
-  Stats::SharedSymbolTable symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
