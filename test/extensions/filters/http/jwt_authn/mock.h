@@ -58,16 +58,16 @@ public:
   MockUpstream(Upstream::MockClusterManager& mock_cm, const std::string& response_body)
       : request_(&mock_cm.async_client_), response_body_(response_body) {
     ON_CALL(mock_cm.async_client_, send_(_, _, _))
-        .WillByDefault(Invoke([this](Http::MessagePtr&, Http::AsyncClient::Callbacks& cb,
-                                     const absl::optional<std::chrono::milliseconds>&)
-                                  -> Http::AsyncClient::Request* {
-          Http::MessagePtr response_message(new Http::ResponseMessageImpl(
-              Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-          response_message->body() = std::make_unique<Buffer::OwnedImpl>(response_body_);
-          cb.onSuccess(std::move(response_message));
-          called_count_++;
-          return &request_;
-        }));
+        .WillByDefault(
+            Invoke([this](Http::MessagePtr&, Http::AsyncClient::Callbacks& cb,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+              Http::MessagePtr response_message(new Http::ResponseMessageImpl(
+                  Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+              response_message->body() = std::make_unique<Buffer::OwnedImpl>(response_body_);
+              cb.onSuccess(std::move(response_message));
+              called_count_++;
+              return &request_;
+            }));
   }
 
   int called_count() const { return called_count_; }
