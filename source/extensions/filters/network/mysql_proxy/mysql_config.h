@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/network/mysql_proxy/v2/mysql_proxy.pb.h"
-#include "envoy/config/filter/network/mysql_proxy/v2/mysql_proxy.pb.validate.h"
+#include "envoy/config/filter/network/mysql_proxy/v1alpha1/mysql_proxy.pb.h"
+#include "envoy/config/filter/network/mysql_proxy/v1alpha1/mysql_proxy.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/mysql_proxy/mysql_filter.h"

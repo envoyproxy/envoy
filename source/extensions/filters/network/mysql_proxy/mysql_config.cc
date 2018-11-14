@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/config/filter/network/mysql_proxy/v2/mysql_proxy.pb.validate.h"
+#include "envoy/config/filter/network/mysql_proxy/v1alpha1/mysql_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
