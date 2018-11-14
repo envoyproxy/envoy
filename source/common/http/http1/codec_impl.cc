@@ -670,7 +670,7 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Conn
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||
       parser_.status_code == 204 || parser_.status_code == 304 ||
-      (parser_.status_code >= 400 && parser_.content_length == 0)) {
+      (parser_.status_code >= 200 && parser_.content_length == 0)) {
     return true;
   } else {
     return false;
