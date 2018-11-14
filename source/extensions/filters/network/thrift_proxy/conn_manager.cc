@@ -4,11 +4,8 @@
 #include "envoy/event/dispatcher.h"
 
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
-#include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
-#include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
-#include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
 #include "extensions/filters/network/thrift_proxy/protocol.h"
-#include "extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
+#include "extensions/filters/network/thrift_proxy/transport.h"
 
 namespace Envoy {
 namespace Extensions {
