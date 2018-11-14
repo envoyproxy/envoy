@@ -206,6 +206,13 @@ public:
                                      bool disconnect_after_headers_complete = false);
 
 protected:
+  // Create the envoy server in another thread and start it.
+  // Will not return until that server is listening.
+  virtual IntegrationTestServerPtr
+  createIntegrationTestServer(const std::string& bootstrap_path,
+                              std::function<void()> pre_worker_start_steps,
+                              Event::TestTimeSystem& time_system);
+
   bool initialized() const { return initialized_; }
 
   // The IpVersion (IPv4, IPv6) to use.
@@ -229,13 +236,14 @@ protected:
 
   bool enable_half_close_{false};
 
+  // True if test will use a fixed RNG value.
+  bool deterministic_{};
+
 private:
   // The type for the Envoy-to-backend connection
   FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
   // True if initialized() has been called.
   bool initialized_{};
-  // True if test will use a fixed RNG value.
-  bool deterministic_{};
 };
 
 } // namespace Envoy

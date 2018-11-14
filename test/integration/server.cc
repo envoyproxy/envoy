@@ -49,9 +49,14 @@ IntegrationTestServer::create(const std::string& config_path,
                               const Network::Address::IpVersion version,
                               std::function<void()> pre_worker_start_test_steps, bool deterministic,
                               Event::TestTimeSystem& time_system) {
+<<<<<<< HEAD
   std::cerr<<"constructing IntegrationTestServer"<<std::endl;
   IntegrationTestServerPtr server{new IntegrationTestServer(time_system, config_path)};
   std::cerr<<"starting IntegrationTestServer"<<std::endl;
+=======
+  IntegrationTestServerPtr server{
+      std::make_unique<IntegrationTestServerImpl>(time_system, config_path)};
+>>>>>>> Refactor integration test server to allow specialization by derived classes (#4803)
   server->start(version, pre_worker_start_test_steps, deterministic);
   std::cerr<<"startED IntegrationTestServer"<<std::endl;
   return server;
@@ -106,14 +111,7 @@ std::cerr<<"pending_listeners_ = "<<pending_listeners_<<std::endl;
 }
 
 IntegrationTestServer::~IntegrationTestServer() {
-  ENVOY_LOG(info, "stopping integration test server");
-
-  if (admin_address_ != nullptr) {
-    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-        admin_address_, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
-    EXPECT_TRUE(response->complete());
-    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  }
+  // Derived class must have shutdown server.
   thread_->join();
 }
 
@@ -135,25 +133,29 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
   }
 }
 
+void IntegrationTestServer::serverReady() {
+  pending_listeners_ = server().listenerManager().listeners().size();
+  server_set_.setReady();
+}
+
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic) {
   std::cerr<<"threadRoutine BEGIN"<<std::endl;
   OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version));
+<<<<<<< HEAD
   std::cerr<<"created OptionsImpl"<<std::endl;
   Server::HotRestartNopImpl restarter;
+=======
+>>>>>>> Refactor integration test server to allow specialization by derived classes (#4803)
   Thread::MutexBasicLockable lock;
 
-  ThreadLocal::InstanceImpl tls;
-  Stats::HeapStatDataAllocator stats_allocator;
-  Stats::StatsOptionsImpl stats_options;
-  Stats::ThreadLocalStoreImpl stats_store(stats_options, stats_allocator);
-  stat_store_ = &stats_store;
   Runtime::RandomGeneratorPtr random_generator;
   if (deterministic) {
     random_generator = std::make_unique<testing::NiceMock<Runtime::MockRandomGenerator>>();
   } else {
     random_generator = std::make_unique<Runtime::RandomGeneratorImpl>();
   }
+<<<<<<< HEAD
   std::cerr<<"about to create InstanceImpl"<<std::endl;
   server_ = std::make_unique<Server::InstanceImpl>(
       options, time_system_, Network::Utility::getLocalAddress(version), *this, restarter,
@@ -173,7 +175,48 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   std::cerr<<"about to run server_"<<std::endl;
   server_->run();
   server_.reset();
+=======
+  createAndRunEnvoyServer(options, time_system_, Network::Utility::getLocalAddress(version), *this,
+                          lock, *this, std::move(random_generator));
+}
+
+void IntegrationTestServerImpl::createAndRunEnvoyServer(
+    OptionsImpl& options, Event::TimeSystem& time_system,
+    Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
+    Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
+    Runtime::RandomGeneratorPtr&& random_generator) {
+  Server::HotRestartNopImpl restarter;
+  ThreadLocal::InstanceImpl tls;
+  Stats::HeapStatDataAllocator stats_allocator;
+  Stats::ThreadLocalStoreImpl stat_store(options.statsOptions(), stats_allocator);
+
+  Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
+                              access_log_lock, component_factory, std::move(random_generator), tls);
+  // This is technically thread unsafe (assigning to a shared_ptr accessed
+  // across threads), but because we synchronize below through serverReady(), the only
+  // consumer on the main test thread in ~IntegrationTestServerImpl will not race.
+  admin_address_ = server.admin().socket().localAddress();
+  server_ = &server;
+  stat_store_ = &stat_store;
+  serverReady();
+  server.run();
+}
+
+IntegrationTestServerImpl::~IntegrationTestServerImpl() {
+  ENVOY_LOG(info, "stopping integration test server");
+
+  Network::Address::InstanceConstSharedPtr admin_address(admin_address_);
+  admin_address_ = nullptr;
+  server_ = nullptr;
+>>>>>>> Refactor integration test server to allow specialization by derived classes (#4803)
   stat_store_ = nullptr;
+
+  if (admin_address != nullptr) {
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
+    EXPECT_TRUE(response->complete());
+    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  }
 }
 
 } // namespace Envoy
