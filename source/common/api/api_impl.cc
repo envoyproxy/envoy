@@ -13,13 +13,13 @@ Event::DispatcherPtr Impl::allocateDispatcher(Event::TimeSystem& time_system) {
   return Event::DispatcherPtr{new Event::DispatcherImpl(time_system)};
 }
 
-Impl::Impl(std::chrono::milliseconds file_flush_interval_msec)
-    : file_flush_interval_msec_(file_flush_interval_msec) {}
+Impl::Impl(std::chrono::milliseconds file_flush_interval_msec, Stats::Store& stats_store)
+    : file_system_(file_flush_interval_msec, stats_store) {}
 
 Filesystem::FileSharedPtr Impl::createFile(const std::string& path, Event::Dispatcher& dispatcher,
-                                           Thread::BasicLockable& lock, Stats::Store& stats_store) {
-  return std::make_shared<Filesystem::FileImpl>(path, dispatcher, lock, stats_store,
-                                                file_flush_interval_msec_);
+                                           Thread::BasicLockable& lock) {
+
+  return file_system_.createFile(path, dispatcher, lock);
 }
 
 bool Impl::fileExists(const std::string& path) { return Filesystem::fileExists(path); }

@@ -34,6 +34,48 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(scopes_.empty());
 }
 
+void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
+  stats_matcher_ = std::move(stats_matcher);
+
+  // The Filesystem and potentially other stat-registering objects are
+  // constructed prior to the stat-matcher, and those add stats
+  // in the default_scope. There should be no requests, so there will
+  // be no copies in TLS caches.
+  Thread::LockGuard lock(lock_);
+  for (ScopeImpl* scope : scopes_) {
+    removeRejectedStats(scope->central_cache_.counters_, deleted_counters_);
+    removeRejectedStats(scope->central_cache_.gauges_, deleted_gauges_);
+    removeRejectedStats(scope->central_cache_.histograms_, deleted_histograms_);
+  }
+}
+
+template <class StatMapClass, class StatListClass>
+void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass& list) {
+  std::vector<const char*> remove_list;
+  for (auto& stat : map) {
+    if (rejects(stat.first)) {
+      remove_list.push_back(stat.first);
+    }
+  }
+  for (const char* stat_name : remove_list) {
+    auto p = map.find(stat_name);
+    ASSERT(p != map.end());
+    list.push_back(p->second); // Save SharedPtr to the list to avoid invalidating refs to stat.
+    map.erase(p);
+  }
+}
+
+bool ThreadLocalStoreImpl::rejects(const char* name) const {
+  // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the
+  // hot path) could become prohibitively expensive. Revisit this usage in the
+  // future.
+  //
+  // Also note that the elaboration of the stat-name into a string is expensive,
+  // so I think it might be better to move the matcher test until after caching,
+  // unless its acceptsAll/rejectsAll.
+  return stats_matcher_->rejects(name);
+}
+
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;

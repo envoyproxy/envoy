@@ -94,8 +94,20 @@ bool illegalPath(const std::string& path) {
   }
 }
 
+Instance::Instance(std::chrono::milliseconds file_flush_interval_msec, Stats::Store& stats_store)
+    : file_flush_interval_msec_(file_flush_interval_msec),
+      file_stats_{FILESYSTEM_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
+                                   POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {}
+
+FileSharedPtr Instance::createFile(const std::string& path, Event::Dispatcher& dispatcher,
+                                   Thread::BasicLockable& lock,
+                                   std::chrono::milliseconds file_flush_interval_msec) {
+  return std::make_shared<Filesystem::FileImpl>(path, dispatcher, lock, file_stats_,
+                                                file_flush_interval_msec);
+};
+
 FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
-                   Thread::BasicLockable& lock, Stats::Store& stats_store,
+                   Thread::BasicLockable& lock, FileSystemStats& stats,
                    std::chrono::milliseconds flush_interval_msec)
     : path_(path), file_lock_(lock), flush_timer_(dispatcher.createTimer([this]() -> void {
         stats_.flushed_by_timer_.inc();
@@ -103,8 +115,7 @@ FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
         flush_timer_->enableTimer(flush_interval_msec_);
       })),
       os_sys_calls_(Api::OsSysCallsSingleton::get()), flush_interval_msec_(flush_interval_msec),
-      stats_{FILESYSTEM_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
-                              POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {
+      stats_(stats) {
   open();
 }
 

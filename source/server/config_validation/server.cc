@@ -42,10 +42,10 @@ ValidationInstance::ValidationInstance(Options& options, Event::TimeSystem& time
                                        Thread::BasicLockable& access_log_lock,
                                        ComponentFactory& component_factory)
     : options_(options), time_system_(time_system), stats_store_(store),
-      api_(new Api::ValidationImpl(options.fileFlushIntervalMsec())),
+      api_(new Api::ValidationImpl(options.fileFlushIntervalMsec(), store)),
       dispatcher_(api_->allocateDispatcher(time_system)),
       singleton_manager_(new Singleton::ManagerImpl()),
-      access_log_manager_(*api_, *dispatcher_, access_log_lock, store), mutex_tracer_(nullptr) {
+      access_log_manager_(*api_, *dispatcher_, access_log_lock), mutex_tracer_(nullptr) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
