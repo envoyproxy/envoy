@@ -5,6 +5,8 @@
 
 #include "common/secret/sds_api.h"
 #include "common/secret/secret_manager_impl.h"
+#include "common/ssl/certificate_validation_context_config_impl.h"
+#include "common/ssl/tls_certificate_config_impl.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
@@ -41,14 +43,15 @@ tls_certificate:
   ASSERT_EQ(secret_manager->findStaticTlsCertificateProvider("undefined"), nullptr);
   ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
 
+  Ssl::TlsCertificateConfigImpl tls_config(
+      *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret());
   const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
-  EXPECT_EQ(
-      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-      secret_manager->findStaticTlsCertificateProvider("abc.com")->secret()->certificateChain());
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
+            tls_config.certificateChain());
 
   const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
-            secret_manager->findStaticTlsCertificateProvider("abc.com")->secret()->privateKey());
+            tls_config.privateKey());
 }
 
 // Validate that secret manager throws an exception when adding duplicated static TLS certificate
@@ -89,11 +92,11 @@ TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
 
   ASSERT_EQ(secret_manager->findStaticCertificateValidationContextProvider("undefined"), nullptr);
   ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
+  Ssl::CertificateValidationContextConfigImpl cvc_config(
+      *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret());
   const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            secret_manager->findStaticCertificateValidationContextProvider("abc.com")
-                ->secret()
-                ->caCert());
+            cvc_config.caCert());
 }
 
 // Validate that secret manager throws an exception when adding duplicated static certificate
@@ -172,12 +175,13 @@ tls_certificate:
   auto secret_config = secret_resources.Add();
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
   dynamic_cast<TlsCertificateSdsApi&>(*secret_provider).onConfigUpdate(secret_resources, "");
+  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret());
   const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            secret_provider->secret()->certificateChain());
+            tls_config.certificateChain());
   const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
-            secret_provider->secret()->privateKey());
+            tls_config.privateKey());
 }
 
 } // namespace

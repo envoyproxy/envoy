@@ -99,10 +99,22 @@ envoy_cc_library(
     name = "minimal_logger_lib",
     srcs = ["logger.cc"],
     hdrs = ["logger.h"],
+    external_deps = ["abseil_synchronization"],
     deps = [
         ":lock_guard_lib",
         ":macros",
         ":non_copyable",
+    ],
+)
+
+envoy_cc_library(
+    name = "mutex_tracer_lib",
+    srcs = ["mutex_tracer_impl.cc"],
+    hdrs = ["mutex_tracer_impl.h"],
+    external_deps = ["abseil_synchronization"],
+    deps = [
+        ":assert_lib",
+        "//include/envoy/common:mutex_tracer",
     ],
 )
 

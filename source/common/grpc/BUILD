@@ -51,6 +51,7 @@ envoy_cc_library(
     name = "status_lib",
     srcs = ["status.cc"],
     hdrs = ["status.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/grpc:status",
     ],

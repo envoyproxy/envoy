@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
@@ -77,6 +78,20 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_binary(
+    name = "codes_speed_test",
+    srcs = ["codes_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/common:empty_string",
+        "//source/common/http:codes_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:stats_lib",
     ],
 )
 

@@ -18,7 +18,8 @@ namespace Http2 {
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options)
-    : dispatcher_(dispatcher), host_(host), priority_(priority), socket_options_(options) {}
+    : ConnPoolImplBase(std::move(host), std::move(priority)), dispatcher_(dispatcher),
+      socket_options_(options) {}
 
 ConnPoolImpl::~ConnPoolImpl() {
   if (primary_client_) {
@@ -72,6 +73,25 @@ void ConnPoolImpl::checkForDrained() {
   }
 }
 
+void ConnPoolImpl::newClientStream(Http::StreamDecoder& response_decoder,
+                                   ConnectionPool::Callbacks& callbacks) {
+  if (!host_->cluster().resourceManager(priority_).requests().canCreate()) {
+    ENVOY_LOG(debug, "max requests overflow");
+    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
+    host_->cluster().stats().upstream_rq_pending_overflow_.inc();
+  } else {
+    ENVOY_CONN_LOG(debug, "creating stream", *primary_client_->client_);
+    primary_client_->total_streams_++;
+    host_->stats().rq_total_.inc();
+    host_->stats().rq_active_.inc();
+    host_->cluster().stats().upstream_rq_total_.inc();
+    host_->cluster().stats().upstream_rq_active_.inc();
+    host_->cluster().resourceManager(priority_).requests().inc();
+    callbacks.onPoolReady(primary_client_->client_->newStream(response_decoder),
+                          primary_client_->real_host_description_);
+  }
+}
+
 ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& response_decoder,
                                                      ConnectionPool::Callbacks& callbacks) {
   ASSERT(drained_callbacks_.empty());
@@ -90,22 +110,22 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
     primary_client_ = std::make_unique<ActiveClient>(*this);
   }
 
-  if (!host_->cluster().resourceManager(priority_).requests().canCreate()) {
-    ENVOY_LOG(debug, "max requests overflow");
-    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
-    host_->cluster().stats().upstream_rq_pending_overflow_.inc();
-  } else {
-    ENVOY_CONN_LOG(debug, "creating stream", *primary_client_->client_);
-    primary_client_->total_streams_++;
-    host_->stats().rq_total_.inc();
-    host_->stats().rq_active_.inc();
-    host_->cluster().stats().upstream_rq_total_.inc();
-    host_->cluster().stats().upstream_rq_active_.inc();
-    host_->cluster().resourceManager(priority_).requests().inc();
-    callbacks.onPoolReady(primary_client_->client_->newStream(response_decoder),
-                          primary_client_->real_host_description_);
+  // If the primary client is not connected yet, queue up the request.
+  if (!primary_client_->upstream_ready_) {
+    // If we're not allowed to enqueue more requests, fail fast.
+    if (!host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
+      ENVOY_LOG(debug, "max pending requests overflow");
+      callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
+      host_->cluster().stats().upstream_rq_pending_overflow_.inc();
+      return nullptr;
+    }
+
+    return newPendingRequest(response_decoder, callbacks);
   }
 
+  // We already have an active client that's connected to upstream, so attempt to establish a
+  // new stream.
+  newClientStream(response_decoder, callbacks);
   return nullptr;
 }
 
@@ -113,6 +133,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
 
+    ENVOY_CONN_LOG(debug, "client disconnected", *client.client_);
     if (client.closed_with_active_rq_) {
       host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
       if (event == Network::ConnectionEvent::RemoteClose) {
@@ -120,6 +141,19 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       } else {
         host_->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
       }
+    }
+
+    if (client.connect_timer_) {
+      host_->cluster().stats().upstream_cx_connect_fail_.inc();
+      host_->stats().cx_connect_fail_.inc();
+
+      // Raw connect failures should never happen under normal circumstances. If we have an upstream
+      // that is behaving badly, requests can get stuck here in the pending state. If we see a
+      // connect failure, we purge all pending requests so that calling code can determine what to
+      // do with the request.
+      // NOTE: We move the existing pending requests to a temporary list. This is done so that
+      //       if retry logic submits a new request to the pool, we don't fail it inline.
+      purgePendingRequests(client.real_host_description_);
     }
 
     if (&client == primary_client_.get()) {
@@ -130,11 +164,6 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       dispatcher_.deferredDelete(std::move(draining_client_));
     }
 
-    if (client.connect_timer_) {
-      host_->cluster().stats().upstream_cx_connect_fail_.inc();
-      host_->stats().cx_connect_fail_.inc();
-    }
-
     if (client.closed_with_active_rq_) {
       checkForDrained();
     }
@@ -142,6 +171,9 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
 
   if (event == Network::ConnectionEvent::Connected) {
     conn_connect_ms_->complete();
+
+    client.upstream_ready_ = true;
+    onUpstreamReady();
   }
 
   if (client.connect_timer_) {
@@ -216,10 +248,17 @@ void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason r
   }
 }
 
+void ConnPoolImpl::onUpstreamReady() {
+  // Establishes new codec streams for each pending request.
+  while (!pending_requests_.empty()) {
+    newClientStream(pending_requests_.back()->decoder_, pending_requests_.back()->callbacks_);
+    pending_requests_.pop_back();
+  }
+}
+
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : parent_(parent),
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })) {
-
   parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan>(
       parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem());
   Upstream::Host::CreateConnectionData data =
