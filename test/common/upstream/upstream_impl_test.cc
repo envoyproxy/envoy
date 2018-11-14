@@ -1818,6 +1818,7 @@ TEST_F(ClusterInfoImplTest, TestMarkSocketOptions) {
   auto options = cluster->info()->clusterSocketOptions();
 
   const auto expected_option = ENVOY_SOCKET_SO_MARK;
+  CHECK_OPTION_SUPPORTED(expected_option);
   const int type = expected_option.value().first;
   const int option = expected_option.value().second;
 
@@ -1839,6 +1840,7 @@ TEST_F(ClusterInfoImplTest, TestTransparentSocketOptions) {
   auto options = cluster->info()->clusterSocketOptions();
 
   const auto expected_option = ENVOY_SOCKET_IP_TRANSPARENT;
+  CHECK_OPTION_SUPPORTED(expected_option);
   const int type = expected_option.value().first;
   const int option = expected_option.value().second;
   socket_mock_.local_address_ =
