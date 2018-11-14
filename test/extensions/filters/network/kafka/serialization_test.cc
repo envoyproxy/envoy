@@ -29,7 +29,6 @@ TEST_EmptyBufferShouldNotBeReady(Int64Buffer);
 TEST_EmptyBufferShouldNotBeReady(BoolBuffer);
 TEST_EmptyBufferShouldNotBeReady(StringBuffer);
 TEST_EmptyBufferShouldNotBeReady(NullableStringBuffer);
-TEST_EmptyBufferShouldNotBeReady(NullableBytesIgnoringBuffer);
 TEST(CompositeBuffer, EmptyBufferShouldNotBeReady) {
   // given
   const CompositeBuffer<INT8, Int8Buffer> testee{};
@@ -217,126 +216,6 @@ TEST(NullableStringBuffer, ShouldThrowOnInvalidLength) {
 
   INT16 len = -2; // -1 is OK for NULLABLE_STRING
   encoder.encode(len, buffer);
-
-  uint64_t remaining = 1024;
-  const char* data = getRawData(buffer);
-
-  // when
-  // then
-  EXPECT_THROW(testee.feed(data, remaining), EnvoyException);
-}
-
-// === NULLABLE BYTES IGNORING BUFFER ==========================================
-
-TEST(NullableBytesIgnoringBuffer, ShouldDeserialize) {
-  // given
-  NullableBytesIgnoringBuffer testee;
-
-  const INT32 bytes_to_ignore = 100;
-  NULLABLE_BYTES bytes = {std::vector<unsigned char>(bytes_to_ignore)};
-
-  Buffer::OwnedImpl buffer;
-  size_t written = encoder.encode(bytes, buffer);
-
-  uint64_t remaining = written * 10;
-  const uint64_t orig_remaining = remaining;
-
-  const char* data = getRawData(buffer);
-  const char* orig_data = data;
-
-  // when
-  const size_t consumed = testee.feed(data, remaining);
-
-  // then
-  ASSERT_EQ(consumed, written);
-  ASSERT_EQ(testee.ready(), true);
-  ASSERT_EQ(testee.get(), bytes_to_ignore);
-  ASSERT_EQ(data, orig_data + consumed);
-  ASSERT_EQ(remaining, orig_remaining - consumed);
-
-  // when - 2
-  const size_t consumed2 = testee.feed(data, remaining);
-
-  // then - 2 (nothing changes)
-  ASSERT_EQ(consumed2, 0);
-  ASSERT_EQ(data, orig_data + consumed);
-  ASSERT_EQ(remaining, orig_remaining - consumed);
-}
-
-TEST(NullableBytesIgnoringBuffer, ShouldDeserializeNullBytes) {
-  // given
-  NullableBytesIgnoringBuffer testee;
-
-  const INT32 bytes_length = -1;
-
-  Buffer::OwnedImpl buffer;
-  const size_t written = encoder.encode(bytes_length, buffer);
-
-  uint64_t remaining = written * 10;
-  const uint64_t orig_remaining = remaining;
-
-  const char* data = getRawData(buffer);
-  const char* orig_data = data;
-
-  // when
-  const size_t consumed = testee.feed(data, remaining);
-
-  // then
-  ASSERT_EQ(consumed, written);
-  ASSERT_EQ(testee.ready(), true);
-  ASSERT_EQ(testee.get(), bytes_length);
-  ASSERT_EQ(data, orig_data + consumed);
-  ASSERT_EQ(remaining, orig_remaining - consumed);
-
-  // when - 2
-  const size_t consumed2 = testee.feed(data, remaining);
-
-  // then - 2 (nothing changes)
-  ASSERT_EQ(consumed2, 0);
-  ASSERT_EQ(data, orig_data + consumed);
-  ASSERT_EQ(remaining, orig_remaining - consumed);
-}
-
-TEST(NullableBytesIgnoringBuffer, ShouldThrowOnInvalidLength) {
-  // given
-  NullableBytesIgnoringBuffer testee;
-  Buffer::OwnedImpl buffer;
-
-  const INT32 bytes_length = -2; // -1 is OK for NULLABLE_BYTES
-  encoder.encode(bytes_length, buffer);
-
-  uint64_t remaining = 1024;
-  const char* data = getRawData(buffer);
-
-  // when
-  // then
-  EXPECT_THROW(testee.feed(data, remaining), EnvoyException);
-}
-
-// === NULLABLE BYTES CAPTURING BUFFER =========================================
-
-TEST(NullableBytesCapturingBuffer, ShouldDeserialize) {
-  const NULLABLE_BYTES value{{'a', 'b', 'c', 'd'}};
-  serializeThenDeserializeAndCheckEquality<NullableBytesCapturingBuffer>(value);
-}
-
-TEST(NullableBytesCapturingBuffer, ShouldDeserializeEmptyBytes) {
-  const NULLABLE_BYTES value{{}};
-  serializeThenDeserializeAndCheckEquality<NullableBytesCapturingBuffer>(value);
-}
-
-TEST(NullableBytesCapturingBuffer, ShouldDeserializeNullBytes) {
-  const NULLABLE_BYTES value = absl::nullopt;
-  serializeThenDeserializeAndCheckEquality<NullableBytesCapturingBuffer>(value);
-}
-
-TEST(NullableBytesCapturingBuffer, ShouldThrowOnInvalidLength) {
-  // given
-  NullableBytesCapturingBuffer testee;
-  Buffer::OwnedImpl buffer;
-
-  const INT32 bytes_length = -2; // -1 is OK for NULLABLE_BYTES
-  encoder.encode(bytes_length, buffer);
 
   uint64_t remaining = 1024;
   const char* data = getRawData(buffer);
