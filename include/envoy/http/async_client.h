@@ -189,7 +189,7 @@ public:
       return *this;
     }
     RequestOptions& setSendXff(bool v) {
-      StreamOptions::seSendXff(v);
+      StreamOptions::setSendXff(v);
       return *this;
     }
 
