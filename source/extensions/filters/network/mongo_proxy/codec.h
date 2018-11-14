@@ -23,7 +23,6 @@ class Message {
 public:
   enum class OpCode {
     OP_REPLY = 1,
-    OP_MSG = 1000,
     OP_UPDATE = 2001,
     OP_INSERT = 2002,
     OP_QUERY = 2004,
@@ -31,7 +30,8 @@ public:
     OP_DELETE = 2006,
     OP_KILL_CURSORS = 2007,
     OP_COMMAND = 2010,
-    OP_COMMANDREPLY = 2011
+    OP_COMMANDREPLY = 2011,
+    OP_MSG = 2013
   };
 
   virtual ~Message(){};
@@ -187,6 +187,27 @@ public:
 
 typedef std::unique_ptr<CommandReplyMessage> CommandReplyMessagePtr;
 
+class MsgMessage : public virtual Message {
+public:
+  struct FlagBits {
+    // clang-format off
+    static const int32_t ChecksumPresent = 0x1 << 0;
+    static const int32_t MoreToCome      = 0x1 << 1;
+    static const int32_t ExhaustAllowed  = 0x1 << 16;
+    // clang-format on
+  };
+
+  virtual bool operator==(const MsgMessage& rhs) const PURE;
+  virtual int32_t flagBits() const PURE;
+  virtual void flagBits(int32_t flagBits) PURE;
+  virtual const std::list<Bson::SectionSharedPtr>& sections() const PURE;
+  virtual std::list<Bson::SectionSharedPtr>& sections() PURE;
+  virtual int32_t checksum() const PURE;
+  virtual void checksum(int32_t flags) PURE;
+};
+
+typedef std::unique_ptr<MsgMessage> MsgMessagePtr;
+
 /**
  * General callbacks for dispatching decoded mongo messages to a sink.
  */
@@ -201,6 +222,7 @@ public:
   virtual void decodeReply(ReplyMessagePtr&& message) PURE;
   virtual void decodeCommand(CommandMessagePtr&& message) PURE;
   virtual void decodeCommandReply(CommandReplyMessagePtr&& message) PURE;
+  virtual void decodeMsg(MsgMessagePtr&& message) PURE;
 };
 
 /**
@@ -229,6 +251,7 @@ public:
   virtual void encodeReply(const ReplyMessage& message) PURE;
   virtual void encodeCommand(const CommandMessage& message) PURE;
   virtual void encodeCommandReply(const CommandReplyMessage& message) PURE;
+  virtual void encodeMsg(const MsgMessage& message) PURE;
 };
 
 } // namespace MongoProxy

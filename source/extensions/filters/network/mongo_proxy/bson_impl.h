@@ -32,6 +32,7 @@ public:
   static std::string removeString(Buffer::Instance& data);
   static std::string removeBinary(Buffer::Instance& data);
   static void writeCString(Buffer::Instance& data, const std::string& value);
+  static void writeByte(Buffer::Instance& data, uint8_t value);
   static void writeInt32(Buffer::Instance& data, int32_t value);
   static void writeInt64(Buffer::Instance& data, int64_t value);
   static void writeDouble(Buffer::Instance& data, double value);
@@ -263,6 +264,69 @@ private:
   void fromBuffer(Buffer::Instance& data);
 
   std::list<FieldPtr> fields_;
+};
+
+class SequenceImpl : public Sequence,
+                     Logger::Loggable<Logger::Id::mongo>,
+                     public std::enable_shared_from_this<SequenceImpl> {
+public:
+  static SequenceSharedPtr create() { return SequenceSharedPtr{new SequenceImpl()}; }
+  static SequenceSharedPtr create(Buffer::Instance& data) {
+    std::shared_ptr<SequenceImpl> new_sequence{new SequenceImpl()};
+    new_sequence->fromBuffer(data);
+    return new_sequence;
+  }
+
+  bool operator==(const Sequence& rhs) const override;
+  int32_t byteSize() const override;
+  void encode(Buffer::Instance& output) const override;
+  std::string toString() const override;
+
+  int32_t size() const override { return size_; }
+  void size(int32_t size) override { size_ = size; }
+  std::string identifier() const override { return identifier_; }
+  void identifier(std::string identifier) override { identifier_ = identifier; }
+  const std::list<DocumentSharedPtr>& documents() const override { return documents_; }
+  std::list<DocumentSharedPtr>& documents() override { return documents_; }
+
+private:
+  SequenceImpl() {}
+
+  void fromBuffer(Buffer::Instance& data);
+
+  int32_t size_;
+  std::string identifier_;
+  std::list<DocumentSharedPtr> documents_;
+};
+
+class SectionImpl : public Section,
+                    Logger::Loggable<Logger::Id::mongo>,
+                    public std::enable_shared_from_this<SectionImpl> {
+public:
+  static SectionSharedPtr create() { return SectionSharedPtr{new SectionImpl()}; }
+  static SectionSharedPtr create(Buffer::Instance& data) {
+    std::shared_ptr<SectionImpl> new_section{new SectionImpl()};
+    new_section->fromBuffer(data);
+    return new_section;
+  }
+
+  bool operator==(const Section& rhs) const override;
+  int32_t byteSize() const override;
+  void encode(Buffer::Instance& output) const override;
+  std::string toString() const override;
+
+  uint8_t payloadType() const override { return payloadType_; }
+  void payloadType(uint8_t payloadType) override { payloadType_ = payloadType; }
+  const Payload* payload() const override { return payload_.get(); }
+  void payload(PayloadSharedPtr&& payload) override { payload_ = std::move(payload); }
+
+private:
+  SectionImpl() {}
+
+  void fromBuffer(Buffer::Instance& data);
+
+  uint8_t payloadType_;
+  PayloadSharedPtr payload_;
 };
 
 } // namespace Bson

@@ -27,6 +27,7 @@ public:
 
 protected:
   std::string documentListToString(const std::list<Bson::DocumentSharedPtr>& documents) const;
+  std::string sectionListToString(const std::list<Bson::SectionSharedPtr>& sections) const;
 
   const int32_t request_id_;
   const int32_t response_to_;
@@ -249,6 +250,32 @@ private:
   std::list<Bson::DocumentSharedPtr> output_docs_;
 };
 
+// OP_MSG message.
+class MsgMessageImpl : public MessageImpl, public MsgMessage, Logger::Loggable<Logger::Id::mongo> {
+public:
+  using MessageImpl::MessageImpl;
+
+  // MessageImpl
+  void fromBuffer(uint32_t message_length, Buffer::Instance& data) override;
+
+  // Mongo::Message
+  std::string toString(bool full) const override;
+
+  // Mongo::MsgMessage
+  bool operator==(const MsgMessage& rhs) const override;
+  int32_t flagBits() const override { return flagBits_; }
+  void flagBits(int32_t flagBits) override { flagBits_ = flagBits; }
+  const std::list<Bson::SectionSharedPtr>& sections() const override { return sections_; }
+  std::list<Bson::SectionSharedPtr>& sections() override { return sections_; }
+  int32_t checksum() const override { return checksum_; }
+  void checksum(int32_t checksum) override { checksum_ = checksum; }
+
+private:
+  int32_t flagBits_{};
+  std::list<Bson::SectionSharedPtr> sections_;
+  int32_t checksum_{};
+};
+
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::mongo> {
 public:
   DecoderImpl(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
@@ -274,6 +301,7 @@ public:
   void encodeReply(const ReplyMessage& message) override;
   void encodeCommand(const CommandMessage& message) override;
   void encodeCommandReply(const CommandReplyMessage& message) override;
+  void encodeMsg(const MsgMessage& message) override;
 
 private:
   void encodeCommonHeader(int32_t total_size, const Message& message, Message::OpCode op);

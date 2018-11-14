@@ -38,6 +38,25 @@ MessageImpl::documentListToString(const std::list<Bson::DocumentSharedPtr>& docu
   return out.str();
 }
 
+std::string
+MessageImpl::sectionListToString(const std::list<Bson::SectionSharedPtr>& sections) const {
+  std::stringstream out;
+  out << "[";
+
+  bool first = true;
+  for (const Bson::SectionSharedPtr& section : sections) {
+    if (!first) {
+      out << ", ";
+    }
+
+    out << section->toString();
+    first = false;
+  }
+
+  out << "]";
+  return out.str();
+}
+
 void GetMoreMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
   ENVOY_LOG(trace, "decoding get more message");
   Bson::BufferHelper::removeInt32(data); // "zero" (unused)
@@ -342,6 +361,52 @@ bool CommandReplyMessageImpl::operator==(const CommandReplyMessage& rhs) const {
 
   return true;
 }
+
+// OP_MSG implementation.
+void MsgMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
+  ENVOY_LOG(trace, "decoding MSG message");
+  uint64_t original_buffer_length = data.length();
+  ASSERT(message_length <= original_buffer_length);
+
+  flagBits_ = Bson::BufferHelper::removeInt32(data);
+  auto hasChecksum = flagBits_ & MsgMessage::FlagBits::ChecksumPresent;
+  auto checksumBytes = hasChecksum * sizeof(int32_t);
+  while (data.length() - (original_buffer_length - message_length) > checksumBytes) {
+    sections_.emplace_back(Bson::SectionImpl::create(data));
+  }
+
+  if (hasChecksum) {
+    checksum_ = Bson::BufferHelper::removeInt32(data);
+  }
+
+  ENVOY_LOG(trace, "{}", toString(true));
+}
+
+std::string MsgMessageImpl::toString(bool full) const {
+  return fmt::format(
+      R"EOF({{"opcode": "OP_MSG", "id": {}, "response_to": {}, "flagBits": "{:#x}", "checksum": "{}", )EOF"
+      R"EOF("sections": {}}} )EOF",
+      request_id_, response_to_, flagBits_, checksum_,
+      full ? sectionListToString(sections_) : std::to_string(sections_.size()));
+}
+
+bool MsgMessageImpl::operator==(const MsgMessage& rhs) const {
+  if (!(requestId() == rhs.requestId() && responseTo() == rhs.responseTo() &&
+        flagBits() == rhs.flagBits() && sections().size() == rhs.sections().size() &&
+        checksum() == rhs.checksum())) {
+    return false;
+  }
+
+  // Compare sections now.
+  for (auto i = sections().begin(), j = rhs.sections().begin(); i != sections().end(); i++, j++) {
+    if (!(**i == **j)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 bool DecoderImpl::decode(Buffer::Instance& data) {
   // See if we have enough data for the message length.
   ENVOY_LOG(trace, "decoding {} bytes", data.length());
@@ -414,6 +479,13 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
         new CommandReplyMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
     callbacks_.decodeCommandReply(std::move(message));
+    break;
+  }
+
+  case Message::OpCode::OP_MSG: {
+    std::unique_ptr<MsgMessageImpl> message(new MsgMessageImpl(request_id, response_to));
+    message->fromBuffer(message_length, data);
+    callbacks_.decodeMsg(std::move(message));
     break;
   }
 
@@ -572,6 +644,27 @@ void EncoderImpl::encodeCommandReply(const CommandReplyMessage& message) {
     document->encode(output_);
   }
 }
+
+void EncoderImpl::encodeMsg(const MsgMessage& message) {
+  int32_t total_size = Message::MessageHeaderSize + Message::Int32Length;
+  for (const Bson::SectionSharedPtr& section : message.sections()) {
+    total_size += section->byteSize();
+  }
+  if (message.flagBits() & MsgMessage::FlagBits::ChecksumPresent) {
+    total_size += Message::Int32Length;
+  }
+
+  // Now encode.
+  encodeCommonHeader(total_size, message, Message::OpCode::OP_MSG);
+  Bson::BufferHelper::writeInt32(output_, message.flagBits());
+  for (const Bson::SectionSharedPtr& section : message.sections()) {
+    section->encode(output_);
+  }
+  if (message.flagBits() & MsgMessage::FlagBits::ChecksumPresent) {
+    Bson::BufferHelper::writeInt32(output_, message.checksum());
+  }
+}
+
 } // namespace MongoProxy
 } // namespace NetworkFilters
 } // namespace Extensions

@@ -31,6 +31,7 @@ public:
   void decodeCommandReply(CommandReplyMessagePtr&& message) override {
     decodeCommandReply_(message);
   }
+  void decodeMsg(MsgMessagePtr&& message) override { decodeMsg_(message); }
 
   MOCK_METHOD1(decodeGetMore_, void(GetMoreMessagePtr& message));
   MOCK_METHOD1(decodeInsert_, void(InsertMessagePtr& message));
@@ -39,6 +40,7 @@ public:
   MOCK_METHOD1(decodeReply_, void(ReplyMessagePtr& message));
   MOCK_METHOD1(decodeCommand_, void(CommandMessagePtr& message));
   MOCK_METHOD1(decodeCommandReply_, void(CommandReplyMessagePtr& message));
+  MOCK_METHOD1(decodeMsg_, void(MsgMessagePtr& message));
 };
 
 class MongoCodecImplTest : public testing::Test {
@@ -440,7 +442,85 @@ TEST_F(MongoCodecImplTest, CommandReply) {
   EXPECT_CALL(callbacks_, decodeCommandReply_(Pointee(Eq(commandReply))));
   decoder_.onData(output_);
 }
+TEST_F(MongoCodecImplTest, MsgEqual) {
+  {
+    MsgMessageImpl m1(0, 0);
+    MsgMessageImpl m2(1, 1);
+    EXPECT_FALSE(m1 == m2);
+  }
 
+  // Trigger fail on comparing flagBits.
+  {
+    MsgMessageImpl m1(0, 0);
+    m1.flagBits(0);
+    MsgMessageImpl m2(0, 0);
+    m2.flagBits(1);
+    EXPECT_FALSE(m1 == m2);
+  }
+
+  // Trigger fail on comparing sections.
+  {
+    MsgMessageImpl m1(0, 0);
+    auto s1 = Bson::SectionImpl::create();
+    s1->payloadType(Bson::Section::PayloadType::Document);
+    m1.sections().push_back(s1);
+    MsgMessageImpl m2(1, 1);
+    auto s2 = Bson::SectionImpl::create();
+    s2->payloadType(Bson::Section::PayloadType::Sequence);
+    EXPECT_FALSE(m1 == m2);
+  }
+
+  // Trigger fail on comparing checksum.
+  {
+    MsgMessageImpl m1(0, 0);
+    m1.checksum(0);
+    MsgMessageImpl m2(0, 0);
+    m2.checksum(1);
+    EXPECT_FALSE(m1 == m2);
+  }
+}
+TEST_F(MongoCodecImplTest, Msg) {
+  {
+    MsgMessageImpl msg(16, 26);
+
+    msg.flagBits(0);
+    auto section = Bson::SectionImpl::create();
+    section->payloadType(Bson::Section::PayloadType::Document);
+    Bson::Payload payload = Bson::DocumentImpl::create()->addString("hello", "world");
+    section->payload(std::make_shared<Bson::Payload>(payload));
+    msg.sections().push_back(section);
+
+    EXPECT_NO_THROW(Json::Factory::loadFromString(msg.toString(true)));
+    EXPECT_NO_THROW(Json::Factory::loadFromString(msg.toString(false)));
+
+    encoder_.encodeMsg(msg);
+    EXPECT_CALL(callbacks_, decodeMsg_(Pointee(Eq(msg))));
+    decoder_.onData(output_);
+  }
+
+  {
+    MsgMessageImpl msg(16, 26);
+
+    msg.flagBits(0);
+    auto sequence = Bson::SequenceImpl::create();
+    auto doc = Bson::DocumentImpl::create()->addString("hello", "world");
+    sequence->size(doc->byteSize());
+    sequence->identifier("id");
+    sequence->documents().push_back(doc);
+    auto section = Bson::SectionImpl::create();
+    section->payloadType(Bson::Section::PayloadType::Sequence);
+    Bson::Payload payload = sequence;
+    section->payload(std::make_shared<Bson::Payload>(payload));
+    msg.sections().push_back(section);
+
+    EXPECT_NO_THROW(Json::Factory::loadFromString(msg.toString(true)));
+    EXPECT_NO_THROW(Json::Factory::loadFromString(msg.toString(false)));
+
+    encoder_.encodeMsg(msg);
+    EXPECT_CALL(callbacks_, decodeMsg_(Pointee(Eq(msg))));
+    decoder_.onData(output_);
+  }
+}
 } // namespace MongoProxy
 } // namespace NetworkFilters
 } // namespace Extensions

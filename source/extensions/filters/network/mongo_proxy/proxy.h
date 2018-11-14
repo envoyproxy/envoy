@@ -70,7 +70,8 @@ typedef ConstSingleton<MongoRuntimeConfigKeys> MongoRuntimeConfig;
   COUNTER(cx_destroy_remote_with_active_rq)                                                        \
   COUNTER(cx_drain_close)                                                                          \
   COUNTER(op_command)                                                                              \
-  COUNTER(op_command_reply)
+  COUNTER(op_command_reply)                                                                        \
+  COUNTER(op_msg)
 // clang-format on
 
 /**
@@ -152,6 +153,7 @@ public:
   void decodeReply(ReplyMessagePtr&& message) override;
   void decodeCommand(CommandMessagePtr&& message) override;
   void decodeCommandReply(CommandReplyMessagePtr&& message) override;
+  void decodeMsg(MsgMessagePtr&& message) override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;

@@ -8,6 +8,8 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 
+#include "absl/types/variant.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -116,6 +118,52 @@ public:
   virtual std::string toString() const PURE;
   virtual const std::list<FieldPtr>& values() const PURE;
 };
+
+class Sequence {
+public:
+  virtual ~Sequence() {}
+
+  virtual bool operator==(const Sequence& rhs) const PURE;
+  virtual int32_t byteSize() const PURE;
+  virtual void encode(Buffer::Instance& output) const PURE;
+  virtual std::string toString() const PURE;
+
+  virtual int32_t size() const PURE;
+  virtual void size(int32_t size) PURE;
+  virtual std::string identifier() const PURE;
+  virtual void identifier(std::string identifier) PURE;
+  virtual const std::list<DocumentSharedPtr>& documents() const PURE;
+  virtual std::list<DocumentSharedPtr>& documents() PURE;
+};
+
+typedef std::shared_ptr<Sequence> SequenceSharedPtr;
+
+typedef absl::variant<DocumentSharedPtr, SequenceSharedPtr> Payload;
+typedef std::shared_ptr<Payload> PayloadSharedPtr;
+
+class Section {
+public:
+  struct PayloadType {
+    // clang-format off
+    static const int32_t Document = 0;
+    static const int32_t Sequence = 1;
+    // clang-format on
+  };
+
+  virtual ~Section() {}
+
+  virtual bool operator==(const Section& rhs) const PURE;
+  virtual int32_t byteSize() const PURE;
+  virtual void encode(Buffer::Instance& output) const PURE;
+  virtual std::string toString() const PURE;
+
+  virtual uint8_t payloadType() const PURE;
+  virtual void payloadType(uint8_t payloadType) PURE;
+  virtual const Payload* payload() const PURE;
+  virtual void payload(PayloadSharedPtr&& fields) PURE;
+};
+
+typedef std::shared_ptr<Section> SectionSharedPtr;
 
 } // namespace Bson
 } // namespace MongoProxy

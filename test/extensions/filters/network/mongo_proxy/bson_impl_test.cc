@@ -28,6 +28,32 @@ TEST(BsonImplTest, Equal) {
   EXPECT_FALSE(*doc1 == *doc2);
 }
 
+TEST(BsonImplTest, SequenceEqual) {
+  {
+    auto seq1 = SequenceImpl::create();
+    auto seq2 = SequenceImpl::create();
+    seq1->size(0);
+    seq2->size(1);
+    EXPECT_FALSE(*seq1 == *seq2);
+  }
+
+  {
+    auto seq1 = SequenceImpl::create();
+    auto seq2 = SequenceImpl::create();
+    seq1->identifier("id");
+    seq2->identifier("id2");
+    EXPECT_FALSE(*seq1 == *seq2);
+  }
+
+  {
+    auto seq1 = SequenceImpl::create();
+    auto seq2 = SequenceImpl::create();
+    seq1->documents().push_back(DocumentImpl::create());
+    seq2->documents().push_back(DocumentImpl::create()->addString("hello", "world"));
+    EXPECT_FALSE(*seq1 == *seq2);
+  }
+}
+
 TEST(BsonImplTest, InvalidMessageLength) {
   Buffer::OwnedImpl buffer;
   BufferHelper::writeInt32(buffer, 100);

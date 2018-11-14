@@ -130,6 +130,10 @@ void BufferHelper::writeDouble(Buffer::Instance& data, double value) {
   writeInt64(data, *to_write);
 }
 
+void BufferHelper::writeByte(Buffer::Instance& data, uint8_t value) {
+  data.add(&value, sizeof(value));
+}
+
 void BufferHelper::writeInt32(Buffer::Instance& data, int32_t value) {
   value = htole32(value);
   data.add(&value, sizeof(value));
@@ -560,6 +564,168 @@ const Field* DocumentImpl::find(const std::string& name, Field::Type type) const
   }
 
   return nullptr;
+}
+
+void SequenceImpl::fromBuffer(Buffer::Instance& data) {
+  size_ = BufferHelper::removeInt32(data);
+  identifier_ = BufferHelper::removeString(data);
+  uint64_t original_buffer_length = data.length();
+  while (data.length() - (original_buffer_length - size_) > 0) {
+    documents_.emplace_back(DocumentImpl::create(data));
+  }
+
+  ENVOY_LOG(trace, "{}", toString());
+}
+
+int32_t SequenceImpl::byteSize() const {
+  int32_t total_size = 2 * sizeof(int32_t);
+  total_size += identifier_.size() + 1;
+  for (const auto& document : documents_) {
+    total_size += document->byteSize();
+  }
+
+  return total_size;
+}
+
+void SequenceImpl::encode(Buffer::Instance& output) const {
+  BufferHelper::writeInt32(output, size_);
+  BufferHelper::writeString(output, identifier_);
+  for (const auto& document : documents_) {
+    document->encode(output);
+  }
+}
+
+bool SequenceImpl::operator==(const Sequence& rhs) const {
+  if (!(size() == rhs.size() && identifier() == rhs.identifier() &&
+        documents().size() == rhs.documents().size())) {
+    return false;
+  }
+
+  for (auto i1 = documents().begin(), i2 = rhs.documents().begin(); i1 != documents().end();
+       i1++, i2++) {
+    if (**i1 == **i2) {
+      continue;
+    }
+
+    return false;
+  }
+
+  return true;
+}
+
+std::string SequenceImpl::toString() const {
+  std::stringstream out;
+  out << "{";
+  out << fmt::format("\"size\": {}, ", size_);
+  out << fmt::format("\"identifier\": \"{}\", ", identifier_);
+  out << "\"document\": [";
+
+  bool first = true;
+  for (const auto& document : documents_) {
+    if (!first) {
+      out << ", ";
+    }
+
+    out << document->toString();
+    first = false;
+  }
+
+  out << "]}";
+  return out.str();
+}
+
+void SectionImpl::fromBuffer(Buffer::Instance& data) {
+  payloadType_ = BufferHelper::removeByte(data);
+  Payload payload;
+  switch (payloadType_) {
+  case Section::PayloadType::Document:
+    payload = DocumentImpl::create(data);
+    payload_ = std::make_shared<Payload>(payload);
+    break;
+  case Section::PayloadType::Sequence:
+    payload = SequenceImpl::create(data);
+    payload_ = std::make_shared<Payload>(payload);
+    break;
+  default:
+    throw EnvoyException("unknown section payload type");
+  }
+
+  ENVOY_LOG(trace, "{}", toString());
+}
+
+int32_t SectionImpl::byteSize() const {
+  int32_t total_size = sizeof(uint8_t);
+  switch (payloadType_) {
+  case Section::PayloadType::Document:
+    total_size += absl::get<DocumentSharedPtr>(*payload_)->byteSize();
+    break;
+  case Section::PayloadType::Sequence:
+    total_size += absl::get<SequenceSharedPtr>(*payload_)->byteSize();
+    break;
+  default:
+    throw EnvoyException("unknown section payload type");
+  }
+
+  return total_size;
+}
+
+void SectionImpl::encode(Buffer::Instance& output) const {
+  BufferHelper::writeByte(output, payloadType_);
+  switch (payloadType_) {
+  case Section::PayloadType::Document:
+    absl::get<DocumentSharedPtr>(*payload_)->encode(output);
+    break;
+  case Section::PayloadType::Sequence:
+    absl::get<SequenceSharedPtr>(*payload_)->encode(output);
+    break;
+  default:
+    throw EnvoyException("unknown section payload type");
+  }
+}
+
+bool SectionImpl::operator==(const Section& rhs) const {
+  if (payloadType() != rhs.payloadType()) {
+    return false;
+  }
+
+  switch (payloadType_) {
+  case Section::PayloadType::Document:
+    if (!(*absl::get<DocumentSharedPtr>(*payload()) ==
+          *absl::get<DocumentSharedPtr>(*rhs.payload()))) {
+      return false;
+    }
+    break;
+  case Section::PayloadType::Sequence:
+    if (!(*absl::get<SequenceSharedPtr>(*payload()) ==
+          *absl::get<SequenceSharedPtr>(*rhs.payload()))) {
+      return false;
+    }
+    break;
+  default:
+    throw EnvoyException("unknown section payload type");
+  }
+
+  return true;
+}
+
+std::string SectionImpl::toString() const {
+  std::stringstream out;
+  out << "{";
+  out << fmt::format("\"payloadType\": {}, ", payloadType_);
+  out << "\"payload\": ";
+  switch (payloadType_) {
+  case Section::PayloadType::Document:
+    out << absl::get<DocumentSharedPtr>(*payload_)->toString();
+    break;
+  case Section::PayloadType::Sequence:
+    out << absl::get<SequenceSharedPtr>(*payload_)->toString();
+    break;
+  default:
+    throw EnvoyException("unknown section payload type");
+  }
+
+  out << "}";
+  return out.str();
 }
 
 } // namespace Bson
