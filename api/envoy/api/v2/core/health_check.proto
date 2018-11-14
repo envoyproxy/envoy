@@ -213,8 +213,9 @@ message HealthCheck {
   // If empty, no event log will be written.
   string event_log_path = 17;
 
-  // If set to true, health check failure events will always be logged.
-  // The default to value for "Always_log_health_check_failures" is false.
+  // If set to true, health check failure events will always be logged.  If set to false, only the 
+  // initial health check failure event will be logged.
+  // The default value is false.
   bool always_log_health_check_failures = 19;
 }
 
