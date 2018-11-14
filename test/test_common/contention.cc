@@ -6,15 +6,16 @@ namespace TestUtil {
 
 void ContentionGenerator::generateContention(MutexTracerImpl& tracer) {
   MutexBasicLockable mu;
-  Envoy::Thread::Thread t1 = launchThread(tracer, &mu);
-  Envoy::Thread::Thread t2 = launchThread(tracer, &mu);
-  t1.join();
-  t2.join();
+  Envoy::Thread::ThreadPtr t1 = launchThread(tracer, &mu);
+  Envoy::Thread::ThreadPtr t2 = launchThread(tracer, &mu);
+  t1->join();
+  t2->join();
 }
 
-Envoy::Thread::Thread ContentionGenerator::launchThread(MutexTracerImpl& tracer,
-                                                        MutexBasicLockable* mu) {
-  return Envoy::Thread::Thread([&tracer, mu]() -> void { holdUntilContention(tracer, mu); });
+Envoy::Thread::ThreadPtr ContentionGenerator::launchThread(MutexTracerImpl& tracer,
+                                                           MutexBasicLockable* mu) {
+  return std::make_unique<Envoy::Thread::ThreadImpl>(
+      [&tracer, mu]() -> void { holdUntilContention(tracer, mu); });
 }
 
 void ContentionGenerator::holdUntilContention(MutexTracerImpl& tracer, MutexBasicLockable* mu) {

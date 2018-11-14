@@ -1,7 +1,9 @@
 #include <functional>
 
+#include "envoy/thread/thread.h"
+
+#include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
-#include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
 
 #include "test/mocks/common.h"
@@ -60,7 +62,7 @@ protected:
   DispatcherImplTest()
       : dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSystem())),
         work_finished_(false) {
-    dispatcher_thread_ = std::make_unique<Thread::Thread>([this]() {
+    dispatcher_thread_ = api_.createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);
       keepalive_timer_ = dispatcher_->createTimer(
@@ -78,7 +80,8 @@ protected:
 
   DangerousDeprecatedTestTime test_time_;
 
-  std::unique_ptr<Thread::Thread> dispatcher_thread_;
+  Api::Impl api_;
+  Thread::ThreadPtr dispatcher_thread_;
   DispatcherPtr dispatcher_;
   Thread::MutexBasicLockable mu_;
   Thread::CondVar cv_;

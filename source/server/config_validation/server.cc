@@ -90,7 +90,7 @@ void ValidationInstance::initialize(Options& options,
   ssl_context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(time_system_);
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo(), *secret_manager_);
+      localInfo(), *secret_manager_, api());
 
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);

@@ -175,7 +175,8 @@ public:
   static IntegrationTestServerPtr create(const std::string& config_path,
                                          const Network::Address::IpVersion version,
                                          std::function<void()> pre_worker_start_test_steps,
-                                         bool deterministic, Event::TestTimeSystem& time_system);
+                                         bool deterministic, Event::TestTimeSystem& time_system,
+                                         Api::Api& api);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer();
@@ -244,8 +245,9 @@ public:
   virtual Network::Address::InstanceConstSharedPtr admin_address() PURE;
 
 protected:
-  IntegrationTestServer(Event::TestTimeSystem& time_system, const std::string& config_path)
-      : time_system_(time_system), config_path_(config_path) {}
+  IntegrationTestServer(Event::TestTimeSystem& time_system, Api::Api& api,
+                        const std::string& config_path)
+      : time_system_(time_system), api_(api), config_path_(config_path) {}
 
   // Create the running envoy server. This function will call serverReady() when the virtual
   // functions server(), stat_store(), and admin_address() may be called, but before the server
@@ -269,6 +271,7 @@ private:
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic);
 
   Event::TestTimeSystem& time_system_;
+  Api::Api& api_;
   const std::string config_path_;
   Thread::ThreadPtr thread_;
   Thread::CondVar listeners_cv_;
@@ -284,8 +287,9 @@ private:
 // Default implementation of IntegrationTestServer
 class IntegrationTestServerImpl : public IntegrationTestServer {
 public:
-  IntegrationTestServerImpl(Event::TestTimeSystem& time_system, const std::string& config_path)
-      : IntegrationTestServer(time_system, config_path) {}
+  IntegrationTestServerImpl(Event::TestTimeSystem& time_system, Api::Api& api,
+                            const std::string& config_path)
+      : IntegrationTestServer(time_system, api, config_path) {}
 
   ~IntegrationTestServerImpl() override;
 

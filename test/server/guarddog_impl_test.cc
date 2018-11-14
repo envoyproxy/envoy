@@ -4,6 +4,7 @@
 
 #include "envoy/common/time.h"
 
+#include "common/api/api_impl.h"
 #include "common/common/utility.h"
 
 #include "server/guarddog_impl.h"
@@ -25,6 +26,7 @@ namespace Server {
 class GuardDogTestBase : public testing::Test {
 protected:
   Event::SimulatedTimeSystem time_system_;
+  Api::Impl api_;
 };
 
 /**
@@ -45,7 +47,7 @@ protected:
    */
   void SetupForDeath() {
     InSequence s;
-    guard_dog_ = std::make_unique<GuardDogImpl>(fakestats_, config_kill_, time_system_);
+    guard_dog_ = std::make_unique<GuardDogImpl>(fakestats_, config_kill_, time_system_, api_);
     unpet_dog_ = guard_dog_->createWatchDog(0);
     guard_dog_->forceCheckForTest();
     time_system_.sleep(std::chrono::milliseconds(500));
@@ -57,7 +59,7 @@ protected:
    */
   void SetupForMultiDeath() {
     InSequence s;
-    guard_dog_ = std::make_unique<GuardDogImpl>(fakestats_, config_multikill_, time_system_);
+    guard_dog_ = std::make_unique<GuardDogImpl>(fakestats_, config_multikill_, time_system_, api_);
     auto unpet_dog_ = guard_dog_->createWatchDog(0);
     guard_dog_->forceCheckForTest();
     auto second_dog_ = guard_dog_->createWatchDog(1);
@@ -114,7 +116,7 @@ TEST_F(GuardDogAlmostDeadTest, NearDeathTest) {
   // This ensures that if only one thread surpasses the multiple kill threshold
   // there is no death. The positive case is covered in MultiKillDeathTest.
   InSequence s;
-  GuardDogImpl gd(fakestats_, config_multikill_, time_system_);
+  GuardDogImpl gd(fakestats_, config_multikill_, time_system_, api_);
   auto unpet_dog = gd.createWatchDog(0);
   auto pet_dog = gd.createWatchDog(1);
   // This part "waits" 600 milliseconds while one dog is touched every 100, and
@@ -140,7 +142,7 @@ protected:
 TEST_F(GuardDogMissTest, MissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
-  GuardDogImpl gd(stats_store_, config_miss_, time_system_);
+  GuardDogImpl gd(stats_store_, config_miss_, time_system_, api_);
   // We'd better start at 0:
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_miss").value());
   auto unpet_dog = gd.createWatchDog(0);
@@ -159,7 +161,7 @@ TEST_F(GuardDogMissTest, MissTest) {
 TEST_F(GuardDogMissTest, MegaMissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
-  GuardDogImpl gd(stats_store_, config_mega_, time_system_);
+  GuardDogImpl gd(stats_store_, config_mega_, time_system_, api_);
   auto unpet_dog = gd.createWatchDog(0);
   // We'd better start at 0:
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_mega_miss").value());
@@ -179,7 +181,7 @@ TEST_F(GuardDogMissTest, MissCountTest) {
   // This tests a flake discovered in the MissTest where real timeout or
   // spurious condition_variable wakeup causes the counter to get incremented
   // more than it should be.
-  GuardDogImpl gd(stats_store_, config_miss_, time_system_);
+  GuardDogImpl gd(stats_store_, config_miss_, time_system_, api_);
   auto sometimes_pet_dog = gd.createWatchDog(0);
   // These steps are executed once without ever touching the watchdog.
   // Then the last step is to touch the watchdog and repeat the steps.
@@ -219,27 +221,27 @@ TEST_F(GuardDogMissTest, MissCountTest) {
 TEST_F(GuardDogTestBase, StartStopTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(0, 0, 0, 0);
-  GuardDogImpl gd(stats, config, time_system_);
+  GuardDogImpl gd(stats, config, time_system_, api_);
 }
 
 TEST_F(GuardDogTestBase, LoopIntervalNoKillTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(40, 50, 0, 0);
-  GuardDogImpl gd(stats, config, time_system_);
+  GuardDogImpl gd(stats, config, time_system_, api_);
   EXPECT_EQ(gd.loopIntervalForTest(), 40);
 }
 
 TEST_F(GuardDogTestBase, LoopIntervalTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
-  GuardDogImpl gd(stats, config, time_system_);
+  GuardDogImpl gd(stats, config, time_system_, api_);
   EXPECT_EQ(gd.loopIntervalForTest(), 90);
 }
 
 TEST_F(GuardDogTestBase, WatchDogThreadIdTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
-  GuardDogImpl gd(stats, config, time_system_);
+  GuardDogImpl gd(stats, config, time_system_, api_);
   auto watched_dog = gd.createWatchDog(123);
   EXPECT_EQ(watched_dog->threadId(), 123);
   gd.stopWatching(watched_dog);

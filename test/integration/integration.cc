@@ -353,8 +353,12 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
   std::cerr<<"createGeneratedApiTestServer START"<<std::endl;//TODO REMOVE
   // AH HAH!!!!!!!!!! IT IS HERE!!!!!!!!! HERE IS WHERE IT GOES WRONG
   test_server_ = IntegrationTestServer::create(
+<<<<<<< HEAD
       bootstrap_path, version_, pre_worker_start_test_steps_, deterministic_, *time_system_);
   std::cerr<<"createGeneratedApiTestServer test_server_ created"<<std::endl;//TODO REMOVE
+=======
+      bootstrap_path, version_, pre_worker_start_test_steps_, deterministic_, *time_system_, *api_);
+>>>>>>> Wire thread creation through the Api interface (#5016)
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0) {
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.
@@ -411,7 +415,7 @@ BaseIntegrationTest::createIntegrationTestServer(const std::string& bootstrap_pa
                                                  std::function<void()> pre_worker_start_test_steps,
                                                  Event::TestTimeSystem& time_system) {
   return IntegrationTestServer::create(bootstrap_path, version_, pre_worker_start_test_steps,
-                                       deterministic_, time_system);
+                                       deterministic_, time_system, *api_);
 }
 
 } // namespace Envoy

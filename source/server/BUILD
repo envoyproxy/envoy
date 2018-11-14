@@ -94,14 +94,15 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":watchdog_lib",
+        "//include/envoy/api:api_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:guarddog_interface",
         "//include/envoy/server:watchdog_interface",
         "//include/envoy/stats:stats_interface",
+        "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
     ],
 )
@@ -351,8 +352,8 @@ envoy_cc_library(
         "//include/envoy/server:guarddog_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:worker_interface",
+        "//include/envoy/thread:thread_interface",
         "//include/envoy/thread_local:thread_local_interface",
-        "//source/common/common:thread_lib",
     ],
 )
 

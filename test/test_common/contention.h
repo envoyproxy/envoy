@@ -26,7 +26,7 @@ public:
   static void generateContention(MutexTracerImpl& tracer);
 
 private:
-  static Envoy::Thread::Thread launchThread(MutexTracerImpl& tracer, MutexBasicLockable* mu);
+  static Envoy::Thread::ThreadPtr launchThread(MutexTracerImpl& tracer, MutexBasicLockable* mu);
 
   static void holdUntilContention(MutexTracerImpl& tracer, MutexBasicLockable* mu);
 };

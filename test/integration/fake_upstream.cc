@@ -369,7 +369,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close), listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
-  thread_ = std::make_unique<Thread::Thread>([this]() -> void { threadRoutine(); });
+  thread_ = api_->createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
 }
 

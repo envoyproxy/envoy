@@ -17,7 +17,7 @@ namespace Envoy {
 namespace Server {
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
-                           Event::TimeSystem& time_system)
+                           Event::TimeSystem& time_system, Api::Api& api)
     : time_system_(time_system), miss_timeout_(config.wdMissTimeout()),
       megamiss_timeout_(config.wdMegaMissTimeout()), kill_timeout_(config.wdKillTimeout()),
       multi_kill_timeout_(config.wdMultiKillTimeout()),
@@ -33,7 +33,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       watchdog_miss_counter_(stats_scope.counter("server.watchdog_miss")),
       watchdog_megamiss_counter_(stats_scope.counter("server.watchdog_mega_miss")),
       run_thread_(true) {
-  start();
+  start(api);
 }
 
 GuardDogImpl::~GuardDogImpl() { stop(); }
@@ -135,9 +135,9 @@ bool GuardDogImpl::waitOrDetectStop() {
   return run_thread_;
 }
 
-void GuardDogImpl::start() {
+void GuardDogImpl::start(Api::Api& api) {
   run_thread_ = true;
-  thread_ = std::make_unique<Thread::Thread>([this]() -> void { threadRoutine(); });
+  thread_ = api.createThread([this]() -> void { threadRoutine(); });
 }
 
 void GuardDogImpl::stop() {

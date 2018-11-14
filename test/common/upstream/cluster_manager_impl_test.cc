@@ -5,6 +5,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/api/api_impl.h"
 #include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
 #include "common/network/socket_option_impl.h"
@@ -142,9 +143,9 @@ public:
                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                          AccessLog::AccessLogManager& log_manager,
                          Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                         MockLocalClusterUpdate& local_cluster_update)
+                         Api::Api& api, MockLocalClusterUpdate& local_cluster_update)
       : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
-                           main_thread_dispatcher, admin),
+                           main_thread_dispatcher, admin, api),
         local_cluster_update_(local_cluster_update) {}
 
 protected:
@@ -169,7 +170,7 @@ public:
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<ClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_);
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, api_);
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -203,7 +204,8 @@ public:
 
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, local_cluster_update_);
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, api_,
+        local_cluster_update_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -237,6 +239,7 @@ public:
     return metadata;
   }
 
+  Api::Impl api_;
   NiceMock<TestClusterManagerFactory> factory_;
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;

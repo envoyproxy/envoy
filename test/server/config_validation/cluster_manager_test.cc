@@ -1,6 +1,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/api/api_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
 #include "server/config_validation/cluster_manager.h"
@@ -22,6 +23,7 @@ namespace Envoy {
 namespace Upstream {
 
 TEST(ValidationClusterManagerTest, MockedMethods) {
+  Api::Impl api;
   NiceMock<Runtime::MockLoader> runtime;
   Event::SimulatedTimeSystem time_system;
   Stats::IsolatedStoreImpl stats;
@@ -36,7 +38,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
 
   ValidationClusterManagerFactory factory(runtime, stats, tls, random, dns_resolver,
                                           ssl_context_manager, dispatcher, local_info,
-                                          secret_manager);
+                                          secret_manager, api);
 
   AccessLog::MockAccessLogManager log_manager;
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;

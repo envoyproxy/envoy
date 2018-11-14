@@ -48,6 +48,7 @@ IntegrationTestServerPtr
 IntegrationTestServer::create(const std::string& config_path,
                               const Network::Address::IpVersion version,
                               std::function<void()> pre_worker_start_test_steps, bool deterministic,
+<<<<<<< HEAD
                               Event::TestTimeSystem& time_system) {
 <<<<<<< HEAD
   std::cerr<<"constructing IntegrationTestServer"<<std::endl;
@@ -57,6 +58,11 @@ IntegrationTestServer::create(const std::string& config_path,
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, config_path)};
 >>>>>>> Refactor integration test server to allow specialization by derived classes (#4803)
+=======
+                              Event::TestTimeSystem& time_system, Api::Api& api) {
+  IntegrationTestServerPtr server{
+      std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
+>>>>>>> Wire thread creation through the Api interface (#5016)
   server->start(version, pre_worker_start_test_steps, deterministic);
   std::cerr<<"startED IntegrationTestServer"<<std::endl;
   return server;
@@ -67,7 +73,7 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
                                   bool deterministic) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_ = std::make_unique<Thread::Thread>(
+  thread_ = api_.createThread(
       [version, deterministic, this]() -> void { threadRoutine(version, deterministic); });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
