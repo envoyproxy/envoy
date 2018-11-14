@@ -40,7 +40,7 @@ public:
 // UNAVAILABLE.
 TEST_F(EnvoyAsyncClientImplTest, StreamHttpStartFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
-  ON_CALL(http_client_, start(_, _, false)).WillByDefault(Return(nullptr));
+  ON_CALL(http_client_, start(_, _)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Unavailable, ""));
   auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
   EXPECT_EQ(grpc_stream, nullptr);
@@ -50,7 +50,7 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpStartFail) {
 // UNAVAILABLE.
 TEST_F(EnvoyAsyncClientImplTest, RequestHttpStartFail) {
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
-  ON_CALL(http_client_, start(_, _, true)).WillByDefault(Return(nullptr));
+  ON_CALL(http_client_, start(_, _)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks, onFailure(Status::GrpcStatus::Unavailable, "", _));
   helloworld::HelloRequest request_msg;
 
@@ -76,10 +76,10 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;
-  EXPECT_CALL(http_client_, start(_, _, false))
-      .WillOnce(Invoke(
-          [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                          const absl::optional<std::chrono::milliseconds>&, bool) {
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
             http_callbacks = &callbacks;
             return &http_stream;
           }));
@@ -102,10 +102,10 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;
-  EXPECT_CALL(http_client_, start(_, _, true))
-      .WillOnce(Invoke(
-          [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                          const absl::optional<std::chrono::milliseconds>&, bool) {
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
             http_callbacks = &callbacks;
             return &http_stream;
           }));
