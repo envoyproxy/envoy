@@ -158,7 +158,8 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  void setDynamicMetadata(std::string field, std::string value);
+  void setDynamicMetadata(std::string op, absl::optional<std::string> db,
+                          absl::optional<std::string> collection);
 
 private:
   struct ActiveQuery {
