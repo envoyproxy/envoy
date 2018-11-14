@@ -296,7 +296,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
 
   // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the hot path) could
   // become prohibitively expensive. Revisit this usage in the future.
-  if (parent_.stats_matcher_->rejects(final_name)) {
+  if (parent_.rejects(final_name.c_str())) {
     return null_counter_;
   }
 
@@ -344,7 +344,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   std::string final_name = prefix_ + name;
 
   // See warning/comments in counter().
-  if (parent_.stats_matcher_->rejects(final_name)) {
+  if (parent_.rejects(final_name.c_str())) {
     return null_gauge_;
   }
 
@@ -374,7 +374,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   std::string final_name = prefix_ + name;
 
   // See warning/comments in counter().
-  if (parent_.stats_matcher_->rejects(final_name)) {
+  if (parent_.rejects(final_name.c_str())) {
     return null_histogram_;
   }
 
@@ -410,7 +410,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name,
                                                          ParentHistogramImpl& parent) {
-  if (parent_.stats_matcher_->rejects(name)) {
+  if (parent_.rejects(name.c_str())) {
     return null_histogram_;
   }
 
