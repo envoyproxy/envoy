@@ -158,6 +158,11 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
+  void setDynamicMetadata(std::string field, double value);
+  void setDynamicMetadata(std::string field, std::string value);
+  void setDynamicMetadata(std::string field, const std::vector<int64_t>& values);
+  void setDynamicMetadata(std::string field, std::list<Bson::DocumentSharedPtr>& values);
+
 private:
   struct ActiveQuery {
     ActiveQuery(ProxyFilter& parent, const QueryMessage& query)
