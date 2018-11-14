@@ -10,7 +10,7 @@ namespace NetworkFilters {
 namespace Kafka {
 
 /**
- * Abstract message
+ * Abstract message (that can be either request or response)
  */
 class Message {
 public:

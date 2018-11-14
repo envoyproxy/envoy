@@ -13,8 +13,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-// === DECODER =================================================================
-
 /**
  * Invoked when request is successfully decoded
  */
@@ -52,8 +50,9 @@ private:
   ParserSharedPtr current_parser_;
 };
 
-// === ENCODER =================================================================
-
+/**
+ * Encodes provided requests into underlying buffer
+ */
 class RequestEncoder : public MessageEncoder<Request> {
 public:
   RequestEncoder(Buffer::Instance& output) : output_(output) {}

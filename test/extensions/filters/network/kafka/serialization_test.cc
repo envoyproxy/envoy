@@ -12,8 +12,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-// === EMPTY (FRESHLY INITIALIZED) BUFFER TESTS ================================
-
 // freshly created buffers should not be ready
 #define TEST_EmptyBufferShouldNotBeReady(BufferClass)                                              \
   TEST(BufferClass, EmptyBufferShouldNotBeReady) {                                                 \
@@ -31,13 +29,13 @@ TEST_EmptyBufferShouldNotBeReady(StringBuffer);
 TEST_EmptyBufferShouldNotBeReady(NullableStringBuffer);
 TEST(CompositeBuffer, EmptyBufferShouldNotBeReady) {
   // given
-  const CompositeBuffer<INT8, Int8Buffer> testee{};
+  const CompositeBuffer<int8_t, Int8Buffer> testee{};
   // when, then
   ASSERT_EQ(testee.ready(), false);
 }
 TEST(ArrayBuffer, EmptyBufferShouldNotBeReady) {
   // given
-  const ArrayBuffer<INT8, Int8Buffer> testee{};
+  const ArrayBuffer<int8_t, Int8Buffer> testee{};
   // when, then
   ASSERT_EQ(testee.ready(), false);
 }
@@ -45,13 +43,11 @@ TEST(ArrayBuffer, EmptyBufferShouldNotBeReady) {
 // Null buffer is a special case, it's always ready and can provide results via 0-arg ctor
 TEST(NullBuffer, EmptyBufferShouldBeReady) {
   // given
-  const NullBuffer<INT8> testee{};
+  const NullBuffer<int8_t> testee{};
   // when, then
   ASSERT_EQ(testee.ready(), true);
   ASSERT_EQ(testee.get(), 0);
 }
-
-// === SERIALIZATION / DESERIALIZATION TESTS ===================================
 
 EncodingContext encoder{-1}; // context is not used when serializing primitive types
 
@@ -146,8 +142,6 @@ template <typename BT, typename AT> void serializeThenDeserializeAndCheckEqualit
   serializeThenDeserializeAndCheckEqualityWithChunks<BT>(expected);
 }
 
-// === NUMERIC BUFFERS =========================================================
-
 // macroed out test for numeric buffers
 #define TEST_BufferShouldDeserialize(BufferClass, DataClass, Value)                                \
   TEST(DataClass, ShouldConsumeCorrectAmountOfData) {                                              \
@@ -156,22 +150,20 @@ template <typename BT, typename AT> void serializeThenDeserializeAndCheckEqualit
     serializeThenDeserializeAndCheckEquality<BufferClass>(value);                                  \
   }
 
-TEST_BufferShouldDeserialize(Int8Buffer, INT8, 42);
-TEST_BufferShouldDeserialize(Int16Buffer, INT16, 42);
-TEST_BufferShouldDeserialize(Int32Buffer, INT32, 42);
-TEST_BufferShouldDeserialize(UInt32Buffer, UINT32, 42);
-TEST_BufferShouldDeserialize(Int64Buffer, INT64, 42);
-TEST_BufferShouldDeserialize(BoolBuffer, BOOLEAN, true);
-
-// === (NULLABLE) STRING BUFFER ================================================
+TEST_BufferShouldDeserialize(Int8Buffer, int8_t, 42);
+TEST_BufferShouldDeserialize(Int16Buffer, int16_t, 42);
+TEST_BufferShouldDeserialize(Int32Buffer, int32_t, 42);
+TEST_BufferShouldDeserialize(UInt32Buffer, uint32_t, 42);
+TEST_BufferShouldDeserialize(Int64Buffer, int64_t, 42);
+TEST_BufferShouldDeserialize(BoolBuffer, bool, true);
 
 TEST(StringBuffer, ShouldDeserialize) {
-  const STRING value = "sometext";
+  const std::string value = "sometext";
   serializeThenDeserializeAndCheckEquality<StringBuffer>(value);
 }
 
 TEST(StringBuffer, ShouldDeserializeEmptyString) {
-  const STRING value = "";
+  const std::string value = "";
   serializeThenDeserializeAndCheckEquality<StringBuffer>(value);
 }
 
@@ -180,7 +172,7 @@ TEST(StringBuffer, ShouldThrowOnInvalidLength) {
   StringBuffer testee;
   Buffer::OwnedImpl buffer;
 
-  INT16 len = -1;
+  int16_t len = -1; // STRING accepts only >= 0
   encoder.encode(len, buffer);
 
   uint64_t remaining = 1024;
@@ -193,19 +185,19 @@ TEST(StringBuffer, ShouldThrowOnInvalidLength) {
 
 TEST(NullableStringBuffer, ShouldDeserializeString) {
   // given
-  const NULLABLE_STRING value{"sometext"};
+  const NullableString value{"sometext"};
   serializeThenDeserializeAndCheckEquality<NullableStringBuffer>(value);
 }
 
 TEST(NullableStringBuffer, ShouldDeserializeEmptyString) {
   // given
-  const NULLABLE_STRING value{""};
+  const NullableString value{""};
   serializeThenDeserializeAndCheckEquality<NullableStringBuffer>(value);
 }
 
 TEST(NullableStringBuffer, ShouldDeserializeAbsentString) {
   // given
-  const NULLABLE_STRING value = absl::nullopt;
+  const NullableString value = absl::nullopt;
   serializeThenDeserializeAndCheckEquality<NullableStringBuffer>(value);
 }
 
@@ -214,7 +206,7 @@ TEST(NullableStringBuffer, ShouldThrowOnInvalidLength) {
   NullableStringBuffer testee;
   Buffer::OwnedImpl buffer;
 
-  INT16 len = -2; // -1 is OK for NULLABLE_STRING
+  int16_t len = -2; // -1 is OK for NULLABLE_STRING
   encoder.encode(len, buffer);
 
   uint64_t remaining = 1024;
@@ -225,11 +217,9 @@ TEST(NullableStringBuffer, ShouldThrowOnInvalidLength) {
   EXPECT_THROW(testee.feed(data, remaining), EnvoyException);
 }
 
-// === ARRAY BUFFER ============================================================
-
 TEST(ArrayBuffer, ShouldConsumeCorrectAmountOfData) {
-  const NULLABLE_ARRAY<STRING> value{{"aaa", "bbbbb", "cc", "d", "e", "ffffffff"}};
-  serializeThenDeserializeAndCheckEquality<ArrayBuffer<STRING, StringBuffer>>(value);
+  const NullableArray<std::string> value{{"aaa", "bbbbb", "cc", "d", "e", "ffffffff"}};
+  serializeThenDeserializeAndCheckEquality<ArrayBuffer<std::string, StringBuffer>>(value);
 }
 
 TEST(ArrayBuffer, ShouldThrowOnInvalidLength) {
@@ -237,7 +227,7 @@ TEST(ArrayBuffer, ShouldThrowOnInvalidLength) {
   ArrayBuffer<std::string, StringBuffer> testee;
   Buffer::OwnedImpl buffer;
 
-  const INT32 len = -2; // -1 is OK for ARRAY
+  const int32_t len = -2; // -1 is OK for ARRAY
   encoder.encode(len, buffer);
 
   uint64_t remaining = 1024;
@@ -248,12 +238,10 @@ TEST(ArrayBuffer, ShouldThrowOnInvalidLength) {
   EXPECT_THROW(testee.feed(data, remaining), EnvoyException);
 }
 
-// === COMPOSITE BUFFER ========================================================
-
 struct CompositeBufferResult {
-  STRING field1_;
-  NULLABLE_ARRAY<INT32> field2_;
-  INT16 field3_;
+  std::string field1_;
+  NullableArray<int32_t> field2_;
+  int16_t field3_;
 
   size_t encode(Buffer::Instance& dst, EncodingContext& encoder) const {
     size_t written{0};
@@ -269,7 +257,7 @@ bool operator==(const CompositeBufferResult& lhs, const CompositeBufferResult& r
          (lhs.field3_ == rhs.field3_);
 }
 
-typedef CompositeBuffer<CompositeBufferResult, StringBuffer, ArrayBuffer<INT32, Int32Buffer>,
+typedef CompositeBuffer<CompositeBufferResult, StringBuffer, ArrayBuffer<int32_t, Int32Buffer>,
                         Int16Buffer>
     TestCompositeBuffer;
 

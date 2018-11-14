@@ -1,4 +1,5 @@
 #include "extensions/filters/network/kafka/kafka_request.h"
+#include "extensions/filters/network/kafka/messages/offset_commit.h"
 
 #include "test/mocks/server/mocks.h"
 
@@ -23,7 +24,7 @@ TEST(RequestParserResolver, ShouldReturnSentinelIfRequestTypeIsNotRegistered) {
 
   // then
   ASSERT_NE(result, nullptr);
-  ASSERT_NE(std::dynamic_pointer_cast<SentinelConsumer>(result), nullptr);
+  ASSERT_NE(std::dynamic_pointer_cast<SentinelParser>(result), nullptr);
 }
 
 TEST(RequestParserResolver, ShouldReturnSentinelIfRequestVersionIsNotRegistered) {
@@ -40,7 +41,7 @@ TEST(RequestParserResolver, ShouldReturnSentinelIfRequestVersionIsNotRegistered)
 
   // then
   ASSERT_NE(result, nullptr);
-  ASSERT_NE(std::dynamic_pointer_cast<SentinelConsumer>(result), nullptr);
+  ASSERT_NE(std::dynamic_pointer_cast<SentinelParser>(result), nullptr);
 }
 
 TEST(RequestParserResolver, ShouldInvokeGeneratorFunctionOnMatch) {
@@ -79,7 +80,7 @@ TEST_F(BufferBasedTest, RequestStartParserTestShouldReturnRequestHeaderParser) {
   // given
   RequestStartParser testee{RequestParserResolver{{}}};
 
-  INT32 request_len = 1234;
+  int32_t request_len = 1234;
   encoder_.encode(request_len, buffer());
 
   const char* bytes = getBytes();
@@ -98,7 +99,7 @@ TEST_F(BufferBasedTest, RequestStartParserTestShouldReturnRequestHeaderParser) {
 class MockRequestParserResolver : public RequestParserResolver {
 public:
   MockRequestParserResolver() : RequestParserResolver{{}} {};
-  MOCK_CONST_METHOD3(createParser, ParserSharedPtr(INT16, INT16, RequestContextSharedPtr));
+  MOCK_CONST_METHOD3(createParser, ParserSharedPtr(int16_t, int16_t, RequestContextSharedPtr));
 };
 
 TEST_F(BufferBasedTest, RequestHeaderParserShouldExtractHeaderDataAndResolveNextParser) {
@@ -107,15 +108,15 @@ TEST_F(BufferBasedTest, RequestHeaderParserShouldExtractHeaderDataAndResolveNext
   const ParserSharedPtr parser{new OffsetCommitRequestV0Parser{nullptr}};
   EXPECT_CALL(parser_resolver, createParser(_, _, _)).WillOnce(Return(parser));
 
-  const INT32 request_len = 1000;
+  const int32_t request_len = 1000;
   RequestContextSharedPtr context{new RequestContext()};
   context->remaining_request_size_ = request_len;
   RequestHeaderParser testee{parser_resolver, context};
 
-  const INT16 api_key{1};
-  const INT16 api_version{2};
-  const INT32 correlation_id{10};
-  const NULLABLE_STRING client_id{"aaa"};
+  const int16_t api_key{1};
+  const int16_t api_version{2};
+  const int32_t correlation_id{10};
+  const NullableString client_id{"aaa"};
   size_t written = 0;
   written += encoder_.encode(api_key, buffer());
   written += encoder_.encode(api_version, buffer());
@@ -141,14 +142,14 @@ TEST_F(BufferBasedTest, RequestHeaderParserShouldExtractHeaderDataAndResolveNext
   ASSERT_EQ(testee.contextForTest()->request_header_, expected_header);
 }
 
-TEST_F(BufferBasedTest, SentinelConsumerShouldConsumeDataUntilEndOfRequest) {
+TEST_F(BufferBasedTest, SentinelParserShouldConsumeDataUntilEndOfRequest) {
   // given
-  const INT32 request_len = 1000;
+  const int32_t request_len = 1000;
   RequestContextSharedPtr context{new RequestContext()};
   context->remaining_request_size_ = request_len;
-  SentinelConsumer testee{context};
+  SentinelParser testee{context};
 
-  const BYTES garbage(request_len * 2);
+  const Bytes garbage(request_len * 2);
   encoder_.encode(garbage, buffer());
 
   const char* bytes = getBytes();

@@ -6,6 +6,7 @@
 
 #include "common/common/assert.h"
 
+#include "extensions/filters/network/kafka/debug_helpers.h"
 #include "extensions/filters/network/kafka/kafka_protocol.h"
 #include "extensions/filters/network/kafka/parser.h"
 #include "extensions/filters/network/kafka/serialization.h"
@@ -15,36 +16,15 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-// === VECTOR ==================================================================
-
-template <typename T> std::ostream& operator<<(std::ostream& os, const std::vector<T>& arg) {
-  os << "[";
-  for (auto iter = arg.begin(); iter != arg.end(); iter++) {
-    if (iter != arg.begin()) {
-      os << ", ";
-    }
-    os << *iter;
-  }
-  os << "]";
-  return os;
-}
-
-template <typename T> std::ostream& operator<<(std::ostream& os, const absl::optional<T>& arg) {
-  if (arg.has_value()) {
-    os << *arg;
-  } else {
-    os << "<null>";
-  }
-  return os;
-}
-
-// === REQUEST HEADER ==========================================================
-
+/**
+ * Represents fields that are present in every Kafka request message
+ * @see http://kafka.apache.org/protocol.html#protocol_messages
+ */
 struct RequestHeader {
-  INT16 api_key_;
-  INT16 api_version_;
-  INT32 correlation_id_;
-  NULLABLE_STRING client_id_;
+  int16_t api_key_;
+  int16_t api_version_;
+  int32_t correlation_id_;
+  NullableString client_id_;
 
   bool operator==(const RequestHeader& rhs) const {
     return api_key_ == rhs.api_key_ && api_version_ == rhs.api_version_ &&
@@ -58,8 +38,11 @@ struct RequestHeader {
   };
 };
 
+/**
+ * Context that is shared between parsers that are handling the same single message
+ */
 struct RequestContext {
-  INT32 remaining_request_size_{0};
+  int32_t remaining_request_size_{0};
   RequestHeader request_header_{};
 
   friend std::ostream& operator<<(std::ostream& os, const RequestContext& arg) {
@@ -70,52 +53,74 @@ struct RequestContext {
 
 typedef std::shared_ptr<RequestContext> RequestContextSharedPtr;
 
-// === REQUEST PARSER MAPPING (REQUEST TYPE => PARSER) =========================
-
-// a function generating a parser with given context
+/**
+ * Function generating a parser with given context
+ */
 typedef std::function<ParserSharedPtr(RequestContextSharedPtr)> GeneratorFunction;
 
-// two-level map: api_key -> api_version -> generator function
-typedef std::unordered_map<INT16, std::shared_ptr<std::unordered_map<INT16, GeneratorFunction>>>
-    GeneratorMap;
+/**
+ * Structure responsible for mapping [api_key, api_version] -> GeneratorFunction
+ */
+typedef std::unordered_map<int16_t, std::unordered_map<int16_t, GeneratorFunction>> GeneratorMap;
 
+/**
+ * Trivial structure specifying which generator function should be used for which api_key &
+ * api_version
+ */
 struct ParserSpec {
-  const INT16 api_key_;
-  const std::vector<INT16> api_versions_;
+  const int16_t api_key_;
+  const std::vector<int16_t> api_versions_;
   const GeneratorFunction generator_;
 };
 
-// helper function that generates a map from specs looking like { api_key, api_versions... }
-GeneratorMap computeGeneratorMap(std::vector<ParserSpec> arg);
-
 /**
- * Provides the parser that is responsible for consuming the request-specific data
+ * Configuration object
+ * Resolves the parser that will be responsible for consuming the request-specific data
  * In other words: provides (api_key, api_version) -> Parser function
  */
 class RequestParserResolver {
 public:
-  RequestParserResolver(std::vector<ParserSpec> arg) : generators_{computeGeneratorMap(arg)} {};
+  RequestParserResolver(const std::vector<ParserSpec> arg);
+  RequestParserResolver(const RequestParserResolver& original, const std::vector<ParserSpec> arg);
   virtual ~RequestParserResolver() = default;
 
-  virtual ParserSharedPtr createParser(INT16 api_key, INT16 api_version,
+  /**
+   * Creates a parser that is going to process data specific for given api_key & api_version
+   * @param api_key request type
+   * @param api_version request version
+   * @param context context to be used by parser
+   * @return parser that is capable of processing data for given request type & version
+   */
+  virtual ParserSharedPtr createParser(int16_t api_key, int16_t api_version,
                                        RequestContextSharedPtr context) const;
 
+  /**
+   * Request versions handled by Kafka up to 0.11
+   */
   static const RequestParserResolver KAFKA_0_11;
+
+  /**
+   * Request versions handled by Kafka up to 1.0
+   */
+  static const RequestParserResolver KAFKA_1_0;
 
 private:
   GeneratorMap generators_;
 };
 
-// === INITIAL PARSERS =========================================================
-
 /**
- * Request start parser just consumes the length of request
+ * Request parser responsible for consuming request length and setting up context with this data
+ * @see http://kafka.apache.org/protocol.html#protocol_common
  */
 class RequestStartParser : public Parser {
 public:
   RequestStartParser(const RequestParserResolver& parser_resolver)
       : parser_resolver_{parser_resolver}, context_{std::make_shared<RequestContext>()} {};
 
+  /**
+   * Consumes INT32 bytes as request length and updates the context with that value
+   * @return RequestHeaderParser instance to process request header
+   */
   ParseResponse parse(const char*& buffer, uint64_t& remaining);
 
   const RequestContextSharedPtr contextForTest() const { return context_; }
@@ -126,17 +131,27 @@ private:
   Int32Buffer buffer_;
 };
 
+/**
+ * Buffer that gets filled in with request header data
+ * @see http://kafka.apache.org/protocol.html#protocol_messages
+ */
 class RequestHeaderBuffer : public CompositeBuffer<RequestHeader, Int16Buffer, Int16Buffer,
                                                    Int32Buffer, NullableStringBuffer> {};
 
 /**
- * Request header parser consumes request header
+ * Parser responsible for computing request header and updating the context with data resolved
+ * On a successful parse uses resolved data (api_key & api_version) to determine next parser.
+ * @see http://kafka.apache.org/protocol.html#protocol_messages
  */
 class RequestHeaderParser : public Parser {
 public:
   RequestHeaderParser(const RequestParserResolver& parser_resolver, RequestContextSharedPtr context)
       : parser_resolver_{parser_resolver}, context_{context} {};
 
+  /**
+   * Uses data provided to compute request header
+   * @return Parser instance responsible for processing rest of the message
+   */
   ParseResponse parse(const char*& buffer, uint64_t& remaining);
 
   const RequestContextSharedPtr contextForTest() const { return context_; }
@@ -147,12 +162,12 @@ private:
   RequestHeaderBuffer buffer_;
 };
 
-// === BUFFERED PARSER =========================================================
-
 /**
  * Buffered parser uses a single buffer to construct a response
  * This parser is responsible for consuming request-specific data (e.g. topic names) and always
  * returns a parsed message
+ * @param RT request class
+ * @param BT buffer type corresponding to request class
  */
 template <typename RT, typename BT> class BufferedParser : public Parser {
 public:
@@ -161,7 +176,7 @@ public:
 
 protected:
   RequestContextSharedPtr context_;
-  BT buffer_;
+  BT buffer_; // underlying request-specific buffer
 };
 
 template <typename RT, typename BT>
@@ -180,8 +195,11 @@ ParseResponse BufferedParser<RT, BT>::parse(const char*& buffer, uint64_t& remai
   }
 }
 
-// names of Buffers/Parsers are influenced by org.apache.kafka.common.protocol.Protocol names
-
+/**
+ * Macro defining RequestParser that uses the underlying Buffer
+ * Aware of versioning
+ * Names of Buffers/Parsers are influenced by org.apache.kafka.common.protocol.Protocol names
+ */
 #define DEFINE_REQUEST_PARSER(REQUEST_TYPE, VERSION)                                               \
   class REQUEST_TYPE##VERSION##Parser                                                              \
       : public BufferedParser<REQUEST_TYPE, REQUEST_TYPE##VERSION##Buffer> {                       \
@@ -189,180 +207,68 @@ ParseResponse BufferedParser<RT, BT>::parse(const char*& buffer, uint64_t& remai
     REQUEST_TYPE##VERSION##Parser(RequestContextSharedPtr ctx) : BufferedParser{ctx} {};           \
   };
 
-// === ABSTRACT REQUEST ========================================================
-
+/**
+ * Abstract Kafka request
+ * Contains data present in every request
+ * @see http://kafka.apache.org/protocol.html#protocol_messages
+ */
 class Request : public Message {
 public:
   /**
    * Request header fields need to be initialized by user in case of newly created requests
    */
-  Request(INT16 api_key) : request_header_{api_key, 0, 0, ""} {};
+  Request(int16_t api_key) : request_header_{api_key, 0, 0, ""} {};
 
   Request(const RequestHeader& request_header) : request_header_{request_header} {};
 
   RequestHeader& header() { return request_header_; }
 
-  INT16& apiVersion() { return request_header_.api_version_; }
-  INT16 apiVersion() const { return request_header_.api_version_; }
+  int16_t& apiVersion() { return request_header_.api_version_; }
+  int16_t apiVersion() const { return request_header_.api_version_; }
 
-  INT32& correlationId() { return request_header_.correlation_id_; }
+  int32_t& correlationId() { return request_header_.correlation_id_; }
 
-  NULLABLE_STRING& clientId() { return request_header_.client_id_; }
+  NullableString& clientId() { return request_header_.client_id_; }
 
-  size_t encode(Buffer::Instance& dst, EncodingContext& encoder) const {
+  /**
+   * Encodes given request into a buffer, with any extra configuration carried by the context
+   */
+  size_t encode(Buffer::Instance& dst, EncodingContext& context) const {
     size_t written{0};
-    written += encoder.encode(request_header_.api_key_, dst);
-    written += encoder.encode(request_header_.api_version_, dst);
-    written += encoder.encode(request_header_.correlation_id_, dst);
-    written += encoder.encode(request_header_.client_id_, dst);
-    written += encodeDetails(dst, encoder);
+    written += context.encode(request_header_.api_key_, dst);
+    written += context.encode(request_header_.api_version_, dst);
+    written += context.encode(request_header_.correlation_id_, dst);
+    written += context.encode(request_header_.client_id_, dst);
+    written += encodeDetails(dst, context);
     return written;
   }
 
+  /**
+   * Pretty-prints given request into a stream
+   */
   std::ostream& print(std::ostream& os) const override final {
     os << request_header_ << " "; // not very pretty
     return printDetails(os);
   }
 
 protected:
+  /**
+   * Encodes request-specific data into a buffer
+   */
   virtual size_t encodeDetails(Buffer::Instance&, EncodingContext&) const PURE;
 
+  /**
+   * Prints request-specific data into a stream
+   */
   virtual std::ostream& printDetails(std::ostream&) const PURE;
 
   RequestHeader request_header_;
 };
 
-// === OFFSET COMMIT (8) =======================================================
-
-struct OffsetCommitPartition {
-  const INT32 partition_;
-  const INT64 offset_;
-  const INT64 timestamp_; // only v1
-  const NULLABLE_STRING metadata_;
-
-  // v0 *and* v2
-  OffsetCommitPartition(INT32 partition, INT64 offset, NULLABLE_STRING metadata)
-      : partition_{partition}, offset_{offset}, timestamp_{-1}, metadata_{metadata} {};
-
-  // v1
-  OffsetCommitPartition(INT32 partition, INT64 offset, INT64 timestamp, NULLABLE_STRING metadata)
-      : partition_{partition}, offset_{offset}, timestamp_{timestamp}, metadata_{metadata} {};
-
-  size_t encode(Buffer::Instance& dst, EncodingContext& encoder) const {
-    size_t written{0};
-    written += encoder.encode(partition_, dst);
-    written += encoder.encode(offset_, dst);
-    if (encoder.apiVersion() == 1) {
-      written += encoder.encode(timestamp_, dst);
-    }
-    written += encoder.encode(metadata_, dst);
-    return written;
-  }
-
-  bool operator==(const OffsetCommitPartition& rhs) const {
-    return partition_ == rhs.partition_ && offset_ == rhs.offset_ && timestamp_ == rhs.timestamp_ &&
-           metadata_ == rhs.metadata_;
-  };
-
-  friend std::ostream& operator<<(std::ostream& os, const OffsetCommitPartition& arg) {
-    return os << "{partition=" << arg.partition_ << ", offset=" << arg.offset_
-              << ", timestamp=" << arg.timestamp_ << ", metadata=" << arg.metadata_ << "}";
-  }
-};
-
-struct OffsetCommitTopic {
-  const STRING topic_;
-  const NULLABLE_ARRAY<OffsetCommitPartition> partitions_;
-
-  size_t encode(Buffer::Instance& dst, EncodingContext& encoder) const {
-    size_t written{0};
-    written += encoder.encode(topic_, dst);
-    written += encoder.encode(partitions_, dst);
-    return written;
-  }
-
-  bool operator==(const OffsetCommitTopic& rhs) const {
-    return topic_ == rhs.topic_ && partitions_ == rhs.partitions_;
-  };
-
-  friend std::ostream& operator<<(std::ostream& os, const OffsetCommitTopic& arg) {
-    return os << "{topic=" << arg.topic_ << ", partitions_=" << arg.partitions_ << "}";
-  }
-};
-
-class OffsetCommitRequest : public Request {
-public:
-  // v0
-  OffsetCommitRequest(STRING group_id, NULLABLE_ARRAY<OffsetCommitTopic> topics)
-      : OffsetCommitRequest(group_id, -1, "", -1, topics){};
-
-  // v1
-  OffsetCommitRequest(STRING group_id, INT32 group_generation_id, STRING member_id,
-                      NULLABLE_ARRAY<OffsetCommitTopic> topics)
-      : OffsetCommitRequest(group_id, group_generation_id, member_id, -1, topics){};
-
-  // v2 .. v3
-  OffsetCommitRequest(STRING group_id, INT32 group_generation_id, STRING member_id,
-                      INT64 retention_time, NULLABLE_ARRAY<OffsetCommitTopic> topics)
-      : Request{RequestType::OffsetCommit}, group_id_{group_id},
-        group_generation_id_{group_generation_id}, member_id_{member_id},
-        retention_time_{retention_time}, topics_{topics} {};
-
-  bool operator==(const OffsetCommitRequest& rhs) const {
-    return request_header_ == rhs.request_header_ && group_id_ == rhs.group_id_ &&
-           group_generation_id_ == rhs.group_generation_id_ && member_id_ == rhs.member_id_ &&
-           retention_time_ == rhs.retention_time_ && topics_ == rhs.topics_;
-  };
-
-protected:
-  size_t encodeDetails(Buffer::Instance& dst, EncodingContext& encoder) const override {
-    size_t written{0};
-    written += encoder.encode(group_id_, dst);
-    if (encoder.apiVersion() >= 1) {
-      written += encoder.encode(group_generation_id_, dst);
-      written += encoder.encode(member_id_, dst);
-    }
-    if (encoder.apiVersion() >= 2) {
-      written += encoder.encode(retention_time_, dst);
-    }
-    written += encoder.encode(topics_, dst);
-    return written;
-  }
-
-  std::ostream& printDetails(std::ostream& os) const override {
-    return os << "{group_id=" << group_id_ << ", group_generation_id=" << group_generation_id_
-              << ", member_id=" << member_id_ << ", retention_time=" << retention_time_
-              << ", topics=" << topics_ << "}";
-  }
-
-private:
-  const STRING group_id_;
-  const INT32 group_generation_id_; // since v1
-  const STRING member_id_;          // since v1
-  const INT64 retention_time_;      // since v2
-  const NULLABLE_ARRAY<OffsetCommitTopic> topics_;
-};
-
-// clang-format off
-class OffsetCommitPartitionV0Buffer : public CompositeBuffer<OffsetCommitPartition, Int32Buffer, Int64Buffer, NullableStringBuffer> {};
-class OffsetCommitPartitionV0ArrayBuffer : public ArrayBuffer<OffsetCommitPartition, OffsetCommitPartitionV0Buffer> {};
-class OffsetCommitTopicV0Buffer : public CompositeBuffer<OffsetCommitTopic, StringBuffer, OffsetCommitPartitionV0ArrayBuffer> {};
-class OffsetCommitTopicV0ArrayBuffer : public ArrayBuffer<OffsetCommitTopic, OffsetCommitTopicV0Buffer> {};
-
-class OffsetCommitPartitionV1Buffer : public CompositeBuffer<OffsetCommitPartition, Int32Buffer, Int64Buffer, Int64Buffer, NullableStringBuffer> {};
-class OffsetCommitPartitionV1ArrayBuffer : public ArrayBuffer<OffsetCommitPartition, OffsetCommitPartitionV1Buffer> {};
-class OffsetCommitTopicV1Buffer : public CompositeBuffer<OffsetCommitTopic, StringBuffer, OffsetCommitPartitionV1ArrayBuffer> {};
-class OffsetCommitTopicV1ArrayBuffer : public ArrayBuffer<OffsetCommitTopic, OffsetCommitTopicV1Buffer> {};
-
-class OffsetCommitRequestV0Buffer : public CompositeBuffer<OffsetCommitRequest, StringBuffer, OffsetCommitTopicV0ArrayBuffer> {};
-class OffsetCommitRequestV1Buffer : public CompositeBuffer<OffsetCommitRequest, StringBuffer, Int32Buffer, StringBuffer, OffsetCommitTopicV1ArrayBuffer> {};
-
-DEFINE_REQUEST_PARSER(OffsetCommitRequest, V0);
-DEFINE_REQUEST_PARSER(OffsetCommitRequest, V1);
-// clang-format on
-
-// === UNKNOWN REQUEST =========================================================
-
+/**
+ * Request that did not have api_key & api_version that could be matched with any of
+ * request-specific parsers
+ */
 class UnknownRequest : public Request {
 public:
   UnknownRequest(const RequestHeader& request_header) : Request{request_header} {};
@@ -380,10 +286,18 @@ protected:
   }
 };
 
-// ignores data until the end of request (contained in context_)
-class SentinelConsumer : public Parser {
+/**
+ * Sentinel parser that is responsible for consuming message bytes for messages that had unsupported
+ * api_key & api_version It does not attempt to capture any data, just throws it away until end of
+ * message
+ */
+class SentinelParser : public Parser {
 public:
-  SentinelConsumer(RequestContextSharedPtr context) : context_{context} {};
+  SentinelParser(RequestContextSharedPtr context) : context_{context} {};
+
+  /**
+   * Returns UnknownRequest
+   */
   ParseResponse parse(const char*& buffer, uint64_t& remaining) override;
 
   const RequestContextSharedPtr contextForTest() const { return context_; }

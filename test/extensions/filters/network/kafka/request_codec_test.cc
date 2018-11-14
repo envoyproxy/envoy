@@ -1,3 +1,4 @@
+#include "extensions/filters/network/kafka/messages/offset_commit.h"
 #include "extensions/filters/network/kafka/request_codec.h"
 
 #include "test/mocks/server/mocks.h"
@@ -39,11 +40,9 @@ template <typename T> std::shared_ptr<T> RequestDecoderTest::serializeAndDeseria
   return std::dynamic_pointer_cast<T>(receivedMessage);
 };
 
-// === OFFSET COMMIT (8) =======================================================
-
 TEST_F(RequestDecoderTest, shouldParseOffsetCommitRequestV0) {
   // given
-  NULLABLE_ARRAY<OffsetCommitTopic> topics{{{"topic1", {{{{0, 10, "m1"}}}}}}};
+  NullableArray<OffsetCommitTopic> topics{{{"topic1", {{{{0, 10, "m1"}}}}}}};
   OffsetCommitRequest request{"group_id", topics};
   request.apiVersion() = 0;
   request.correlationId() = 10;
@@ -60,7 +59,7 @@ TEST_F(RequestDecoderTest, shouldParseOffsetCommitRequestV0) {
 TEST_F(RequestDecoderTest, shouldParseOffsetCommitRequestV1) {
   // given
   // partitions have timestamp in v1 only
-  NULLABLE_ARRAY<OffsetCommitTopic> topics{
+  NullableArray<OffsetCommitTopic> topics{
       {{"topic1", {{{0, 10, 100, "m1"}, {2, 20, 101, "m2"}}}}, {"topic2", {{{3, 30, 102, "m3"}}}}}};
   OffsetCommitRequest request{"group_id",
                               40,          // group_generation_id
@@ -78,12 +77,10 @@ TEST_F(RequestDecoderTest, shouldParseOffsetCommitRequestV1) {
   ASSERT_EQ(*received, request);
 }
 
-// === UNKNOWN REQUEST =========================================================
-
 TEST_F(RequestDecoderTest, shouldProduceAbortedMessageOnUnknownData) {
   // given
   RequestEncoder serializer{buffer_};
-  NULLABLE_ARRAY<OffsetCommitTopic> topics{{{"topic1", {{{{0, 10, "m1"}}}}}}};
+  NullableArray<OffsetCommitTopic> topics{{{"topic1", {{{{0, 10, "m1"}}}}}}};
   OffsetCommitRequest request{"group_id", topics};
   request.apiVersion() = 1;
   request.correlationId() = 42;

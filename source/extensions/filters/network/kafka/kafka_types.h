@@ -10,20 +10,34 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-typedef int8_t INT8;
-typedef int16_t INT16;
-typedef int32_t INT32;
-typedef int64_t INT64;
-typedef uint32_t UINT32;
-typedef bool BOOLEAN;
+/**
+ * Represents a sequence of characters or null. For non-null strings, first the length N is given as
+ * an INT16. Then N bytes follow which are the UTF-8 encoding of the character sequence. A null
+ * value is encoded with length of -1 and there are no following bytes.
+ */
+typedef absl::optional<std::string> NullableString;
 
-typedef std::string STRING;
-typedef absl::optional<STRING> NULLABLE_STRING;
+/**
+ * Represents a raw sequence of bytes.
+ * First the length N is given as an INT32. Then N bytes follow.
+ */
+typedef std::vector<unsigned char> Bytes;
 
-typedef std::vector<unsigned char> BYTES;
-typedef absl::optional<BYTES> NULLABLE_BYTES;
+/**
+ * Represents a raw sequence of bytes or null. For non-null values, first the length N is given as
+ * an INT32. Then N bytes follow. A null value is encoded with length of -1 and there are no
+ * following bytes.
+ */
+typedef absl::optional<Bytes> NullableBytes;
 
-template <typename T> using NULLABLE_ARRAY = absl::optional<std::vector<T>>;
+/**
+ * Represents a sequence of objects of a given type T.
+ * Type T can be either a primitive type (e.g. STRING) or a structure.
+ * First, the length N is given as an INT32.
+ * Then N instances of type T follow.
+ * A null array is represented with a length of -1.
+ */
+template <typename T> using NullableArray = absl::optional<std::vector<T>>;
 
 } // namespace Kafka
 } // namespace NetworkFilters

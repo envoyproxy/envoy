@@ -9,8 +9,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-// === DECODER =================================================================
-
 void RequestDecoder::onData(Buffer::Instance& data) {
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
   Buffer::RawSlice slices[num_slices];
@@ -46,14 +44,12 @@ void RequestDecoder::doParse(ParserSharedPtr& parser, const Buffer::RawSlice& sl
   }
 }
 
-// === ENCODER =================================================================
-
 void RequestEncoder::encode(const Request& message) {
   EncodingContext encoder{message.apiVersion()};
   Buffer::OwnedImpl data_buffer;
-  INT32 data_len = encoder.encode(message, data_buffer); // encode data computing data length
-  encoder.encode(data_len, output_);                     // encode data length into result
-  output_.add(data_buffer);                              // copy data into result
+  int32_t data_len = encoder.encode(message, data_buffer); // encode data computing data length
+  encoder.encode(data_len, output_);                       // encode data length into result
+  output_.add(data_buffer);                                // copy data into result
 }
 
 } // namespace Kafka
