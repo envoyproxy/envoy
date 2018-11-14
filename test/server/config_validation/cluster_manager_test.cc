@@ -23,7 +23,7 @@ namespace Envoy {
 namespace Upstream {
 
 TEST(ValidationClusterManagerTest, MockedMethods) {
-  Api::Impl api(std::chrono::milliseconds(1000));
+  Api::Impl api;
   NiceMock<Runtime::MockLoader> runtime;
   Event::SimulatedTimeSystem time_system;
   Stats::IsolatedStoreImpl stats;

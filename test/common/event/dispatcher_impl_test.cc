@@ -60,8 +60,7 @@ TEST(DeferredDeleteTest, DeferredDelete) {
 class DispatcherImplTest : public ::testing::Test {
 protected:
   DispatcherImplTest()
-      : api_(std::chrono::milliseconds(1000)),
-        dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSystem())),
+      : dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSystem())),
         work_finished_(false) {
     dispatcher_thread_ = api_.createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.

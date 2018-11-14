@@ -208,7 +208,7 @@ class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        dispatcher_(test_time_.timeSystem()), api_(std::chrono::milliseconds(1000)) {}
+        dispatcher_(test_time_.timeSystem()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {

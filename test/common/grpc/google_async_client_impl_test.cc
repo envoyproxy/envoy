@@ -46,7 +46,7 @@ public:
 class EnvoyGoogleAsyncClientImplTest : public testing::Test {
 public:
   EnvoyGoogleAsyncClientImplTest()
-      : dispatcher_(test_time_.timeSystem()), api_(std::chrono::milliseconds(1000)),
+      : dispatcher_(test_time_.timeSystem()),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     envoy::api::v2::core::GrpcService config;
     auto* google_grpc = config.mutable_google_grpc();

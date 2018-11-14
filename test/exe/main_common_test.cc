@@ -136,8 +136,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, MainCommonTest,
 class AdminRequestTest : public MainCommonTest {
 protected:
   AdminRequestTest()
-      : api_(std::chrono::milliseconds(1000)), envoy_return_(false), envoy_started_(false),
-        envoy_finished_(false), pause_before_run_(false), pause_after_run_(false) {
+      : envoy_return_(false), envoy_started_(false), envoy_finished_(false),
+        pause_before_run_(false), pause_after_run_(false) {
     addArg("--disable-hot-restart");
   }
 

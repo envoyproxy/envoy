@@ -42,7 +42,7 @@ public:
 
 class AddTen {
 public:
-  AddTen() : api_(std::chrono::milliseconds(1000)) {
+  AddTen() {
     thread_ = api_.createThread([this]() -> void { threadRoutine(); });
   }
   ~AddTen() {

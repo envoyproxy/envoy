@@ -43,8 +43,7 @@ OptionsImpl asConfigYaml(const OptionsImpl& src) {
 
 class ConfigTest {
 public:
-  ConfigTest(const OptionsImpl& options)
-      : api_(std::chrono::milliseconds(1000)), options_(options) {
+  ConfigTest(const OptionsImpl& options) : options_(options) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));

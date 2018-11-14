@@ -25,8 +25,6 @@ namespace Server {
 
 class GuardDogTestBase : public testing::Test {
 protected:
-  GuardDogTestBase() : api_(std::chrono::milliseconds(1000)) {}
-
   Event::SimulatedTimeSystem time_system_;
   Api::Impl api_;
 };

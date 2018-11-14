@@ -15,7 +15,7 @@ namespace Api {
  */
 class Impl : public Api::Api {
 public:
-  Impl(std::chrono::milliseconds file_flush_interval_msec);
+  Impl(std::chrono::milliseconds file_flush_interval_msec = std::chrono::milliseconds(1000));
 
   // Api::Api
   Event::DispatcherPtr allocateDispatcher(Event::TimeSystem& time_system) override;

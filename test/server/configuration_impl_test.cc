@@ -53,8 +53,7 @@ TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
 class ConfigurationImplTest : public testing::Test {
 protected:
   ConfigurationImplTest()
-      : api_(std::chrono::milliseconds(1000)),
-        cluster_manager_factory_(server_.runtime(), server_.stats(), server_.threadLocal(),
+      : cluster_manager_factory_(server_.runtime(), server_.stats(), server_.threadLocal(),
                                  server_.random(), server_.dnsResolver(),
                                  server_.sslContextManager(), server_.dispatcher(),
                                  server_.localInfo(), server_.secretManager(), api_) {}

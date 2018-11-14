@@ -31,7 +31,7 @@ namespace Envoy {
 
 class FileSystemImplTest : public ::testing::Test {
 protected:
-  FileSystemImplTest() : api_(std::chrono::milliseconds(1000)) {}
+  FileSystemImplTest() {}
 
   Api::Impl api_;
 };

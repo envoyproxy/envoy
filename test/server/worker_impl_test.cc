@@ -24,7 +24,7 @@ namespace Server {
 
 class WorkerImplTest : public testing::Test {
 public:
-  WorkerImplTest() : api_(std::chrono::milliseconds(1000)) {
+  WorkerImplTest() {
     // In the real worker the watchdog has timers that prevent exit. Here we need to prevent event
     // loop exit since we use mock timers.
     no_exit_timer_->enableTimer(std::chrono::hours(1));

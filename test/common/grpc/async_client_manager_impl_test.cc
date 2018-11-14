@@ -18,8 +18,6 @@ namespace {
 
 class AsyncClientManagerImplTest : public testing::Test {
 public:
-  AsyncClientManagerImplTest() : api_(std::chrono::milliseconds(1000)) {}
-
   Upstream::MockClusterManager cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::MockStore scope_;

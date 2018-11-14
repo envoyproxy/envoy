@@ -116,7 +116,7 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
 
-  Api::Impl api(std::chrono::milliseconds(1000));
+  Api::Impl api;
   DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl main_dispatcher(test_time.timeSystem());
   Event::DispatcherImpl thread_dispatcher(test_time.timeSystem());

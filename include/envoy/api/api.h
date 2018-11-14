@@ -49,7 +49,7 @@ public:
   virtual std::string fileReadToEnd(const std::string& path) PURE;
 
   /**
-   * Create a  thread.
+   * Create a thread.
    * @param thread_routine supplies the function to invoke in the thread.
    */
   virtual Thread::ThreadPtr createThread(std::function<void()> thread_routine) PURE;
