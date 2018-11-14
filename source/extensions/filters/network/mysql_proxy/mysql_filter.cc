@@ -41,7 +41,7 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
     ServerGreeting greeting{};
     greeting.Decode(data);
     if (greeting.GetSeq() != GREETING_SEQ_NUM) {
-      config_->stats_.wrong_sequence_.inc();
+      config_->stats_.protocol_errors_.inc();
       break;
     }
     session_.SetState(MysqlSession::State::MYSQL_CHALLENGE_REQ);
@@ -53,12 +53,12 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
     ClientLogin client_login{};
     client_login.Decode(data);
     if (client_login.GetSeq() != CHALLENGE_SEQ_NUM) {
-      config_->stats_.wrong_sequence_.inc();
+      config_->stats_.protocol_errors_.inc();
       break;
     }
     if (client_login.IsSSLRequest()) {
       session_.SetState(MysqlSession::State::MYSQL_SSL_PT);
-      config_->stats_.ssl_pass_through_.inc();
+      config_->stats_.upgraded_to_ssl_.inc();
     } else if (client_login.IsResponse41()) {
       session_.SetState(MysqlSession::State::MYSQL_CHALLENGE_RESP_41);
     } else {
@@ -73,7 +73,7 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
     ClientLoginResponse client_login_resp{};
     client_login_resp.Decode(data);
     if (client_login_resp.GetSeq() != CHALLENGE_RESP_SEQ_NUM) {
-      config_->stats_.wrong_sequence_.inc();
+      config_->stats_.protocol_errors_.inc();
       break;
     }
     if (client_login_resp.GetRespCode() == MYSQL_RESP_OK) {
@@ -94,7 +94,7 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
     ClientSwitchResponse client_switch_resp{};
     client_switch_resp.Decode(data);
     if ((client_switch_resp.GetSeq() != session_.GetExpectedSeq())) {
-      config_->stats_.wrong_sequence_.inc();
+      config_->stats_.protocol_errors_.inc();
       break;
     }
     session_.SetState(MysqlSession::State::MYSQL_AUTH_SWITCH_MORE);
@@ -105,7 +105,7 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
     ClientLoginResponse client_login_resp{};
     client_login_resp.Decode(data);
     if (client_login_resp.GetSeq() != session_.GetExpectedSeq()) {
-      config_->stats_.wrong_sequence_.inc();
+      config_->stats_.protocol_errors_.inc();
       break;
     }
     if (client_login_resp.GetRespCode() == MYSQL_RESP_OK) {
@@ -140,7 +140,7 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
 }
 
 Network::FilterStatus MysqlFilter::onNewConnection() {
-  config_->stats_.new_sessions_.inc();
+  config_->stats_.sessions_.inc();
   session_.SetId(read_callbacks_->connection().id());
   return Network::FilterStatus::Continue;
 }

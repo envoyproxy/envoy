@@ -18,7 +18,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MysqlProxy {
 
-#define NEW_SESSIONS 5
+#define SESSIONS 5
 
 class MysqlIntegrationTest : public MysqlTestUtils,
                              public BaseIntegrationTest,
@@ -67,7 +67,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, MysqlIntegrationTest,
  * Verify counters
  */
 TEST_P(MysqlIntegrationTest, MysqlStatsNewSessionTest) {
-  for (int idx = 0; idx < NEW_SESSIONS; idx++) {
+  for (int idx = 0; idx < SESSIONS; idx++) {
     IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
     FakeRawConnectionPtr fake_upstream_connection;
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -82,10 +82,10 @@ TEST_P(MysqlIntegrationTest, MysqlStatsNewSessionTest) {
 
   int ret = 0;
   int counter = 0;
-  std::string mysql_stat = "mysql.mysql_stats.new_sessions";
+  std::string mysql_stat = "mysql.mysql_stats.sessions";
   ret = mysqlGetCounterValueFromStats(response->body(), mysql_stat, counter);
   EXPECT_EQ(ret, 0);
-  EXPECT_EQ(counter, NEW_SESSIONS);
+  EXPECT_EQ(counter, SESSIONS);
 }
 
 /* Login Test:

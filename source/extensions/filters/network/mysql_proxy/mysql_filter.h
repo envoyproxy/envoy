@@ -28,15 +28,11 @@ namespace MysqlProxy {
  */
 // clang-format off
 #define ALL_MYSQL_PROXY_STATS(COUNTER)                                           \
-  COUNTER(new_sessions)                                                          \
-  COUNTER(total_mysql_headers)                                                   \
-  COUNTER(byte_count)                                                            \
+  COUNTER(sessions)                                                              \
   COUNTER(login_attempts)                                                        \
   COUNTER(login_failures)                                                        \
-  COUNTER(total_queries)                                                         \
-  COUNTER(query_failures)                                                        \
-  COUNTER(wrong_sequence)                                                        \
-  COUNTER(ssl_pass_through)                                                      \
+  COUNTER(protocol_errors)                                                       \
+  COUNTER(upgraded_to_ssl)                                                       \
   COUNTER(auth_switch_request)                                                   \
 // clang-format on
 

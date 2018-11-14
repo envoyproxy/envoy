@@ -1,4 +1,6 @@
 #pragma once
+#include <cstdint>
+
 #include "envoy/common/platform.h"
 
 #include "common/buffer/buffer_impl.h"

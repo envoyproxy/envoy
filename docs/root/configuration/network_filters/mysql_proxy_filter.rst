@@ -18,14 +18,10 @@ following statistics:
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  new_sessions, Counter, Number of Mysql sessions since start
-  total_mysql_headers, Counter, Number of times the delay is injected
-  byte_count, Counter, Number of OP_GET_MORE messages
-  login_attempts, Counter, Number of OP_INSERT messages
-  login_failures, Counter, Number of OP_KILL_CURSORS messages
-  total_queries, Counter, Number of OP_QUERY messages
-  query_failures, Counter, Number of OP_QUERY with tailable cursor flag set
-  wrong_sequence, Counter, Number of OP_QUERY with no cursor timeout flag set
-  ssl_pass_through, Counter, Number of OP_QUERY with await data flag set
-  auth_switch_request, Counter, Number of OP_QUERY with exhaust flag set
+  sessions, Counter, Number of Mysql sessions since start
+  login_attempts, Counter, Number of login attempts
+  login_failures, Counter, Number of login failures
+  protocol_errors, Counter, Number of out of sequence protocol messages encountered in a session
+  upgraded_to_ssl, Counter, Number of sessions/connections that were upgraded to SSL
+  auth_switch_request, Counter, Number of times the upstream server requested clients to switch to a different authentication method
 
