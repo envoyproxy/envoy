@@ -1,6 +1,7 @@
 #include <chrono>
 #include <string>
 
+#include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
@@ -28,27 +29,35 @@ using testing::Throw;
 
 namespace Envoy {
 
-TEST(FileSystemImpl, BadFile) {
+class FileSystemImplTest : public ::testing::Test {
+protected:
+  FileSystemImplTest() {}
+
+  Api::Impl api_;
+};
+
+TEST_F(FileSystemImplTest, BadFile) {
   Event::MockDispatcher dispatcher;
   Thread::MutexBasicLockable lock;
   Stats::IsolatedStoreImpl store;
   EXPECT_CALL(dispatcher, createTimer_(_));
-  EXPECT_THROW(Filesystem::FileImpl("", dispatcher, lock, store, std::chrono::milliseconds(10000)),
-               EnvoyException);
+  EXPECT_THROW(
+      Filesystem::FileImpl("", dispatcher, lock, store, api_, std::chrono::milliseconds(10000)),
+      EnvoyException);
 }
 
-TEST(FileSystemImpl, fileExists) {
+TEST_F(FileSystemImplTest, fileExists) {
   EXPECT_TRUE(Filesystem::fileExists("/dev/null"));
   EXPECT_FALSE(Filesystem::fileExists("/dev/blahblahblah"));
 }
 
-TEST(FileSystemImpl, directoryExists) {
+TEST_F(FileSystemImplTest, directoryExists) {
   EXPECT_TRUE(Filesystem::directoryExists("/dev"));
   EXPECT_FALSE(Filesystem::directoryExists("/dev/null"));
   EXPECT_FALSE(Filesystem::directoryExists("/dev/blahblah"));
 }
 
-TEST(FileSystemImpl, fileSize) {
+TEST_F(FileSystemImplTest, fileSize) {
   EXPECT_EQ(0, Filesystem::fileSize("/dev/null"));
   EXPECT_EQ(-1, Filesystem::fileSize("/dev/blahblahblah"));
   const std::string data = "test string\ntest";
@@ -56,7 +65,7 @@ TEST(FileSystemImpl, fileSize) {
   EXPECT_EQ(data.length(), Filesystem::fileSize(file_path));
 }
 
-TEST(FileSystemImpl, fileReadToEndSuccess) {
+TEST_F(FileSystemImplTest, fileReadToEndSuccess) {
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
 
@@ -65,7 +74,7 @@ TEST(FileSystemImpl, fileReadToEndSuccess) {
 
 // Files are read into std::string; verify that all bytes (eg non-ascii characters) come back
 // unmodified
-TEST(FileSystemImpl, fileReadToEndSuccessBinary) {
+TEST_F(FileSystemImplTest, fileReadToEndSuccessBinary) {
   std::string data;
   for (unsigned i = 0; i < 256; i++) {
     data.push_back(i);
@@ -80,20 +89,22 @@ TEST(FileSystemImpl, fileReadToEndSuccessBinary) {
   }
 }
 
-TEST(FileSystemImpl, fileReadToEndDoesNotExist) {
+TEST_F(FileSystemImplTest, fileReadToEndDoesNotExist) {
   unlink(TestEnvironment::temporaryPath("envoy_this_not_exist").c_str());
   EXPECT_THROW(Filesystem::fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist")),
                EnvoyException);
 }
 
-TEST(FilesystemImpl, CanonicalPathSuccess) { EXPECT_EQ("/", Filesystem::canonicalPath("//")); }
+TEST_F(FileSystemImplTest, CanonicalPathSuccess) {
+  EXPECT_EQ("/", Filesystem::canonicalPath("//"));
+}
 
-TEST(FilesystemImpl, CanonicalPathFail) {
+TEST_F(FileSystemImplTest, CanonicalPathFail) {
   EXPECT_THROW_WITH_MESSAGE(Filesystem::canonicalPath("/_some_non_existent_file"), EnvoyException,
                             "Unable to determine canonical path for /_some_non_existent_file");
 }
 
-TEST(FilesystemImpl, IllegalPath) {
+TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_FALSE(Filesystem::illegalPath("/"));
   EXPECT_TRUE(Filesystem::illegalPath("/dev"));
   EXPECT_TRUE(Filesystem::illegalPath("/dev/"));
@@ -104,7 +115,7 @@ TEST(FilesystemImpl, IllegalPath) {
   EXPECT_TRUE(Filesystem::illegalPath("/_some_non_existent_file"));
 }
 
-TEST(FileSystemImpl, flushToLogFilePeriodically) {
+TEST_F(FileSystemImplTest, flushToLogFilePeriodically) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);
 
@@ -114,7 +125,8 @@ TEST(FileSystemImpl, flushToLogFilePeriodically) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).WillOnce(Return(5));
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
+  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, api_,
+                            std::chrono::milliseconds(40));
 
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
   EXPECT_CALL(os_sys_calls, write_(_, _, _))
@@ -157,7 +169,7 @@ TEST(FileSystemImpl, flushToLogFilePeriodically) {
   }
 }
 
-TEST(FileSystemImpl, flushToLogFileOnDemand) {
+TEST_F(FileSystemImplTest, flushToLogFileOnDemand) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);
 
@@ -167,7 +179,8 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).WillOnce(Return(5));
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
+  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, api_,
+                            std::chrono::milliseconds(40));
 
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
 
@@ -230,7 +243,7 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
   }
 }
 
-TEST(FileSystemImpl, reopenFile) {
+TEST_F(FileSystemImplTest, reopenFile) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);
 
@@ -241,7 +254,8 @@ TEST(FileSystemImpl, reopenFile) {
 
   Sequence sq;
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).InSequence(sq).WillOnce(Return(5));
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
+  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, api_,
+                            std::chrono::milliseconds(40));
 
   EXPECT_CALL(os_sys_calls, write_(_, _, _))
       .InSequence(sq)
@@ -290,7 +304,7 @@ TEST(FileSystemImpl, reopenFile) {
   }
 }
 
-TEST(FilesystemImpl, reopenThrows) {
+TEST_F(FileSystemImplTest, reopenThrows) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);
 
@@ -310,7 +324,8 @@ TEST(FilesystemImpl, reopenThrows) {
   Sequence sq;
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).InSequence(sq).WillOnce(Return(5));
 
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
+  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, api_,
+                            std::chrono::milliseconds(40));
   EXPECT_CALL(os_sys_calls, close(5)).InSequence(sq);
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).InSequence(sq).WillOnce(Return(-1));
 
@@ -339,14 +354,15 @@ TEST(FilesystemImpl, reopenThrows) {
   timer->callback_();
 }
 
-TEST(FilesystemImpl, bigDataChunkShouldBeFlushedWithoutTimer) {
+TEST_F(FileSystemImplTest, bigDataChunkShouldBeFlushedWithoutTimer) {
   NiceMock<Event::MockDispatcher> dispatcher;
   Thread::MutexBasicLockable mutex;
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
+  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, api_,
+                            std::chrono::milliseconds(40));
 
   EXPECT_CALL(os_sys_calls, write_(_, _, _))
       .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {

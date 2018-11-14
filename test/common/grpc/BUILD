@@ -27,6 +27,7 @@ envoy_cc_test(
     name = "async_client_manager_impl_test",
     srcs = ["async_client_manager_impl_test.cc"],
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
@@ -61,6 +62,7 @@ envoy_cc_test(
     name = "google_async_client_impl_test",
     srcs = envoy_select_google_grpc(["google_async_client_impl_test.cc"]),
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
@@ -96,6 +98,7 @@ envoy_cc_test_library(
     deps = [
         ":grpc_client_integration_lib",
         ":utility_lib",
+        "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http2:conn_pool_lib",
         "//test/integration:integration_lib",

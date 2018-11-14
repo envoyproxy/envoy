@@ -62,7 +62,7 @@ TEST_P(LegacyJsonIntegrationTest, TestServerXfc) {
   param_map["set_current_client_cert_details"] = "";
   std::string config = TestEnvironment::temporaryFileSubstitute(
       "test/config/integration/server_xfcc.json", param_map, port_map_, version_);
-  IntegrationTestServer::create(config, version_, nullptr, false, timeSystem());
+  IntegrationTestServer::create(config, version_, nullptr, false, timeSystem(), *api_);
 }
 
 TEST_P(LegacyJsonIntegrationTest, TestEchoServer) {
