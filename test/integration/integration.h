@@ -12,7 +12,6 @@
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
@@ -190,8 +189,6 @@ private:
 
 public:
   Event::DispatcherPtr dispatcher_;
-  Stats::MockIsolatedStatsStore stats_store_;
-  Api::ApiPtr api_;
 
   /**
    * Open a connection to Envoy, send a series of bytes, and return the
