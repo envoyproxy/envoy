@@ -709,7 +709,7 @@ TEST_F(Http1ClientConnectionImplTest, EmptyBodyResponse) {
   request_encoder.encodeHeaders(headers, true);
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
-  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+  Buffer::OwnedImpl response("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n");
   codec_->dispatch(response);
 }
 
@@ -923,7 +923,7 @@ TEST_F(Http1ClientConnectionImplTest, HighwatermarkMultipleResponses) {
   static_cast<ClientConnection*>(codec_.get())
       ->onUnderlyingConnectionAboveWriteBufferHighWatermark();
 
-  EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
   codec_->dispatch(response);
 
