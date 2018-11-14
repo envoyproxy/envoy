@@ -289,10 +289,12 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
     command_line_options->set_local_address_ip_version(
         envoy::admin::v2alpha::CommandLineOptions::v6);
   }
-  command_line_options->mutable_file_flush_interval()->set_seconds(fileFlushIntervalMsec().count() /
-                                                                   1000);
-  command_line_options->mutable_parent_shutdown_time()->set_seconds(parentShutdownTime().count());
-  command_line_options->mutable_drain_time()->set_seconds(drainTime().count());
+  command_line_options->mutable_file_flush_interval()->MergeFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(fileFlushIntervalMsec().count()));
+  command_line_options->mutable_parent_shutdown_time()->MergeFrom(
+      Protobuf::util::TimeUtil::SecondsToDuration(parentShutdownTime().count()));
+  command_line_options->mutable_drain_time()->MergeFrom(
+      Protobuf::util::TimeUtil::SecondsToDuration(drainTime().count()));
   command_line_options->set_max_stats(maxStats());
   command_line_options->set_max_obj_name_len(statsOptions().maxObjNameLength());
   command_line_options->set_disable_hot_restart(hotRestartDisabled());

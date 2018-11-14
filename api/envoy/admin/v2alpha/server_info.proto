@@ -33,67 +33,63 @@ message ServerInfo {
 }
 
 message CommandLineOptions {
-  // Value of "base-id" option that specifies the base ID so that multiple envoys can run on the
-  // same host if needed.
+  // See :option:`--base-id` for details.
   uint64 base_id = 1;
 
-  // Value of "concurrency" option that specifies the number of worker threads to run.
+  // See :option:`--concurrency` for details.
   uint32 concurrency = 2;
 
-  // Value of "config-path" option that specifies the path to configuration file.
+  // See :option:`--config-path` for details.
   string config_path = 3;
 
-  // Value of "config-yaml" option that specifies the inline YAML configuration, merges with the
-  // contents of --config-path.
+  // See :option:`--config-yaml` for details.
   string config_yaml = 4;
 
-  // Value of "allow-unknown-fields" that specifies whether to allow unknown fields in the
-  // configuration.
+  // See :option:`--allow-unknown-fields` for details.
   bool allow_unknown_fields = 5;
 
-  // Value of "admin-address-path" that specifies the admin address path.
+  // See :option:`--admin-address-path` for details.
   string admin_address_path = 6;
 
   enum IpVersion {
     v4 = 0;
     v6 = 1;
   }
-  // Value of "local_address_ip_version" that specifies the local IP address version (v4 or v6).
+
+  // See :option:`--local-address-ip-version` for details.
   IpVersion local_address_ip_version = 7;
 
-  // Value of "log_level" that specifies the log level.
+  // See :option:`--log-level` for details.
   string log_level = 8;
 
-  // Value of "component_log_level" that specifies comma separated list of component log levels.
+  // See :option:`--component-log-level` for details.
   string component_log_level = 9;
 
-  // Value of "log_format" that specifies the log message format.
+  // See :option:`--log-format` for details.
   string log_format = 10;
 
-  // Value of "log_path" that specifies the path to log file.
+  // See :option:`--log-path` for details.
   string log_path = 11;
 
-  // Value of "hot-restart-version" that specifies the hot restart compatibility version.
+  // See :option:`--hot-restart-version` for details.
   bool hot_restart_version = 12;
 
-  // Value of "service-cluster" that specifies the cluster name.
+  // See :option:`--service-cluster` for details.
   string service_cluster = 13;
 
-  // Value of "service-node" that specifies the node name.
+  // See :option:`--service-node` for details.
   string service_node = 14;
 
-  // Value of "service-zone" that specifies the zone name.
+  // See :option:`--service-zone` for details.
   string service_zone = 15;
 
-  // Value of "file-flush-interval-msec" that specifies the interval for log flushing in milli
-  // seconds.
+  // See :option:`--file-flush-interval-msec` for details.
   google.protobuf.Duration file_flush_interval = 16;
 
-  // Value of "drain-time-s" that specifies the hot restart drain time in seconds.
+  // See :option:`--drain-time-s` for details.
   google.protobuf.Duration drain_time = 17;
 
-  // Value of "parent-shutdown-time-s" that specifies the hot restart parent shutdown time in
-  // seconds.
+  // See :option:`--parent-shutdown-time-s` for details.
   google.protobuf.Duration parent_shutdown_time = 18;
 
   enum Mode {
@@ -107,24 +103,21 @@ message CommandLineOptions {
     InitOnly = 2;
   }
 
-  // Value of "mode" that specifies the mode in which the server is running.
+  // See :option:`--mode` for details.
   Mode mode = 19;
 
-  // Value of "max-stats" that specifies the maximum number of stats gauges and counters that can be
-  // allocated in shared memory.
+  // See :option:`--max-stats` for details.
   uint64 max_stats = 20;
 
-  // Value of "max-obj-name-len" that specifies the maximum name length for a field in the config.
-  // Applies to listener name, route config name and cluster name.
+  // See :option:`--max-obj-name-len` for details.
   uint64 max_obj_name_len = 21;
 
-  // Value of "disable-hot-restart" that specifies whether the hot restart functionality has been
-  // disabled.
+  // See :option:`--disable-hot-restart` for details.
   bool disable_hot_restart = 22;
 
-  // Value of "enable-mutex-tracing" that specifies whether the mutex contention has been enabled.
+  // See :option:`--enable-mutex-tracing` for details.
   bool enable_mutex_tracing = 23;
 
-  // Which restart epoch the server is currently in.
+  // See :option:`--restart-epoch` for details.
   uint32 restart_epoch = 24;
 }
