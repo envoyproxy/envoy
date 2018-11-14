@@ -624,6 +624,12 @@ public:
    * @return bool whether x-envoy-attempt-count should be included on the upstream request.
    */
   virtual bool includeAttemptCount() const PURE;
+
+  typedef std::map<std::string, bool> UpgradeMap;
+  /**
+   * @return a map of route-specific upgrades to their enabled/disabled status.
+   */
+  virtual const UpgradeMap& upgradeMap() const PURE;
 };
 
 /**

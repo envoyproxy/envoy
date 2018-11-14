@@ -370,6 +370,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   if (route.route().has_cors()) {
     cors_policy_ = std::make_unique<CorsPolicyImpl>(route.route().cors());
   }
+  for (const auto upgrade_config : route.route().upgrade_configs()) {
+    bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
+    upgrade_map_.emplace(std::make_pair(upgrade_config.upgrade_type(), enabled));
+  }
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
