@@ -4,15 +4,26 @@
 # different sorts of builds. This script expects CLANG_TOOLCHAIN to be set
 # to the directory above "bin/clang".
 #
-# Bazel notes:
-#     --subcommands
-#     --runs_per_test=100
-#     --config=clang-asan
+# Usage:
+#   bz.sh [-nocache] \
+#     [-debug|-valgrind|-opt|-optdebug|-stacktrace|-tsan|-asan|-dtsan|-dasan] \
+#     test|debug|run|clean [other bazel flags]
+#
+# Examples:
+#   bz.sh test //test/...
+#   bz.sh -tsan test //test/common/stats:thread_local_store_test \
+#       --runs_per_test=100
+#   bz.sh -opt build //source/exe:envoy-static --subcommands
 #
 # TODO(jmarantz): rewrite in Python.
 
 # Use Clang for most builds.
 export CC=$CLANG_TOOLCHAIN/bin/clang; export CXX=$CLANG_TOOLCHAIN/bin/clang++
+
+if [ ! -x "$CC" ]; then
+  echo Set CLANG_TOOLCHAIN to the directory above bin/clang.
+  exit 
+fi
 
 # Find the top level of this git client, or die trying.
 while [ ! -e .git ]; do
