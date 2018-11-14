@@ -315,7 +315,6 @@ private:
   Server::Instance* server_{};
   Stats::Store* stat_store_{};
   Network::Address::InstanceConstSharedPtr admin_address_;
-  TcpDumpPtr tcp_dump_;
 };
 
 } // namespace Envoy
