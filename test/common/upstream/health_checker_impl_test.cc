@@ -483,6 +483,50 @@ public:
   void expectSessionCreate() { expectSessionCreate(health_checker_map_); }
   void expectClientCreate(size_t index) { expectClientCreate(index, health_checker_map_); }
 
+  void expectSuccessStartFailedFailFirst(const absl::optional<std::string>& health_checked_cluster = absl::optional<std::string>()) {
+    cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+    cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
+        Host::HealthFlag::FAILED_ACTIVE_HC);
+    expectSessionCreate();
+    expectStreamCreate(0);
+    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+    health_checker_->start();
+
+    // Test that failing first disables fast success.
+    EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+    EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
+    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+    EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+    respond(0, "503", false, false, false, health_checked_cluster);
+    EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+        Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+
+    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+    expectStreamCreate(0);
+    test_sessions_[0]->interval_timer_->callback_();
+
+    EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
+    EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
+    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+    respond(0, "200", false, false, false, health_checked_cluster);
+    EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+        Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+
+    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+    expectStreamCreate(0);
+    test_sessions_[0]->interval_timer_->callback_();
+
+    EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+    EXPECT_CALL(*event_logger_, logAddHealthy(_, _, false));
+    EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
+    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+    respond(0, "200", false, false, false, health_checked_cluster);
+    EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+  }
+
   MOCK_METHOD2(onHostStatus, void(HostSharedPtr host, HealthTransition changed_state));
 
   std::shared_ptr<MockCluster> cluster_;
@@ -1022,48 +1066,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirstServiceCheck) {
   setupNoServiceValidationHC();
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillRepeatedly(Return(true));
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
-      Host::HealthFlag::FAILED_ACTIVE_HC);
-  expectSessionCreate();
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
-  health_checker_->start();
   absl::optional<std::string> health_checked_cluster("locations-production-iad");
-
-  // Test that failing first disables fast success.
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
-  respond(0, "503", false, false, false, health_checked_cluster);
-  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
-      Host::HealthFlag::FAILED_ACTIVE_HC));
-  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
-
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
-  expectStreamCreate(0);
-  test_sessions_[0]->interval_timer_->callback_();
-
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respond(0, "200", false, false, false, health_checked_cluster);
-  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
-      Host::HealthFlag::FAILED_ACTIVE_HC));
-  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
-
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
-  expectStreamCreate(0);
-  test_sessions_[0]->interval_timer_->callback_();
-
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(*event_logger_, logAddHealthy(_, _, false));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respond(0, "200", false, false, false, health_checked_cluster);
-  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+  expectSuccessStartFailedFailFirst(health_checked_cluster);
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessNoTraffic) {
@@ -1107,92 +1111,12 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedSuccessFirst) {
 
 TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirst) {
   setupNoServiceValidationHC();
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
-      Host::HealthFlag::FAILED_ACTIVE_HC);
-  expectSessionCreate();
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
-  health_checker_->start();
-
-  // Test that failing first disables fast success.
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
-  respond(0, "503", false);
-  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
-      Host::HealthFlag::FAILED_ACTIVE_HC));
-  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
-
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
-  expectStreamCreate(0);
-  test_sessions_[0]->interval_timer_->callback_();
-
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respond(0, "200", false);
-  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
-      Host::HealthFlag::FAILED_ACTIVE_HC));
-  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
-
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
-  expectStreamCreate(0);
-  test_sessions_[0]->interval_timer_->callback_();
-
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(*event_logger_, logAddHealthy(_, _, false));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respond(0, "200", false);
-  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+  expectSuccessStartFailedFailFirst();
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirstLogError) {
   setupNoServiceValidationHCAlwaysLogFailure();
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
-      Host::HealthFlag::FAILED_ACTIVE_HC);
-  expectSessionCreate();
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
-  health_checker_->start();
-
-  // Test that failing first disables fast success.
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
-  respond(0, "503", false);
-  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
-      Host::HealthFlag::FAILED_ACTIVE_HC));
-  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
-
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
-  expectStreamCreate(0);
-  test_sessions_[0]->interval_timer_->callback_();
-
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respond(0, "200", false);
-  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
-      Host::HealthFlag::FAILED_ACTIVE_HC));
-  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
-
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
-  expectStreamCreate(0);
-  test_sessions_[0]->interval_timer_->callback_();
-
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(*event_logger_, logAddHealthy(_, _, false));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respond(0, "200", false);
-  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+  expectSuccessStartFailedFailFirst();
 }
 
 TEST_F(HttpHealthCheckerImplTest, HttpFail) {
