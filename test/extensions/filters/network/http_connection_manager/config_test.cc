@@ -452,6 +452,20 @@ TEST_F(HttpConnectionManagerConfigTest, BadAccessLogNestedTypes) {
   EXPECT_THROW(factory.createFilterFactory(*json_config, context_), Json::Exception);
 }
 
+TEST_F(HttpConnectionManagerConfigTest, ReversedEncodeOrderConfig) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_TRUE(config.reverseEncodeOrder());
+}
+
 class FilterChainTest : public HttpConnectionManagerConfigTest {
 public:
   const std::string basic_config_ = R"EOF(

@@ -14,3 +14,5 @@
 /*/extensions/transport_sockets/alts @htuch @yangminzhu
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
+# tracers.datadog extension
+/*/extensions/tracers/datadog @cgilmour @palazzem

@@ -1,6 +1,8 @@
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -576,6 +578,37 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
   // Check B3 sampled flag is set to sample
   EXPECT_EQ(ZipkinCoreConstants::get().SAMPLED, sampled_entry->value().getStringView());
+}
+
+TEST_F(ZipkinDriverTest, DuplicatedHeader) {
+  setupValidDriver();
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
+                                   Hex::uint64ToHex(generateRandom64()));
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID,
+                                   Hex::uint64ToHex(generateRandom64()));
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
+                                   Hex::uint64ToHex(generateRandom64()));
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, false});
+
+  typedef std::function<bool(const std::string& key)> DupCallback;
+  DupCallback dup_callback = [](const std::string& key) -> bool {
+    static std::unordered_map<std::string, bool> dup;
+    if (dup.find(key) == dup.end()) {
+      dup[key] = true;
+      return false;
+    }
+    return true;
+  };
+
+  span->setSampled(true);
+  span->injectContext(request_headers_);
+  request_headers_.iterate(
+      [](const Http::HeaderEntry& header, void* cb) -> Http::HeaderMap::Iterate {
+        EXPECT_FALSE(static_cast<DupCallback*>(cb)->operator()(header.key().c_str()));
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      &dup_callback);
 }
 } // namespace Zipkin
 } // namespace Tracers
