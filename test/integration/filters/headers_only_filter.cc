@@ -6,6 +6,7 @@
 
 #include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
+
 #include "test/integration/filters/common.h"
 
 namespace Envoy {

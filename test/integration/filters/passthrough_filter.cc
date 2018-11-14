@@ -19,4 +19,4 @@ static Registry::RegisterFactory<SimpleFilterConfig<TestPassThroughFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
-}
+} // namespace Envoy

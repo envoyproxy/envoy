@@ -1027,7 +1027,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     }
   }
 
-
   // If we're encoding a headers only response, then mark the local as complete. This ensures
   // that we don't attempt to reset the downstream request in doEndStream.
   if (encoding_headers_only_) {
