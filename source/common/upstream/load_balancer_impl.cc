@@ -593,15 +593,8 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
 
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector& hosts_to_use,
                                                                 const HostsSource&) {
-  // A user is not allowed to specify less than two choices.
-  uint32_t choice_count = 2;
-  if (least_request_config_.has_value()) {
-    choice_count = least_request_config_.value().choice_count().value();
-  }
-  ASSERT(choice_count >= 2);
-
   HostSharedPtr candidate_host = nullptr;
-  for (uint32_t ii = 0; ii < choice_count; ++ii) {
+  for (uint32_t choice_idx = 0; choice_idx < choice_count_; ++choice_idx) {
     const int rand_idx = random_.random() % hosts_to_use.size();
     HostSharedPtr sampled_host = hosts_to_use[rand_idx];
 

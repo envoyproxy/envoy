@@ -370,7 +370,10 @@ public:
       const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig> least_request_config)
       : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                             common_config),
-        least_request_config_(least_request_config) {
+        least_request_config_(least_request_config),
+        choice_count_(least_request_config_.has_value()
+                          ? least_request_config_.value().choice_count().value()
+                          : 2) {
     initialize();
   }
 
@@ -392,6 +395,7 @@ private:
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
   const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig> least_request_config_;
+  const uint32_t choice_count_;
 };
 
 /**
