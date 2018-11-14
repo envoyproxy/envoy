@@ -1,8 +1,6 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_filter.h"
 
-#include "test/integration/integration.h"
-#include "test/integration/utility.h"
 #include "test/mocks/network/mocks.h"
 
 #include "gmock/gmock.h"

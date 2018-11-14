@@ -17,8 +17,7 @@ envoy_cc_test_library(
     srcs = ["mysql_test_utils.cc"],
     hdrs = ["mysql_test_utils.h"],
     deps = [
-        "//source/extensions/filters/network/mysql_proxy:config",
-        "//test/integration:integration_lib",
+        "//source/extensions/filters/network/mysql_proxy:proxy_lib",
     ],
 )
 
@@ -27,16 +26,10 @@ envoy_extension_cc_test(
     srcs = [
         "mysql_codec_test.cc",
     ],
-    data = [
-        "mysql_test_config.yaml",
-    ],
     extension_name = "envoy.filters.network.mysql_proxy",
     deps = [
         ":mysql_test_utils_lib",
-        "//source/common/tcp_proxy",
-        "//source/extensions/filters/network/mysql_proxy:config",
-        "//source/extensions/filters/network/tcp_proxy:config",
-        "//test/integration:integration_lib",
+        "//source/extensions/filters/network/mysql_proxy:proxy_lib",
     ],
 )
 
@@ -49,8 +42,7 @@ envoy_extension_cc_test(
     deps = [
         ":mysql_test_utils_lib",
         "//source/extensions/filters/network/mysql_proxy:config",
-        "//test/integration:integration_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/network:network_mocks",
     ],
 )
 
@@ -67,6 +59,7 @@ envoy_extension_cc_test(
         ":mysql_test_utils_lib",
         "//source/common/tcp_proxy",
         "//source/extensions/filters/network/mysql_proxy:config",
+        "//source/extensions/filters/network/mysql_proxy:proxy_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration:integration_lib",
     ],
