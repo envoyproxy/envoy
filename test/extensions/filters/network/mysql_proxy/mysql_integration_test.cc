@@ -24,8 +24,8 @@ class MysqlIntegrationTest : public MysqlTestUtils,
                              public BaseIntegrationTest,
                              public testing::TestWithParam<Network::Address::IpVersion> {
   std::string mysqlConfig() {
-    return TestEnvironment::readFileToStringForTest(
-        TestEnvironment::runfilesPath("test/config/integration/mysql_test_config.yaml"));
+    return TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+        "test/extensions/filters/network/mysql_proxy/mysql_test_config.yaml"));
   }
 
 public:

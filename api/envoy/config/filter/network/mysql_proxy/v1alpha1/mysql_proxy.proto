@@ -5,8 +5,8 @@ option go_package = "v2";
 
 import "validate/validate.proto";
 
-// [#protodoc-title: Mysql proxy]
-// MysqlDB :ref:`configuration overview <config_network_filters_mysql_proxy>`.
+// [#protodoc-title: Mysql proxy
+// Mysql Proxy :ref:`configuration overview <config_network_filters_mysql_proxy>`.
 
 message MysqlProxy {
   // The human readable prefix to use when emitting :ref:`statistics

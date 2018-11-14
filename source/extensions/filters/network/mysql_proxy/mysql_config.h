@@ -15,14 +15,14 @@ namespace MysqlProxy {
 /**
  * Config registration for the mysql proxy filter.
  */
-class MysqlConfigFactory
-    : public Common::FactoryBase<envoy::config::filter::network::mysql_proxy::v2::MysqlProxy> {
+class MysqlConfigFactory : public Common::FactoryBase<
+                               envoy::config::filter::network::mysql_proxy::v1alpha1::MysqlProxy> {
 public:
   MysqlConfigFactory() : FactoryBase(NetworkFilterNames::get().MysqlProxy) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::network::mysql_proxy::v2::MysqlProxy& proto_config,
+      const envoy::config::filter::network::mysql_proxy::v1alpha1::MysqlProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 

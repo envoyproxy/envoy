@@ -23,7 +23,6 @@ exports_files([
     "server_unix_listener.yaml",
     "server_xfcc.json",
     "tcp_proxy.json",
-    "mysql_test_config.yaml",
 ])
 
 filegroup(

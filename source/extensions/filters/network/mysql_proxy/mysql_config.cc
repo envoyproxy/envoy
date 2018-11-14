@@ -22,7 +22,7 @@ namespace MysqlProxy {
 
 Network::FilterFactoryCb
 NetworkFilters::MysqlProxy::MysqlConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::network::mysql_proxy::v2::MysqlProxy& proto_config,
+    const envoy::config::filter::network::mysql_proxy::v1alpha1::MysqlProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());

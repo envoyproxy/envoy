@@ -28,7 +28,7 @@ envoy_extension_cc_test(
         "mysql_codec_test.cc",
     ],
     data = [
-        "//test/config/integration:mysql_test_config.yaml",
+        "mysql_test_config.yaml",
     ],
     extension_name = "envoy.filters.network.mysql_proxy",
     deps = [
@@ -60,7 +60,7 @@ envoy_extension_cc_test(
         "mysql_integration_test.cc",
     ],
     data = [
-        "//test/config/integration:mysql_test_config.yaml",
+        "mysql_test_config.yaml",
     ],
     extension_name = "envoy.filters.network.mysql_proxy",
     deps = [
