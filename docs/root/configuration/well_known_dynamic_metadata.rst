@@ -3,18 +3,15 @@
 Well Known Dynamic Metadata
 ===========================
 
-Filters can emit dynamic metadata via the `StreamInfo` interface on a `Connection`. Following are
-some well known dynamic metadata keys emitted by Envoy filters.
+Filters can emit dynamic metadata via the *setDynamicMetadata* routine in the
+:repo:`StreamInfo <include/envoy/stream_info/stream_info.h>` interface on a
+:repo:`Connection <include/envoy/network/connection.h>`. This metadata emitted by a filter can be
+consumed by other filters and useful features can be built by stacking such filters. For example,
+a logging filter can consume dynamic metadata from an RBAC filter to log details about runtime
+shadow rule behavior. Another example is where an RBAC filter permits/restricts MongoDB operations
+by looking at the operational metadata emitted by the MongoDB filter.
 
-RBAC Filter
------------
+The following Envoy filters emit dynamic metadata that other filters can leverage.
 
-The RBAC filters (both :ref:`HTTP <config_http_filters_rbac>` and
-:ref:`Network <config_network_filters_rbac>`) emit the following dynamic metadata.
-
-.. csv-table::
-  :header: Name, Type, Description
-  :widths: 1, 1, 2
-
-  shadow_effective_policy_id, string, The effective shadow policy ID matching the action (if any).
-  shadow_engine_result, string, The engine result for the shadow rules (i.e. either `allowed` or `denied`).
+* :ref:`Role Based Access Control (RBAC) Filter <config_http_filters_rbac_dynamic_metadata>`
+* :ref:`Role Based Access Control (RBAC) Network Filter <config_network_filters_rbac_dynamic_metadata>`
