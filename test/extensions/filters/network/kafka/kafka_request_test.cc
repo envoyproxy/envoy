@@ -1,3 +1,5 @@
+#include "common/common/stack_array.h"
+
 #include "extensions/filters/network/kafka/kafka_request.h"
 #include "extensions/filters/network/kafka/messages/offset_commit.h"
 
@@ -66,8 +68,8 @@ public:
 
   const char* getBytes() {
     uint64_t num_slices = buffer_.getRawSlices(nullptr, 0);
-    Buffer::RawSlice slices[num_slices];
-    buffer_.getRawSlices(slices, num_slices);
+    STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+    buffer_.getRawSlices(slices.begin(), num_slices);
     return reinterpret_cast<const char*>((slices[0]).mem_);
   }
 

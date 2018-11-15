@@ -64,8 +64,8 @@ typedef std::function<ParserSharedPtr(RequestContextSharedPtr)> GeneratorFunctio
 typedef std::unordered_map<int16_t, std::unordered_map<int16_t, GeneratorFunction>> GeneratorMap;
 
 /**
- * Trivial structure specifying which generator function should be used for which api_key &
- * api_version
+ * Trivial structure specifying which generator function should be used
+ * for which api_key & api_version
  */
 struct ParserSpec {
   const int16_t api_key_;
@@ -128,15 +128,34 @@ public:
 private:
   const RequestParserResolver& parser_resolver_;
   const RequestContextSharedPtr context_;
-  Int32Buffer buffer_;
+  Int32Deserializer request_length_;
 };
 
 /**
- * Buffer that gets filled in with request header data
+ * Deserializer that extracts request header
  * @see http://kafka.apache.org/protocol.html#protocol_messages
  */
-class RequestHeaderBuffer : public CompositeBuffer<RequestHeader, Int16Buffer, Int16Buffer,
-                                                   Int32Buffer, NullableStringBuffer> {};
+class RequestHeaderDeserializer : public Deserializer<RequestHeader> {
+public:
+  size_t feed(const char*& buffer, uint64_t& remaining) {
+    size_t consumed = 0;
+    consumed += api_key_.feed(buffer, remaining);
+    consumed += api_version_.feed(buffer, remaining);
+    consumed += correlation_id_.feed(buffer, remaining);
+    consumed += client_id_.feed(buffer, remaining);
+    return consumed;
+  }
+  bool ready() const { return client_id_.ready(); }
+  RequestHeader get() const {
+    return {api_key_.get(), api_version_.get(), correlation_id_.get(), client_id_.get()};
+  }
+
+protected:
+  Int16Deserializer api_key_;
+  Int16Deserializer api_version_;
+  Int32Deserializer correlation_id_;
+  NullableStringDeserializer client_id_;
+};
 
 /**
  * Parser responsible for computing request header and updating the context with data resolved
@@ -159,33 +178,34 @@ public:
 private:
   const RequestParserResolver& parser_resolver_;
   const RequestContextSharedPtr context_;
-  RequestHeaderBuffer buffer_;
+  RequestHeaderDeserializer deserializer_;
 };
 
 /**
- * Buffered parser uses a single buffer to construct a response
+ * Buffered parser uses a single deserializer to construct a response
  * This parser is responsible for consuming request-specific data (e.g. topic names) and always
  * returns a parsed message
  * @param RT request class
- * @param BT buffer type corresponding to request class
+ * @param BT deserializer type corresponding to request class (should be subclass of
+ * Deserializer<RT>)
  */
-template <typename RT, typename BT> class BufferedParser : public Parser {
+template <typename RT, typename BT> class RequestParser : public Parser {
 public:
-  BufferedParser(RequestContextSharedPtr context) : context_{context} {};
+  RequestParser(RequestContextSharedPtr context) : context_{context} {};
   ParseResponse parse(const char*& buffer, uint64_t& remaining) override;
 
 protected:
   RequestContextSharedPtr context_;
-  BT buffer_; // underlying request-specific buffer
+  BT deserializer; // underlying request-specific deserializer
 };
 
 template <typename RT, typename BT>
-ParseResponse BufferedParser<RT, BT>::parse(const char*& buffer, uint64_t& remaining) {
-  context_->remaining_request_size_ -= buffer_.feed(buffer, remaining);
-  if (buffer_.ready()) {
-    // after a successful parse, there should be nothing left
+ParseResponse RequestParser<RT, BT>::parse(const char*& buffer, uint64_t& remaining) {
+  context_->remaining_request_size_ -= deserializer.feed(buffer, remaining);
+  if (deserializer.ready()) {
+    // after a successful parse, there should be nothing left - we have consumed all the bytes
     ASSERT(0 == context_->remaining_request_size_);
-    RT request = buffer_.get();
+    RT request = deserializer.get();
     request.header() = context_->request_header_;
     ENVOY_LOG(trace, "parsed request {}: {}", *context_, request);
     MessageSharedPtr msg = std::make_shared<RT>(request);
@@ -202,9 +222,9 @@ ParseResponse BufferedParser<RT, BT>::parse(const char*& buffer, uint64_t& remai
  */
 #define DEFINE_REQUEST_PARSER(REQUEST_TYPE, VERSION)                                               \
   class REQUEST_TYPE##VERSION##Parser                                                              \
-      : public BufferedParser<REQUEST_TYPE, REQUEST_TYPE##VERSION##Buffer> {                       \
+      : public RequestParser<REQUEST_TYPE, REQUEST_TYPE##VERSION##Buffer> {                        \
   public:                                                                                          \
-    REQUEST_TYPE##VERSION##Parser(RequestContextSharedPtr ctx) : BufferedParser{ctx} {};           \
+    REQUEST_TYPE##VERSION##Parser(RequestContextSharedPtr ctx) : RequestParser{ctx} {};            \
   };
 
 /**
@@ -235,10 +255,12 @@ public:
    */
   size_t encode(Buffer::Instance& dst, EncodingContext& context) const {
     size_t written{0};
+    // encode request header
     written += context.encode(request_header_.api_key_, dst);
     written += context.encode(request_header_.api_version_, dst);
     written += context.encode(request_header_.correlation_id_, dst);
     written += context.encode(request_header_.client_id_, dst);
+    // encode request-specific data
     written += encodeDetails(dst, context);
     return written;
   }
@@ -247,7 +269,9 @@ public:
    * Pretty-prints given request into a stream
    */
   std::ostream& print(std::ostream& os) const override final {
+    // write header
     os << request_header_ << " "; // not very pretty
+    // write request-specific data
     return printDetails(os);
   }
 

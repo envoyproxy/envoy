@@ -13,6 +13,7 @@ namespace Kafka {
 
 /**
  * Holds the partition node (leaf)
+ * Supports all versions (some fields are not used in some versions)
  */
 struct OffsetCommitPartition {
   const int32_t partition_;
@@ -130,23 +131,160 @@ private:
   const NullableArray<OffsetCommitTopic> topics_;
 };
 
-// clang-format off
-class OffsetCommitPartitionV0Buffer : public CompositeBuffer<OffsetCommitPartition, Int32Buffer, Int64Buffer, NullableStringBuffer> {};
-class OffsetCommitPartitionV0ArrayBuffer : public ArrayBuffer<OffsetCommitPartition, OffsetCommitPartitionV0Buffer> {};
-class OffsetCommitTopicV0Buffer : public CompositeBuffer<OffsetCommitTopic, StringBuffer, OffsetCommitPartitionV0ArrayBuffer> {};
-class OffsetCommitTopicV0ArrayBuffer : public ArrayBuffer<OffsetCommitTopic, OffsetCommitTopicV0Buffer> {};
+/**
+ * Deserializes bytes into OffsetCommitPartition (api version 0)
+ */
+class OffsetCommitPartitionV0Buffer : public Deserializer<OffsetCommitPartition> {
+public:
+  size_t feed(const char*& buffer, uint64_t& remaining) {
+    size_t consumed = 0;
+    consumed += partition_.feed(buffer, remaining);
+    consumed += offset_.feed(buffer, remaining);
+    consumed += metadata_.feed(buffer, remaining);
+    return consumed;
+  }
+  bool ready() const { return metadata_.ready(); }
+  OffsetCommitPartition get() const { return {partition_.get(), offset_.get(), metadata_.get()}; }
 
-class OffsetCommitPartitionV1Buffer : public CompositeBuffer<OffsetCommitPartition, Int32Buffer, Int64Buffer, Int64Buffer, NullableStringBuffer> {};
-class OffsetCommitPartitionV1ArrayBuffer : public ArrayBuffer<OffsetCommitPartition, OffsetCommitPartitionV1Buffer> {};
-class OffsetCommitTopicV1Buffer : public CompositeBuffer<OffsetCommitTopic, StringBuffer, OffsetCommitPartitionV1ArrayBuffer> {};
-class OffsetCommitTopicV1ArrayBuffer : public ArrayBuffer<OffsetCommitTopic, OffsetCommitTopicV1Buffer> {};
+protected:
+  Int32Deserializer partition_;
+  Int64Deserializer offset_;
+  NullableStringDeserializer metadata_;
+};
 
-class OffsetCommitRequestV0Buffer : public CompositeBuffer<OffsetCommitRequest, StringBuffer, OffsetCommitTopicV0ArrayBuffer> {};
-class OffsetCommitRequestV1Buffer : public CompositeBuffer<OffsetCommitRequest, StringBuffer, Int32Buffer, StringBuffer, OffsetCommitTopicV1ArrayBuffer> {};
+/**
+ * Deserializes bytes into OffsetCommitPartition (api version 1)
+ */
+class OffsetCommitPartitionV1Buffer : public Deserializer<OffsetCommitPartition> {
+public:
+  size_t feed(const char*& buffer, uint64_t& remaining) {
+    size_t consumed = 0;
+    consumed += partition_.feed(buffer, remaining);
+    consumed += offset_.feed(buffer, remaining);
+    consumed += timestamp_.feed(buffer, remaining);
+    consumed += metadata_.feed(buffer, remaining);
+    return consumed;
+  }
+  bool ready() const { return metadata_.ready(); }
+  OffsetCommitPartition get() const {
+    return {partition_.get(), offset_.get(), timestamp_.get(), metadata_.get()};
+  }
+
+protected:
+  Int32Deserializer partition_;
+  Int64Deserializer offset_;
+  Int64Deserializer timestamp_;
+  NullableStringDeserializer metadata_;
+};
+
+/**
+ * Deserializes array of OffsetCommitPartition-s v0
+ */
+class OffsetCommitPartitionV0ArrayBuffer
+    : public ArrayDeserializer<OffsetCommitPartition, OffsetCommitPartitionV0Buffer> {};
+
+/**
+ * Deserializes array of OffsetCommitPartition-s v1
+ */
+class OffsetCommitPartitionV1ArrayBuffer
+    : public ArrayDeserializer<OffsetCommitPartition, OffsetCommitPartitionV1Buffer> {};
+
+/**
+ * Deserializes bytes into OffsetCommitTopic v0 (which is composed of topic name + array of v0
+ * partitions)
+ */
+class OffsetCommitTopicV0Buffer : public Deserializer<OffsetCommitTopic> {
+public:
+  size_t feed(const char*& buffer, uint64_t& remaining) {
+    size_t consumed = 0;
+    consumed += topic_.feed(buffer, remaining);
+    consumed += partitions_.feed(buffer, remaining);
+    return consumed;
+  }
+  bool ready() const { return partitions_.ready(); }
+  OffsetCommitTopic get() const { return {topic_.get(), partitions_.get()}; }
+
+protected:
+  StringDeserializer topic_;
+  OffsetCommitPartitionV0ArrayBuffer partitions_;
+};
+
+/**
+ * Deserializes bytes into OffsetCommitTopic v1 (which is composed of topic name + array of v1
+ * partitions)
+ */
+class OffsetCommitTopicV1Buffer : public Deserializer<OffsetCommitTopic> {
+public:
+  size_t feed(const char*& buffer, uint64_t& remaining) {
+    size_t consumed = 0;
+    consumed += topic_.feed(buffer, remaining);
+    consumed += partitions_.feed(buffer, remaining);
+    return consumed;
+  }
+  bool ready() const { return partitions_.ready(); }
+  OffsetCommitTopic get() const { return {topic_.get(), partitions_.get()}; }
+
+protected:
+  StringDeserializer topic_;
+  OffsetCommitPartitionV1ArrayBuffer partitions_;
+};
+
+/**
+ * Deserializes array of OffsetCommitTopic-s v0
+ */
+class OffsetCommitTopicV0ArrayBuffer
+    : public ArrayDeserializer<OffsetCommitTopic, OffsetCommitTopicV0Buffer> {};
+
+/**
+ * Deserializes array of OffsetCommitTopic-s v1
+ */
+class OffsetCommitTopicV1ArrayBuffer
+    : public ArrayDeserializer<OffsetCommitTopic, OffsetCommitTopicV1Buffer> {};
+
+class OffsetCommitRequestV0Buffer : public Deserializer<OffsetCommitRequest> {
+public:
+  size_t feed(const char*& buffer, uint64_t& remaining) {
+    size_t consumed = 0;
+    consumed += group_id_.feed(buffer, remaining);
+    consumed += topics_.feed(buffer, remaining);
+    return consumed;
+  }
+  bool ready() const { return topics_.ready(); }
+  OffsetCommitRequest get() const { return {group_id_.get(), topics_.get()}; }
+
+protected:
+  StringDeserializer group_id_;
+  OffsetCommitTopicV0ArrayBuffer topics_;
+};
+
+class OffsetCommitRequestV1Buffer : public Deserializer<OffsetCommitRequest> {
+public:
+  size_t feed(const char*& buffer, uint64_t& remaining) {
+    size_t consumed = 0;
+    consumed += group_id_.feed(buffer, remaining);
+    consumed += generation_id_.feed(buffer, remaining);
+    consumed += member_id_.feed(buffer, remaining);
+    consumed += topics_.feed(buffer, remaining);
+    return consumed;
+  }
+  bool ready() const { return topics_.ready(); }
+  OffsetCommitRequest get() const {
+    return {group_id_.get(), generation_id_.get(), member_id_.get(), topics_.get()};
+  }
+
+protected:
+  StringDeserializer group_id_;
+  Int32Deserializer generation_id_;
+  StringDeserializer member_id_;
+  OffsetCommitTopicV1ArrayBuffer topics_;
+};
+
+/**
+ * Define Parsers that wrap the corresponding buffers
+ */
 
 DEFINE_REQUEST_PARSER(OffsetCommitRequest, V0);
 DEFINE_REQUEST_PARSER(OffsetCommitRequest, V1);
-// clang-format on
 
 } // namespace Kafka
 } // namespace NetworkFilters

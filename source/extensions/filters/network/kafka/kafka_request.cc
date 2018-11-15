@@ -70,9 +70,9 @@ ParserSharedPtr RequestParserResolver::createParser(int16_t api_key, int16_t api
 }
 
 ParseResponse RequestStartParser::parse(const char*& buffer, uint64_t& remaining) {
-  buffer_.feed(buffer, remaining);
-  if (buffer_.ready()) {
-    context_->remaining_request_size_ = buffer_.get();
+  request_length_.feed(buffer, remaining);
+  if (request_length_.ready()) {
+    context_->remaining_request_size_ = request_length_.get();
     return ParseResponse::nextParser(
         std::make_shared<RequestHeaderParser>(parser_resolver_, context_));
   } else {
@@ -81,10 +81,10 @@ ParseResponse RequestStartParser::parse(const char*& buffer, uint64_t& remaining
 }
 
 ParseResponse RequestHeaderParser::parse(const char*& buffer, uint64_t& remaining) {
-  context_->remaining_request_size_ -= buffer_.feed(buffer, remaining);
+  context_->remaining_request_size_ -= deserializer_.feed(buffer, remaining);
 
-  if (buffer_.ready()) {
-    RequestHeader request_header = buffer_.get();
+  if (deserializer_.ready()) {
+    RequestHeader request_header = deserializer_.get();
     context_->request_header_ = request_header;
     ParserSharedPtr next_parser = parser_resolver_.createParser(
         request_header.api_key_, request_header.api_version_, context_);
