@@ -2,9 +2,10 @@
 
 #include <string>
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
+
+#include "extensions/filters/http/common/empty_http_filter_config.h"
 
 namespace Envoy {
 
