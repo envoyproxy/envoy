@@ -254,6 +254,10 @@ HeaderParserPtr HeaderParser::configure(
 
 void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
                                    const StreamInfo::StreamInfo& stream_info) const {
+  for (const auto& header : headers_to_remove_) {
+    headers.remove(header);
+  }
+
   for (const auto& formatter : headers_to_add_) {
     const std::string value = formatter.second->format(stream_info);
     if (!value.empty()) {
@@ -263,10 +267,6 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
         headers.setReferenceKey(formatter.first, value);
       }
     }
-  }
-
-  for (const auto& header : headers_to_remove_) {
-    headers.remove(header);
   }
 }
 

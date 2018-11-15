@@ -769,5 +769,49 @@ route:
             header_map.get_("x-request-start-range"));
 }
 
+TEST(HeaderParserTest, EvaluateRequestHeadersRemoveBeforeAdd) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+request_headers_to_add:
+  - header:
+      key: "x-foo-header"
+      value: "bar"
+request_headers_to_remove: ["x-foo-header"]
+)EOF";
+
+  const auto route = parseRouteFromV2Yaml(yaml);
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
+  Http::TestHeaderMapImpl header_map{{"x-foo-header", "foo"}};
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  req_header_parser->evaluateHeaders(header_map, stream_info);
+  EXPECT_EQ("bar", header_map.get_("x-foo-header"));
+}
+
+TEST(HeaderParserTest, EvaluateResponseHeadersRemoveBeforeAdd) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+response_headers_to_add:
+  - header:
+      key: "x-foo-header"
+      value: "bar"
+response_headers_to_remove: ["x-foo-header"]
+)EOF";
+
+  const auto route = parseRouteFromV2Yaml(yaml);
+  HeaderParserPtr resp_header_parser =
+      HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
+  Http::TestHeaderMapImpl header_map{{"x-foo-header", "foo"}};
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  resp_header_parser->evaluateHeaders(header_map, stream_info);
+  EXPECT_EQ("bar", header_map.get_("x-foo-header"));
+}
+
 } // namespace Router
 } // namespace Envoy
