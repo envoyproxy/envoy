@@ -252,10 +252,12 @@ private:
   HEADER_FUNC(EnvoyExternalAddress)                                                                \
   HEADER_FUNC(EnvoyForceTrace)                                                                     \
   HEADER_FUNC(EnvoyImmediateHealthCheckFail)                                                       \
+  HEADER_FUNC(EnvoyInternalRedirect)                                                               \
   HEADER_FUNC(EnvoyInternalRequest)                                                                \
   HEADER_FUNC(EnvoyIpTags)                                                                         \
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
+  HEADER_FUNC(EnvoyOriginalUrl)                                                                    \
   HEADER_FUNC(EnvoyOverloaded)                                                                     \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \

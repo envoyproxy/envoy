@@ -35,6 +35,21 @@
 
 namespace Envoy {
 namespace Router {
+namespace {
+InternalRedirectAction convertRedirectAction(const envoy::api::v2::route::RouteAction& route) {
+  switch (route.internal_redirect_action()) {
+  case envoy::api::v2::route::RouteAction::REJECT:
+    return InternalRedirectAction::Reject;
+  case envoy::api::v2::route::RouteAction::PASS_THROUGH:
+    return InternalRedirectAction::PassThrough;
+  case envoy::api::v2::route::RouteAction::HANDLE:
+    return InternalRedirectAction::Handle;
+  default:
+    return InternalRedirectAction::Reject;
+  }
+}
+
+} // namespace
 
 std::string SslRedirector::newPath(const Http::HeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
@@ -315,7 +330,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route)),
       per_filter_configs_(route.per_filter_config(), factory_context),
-      time_system_(factory_context.dispatcher().timeSystem()) {
+      time_system_(factory_context.dispatcher().timeSystem()),
+      internal_redirect_action_(convertRedirectAction(route.route())) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);

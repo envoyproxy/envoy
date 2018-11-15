@@ -202,6 +202,8 @@ public:
  * RetryStatus whether request should be retried or not.
  */
 enum class RetryStatus { No, NoOverflow, Yes };
+// FIXME doc
+enum class InternalRedirectAction { Reject, PassThrough, Handle };
 
 /**
  * Wraps retry state for an active routed request.
@@ -624,6 +626,9 @@ public:
    * @return bool whether x-envoy-attempt-count should be included on the upstream request.
    */
   virtual bool includeAttemptCount() const PURE;
+
+  // FIXME doc
+  virtual InternalRedirectAction internalRedirectAction() const PURE;
 };
 
 /**

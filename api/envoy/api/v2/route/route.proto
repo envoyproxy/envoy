@@ -722,6 +722,14 @@ message RouteAction {
   // This can be used to prevent unexpected upstream request timeouts due to potentially long
   // time gaps between gRPC request and response in gRPC streaming mode.
   google.protobuf.Duration max_grpc_timeout = 23 [(gogoproto.stdduration) = true];
+
+  // [#not-implemented-hide:]
+  enum InternalRedirectAction {
+    REJECT = 0;
+    PASS_THROUGH = 1;
+    HANDLE = 2;
+  }
+  InternalRedirectAction internal_redirect_action = 25;
 }
 
 message RedirectAction {

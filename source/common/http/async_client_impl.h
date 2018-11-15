@@ -234,6 +234,9 @@ private:
     }
 
     bool includeAttemptCount() const override { return false; }
+    Router::InternalRedirectAction internalRedirectAction() const override {
+      return Router::InternalRedirectAction::Reject;
+    }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;

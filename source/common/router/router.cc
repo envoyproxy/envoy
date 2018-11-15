@@ -31,6 +31,46 @@ namespace Envoy {
 namespace Router {
 namespace {
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
+
+bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_headers,
+                                              const Http::HeaderEntry& internal_redirect) {
+  // Envoy does not currently support multiple rounds of redirects.
+  if (downstream_headers.EnvoyOriginalUrl()) {
+    return false;
+  }
+  // Make sure the redirect response contains a URL to redirect to.
+  if (internal_redirect.value().getStringView().length() == 0) {
+    return false;
+  }
+
+  Http::Utility::Url absolute_url;
+  if (!absolute_url.initialize(internal_redirect.value().getStringView())) {
+    return false;
+  }
+
+  ASSERT(downstream_headers.ForwardedProto());
+  if (downstream_headers.ForwardedProto()->value().c_str() == Http::Headers::get().SchemeValues.Http &&
+      absolute_url.scheme() == Http::Headers::get().SchemeValues.Https ) {
+    // Don't allow serving HTTP responses over TLS.
+    return false;
+  }
+
+  // Preserve the original request URL for the second pass.
+  downstream_headers.insertEnvoyOriginalUrl().value(
+      absl::StrCat(downstream_headers.ForwardedProto()->value().getStringView(),
+                   "://",
+                   downstream_headers.Host()->value().getStringView(),
+                   downstream_headers.Path()->value().getStringView()));
+
+  // Replace the original host, scheme and path.
+  downstream_headers.insertScheme().value(std::string(absolute_url.scheme()));
+  downstream_headers.insertHost().value(std::string(absolute_url.host()));
+  downstream_headers.insertPath().value(std::string(absolute_url.path()));
+
+  return true;
+}
+
+
 } // namespace
 
 void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers,
@@ -628,6 +668,32 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
     retry_state_.reset();
   }
 
+
+  if (headers->EnvoyInternalRedirect()) {
+    switch (route_entry_->internalRedirectAction()) {
+      case InternalRedirectAction::Reject:
+        // Upstream asked for an internal redirect when internal redirects are not
+        // configured on.
+        cluster_->stats().upstream_internal_redirect_rejected_total_.inc();
+        headers->removeEnvoyInternalRedirect();  // Just to be paranoid.
+        callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr);
+        return;
+      case InternalRedirectAction::Handle:
+        if (!setupInternalRedirect(headers, end_stream)) {
+          cluster_->stats().upstream_internal_redirect_failed_total_.inc();
+          headers->removeEnvoyInternalRedirect();
+          callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr);
+        } else {
+          cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
+        }
+        // Either we've set up an internal redirect, or sent a failure reply.
+        return;
+      case InternalRedirectAction::PassThrough:
+        // Pass the redirect through to frontline Envoy instances.
+        break;
+    }
+  }
+
   // Only send upstream service time if we received the complete request and this is not a
   // premature response.
   if (DateUtil::timePointValid(downstream_request_complete_time_)) {
@@ -765,8 +831,28 @@ bool Filter::setupRetry(bool end_stream) {
   return true;
 }
 
+bool Filter::setupInternalRedirect(const Http::HeaderMapPtr& headers, bool end_stream) {
+  const Http::HeaderEntry* internal_redirect = headers->EnvoyInternalRedirect();
+  ASSERT(internal_redirect);
+  // As with setupRetry, redirects are not supported for streaming requests yet.
+  if (!downstream_end_stream_ ||
+      callbacks_->decodingBuffer() || // Redirects woth body not yet supported.
+      !convertRequestHeadersForInternalRedirect(*downstream_headers_, *internal_redirect)) {
+    ENVOY_STREAM_LOG(debug, "failing redirect", *callbacks_);
+    return false;
+  }
+
+  // FIXME reselect route or fail with 404, or defer?
+
+  // FIXME for now this acts as a retry, and does not rerun the filter chain.
+  // Fix this.
+  setupRetry(end_stream);
+  doRetry();
+  return true;
+}
+
 void Filter::doRetry() {
-  is_retry_ = true;
+  //FIXME is_retry_ = true;
   attempt_count_++;
   Http::ConnectionPool::Instance* conn_pool = getConnPool();
   if (!conn_pool) {

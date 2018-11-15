@@ -196,6 +196,11 @@ protected:
   FakeStreamPtr upstream_request_;
   // A pointer to the request encoder, if used.
   Http::StreamEncoder* request_encoder_{nullptr};
+  Http::TestHeaderMapImpl default_request_headers_{{":method", "GET"},
+                                                   {":path", "/test/long/url"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "host"},
+                                                   {"x-lyft-user-id", "123"}};
   // The response headers sent by sendRequestAndWaitForResponse() by default.
   Http::TestHeaderMapImpl default_response_headers_{{":status", "200"}};
   // The codec type for the client-to-Envoy connection

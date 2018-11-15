@@ -82,7 +82,9 @@ public:
                 envoy::api::v2::route::VirtualHost::TlsRequirementType type =
                     envoy::api::v2::route::VirtualHost::NONE,
                 envoy::api::v2::route::RouteAction::RetryPolicy retry_policy = {},
-                bool include_attempt_count_header = false);
+                bool include_attempt_count_header = false,
+                const envoy::api::v2::route::RouteAction::InternalRedirectAction action =
+                    envoy::api::v2::route::RouteAction::REJECT);
 
   // Add an HTTP filter prior to existing filters.
   void addFilter(const std::string& filter_yaml);

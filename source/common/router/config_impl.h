@@ -346,6 +346,9 @@ public:
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
   bool includeAttemptCount() const override { return vhost_.includeAttemptCount(); }
+  InternalRedirectAction internalRedirectAction() const override {
+    return internal_redirect_action_;
+  }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -442,6 +445,9 @@ private:
     }
 
     bool includeAttemptCount() const override { return parent_->includeAttemptCount(); }
+    InternalRedirectAction internalRedirectAction() const override {
+      return parent_->internalRedirectAction();
+    }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -562,6 +568,7 @@ private:
   std::string direct_response_body_;
   PerFilterConfigs per_filter_configs_;
   Event::TimeSystem& time_system_;
+  InternalRedirectAction internal_redirect_action_;
 };
 
 /**
