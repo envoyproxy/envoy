@@ -2,13 +2,13 @@
 
 set -e
 
-VERSION=2.0.5
-SHA256=8bb29d84f06eb23c7ea4aa4794dbb248ede9fcb23b6989cbef81dc79352afc97
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "${SCRIPT_DIR}/versions.sh"
 
-curl https://github.com/LuaJIT/LuaJIT/archive/v"$VERSION".tar.gz -sLo LuaJIT-"$VERSION".tar.gz \
-  && echo "$SHA256" LuaJIT-"$VERSION".tar.gz | sha256sum --check
-tar xf LuaJIT-"$VERSION".tar.gz
-cd LuaJIT-"$VERSION"
+curl "$LUAJIT_FILE_URL" -sLo LuaJIT-"$LUAJIT_VERSION".tar.gz \
+  && echo "$LUAJIT_FILE_SHA256" LuaJIT-"$LUAJIT_VERSION".tar.gz | sha256sum --check
+tar xf LuaJIT-"$LUAJIT_VERSION".tar.gz
+cd LuaJIT-"$LUAJIT_VERSION"
 
 
 # Fixup Makefile with things that cannot be set via env var.

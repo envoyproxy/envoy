@@ -2,14 +2,14 @@
 
 set -e
 
-VERSION=2.1.8-stable
-SHA256=316ddb401745ac5d222d7c529ef1eada12f58f6376a66c1118eee803cb70f83d
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "${SCRIPT_DIR}/versions.sh"
 
 # Maintainer provided source tarball does not contain cmake content so using Github tarball.
-curl https://github.com/libevent/libevent/archive/release-"$VERSION".tar.gz -sLo libevent-release-"$VERSION".tar.gz \
-  && echo "$SHA256" libevent-release-"$VERSION".tar.gz | sha256sum --check
-tar xf libevent-release-"$VERSION".tar.gz
-cd libevent-release-"$VERSION"
+curl "$LIBEVENT_FILE_URL" -sLo libevent-"$LIBEVENT_TAG".tar.gz \
+  && echo "$LIBEVENT_FILE_SHA256" libevent-"$LIBEVENT_TAG".tar.gz | sha256sum --check
+tar xf libevent-"$LIBEVENT_TAG".tar.gz
+cd libevent-"$LIBEVENT_TAG"
 
 mkdir build
 cd build

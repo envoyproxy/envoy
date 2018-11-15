@@ -2,13 +2,13 @@
 
 set -e
 
-VERSION=1.34.0
-SHA256=8889399ddd38aa0405f6e84f1c050a292286089441686b8a9c5e937de4f5b61d
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "${SCRIPT_DIR}/versions.sh"
 
-curl https://github.com/nghttp2/nghttp2/releases/download/v"$VERSION"/nghttp2-"$VERSION".tar.gz -sLo nghttp2-"$VERSION".tar.gz \
-  && echo "$SHA256" nghttp2-"$VERSION".tar.gz | sha256sum --check
-tar xf nghttp2-"$VERSION".tar.gz
-cd nghttp2-"$VERSION"
+curl "$NGHTTP2_FILE_URL" -sLo nghttp2-"$NGHTTP2_VERSION".tar.gz \
+  && echo "$NGHTTP2_FILE_SHA256" nghttp2-"$NGHTTP2_VERSION".tar.gz | sha256sum --check
+tar xf nghttp2-"$NGHTTP2_VERSION".tar.gz
+cd nghttp2-"$NGHTTP2_VERSION"
 
 # Allow nghttp2 to build as static lib on Windows
 # TODO: remove once https://github.com/nghttp2/nghttp2/pull/1198 is merged

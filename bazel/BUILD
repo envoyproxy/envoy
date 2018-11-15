@@ -128,3 +128,15 @@ config_setting(
     name = "force_libcpp",
     values = {"define": "force_libcpp=enabled"},
 )
+
+py_binary(
+    name = "print_dependencies",
+    srcs = ["print_dependencies.py"],
+    data = [
+        ":repository_locations.bzl",
+        ":target_recipes.bzl",
+        "//api/bazel:repository_locations.bzl",
+        "//ci/build_container/build_recipes:versions.sh",
+    ],
+    main = "print_dependencies.py",
+)

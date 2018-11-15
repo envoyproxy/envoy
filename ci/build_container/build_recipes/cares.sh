@@ -2,9 +2,8 @@
 
 set -e
 
-TAG=cares-1_15_0
-VERSION=c-ares-1.15.0
-SHA256=6cdb97871f2930530c97deb7cf5c8fa4be5a0b02c7cea6e7c7667672a39d6852
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "${SCRIPT_DIR}/versions.sh"
 
 # cares is fussy over whether -D appears inside CFLAGS vs. CPPFLAGS, oss-fuzz
 # sets CFLAGS with -D, so we need to impedance match here. In turn, OS X automake
@@ -12,10 +11,10 @@ SHA256=6cdb97871f2930530c97deb7cf5c8fa4be5a0b02c7cea6e7c7667672a39d6852
 CPPFLAGS="$(for f in $CXXFLAGS; do if [[ $f =~ -D.* ]]; then echo $f; fi; done | tr '\n' ' ')"
 CFLAGS="$(for f in $CXXFLAGS; do if [[ ! $f =~ -D.* ]]; then echo $f; fi; done | tr '\n' ' ')"
 
-curl https://github.com/c-ares/c-ares/releases/download/"$TAG"/"$VERSION".tar.gz -sLo "$VERSION".tar.gz \
-  && echo "$SHA256" "$VERSION".tar.gz | sha256sum --check
-tar xf "$VERSION".tar.gz
-cd "$VERSION"
+curl "$CARES_FILE_URL" -sLo c-ares-"$CARES_VERSION".tar.gz \
+  && echo "$CARES_FILE_SHA256" c-ares-"$CARES_VERSION".tar.gz | sha256sum --check
+tar xf c-ares-"$CARES_VERSION".tar.gz
+cd c-ares-"$CARES_VERSION"
 
 mkdir build
 cd build

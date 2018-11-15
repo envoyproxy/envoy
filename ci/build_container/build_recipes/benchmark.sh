@@ -2,19 +2,21 @@
 
 set -e
 
-# use commit where cmake 3.6 feature removed. Unblocks Ubuntu 16.xx or below builds
-# TODO (moderation) change back to tarball method on next benchmark release
-export COMMIT="505be96ab23056580a3a2315abba048f4428b04e"
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "${SCRIPT_DIR}/versions.sh"
 
-git clone https://github.com/google/benchmark.git
-(cd benchmark; git reset --hard "$COMMIT")
+curl "$BENCHMARK_FILE_URL" -sLo benchmark-"$BENCHMARK_GIT_SHA".tar.gz \
+  && echo "$BENCHMARK_FILE_SHA256" benchmark-"$BENCHMARK_GIT_SHA".tar.gz | sha256sum --check
+tar xf benchmark-"$BENCHMARK_GIT_SHA".tar.gz
+cd benchmark-"$BENCHMARK_GIT_SHA"
+
 mkdir build
-
 cd build
 
-cmake -G "Ninja" ../benchmark \
+cmake -G "Ninja" \
   -DCMAKE_BUILD_TYPE=RELEASE \
-  -DBENCHMARK_ENABLE_GTEST_TESTS=OFF
+  -DBENCHMARK_ENABLE_GTEST_TESTS=OFF \
+  ..
 ninja
 
 benchmark_lib="libbenchmark.a"
@@ -23,7 +25,7 @@ if [[ "${OS}" == "Windows_NT" ]]; then
 fi
 
 cp "src/$benchmark_lib" "$THIRDPARTY_BUILD"/lib
-cd ../benchmark
+cd ..
 
 INCLUDE_DIR="$THIRDPARTY_BUILD/include/testing/base/public"
 mkdir -p "$INCLUDE_DIR"

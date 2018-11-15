@@ -21,3 +21,4 @@ TAGS
 .vimrc
 .vs
 .vscode
+*.bzlc

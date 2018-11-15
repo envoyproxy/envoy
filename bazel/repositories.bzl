@@ -1,4 +1,3 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":genrule_repository.bzl", "genrule_repository")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
 load(":target_recipes.bzl", "TARGET_RECIPES")
@@ -8,6 +7,7 @@ load(
     "setup_vc_env_vars",
 )
 load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
+load("//api/bazel:envoy_http_archive.bzl", "envoy_http_archive")
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
@@ -16,35 +16,7 @@ PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
 GO_VERSION = "1.10.4"
 
 def _repository_impl(name, **kwargs):
-    # `existing_rule_keys` contains the names of repositories that have already
-    # been defined in the Bazel workspace. By skipping repos with existing keys,
-    # users can override dependency versions by using standard Bazel repository
-    # rules in their WORKSPACE files.
-    existing_rule_keys = native.existing_rules().keys()
-    if name in existing_rule_keys:
-        # This repository has already been defined, probably because the user
-        # wants to override the version. Do nothing.
-        return
-
-    loc_key = kwargs.pop("repository_key", name)
-    location = REPOSITORY_LOCATIONS[loc_key]
-
-    # Git tags are mutable. We want to depend on commit IDs instead. Give the
-    # user a useful error if they accidentally specify a tag.
-    if "tag" in location:
-        fail(
-            "Refusing to depend on Git tag %r for external dependency %r: use 'commit' instead." %
-            (location["tag"], name),
-        )
-
-    # HTTP tarball at a given URL. Add a BUILD file if requested.
-    http_archive(
-        name = name,
-        urls = location["urls"],
-        sha256 = location["sha256"],
-        strip_prefix = location.get("strip_prefix", ""),
-        **kwargs
-    )
+    envoy_http_archive(name, repository_locations = REPOSITORY_LOCATIONS, **kwargs)
 
 def _build_recipe_repository_impl(ctxt):
     # modify the recipes list based on the build context
