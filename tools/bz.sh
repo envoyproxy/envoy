@@ -129,6 +129,14 @@ fi
 
 # synthesize a readable and unique cache directory, so it's easy to know
 # what to manually delete.
+#
+# TODO(jmarantz) @lizan suggests using --output_base rather than --disk_cache
+# which should reduce duplication. That option is documented in
+# https://docs.bazel.build/versions/master/command-line-reference.html
+# but does not appear to work in bazel 0.19.1, yielding:
+#
+# ERROR: Unrecognized option: --output_base=/home/jmarantz/.cache.git3.fastbuild
+#
 args="$args --disk_cache=$cache_directory/.cache.$client_id.$mode"
 
 # TODO(jmarantz): add filtering out of uninteresting error messages.
