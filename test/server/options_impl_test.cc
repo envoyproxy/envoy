@@ -34,15 +34,6 @@ public:
                                          [](uint64_t, uint64_t, bool) { return "1"; },
                                          spdlog::level::warn);
   }
-
-  const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
-  parseComponentLogLevels(const std::unique_ptr<OptionsImpl>& options,
-                          const std::string& component_log_levels) {
-    options->parseComponentLogLevels(component_log_levels);
-    return options->componentLogLevels();
-  }
-
-  uint32_t count(const std::unique_ptr<OptionsImpl>& options) { return options->count(); }
 };
 
 TEST_F(OptionsImplTest, HotRestartVersion) {
@@ -214,7 +205,7 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // 2. version        - default TCLAP argument.
   // 3. help           - default TCLAP argument.
   // 4. ignore_rest    - default TCLAP argument.
-  EXPECT_EQ(count(options) - 4, command_line_options->GetDescriptor()->field_count());
+  EXPECT_EQ(options->count() - 4, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, BadCliOption) {
@@ -234,7 +225,7 @@ TEST_F(OptionsImplTest, BadMaxStatsOption) {
 
 TEST_F(OptionsImplTest, ParseComponentLogLevels) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
-  parseComponentLogLevels(options, "upstream:debug,connection:trace");
+  options->parseComponentLogLevels("upstream:debug,connection:trace");
   const std::vector<std::pair<std::string, spdlog::level::level_enum>>& component_log_levels =
       options->componentLogLevels();
   EXPECT_EQ(2, component_log_levels.size());
@@ -246,32 +237,32 @@ TEST_F(OptionsImplTest, ParseComponentLogLevels) {
 
 TEST_F(OptionsImplTest, ParseComponentLogLevelsWithBlank) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
-  parseComponentLogLevels(options, "");
+  options->parseComponentLogLevels("");
   EXPECT_EQ(0, options->componentLogLevels().size());
 }
 
 TEST_F(OptionsImplTest, InvalidComponent) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
-  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "blah:debug"), MalformedArgvException,
+  EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("blah:debug"), MalformedArgvException,
                           "error: invalid component specified 'blah'");
 }
 
 TEST_F(OptionsImplTest, InvalidLogLevel) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
-  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "upstream:blah,connection:trace"),
+  EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream:blah,connection:trace"),
                           MalformedArgvException, "error: invalid log level specified 'blah'");
 }
 
 TEST_F(OptionsImplTest, InvalidComponentLogLevelStructure) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
-  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "upstream:foo:bar"),
+  EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream:foo:bar"),
                           MalformedArgvException,
                           "error: component log level not correctly specified 'upstream:foo:bar'");
 }
 
 TEST_F(OptionsImplTest, IncompleteComponentLogLevel) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
-  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "upstream"), MalformedArgvException,
+  EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream"), MalformedArgvException,
                           "component log level not correctly specified 'upstream'");
 }
 
