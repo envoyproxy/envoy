@@ -18,10 +18,8 @@ TEST(ValidationAsyncClientTest, MockedMethods) {
 
   DangerousDeprecatedTestTime test_time;
   ValidationAsyncClient client(test_time.timeSystem());
-  EXPECT_EQ(nullptr, client.send(std::move(message), callbacks,
-                                 absl::optional<std::chrono::milliseconds>()));
-  EXPECT_EQ(nullptr,
-            client.start(stream_callbacks, absl::optional<std::chrono::milliseconds>(), false));
+  EXPECT_EQ(nullptr, client.send(std::move(message), callbacks, AsyncClient::RequestOptions()));
+  EXPECT_EQ(nullptr, client.start(stream_callbacks, AsyncClient::StreamOptions()));
 }
 
 } // namespace Http

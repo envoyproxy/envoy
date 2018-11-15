@@ -343,13 +343,14 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(
-      bootstrap_path, version_, pre_worker_start_test_steps_, deterministic_, *time_system_);
+      bootstrap_path, version_, pre_worker_start_test_steps_, deterministic_, *time_system_, *api_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0) {
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.
     test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
     registerTestServerPorts(port_names);
   }
+  api_ = std::make_unique<Api::Impl>(test_server_->server_.stats());
 }
 
 void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
@@ -397,9 +398,10 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
 IntegrationTestServerPtr
 BaseIntegrationTest::createIntegrationTestServer(const std::string& bootstrap_path,
                                                  std::function<void()> pre_worker_start_test_steps,
-                                                 Event::TestTimeSystem& time_system) {
+                                                 Event::TestTimeSystem& time_system,
+                                                 Api::Api& api) {
   return IntegrationTestServer::create(bootstrap_path, version_, pre_worker_start_test_steps,
-                                       deterministic_, time_system);
+                                       deterministic_, time_system, *api);
 }
 
 } // namespace Envoy

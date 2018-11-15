@@ -1,4 +1,6 @@
+#include "common/api/api_impl.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/isolated_store_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -115,6 +117,8 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
 
+  Stats::IsolatedStoreImpl stat_store;
+  Api::Impl api(stat_store);
   DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl main_dispatcher(test_time.timeSystem());
   Event::DispatcherImpl thread_dispatcher(test_time.timeSystem());
@@ -127,13 +131,13 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   // Verify we have the expected dispatcher for the main thread.
   EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
 
-  Thread::Thread([&thread_dispatcher, &tls]() {
+  Thread::ThreadPtr thread = api.createThread([&thread_dispatcher, &tls]() {
     // Ensure that the dispatcher update in tls posted during the above registerThread happens.
     thread_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
     // Verify we have the expected dispatcher for the new thread thread.
     EXPECT_EQ(&thread_dispatcher, &tls.dispatcher());
-  })
-      .join();
+  });
+  thread->join();
 
   // Verify we still have the expected dispatcher for the main thread.
   EXPECT_EQ(&main_dispatcher, &tls.dispatcher());

@@ -13,7 +13,7 @@ namespace Api {
 
 class ApiImplTest : public testing::Test {
 protected:
-  ApiImplTest() : api_(std::chrono::milliseconds(10000), store_) {}
+  ApiImplTest() : api_(store_, std::chrono::milliseconds(10000)) {}
 
   Stats::IsolatedStoreImpl store_;
   Impl api_;

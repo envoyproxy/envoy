@@ -14,13 +14,13 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/thread/thread.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
 #include "common/common/stack_array.h"
-#include "common/common/thread.h"
 
 #include "absl/strings/match.h"
 
@@ -94,28 +94,30 @@ bool illegalPath(const std::string& path) {
   }
 }
 
-Instance::Instance(std::chrono::milliseconds file_flush_interval_msec, Stats::Store& stats_store)
+Instance::Instance(std::chrono::milliseconds file_flush_interval_msec, Stats::Store& stats_store,
+                   Api::Api& api)
     : file_flush_interval_msec_(file_flush_interval_msec),
       file_stats_{FILESYSTEM_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
-                                   POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {}
+                                   POOL_GAUGE_PREFIX(stats_store, "filesystem."))},
+      api_(api) {}
 
 FileSharedPtr Instance::createFile(const std::string& path, Event::Dispatcher& dispatcher,
                                    Thread::BasicLockable& lock,
                                    std::chrono::milliseconds file_flush_interval_msec) {
   return std::make_shared<Filesystem::FileImpl>(path, dispatcher, lock, file_stats_,
-                                                file_flush_interval_msec);
+                                                file_flush_interval_msec, api_);
 };
 
 FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
                    Thread::BasicLockable& lock, FileSystemStats& stats,
-                   std::chrono::milliseconds flush_interval_msec)
+                   std::chrono::milliseconds flush_interval_msec, Api::Api& api)
     : path_(path), file_lock_(lock), flush_timer_(dispatcher.createTimer([this]() -> void {
         stats_.flushed_by_timer_.inc();
         flush_event_.notifyOne();
         flush_timer_->enableTimer(flush_interval_msec_);
       })),
-      os_sys_calls_(Api::OsSysCallsSingleton::get()), flush_interval_msec_(flush_interval_msec),
-      stats_(stats) {
+      os_sys_calls_(Api::OsSysCallsSingleton::get()), api_(api),
+      flush_interval_msec_(flush_interval_msec), stats_(stats) {
   open();
 }
 
@@ -260,7 +262,7 @@ void FileImpl::write(absl::string_view data) {
 }
 
 void FileImpl::createFlushStructures() {
-  flush_thread_ = std::make_unique<Thread::Thread>([this]() -> void { flushThreadFunc(); });
+  flush_thread_ = api_.createThread([this]() -> void { flushThreadFunc(); });
   flush_timer_->enableTimer(flush_interval_msec_);
 }
 

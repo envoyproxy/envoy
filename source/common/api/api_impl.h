@@ -17,7 +17,8 @@ namespace Api {
  */
 class Impl : public Api::Api {
 public:
-  Impl(std::chrono::milliseconds file_flush_interval_msec, Stats::Store& stats_store);
+  Impl(Stats::Store& stats_store,
+       std::chrono::milliseconds file_flush_interval_msec = std::chrono::milliseconds(1000));
 
   // Api::Api
   Event::DispatcherPtr allocateDispatcher(Event::TimeSystem& time_system) override;
@@ -25,6 +26,9 @@ public:
                                        Thread::BasicLockable& lock) override;
   bool fileExists(const std::string& path) override;
   std::string fileReadToEnd(const std::string& path) override;
+  Thread::ThreadPtr createThread(std::function<void()> thread_routine) override;
+
+  Filesystem::Instance& fileSystem() { return file_system_; }
 
 private:
   Filesystem::Instance file_system_;

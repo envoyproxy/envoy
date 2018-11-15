@@ -1,6 +1,7 @@
 #include <chrono>
 #include <string>
 
+#include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
@@ -30,10 +31,12 @@ namespace Envoy {
 
 class FileSystemImplTest : public testing::Test {
 protected:
-  FileSystemImplTest() : file_system_(std::chrono::milliseconds(10000), stats_store_) {}
+  FileSystemImplTest()
+      : api_(stats_store_, std::chrono::milliseconds(10000)), file_system_(api_.fileSystem()) {}
 
   const std::chrono::milliseconds timeout_40ms_{40};
   Stats::IsolatedStoreImpl stats_store_;
+  Api::Impl api_;
   Filesystem::Instance file_system_;
 };
 
@@ -44,18 +47,18 @@ TEST_F(FileSystemImplTest, BadFile) {
   EXPECT_THROW(file_system_.createFile("", dispatcher, lock), EnvoyException);
 }
 
-TEST(FileSystemImpl, fileExists) {
+TEST_F(FileSystemImplTest, fileExists) {
   EXPECT_TRUE(Filesystem::fileExists("/dev/null"));
   EXPECT_FALSE(Filesystem::fileExists("/dev/blahblahblah"));
 }
 
-TEST(FileSystemImpl, directoryExists) {
+TEST_F(FileSystemImplTest, directoryExists) {
   EXPECT_TRUE(Filesystem::directoryExists("/dev"));
   EXPECT_FALSE(Filesystem::directoryExists("/dev/null"));
   EXPECT_FALSE(Filesystem::directoryExists("/dev/blahblah"));
 }
 
-TEST(FileSystemImpl, fileSize) {
+TEST_F(FileSystemImplTest, fileSize) {
   EXPECT_EQ(0, Filesystem::fileSize("/dev/null"));
   EXPECT_EQ(-1, Filesystem::fileSize("/dev/blahblahblah"));
   const std::string data = "test string\ntest";
@@ -63,7 +66,7 @@ TEST(FileSystemImpl, fileSize) {
   EXPECT_EQ(data.length(), Filesystem::fileSize(file_path));
 }
 
-TEST(FileSystemImpl, fileReadToEndSuccess) {
+TEST_F(FileSystemImplTest, fileReadToEndSuccess) {
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
 
@@ -72,7 +75,7 @@ TEST(FileSystemImpl, fileReadToEndSuccess) {
 
 // Files are read into std::string; verify that all bytes (eg non-ascii characters) come back
 // unmodified
-TEST(FileSystemImpl, fileReadToEndSuccessBinary) {
+TEST_F(FileSystemImplTest, fileReadToEndSuccessBinary) {
   std::string data;
   for (unsigned i = 0; i < 256; i++) {
     data.push_back(i);
@@ -87,20 +90,22 @@ TEST(FileSystemImpl, fileReadToEndSuccessBinary) {
   }
 }
 
-TEST(FileSystemImpl, fileReadToEndDoesNotExist) {
+TEST_F(FileSystemImplTest, fileReadToEndDoesNotExist) {
   unlink(TestEnvironment::temporaryPath("envoy_this_not_exist").c_str());
   EXPECT_THROW(Filesystem::fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist")),
                EnvoyException);
 }
 
-TEST(FilesystemImpl, CanonicalPathSuccess) { EXPECT_EQ("/", Filesystem::canonicalPath("//")); }
+TEST_F(FileSystemImplTest, CanonicalPathSuccess) {
+  EXPECT_EQ("/", Filesystem::canonicalPath("//"));
+}
 
-TEST(FilesystemImpl, CanonicalPathFail) {
+TEST_F(FileSystemImplTest, CanonicalPathFail) {
   EXPECT_THROW_WITH_MESSAGE(Filesystem::canonicalPath("/_some_non_existent_file"), EnvoyException,
                             "Unable to determine canonical path for /_some_non_existent_file");
 }
 
-TEST(FilesystemImpl, IllegalPath) {
+TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_FALSE(Filesystem::illegalPath("/"));
   EXPECT_TRUE(Filesystem::illegalPath("/dev"));
   EXPECT_TRUE(Filesystem::illegalPath("/dev/"));

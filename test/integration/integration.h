@@ -183,6 +183,7 @@ public:
 
   Event::TestTimeSystem& timeSystem() { return *time_system_; }
 
+  Api::ApiPtr api_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
 private:
   TestTimeSystemPtr time_system_;

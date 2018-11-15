@@ -365,12 +365,12 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
                            Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type,
                            Event::TestTimeSystem& time_system, bool enable_half_close)
     : http_type_(type), socket_(std::move(listen_socket)),
-      api_(new Api::Impl(milliseconds(10000), stats_store_)), time_system_(time_system),
+      api_(new Api::Impl(stats_store_, milliseconds(10000))), time_system_(time_system),
       dispatcher_(api_->allocateDispatcher(time_system_)),
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close), listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
-  thread_ = std::make_unique<Thread::Thread>([this]() -> void { threadRoutine(); });
+  thread_ = api_->createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
 }
 
