@@ -35,6 +35,9 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, hotRestartDisabled()).WillByDefault(ReturnPointee(&hot_restart_disabled_));
   ON_CALL(*this, signalHandlingEnabled()).WillByDefault(ReturnPointee(&signal_handling_enabled_));
   ON_CALL(*this, mutexTracingEnabled()).WillByDefault(ReturnPointee(&mutex_tracing_enabled_));
+  ON_CALL(*this, toCommandLineOptions()).WillByDefault(Invoke([] {
+    return std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
+  }));
 }
 MockOptions::~MockOptions() {}
 

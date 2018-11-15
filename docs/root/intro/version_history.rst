@@ -7,6 +7,7 @@ Version history
 * access log: added dynamic metadata to access log messages streamed over gRPC.
 * admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * admin: :http:get:`/server_info` now responds with a JSON object instead of a single string.
+* admin: added support for displaying command line options in :http:get:`/server_info` end point.
 * circuit-breaker: added cx_open, rq_pending_open, rq_open and rq_retry_open gauges to expose live
   state via :ref:`circuit breakers statistics <config_cluster_manager_cluster_stats_circuit_breakers>`.
 * cluster: set a default of 1s for :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>`.
