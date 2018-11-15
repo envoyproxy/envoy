@@ -29,7 +29,10 @@ protected:
   // all the load balancers have equivalent functonality for failover host sets.
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
-  LoadBalancerTestBase() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
+  LoadBalancerTestBase() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
+    least_request_lb_config_.mutable_choice_count()->set_value(2);
+  }
+
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -39,6 +42,7 @@ protected:
   MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
+  envoy::api::v2::Cluster::LeastRequestLbConfig least_request_lb_config_;
 };
 
 class TestLb : public LoadBalancerBase {
@@ -964,7 +968,8 @@ INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, RoundRobinLoadBalancerTest,
 
 class LeastRequestLoadBalancerTest : public LoadBalancerTestBase {
 public:
-  LeastRequestLoadBalancer lb_{priority_set_, nullptr, stats_, runtime_, random_, common_config_};
+  LeastRequestLoadBalancer lb_{
+      priority_set_, nullptr, stats_, runtime_, random_, common_config_, least_request_lb_config_};
 };
 
 TEST_P(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
@@ -1012,8 +1017,6 @@ TEST_P(LeastRequestLoadBalancerTest, Normal) {
   stats_.max_host_weight_.set(1UL);
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 
   hostSet().healthy_hosts_[0]->stats().rq_active_.set(1);
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(2);
@@ -1024,6 +1027,54 @@ TEST_P(LeastRequestLoadBalancerTest, Normal) {
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(1);
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
+}
+
+TEST_P(LeastRequestLoadBalancerTest, PNC) {
+  hostSet().healthy_hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83")};
+  stats_.max_host_weight_.set(1UL);
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+
+  hostSet().healthy_hosts_[0]->stats().rq_active_.set(4);
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[2]->stats().rq_active_.set(2);
+  hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
+
+  // Creating various load balancer objects with different choice configs.
+  envoy::api::v2::Cluster::LeastRequestLbConfig lr_lb_config;
+  lr_lb_config.mutable_choice_count()->set_value(2);
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,      runtime_,
+                                random_,       common_config_, lr_lb_config};
+  lr_lb_config.mutable_choice_count()->set_value(5);
+  LeastRequestLoadBalancer lb_5{priority_set_, nullptr,        stats_,      runtime_,
+                                random_,       common_config_, lr_lb_config};
+
+  // Verify correct number of choices.
+
+  // 0 choices configured should default to P2C.
+  EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+
+  // 2 choices configured results in P2C.
+  EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+
+  // 5 choices configured results in P5C.
+  EXPECT_CALL(random_, random()).Times(6).WillRepeatedly(Return(0));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_5.chooseHost(nullptr));
+
+  // Verify correct host chosen in P5C scenario.
+  EXPECT_CALL(random_, random())
+      .Times(6)
+      .WillOnce(Return(0))
+      .WillOnce(Return(3))
+      .WillOnce(Return(0))
+      .WillOnce(Return(3))
+      .WillOnce(Return(2))
+      .WillOnce(Return(1));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_5.chooseHost(nullptr));
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
