@@ -762,12 +762,12 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
 
 void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* filter,
                                                      Buffer::Instance& data, bool end_stream) {
+  resetIdleTimer();
+
   // If we previously decided to decode only the headers, do nothing here.
   if (decoding_headers_only_) {
     return;
   }
-
-  resetIdleTimer();
 
   // If a response is complete or a reset has been sent, filters do not care about further body
   // data. Just drop it.
@@ -1016,7 +1016,17 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
-    if (!(*entry)->commonHandleAfterHeadersCallback(status, encoding_headers_only_)) {
+
+    const auto continue_iteration =
+        (*entry)->commonHandleAfterHeadersCallback(status, encoding_headers_only_);
+
+    // If we're encoding a headers only response, then mark the local as complete. This ensures
+    // that we don't attempt to reset the downstream request in doEndStream.
+    if (encoding_headers_only_) {
+      state_.local_complete_ = true;
+    }
+
+    if (!continue_iteration) {
       return;
     }
 
@@ -1025,12 +1035,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     if (end_stream && buffered_response_data_ && continue_data_entry == encoder_filters_.end()) {
       continue_data_entry = entry;
     }
-  }
-
-  // If we're encoding a headers only response, then mark the local as complete. This ensures
-  // that we don't attempt to reset the downstream request in doEndStream.
-  if (encoding_headers_only_) {
-    state_.local_complete_ = true;
   }
 
   // Base headers.
