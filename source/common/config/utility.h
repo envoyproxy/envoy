@@ -4,6 +4,7 @@
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/grpc_mux.h"
+#include "envoy/config/incremental_subscription.h"
 #include "envoy/config/subscription.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
@@ -228,6 +229,26 @@ public:
    */
   static SubscriptionStats generateStats(Stats::Scope& scope) {
     return {ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
+  }
+
+  /**
+   * Generate an IncrementalSubscriptionStats object from stats scope.
+   * @param scope for stats.
+   * @return SubscriptionStats for scope.
+   */
+  static IncrementalSubscriptionStats generateIncrementalStats(Stats::Scope& scope) {
+    return {ALL_INCREMENTAL_SUBSCRIPTION_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
+  }
+
+  /**
+   * Generate a SubscriptionStats object from stats scope.
+   * @param scope for stats.
+   * @return SubscriptionStats for scope.
+   */
+  static ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
+    const std::string control_plane_prefix = "control_plane.";
+    return {ALL_CONTROL_PLANE_STATS(POOL_COUNTER_PREFIX(scope, control_plane_prefix),
+                                    POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
   }
 
   /**

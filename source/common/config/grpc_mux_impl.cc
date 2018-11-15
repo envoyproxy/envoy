@@ -16,7 +16,7 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
                          const RateLimitSettings& rate_limit_settings)
     : local_info_(local_info), async_client_(std::move(async_client)),
       service_method_(service_method), random_(random), time_source_(dispatcher.timeSystem()),
-      control_plane_stats_(generateControlPlaneStats(scope)),
+      control_plane_stats_(Utility::generateControlPlaneStats(scope)),
       rate_limiting_enabled_(rate_limit_settings.enabled_) {
   Config::Utility::checkLocalInfo("ads", local_info);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });

@@ -31,6 +31,7 @@
 #include "common/router/shadow_writer_impl.h"
 #include "common/tcp/conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
+#include "common/upstream/cds_incremental.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/original_dst_cluster.h"
@@ -279,7 +280,10 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
     return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_name);
   });
 
-  // We can now potentially create the CDS API once the backing cluster exists.
+  // TODO TODO create incremental here...... maybe distinguish from vanilla by checking the
+  // api_config_source field of cds_config? in turn, grpc_services, and then i'm guessing
+  // target_specifier.(need to check both i guess: cluster_name for EnvoyGrpc, and target_uri for
+  // GoogleGrpc). We can now potentially create the CDS API once the backing cluster exists.
   if (bootstrap.dynamic_resources().has_cds_config()) {
     cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), eds_config_, *this);
     init_helper_.setCds(cds_api_.get());
@@ -1208,8 +1212,11 @@ ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
 CdsApiPtr ProdClusterManagerFactory::createCds(
     const envoy::api::v2::core::ConfigSource& cds_config,
     const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm) {
-  return CdsApiImpl::create(cds_config, eds_config, cm, main_thread_dispatcher_, random_,
-                            local_info_, stats_);
+  // TODO intelligently choose one or the other
+  return CdsIncremental::create(cds_config, eds_config, cm, main_thread_dispatcher_, random_,
+                                local_info_, stats_);
+  //  return CdsApiImpl::create(cds_config, eds_config, cm, main_thread_dispatcher_, random_,
+  //                            local_info_, stats_);
 }
 
 } // namespace Upstream

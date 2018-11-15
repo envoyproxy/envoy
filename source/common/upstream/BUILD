@@ -29,6 +29,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cds_incremental_lib",
+    srcs = ["cds_incremental.cc"],
+    hdrs = ["cds_incremental.h"],
+    deps = [
+        "//include/envoy/config:incremental_subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//source/common/common:cleanup_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:incremental_subscription_factory_lib",
+        "//source/common/config:resources_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2:cds_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "cds_subscription_lib",
     srcs = ["cds_subscription.cc"],
     hdrs = ["cds_subscription.h"],
@@ -55,6 +73,7 @@ envoy_cc_library(
     hdrs = ["cluster_manager_impl.h"],
     deps = [
         ":cds_api_lib",
+        ":cds_incremental_lib",
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
         ":ring_hash_lb_lib",

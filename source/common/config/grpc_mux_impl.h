@@ -56,11 +56,6 @@ private:
   void handleFailure();
   void queueDiscoveryRequest(const std::string& type_url);
   void drainRequests();
-  ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
-    const std::string control_plane_prefix = "control_plane.";
-    return {ALL_CONTROL_PLANE_STATS(POOL_COUNTER_PREFIX(scope, control_plane_prefix),
-                                    POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
-  }
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const std::vector<std::string>& resources, GrpcMuxCallbacks& callbacks,

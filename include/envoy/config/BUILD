@@ -18,6 +18,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "incremental_subscription_interface",
+    hdrs = ["incremental_subscription.h"],
+    deps = [
+        "//include/envoy/stats:stats_macros",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "subscription_interface",
     hdrs = ["subscription.h"],
     deps = [
