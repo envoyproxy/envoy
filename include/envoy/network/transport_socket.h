@@ -150,7 +150,7 @@ public:
    *         SSL, regardless of the upstream cluster configuration. The filters like tcp_proxy
    *         should override the server name in the upstream cluster configuration with that value.
    */
-  virtual const absl::optional<std::string>& overrideServerName() const PURE;
+  virtual const absl::optional<std::string>& serverNameOverride() const PURE;
 
   /**
    * @param vector of bytes to which the option should append hash key data that will be used

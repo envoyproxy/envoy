@@ -1188,8 +1188,8 @@ TEST_F(TcpProxyRoutingTest, UpstreamServerName) {
                            -> Tcp::ConnectionPool::Instance* {
         EXPECT_EQ(cluster, "fake_cluster");
         EXPECT_NE(transport_socket_options, nullptr);
-        EXPECT_TRUE(transport_socket_options->overrideServerName().has_value());
-        EXPECT_EQ(transport_socket_options->overrideServerName().value(), "www.example.com");
+        EXPECT_TRUE(transport_socket_options->serverNameOverride().has_value());
+        EXPECT_EQ(transport_socket_options->serverNameOverride().value(), "www.example.com");
         return nullptr;
       }));
 

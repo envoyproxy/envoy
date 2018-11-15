@@ -215,8 +215,8 @@ const std::string testUtilV2(
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         std::string sni = transport_socket_options != NULL &&
-                                  transport_socket_options->overrideServerName().has_value()
-                              ? transport_socket_options->overrideServerName().value()
+                                  transport_socket_options->serverNameOverride().has_value()
+                              ? transport_socket_options->serverNameOverride().value()
                               : client_ctx_proto.sni();
         socket->setRequestedServerName(sni);
         Network::ConnectionPtr new_connection = dispatcher.createServerConnection(

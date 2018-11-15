@@ -10,7 +10,7 @@ public:
   TransportSocketOptionsImpl(std::string override_server_name = "");
 
   // Network::TransportSocketOptions
-  const absl::optional<std::string>& overrideServerName() const override {
+  const absl::optional<std::string>& serverNameOverride() const override {
     return override_server_name_;
   }
   void hashKey(std::vector<uint8_t>& key) const override;
