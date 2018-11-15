@@ -22,20 +22,21 @@ export CC=$CLANG_TOOLCHAIN/bin/clang; export CXX=$CLANG_TOOLCHAIN/bin/clang++
 
 if [ ! -x "$CC" ]; then
   echo Set CLANG_TOOLCHAIN to the directory above bin/clang.
-  exit 
+  exit 1
 fi
 
 # Find the top level of this git client, or die trying.
 while [ ! -e .git ]; do
   if [ "$PWD" = "/" ]; then
     echo $0 must be run from inside a git client.
+    exit 1
   fi
   cd ..
 done
 
 # Identify the git client relative to the cache's parent directory, cleaned
 # up a little. For example, assuming the cache prefix "/home/user/.cache."
-# and the git directory is "/home/user/git2", we'll make the cache
+# and the git directory is "/home/user/git2/envoy", we'll make the cache
 # prefix be: "/home/user/.cache.git2.
 cache_directory="$HOME"
 dir_above_this=$(realpath "$PWD/..")
@@ -89,7 +90,7 @@ elif [ "$1" == "-optdebug" ]; then
 elif [ "$1" == "-stacktrace" ]; then
   # Note: we compile for debug here, but with clang rather than g++, so
   # we don't share a cache.
-  args="$args --compilation_mode=dbg $args  \
+  args="$args --compilation_mode=dbg $args \
         --run_under=`pwd`/tools/stack_decode.py \
         --strategy=TestRunner=standalone --test_output=all"
   mode="stacktrace"
