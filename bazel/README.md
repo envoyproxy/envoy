@@ -417,5 +417,55 @@ a [JSON Compilation Database](https://clang.llvm.org/docs/JSONCompilationDatabas
 with any tools (e.g. clang-tidy) compatible with the format.
 
 The compilation database could also be used to setup editors with cross reference, code completion.
-For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or 
+For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
 [cquery](https://github.com/cquery-project/cquery) with supported editors.
+
+# Advanced caching setup
+
+Below is the advanced caching setup, it will make bazel cache works efficiently when you run
+different compilation mode and/or have multiple working tree.
+
+## Setup local HTTP cache
+
+```
+go run github.com/buchgr/bazel-remote --dir ${HOME}/bazel_cache --host 127.0.0.1 --port 28080 --max_size 64
+```
+
+See [bazel remote cache](github.com/buchgr/bazel-remote) for more information on the parameters.
+The command above will setup a maximum 64 GiB cache at `~/bazel_cache` on port 28080. You might
+want to setup a larger cache if you run ASAN builds.
+
+NOTE: Using docker to run remote cache server described in remote cache docs will likely have
+slower cache performance on macOS due to slow Docker for Mac disk performance.
+
+## Setup common `envoy_deps`
+
+This step setup common `envoy_deps` allowing HTTP cache works across working tree in different
+paths. Also it allow new working trees to skip dependency compilation. The drawback is that the
+cached dependencies won't be updated automatically, so make sure all your working tree have
+same (or compatible) dependencies, and run this step periodically to update them.
+
+Make sure you don't have `--override_repository` in your `.bazelrc` when you run this step.
+
+```
+bazel fetch //test/...
+cp -LR $(bazel info output_base)/external/envoy_deps_cache
+```
+
+## Run bazel using caches
+
+Adding following parameter to bazel everytime or persist them in `.bazelrc`, note you will need to expand
+the env vars for `.bazelrc`.
+
+```
+--remote_http_cache=http://127.0.0.1:28080/
+--override_repository=envoy_deps=${HOME}/envoy_deps_cache
+```
+
+You might need following parameters as well to make cache more efficient. This will let Bazel use
+an environment with a static value for PATH and does not inherit LD_LIBRARY_PATH or TMPDIR. You
+can ovverride those environment variables with `--action_env=ENV_VARIABLE`.
+
+```
+--experimental_strict_action_env
+```
