@@ -1029,14 +1029,14 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     lb_ = std::make_unique<SubsetLoadBalancer>(
         cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
         parent.parent_.runtime_, parent.parent_.random_, cluster->lbSubsetInfo(),
-        cluster->lbRingHashConfig(), cluster->lbConfig());
+        cluster->lbRingHashConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig());
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
       ASSERT(lb_factory_ == nullptr);
-      lb_ = std::make_unique<LeastRequestLoadBalancer>(priority_set_, parent_.local_priority_set_,
-                                                       cluster->stats(), parent.parent_.runtime_,
-                                                       parent.parent_.random_, cluster->lbConfig());
+      lb_ = std::make_unique<LeastRequestLoadBalancer>(
+          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
+          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig());
       break;
     }
     case LoadBalancerType::Random: {
