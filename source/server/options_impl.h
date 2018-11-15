@@ -108,11 +108,11 @@ public:
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
   virtual Server::CommandLineOptionsPtr toCommandLineOptions() const override;
+  void parseComponentLogLevels(const std::string& component_log_levels);
+  uint32_t count() const;
 
 private:
-  void parseComponentLogLevels(const std::string& component_log_levels);
   void logError(const std::string& error) const;
-  uint32_t count() const;
 
   uint64_t base_id_;
   uint32_t concurrency_;
@@ -141,8 +141,6 @@ private:
   bool signal_handling_enabled_;
   bool mutex_tracing_enabled_;
   uint32_t count_;
-
-  friend class OptionsImplTest;
 };
 
 /**
