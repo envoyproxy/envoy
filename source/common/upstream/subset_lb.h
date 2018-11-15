@@ -39,12 +39,16 @@ private:
   // Represents a subset of an original HostSet.
   class HostSubsetImpl : public HostSetImpl {
   public:
-    HostSubsetImpl(const HostSet& original_host_set, bool locality_weight_aware)
+    HostSubsetImpl(const HostSet& original_host_set, bool locality_weight_aware,
+                   bool scale_locality_weight)
         : HostSetImpl(original_host_set.priority(), original_host_set.overprovisioning_factor()),
-          original_host_set_(original_host_set), locality_weight_aware_(locality_weight_aware) {}
+          original_host_set_(original_host_set), locality_weight_aware_(locality_weight_aware),
+          scale_locality_weight_(scale_locality_weight) {}
 
     void update(const HostVector& hosts_added, const HostVector& hosts_removed,
                 HostPredicate predicate);
+    LocalityWeightsConstSharedPtr
+    determineLocalityWeights(const HostsPerLocality& hosts_per_locality) const;
 
     void triggerCallbacks() { HostSetImpl::runUpdateCallbacks({}, {}); }
     bool empty() { return hosts().empty(); }
@@ -52,13 +56,14 @@ private:
   private:
     const HostSet& original_host_set_;
     const bool locality_weight_aware_;
+    const bool scale_locality_weight_;
   };
 
   // Represents a subset of an original PrioritySet.
   class PrioritySubsetImpl : public PrioritySetImpl {
   public:
     PrioritySubsetImpl(const SubsetLoadBalancer& subset_lb, HostPredicate predicate,
-                       bool locality_weight_aware);
+                       bool locality_weight_aware, bool scale_locality_weight);
 
     void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
 
@@ -87,6 +92,7 @@ private:
     const PrioritySet& original_priority_set_;
     const HostPredicate predicate_;
     const bool locality_weight_aware_;
+    const bool scale_locality_weight_;
     bool empty_ = true;
   };
 
@@ -164,6 +170,7 @@ private:
   LbSubsetMap subsets_;
 
   const bool locality_weight_aware_;
+  const bool scale_locality_weight_;
 
   friend class SubsetLoadBalancerDescribeMetadataTester;
 };

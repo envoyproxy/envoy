@@ -52,6 +52,12 @@ public:
    * @return bool whether routing to subsets should take locality weights into account.
    */
   virtual bool localityWeightAware() const PURE;
+
+  /*
+   * @return bool whether the locality weights should be scaled according to how many
+   * hosts were removed from the original host set.
+   */
+  virtual bool scaleLocalityWeight() const PURE;
 };
 
 } // namespace Upstream
