@@ -58,7 +58,7 @@ private:
   Http::HeaderMapPtr continue_headers_;
   Http::HeaderMapPtr headers_;
   Http::HeaderMapPtr trailers_;
-  Http::MetadataMapPtr metadata_map_;
+  Http::MetadataMapPtr metadata_map_{new Http::MetadataMap()};
   bool waiting_for_end_stream_{};
   bool saw_end_stream_{};
   std::string body_;

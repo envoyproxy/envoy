@@ -178,6 +178,8 @@ protected:
   void testHittingDecoderFilterLimit();
   void testHittingEncoderFilterLimit();
   void testEnvoyProxyMetadataInResponse();
+  void testEnvoyProxyMultipleMetadata();
+  void testEnvoyProxyInvalidMetadata();
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
                                     const std::string& via = "");
   void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,
@@ -199,6 +201,10 @@ protected:
   Http::StreamEncoder* request_encoder_{nullptr};
   // The response headers sent by sendRequestAndWaitForResponse() by default.
   Http::TestHeaderMapImpl default_response_headers_{{":status", "200"}};
+  Http::TestHeaderMapImpl default_request_headers_{{":method", "GET"},
+                                                   {":path", "/test/long/url"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "host"}};
   // The codec type for the client-to-Envoy connection
   Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
 };

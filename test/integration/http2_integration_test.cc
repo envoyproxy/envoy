@@ -99,6 +99,14 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   testEnvoyProxyMetadataInResponse();
 }
 
+TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) {
+  testEnvoyProxyMultipleMetadata();
+}
+
+TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) {
+  testEnvoyProxyInvalidMetadata();
+}
+
 TEST_P(Http2IntegrationTest, EnvoyHandlingDuplicate100Continue) {
   testEnvoyHandling100Continue(true);
 }
