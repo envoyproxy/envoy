@@ -27,7 +27,7 @@ Version history
   value to override the default HTTP to gRPC status mapping.
 * load balancer: added a `configuration <envoy_api_msg_Cluster.LeastRequestLbConfig>` option to specify the number of choices made in P2C.
 * http: no longer close the TCP connection when a HTTP/1 request is retried due
-  to a 5xx/499 response with empty body.
+  to a response with empty body.
 * network: removed the reference to `FilterState` in `Connection` in favor of `StreamInfo`.
 * logging: added missing [ in log prefix.
 * rate-limit: added :ref:`configuration <envoy_api_field_config.filter.http.rate_limit.v2.RateLimit.rate_limited_as_resource_exhausted>`
