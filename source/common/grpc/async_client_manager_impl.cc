@@ -38,6 +38,8 @@ AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
   google_tls_slot_ = tls.allocateSlot();
   google_tls_slot_->set(
       [&api](Event::Dispatcher&) { return std::make_shared<GoogleAsyncClientThreadLocal>(api); });
+#else
+  UNREFERENCED_PARAMETER(api);
 #endif
 }
 
