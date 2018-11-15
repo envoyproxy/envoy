@@ -1151,7 +1151,18 @@ void HttpIntegrationTest::testEnvoyProxyMultipleMetadata() {
   waitForNextUpstreamRequest();
 
   // Sends metadata before response header.
-  std::vector<Http::MetadataMap> metadata_map_vector = {{{"0", "000"},}, {{"1", "111"},}, {{"2", "222"},}, {{"3", "333"},}};
+  std::vector<Http::MetadataMap> metadata_map_vector = {{
+                                                            {"0", "000"},
+                                                        },
+                                                        {
+                                                            {"1", "111"},
+                                                        },
+                                                        {
+                                                            {"2", "222"},
+                                                        },
+                                                        {
+                                                            {"3", "333"},
+                                                        }};
   upstream_request_->encodeMetadata(metadata_map_vector[0]);
   upstream_request_->encodeMetadata(metadata_map_vector[1]);
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -1246,7 +1257,6 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
     EXPECT_STREQ(via.c_str(), response->headers().Via()->value().c_str());
   }
 }
-
 
 void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upstream_complete,
                                                        bool with_encoder_filter) {
