@@ -124,6 +124,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   cmd.setExceptionHandling(false);
   try {
     cmd.parse(argc, argv);
+    count_ = cmd.getArgList().size();
   } catch (TCLAP::ArgException& e) {
     try {
       cmd.getOutput()->failure(cmd, e);
@@ -196,7 +197,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   concurrency_ = std::max(1U, concurrency.getValue());
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
-  if (allow_unknown_fields.getValue()) {
+  allow_unknown_fields_ = allow_unknown_fields.getValue();
+  if (allow_unknown_fields_) {
     MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Allow;
   }
   admin_address_path_ = admin_address_path.getValue();
@@ -222,6 +224,7 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
   if (component_log_levels.empty()) {
     return;
   }
+  component_log_level_str_ = component_log_levels;
   std::vector<std::string> log_levels = absl::StrSplit(component_log_levels, ',');
   for (auto& level : log_levels) {
     std::vector<std::string> log_name_level = absl::StrSplit(level, ':');
@@ -249,9 +252,55 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
   }
 }
 
+uint32_t OptionsImpl::count() const { return count_; }
+
 void OptionsImpl::logError(const std::string& error) const {
   std::cerr << error << std::endl;
   throw MalformedArgvException(error);
+}
+
+Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
+  Server::CommandLineOptionsPtr command_line_options =
+      std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
+  command_line_options->set_base_id(baseId());
+  command_line_options->set_concurrency(concurrency());
+  command_line_options->set_config_path(configPath());
+  command_line_options->set_config_yaml(configYaml());
+  command_line_options->set_allow_unknown_fields(allow_unknown_fields_);
+  command_line_options->set_admin_address_path(adminAddressPath());
+  command_line_options->set_component_log_level(component_log_level_str_);
+  command_line_options->set_log_level(spdlog::level::to_c_str(logLevel()));
+  command_line_options->set_log_format(logFormat());
+  command_line_options->set_log_path(logPath());
+  command_line_options->set_service_cluster(serviceClusterName());
+  command_line_options->set_service_node(serviceNodeName());
+  command_line_options->set_service_zone(serviceZone());
+  if (mode() == Server::Mode::Serve) {
+    command_line_options->set_mode(envoy::admin::v2alpha::CommandLineOptions::Serve);
+  } else if (mode() == Server::Mode::Validate) {
+    command_line_options->set_mode(envoy::admin::v2alpha::CommandLineOptions::Validate);
+  } else {
+    command_line_options->set_mode(envoy::admin::v2alpha::CommandLineOptions::InitOnly);
+  }
+  if (localAddressIpVersion() == Network::Address::IpVersion::v4) {
+    command_line_options->set_local_address_ip_version(
+        envoy::admin::v2alpha::CommandLineOptions::v4);
+  } else {
+    command_line_options->set_local_address_ip_version(
+        envoy::admin::v2alpha::CommandLineOptions::v6);
+  }
+  command_line_options->mutable_file_flush_interval()->MergeFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(fileFlushIntervalMsec().count()));
+  command_line_options->mutable_parent_shutdown_time()->MergeFrom(
+      Protobuf::util::TimeUtil::SecondsToDuration(parentShutdownTime().count()));
+  command_line_options->mutable_drain_time()->MergeFrom(
+      Protobuf::util::TimeUtil::SecondsToDuration(drainTime().count()));
+  command_line_options->set_max_stats(maxStats());
+  command_line_options->set_max_obj_name_len(statsOptions().maxObjNameLength());
+  command_line_options->set_disable_hot_restart(hotRestartDisabled());
+  command_line_options->set_enable_mutex_tracing(mutexTracingEnabled());
+  command_line_options->set_restart_epoch(restartEpoch());
+  return command_line_options;
 }
 
 OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& service_node,

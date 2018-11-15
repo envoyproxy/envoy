@@ -41,6 +41,8 @@ public:
     options->parseComponentLogLevels(component_log_levels);
     return options->componentLogLevels();
   }
+
+  uint32_t count(const std::unique_ptr<OptionsImpl>& options) { return options->count(); }
 };
 
 TEST_F(OptionsImplTest, HotRestartVersion) {
@@ -150,6 +152,34 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(stats_options.max_stat_suffix_length_, options->statsOptions().maxStatSuffixLength());
   EXPECT_EQ(!hot_restart_disabled, options->hotRestartDisabled());
   EXPECT_EQ(!signal_handling_enabled, options->signalHandlingEnabled());
+
+  // Validate that CommandLineOptions is constructed correctly.
+  Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
+
+  EXPECT_EQ(options->baseId(), command_line_options->base_id());
+  EXPECT_EQ(options->concurrency(), command_line_options->concurrency());
+  EXPECT_EQ(options->configPath(), command_line_options->config_path());
+  EXPECT_EQ(options->configYaml(), command_line_options->config_yaml());
+  EXPECT_EQ(options->adminAddressPath(), command_line_options->admin_address_path());
+  EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::v6,
+            command_line_options->local_address_ip_version());
+  EXPECT_EQ(options->drainTime().count(), command_line_options->drain_time().seconds());
+  EXPECT_EQ(spdlog::level::to_c_str(options->logLevel()), command_line_options->log_level());
+  EXPECT_EQ(options->logFormat(), command_line_options->log_format());
+  EXPECT_EQ(options->logPath(), command_line_options->log_path());
+  EXPECT_EQ(options->parentShutdownTime().count(),
+            command_line_options->parent_shutdown_time().seconds());
+  EXPECT_EQ(options->restartEpoch(), command_line_options->restart_epoch());
+  EXPECT_EQ(options->fileFlushIntervalMsec().count() / 1000,
+            command_line_options->file_flush_interval().seconds());
+  EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::Validate, command_line_options->mode());
+  EXPECT_EQ(options->serviceClusterName(), command_line_options->service_cluster());
+  EXPECT_EQ(options->serviceNodeName(), command_line_options->service_node());
+  EXPECT_EQ(options->serviceZone(), command_line_options->service_zone());
+  EXPECT_EQ(options->maxStats(), command_line_options->max_stats());
+  EXPECT_EQ(options->statsOptions().maxObjNameLength(), command_line_options->max_obj_name_len());
+  EXPECT_EQ(options->hotRestartDisabled(), command_line_options->disable_hot_restart());
+  EXPECT_EQ(options->mutexTracingEnabled(), command_line_options->enable_mutex_tracing());
 }
 
 TEST_F(OptionsImplTest, DefaultParams) {
@@ -160,6 +190,31 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
   EXPECT_EQ(Server::Mode::Serve, options->mode());
   EXPECT_EQ(false, options->hotRestartDisabled());
+
+  // Validate that CommandLineOptions is constructed correctly with default params.
+  Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
+
+  EXPECT_EQ(600, command_line_options->drain_time().seconds());
+  EXPECT_EQ(900, command_line_options->parent_shutdown_time().seconds());
+  EXPECT_EQ("", command_line_options->admin_address_path());
+  EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::v4,
+            command_line_options->local_address_ip_version());
+  EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::Serve, command_line_options->mode());
+  EXPECT_EQ(false, command_line_options->disable_hot_restart());
+}
+
+// Validates that the server_info proto is in sync with the options.
+TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
+  Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
+  // Failure of this condition indicates that the server_info proto is not in sync with the options.
+  // If an option is added/removed, please update server_info proto as well to keep it in sync.
+  // Currently the following 4 options are not defined in proto, hence the count differs by 4.
+  // 1. v2-config-only - being deprecated.
+  // 2. version        - default TCLAP argument.
+  // 3. help           - default TCLAP argument.
+  // 4. ignore_rest    - default TCLAP argument.
+  EXPECT_EQ(count(options) - 4, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, BadCliOption) {

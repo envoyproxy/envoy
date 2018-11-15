@@ -69,8 +69,9 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 
   auto& http_async_client = parent_.cm_.httpAsyncClientForCluster(parent_.remote_cluster_name_);
   dispatcher_ = &http_async_client.dispatcher();
-  stream_ = http_async_client.start(*this, absl::optional<std::chrono::milliseconds>(timeout_),
-                                    buffer_body_for_retry);
+  stream_ = http_async_client.start(
+      *this, Http::AsyncClient::StreamOptions().setTimeout(timeout_).setBufferBodyForRetry(
+                 buffer_body_for_retry));
 
   if (stream_ == nullptr) {
     callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable, EMPTY_STRING);

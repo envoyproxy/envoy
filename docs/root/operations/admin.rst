@@ -180,17 +180,44 @@ modify different aspects of the server:
 
 .. http:get:: /server_info
 
-  Outputs a JSON message containing information about the running server. Sample output looks like:
+  Outputs a JSON message containing information about the running server.
 
-.. code-block:: none
+  Sample output looks like:
 
-  {
-   "version": "b050513e840aa939a01f89b07c162f00ab3150eb/1.9.0-dev/Modified/DEBUG",
-   "state": "LIVE",
-   "epoch": 0,
-   "uptime_current_epoch": "6s",
-   "uptime_all_epochs": "6s"
-  }
+  .. code-block:: json
+
+    {
+      "version": "b050513e840aa939a01f89b07c162f00ab3150eb/1.9.0-dev/Modified/DEBUG",
+      "state": "LIVE",
+      "command_line_options": {
+        "base_id": "0",
+        "concurrency": 8,
+        "config_path": "config.yaml",
+        "config_yaml": "",
+        "allow_unknown_fields": false,
+        "admin_address_path": "",
+        "local_address_ip_version": "v4",
+        "log_level": "info",
+        "component_log_level": "",
+        "log_format": "[%Y-%m-%d %T.%e][%t][%l][%n] %v",
+        "log_path": "",
+        "hot_restart_version": false,
+        "service_cluster": "",
+        "service_node": "",
+        "service_zone": "",
+        "mode": "Serve",
+        "max_stats": "16384",
+        "max_obj_name_len": "60",
+        "disable_hot_restart": false,
+        "enable_mutex_tracing": false,
+        "restart_epoch": 0,
+        "file_flush_interval": "10s",
+        "drain_time": "600s",
+        "parent_shutdown_time": "900s"
+      },
+      "uptime_current_epoch": "6s",
+      "uptime_all_epochs": "6s"
+    }
 
 See the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
 explanation of the output.
