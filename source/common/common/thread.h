@@ -18,21 +18,18 @@ typedef int32_t ThreadId;
 ThreadId currentThreadId();
 
 /**
- * Wrapper for a pthread thread. We don't use std::thread because it eats exceptions and leads to
- * unusable stack traces.
+ * Convenience method for tests to get a statically allocated ThreadSystem.
  */
-class ThreadImpl : public Thread {
+ThreadSystem& threadSystemForTest();
+
+/**
+ * Implementation of ThreadSystem
+ */
+class ThreadSystemImpl : public ThreadSystem {
 public:
-  ThreadImpl(std::function<void()> thread_routine);
+  ThreadSystemImpl() {}
 
-  /**
-   * Join on thread exit.
-   */
-  void join() override;
-
-private:
-  std::function<void()> thread_routine_;
-  pthread_t thread_id_;
+  ThreadPtr createThread(std::function<void()> thread_routine) override;
 };
 
 /**

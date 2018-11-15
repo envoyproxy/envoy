@@ -1,6 +1,5 @@
 #include <memory>
 
-#include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/singleton/threadsafe_singleton.h"
@@ -43,7 +42,7 @@ public:
 class AddTen {
 public:
   AddTen() {
-    thread_ = api_.createThread([this]() -> void { threadRoutine(); });
+    thread_ = thread_system_.createThread([this]() -> void { threadRoutine(); });
   }
   ~AddTen() {
     thread_->join();
@@ -57,7 +56,7 @@ private:
       singleton.addOne();
     }
   }
-  Api::Impl api_;
+  Thread::ThreadSystemImpl thread_system_;
   Thread::ThreadPtr thread_;
 };
 

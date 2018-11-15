@@ -14,7 +14,7 @@ void ContentionGenerator::generateContention(MutexTracerImpl& tracer) {
 
 Envoy::Thread::ThreadPtr ContentionGenerator::launchThread(MutexTracerImpl& tracer,
                                                            MutexBasicLockable* mu) {
-  return std::make_unique<Envoy::Thread::ThreadImpl>(
+  return threadSystemForTest().createThread(
       [&tracer, mu]() -> void { holdUntilContention(tracer, mu); });
 }
 

@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Api {
 
 TEST(ApiImplTest, readFileToEnd) {
-  Impl api(std::chrono::milliseconds(10000));
+  Impl api;
 
   const std::string data = "test read To End\nWith new lines.";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_api_envoy", data);
@@ -20,7 +20,7 @@ TEST(ApiImplTest, readFileToEnd) {
 }
 
 TEST(ApiImplTest, fileExists) {
-  Impl api(std::chrono::milliseconds(10000));
+  Impl api;
 
   EXPECT_TRUE(api.fileExists("/dev/null"));
   EXPECT_FALSE(api.fileExists("/dev/blahblahblah"));

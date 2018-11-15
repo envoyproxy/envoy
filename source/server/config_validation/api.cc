@@ -5,8 +5,9 @@
 namespace Envoy {
 namespace Api {
 
-ValidationImpl::ValidationImpl(std::chrono::milliseconds file_flush_interval_msec)
-    : Impl(file_flush_interval_msec) {}
+ValidationImpl::ValidationImpl(std::chrono::milliseconds file_flush_interval_msec,
+                               Thread::ThreadSystem& thread_system)
+    : Impl(file_flush_interval_msec, thread_system) {}
 
 Event::DispatcherPtr ValidationImpl::allocateDispatcher(Event::TimeSystem& time_system) {
   return Event::DispatcherPtr{new Event::ValidationDispatcher(time_system)};
