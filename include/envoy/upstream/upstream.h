@@ -536,6 +536,12 @@ public:
   virtual envoy::api::v2::Cluster::DiscoveryType type() const PURE;
 
   /**
+   * @return configuration for least request load balancing, only used if LB type is least request.
+   */
+  virtual const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>&
+  lbLeastRequestConfig() const PURE;
+
+  /**
    * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.
    */
   virtual const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&

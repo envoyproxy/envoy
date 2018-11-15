@@ -27,6 +27,9 @@ message HealthCheckEvent {
 
     // Host addition.
     HealthCheckAddHealthy add_healthy_event = 5;
+
+    // Host failure.
+    HealthCheckFailure health_check_failure_event = 7;
   }
 
   // Timestamp for event.
@@ -56,4 +59,11 @@ message HealthCheckAddHealthy {
   // the configured :ref:`healthy threshold <envoy_api_field_core.HealthCheck.healthy_threshold>`
   // is bypassed and the host is immediately added.
   bool first_check = 1;
+}
+
+message HealthCheckFailure {
+  // The type of failure that caused this event.
+  HealthCheckFailureType failure_type = 1 [(validate.rules).enum.defined_only = true];
+  // Whether this event is the result of the first ever health check on a host.
+  bool first_check = 2;
 }

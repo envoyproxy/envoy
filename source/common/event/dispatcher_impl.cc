@@ -11,6 +11,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/lock_guard.h"
+#include "common/common/thread.h"
 #include "common/event/file_event_impl.h"
 #include "common/event/signal_impl.h"
 #include "common/filesystem/watcher_impl.h"
@@ -150,7 +151,7 @@ void DispatcherImpl::post(std::function<void()> callback) {
 }
 
 void DispatcherImpl::run(RunType type) {
-  run_tid_ = Thread::Thread::currentThreadId();
+  run_tid_ = Thread::currentThreadId();
 
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does

@@ -385,6 +385,13 @@ TEST(AccessLogFormatterTest, startTimeFormatter) {
 void verifyJsonOutput(std::string json_string,
                       std::unordered_map<std::string, std::string> expected_map) {
   const auto parsed = Json::Factory::loadFromString(json_string);
+
+  // Every json log line should have only one newline character, and it should be the last character
+  // in the string
+  const auto newline_pos = json_string.find('\n');
+  EXPECT_NE(newline_pos, std::string::npos);
+  EXPECT_EQ(newline_pos, json_string.length() - 1);
+
   for (const auto& pair : expected_map) {
     EXPECT_EQ(parsed->getString(pair.first), pair.second);
   }
@@ -411,6 +418,7 @@ TEST(AccessLogFormatterTest, JsonFormatterPlainStringTest) {
   verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
                    expected_json_map);
 }
+
 TEST(AccessLogFormatterTest, JsonFormatterSingleOperatorTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestHeaderMapImpl request_header;
