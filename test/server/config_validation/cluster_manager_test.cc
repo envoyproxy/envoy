@@ -1,6 +1,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/api/api_impl.h"
 #include "common/http/codes.h"
 #include "common/ssl/context_manager_impl.h"
 
@@ -23,6 +24,7 @@ namespace Envoy {
 namespace Upstream {
 
 TEST(ValidationClusterManagerTest, MockedMethods) {
+  Api::Impl api;
   NiceMock<Runtime::MockLoader> runtime;
   Event::SimulatedTimeSystem time_system;
   Stats::IsolatedStoreImpl stats;
@@ -37,7 +39,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
 
   ValidationClusterManagerFactory factory(runtime, stats, tls, random, dns_resolver,
                                           ssl_context_manager, dispatcher, local_info,
-                                          secret_manager);
+                                          secret_manager, api);
 
   AccessLog::MockAccessLogManager log_manager;
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;
@@ -52,8 +54,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
 
   Http::AsyncClient& client = cluster_manager->httpAsyncClientForCluster("cluster");
   Http::MockAsyncClientStreamCallbacks stream_callbacks;
-  EXPECT_EQ(nullptr,
-            client.start(stream_callbacks, absl::optional<std::chrono::milliseconds>(), false));
+  EXPECT_EQ(nullptr, client.start(stream_callbacks, Http::AsyncClient::StreamOptions()));
 }
 
 } // namespace Upstream

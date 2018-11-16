@@ -37,10 +37,10 @@ public:
     Http::MessagePtr message = Http::Utility::prepareHeaders(uri);
     message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
     ENVOY_LOG(debug, "fetch pubkey from [uri = {}]: start", uri_->uri());
-    request_ =
-        cm_.httpAsyncClientForCluster(uri.cluster())
-            .send(std::move(message), *this,
-                  std::chrono::milliseconds(DurationUtil::durationToMilliseconds(uri.timeout())));
+    request_ = cm_.httpAsyncClientForCluster(uri.cluster())
+                   .send(std::move(message), *this,
+                         Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(
+                             DurationUtil::durationToMilliseconds(uri.timeout()))));
   }
 
   // HTTP async receive methods

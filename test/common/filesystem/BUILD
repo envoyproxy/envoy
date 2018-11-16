@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "filesystem_impl_test",
     srcs = ["filesystem_impl_test.cc"],
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:dispatcher_includes",

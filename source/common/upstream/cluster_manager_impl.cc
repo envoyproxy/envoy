@@ -174,7 +174,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                                        const LocalInfo::LocalInfo& local_info,
                                        AccessLog::AccessLogManager& log_manager,
                                        Event::Dispatcher& main_thread_dispatcher,
-                                       Server::Admin& admin, Http::CodeStats& code_stats)
+                                       Server::Admin& admin, Api::Api& api,
+                                       Http::CodeStats& code_stats)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), log_manager_(log_manager),
       bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
@@ -183,7 +184,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
       time_source_(main_thread_dispatcher.timeSystem()), dispatcher_(main_thread_dispatcher) {
-  async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls, time_source_);
+  async_client_manager_ =
+      std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls, time_source_, api);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
@@ -347,14 +349,15 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     //
     // See https://github.com/envoyproxy/envoy/pull/3941 for more context.
     bool scheduled = false;
-    const bool merging_enabled = cluster.info()->lbConfig().has_update_merge_window();
+    const auto merge_timeout =
+        PROTOBUF_GET_MS_OR_DEFAULT(cluster.info()->lbConfig(), update_merge_window, 1000);
     // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
     const bool is_mergeable = !hosts_added.size() && !hosts_removed.size();
 
-    if (merging_enabled) {
+    if (merge_timeout > 0) {
       // If this is not mergeable, we should cancel any scheduled updates since
       // we'll deliver it immediately.
-      scheduled = scheduleUpdate(cluster, priority, is_mergeable);
+      scheduled = scheduleUpdate(cluster, priority, is_mergeable, merge_timeout);
     }
 
     // If an update was not scheduled for later, deliver it immediately.
@@ -374,10 +377,8 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 }
 
-bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable) {
-  const auto& update_merge_window = cluster.info()->lbConfig().update_merge_window();
-  const auto timeout = DurationUtil::durationToMilliseconds(update_merge_window);
-
+bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable,
+                                        const uint64_t timeout) {
   // Find pending updates for this cluster.
   auto& updates_by_prio = updates_map_[cluster.info()->name()];
   if (!updates_by_prio) {
@@ -1030,14 +1031,14 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     lb_ = std::make_unique<SubsetLoadBalancer>(
         cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
         parent.parent_.runtime_, parent.parent_.random_, cluster->lbSubsetInfo(),
-        cluster->lbRingHashConfig(), cluster->lbConfig());
+        cluster->lbRingHashConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig());
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
       ASSERT(lb_factory_ == nullptr);
-      lb_ = std::make_unique<LeastRequestLoadBalancer>(priority_set_, parent_.local_priority_set_,
-                                                       cluster->stats(), parent.parent_.runtime_,
-                                                       parent.parent_.random_, cluster->lbConfig());
+      lb_ = std::make_unique<LeastRequestLoadBalancer>(
+          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
+          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig());
       break;
     }
     case LoadBalancerType::Random: {
@@ -1174,7 +1175,7 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     Server::Admin& admin, Http::CodeStats& code_stats) {
   return ClusterManagerPtr{new ClusterManagerImpl(bootstrap, *this, stats, tls, runtime, random,
                                                   local_info, log_manager, main_thread_dispatcher_,
-                                                  admin, code_stats)};
+                                                  admin, api_, code_stats)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(

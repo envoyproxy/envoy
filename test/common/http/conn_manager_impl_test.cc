@@ -2965,10 +2965,8 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
     decoder->decodeData(fake_data2, true);
   }));
 
-  setupFilterChain(3, 2);
-
-  // Test route caching.
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _));
+  setupFilterChain(3, 2);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
@@ -3056,10 +3054,8 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFiltersWithInorderEncoders) {
     decoder->decodeData(fake_data2, true);
   }));
 
-  setupFilterChain(3, 2);
-
-  // Test route caching.
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _));
+  setupFilterChain(3, 2);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {

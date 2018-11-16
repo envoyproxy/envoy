@@ -5,6 +5,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/api/api_impl.h"
 #include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
 #include "common/http/codes.h"
@@ -145,9 +146,10 @@ public:
                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                          AccessLog::AccessLogManager& log_manager,
                          Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                         MockLocalClusterUpdate& local_cluster_update, Http::CodeStats& code_stats)
+                         Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
+                         Http::CodeStats& code_stats)
       : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
-                           main_thread_dispatcher, admin, code_stats),
+                           main_thread_dispatcher, admin, api, code_stats),
         local_cluster_update_(local_cluster_update) {}
 
 protected:
@@ -172,7 +174,7 @@ public:
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<ClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, code_stats_);
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, api_, code_stats_);
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -191,21 +193,23 @@ public:
           address: "127.0.0.1"
           port_value: 11002
   )EOF";
-    const std::string merge_window = R"EOF(
+    const std::string merge_window_enabled = R"EOF(
       common_lb_config:
         update_merge_window: 3s
   )EOF";
+    const std::string merge_window_disabled = R"EOF(
+      common_lb_config:
+        update_merge_window: 0s
+  )EOF";
 
-    if (enable_merge_window) {
-      yaml += merge_window;
-    }
+    yaml += enable_merge_window ? merge_window_enabled : merge_window_disabled;
 
     const auto& bootstrap = parseBootstrapFromV2Yaml(yaml);
 
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, local_cluster_update_,
-        code_stats_);
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, api_,
+        local_cluster_update_, code_stats_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -239,6 +243,7 @@ public:
     return metadata;
   }
 
+  Api::Impl api_;
   NiceMock<TestClusterManagerFactory> factory_;
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;

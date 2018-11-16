@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/singleton/threadsafe_singleton.h"
@@ -42,7 +43,7 @@ public:
 class AddTen {
 public:
   AddTen() {
-    thread_ = std::make_unique<Thread::Thread>([this]() -> void { threadRoutine(); });
+    thread_ = api_.createThread([this]() -> void { threadRoutine(); });
   }
   ~AddTen() {
     thread_->join();
@@ -56,6 +57,7 @@ private:
       singleton.addOne();
     }
   }
+  Api::Impl api_;
   Thread::ThreadPtr thread_;
 };
 
