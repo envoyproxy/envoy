@@ -165,6 +165,16 @@ struct StreamInfoImpl : public StreamInfo {
     return downstream_local_address_;
   }
 
+  void setDownstreamDirectlyConnectedAddress(const Network::Address::InstanceConstSharedPtr&
+                                                 downstream_directly_connected_address) override {
+    downstream_directly_connected_address_ = downstream_directly_connected_address;
+  }
+
+  const Network::Address::InstanceConstSharedPtr&
+  downstreamDirectlyConnectedAddress() const override {
+    return downstream_directly_connected_address_;
+  }
+
   void setDownstreamRemoteAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_remote_address) override {
     downstream_remote_address_ = downstream_remote_address;
@@ -218,6 +228,7 @@ private:
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_directly_connected_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   std::string requested_server_name_;
 };

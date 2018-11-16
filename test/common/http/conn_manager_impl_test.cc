@@ -951,6 +951,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
         EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
         EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamDirectlyConnectedAddress());
         EXPECT_NE(nullptr, stream_info.routeEntry());
       }));
 
@@ -995,6 +996,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
         EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
         EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamDirectlyConnectedAddress());
         EXPECT_NE(nullptr, stream_info.routeEntry());
       }));
 
@@ -1042,6 +1044,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(400));
         EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
         EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamDirectlyConnectedAddress());
         EXPECT_EQ(nullptr, stream_info.routeEntry());
       }));
 
