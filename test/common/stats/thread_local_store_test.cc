@@ -886,5 +886,38 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   }
 }
 
+class TruncatingAllocTest : public HeapStatsThreadLocalStoreTest {
+  class TruncatingHeapAlloc : public HeapStatDataAllocator {
+  public:
+    bool requiresBoundedStatNameSize() const override { return true; }
+  };
+
+protected:
+  void SetUp() override {
+    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, truncating_heap_alloc_);
+    // Do not call superclass SetUp.
+  }
+
+  TruncatingHeapAlloc truncating_heap_alloc_;
+};
+
+TEST_F(TruncatingAllocTest, LookupNotTruncated) {
+  EXPECT_NO_LOGS({
+    Counter& counter = store_->counter("simple");
+    EXPECT_EQ(&counter, &store_->counter("simple"));
+  });
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
+TEST_F(TruncatingAllocTest, LookupTruncated) {
+  const uint64_t max_name_length = options_.maxNameLength();
+  const std::string name_1(max_name_length + 1, 'A');
+  EXPECT_LOG_CONTAINS("warning", "is too long with", {
+    Counter& counter = store_->counter(name_1);
+    EXPECT_EQ(&counter, &store_->counter(name_1));
+  });
+}
+
 } // namespace Stats
 } // namespace Envoy
