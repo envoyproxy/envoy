@@ -11,7 +11,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 
-#include "test/common/access_log/test_util.h"
+#include "test/common/stream_info/test_util.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"

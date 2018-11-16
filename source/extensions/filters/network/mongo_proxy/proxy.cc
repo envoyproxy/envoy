@@ -64,10 +64,12 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log,
                          const FaultConfigSharedPtr& fault_config,
                          const Network::DrainDecision& drain_decision,
-                         Runtime::RandomGenerator& generator, Event::TimeSystem& time_system)
+                         Runtime::RandomGenerator& generator, Event::TimeSystem& time_system,
+                         bool emit_dynamic_metadata)
     : stat_prefix_(stat_prefix), scope_(scope), stats_(generateStats(stat_prefix, scope)),
       runtime_(runtime), drain_decision_(drain_decision), generator_(generator),
-      access_log_(access_log), fault_config_(fault_config), time_system_(time_system) {
+      access_log_(access_log), fault_config_(fault_config), time_system_(time_system),
+      emit_dynamic_metadata_(emit_dynamic_metadata) {
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ConnectionLoggingEnabled,
                                           100)) {
     // If we are not logging at the connection level, just release the shared pointer so that we
@@ -101,9 +103,11 @@ void ProxyFilter::setDynamicMetadata(std::string op, absl::optional<std::string>
 void ProxyFilter::decodeGetMore(GetMoreMessagePtr&& message) {
   tryInjectDelay();
 
-  std::vector<std::string> names = absl::StrSplit(message->fullCollectionName(), '.');
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationGetMore,
-                     absl::make_optional(names[0]), absl::make_optional(names[1]));
+  if (emit_dynamic_metadata_) {
+    std::vector<std::string> names = absl::StrSplit(message->fullCollectionName(), '.');
+    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationGetMore,
+                       absl::make_optional(names[0]), absl::make_optional(names[1]));
+  }
 
   stats_.op_get_more_.inc();
   logMessage(*message, true);
@@ -113,9 +117,11 @@ void ProxyFilter::decodeGetMore(GetMoreMessagePtr&& message) {
 void ProxyFilter::decodeInsert(InsertMessagePtr&& message) {
   tryInjectDelay();
 
-  std::vector<std::string> names = absl::StrSplit(message->fullCollectionName(), '.');
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationInsert,
-                     absl::make_optional(names[0]), absl::make_optional(names[1]));
+  if (emit_dynamic_metadata_) {
+    std::vector<std::string> names = absl::StrSplit(message->fullCollectionName(), '.');
+    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationInsert,
+                       absl::make_optional(names[0]), absl::make_optional(names[1]));
+  }
 
   stats_.op_insert_.inc();
   logMessage(*message, true);
@@ -125,8 +131,10 @@ void ProxyFilter::decodeInsert(InsertMessagePtr&& message) {
 void ProxyFilter::decodeKillCursors(KillCursorsMessagePtr&& message) {
   tryInjectDelay();
 
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationKillCursors, absl::nullopt,
-                     absl::nullopt);
+  if (emit_dynamic_metadata_) {
+    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationKillCursors, absl::nullopt,
+                       absl::nullopt);
+  }
 
   stats_.op_kill_cursors_.inc();
   logMessage(*message, true);
@@ -136,9 +144,11 @@ void ProxyFilter::decodeKillCursors(KillCursorsMessagePtr&& message) {
 void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
   tryInjectDelay();
 
-  std::vector<std::string> names = absl::StrSplit(message->fullCollectionName(), '.');
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationQuery,
-                     absl::make_optional(names[0]), absl::make_optional(names[1]));
+  if (emit_dynamic_metadata_) {
+    std::vector<std::string> names = absl::StrSplit(message->fullCollectionName(), '.');
+    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationQuery,
+                       absl::make_optional(names[0]), absl::make_optional(names[1]));
+  }
 
   stats_.op_query_.inc();
   logMessage(*message, true);
@@ -202,8 +212,10 @@ void ProxyFilter::chargeQueryStats(const std::string& prefix,
 }
 
 void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationReply, absl::nullopt,
-                     absl::nullopt);
+  if (emit_dynamic_metadata_) {
+    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationReply, absl::nullopt,
+                       absl::nullopt);
+  }
 
   stats_.op_reply_.inc();
   logMessage(*message, false);
@@ -271,8 +283,10 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
 void ProxyFilter::decodeCommand(CommandMessagePtr&& message) {
   tryInjectDelay();
 
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationCommand,
-                     absl::make_optional(message->database()), absl::nullopt);
+  if (emit_dynamic_metadata_) {
+    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationCommand,
+                       absl::make_optional(message->database()), absl::nullopt);
+  }
 
   stats_.op_command_.inc();
   logMessage(*message, true);
@@ -282,8 +296,10 @@ void ProxyFilter::decodeCommand(CommandMessagePtr&& message) {
 void ProxyFilter::decodeCommandReply(CommandReplyMessagePtr&& message) {
   tryInjectDelay();
 
-  setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationCommandReply, absl::nullopt,
-                     absl::nullopt);
+  if (emit_dynamic_metadata_) {
+    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationCommandReply, absl::nullopt,
+                       absl::nullopt);
+  }
 
   stats_.op_command_reply_.inc();
   logMessage(*message, true);
@@ -317,6 +333,15 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
     // stats. This can be removed once we are more confident of this code.
     buffer.drain(buffer.length());
     return;
+  }
+
+  // Clear dynamic metadata
+  if (emit_dynamic_metadata_) {
+    (*read_callbacks_->connection()
+          .streamInfo()
+          .dynamicMetadata()
+          .mutable_filter_metadata())[NetworkFilterNames::get().MongoProxy]
+        .clear_fields();
   }
 
   if (!decoder_) {

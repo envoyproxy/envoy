@@ -6,6 +6,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Const;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
@@ -64,6 +65,7 @@ MockStreamInfo::MockStreamInfo()
   }));
   ON_CALL(*this, bytesSent()).WillByDefault(ReturnPointee(&bytes_sent_));
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
+  ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
   ON_CALL(*this, setRequestedServerName(_))
       .WillByDefault(Invoke([this](const absl::string_view requested_server_name) {

@@ -176,6 +176,7 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
+  envoy::api::v2::core::Metadata& dynamicMetadata() override { return metadata_; };
   const envoy::api::v2::core::Metadata& dynamicMetadata() const override { return metadata_; };
 
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {

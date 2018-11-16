@@ -43,6 +43,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/mongo_proxy:bson_lib",
         "//source/extensions/filters/network/mongo_proxy:codec_lib",
         "//source/extensions/filters/network/mongo_proxy:proxy_lib",
+        "//test/common/stream_info:test_util",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",

@@ -34,11 +34,13 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
     fault_config = std::make_shared<FaultConfig>(proto_config.delay());
   }
 
-  return [stat_prefix, &context, access_log,
-          fault_config](Network::FilterManager& filter_manager) -> void {
+  const bool emit_dynamic_metadata = proto_config.emit_dynamic_metadata();
+  return [stat_prefix, &context, access_log, fault_config,
+          emit_dynamic_metadata](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<ProdProxyFilter>(
         stat_prefix, context.scope(), context.runtime(), access_log, fault_config,
-        context.drainDecision(), context.random(), context.dispatcher().timeSystem()));
+        context.drainDecision(), context.random(), context.dispatcher().timeSystem(),
+        emit_dynamic_metadata));
   };
 }
 

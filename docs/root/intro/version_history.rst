@@ -28,8 +28,9 @@ Version history
 * http: no longer close the TCP connection when a HTTP/1 request is retried due
   to a response with empty body.
 * load balancer: added a `configuration <envoy_api_msg_Cluster.LeastRequestLbConfig>` option to specify the number of choices made in P2C.
-* network: removed the reference to `FilterState` in `Connection` in favor of `StreamInfo`.
 * logging: added missing [ in log prefix.
+* mongo_proxy: added :ref:`dynamic metadata <config_network_filters_mongo_proxy_dynamic_metadata>`.
+* network: removed the reference to `FilterState` in `Connection` in favor of `StreamInfo`.
 * rate-limit: added :ref:`configuration <envoy_api_field_config.filter.http.rate_limit.v2.RateLimit.rate_limited_as_resource_exhausted>`
   to specify whether the `GrpcStatus` status returned should be `RESOURCE_EXHAUSTED` or
   `UNAVAILABLE` when a gRPC call is rate limited.

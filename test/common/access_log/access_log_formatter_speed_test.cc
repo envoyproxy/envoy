@@ -1,7 +1,7 @@
 #include "common/access_log/access_log_formatter.h"
 #include "common/network/address_impl.h"
 
-#include "test/common/access_log/test_util.h"
+#include "test/common/stream_info/test_util.h"
 #include "test/mocks/http/mocks.h"
 
 #include "testing/base/public/benchmark.h"

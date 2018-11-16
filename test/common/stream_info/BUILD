@@ -39,6 +39,17 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "test_util",
+    hdrs = ["test_util.h"],
+    deps = [
+        "//include/envoy/stream_info:stream_info_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "//test/test_common:test_time_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],

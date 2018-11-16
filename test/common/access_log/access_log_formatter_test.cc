@@ -17,6 +17,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Const;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -504,6 +505,7 @@ TEST(AccessLogFormatterTest, JsonFormatterDynamicMetadataTest) {
   envoy::api::v2::core::Metadata metadata;
   populateMetadataTestData(metadata);
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   std::unordered_map<std::string, std::string> expected_json_map = {
       {"test_key", "\"test_value\""},
@@ -622,6 +624,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     envoy::api::v2::core::Metadata metadata;
     populateMetadataTestData(metadata);
     EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
     const std::string format = "%DYNAMIC_METADATA(com.test:test_key)%|%DYNAMIC_METADATA(com.test:"
                                "test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%";
     FormatterImpl formatter(format);
