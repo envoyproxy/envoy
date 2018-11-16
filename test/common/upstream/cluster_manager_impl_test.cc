@@ -71,6 +71,13 @@ public:
     return Http::ConnectionPool::InstancePtr{allocateConnPool_(host)};
   }
 
+  Http::ConnectionPool::InstancePtr
+  allocateTransparentConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
+                              Http::Protocol,
+                              const Network::ConnectionSocket::OptionsSharedPtr&) override {
+    return Http::ConnectionPool::InstancePtr{allocateTransparentConnPool_(host)};
+  }
+
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
                       const Network::ConnectionSocket::OptionsSharedPtr&,
@@ -109,6 +116,8 @@ public:
                                const LocalInfo::LocalInfo& local_info,
                                AccessLog::AccessLogManager& log_manager, Server::Admin& admin));
   MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(HostConstSharedPtr host));
+  MOCK_METHOD1(allocateTransparentConnPool_,
+               Http::ConnectionPool::Instance*(HostConstSharedPtr host));
   MOCK_METHOD1(allocateTcpConnPool_, Tcp::ConnectionPool::Instance*(HostConstSharedPtr host));
   MOCK_METHOD5(clusterFromProto_,
                ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
@@ -2286,6 +2295,44 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
 
   EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
   EXPECT_EQ(0, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
+}
+
+// Tests that httpConnPoolForCluster with the transparency options sets tells the factory to build a
+// transparent cluster.
+TEST_F(ClusterManagerImplTest, TransparentCluster) {
+  //createWithLocalClusterUpdate();
+  const std::string json = R"EOF(
+  {
+    "clusters": []
+  }
+  )EOF";
+
+  create(parseBootstrapFromJson(json));
+
+  uint64_t features = ClusterInfo::Features::SRC_TRANSPARENT;
+  std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
+  cluster1->info_->name_ = "cluster_1";
+  cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
+    makeTestHost(cluster1->info_, "tcp://127.0.0.1:11001")
+  };
+
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
+
+  ASSERT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_1"), ""));
+  // initialize the cluster so that it is made active.
+  cluster1->initialize_callback_();
+
+  ON_CALL(*cluster1->info_, features()).WillByDefault(Return(features));
+
+  auto mock_pool = new Http::ConnectionPool::MockInstance();
+  EXPECT_CALL(factory_, allocateTransparentConnPool_(_)).WillOnce(Return(mock_pool));
+
+  // Not being called. Steppy Steppy!
+  auto new_pool = cluster_manager_->httpConnPoolForCluster("cluster_1",
+                                                           ResourcePriority::Default,
+                                                           Http::Protocol::Http11, nullptr);
+  EXPECT_EQ(new_pool, mock_pool);
+  cluster_manager_.reset();
 }
 
 class ClusterManagerInitHelperTest : public testing::Test {

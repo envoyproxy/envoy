@@ -55,6 +55,10 @@ public:
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, Http::Protocol protocol,
                    const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+  Http::ConnectionPool::InstancePtr
+  allocateTransparentConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                              ResourcePriority priority, Http::Protocol protocol,
+                              const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,

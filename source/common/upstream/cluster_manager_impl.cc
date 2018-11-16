@@ -36,6 +36,7 @@
 #include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
+#include "common/http/wrapped_connection_pool.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -1121,9 +1122,20 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
   ConnPoolsContainer& container = parent_.host_http_conn_pool_map_[host];
   if (!container.pools_[hash_key]) {
-    container.pools_[hash_key] = parent_.parent_.factory_.allocateConnPool(
-        parent_.thread_local_dispatcher_, host, priority, protocol,
-        have_options ? context->downstreamConnection()->socketOptions() : nullptr);
+    bool transparent = cluster_info_->features() & Upstream::ClusterInfo::Features::SRC_TRANSPARENT;
+    // We may want to refactor this later so that the "wrapper" is decoupled from the underlying
+    // pool creation method. E.g. create them separately. Otherwise we may end up bloating the
+    // cluster manager factory with options and methods.
+    if (transparent) {
+      container.pools_[hash_key] = parent_.parent_.factory_.allocateTransparentConnPool(
+          parent_.thread_local_dispatcher_, host, priority, protocol,
+          have_options ? context->downstreamConnection()->socketOptions() : nullptr);
+    }
+    else {
+      container.pools_[hash_key] = parent_.parent_.factory_.allocateConnPool(
+          parent_.thread_local_dispatcher_, host, priority, protocol,
+          have_options ? context->downstreamConnection()->socketOptions() : nullptr);
+    }
   }
 
   return container.pools_[hash_key].get();
@@ -1194,6 +1206,23 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     return Http::ConnectionPool::InstancePtr{
         new Http::Http1::ConnPoolImplProd(dispatcher, host, priority, options)};
   }
+}
+
+Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTransparentConnPool(
+    Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
+    Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options) {
+      auto builder = [&]() {
+        if (protocol == Http::Protocol::Http2 &&
+            runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
+          return Http::ConnectionPool::InstancePtr{
+              new Http::Http2::ProdConnPoolImpl(dispatcher, host, priority, options)};
+        } else {
+          return Http::ConnectionPool::InstancePtr{
+              new Http::Http1::ConnPoolImplProd(dispatcher, host, priority, options)};
+        }
+      };
+
+      return Http::ConnectionPool::InstancePtr{ new Http::WrappedConnectionPool(builder) };
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(

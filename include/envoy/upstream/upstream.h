@@ -473,6 +473,8 @@ public:
     static const uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
     // Whether connections should be immediately closed upon health failure.
     static const uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
+    // Whether upstream connections use src transparency
+    static const uint64_t SRC_TRANSPARENT = 0x8;
   };
 
   virtual ~ClusterInfo() {}

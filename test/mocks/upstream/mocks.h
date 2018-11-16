@@ -219,6 +219,12 @@ public:
                                         const Network::ConnectionSocket::OptionsSharedPtr& options,
                                         Network::TransportSocketOptionsSharedPtr));
 
+  MOCK_METHOD5(allocateTransparentConnPool,
+               Http::ConnectionPool::InstancePtr(
+                   Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                   ResourcePriority priority, Http::Protocol protocol,
+                   const Network::ConnectionSocket::OptionsSharedPtr& options));
+
   MOCK_METHOD5(clusterFromProto,
                ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                 Outlier::EventLoggerSharedPtr outlier_event_logger,
