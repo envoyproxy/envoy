@@ -9,16 +9,6 @@ namespace NetworkFilters {
 namespace MySQLProxy {
 
 class MySQLCodecQuery : public MySQLCodec {
-private:
-#define USE "use"
-#define DESCRIBE "describe"
-#define INSERT "insert"
-#define ALTER "alter"
-
-  MySQLCodec::Cmd cmd_;
-  std::string op_;
-  std::string statement_;
-
 public:
   int Decode(Buffer::Instance& buffer);
   std::string Encode();
@@ -28,6 +18,11 @@ public:
   void SetCmd(MySQLCodec::Cmd cmd);
   void SetOp(std::string& op);
   void SetStatement(std::string& statement);
+
+private:
+  MySQLCodec::Cmd cmd_;
+  std::string op_;
+  std::string statement_;
 };
 
 } // namespace MySQLProxy

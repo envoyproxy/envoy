@@ -13,10 +13,10 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-#define MYSQL_UT_RESP_OK 0
-#define MYSQL_UT_LAST_ID 0
-#define MYSQL_UT_SERVER_OK 0
-#define MYSQL_UT_SERVER_WARNINGS 0x0001
+constexpr int MYSQL_UT_RESP_OK = 0;
+constexpr int MYSQL_UT_LAST_ID = 0;
+constexpr int MYSQL_UT_SERVER_OK = 0;
+constexpr int MYSQL_UT_SERVER_WARNINGS = 0x0001;
 
 class MySQLCodecTest : public MySQLTestUtils, public testing::Test {};
 

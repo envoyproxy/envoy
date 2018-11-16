@@ -9,10 +9,6 @@ namespace NetworkFilters {
 namespace MySQLProxy {
 
 class ClientSwitchResponse : public MySQLCodec {
-private:
-  std::string auth_plugin_resp_;
-  int seq_;
-
 public:
   int GetSeq() { return seq_; }
   void SetSeq(int seq);
@@ -20,6 +16,10 @@ public:
   void SetAuthPluginResp(std::string& auth_swith_resp);
   int Decode(Buffer::Instance& buffer);
   std::string Encode();
+
+private:
+  std::string auth_plugin_resp_;
+  int seq_;
 };
 
 } // namespace MySQLProxy

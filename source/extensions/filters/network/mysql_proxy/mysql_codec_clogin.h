@@ -8,18 +8,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
+constexpr int UNSET_BYTES = 23;
 class ClientLogin : public MySQLCodec {
-private:
-#define UNSET_BYTES 23
-
-  int client_cap_;
-  int extended_client_cap_;
-  int max_packet_;
-  int charset_;
-  std::string username_;
-  std::string auth_resp_;
-  std::string db_;
-
 public:
   int Decode(Buffer::Instance& buffer);
   std::string Encode();
@@ -43,6 +33,15 @@ public:
   void SetUsername(std::string& username);
   void SetAuthResp(std::string& auth_resp);
   void SetDB(std::string& db);
+
+private:
+  int client_cap_;
+  int extended_client_cap_;
+  int max_packet_;
+  int charset_;
+  std::string username_;
+  std::string auth_resp_;
+  std::string db_;
 };
 
 } // namespace MySQLProxy

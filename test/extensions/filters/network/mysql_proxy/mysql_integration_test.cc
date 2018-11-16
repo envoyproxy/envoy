@@ -24,7 +24,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-#define SESSIONS 5
+constexpr int SESSIONS = 5;
 
 class MySQLIntegrationTest : public MySQLTestUtils,
                              public BaseIntegrationTest,

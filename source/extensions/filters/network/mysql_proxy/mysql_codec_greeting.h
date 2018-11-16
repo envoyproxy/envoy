@@ -9,16 +9,6 @@ namespace NetworkFilters {
 namespace MySQLProxy {
 
 class ServerGreeting : public MySQLCodec {
-private:
-  int protocol_;
-  std::string version_;
-  int thread_id_;
-  std::string salt_;
-  int server_cap_;
-  int server_language_;
-  int server_status_;
-  int ext_server_cap_;
-
 public:
   int Decode(Buffer::Instance& buffer);
   std::string Encode();
@@ -38,6 +28,16 @@ public:
   void SetServerLanguage(int server_language);
   void SetServerStatus(int server_status);
   void SetExtServerCap(int ext_server_cap);
+
+private:
+  int protocol_;
+  std::string version_;
+  int thread_id_;
+  std::string salt_;
+  int server_cap_;
+  int server_language_;
+  int server_status_;
+  int ext_server_cap_;
 };
 
 } // namespace MySQLProxy

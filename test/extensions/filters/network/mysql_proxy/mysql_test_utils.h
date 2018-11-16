@@ -6,15 +6,15 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-#define MYSQL_VER_MAJOR 5
-#define MYSQL_VER_MINOR 0
-#define MYSQL_VER_VAR 54
-#define MYSQL_SM_LAST_ID 0
-#define MYSQL_SM_SERVER_OK 0
-#define MYSQL_SM_SERVER_WARNINGS 0x0001
-#define MYSQL_SM_AFFECTED_ROWS 1
-#define CLIENT_NUM 10
-#define PARALLEL_SESSIONS 4
+constexpr int MYSQL_VER_MAJOR = 5;
+constexpr int MYSQL_VER_MINOR = 0;
+constexpr int MYSQL_VER_VAR = 54;
+constexpr int MYSQL_SM_LAST_ID = 0;
+constexpr int MYSQL_SM_SERVER_OK = 0;
+constexpr int MYSQL_SM_SERVER_WARNINGS = 0x0001;
+constexpr int MYSQL_SM_AFFECTED_ROWS = 1;
+constexpr int CLIENT_NUM = 10;
+constexpr int PARALLEL_SESSIONS = 4;
 
 class MySQLTestUtils {
 

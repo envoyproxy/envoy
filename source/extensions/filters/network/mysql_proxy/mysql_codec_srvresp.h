@@ -11,10 +11,6 @@ namespace NetworkFilters {
 namespace MySQLProxy {
 
 class MySQLCodecSrvResp : public MySQLCodec {
-private:
-  uint16_t server_status_;
-  uint16_t warnings_;
-
 public:
   MySQLCodecSrvResp();
   int Decode(Buffer::Instance& buffer);
@@ -23,6 +19,10 @@ public:
   uint16_t GetWarnings() { return warnings_; }
   void SetServerStatus(uint16_t status);
   void SetWarnings(uint16_t warnings);
+
+private:
+  uint16_t server_status_;
+  uint16_t warnings_;
 };
 
 } // namespace MySQLProxy

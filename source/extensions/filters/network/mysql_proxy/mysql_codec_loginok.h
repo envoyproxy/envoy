@@ -11,14 +11,6 @@ namespace NetworkFilters {
 namespace MySQLProxy {
 
 class ClientLoginResponse : public MySQLCodec {
-private:
-#define RESP_OK_PACKET 0x0
-  uint8_t resp_code_;
-  uint8_t affected_rows_;
-  uint8_t last_insert_id_;
-  uint16_t server_status_;
-  uint16_t warnings_;
-
 public:
   int Decode(Buffer::Instance& buffer);
   std::string Encode();
@@ -32,6 +24,13 @@ public:
   void SetLastInsertId(uint8_t last_insert_id);
   void SetServerStatus(uint16_t status);
   void SetWarnings(uint16_t warnings);
+
+private:
+  uint8_t resp_code_;
+  uint8_t affected_rows_;
+  uint8_t last_insert_id_;
+  uint16_t server_status_;
+  uint16_t warnings_;
 };
 
 } // namespace MySQLProxy

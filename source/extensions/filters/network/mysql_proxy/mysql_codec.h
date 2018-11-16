@@ -11,91 +11,85 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
+constexpr int MYSQL_MAX_STR_SIZE = 256;
+constexpr int MYSQL_PKT_SIZE = 1500;
+constexpr int MYSQL_HDR_SIZE = 4;
+constexpr int MYSQL_PROTOCOL_9 = 9;
+constexpr int MYSQL_PROTOCOL_10 = 10;
+constexpr int MYSQL_PKT_0 = 0;
+constexpr int MYSQL_UNAME_PKT_NUM = 1;
+constexpr int MYSQL_HDR_PKT_SIZE_MASK = 0x00FFFFFF;
+constexpr int MYSQL_HDR_SEQ_MASK = 0x000000FF;
+constexpr int MYSQL_LOGIN_RESP_PKT_NUM = 2;
+constexpr int MYSQL_RESPONSE_PKT_NUM = 1;
+constexpr int MAX_MYSQL_QUERY_STRING = 256;
+constexpr int MAX_MYSQL_USER_STRING = 256;
+constexpr int MIN_RESPONSE_PAYLOAD = 5;
+constexpr int MYSQL_MAX_USER_LEN = 32;
+constexpr int MYSQL_MAX_PASSWD_LEN = 32;
+constexpr int MYSQL_RESP_OK = 0x00;
+constexpr int MYSQL_RESP_MORE = 0x01;
+constexpr int MYSQL_RESP_AUTH_SWITCH = 0xfe;
+constexpr int MYSQL_RESP_ERR = 0xff;
+
+constexpr int EOF_MARKER = 0xfe;
+constexpr int ERR_MARKER = 0xff;
+
+constexpr int CLIENT_CAP_FLD = 2;
+constexpr int EXT_CLIENT_CAP_FLD = 2;
+constexpr int MAX_PKT_FLD = 4;
+constexpr int CHARSET_FLD = 1;
+constexpr int UNAME_RSVD_STR = 23;
+
+constexpr int FILLER_1_SIZE = 1;
+constexpr int FILLER_2_SIZE = 2;
+constexpr int FILLER_3_SIZE = 3;
+constexpr int MYSQL_DEFAULT = 4;
+constexpr int CHARACTER_SET_SIZE = 2;
+
+constexpr int MAX_TABLE_COLUMNS = 64;
+constexpr int MAX_TABLE_ROWS = 128;
+
+constexpr int LAYOUT_CTLG = 0;
+constexpr int LAYOUT_DB = 1;
+constexpr int LAYOUT_TBL = 2;
+constexpr int LAYOUT_ORG_TBL = 3;
+constexpr int LAYOUT_NAME = 4;
+constexpr int LAYOUT_ORG_NAME = 5;
+constexpr int MYSQL_CATALOG_LAYOUT = 6;
+constexpr int MULTI_CLIENT = 10;
+constexpr int LOGIN_OK_SEQ = 2;
+constexpr int GREETING_SEQ_NUM = 0;
+constexpr int CHALLENGE_SEQ_NUM = 1;
+constexpr int CHALLENGE_RESP_SEQ_NUM = 2;
+constexpr int AUTH_SWITH_RESP_SEQ = 3;
+constexpr int MYSQL_THREAD_ID = 0x5e;
+constexpr int MYSQL_SERVER_CAPAB = 0x0101;
+constexpr int MYSQL_SERVER_LANGUAGE = 0x21;
+constexpr int MYSQL_SERVER_STATUS = 0x0200;
+constexpr int MYSQL_SERVER_EXT_CAPAB = 0x0200;
+constexpr int MYSQL_AUTHPLGIN = 0x00;
+constexpr int MYSQL_UNSET = 0x00;
+constexpr int MYSQL_UNSET_SIZE = 10;
+constexpr int MYSQL_CLIENT_CONNECT_WITH_DB = 0x0008;
+constexpr int MYSQL_CLIENT_CAPAB_41VS320 = 0x0200;
+constexpr int MYSQL_CLIENT_CAPAB_SSL = 0x0800;
+constexpr int MYSQL_EXT_CLIENT_CAPAB = 0x0300;
+constexpr int MYSQL_EXT_CL_PLG_AUTH_CL_DATA = 0x0020;
+constexpr int MYSQL_EXT_CL_SECURE_CONNECTION = 0x8000;
+constexpr int MYSQL_MAX_PACKET = 0x00000001;
+constexpr int MYSQL_CHARSET = 0x21;
+
+constexpr uint8_t LENENCODINT_1BYTE = 0xfb;
+constexpr uint8_t LENENCODINT_2BYTES = 0xfc;
+constexpr uint8_t LENENCODINT_3BYTES = 0xfd;
+constexpr uint8_t LENENCODINT_8BYTES = 0xfe;
+
+constexpr int MYSQL_SUCCESS = 0;
+constexpr int MYSQL_FAILURE = -1;
+constexpr char MYSQL_STR_END = '\0';
+
 class MySQLCodec : public Logger::Loggable<Logger::Id::filter> {
-#define MYSQL_MAX_STR_SIZE 256
-#define MYSQL_PKT_SIZE 1500
-#define MYSQL_HDR_SIZE 4
-#define MYSQL_PROTOCOL_9 9
-#define MYSQL_PROTOCOL_10 10
-#define MYSQL_PKT_0 0
-#define MYSQL_UNAME_PKT_NUM 1
-#define MYSQL_HDR_PKT_SIZE_MASK 0x00FFFFFF
-#define MYSQL_HDR_SEQ_MASK 0x000000FF
-#define MYSQL_LOGIN_RESP_PKT_NUM 2
-#define MYSQL_RESPONSE_PKT_NUM 1
-#define MAX_MYSQL_QUERY_STRING 256
-#define MAX_MYSQL_USER_STRING 256
-#define MIN_RESPONSE_PAYLOAD 5
-#define MYSQL_MAX_USER_LEN 32
-#define MYSQL_MAX_PASSWD_LEN 32
-#define MYSQL_RESP_OK 0x00
-#define MYSQL_RESP_MORE 0x01
-#define MYSQL_RESP_AUTH_SWITCH 0xfe
-#define MYSQL_RESP_ERR 0xff
-
-#define EOF_MARKER 0xfe
-#define ERR_MARKER 0xff
-
-#define CLIENT_CAP_FLD 2
-#define EXT_CLIENT_CAP_FLD 2
-#define MAX_PKT_FLD 4
-#define CHARSET_FLD 1
-#define UNAME_RSVD_STR 23
-
-#define FILLER_1_SIZE 1
-#define FILLER_2_SIZE 2
-#define FILLER_3_SIZE 3
-#define MYSQL_DEFAULT 4
-#define CHARACTER_SET_SIZE 2
-
-#define MAX_TABLE_COLUMNS 64
-#define MAX_TABLE_ROWS 128
-
-#define LAYOUT_CTLG 0
-#define LAYOUT_DB 1
-#define LAYOUT_TBL 2
-#define LAYOUT_ORG_TBL 3
-#define LAYOUT_NAME 4
-#define LAYOUT_ORG_NAME 5
-#define MYSQL_CATALOG_LAYOUT 6
-
-#define OK_MESSAGE "\x00\x00"
-#define KO_MESSAGE "\x00\x01"
-#define MYSQL_STR_DEL "\x00"
-#define MULTI_CLIENT 10
-#define LOGIN_OK_SEQ 2
-
-#define GREETING_SEQ_NUM 0
-#define CHALLENGE_SEQ_NUM 1
-#define CHALLENGE_RESP_SEQ_NUM 2
-#define AUTH_SWITH_RESP_SEQ 3
-
-#define MYSQL_THREAD_ID 0x5e
-#define MYSQL_SERVER_CAPAB 0x0101
-#define MYSQL_SERVER_LANGUAGE 0x21
-#define MYSQL_SERVER_STATUS 0x0200
-#define MYSQL_SERVER_EXT_CAPAB 0x0200
-#define MYSQL_AUTHPLGIN 0x00
-#define MYSQL_UNSET 0x00
-#define MYSQL_UNSET_SIZE 10
-#define MYSQL_CLIENT_CONNECT_WITH_DB 0x0008
-#define MYSQL_CLIENT_CAPAB_41VS320 0x0200
-#define MYSQL_CLIENT_CAPAB_SSL 0x0800
-#define MYSQL_EXT_CLIENT_CAPAB 0x0300
-#define MYSQL_EXT_CL_PLG_AUTH_CL_DATA 0x0020
-#define MYSQL_EXT_CL_SECURE_CONNECTION 0x8000
-#define MYSQL_MAX_PACKET 0x00000001
-#define MYSQL_CHARSET 0x21
-
-#define LENENCODINT_1BYTE 0xfb
-#define LENENCODINT_2BYTES 0xfc
-#define LENENCODINT_3BYTES 0xfd
-#define LENENCODINT_8BYTES 0xfe
-
-#define MYSQL_SUCCESS 0
-#define MYSQL_FAILURE (-1)
-#define MYSQL_STR_END '\0'
-
 public:
   enum class PktType {
     MYSQL_REQUEST = 0,
@@ -136,8 +130,8 @@ public:
     uint32_t bits;
   };
 
-  MySQLCodec::Cmd ParseCmd(Buffer::Instance& data);
-  MySQLCodec::PktType CheckPktType(Buffer::Instance& data);
+  Cmd ParseCmd(Buffer::Instance& data);
+  PktType CheckPktType(Buffer::Instance& data);
   int BufUint8Drain(Buffer::Instance& buffer, uint8_t& val);
   int BufUint16Drain(Buffer::Instance& buffer, uint16_t& val);
   int BufUint32Drain(Buffer::Instance& buffer, uint32_t& val);
