@@ -57,5 +57,5 @@ To run clang-tidy under Docker, run the following (this creates a full
 compilation db and takes a long time):
 
 ```
-ci/run_envoy_docker.sh ci/do_ci.sh bazel.clang_tidy
+./ci/run_envoy_docker.sh ci/do_ci.sh bazel.clang_tidy
 ```
