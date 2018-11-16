@@ -91,13 +91,18 @@ ConnectionPool::Cancellable* ConnPoolImpl::newConnection(ConnectionPool::Callbac
   if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
     bool can_create_connection =
         host_->cluster().resourceManager(priority_).connections().canCreate();
+    bool can_create_pending_connection =
+        host_->cluster().resourceManager(priority_).pendingConnections().canCreate();
     if (!can_create_connection) {
       host_->cluster().stats().upstream_cx_overflow_.inc();
+    }
+    if (!can_create_pending_connection) {
+      host_->cluster().stats().upstream_cx_pending_overflow_.inc();
     }
 
     // If we have no connections at all, make one no matter what so we don't starve.
     if ((ready_conns_.empty() && busy_conns_.empty() && pending_conns_.empty()) ||
-        can_create_connection) {
+        (can_create_connection && can_create_pending_connection)) {
       createNewConnection();
     }
 
