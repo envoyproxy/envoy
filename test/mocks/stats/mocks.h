@@ -191,29 +191,43 @@ public:
   StatsOptionsImpl stats_options_;
 };
 
-// The MockSymbolTable behaves like SymbolTableImpl, except that you can
-// have SymbolEncodings from multiple symbol tables interact. This is
-// achieved with unity encoding.
-//
-// The reason this is desirable for tests is that it is very difficult to
-// inject the right SymbolTable& everywhere it needs to go in the test
-// infratsructure, since all the existing mocks have no context.
+class SymbolTableSingleton : public SymbolTableImpl {
+ public:
+  static SymbolTableSingleton& get();
+  void release();
+
+ private:
+  SymbolTableSingleton(Thread::MutexBasicLockable& mutex);
+  static SymbolTableSingleton* singleton_;
+  Thread::MutexBasicLockable& mutex_;  // Lock guards don't work as mutex outlives object.
+  uint64_t ref_count_;
+};
+
 class MockSymbolTable : public SymbolTable {
-public:
+ public:
   MockSymbolTable();
   ~MockSymbolTable();
 
-  SymbolEncoding encode(absl::string_view name) override;
-  uint64_t numSymbols() const override;
-  bool lessThan(const StatName& a, const StatName& b) const override;
-  void free(StatName stat_name) override;
-  void incRefCount(StatName stat_name) override;
-  std::string decode(const SymbolStorage symbol_vec, uint64_t size) const override;
-  bool interoperable(const SymbolTable&) const override { return true; }
+  SymbolEncoding encode(absl::string_view name) override { return singleton_.encode(name); }
+  uint64_t numSymbols() const override { return singleton_.numSymbols(); }
+  bool lessThan(const StatName& a, const StatName& b) const override {
+    return singleton_.lessThan(a, b);
+  }
+  void free(StatName stat_name) override { singleton_.free(stat_name); }
+  void incRefCount(StatName stat_name) override { singleton_.incRefCount(stat_name); }
+  std::string decode(const SymbolStorage symbol_vec, uint64_t size) const override {
+    return singleton_.decode(symbol_vec, size);
+  }
+  bool interoperable(const SymbolTable& other) const override {
+    return dynamic_cast<const MockSymbolTable*>(&other) != nullptr;
+  }
 
 #ifndef ENVOY_CONFIG_COVERAGE
-  void debugPrint() const override;
+  void debugPrint() const override { singleton_.debugPrint(); }
 #endif
+
+ private:
+  SymbolTableSingleton& singleton_;
 };
 
 /**
@@ -226,6 +240,9 @@ public:
   ~MockIsolatedStatsStore();
 
   MOCK_METHOD2(deliverHistogramToSinks, void(const Histogram& histogram, uint64_t value));
+
+ private:
+  MockSymbolTable symbol_table_;
 };
 
 } // namespace Stats

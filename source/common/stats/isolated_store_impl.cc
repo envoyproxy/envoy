@@ -37,5 +37,11 @@ ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
   return std::make_unique<ScopePrefixer>(name, *this);
 }
 
+void IsolatedStoreImpl::clear() {
+  counters_.clear();
+  gauges_.clear();
+  histograms_.clear();
+}
+
 } // namespace Stats
 } // namespace Envoy

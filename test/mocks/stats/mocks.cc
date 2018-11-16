@@ -127,54 +127,42 @@ MockStore::MockStore(SymbolTable& symbol_table)
 }
 MockStore::~MockStore() {}
 
-MockSymbolTable::MockSymbolTable() {}
-MockSymbolTable::~MockSymbolTable() {}
+SymbolTableSingleton* SymbolTableSingleton::singleton_ = nullptr;
 
-SymbolEncoding MockSymbolTable::encode(absl::string_view name) {
-  SymbolEncoding encoding;
-  if (name.empty()) {
-    return encoding;
+SymbolTableSingleton::SymbolTableSingleton(Thread::MutexBasicLockable& mutex)
+    : mutex_(mutex), ref_count_(1) {}
+
+SymbolTableSingleton& SymbolTableSingleton::get() {
+  static Thread::MutexBasicLockable* mutex = new Thread::MutexBasicLockable;
+  Thread::LockGuard lock(*mutex);
+  if (singleton_ == nullptr) {
+    singleton_ = new SymbolTableSingleton(*mutex);
+  } else {
+    ++singleton_->ref_count_;
   }
-  std::vector<absl::string_view> tokens = absl::StrSplit(name, '.');
-  for (absl::string_view token : tokens) {
-    encoding.addSymbol(static_cast<Symbol>(token.size()));
-    ;
-    for (char c : token) {
-      encoding.addSymbol(static_cast<Symbol>(c));
-    }
-  }
-  return encoding;
+  return *singleton_;
 }
 
-std::string MockSymbolTable::decode(const SymbolStorage symbol_vec, uint64_t size) const {
-  std::string out;
-  SymbolVec symbols = SymbolEncoding::decodeSymbols(symbol_vec, size);
-  for (size_t i = 0; i < symbols.size();) {
-    if (!out.empty()) {
-      out += ".";
-    }
-    size_t end = static_cast<size_t>(symbols[i]) + i + 1;
-    while (++i < end) {
-      out += static_cast<char>(symbols[i]);
-    }
+void SymbolTableSingleton::release() {
+  Thread::LockGuard lock(mutex_);
+  ASSERT(singleton_ != nullptr);
+  ASSERT(singleton_ == this);
+  if (--singleton_->ref_count_ == 0) {
+    singleton_ = nullptr;
+    delete this;
   }
-  return out;
 }
 
-bool MockSymbolTable::lessThan(const StatName& a, const StatName& b) const {
-  return a.toString(*this) < b.toString(*this);
+MockSymbolTable::MockSymbolTable() : singleton_(SymbolTableSingleton::get()) {}
+
+MockSymbolTable::~MockSymbolTable() {
+  singleton_.release();
 }
 
-uint64_t MockSymbolTable::numSymbols() const { return 0; }
-void MockSymbolTable::free(StatName) {}
-void MockSymbolTable::incRefCount(StatName) {}
-#ifndef ENVOY_CONFIG_COVERAGE
-void MockSymbolTable::debugPrint() const {}
-#endif
-
-MockIsolatedStatsStore::MockIsolatedStatsStore()
-    : IsolatedStoreImpl(std::make_unique<MockSymbolTable>()) {}
-MockIsolatedStatsStore::~MockIsolatedStatsStore() {}
+MockIsolatedStatsStore::MockIsolatedStatsStore() : IsolatedStoreImpl(symbol_table_) {}
+MockIsolatedStatsStore::~MockIsolatedStatsStore() {
+  IsolatedStoreImpl::clear();
+}
 
 } // namespace Stats
 } // namespace Envoy

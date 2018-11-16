@@ -50,6 +50,9 @@ public:
     return vec;
   }
 
+  void clear() { stats_.clear(); }
+
+
 private:
   StatNameHashMap<std::shared_ptr<Base>> stats_;
   Allocator alloc_;
@@ -93,6 +96,8 @@ public:
     StatNameTempStorage storage(name, symbolTable());
     return histogramx(storage.statName());
   }
+
+  void clear();
 
 private:
   std::unique_ptr<SymbolTable> symbol_table_storage_;
