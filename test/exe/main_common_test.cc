@@ -136,7 +136,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, MainCommonTest,
 class AdminRequestTest : public MainCommonTest {
 protected:
   AdminRequestTest()
-      : envoy_return_(false), envoy_started_(false), envoy_finished_(false),
+      : api_(stats_store_),
+        envoy_return_(false), envoy_started_(false), envoy_finished_(false),
         pause_before_run_(false), pause_after_run_(false) {
     addArg("--disable-hot-restart");
   }
@@ -194,6 +195,7 @@ protected:
   }
 
   Api::Impl api_;
+  Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Thread::Thread> envoy_thread_;
   std::unique_ptr<MainCommon> main_common_;
   absl::Notification started_;

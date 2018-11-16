@@ -350,7 +350,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
     test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
     registerTestServerPorts(port_names);
   }
-  api_ = std::make_unique<Api::Impl>(test_server_->server_.stats());
+  api_ = std::make_unique<Api::Impl>(test_server_->stat_store());
 }
 
 void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
@@ -398,10 +398,9 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
 IntegrationTestServerPtr
 BaseIntegrationTest::createIntegrationTestServer(const std::string& bootstrap_path,
                                                  std::function<void()> pre_worker_start_test_steps,
-                                                 Event::TestTimeSystem& time_system,
-                                                 Api::Api& api) {
+                                                 Event::TestTimeSystem& time_system) {
   return IntegrationTestServer::create(bootstrap_path, version_, pre_worker_start_test_steps,
-                                       deterministic_, time_system, *api);
+                                       deterministic_, time_system, *api_);
 }
 
 } // namespace Envoy
