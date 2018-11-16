@@ -218,12 +218,12 @@ protected:
 
   void expectAsyncClientSend() {
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
-                             const absl::optional<std::chrono::milliseconds>&)
-                             -> Envoy::Http::AsyncClient::Request* {
-          callbacks_.push_back(&cb);
-          return &request_;
-        }));
+        .WillOnce(Invoke(
+            [&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
+                const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
+              callbacks_.push_back(&cb);
+              return &request_;
+            }));
   }
 
   void completeRequest(const std::string& status, const std::string& body) {
@@ -269,12 +269,12 @@ TEST_F(SquashFilterTest, DecodeHeaderContinuesOnClientFail) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("squash")).WillOnce(ReturnRef(cm_.async_client_));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& callbacks,
-                           const absl::optional<std::chrono::milliseconds>&)
-                           -> Envoy::Http::AsyncClient::Request* {
-        callbacks.onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
-        return nullptr;
-      }));
+      .WillOnce(Invoke(
+          [&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
+            callbacks.onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
+            return nullptr;
+          }));
 
   Envoy::Http::TestHeaderMapImpl headers{{":method", "GET"},
                                          {":authority", "www.solo.io"},
@@ -435,7 +435,7 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks&,
-                           const absl::optional<std::chrono::milliseconds>&)
+                           const Http::AsyncClient::RequestOptions&)
                            -> Envoy::Http::AsyncClient::Request* { return &request_; }));
 
   EXPECT_CALL(request_, cancel());

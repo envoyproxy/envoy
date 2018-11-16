@@ -26,7 +26,6 @@ public:
   // work around this, it is not needed the moment.
   DirectoryIteratorImpl(const DirectoryIteratorImpl&) = delete;
   DirectoryIteratorImpl(DirectoryIteratorImpl&&) = default;
-  DirectoryIteratorImpl& operator=(DirectoryIteratorImpl&&) = default;
 
 private:
   void nextEntry();

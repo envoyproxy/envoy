@@ -16,7 +16,7 @@ namespace Singleton {
  */
 class ManagerImpl : public Manager {
 public:
-  ManagerImpl() : run_tid_(Thread::Thread::currentThreadId()) {}
+  ManagerImpl() : run_tid_(Thread::currentThreadId()) {}
 
   // Singleton::Manager
   InstanceSharedPtr get(const std::string& name, SingletonFactoryCb cb) override;

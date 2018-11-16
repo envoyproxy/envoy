@@ -69,7 +69,7 @@ void RestApiFetcher::refresh() {
   message->headers().insertHost().value(remote_cluster_name_);
   active_request_ = cm_.httpAsyncClientForCluster(remote_cluster_name_)
                         .send(std::move(message), *this,
-                              absl::optional<std::chrono::milliseconds>(request_timeout_));
+                              AsyncClient::RequestOptions().setTimeout(request_timeout_));
 }
 
 void RestApiFetcher::requestComplete() {

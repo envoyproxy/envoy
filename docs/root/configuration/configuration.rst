@@ -23,3 +23,4 @@ Configuration reference
   tools/router_check
   overload_manager/overload_manager
   secret
+  well_known_dynamic_metadata

@@ -22,9 +22,11 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LoadBalancerSubsetInfo& subsets,
     const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
+    const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>& least_request_config,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
-    : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config), common_config_(common_config),
-      stats_(stats), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
+    : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
+      least_request_config_(least_request_config), common_config_(common_config), stats_(stats),
+      runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),
                                subsets.defaultSubset().fields().end()),
       subset_keys_(subsets.subsetKeys()), original_priority_set_(priority_set),
@@ -431,9 +433,9 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
 
   switch (subset_lb.lb_type_) {
   case LoadBalancerType::LeastRequest:
-    lb_ = std::make_unique<LeastRequestLoadBalancer>(*this, subset_lb.original_local_priority_set_,
-                                                     subset_lb.stats_, subset_lb.runtime_,
-                                                     subset_lb.random_, subset_lb.common_config_);
+    lb_ = std::make_unique<LeastRequestLoadBalancer>(
+        *this, subset_lb.original_local_priority_set_, subset_lb.stats_, subset_lb.runtime_,
+        subset_lb.random_, subset_lb.common_config_, subset_lb.least_request_config_);
     break;
 
   case LoadBalancerType::Random:

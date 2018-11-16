@@ -66,11 +66,14 @@ public:
   }
   void decodeTrailers(HeaderMapPtr&& trailers) override { decodeTrailers_(trailers); }
 
+  void decodeMetadata(MetadataMapPtr&& metadata_map) override { decodeMetadata_(metadata_map); }
+
   // Http::StreamDecoder
   MOCK_METHOD2(decodeHeaders_, void(HeaderMapPtr& headers, bool end_stream));
   MOCK_METHOD1(decode100ContinueHeaders_, void(HeaderMapPtr& headers));
   MOCK_METHOD2(decodeData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(decodeTrailers_, void(HeaderMapPtr& trailers));
+  MOCK_METHOD1(decodeMetadata_, void(MetadataMapPtr& metadata_map));
 };
 
 class MockStreamCallbacks : public StreamCallbacks {
@@ -122,6 +125,7 @@ public:
   MOCK_METHOD2(encodeHeaders, void(const HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers, void(const HeaderMap& trailers));
+  MOCK_METHOD1(encodeMetadata, void(const MetadataMap& metadata_map));
   MOCK_METHOD0(getStream, Stream&());
 
   testing::NiceMock<MockStream> stream_;
@@ -347,17 +351,14 @@ public:
   MOCK_METHOD0(onRequestDestroy, void());
 
   // Http::AsyncClient
-  Request* send(MessagePtr&& request, Callbacks& callbacks,
-                const absl::optional<std::chrono::milliseconds>& timeout) override {
-    return send_(request, callbacks, timeout);
+  Request* send(MessagePtr&& request, Callbacks& callbacks, const RequestOptions& args) override {
+    return send_(request, callbacks, args);
   }
 
-  MOCK_METHOD3(send_, Request*(MessagePtr& request, Callbacks& callbacks,
-                               const absl::optional<std::chrono::milliseconds>& timeout));
+  MOCK_METHOD3(send_,
+               Request*(MessagePtr& request, Callbacks& callbacks, const RequestOptions& args));
 
-  MOCK_METHOD3(start, Stream*(StreamCallbacks& callbacks,
-                              const absl::optional<std::chrono::milliseconds>& timeout,
-                              bool buffer_body_for_retry));
+  MOCK_METHOD2(start, Stream*(StreamCallbacks& callbacks, const StreamOptions& args));
 
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
 
