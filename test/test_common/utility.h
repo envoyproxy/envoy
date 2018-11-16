@@ -406,7 +406,18 @@ namespace Stats {
  */
 class TestAllocator : public RawStatDataAllocator {
 public:
-  TestAllocator(const StatsOptions& stats_options) : stats_options_(stats_options) {}
+  struct TestBlockMemoryHashSetOptions : public BlockMemoryHashSetOptions {
+    TestBlockMemoryHashSetOptions() {
+      capacity = 200;
+      num_slots = 131;
+    }
+  }
+
+  TestAllocator(const StatsOptions& stats_options)
+      : stats_options_(stats_options),
+        block_memory_(std::make_unique<uint8_t[]>(BlockMemoryHashSet::numBytes(
+            block_hash_options, stats_options))),
+        hash_set_(block_hash_options, true, block_memory, stats_options) {}
   ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
 
   RawStatData* alloc(absl::string_view name) override {
@@ -435,6 +446,10 @@ public:
 private:
   static void freeAdapter(RawStatData* data) { ::free(data); }
   std::unordered_map<std::string, CSmartPtr<RawStatData, freeAdapter>> stats_;
+  Thread::MutexBasicLockable mutex_;
+  TestBlockMemoryHashSetOptions block_hash_options;
+  std::unique_ptr<uint8_t[]> block_memory_;
+  BlockMemoryHashSet hash_set_;
   const StatsOptions& stats_options_;
 };
 

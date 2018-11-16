@@ -17,6 +17,7 @@
 #include "common/common/assert.h"
 #include "common/common/block_memory_hash_set.h"
 #include "common/common/hash.h"
+#include "common/common/thread.h"
 #include "common/stats/stat_data_allocator_impl.h"
 
 #include "absl/strings/string_view.h"
@@ -97,7 +98,9 @@ using RawStatDataSet = BlockMemoryHashSet<Stats::RawStatData>;
 
 class RawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
 public:
-  RawStatDataAllocator(Thread::MutexLockable& mutex, RawStatDataSet& stat_set_) : mutex_(mutex) {}
+  RawStatDataAllocator(Thread::BasicLockable& mutex, RawStatDataSet& stat_set)
+      : mutex_(mutex),
+        stat_set_(stat_set) {}
 
   // StatDataAllocator
   bool requiresBoundedStatNameSize() const override { return true; }
@@ -105,8 +108,8 @@ public:
   void free(Stats::RawStatData& data) override;
 
 private:
-  Thread::MutexLockable& mutex_;
-  RawStatDataSet& stat_set_;
+  Thread::BasicLockable& mutex_;
+  RawStatDataSet& stat_set_ GUARDED_BY(mutex_);
 };
 
 
