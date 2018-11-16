@@ -157,7 +157,8 @@ MockSymbolTable::MockSymbolTable() : singleton_(SymbolTableSingleton::get()) {}
 
 MockSymbolTable::~MockSymbolTable() { singleton_.release(); }
 
-MockIsolatedStatsStore::MockIsolatedStatsStore() : IsolatedStoreImpl(symbol_table_) {}
+//MockIsolatedStatsStore::MockIsolatedStatsStore() : IsolatedStoreImpl(symbol_table_) {}
+MockIsolatedStatsStore::MockIsolatedStatsStore() {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() { IsolatedStoreImpl::clear(); }
 
 } // namespace Stats

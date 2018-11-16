@@ -242,7 +242,7 @@ public:
   MOCK_METHOD2(deliverHistogramToSinks, void(const Histogram& histogram, uint64_t value));
 
 private:
-  MockSymbolTable symbol_table_;
+  //MockSymbolTable symbol_table_;
 };
 
 } // namespace Stats
