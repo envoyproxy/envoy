@@ -8,7 +8,7 @@
 
 #include "common/common/logger.h"
 
-#include "openssl/bytestring.h"
+#include "common/ssl/ssl_impl.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -68,13 +68,13 @@ public:
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
+  void onALPN(const unsigned char* data, unsigned int len);
 
 private:
   void parseClientHello(const void* data, size_t len);
   void onRead();
   void onTimeout();
   void done(bool success);
-  void onALPN(const unsigned char* data, unsigned int len);
   void onServername(absl::string_view name);
 
   ConfigSharedPtr config_;

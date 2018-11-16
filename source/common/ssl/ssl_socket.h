@@ -12,6 +12,7 @@
 #include "common/common/logger.h"
 #include "common/ssl/context_impl.h"
 #include "common/ssl/utility.h"
+#include "common/ssl/ssl_impl.h"
 
 #include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"

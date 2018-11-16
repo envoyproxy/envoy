@@ -20,6 +20,7 @@
 #include "openssl/hmac.h"
 #include "openssl/rand.h"
 #include "openssl/x509v3.h"
+#include "openssl/err.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -41,14 +42,16 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     rc = SSL_CTX_set_max_proto_version(ctx.ssl_ctx_.get(), config.maxProtocolVersion());
     RELEASE_ASSERT(rc == 1, "");
 
-    if (!SSL_CTX_set_strict_cipher_list(ctx.ssl_ctx_.get(), config.cipherSuites().c_str())) {
+    if (!Envoy::Ssl::set_strict_cipher_list(ctx.ssl_ctx_.get(), config.cipherSuites().c_str())) {
       std::vector<absl::string_view> ciphers =
-          StringUtil::splitToken(config.cipherSuites(), ":+-![|]", false);
+        StringUtil::splitToken(config.cipherSuites(), ":+![|]", false);
       std::vector<std::string> bad_ciphers;
       for (const auto& cipher : ciphers) {
         std::string cipher_str(cipher);
-        if (!SSL_CTX_set_strict_cipher_list(ctx.ssl_ctx_.get(), cipher_str.c_str())) {
-          bad_ciphers.push_back(cipher_str);
+        if (cipher_str.compare("-ALL") && cipher_str.compare("ALL")){
+          if (!Envoy::Ssl::set_strict_cipher_list(ctx.ssl_ctx_.get(), cipher_str.c_str())) {
+            bad_ciphers.push_back(cipher_str);
+          }
         }
       }
       throw EnvoyException(fmt::format("Failed to initialize cipher suites {}. The following "
@@ -92,6 +95,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
           X509_STORE_add_crl(store, item->crl);
           has_crl = true;
         }
+
+        Envoy::Ssl::ssl_ctx_add_client_CA(ctx.ssl_ctx_.get(), item->x509);
+
       }
       if (ca_cert_ == nullptr) {
         throw EnvoyException(fmt::format("Failed to load trusted CA certificates from {}",
@@ -294,6 +300,7 @@ bssl::UniquePtr<SSL> ContextImpl::newSsl(absl::optional<std::string>) {
   // We use the first certificate for a new SSL object, later in the
   // SSL_CTX_set_select_certificate_cb() callback following ClientHello, we replace with the
   // selected certificate via SSL_set_SSL_CTX().
+  //return Envoy::Ssl::newSsl(ctx_.get());
   return bssl::UniquePtr<SSL>(SSL_new(tls_contexts_[0].ssl_ctx_.get()));
 }
 
@@ -319,10 +326,9 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
     }
   }
 
-  SSL* ssl = reinterpret_cast<SSL*>(
-      X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
-  return impl->verifyCertificate(cert.get());
+  X509* cert = Envoy::Ssl::getVerifyCallbackCert(store_ctx, arg);
+
+  return impl->verifyCertificate(cert);
 }
 
 int ContextImpl::verifyCertificate(X509* cert) {
@@ -552,7 +558,7 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(absl::optional<std::string> overr
   }
 
   if (allow_renegotiation_) {
-    SSL_set_renegotiate_mode(ssl_con.get(), ssl_renegotiate_freely);
+    Envoy::Ssl::allowRenegotiation(ssl_con.get());
   }
 
   if (max_session_keys_ > 0) {
@@ -565,7 +571,8 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(absl::optional<std::string> overr
         SSL_SESSION* session = session_keys_.front().get();
         SSL_set_session(ssl_con.get(), session);
         // Remove single-use session key (TLS 1.3) after first use.
-        if (SSL_SESSION_should_be_single_use(session)) {
+        if (Envoy::Ssl::should_be_single_use(session)) {
+//        if (SSL_SESSION_should_be_single_use(session)) {
           session_keys_.pop_front();
         }
       }
@@ -587,7 +594,8 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(absl::optional<std::string> overr
 int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
   // In case we ever store single-use session key (TLS 1.3),
   // we need to switch to using write/write locks.
-  if (SSL_SESSION_should_be_single_use(session)) {
+  if (Envoy::Ssl::should_be_single_use(session)) {
+  //if (SSL_SESSION_should_be_single_use(session)) {
     session_keys_single_use_ = true;
   }
   absl::WriterMutexLock l(&session_keys_mu_);
@@ -607,16 +615,18 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
   if (config.tlsCertificates().empty()) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
+
   // First, configure the base context for ClientHello interception.
   // TODO(htuch): replace with SSL_IDENTITY when we have this as a means to do multi-cert in
   // BoringSSL.
-  SSL_CTX_set_select_certificate_cb(
-      tls_contexts_[0].ssl_ctx_.get(),
-      [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
-        return static_cast<ServerContextImpl*>(
-                   SSL_CTX_get_app_data(SSL_get_SSL_CTX(client_hello->ssl)))
-            ->selectTlsContext(client_hello);
-      });
+  Envoy::Ssl::set_select_certificate_cb(tls_contexts_[0].ssl_ctx_.get());
+//  SSL_CTX_set_select_certificate_cb(
+//      tls_contexts_[0].ssl_ctx_.get(),
+//      [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
+//        return static_cast<ServerContextImpl*>(
+//                   SSL_CTX_get_app_data(SSL_get_SSL_CTX(client_hello->ssl)))
+//            ->selectTlsContext(client_hello);
+//      });
   // Compute the session context ID hash. We use all the certificate identities,
   // since we should have a common ID for session resumption no matter what cert
   // is used.
@@ -640,18 +650,19 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
                                  this);
     }
 
+//    if (sk_X509_NAME_num(list.get()) > 0)
+//      SSL_CTX_set_client_CA_list(ctx_.get(), list.release());
+
+    auto ssl_tlsext_ticket_key_cb = +[](SSL *ssl, unsigned char key_name[16], unsigned char *iv, EVP_CIPHER_CTX *ctx, HMAC_CTX *hmac_ctx, int encrypt) -> int 
+    {
+      ContextImpl* context_impl = static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
+      ServerContextImpl* server_context_impl = dynamic_cast<ServerContextImpl*>(context_impl);
+      RELEASE_ASSERT(server_context_impl != nullptr, ""); // for Coverity
+      return server_context_impl->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx, encrypt);
+    };
+
     if (!session_ticket_keys_.empty()) {
-      SSL_CTX_set_tlsext_ticket_key_cb(
-          ctx.ssl_ctx_.get(),
-          [](SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
-             int encrypt) -> int {
-            ContextImpl* context_impl =
-                static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
-            ServerContextImpl* server_context_impl = dynamic_cast<ServerContextImpl*>(context_impl);
-            RELEASE_ASSERT(server_context_impl != nullptr, ""); // for Coverity
-            return server_context_impl->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx,
-                                                             encrypt);
-          });
+      SSL_CTX_set_tlsext_ticket_key_cb(ctx.ssl_ctx_.get(), ssl_tlsext_ticket_key_cb);
     }
 
     int rc = SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_context_buf,
@@ -663,8 +674,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
 void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::string>& server_names,
                                                        uint8_t* session_context_buf,
                                                        unsigned& session_context_len) {
-  EVP_MD_CTX md;
-  int rc = EVP_DigestInit(&md, EVP_sha256());
+  EVP_MD_CTX *md = Envoy::Ssl::newEVP_MD_CTX();
+  int rc = EVP_DigestInit(md, EVP_sha256());
   RELEASE_ASSERT(rc == 1, "");
 
   // Hash the CommonName/SANs of all the server certificates. This makes sure that sessions can only
@@ -684,7 +695,7 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
       RELEASE_ASSERT(cn_entry != nullptr, "");
       ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
       RELEASE_ASSERT(ASN1_STRING_length(cn_asn1) > 0, "");
-      rc = EVP_DigestUpdate(&md, ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
+      rc = EVP_DigestUpdate(md, ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
       RELEASE_ASSERT(rc == 1, "");
     }
 
@@ -693,7 +704,7 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
     if (san_names != nullptr) {
       for (const GENERAL_NAME* san : san_names.get()) {
         if (san->type == GEN_DNS || san->type == GEN_URI) {
-          rc = EVP_DigestUpdate(&md, ASN1_STRING_data(san->d.ia5), ASN1_STRING_length(san->d.ia5));
+          rc = EVP_DigestUpdate(md, ASN1_STRING_data(san->d.ia5), ASN1_STRING_length(san->d.ia5));
           RELEASE_ASSERT(rc == 1, "");
         }
       }
@@ -706,7 +717,7 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
     rc =
         X509_NAME_digest(cert_issuer_name, EVP_sha256(), session_context_buf, &session_context_len);
     RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
-    rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
+    rc = EVP_DigestUpdate(md, session_context_buf, session_context_len);
     RELEASE_ASSERT(rc == 1, "");
   }
 
@@ -717,25 +728,25 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
   if (ca_cert_ != nullptr) {
     rc = X509_digest(ca_cert_.get(), EVP_sha256(), session_context_buf, &session_context_len);
     RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
-    rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
+    rc = EVP_DigestUpdate(md, session_context_buf, session_context_len);
     RELEASE_ASSERT(rc == 1, "");
 
     // verify_subject_alt_name_list_ can only be set with a ca_cert
     for (const std::string& name : verify_subject_alt_name_list_) {
-      rc = EVP_DigestUpdate(&md, name.data(), name.size());
+      rc = EVP_DigestUpdate(md, name.data(), name.size());
       RELEASE_ASSERT(rc == 1, "");
     }
   }
 
   for (const auto& hash : verify_certificate_hash_list_) {
-    rc = EVP_DigestUpdate(&md, hash.data(),
+    rc = EVP_DigestUpdate(md, hash.data(),
                           hash.size() *
                               sizeof(std::remove_reference<decltype(hash)>::type::value_type));
     RELEASE_ASSERT(rc == 1, "");
   }
 
   for (const auto& hash : verify_certificate_spki_list_) {
-    rc = EVP_DigestUpdate(&md, hash.data(),
+    rc = EVP_DigestUpdate(md, hash.data(),
                           hash.size() *
                               sizeof(std::remove_reference<decltype(hash)>::type::value_type));
     RELEASE_ASSERT(rc == 1, "");
@@ -744,12 +755,14 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
   // Hash configured SNIs for this context, so that sessions cannot be resumed across different
   // filter chains, even when using the same server certificate.
   for (const auto& name : server_names) {
-    rc = EVP_DigestUpdate(&md, name.data(), name.size());
+    rc = EVP_DigestUpdate(md, name.data(), name.size());
     RELEASE_ASSERT(rc == 1, "");
   }
 
-  rc = EVP_DigestFinal(&md, session_context_buf, &session_context_len);
+  rc = EVP_DigestFinal(md, session_context_buf, &session_context_len);
   RELEASE_ASSERT(rc == 1, "");
+
+  EVP_MD_CTX_free(md);
 }
 
 int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,
@@ -812,14 +825,14 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
   }
 }
 
-enum ssl_select_cert_result_t
-ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
+//enum ssl_select_cert_result_t
+//ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   // This is currently a nop, since we only have a single cert, but this is where we will implement
   // the certificate selection logic in #1319.
-  RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, tls_contexts_[0].ssl_ctx_.get()) != nullptr,
-                 "");
-  return ssl_select_cert_success;
-}
+//  RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, tls_contexts_[0].ssl_ctx_.get()) != nullptr,
+//                 "");
+//  return ssl_select_cert_success;
+//}
 
 void ServerContextImpl::TlsContext::addClientValidationContext(
     const CertificateValidationContextConfig& config, bool require_client_cert) {
@@ -827,8 +840,9 @@ void ServerContextImpl::TlsContext::addClientValidationContext(
       BIO_new_mem_buf(const_cast<char*>(config.caCert().data()), config.caCert().size()));
   RELEASE_ASSERT(bio != nullptr, "");
   // Based on BoringSSL's SSL_add_file_cert_subjects_to_stack().
-  bssl::UniquePtr<STACK_OF(X509_NAME)> list(sk_X509_NAME_new(
-      [](const X509_NAME** a, const X509_NAME** b) -> int { return X509_NAME_cmp(*a, *b); }));
+//  bssl::UniquePtr<STACK_OF(X509_NAME)> list(sk_X509_NAME_new(
+//      [](const X509_NAME** a, const X509_NAME** b) -> int { return X509_NAME_cmp(*a, *b); }));
+  bssl::UniquePtr<STACK_OF(X509_NAME)> list = Envoy::Ssl::initX509Names();
   RELEASE_ASSERT(list != nullptr, "");
   for (;;) {
     bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
@@ -858,7 +872,9 @@ void ServerContextImpl::TlsContext::addClientValidationContext(
     throw EnvoyException(
         fmt::format("Failed to load trusted client CA certificates from {}", config.caCertPath()));
   }
-  SSL_CTX_set_client_CA_list(ssl_ctx_.get(), list.release());
+
+  if (sk_X509_NAME_num(list.get()) > 0)
+    SSL_CTX_set_client_CA_list(ssl_ctx_.get(), list.release());
 
   // SSL_VERIFY_PEER or stronger mode was already set in ContextImpl::ContextImpl().
   if (require_client_cert) {

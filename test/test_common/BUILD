@@ -193,8 +193,12 @@ envoy_cc_library(
     name = "tls_utility_lib",
     srcs = ["tls_utility.cc"],
     hdrs = ["tls_utility.h"],
-    external_deps = ["ssl"],
+    external_deps = [
+        "ssl",
+    ],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/common/ssl:ssl_impl_common_hdrs_lib",
+        "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
     ],
 )

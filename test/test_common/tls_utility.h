@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "common/ssl/ssl_impl.h"
+
 namespace Envoy {
 namespace Tls {
 namespace Test {

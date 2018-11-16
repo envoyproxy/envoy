@@ -16,7 +16,9 @@
 
 #include "extensions/transport_sockets/well_known_names.h"
 
-#include "openssl/bytestring.h"
+#include "common/ssl/ssl_impl.h"
+#include "extensions/filters/listener/tls_inspector/ssl_impl_tls_inspector.h"
+
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -26,7 +28,7 @@ namespace TlsInspector {
 
 Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
-      ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
+      ssl_ctx_(SSL_CTX_new(Envoy::Ssl::TLS_with_buffers_method())),
       max_client_hello_size_(max_client_hello_size) {
 
   if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
@@ -36,26 +38,32 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
 
   SSL_CTX_set_options(ssl_ctx_.get(), SSL_OP_NO_TICKET);
   SSL_CTX_set_session_cache_mode(ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
-  SSL_CTX_set_select_certificate_cb(
-      ssl_ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
-        const uint8_t* data;
-        size_t len;
-        if (SSL_early_callback_ctx_extension_get(
-                client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &len)) {
-          Filter* filter = static_cast<Filter*>(SSL_get_app_data(client_hello->ssl));
-          filter->onALPN(data, len);
-        }
-        return ssl_select_cert_success;
-      });
-  SSL_CTX_set_tlsext_servername_callback(
-      ssl_ctx_.get(), [](SSL* ssl, int* out_alert, void*) -> int {
-        Filter* filter = static_cast<Filter*>(SSL_get_app_data(ssl));
-        filter->onServername(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name));
 
-        // Return an error to stop the handshake; we have what we wanted already.
-        *out_alert = SSL_AD_USER_CANCELLED;
-        return SSL_TLSEXT_ERR_ALERT_FATAL;
-      });
+  Envoy::Ssl::set_certificate_cb(ssl_ctx_.get());
+
+  auto tlsext_servername_cb = +[](SSL *ssl, int* out_alert, void *arg) -> int
+  {
+    Filter* filter = static_cast<Filter*>(SSL_get_app_data(ssl));
+    absl::string_view servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+    filter->onServername(servername);
+
+    return Envoy::Ssl::getServernameCallbackReturn(out_alert);
+  };
+  SSL_CTX_set_tlsext_servername_callback(ssl_ctx_.get(), tlsext_servername_cb);
+
+  auto alpn_cb = [](SSL *ssl,
+                   const unsigned char **out,
+                   unsigned char *outlen,
+                   const unsigned char *in,
+                   unsigned int inlen,
+                   void *arg) -> int
+  {
+    Filter* filter = static_cast<Filter*>(SSL_get_app_data(ssl));
+    filter->onALPN(in, inlen);
+
+    return SSL_TLSEXT_ERR_OK;
+  };
+  SSL_CTX_set_alpn_select_cb(ssl_ctx_.get(), alpn_cb, nullptr);
 }
 
 bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_ctx_.get())}; }
@@ -100,21 +108,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 }
 
 void Filter::onALPN(const unsigned char* data, unsigned int len) {
-  CBS wire, list;
-  CBS_init(&wire, reinterpret_cast<const uint8_t*>(data), static_cast<size_t>(len));
-  if (!CBS_get_u16_length_prefixed(&wire, &list) || CBS_len(&wire) != 0 || CBS_len(&list) < 2) {
-    // Don't produce errors, let the real TLS stack do it.
-    return;
-  }
-  CBS name;
-  std::vector<absl::string_view> protocols;
-  while (CBS_len(&list) > 0) {
-    if (!CBS_get_u8_length_prefixed(&list, &name) || CBS_len(&name) == 0) {
-      // Don't produce errors, let the real TLS stack do it.
-      return;
-    }
-    protocols.emplace_back(reinterpret_cast<const char*>(CBS_data(&name)), CBS_len(&name));
-  }
+  std::vector<absl::string_view> protocols = Envoy::Ssl::getAlpnProtocols(data, len);
   cb_->socket().setRequestedApplicationProtocols(protocols);
   alpn_found_ = true;
 }

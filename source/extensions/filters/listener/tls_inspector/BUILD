@@ -13,8 +13,14 @@ envoy_package()
 
 envoy_cc_library(
     name = "tls_inspector_lib",
-    srcs = ["tls_inspector.cc"],
-    hdrs = ["tls_inspector.h"],
+    srcs = [
+        "tls_inspector.cc",
+        "ssl_impl_tls_inspector.cc",
+    ],
+    hdrs = [
+        "tls_inspector.h",
+        "ssl_impl_tls_inspector.h",
+    ],
     external_deps = ["ssl"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
@@ -25,6 +31,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/extensions/transport_sockets:well_known_names",
+        "//source/common/ssl:ssl_impl_hdrs_lib",
     ],
 )
 
@@ -38,3 +45,4 @@ envoy_cc_library(
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
     ],
 )
+

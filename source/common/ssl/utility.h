@@ -4,6 +4,8 @@
 #include <vector>
 
 #include "common/common/utility.h"
+#include "common/ssl/ssl_impl.h"
+#include "common/ssl/ssl_impl_common.h"
 
 #include "openssl/ssl.h"
 

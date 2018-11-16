@@ -12,6 +12,8 @@
 #include "openssl/err.h"
 #include "openssl/x509v3.h"
 
+#include <iostream>
+
 using Envoy::Network::PostIoAction;
 
 namespace Envoy {

@@ -209,8 +209,7 @@ const std::string testUtilV2(
     SSL* client_ssl_socket = ssl_socket->rawSslForTest();
     SSL_CTX* client_ssl_context = SSL_get_SSL_CTX(client_ssl_socket);
     SSL_SESSION* client_ssl_session =
-        SSL_SESSION_from_bytes(reinterpret_cast<const uint8_t*>(client_session.data()),
-                               client_session.size(), client_ssl_context);
+        Envoy::Ssl::ssl_session_from_bytes(client_ssl_socket, client_ssl_context, client_session);
     int rc = SSL_set_session(client_ssl_socket, client_ssl_session);
     ASSERT(rc == 1);
     SSL_SESSION_free(client_ssl_session);
@@ -276,10 +275,10 @@ const std::string testUtilV2(
       }
 
       SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_socket);
-      EXPECT_TRUE(SSL_SESSION_is_resumable(client_ssl_session));
+      EXPECT_TRUE(Envoy::Ssl::ssl_session_is_resumable(client_ssl_session));
       uint8_t* session_data;
       size_t session_len;
-      int rc = SSL_SESSION_to_bytes(client_ssl_session, &session_data, &session_len);
+      int rc = Envoy::Ssl::ssl_session_to_bytes(client_ssl_session, &session_data, &session_len);
       ASSERT(rc == 1);
       new_session = std::string(reinterpret_cast<char*>(session_data), session_len);
       OPENSSL_free(session_data);
@@ -2013,7 +2012,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
         const Ssl::SslSocket* ssl_socket =
             dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
         ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
-        EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
+        EXPECT_TRUE(Envoy::Ssl::ssl_session_is_resumable(ssl_session));
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher.exit();
@@ -2431,7 +2430,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
         const Ssl::SslSocket* ssl_socket =
             dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
         ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
-        EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
+        EXPECT_TRUE(Envoy::Ssl::ssl_session_is_resumable(ssl_session));
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher_->exit();

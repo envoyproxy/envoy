@@ -66,12 +66,12 @@ envoy_cc_library(
         "context_impl.h",
         "context_manager_impl.h",
     ],
-    external_deps = [
-        "abseil_synchronization",
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         ":utility_lib",
+        ":ssl_impl_common_hdrs_lib",
+        ":ssl_impl_common_lib",
+        ":ssl_impl_hdrs_lib",
         "//include/envoy/ssl:context_config_interface",
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
@@ -118,7 +118,57 @@ envoy_cc_library(
         "ssl",
     ],
     deps = [
+        ":ssl_impl_common_hdrs_lib",
+        ":ssl_impl_hdrs_lib",
+        ":ssl_impl_common_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "ssl_impl_common_lib",
+    srcs = [
+        "ssl_impl_common.cc",
+    ],
+    hdrs = [
+        "context_impl.h",
+        "context_manager_impl.h",
+    ],
+    external_deps = [
+        "ssl",
+    ],
+    deps = [
+        ":ssl_impl_hdrs_lib",
+        ":ssl_impl_common_hdrs_lib",
+        "//include/envoy/ssl:context_config_interface",
+        "//include/envoy/ssl:context_interface",
+        "//include/envoy/ssl:context_manager_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "ssl_impl_hdrs_lib",
+    hdrs = [
+        "ssl_impl.h",
+    ],
+    external_deps = [
+                 "ssl",
+    ],
+)
+
+envoy_cc_library(
+    name = "ssl_impl_common_hdrs_lib",
+    hdrs = [
+        "ssl_impl_common.h",
+    ],
+    external_deps = [
+                 "ssl",
+    ],
+)
+

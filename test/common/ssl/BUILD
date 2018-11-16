@@ -12,14 +12,16 @@ envoy_package()
 envoy_cc_test(
     name = "ssl_socket_test",
     srcs = [
-        "ssl_certs_test.h",
         "ssl_socket_test.cc",
+        "ssl_certs_test.h",
     ],
     data = [
         "gen_unittest_certs.sh",
         "//test/common/ssl/test_data:certs",
     ],
-    external_deps = ["ssl"],
+    external_deps = [
+        "ssl"
+    ],
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
@@ -34,6 +36,8 @@ envoy_cc_test(
         "//source/common/ssl:context_lib",
         "//source/common/ssl:ssl_socket_lib",
         "//source/common/ssl:utility_lib",
+        "//source/common/ssl:ssl_impl_common_hdrs_lib",
+        "//source/common/ssl:ssl_impl_common_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
