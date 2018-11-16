@@ -2,12 +2,6 @@
 
 namespace Envoy {
 namespace Network {
-TransportSocketOptionsImpl::TransportSocketOptionsImpl(std::string override_server_name) {
-  if (!override_server_name.empty()) {
-    override_server_name_ = override_server_name;
-  }
-}
-
 void TransportSocketOptionsImpl::hashKey(std::vector<uint8_t>& key) const {
   if (!override_server_name_.has_value()) {
     return;

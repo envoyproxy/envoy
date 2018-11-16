@@ -7,7 +7,10 @@ namespace Network {
 
 class TransportSocketOptionsImpl : public TransportSocketOptions {
 public:
-  TransportSocketOptionsImpl(std::string override_server_name = "");
+  TransportSocketOptionsImpl(std::string override_server_name = "")
+      : override_server_name_(override_server_name.empty()
+                                  ? absl::nullopt
+                                  : absl::optional<std::string>(override_server_name)) {}
 
   // Network::TransportSocketOptions
   const absl::optional<std::string>& serverNameOverride() const override {
@@ -16,7 +19,7 @@ public:
   void hashKey(std::vector<uint8_t>& key) const override;
 
 private:
-  absl::optional<std::string> override_server_name_;
+  const absl::optional<std::string> override_server_name_;
 };
 
 } // namespace Network
