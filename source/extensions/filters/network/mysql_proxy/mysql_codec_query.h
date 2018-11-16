@@ -8,10 +8,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-class MySQLCodecQuery : public MySQLCodec {
+class Query : public MySQLCodec {
 public:
-  int Decode(Buffer::Instance& buffer);
-  std::string Encode();
+  // MySQLCodec
+  int Decode(Buffer::Instance&) override { return 0; }
+  std::string Encode() override { return ""; }
+
   MySQLCodec::Cmd GetCmd() { return cmd_; }
   std::string& GetOp() { return op_; }
   std::string& GetStatment() { return statement_; }
@@ -25,10 +27,12 @@ private:
   std::string statement_;
 };
 
-class MySQLCodecQueryResp : public MySQLCodec {
+class QueryResp : public MySQLCodec {
 public:
-  int Decode(Buffer::Instance& buffer);
-  std::string& Encode();
+  // MySQLCodec
+  int Decode(Buffer::Instance&) override { return 0; }
+  std::string Encode() override { return ""; }
+
   uint16_t GetServerStatus() { return server_status_; }
   uint16_t GetWarnings() { return warnings_; }
   void SetServerStatus(uint16_t status);

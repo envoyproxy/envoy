@@ -10,12 +10,14 @@ namespace MySQLProxy {
 
 class ClientSwitchResponse : public MySQLCodec {
 public:
+  // MySQLCodec
+  int Decode(Buffer::Instance& buffer) override;
+  std::string Encode() override;
+
   int GetSeq() { return seq_; }
   void SetSeq(int seq);
   std::string& GetAuthPluginResp() { return auth_plugin_resp_; }
   void SetAuthPluginResp(std::string& auth_swith_resp);
-  int Decode(Buffer::Instance& buffer);
-  std::string Encode();
 
 private:
   std::string auth_plugin_resp_;

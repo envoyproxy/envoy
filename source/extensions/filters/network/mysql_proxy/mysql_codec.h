@@ -130,27 +130,30 @@ public:
     uint32_t bits;
   };
 
-  Cmd ParseCmd(Buffer::Instance& data);
-  PktType CheckPktType(Buffer::Instance& data);
+  virtual int Decode(Buffer::Instance& data) PURE;
+  virtual std::string Encode() PURE;
+  virtual ~MySQLCodec(){};
+
+  void BufUint8Add(Buffer::Instance& buffer, uint8_t val) { buffer.add(&val, sizeof(uint8_t)); }
+  void BufUint16Add(Buffer::Instance& buffer, uint16_t val) { buffer.add(&val, sizeof(uint16_t)); }
+  void BufUint32Add(Buffer::Instance& buffer, uint32_t val) { buffer.add(&val, sizeof(uint32_t)); }
+  void BufStringAdd(Buffer::Instance& buffer, const std::string& str) { buffer.add(str); }
+  std::string BufToString(Buffer::Instance& buffer);
+  std::string EncodeHdr(const std::string& cmd_str, int seq);
+  int GetSeq() { return seq_; }
+  bool EndOfBuffer(Buffer::Instance& buffer);
+
   int BufUint8Drain(Buffer::Instance& buffer, uint8_t& val);
   int BufUint16Drain(Buffer::Instance& buffer, uint16_t& val);
   int BufUint32Drain(Buffer::Instance& buffer, uint32_t& val);
   int BufUint64Drain(Buffer::Instance& buffer, uint64_t& val);
   int BufReadBySizeDrain(Buffer::Instance& buffer, int len, int& val);
   int ReadLengthEncodedIntegerDrain(Buffer::Instance& buffer, int& val);
-  void BufUint8Add(Buffer::Instance& buffer, uint8_t val) { buffer.add(&val, sizeof(uint8_t)); }
-  void BufUint16Add(Buffer::Instance& buffer, uint16_t val) { buffer.add(&val, sizeof(uint16_t)); }
-  void BufUint32Add(Buffer::Instance& buffer, uint32_t val) { buffer.add(&val, sizeof(uint32_t)); }
-  void BufStringAdd(Buffer::Instance& buffer, const std::string& str) { buffer.add(str); }
   int DrainBytes(Buffer::Instance& buffer, int skip_bytes);
   int BufStringDrain(Buffer::Instance& buffer, std::string& str);
   int BufStringDrainBySize(Buffer::Instance& buffer, std::string& str, int len);
-  std::string BufToString(Buffer::Instance& buffer);
-  std::string EncodeHdr(const std::string& cmd_str, int seq);
   int HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq);
-  int GetSeq() { return seq_; }
   void SetSeq(int seq);
-  bool EndOfBuffer(Buffer::Instance& buffer);
 
 private:
   uint64_t offset_;

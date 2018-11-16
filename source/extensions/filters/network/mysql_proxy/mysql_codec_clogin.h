@@ -11,8 +11,10 @@ namespace MySQLProxy {
 constexpr int UNSET_BYTES = 23;
 class ClientLogin : public MySQLCodec {
 public:
-  int Decode(Buffer::Instance& buffer);
-  std::string Encode();
+  // MySQLCodec
+  int Decode(Buffer::Instance& buffer) override;
+  std::string Encode() override;
+
   int GetClientCap() { return client_cap_; }
   int GetExtendedClientCap() { return extended_client_cap_; }
   int GetMaxPacket() { return max_packet_; }

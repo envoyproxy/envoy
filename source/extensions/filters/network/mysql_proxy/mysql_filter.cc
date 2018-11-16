@@ -129,14 +129,20 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, bool end_stre
   }
 
   // Process Query
-  case MySQLSession::State::MYSQL_REQ:
+  case MySQLSession::State::MYSQL_REQ: {
+    Query query{};
+    query.Decode(data);
     session_.SetState(MySQLSession::State::MYSQL_REQ_RESP);
     break;
+  }
 
   // Process Query Response
-  case MySQLSession::State::MYSQL_REQ_RESP:
+  case MySQLSession::State::MYSQL_REQ_RESP: {
+    QueryResp query_resp{};
+    query_resp.Decode(data);
     session_.SetState(MySQLSession::State::MYSQL_REQ);
     break;
+  }
 
   case MySQLSession::State::MYSQL_ERROR:
   case MySQLSession::State::MYSQL_NOT_HANDLED:
