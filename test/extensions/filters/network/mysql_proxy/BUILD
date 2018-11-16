@@ -2,20 +2,23 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_extension_cc_test_library",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_mock",
     "envoy_extension_cc_test",
+    "envoy_extension_cc_test_library",
 )
 
 envoy_package()
 
-envoy_cc_test_library(
+envoy_extension_cc_test_library(
     name = "mysql_test_utils_lib",
     srcs = ["mysql_test_utils.cc"],
     hdrs = ["mysql_test_utils.h"],
+    extension_name = "envoy.filters.network.mysql_proxy",
     deps = [
         "//source/extensions/filters/network/mysql_proxy:proxy_lib",
     ],

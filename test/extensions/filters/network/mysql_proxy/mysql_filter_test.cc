@@ -33,7 +33,6 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
 };
 
-
 // Test New Session counter increment
 TEST_F(MysqlFilterTest, NewSessionStatsTest) {
   initialize();
