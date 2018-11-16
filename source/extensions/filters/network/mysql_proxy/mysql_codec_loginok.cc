@@ -37,7 +37,7 @@ int ClientLoginResponse::Decode(Buffer::Instance& buffer) {
   }
   SetRespCode(resp_code);
   if ((resp_code == MYSQL_RESP_AUTH_SWITCH) && EndOfBuffer(buffer)) {
-    /* OldAuthSwitchRequest */
+    // OldAuthSwitchRequest
     return MYSQL_SUCCESS;
   }
   uint8_t affected_rows = 0;

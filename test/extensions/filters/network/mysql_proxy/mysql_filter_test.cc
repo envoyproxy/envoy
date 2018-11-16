@@ -33,9 +33,8 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
 };
 
-/*
- * Test New Session counter increment
- */
+
+// Test New Session counter increment
 TEST_F(MysqlFilterTest, NewSessionStatsTest) {
   initialize();
 
@@ -45,10 +44,9 @@ TEST_F(MysqlFilterTest, NewSessionStatsTest) {
   EXPECT_EQ(SESSIONS, config_->stats().sessions_.value());
 }
 
-/*
+/**
  * Test Mysql Handshake with protocol version 41
  * SM: greeting(p=10) -> challenge-req(v41) -> serv-resp-ok
- * validate counters and state-machine
  */
 TEST_F(MysqlFilterTest, MySqlHandshake41OkTest) {
   initialize();
@@ -74,11 +72,10 @@ TEST_F(MysqlFilterTest, MySqlHandshake41OkTest) {
   EXPECT_EQ(MysqlSession::State::MYSQL_REQ, filter_->getSession().GetState());
 }
 
-/*
+/**
  * Test Mysql Handshake with protocol version 41
  * Server responds with Error
  * SM: greeting(p=10) -> challenge-req(v41) -> serv-resp-err
- * validate counters and state-machine
  */
 TEST_F(MysqlFilterTest, MySqlHandshake41ErrTest) {
   initialize();
@@ -105,10 +102,9 @@ TEST_F(MysqlFilterTest, MySqlHandshake41ErrTest) {
   EXPECT_EQ(MysqlSession::State::MYSQL_ERROR, filter_->getSession().GetState());
 }
 
-/*
+/**
  * Test Mysql Handshake with protocol version 320
  * SM: greeting(p=10) -> challenge-req(v320) -> serv-resp-ok
- * validate counters and state-machine
  */
 TEST_F(MysqlFilterTest, MySqlHandshake320OkTest) {
   initialize();
@@ -134,11 +130,10 @@ TEST_F(MysqlFilterTest, MySqlHandshake320OkTest) {
   EXPECT_EQ(MysqlSession::State::MYSQL_REQ, filter_->getSession().GetState());
 }
 
-/*
+/**
  * Test Mysql Handshake with protocol version 320
  * Server responds with Error
  * SM: greeting(p=10) -> challenge-req(v320) -> serv-resp-err
- * validate counters and state-machine
  */
 TEST_F(MysqlFilterTest, MySqlHandshake320ErrTest) {
   initialize();
@@ -165,11 +160,10 @@ TEST_F(MysqlFilterTest, MySqlHandshake320ErrTest) {
   EXPECT_EQ(MysqlSession::State::MYSQL_ERROR, filter_->getSession().GetState());
 }
 
-/*
+/**
  * Test Mysql Handshake with SSL Request
  * State-machine moves to SSL-Pass-Through
  * SM: greeting(p=10) -> challenge-req(v320) -> SSL_PT
- * validate counters and state-machine
  */
 TEST_F(MysqlFilterTest, MySqlHandshakeSSLTest) {
   initialize();
@@ -192,12 +186,11 @@ TEST_F(MysqlFilterTest, MySqlHandshakeSSLTest) {
   EXPECT_EQ(MysqlSession::State::MYSQL_SSL_PT, filter_->getSession().GetState());
 }
 
-/*
+/**
  * Test Mysql Handshake with protocol version 320
  * Server responds with Auth Switch
  * SM: greeting(p=10) -> challenge-req(v320) -> serv-resp-auth-switch ->
  * -> auth_switch_resp -> serv-resp-ok
- * validate counters and state-machine
  */
 TEST_F(MysqlFilterTest, MySqlHandshake320AuthSwitchTest) {
   initialize();
@@ -232,11 +225,11 @@ TEST_F(MysqlFilterTest, MySqlHandshake320AuthSwitchTest) {
   EXPECT_EQ(MysqlSession::State::MYSQL_REQ, filter_->getSession().GetState());
 }
 
-/* Negative sequence
+/**
+ * Negative sequence
  * Test Mysql Handshake with protocol version 41
  * - send 2 back-to-back Greeting message (duplicated message)
  * -> expect filter to ignore the second.
- * validate counters and state-machine
  */
 TEST_F(MysqlFilterTest, MySqlHandshake41Ok2GreetTest) {
   initialize();
@@ -267,11 +260,11 @@ TEST_F(MysqlFilterTest, MySqlHandshake41Ok2GreetTest) {
   EXPECT_EQ(MysqlSession::State::MYSQL_REQ, filter_->getSession().GetState());
 }
 
-/* Negative sequence
+/**
+ * Negative sequence
  * Test Mysql Handshake with protocol version 41
  * - send 2 back-to-back Challenge messages.
  * -> expect the filter to ignore the second
- * validate counters and state-machine
  */
 TEST_F(MysqlFilterTest, MySqlHandshake41Ok2CloginTest) {
   initialize();
@@ -304,12 +297,12 @@ TEST_F(MysqlFilterTest, MySqlHandshake41Ok2CloginTest) {
   EXPECT_EQ(MysqlSession::State::MYSQL_REQ, filter_->getSession().GetState());
 }
 
-/* Negative sequence
+/**
+ * Negative sequence
  * Test Mysql Handshake with protocol version 41
  * - send out or order challenge and greeting messages.
  * -> expect the filter to ignore the challenge,
  *    since greeting was not seen
- * validate counters and state-machine
  */
 TEST_F(MysqlFilterTest, MySqlHandshake41OkOOOLoginTest) {
   initialize();
@@ -329,13 +322,13 @@ TEST_F(MysqlFilterTest, MySqlHandshake41OkOOOLoginTest) {
   EXPECT_EQ(MysqlSession::State::MYSQL_CHALLENGE_REQ, filter_->getSession().GetState());
 }
 
-/* Negative sequence
+/**
+ * Negative sequence
  * Test Mysql Handshake with protocol version 41
  * - send out or order challenge and greeting messages
  *   followed by login ok
  * -> expect the filter to ignore initial challenge as well as
  *    serverOK because out of order
- * validate counters and state-machine
  */
 TEST_F(MysqlFilterTest, MySqlHandshake41OkOOOFullLoginTest) {
   initialize();
@@ -361,12 +354,12 @@ TEST_F(MysqlFilterTest, MySqlHandshake41OkOOOFullLoginTest) {
   EXPECT_EQ(2UL, config_->stats().protocol_errors_.value());
 }
 
-/* Negative sequence
+/**
+ * Negative sequence
  * Test Mysql Handshake with protocol version 41
  * - send greeting messages followed by login ok
  * -> expect filte to ignore serverOK, because it has not
  *    processed Challenge message
- * validate counters and state-machine
  */
 TEST_F(MysqlFilterTest, MySqlHandshake41OkGreetingLoginOKTest) {
   initialize();
@@ -386,13 +379,12 @@ TEST_F(MysqlFilterTest, MySqlHandshake41OkGreetingLoginOKTest) {
   EXPECT_EQ(1UL, config_->stats_.protocol_errors_.value());
 }
 
-/*
+/**
  * Negative Testing
  * Test Mysql Handshake with protocol version 320
  * Server responds with Auth Switch wrong sequence
  * -> expect filter to ignore auth-switch message
  *    because of wrong seq.
- * validate counters and state-machine
  */
 TEST_F(MysqlFilterTest, MySqlHandshake320AuthSwitchWromgSeqTest) {
   initialize();

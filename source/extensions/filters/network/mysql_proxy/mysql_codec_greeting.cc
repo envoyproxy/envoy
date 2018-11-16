@@ -59,7 +59,7 @@ int ServerGreeting::Decode(Buffer::Instance& buffer) {
   }
   SetSalt(salt);
   if (protocol_ == MYSQL_PROTOCOL_9) {
-    /* End of HandshakeV9 greeting */
+    // End of HandshakeV9 greeting
     return MYSQL_SUCCESS;
   }
   uint16_t server_cap = 0;
@@ -69,7 +69,7 @@ int ServerGreeting::Decode(Buffer::Instance& buffer) {
   }
   SetServerCap(server_cap);
   if (EndOfBuffer(buffer) == true) {
-    /* HandshakeV10 can terminate after Server Capabilities */
+    // HandshakeV10 can terminate after Server Capabilities
     return MYSQL_SUCCESS;
   }
   uint8_t server_language = 0;

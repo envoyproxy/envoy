@@ -73,7 +73,7 @@ int ClientLogin::Decode(Buffer::Instance& buffer) {
   }
   SetMaxPacket(max_packet);
   if (IsSSLRequest()) {
-    /* Stop Parsing if CLIENT_SSL flag is set */
+    // Stop Parsing if CLIENT_SSL flag is set
     return MYSQL_SUCCESS;
   }
   uint8_t charset = 0;

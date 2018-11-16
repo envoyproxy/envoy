@@ -48,7 +48,6 @@ TEST_F(MysqlCodecTest, MysqlServerChallengeV9EncDec) {
  * Test the MYSQL Greeting message V10 parser:
  * - message is encoded using the ServerGreeting class
  * - message is decoded using the ServerGreeting class
- * Results are verified
  */
 TEST_F(MysqlCodecTest, MysqlServerChallengeV10EncDec) {
   ServerGreeting mysql_greet_encode{};
@@ -83,7 +82,6 @@ TEST_F(MysqlCodecTest, MysqlServerChallengeV10EncDec) {
  * - message is encoded using the ClientLogin class
  *   - CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA set
  * - message is decoded using the ClientLogin class
- * Results are verified
  */
 TEST_F(MysqlCodecTest, MysqlClLoginV41PluginAuthEncDec) {
   ClientLogin mysql_clogin_encode{};
@@ -120,7 +118,6 @@ TEST_F(MysqlCodecTest, MysqlClLoginV41PluginAuthEncDec) {
  * - message is encoded using the ClientLogin class
  *   - CLIENT_SECURE_CONNECTION set
  * - message is decoded using the ClientLogin class
- * Results are verified
  */
 TEST_F(MysqlCodecTest, MysqlClientLogin41SecureConnEncDec) {
   ClientLogin mysql_clogin_encode{};
@@ -156,7 +153,6 @@ TEST_F(MysqlCodecTest, MysqlClientLogin41SecureConnEncDec) {
  * Test the MYSQL Client Login 41 message parser:
  * - message is encoded using the ClientLogin class
  * - message is decoded using the ClientLogin class
- * Results are verified
  */
 TEST_F(MysqlCodecTest, MysqlClientLogin41EncDec) {
   ClientLogin mysql_clogin_encode{};
@@ -187,7 +183,6 @@ TEST_F(MysqlCodecTest, MysqlClientLogin41EncDec) {
  * Test the MYSQL Client Login 320 message parser:
  * - message is encoded using the ClientLogin class
  * - message is decoded using the ClientLogin class
- * Results are verified
  */
 TEST_F(MysqlCodecTest, MysqlClientLogin320EncDec) {
   ClientLogin mysql_clogin_encode{};
@@ -218,7 +213,6 @@ TEST_F(MysqlCodecTest, MysqlClientLogin320EncDec) {
  * Test the MYSQL Client Login SSL message parser:
  * - message is encoded using the ClientLogin class
  * - message is decoded using the ClientLogin class
- * Results are verified
  */
 TEST_F(MysqlCodecTest, MysqlClientLoginSSLEncDec) {
   ClientLogin mysql_clogin_encode{};
@@ -246,7 +240,6 @@ TEST_F(MysqlCodecTest, MysqlClientLoginSSLEncDec) {
  * Test the MYSQL Server Login OK message parser:
  * - message is encoded using the ClientLoginResponse class
  * - message is decoded using the ClientLoginResponse class
- * Results are verified
  */
 TEST_F(MysqlCodecTest, MysqlLoginOkEncDec) {
   ClientLoginResponse mysql_loginok_encode{};

@@ -60,9 +60,8 @@ int MysqlCodec::DrainBytes(Buffer::Instance& buffer, int skip_bytes) {
   return MYSQL_SUCCESS;
 }
 
-/* Implementation of Mysql lenenc encoder
- * https://dev.mysql.com/doc/internals/en/integer.html#packet-Protocol::LengthEncodedInteger
- */
+// Implementation of Mysql lenenc encoder based on
+// https://dev.mysql.com/doc/internals/en/integer.html#packet-Protocol::LengthEncodedInteger
 int MysqlCodec::ReadLengthEncodedIntegerDrain(Buffer::Instance& buffer, int& val) {
   int size = 0;
   uint8_t byte_val = 0;

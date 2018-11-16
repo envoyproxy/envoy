@@ -34,10 +34,11 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
     return Network::FilterStatus::Continue;
   }
 
-  /* Run the mysql state machine */
+  // Run the mysql state machine
   switch (session_.GetState()) {
+
+  // expect Server Challenge packet
   case MysqlSession::State::MYSQL_INIT: {
-    /* expect Server Challenge packet */
     ServerGreeting greeting{};
     greeting.Decode(data);
     if (greeting.GetSeq() != GREETING_SEQ_NUM) {
@@ -47,8 +48,9 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
     session_.SetState(MysqlSession::State::MYSQL_CHALLENGE_REQ);
     break;
   }
+
+  // Process Client Handshake Response
   case MysqlSession::State::MYSQL_CHALLENGE_REQ: {
-    /* Process Client Handshake Response */
     config_->stats_.login_attempts_.inc();
     ClientLogin client_login{};
     client_login.Decode(data);
@@ -66,8 +68,10 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
     }
     break;
   }
+
   case MysqlSession::State::MYSQL_SSL_PT:
     return Network::FilterStatus::Continue;
+
   case MysqlSession::State::MYSQL_CHALLENGE_RESP_41:
   case MysqlSession::State::MYSQL_CHALLENGE_RESP_320: {
     ClientLoginResponse client_login_resp{};
@@ -90,6 +94,7 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
     }
     break;
   }
+
   case MysqlSession::State::MYSQL_AUTH_SWITCH_RESP: {
     ClientSwitchResponse client_switch_resp{};
     client_switch_resp.Decode(data);
@@ -101,6 +106,7 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
     session_.SetExpectedSeq(client_switch_resp.GetSeq() + 1);
     break;
   }
+
   case MysqlSession::State::MYSQL_AUTH_SWITCH_MORE: {
     ClientLoginResponse client_login_resp{};
     client_login_resp.Decode(data);
@@ -121,21 +127,26 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
     }
     break;
   }
+
+  // Process Query
   case MysqlSession::State::MYSQL_REQ:
-    /* Process Query */
     session_.SetState(MysqlSession::State::MYSQL_REQ_RESP);
     break;
+
+  // Process Query Response
   case MysqlSession::State::MYSQL_REQ_RESP:
-    /* Process Query Response */
     session_.SetState(MysqlSession::State::MYSQL_REQ);
     break;
+
   case MysqlSession::State::MYSQL_ERROR:
   case MysqlSession::State::MYSQL_NOT_HANDLED:
   default:
     break;
   }
+
   ENVOY_CONN_LOG(trace, "mysql msg processed, session in state {}", read_callbacks_->connection(),
                  static_cast<int>(session_.GetState()));
+
   return Network::FilterStatus::Continue;
 }
 

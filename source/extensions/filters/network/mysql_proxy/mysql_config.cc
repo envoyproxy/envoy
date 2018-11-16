@@ -19,7 +19,6 @@ namespace MysqlProxy {
  * Config registration for the mysql filter. @see
  * NamedNetworkFilterConfigFactory.
  */
-
 Network::FilterFactoryCb
 NetworkFilters::MysqlProxy::MysqlConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::mysql_proxy::v1alpha1::MysqlProxy& proto_config,

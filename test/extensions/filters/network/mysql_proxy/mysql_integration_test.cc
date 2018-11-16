@@ -37,14 +37,10 @@ class MysqlIntegrationTest : public MysqlTestUtils,
 public:
   MysqlIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()){};
 
-  /**
-   * Initializer for an individual integration test.
-   */
+  // Initializer for an individual integration test.
   void SetUp() override { BaseIntegrationTest::initialize(); }
 
-  /**
-   * Destructor for an individual integration test.
-   */
+  // Destructor for an individual integration test.
   void TearDown() override {
     test_server_.reset();
     fake_upstreams_.clear();
@@ -67,10 +63,9 @@ int mysqlGetCounterValueFromStats(const std::string& msg, const std::string& mys
 INSTANTIATE_TEST_CASE_P(IpVersions, MysqlIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-/* NewSession Test:
- * Attempt a New Session and verify it is received by
- * mysql onNewConnection.
- * Verify counters
+/**
+ * NewSession Test:
+ * Attempt a New Session and verify it is received by mysql onNewConnection.
  */
 TEST_P(MysqlIntegrationTest, MysqlStatsNewSessionTest) {
   for (int idx = 0; idx < SESSIONS; idx++) {
@@ -94,7 +89,8 @@ TEST_P(MysqlIntegrationTest, MysqlStatsNewSessionTest) {
   EXPECT_EQ(counter, SESSIONS);
 }
 
-/* Login Test:
+/**
+ * Login Test:
  * Attempt a mysql login and verify it is processed by the filter:
  * Verify counters:
  * - correct number of attempts
@@ -109,18 +105,18 @@ TEST_P(MysqlIntegrationTest, MysqLoginTest) {
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
-  /* greeting */
+  // greeting
   std::string greeting = EncodeServerGreeting(MYSQL_PROTOCOL_10);
   ASSERT_TRUE(fake_upstream_connection->write(greeting));
   tcp_client->waitForData(str);
 
-  /* Client username/password and capabilities */
+  // Client username/password and capabilities
   std::string login = EncodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, user);
   tcp_client->write(login);
   ASSERT_TRUE(fake_upstream_connection->waitForData(login.length(), &rcvd_data));
   EXPECT_EQ(login, rcvd_data);
 
-  /* Server response OK to username/password */
+  // Server response OK to username/password
   std::string loginok = EncodeClientLoginResp(MYSQL_RESP_OK);
   ASSERT_TRUE(fake_upstream_connection->write(loginok));
   tcp_client->waitForData(str);
@@ -128,7 +124,7 @@ TEST_P(MysqlIntegrationTest, MysqLoginTest) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
-  /* Verify counters */
+  // Verify counters
   BufferingStreamDecoderPtr response =
       IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json", "",
                                          Http::CodecClient::Type::HTTP1, version_);
@@ -144,7 +140,8 @@ TEST_P(MysqlIntegrationTest, MysqLoginTest) {
   EXPECT_EQ(counter, 0);
 }
 
-/* Multiple Connections Login Test:
+/**
+ * Multiple Connections Login Test:
  * Attempt a mysql login and verify it is processed by the filter:
  * Verify counters:
  * - correct number of attempts
@@ -163,18 +160,18 @@ TEST_P(MysqlIntegrationTest, MysqlUnitTestMultiClientsLoop) {
     FakeRawConnectionPtr fake_upstream_connection;
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
-    /* greeting */
+    // greeting
     std::string greeting = EncodeServerGreeting(MYSQL_PROTOCOL_10);
     ASSERT_TRUE(fake_upstream_connection->write(greeting));
     tcp_client->waitForData(str);
 
-    /* Client username/password and capabilities */
+    // Client username/password and capabilities
     std::string login = EncodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, user);
     tcp_client->write(login);
     ASSERT_TRUE(fake_upstream_connection->waitForData(login.length(), &rcvd_data));
     EXPECT_EQ(login, rcvd_data);
 
-    /* Server response OK to username/password */
+    // Server response OK to username/password
     std::string loginok = EncodeClientLoginResp(MYSQL_RESP_OK);
     ASSERT_TRUE(fake_upstream_connection->write(loginok));
     tcp_client->waitForData(str);
@@ -183,7 +180,7 @@ TEST_P(MysqlIntegrationTest, MysqlUnitTestMultiClientsLoop) {
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   }
 
-  /* Verify counters: CLIENT_NUM login attempts, no failures */
+  // Verify counters: CLIENT_NUM login attempts, no failures
   BufferingStreamDecoderPtr response =
       IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json", "",
                                          Http::CodecClient::Type::HTTP1, version_);
