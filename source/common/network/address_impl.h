@@ -12,6 +12,8 @@
 #include "envoy/network/address.h"
 #include "envoy/network/io_handle.h"
 
+#include "common/network/io_socket_handle_impl.h"
+
 namespace Envoy {
 namespace Network {
 namespace Address {
@@ -36,18 +38,18 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
 
 /**
  * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
- * @param io_handle I/O handle.
+ * @param fd socket file descriptor
  * @return InstanceConstSharedPtr for bound address.
  */
-InstanceConstSharedPtr addressFromFd(IoHandle& io_handle);
+InstanceConstSharedPtr addressFromFd(int fd);
 
 /**
  * Obtain the address of the peer of the socket with the specified file descriptor.
  * Raises an EnvoyException on failure.
- * @param io_handle I/O handle.
+ * @param fd socket file descriptor
  * @return InstanceConstSharedPtr for peer address.
  */
-InstanceConstSharedPtr peerAddressFromFd(IoHandle& io_handle);
+InstanceConstSharedPtr peerAddressFromFd(int fd);
 
 /**
  * Base class for all address types.
@@ -62,7 +64,7 @@ public:
 
 protected:
   InstanceBase(Type type) : type_(type) {}
-  IoHandle socketFromSocketType(SocketType type) const;
+  IoHandlePtr socketFromSocketType(SocketType type) const;
 
   std::string friendly_name_;
 
@@ -98,10 +100,10 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(IoHandle& io_handle) const override;
-  Api::SysCallIntResult connect(IoHandle& io_handle) const override;
+  Api::SysCallIntResult bind(int fd) const override;
+  Api::SysCallIntResult connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
-  IoHandle socket(SocketType type) const override;
+  IoHandlePtr socket(SocketType type) const override;
 
 private:
   struct Ipv4Helper : public Ipv4 {
@@ -158,10 +160,10 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(IoHandle& io_handle) const override;
-  Api::SysCallIntResult connect(IoHandle& io_handle) const override;
+  Api::SysCallIntResult bind(int fd) const override;
+  Api::SysCallIntResult connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
-  IoHandle socket(SocketType type) const override;
+  IoHandlePtr socket(SocketType type) const override;
 
 private:
   struct Ipv6Helper : public Ipv6 {
@@ -215,10 +217,10 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(IoHandle& io_handle) const override;
-  Api::SysCallIntResult connect(IoHandle& io_handle) const override;
+  Api::SysCallIntResult bind(int fd) const override;
+  Api::SysCallIntResult connect(int fd) const override;
   const Ip* ip() const override { return nullptr; }
-  IoHandle socket(SocketType type) const override;
+  IoHandlePtr socket(SocketType type) const override;
 
 private:
   sockaddr_un address_;

@@ -26,9 +26,14 @@ public:
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * @return the ioHandle containing the socket's file descriptor.
+   * @return address of the ioHandle containing the socket's file descriptor.
    */
-  virtual IoHandle& ioHandle() PURE;
+  virtual IoHandlePtr& ioHandle() PURE;
+
+  /**
+   * @return const address of the ioHandle containing the socket's file descriptor.
+   */
+  virtual const IoHandleConstPtr& ioHandle() const PURE;
 
   /**
    * Close the underlying socket.

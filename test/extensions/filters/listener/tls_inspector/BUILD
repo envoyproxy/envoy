@@ -13,6 +13,7 @@ envoy_cc_test(
     name = "tls_inspector_test",
     srcs = ["tls_inspector_test.cc"],
     deps = [
+        "//source/common/network:io_socket_handle_lib",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
@@ -30,6 +31,7 @@ envoy_cc_binary(
         "benchmark",
     ],
     deps = [
+        "//source/common/network:io_socket_handle_lib",
         "//source/common/network:listen_socket_lib",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//test/mocks/api:api_mocks",

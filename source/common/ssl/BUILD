@@ -28,6 +28,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_annotations",
         "//source/common/http:headers_lib",
+        "//source/common/network:io_socket_handle_lib",
     ],
 )
 

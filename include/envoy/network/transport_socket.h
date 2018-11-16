@@ -1,8 +1,8 @@
 #pragma once
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
-#include "envoy/buffer/buffer.h"
 #include "envoy/ssl/connection.h"
 
 namespace Envoy {
@@ -47,9 +47,14 @@ public:
   virtual ~TransportSocketCallbacks() {}
 
   /**
-   * @return int the I/O handle associated with the connection.
+   * @return adddress of the I/O handle associated with the connection.
    */
-  virtual IoHandle& ioHandle() PURE;
+  virtual IoHandlePtr& ioHandle() PURE;
+
+  /**
+   * @return const address the I/O handle associated with the connection.
+   */
+  virtual const IoHandleConstPtr& ioHandle() const PURE;
 
   /**
    * @return Network::Connection& the connection interface.

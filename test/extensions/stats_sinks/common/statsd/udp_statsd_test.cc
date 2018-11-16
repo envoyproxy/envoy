@@ -1,6 +1,7 @@
 #include <chrono>
 
 #include "common/network/address_impl.h"
+#include "common/network/io_socket_handle_impl.h"
 #include "common/network/utility.h"
 
 #include "extensions/stat_sinks/common/statsd/statsd.h"
@@ -40,10 +41,10 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
       Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:8125", Network::Test::getLoopbackAddressUrlString(GetParam())));
   UdpStatsdSink sink(tls_, server_address, false);
-  Network::IoHandle io_handle = sink.getFdForTests();
-  EXPECT_NE(io_handle, -1);
+  Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(sink.getFdForTests());
+  EXPECT_NE(io_handle->fd(), -1);
 
-  // Check that io_handle has not changed.
+  // Check that fd has not changed.
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
   counter->used_ = true;
@@ -62,12 +63,12 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   timer.name_ = "test_timer";
   sink.onHistogramComplete(timer, 5);
 
-  EXPECT_EQ(io_handle, sink.getFdForTests());
+  EXPECT_EQ(io_handle->fd(), sink.getFdForTests());
 
   if (GetParam() == Network::Address::IpVersion::v4) {
-    EXPECT_EQ("127.0.0.1:8125", Network::Address::peerAddressFromFd(io_handle)->asString());
+    EXPECT_EQ("127.0.0.1:8125", Network::Address::peerAddressFromFd(io_handle->fd())->asString());
   } else {
-    EXPECT_EQ("[::1]:8125", Network::Address::peerAddressFromFd(io_handle)->asString());
+    EXPECT_EQ("[::1]:8125", Network::Address::peerAddressFromFd(io_handle->fd())->asString());
   }
   tls_.shutdownThread();
 }
@@ -85,10 +86,10 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
       Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:8125", Network::Test::getLoopbackAddressUrlString(GetParam())));
   UdpStatsdSink sink(tls_, server_address, true);
-  Network::IoHandle io_handle = sink.getFdForTests();
-  EXPECT_NE(io_handle, -1);
+  Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(sink.getFdForTests());
+  EXPECT_NE(io_handle->fd(), -1);
 
-  // Check that io_handle has not changed.
+  // Check that fd has not changed.
   std::vector<Stats::Tag> tags = {Stats::Tag{"node", "test"}};
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
@@ -111,12 +112,12 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
   timer.tags_ = tags;
   sink.onHistogramComplete(timer, 5);
 
-  EXPECT_EQ(io_handle, sink.getFdForTests());
+  EXPECT_EQ(io_handle->fd(), sink.getFdForTests());
 
   if (GetParam() == Network::Address::IpVersion::v4) {
-    EXPECT_EQ("127.0.0.1:8125", Network::Address::peerAddressFromFd(io_handle)->asString());
+    EXPECT_EQ("127.0.0.1:8125", Network::Address::peerAddressFromFd(io_handle->fd())->asString());
   } else {
-    EXPECT_EQ("[::1]:8125", Network::Address::peerAddressFromFd(io_handle)->asString());
+    EXPECT_EQ("[::1]:8125", Network::Address::peerAddressFromFd(io_handle->fd())->asString());
   }
   tls_.shutdownThread();
 }

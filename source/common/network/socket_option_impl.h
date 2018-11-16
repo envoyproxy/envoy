@@ -6,9 +6,9 @@
 #include <sys/socket.h>
 
 #include "envoy/api/os_sys_calls.h"
-#include "envoy/network/listen_socket.h"
 
 #include "common/common/logger.h"
+#include "common/network/listen_socket_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -83,7 +83,7 @@ typedef absl::optional<std::pair<int, int>> SocketOptionName;
 #define ENVOY_SOCKET_TCP_FASTOPEN Network::SocketOptionName()
 #endif
 
-class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
+class SocketOptionImpl : public SocketImpl::Option, Logger::Loggable<Logger::Id::connection> {
 public:
   SocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
                    Network::SocketOptionName optname, int value) // Yup, int. See setsockopt(2).

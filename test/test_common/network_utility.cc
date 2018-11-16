@@ -26,12 +26,12 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
     return nullptr;
   }
-  IoHandle ioHandle = addr_port->socket(type);
-  ScopedFdCloser closer(ioHandle);
+  IoHandlePtr io_handle = addr_port->socket(type);
+  ScopedFdCloser closer(io_handle->fd());
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
-  Api::SysCallIntResult result = addr_port->bind(ioHandle);
+  Api::SysCallIntResult result = addr_port->bind(io_handle->fd());
   int err;
   const char* failing_fn = nullptr;
   if (result.rc_ != 0) {
@@ -39,7 +39,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
     failing_fn = "bind";
   } else if (type == Address::SocketType::Stream) {
     // Try listening on the port also, if the type is TCP.
-    if (::listen(ioHandle, 1) != 0) {
+    if (::listen(io_handle->fd(), 1) != 0) {
       err = errno;
       failing_fn = "listen";
     }
@@ -60,7 +60,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   // If the port we bind is zero, then the OS will pick a free port for us (assuming there are
   // any), and we need to find out the port number that the OS picked so we can return it.
   if (addr_port->ip()->port() == 0) {
-    return Address::addressFromFd(ioHandle);
+    return Address::addressFromFd(io_handle->fd());
   }
   return addr_port;
 }
@@ -149,29 +149,29 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, 
 
 bool supportsIpVersion(const Address::IpVersion version) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  IoHandle ioHandle = addr->socket(Address::SocketType::Stream);
-  if (0 != addr->bind(ioHandle).rc_) {
+  IoHandlePtr io_handle = addr->socket(Address::SocketType::Stream);
+  if (0 != addr->bind(io_handle->fd()).rc_) {
     // Socket bind failed.
-    RELEASE_ASSERT(::close(ioHandle) == 0, "");
+    RELEASE_ASSERT(::close(io_handle->fd()) == 0, "");
     return false;
   }
-  RELEASE_ASSERT(::close(ioHandle) == 0, "");
+  RELEASE_ASSERT(::close(io_handle->fd()) == 0, "");
   return true;
 }
 
 std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
                                                                      Address::SocketType type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  IoHandle ioHandle = addr->socket(type);
-  Api::SysCallIntResult result = addr->bind(ioHandle);
+  IoHandlePtr io_handle = addr->socket(type);
+  Api::SysCallIntResult result = addr->bind(io_handle->fd());
   if (0 != result.rc_) {
-    close(ioHandle);
+    close(io_handle->fd());
     std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
                                   addr->asString(), strerror(result.errno_), result.errno_);
     ADD_FAILURE() << msg;
     throw EnvoyException(msg);
   }
-  return std::make_pair(Address::addressFromFd(ioHandle), ioHandle.fd());
+  return std::make_pair(Address::addressFromFd(io_handle->fd()), io_handle->fd());
 }
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }

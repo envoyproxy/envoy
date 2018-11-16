@@ -81,7 +81,7 @@ public:
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
-  MOCK_METHOD0(state, State());
+  MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
   MOCK_CONST_METHOD0(bufferLimit, uint32_t());
@@ -124,7 +124,7 @@ public:
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
-  MOCK_METHOD0(state, State());
+  MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
   MOCK_CONST_METHOD0(bufferLimit, uint32_t());
@@ -307,13 +307,14 @@ public:
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
-  MOCK_METHOD0(ioHandle, IoHandle&());
+  MOCK_METHOD0(ioHandle, IoHandlePtr&());
+  MOCK_CONST_METHOD0(ioHandle, const IoHandleConstPtr&());
   MOCK_METHOD0(close, void());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr& option));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr& options));
   MOCK_CONST_METHOD0(options, const OptionsSharedPtr&());
 
-  IoHandle ioHandle_;
+  IoHandlePtr ioHandle_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
 };
@@ -350,10 +351,11 @@ public:
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr&));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr&));
   MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());
-  MOCK_METHOD0(ioHandle, IoHandle&());
+  MOCK_METHOD0(ioHandle, IoHandlePtr&());
+  MOCK_CONST_METHOD0(ioHandle, const IoHandleConstPtr&());
   MOCK_METHOD0(close, void());
 
-  IoHandle io_handle_;
+  IoHandlePtr ioHandle_;
   Address::InstanceConstSharedPtr local_address_;
 };
 
@@ -428,10 +430,10 @@ public:
     return asString() == other.asString();
   }
 
-  MOCK_CONST_METHOD1(bind, Api::SysCallIntResult(IoHandle&));
-  MOCK_CONST_METHOD1(connect, Api::SysCallIntResult(IoHandle&));
+  MOCK_CONST_METHOD1(bind, Api::SysCallIntResult(int));
+  MOCK_CONST_METHOD1(connect, Api::SysCallIntResult(int));
   MOCK_CONST_METHOD0(ip, Address::Ip*());
-  MOCK_CONST_METHOD1(socket, IoHandle(Address::SocketType));
+  MOCK_CONST_METHOD1(socket, IoHandlePtr(Address::SocketType));
   MOCK_CONST_METHOD0(type, Address::Type());
 
   const std::string& asString() const override { return physical_; }
@@ -472,7 +474,8 @@ public:
   MockTransportSocketCallbacks();
   ~MockTransportSocketCallbacks();
 
-  MOCK_METHOD0(ioHandle, IoHandle&());
+  MOCK_METHOD0(ioHandle, IoHandlePtr&());
+  MOCK_CONST_METHOD0(ioHandle, const IoHandleConstPtr&());
   MOCK_METHOD0(connection, Connection&());
   MOCK_METHOD0(shouldDrainReadBuffer, bool());
   MOCK_METHOD0(setReadBufferReady, void());
