@@ -63,6 +63,8 @@ public:
   MOCK_CONST_METHOD0(type, envoy::api::v2::Cluster::DiscoveryType());
   MOCK_CONST_METHOD0(lbRingHashConfig,
                      const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&());
+  MOCK_CONST_METHOD0(lbLeastRequestConfig,
+                     const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>&());
   MOCK_CONST_METHOD0(lbOriginalDstConfig,
                      const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>&());
   MOCK_CONST_METHOD0(maintenanceMode, bool());

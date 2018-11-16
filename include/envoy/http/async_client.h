@@ -132,33 +132,93 @@ public:
   virtual ~AsyncClient() {}
 
   /**
+   * A structure to hold the options for AsyncStream object.
+   */
+  struct StreamOptions {
+    StreamOptions& setTimeout(const absl::optional<std::chrono::milliseconds>& v) {
+      timeout = v;
+      return *this;
+    }
+    StreamOptions& setTimeout(const std::chrono::milliseconds& v) {
+      timeout = v;
+      return *this;
+    }
+    StreamOptions& setBufferBodyForRetry(bool v) {
+      buffer_body_for_retry = v;
+      return *this;
+    }
+    StreamOptions& setSendXff(bool v) {
+      send_xff = v;
+      return *this;
+    }
+
+    // For gmock test
+    bool operator==(const StreamOptions& src) const {
+      return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
+             send_xff == src.send_xff;
+    }
+
+    // The timeout supplies the stream timeout, measured since when the frame with
+    // end_stream flag is sent until when the first frame is received.
+    absl::optional<std::chrono::milliseconds> timeout;
+
+    // The buffer_body_for_retry specifies whether the streamed body will be buffered so that
+    // it can be retried. In general, this should be set to false for a true stream. However,
+    // streaming is also used in certain cases such as gRPC unary calls, where retry can
+    // still be useful.
+    bool buffer_body_for_retry{false};
+
+    // If true, x-forwarded-for header will be added.
+    bool send_xff{true};
+  };
+
+  /**
+   * A structure to hold the options for AsyncRequest object.
+   */
+  struct RequestOptions : public StreamOptions {
+    RequestOptions& setTimeout(const absl::optional<std::chrono::milliseconds>& v) {
+      StreamOptions::setTimeout(v);
+      return *this;
+    }
+    RequestOptions& setTimeout(const std::chrono::milliseconds& v) {
+      StreamOptions::setTimeout(v);
+      return *this;
+    }
+    RequestOptions& setBufferBodyForRetry(bool v) {
+      StreamOptions::setBufferBodyForRetry(v);
+      return *this;
+    }
+    RequestOptions& setSendXff(bool v) {
+      StreamOptions::setSendXff(v);
+      return *this;
+    }
+
+    // For gmock test
+    bool operator==(const RequestOptions& src) const { return StreamOptions::operator==(src); }
+  };
+
+  /**
    * Send an HTTP request asynchronously
    * @param request the request to send.
    * @param callbacks the callbacks to be notified of request status.
-   * @param timeout supplies the request timeout
+   * @param options the data struct to control the request sending.
    * @return a request handle or nullptr if no request could be created. NOTE: In this case
    *         onFailure() has already been called inline. The client owns the request and the
    *         handle should just be used to cancel.
    */
+
   virtual Request* send(MessagePtr&& request, Callbacks& callbacks,
-                        const absl::optional<std::chrono::milliseconds>& timeout) PURE;
+                        const RequestOptions& options) PURE;
 
   /**
    * Start an HTTP stream asynchronously.
    * @param callbacks the callbacks to be notified of stream status.
-   * @param timeout supplies the stream timeout, measured since when the frame with end_stream
-   *        flag is sent until when the first frame is received.
-   * @param buffer_body_for_retry specifies whether the streamed body will be buffered so that
-   *        it can be retried. In general, this should be set to false for a true stream. However,
-   *        streaming is also used in certain cases such as gRPC unary calls, where retry can
-   *        still be useful.
+   * @param options the data struct to control the stream.
    * @return a stream handle or nullptr if no stream could be started. NOTE: In this case
    *         onResetStream() has already been called inline. The client owns the stream and
    *         the handle can be used to send more messages or close the stream.
    */
-  virtual Stream* start(StreamCallbacks& callbacks,
-                        const absl::optional<std::chrono::milliseconds>& timeout,
-                        bool buffer_body_for_retry) PURE;
+  virtual Stream* start(StreamCallbacks& callbacks, const StreamOptions& options) PURE;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this client.

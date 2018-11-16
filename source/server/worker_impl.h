@@ -40,7 +40,8 @@ private:
 class WorkerImpl : public Worker, Logger::Loggable<Logger::Id::main> {
 public:
   WorkerImpl(ThreadLocal::Instance& tls, TestHooks& hooks, Event::DispatcherPtr&& dispatcher,
-             Network::ConnectionHandlerPtr handler, OverloadManager& overload_manager);
+             Network::ConnectionHandlerPtr handler, OverloadManager& overload_manager,
+             Api::Api& api);
 
   // Server::Worker
   void addListener(Network::ListenerConfig& listener, AddListenerCompletion completion) override;
@@ -59,6 +60,7 @@ private:
   TestHooks& hooks_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
+  Api::Api& api_;
   Thread::ThreadPtr thread_;
 };
 
