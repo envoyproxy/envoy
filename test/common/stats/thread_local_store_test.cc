@@ -919,17 +919,21 @@ TEST_F(TruncatingAllocTest, GaugeNotTruncated) {
 }
 
 TEST_F(TruncatingAllocTest, CounterTruncated) {
+  Counter* counter = nullptr;
   EXPECT_LOG_CONTAINS("warning", "is too long with", {
-    Counter& counter = store_->counter(long_name_);
-    EXPECT_EQ(&counter, &store_->counter(long_name_));
+    Counter& c = store_->counter(long_name_);
+    counter = &c;
   });
+  EXPECT_NO_LOGS(EXPECT_EQ(counter, &store_->counter(long_name_)));
 }
 
 TEST_F(TruncatingAllocTest, GaugeTruncated) {
+  Gauge* gauge = nullptr;
   EXPECT_LOG_CONTAINS("warning", "is too long with", {
-    Gauge& gauge = store_->gauge(long_name_);
-    EXPECT_EQ(&gauge, &store_->gauge(long_name_));
+    Gauge& g = store_->gauge(long_name_);
+    gauge = &g;
   });
+  EXPECT_NO_LOGS(EXPECT_EQ(gauge, &store_->gauge(long_name_)));
 }
 
 TEST_F(TruncatingAllocTest, HistogramWithLongNameNotTruncated) {

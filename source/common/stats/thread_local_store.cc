@@ -165,21 +165,12 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
 }
 
 absl::string_view ThreadLocalStoreImpl::truncateStatNameIfNeeded(absl::string_view name) {
-  // If the main allocator requires stat name truncation, warn and truncate, before
-  // attempting to allocate.
+  // If the main allocator requires stat name truncation, do so now, though any
+  // warnings will be printed only if the truncated stat requires a new
+  // allocation.
   if (alloc_.requiresBoundedStatNameSize()) {
     const uint64_t max_length = stats_options_.maxNameLength();
-
-    // Note that the heap-allocator does not truncate itself; we have to
-    // truncate here if we are using heap-allocation as a fallback due to an
-    // exhausted shared-memory block
-    if (name.size() > max_length) {
-      ENVOY_LOG_MISC(
-          warn,
-          "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
-          name, name.size(), max_length);
-      name = absl::string_view(name.data(), max_length);
-    }
+    name = name.substr(0, max_length);
   }
   return name;
 }
@@ -217,6 +208,14 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   if (p != central_cache_map.end()) {
     central_ref = &(p->second);
   } else {
+    // If we had to truncate, warn now that we've missed all caches.
+    if (truncation_buffer != nullptr) {
+      ENVOY_LOG_MISC(
+          warn,
+          "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
+          name, name.size(), truncation_buffer->size());
+    }
+
     std::vector<Tag> tags;
 
     // Tag extraction occurs on the original, untruncated name so the extraction
