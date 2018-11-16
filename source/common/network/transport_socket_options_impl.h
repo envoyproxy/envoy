@@ -7,7 +7,7 @@ namespace Network {
 
 class TransportSocketOptionsImpl : public TransportSocketOptions {
 public:
-  TransportSocketOptionsImpl(std::string override_server_name = "")
+  TransportSocketOptionsImpl(absl::string_view override_server_name = "")
       : override_server_name_(override_server_name.empty()
                                   ? absl::nullopt
                                   : absl::optional<std::string>(override_server_name)) {}
