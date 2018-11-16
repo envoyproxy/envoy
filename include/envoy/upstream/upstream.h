@@ -350,6 +350,7 @@ public:
   COUNTER  (upstream_cx_idle_timeout)                                                              \
   COUNTER  (upstream_cx_connect_attempts_exceeded)                                                 \
   COUNTER  (upstream_cx_overflow)                                                                  \
+  COUNTER  (upstream_cx_pending_overflow)                                                          \
   HISTOGRAM(upstream_cx_connect_ms)                                                                \
   HISTOGRAM(upstream_cx_length_ms)                                                                 \
   COUNTER  (upstream_cx_destroy)                                                                   \
@@ -415,6 +416,7 @@ public:
  */
 // clang-format off
 #define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GAUGE)                                                  \
+  GAUGE (cx_pending_open)                                                                          \
   GAUGE (cx_open)                                                                                  \
   GAUGE (rq_pending_open)                                                                          \
   GAUGE (rq_open)                                                                                  \

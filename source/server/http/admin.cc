@@ -263,6 +263,8 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
                                    Buffer::Instance& response) {
   response.add(fmt::format("{}::{}_priority::max_connections::{}\n", cluster_name, priority_str,
                            resource_manager.connections().max()));
+  response.add(fmt::format("{}::{}_priority::max_pending_connections::{}\n", cluster_name, priority_str,
+                           resource_manager.pendingConnections().max()));
   response.add(fmt::format("{}::{}_priority::max_pending_requests::{}\n", cluster_name,
                            priority_str, resource_manager.pendingRequests().max()));
   response.add(fmt::format("{}::{}_priority::max_requests::{}\n", cluster_name, priority_str,

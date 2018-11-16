@@ -42,6 +42,10 @@ message CircuitBreakers {
     // The maximum number of parallel retries that Envoy will allow to the
     // upstream cluster. If not specified, the default is 3.
     google.protobuf.UInt32Value max_retries = 5;
+
+    // The maximum number of connections that Envoy will allow to be in the
+    // establishing state.  If not specified, the default is 128.
+    google.protobuf.UInt32Value max_pending_connections = 6;
   }
 
   // If multiple :ref:`Thresholds<envoy_api_msg_cluster.CircuitBreakers.Thresholds>`

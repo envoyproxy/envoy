@@ -53,6 +53,11 @@ public:
   virtual ~ResourceManager() {}
 
   /**
+   * @return Resource& active pending TCP connections (not yet established).
+   */
+  virtual Resource& pendingConnections() PURE;
+
+  /**
    * @return Resource& active TCP connections.
    */
   virtual Resource& connections() PURE;

@@ -703,6 +703,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
                                         Stats::Scope& stats_scope,
                                         const envoy::api::v2::core::RoutingPriority& priority) {
   uint64_t max_connections = 1024;
+  uint64_t max_pending_connections = 128;
   uint64_t max_pending_requests = 1024;
   uint64_t max_requests = 1024;
   uint64_t max_retries = 3;
@@ -730,13 +731,15 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
       });
   if (it != thresholds.cend()) {
     max_connections = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connections, max_connections);
+    max_pending_connections = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_pending_connections, max_pending_connections);
     max_pending_requests =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_pending_requests, max_pending_requests);
     max_requests = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_requests, max_requests);
     max_retries = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_retries, max_retries);
   }
   return std::make_unique<ResourceManagerImpl>(
-      runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
+      runtime, runtime_prefix, max_pending_connections, max_connections,
+      max_pending_requests, max_requests, max_retries,
       ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name));
 }
 

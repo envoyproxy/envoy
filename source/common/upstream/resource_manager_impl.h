@@ -26,10 +26,12 @@ namespace Upstream {
 class ResourceManagerImpl : public ResourceManager {
 public:
   ResourceManagerImpl(Runtime::Loader& runtime, const std::string& runtime_key,
-                      uint64_t max_connections, uint64_t max_pending_requests,
-                      uint64_t max_requests, uint64_t max_retries,
-                      ClusterCircuitBreakersStats cb_stats)
-      : connections_(max_connections, runtime, runtime_key + "max_connections", cb_stats.cx_open_),
+                      uint64_t max_pending_connections, uint64_t max_connections,
+                      uint64_t max_pending_requests, uint64_t max_requests,
+                      uint64_t max_retries, ClusterCircuitBreakersStats
+                      cb_stats)
+      : pending_connections_(max_pending_connections, runtime, runtime_key + "max_pending_connections", cb_stats.cx_pending_open_),
+        connections_(max_connections, runtime, runtime_key + "max_connections", cb_stats.cx_open_),
         pending_requests_(max_pending_requests, runtime, runtime_key + "max_pending_requests",
                           cb_stats.rq_pending_open_),
         requests_(max_requests, runtime, runtime_key + "max_requests", cb_stats.rq_open_),
@@ -37,6 +39,7 @@ public:
 
   // Upstream::ResourceManager
   Resource& connections() override { return connections_; }
+  Resource& pendingConnections() override { return pending_connections_; }
   Resource& pendingRequests() override { return pending_requests_; }
   Resource& requests() override { return requests_; }
   Resource& retries() override { return retries_; }
@@ -74,6 +77,7 @@ private:
     Stats::Gauge& open_gauge_;
   };
 
+  ResourceImpl pending_connections_;
   ResourceImpl connections_;
   ResourceImpl pending_requests_;
   ResourceImpl requests_;

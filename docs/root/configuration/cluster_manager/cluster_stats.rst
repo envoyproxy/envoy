@@ -41,6 +41,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_idle_timeout, Counter, Total connection idle timeouts
   upstream_cx_connect_attempts_exceeded, Counter, Total consecutive connection failures exceeding configured connection attempts
   upstream_cx_overflow, Counter, Total times that the cluster's connection circuit breaker overflowed
+  upstream_cx_pending_overflow, Counter, Total times that the cluster's connection pending circuit breaker overflowed
   upstream_cx_connect_ms, Histogram, Connection establishment milliseconds
   upstream_cx_length_ms, Histogram, Connection length milliseconds
   upstream_cx_destroy, Counter, Total destroyed connections
@@ -143,6 +144,7 @@ Circuit breakers statistics will be rooted at *cluster.<name>.circuit_breakers.<
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
+  cx_pending_open, Gauge, Whether the pending connections circuit breaker is closed (0) or open (1)
   cx_open, Gauge, Whether the connection circuit breaker is closed (0) or open (1)
   rq_pending_open, Gauge, Whether the pending requests circuit breaker is closed (0) or open (1)
   rq_open, Gauge, Whether the requests circuit breaker is closed (0) or open (1)
