@@ -208,7 +208,7 @@ struct ActiveTestRequest {
  * Verify that connections are drained when requested.
  */
 TEST_F(Http1ConnPoolImplTest, DrainConnections) {
-  cluster_->resetResourceManager(2, 1024, 1024, 1);
+  cluster_->resetResourceManager(2, 2, 1024, 1024, 1);
   InSequence s;
 
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
@@ -293,7 +293,7 @@ TEST_F(Http1ConnPoolImplTest, MultipleRequestAndResponse) {
  * Test when we overflow max pending requests.
  */
 TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
-  cluster_->resetResourceManager(1, 1, 1024, 1);
+  cluster_->resetResourceManager(1, 1, 1, 1024, 1);
 
   EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_pending_open_.value());
 
@@ -615,7 +615,7 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
 }
 
 TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
-  cluster_->resetResourceManager(2, 1024, 1024, 1);
+  cluster_->resetResourceManager(2, 2, 1024, 1024, 1);
   InSequence s;
 
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
