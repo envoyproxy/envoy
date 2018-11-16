@@ -5,4 +5,4 @@ use("github.com/repokitteh/modules/circleci.star#itayd-patch-4", secret_token=ge
 
 alias('retest', 'retry-circle')
 
-enable('retry-circle')
+enable('cancel-circle')
