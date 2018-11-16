@@ -75,7 +75,7 @@ Sets the label `waiting:any` on a PR. When a new commit is pushed or any comment
 
 [Demo PR](https://github.com/envoyproxy/envoybot/pull/15)
 
-### [Retest CircleCI](https://github.com/repokitteh/modules/blob/master/circleci.star)
+### [CircleCI Retest](https://github.com/repokitteh/modules/blob/master/circleci.star)
 Restart failed CircleCI tests.
 
 Example:
@@ -84,4 +84,4 @@ Example:
 ```
 Restarts all failed CircleCI tests, as reported in the commit statuses.
 
-[Demo PR](TBD)
+[Demo PR](https://github.com/envoyproxy/envoy/pull/5060#issuecomment-439285928)
