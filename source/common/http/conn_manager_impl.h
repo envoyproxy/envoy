@@ -409,7 +409,9 @@ private:
     // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
     bool has_continue_headers_{};
     bool is_head_request_{};
+    // Whether a filter has indicated that the request should be treated as a headers only request.
     bool decoding_headers_only_{};
+    // Whether a filter has indicated that the response should be treated as a headers only response.
     bool encoding_headers_only_{};
   };
 
