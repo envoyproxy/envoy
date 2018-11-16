@@ -925,7 +925,7 @@ TEST_F(TruncatingAllocTest, CounterTruncated) {
   });
 }
 
-TEST_F(TruncatingAllocTest, GauageTruncated) {
+TEST_F(TruncatingAllocTest, GaugeTruncated) {
   EXPECT_LOG_CONTAINS("warning", "is too long with", {
     Gauge& gauge = store_->gauge(long_name_);
     EXPECT_EQ(&gauge, &store_->gauge(long_name_));
