@@ -247,6 +247,7 @@ envoy_cc_library(
     hdrs = ["transport_socket_options_impl.h"],
     deps = [
         "//include/envoy/network:transport_socket_interface",
+        "//source/common/common:utility_lib",
     ],
 )
 
