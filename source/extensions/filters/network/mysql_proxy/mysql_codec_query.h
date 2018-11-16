@@ -25,6 +25,20 @@ private:
   std::string statement_;
 };
 
+class MySQLCodecQueryResp : public MySQLCodec {
+public:
+  int Decode(Buffer::Instance& buffer);
+  std::string& Encode();
+  uint16_t GetServerStatus() { return server_status_; }
+  uint16_t GetWarnings() { return warnings_; }
+  void SetServerStatus(uint16_t status);
+  void SetWarnings(uint16_t warnings);
+
+private:
+  uint16_t server_status_;
+  uint16_t warnings_;
+};
+
 } // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions

@@ -1,4 +1,4 @@
-#include "extensions/filters/network/mysql_proxy/mysql_codec_loginok.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 
