@@ -194,11 +194,11 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache) {
 
   const char* stat_key = name.c_str();
-  std::string truncation_buffer;
+  std::unique_ptr<std::string> truncation_buffer;
   absl::string_view truncated_name = parent_.truncateStatNameIfNeeded(name);
   if (truncated_name.size() < name.size()) {
-    truncation_buffer = std::string(truncated_name);
-    stat_key = truncation_buffer.c_str(); // must be nul-terminated.
+    truncation_buffer = std::make_unique<std::string>(std::string(truncated_name));
+    stat_key = truncation_buffer->c_str(); // must be nul-terminated.
   }
 
   // If we have a valid cache entry, return it.
