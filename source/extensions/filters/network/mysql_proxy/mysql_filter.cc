@@ -128,18 +128,18 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, bool end_stre
     break;
   }
 
-  // Process Query
+  // Process Command
   case MySQLSession::State::MYSQL_REQ: {
-    Query query{};
-    query.Decode(data);
+    Command command{};
+    command.Decode(data);
     session_.SetState(MySQLSession::State::MYSQL_REQ_RESP);
     break;
   }
 
-  // Process Query Response
+  // Process Command Response
   case MySQLSession::State::MYSQL_REQ_RESP: {
-    QueryResp query_resp{};
-    query_resp.Decode(data);
+    CommandResp command_resp{};
+    command_resp.Decode(data);
     session_.SetState(MySQLSession::State::MYSQL_REQ);
     break;
   }

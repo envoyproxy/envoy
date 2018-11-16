@@ -119,6 +119,14 @@ std::string MySQLCodec::BufToString(Buffer::Instance& buffer) {
   return s;
 }
 
+MySQLCodec::Cmd MySQLCodec::ParseCmd(Buffer::Instance& data) {
+  uint8_t cmd;
+  if (BufUint8Drain(data, cmd) != MYSQL_SUCCESS) {
+    return MySQLCodec::Cmd::COM_NULL;
+  }
+  return static_cast<MySQLCodec::Cmd>(cmd);
+}
+
 void MySQLCodec::SetSeq(int seq) { seq_ = seq; }
 
 std::string MySQLCodec::EncodeHdr(const std::string& cmd_str, int seq) {

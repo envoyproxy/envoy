@@ -134,6 +134,7 @@ public:
   virtual std::string Encode() PURE;
   virtual ~MySQLCodec(){};
 
+  Cmd ParseCmd(Buffer::Instance& data);
   void BufUint8Add(Buffer::Instance& buffer, uint8_t val) { buffer.add(&val, sizeof(uint8_t)); }
   void BufUint16Add(Buffer::Instance& buffer, uint16_t val) { buffer.add(&val, sizeof(uint16_t)); }
   void BufUint32Add(Buffer::Instance& buffer, uint32_t val) { buffer.add(&val, sizeof(uint32_t)); }
