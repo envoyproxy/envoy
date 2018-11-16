@@ -115,6 +115,7 @@ protected:
     Stats::TimespanPtr conn_length_;
     uint64_t remaining_requests_;
     bool timed_out_;
+    bool connection_succeeded_{false};
   };
 
   typedef std::unique_ptr<ActiveConn> ActiveConnPtr;

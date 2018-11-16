@@ -203,6 +203,9 @@ void ConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent 
   if (event == Network::ConnectionEvent::Connected) {
     conn_connect_ms_->complete();
     processIdleConnection(conn, true, false);
+
+    conn.connection_succeeded_ = true;
+    host_->cluster().resourceManager(priority_).pendingConnections().dec();
   }
 }
 
@@ -377,6 +380,7 @@ ConnPoolImpl::ActiveConn::ActiveConn(ConnPoolImpl& parent)
       parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSystem());
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
+  parent_.host_->cluster().resourceManager(parent_.priority_).pendingConnections().inc();
 
   conn_->setConnectionStats({parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
                              parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
@@ -400,6 +404,10 @@ ConnPoolImpl::ActiveConn::~ActiveConn() {
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().dec();
 
   parent_.onConnDestroyed(*this);
+  if (!connection_succeeded_) {
+    // we failed to decrement pendingConnections previously, so do it now
+    parent_.host_->cluster().resourceManager(parent_.priority_).pendingConnections().dec();
+  }
 }
 
 void ConnPoolImpl::ActiveConn::onConnectTimeout() {

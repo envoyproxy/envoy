@@ -179,6 +179,9 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
   if (event == Network::ConnectionEvent::Connected) {
     conn_connect_ms_->complete();
     processIdleClient(client, false);
+
+    client.connection_succeeded_ = true;
+    host_->cluster().resourceManager(priority_).pendingConnections().dec();
   }
 }
 
@@ -299,6 +302,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
       parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSystem());
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
+  parent_.host_->cluster().resourceManager(parent_.priority_).pendingConnections().inc();
 
   codec_client_->setConnectionStats(
       {parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
@@ -313,6 +317,11 @@ ConnPoolImpl::ActiveClient::~ActiveClient() {
   parent_.host_->stats().cx_active_.dec();
   conn_length_->complete();
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().dec();
+
+  if (!connection_succeeded_) {
+    // we failed to decrement pendingConnections previously, so do it now
+    parent_.host_->cluster().resourceManager(parent_.priority_).pendingConnections().dec();
+  }
 }
 
 void ConnPoolImpl::ActiveClient::onConnectTimeout() {
