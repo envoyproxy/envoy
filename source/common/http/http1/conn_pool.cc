@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <list>
+#include <memory>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -22,7 +23,8 @@ namespace Http1 {
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options)
-    : dispatcher_(dispatcher), host_(host), priority_(priority), socket_options_(options),
+    : ConnPoolImplBase(std::move(host), std::move(priority)), dispatcher_(dispatcher),
+      socket_options_(options),
       upstream_ready_timer_(dispatcher_.createTimer([this]() { onUpstreamReady(); })) {}
 
 ConnPoolImpl::~ConnPoolImpl() {
@@ -58,7 +60,7 @@ void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
 void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) {
   ASSERT(!client.stream_wrapper_);
-  client.stream_wrapper_.reset(new StreamWrapper(response_decoder, client));
+  client.stream_wrapper_ = std::make_unique<StreamWrapper>(response_decoder, client);
   callbacks.onPoolReady(*client.stream_wrapper_, client.real_host_description_);
 }
 
@@ -103,10 +105,7 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
       createNewConnection();
     }
 
-    ENVOY_LOG(debug, "queueing request due to no available connections");
-    PendingRequestPtr pending_request(new PendingRequest(*this, response_decoder, callbacks));
-    pending_request->moveIntoList(std::move(pending_request), pending_requests_);
-    return pending_requests_.front().get();
+    return newPendingRequest(response_decoder, callbacks);
   } else {
     ENVOY_LOG(debug, "max pending requests overflow");
     callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
@@ -153,16 +152,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       // that is behaving badly, requests can get stuck here in the pending state. If we see a
       // connect failure, we purge all pending requests so that calling code can determine what to
       // do with the request.
-      // NOTE: We move the existing pending requests to a temporary list. This is done so that
-      //       if retry logic submits a new request to the pool, we don't fail it inline.
-      std::list<PendingRequestPtr> pending_requests_to_purge(std::move(pending_requests_));
-      while (!pending_requests_to_purge.empty()) {
-        PendingRequestPtr request =
-            pending_requests_to_purge.front()->removeFromList(pending_requests_to_purge);
-        host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
-        request->callbacks_.onPoolFailure(ConnectionPool::PoolFailureReason::ConnectionFailure,
-                                          client.real_host_description_);
-      }
+      purgePendingRequests(client.real_host_description_);
     }
 
     dispatcher_.deferredDelete(std::move(removed));
@@ -195,13 +185,6 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
 void ConnPoolImpl::onDownstreamReset(ActiveClient& client) {
   // If we get a downstream reset to an attached client, we just blow it away.
   client.codec_client_->close();
-}
-
-void ConnPoolImpl::onPendingRequestCancel(PendingRequest& request) {
-  ENVOY_LOG(debug, "cancelling pending request");
-  request.removeFromList(pending_requests_);
-  host_->cluster().stats().upstream_rq_cancelled_.inc();
-  checkForDrained();
 }
 
 void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
@@ -294,26 +277,13 @@ void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
   parent_.parent_.onResponseComplete(parent_);
 }
 
-ConnPoolImpl::PendingRequest::PendingRequest(ConnPoolImpl& parent, StreamDecoder& decoder,
-                                             ConnectionPool::Callbacks& callbacks)
-    : parent_(parent), decoder_(decoder), callbacks_(callbacks) {
-  parent_.host_->cluster().stats().upstream_rq_pending_total_.inc();
-  parent_.host_->cluster().stats().upstream_rq_pending_active_.inc();
-  parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().inc();
-}
-
-ConnPoolImpl::PendingRequest::~PendingRequest() {
-  parent_.host_->cluster().stats().upstream_rq_pending_active_.dec();
-  parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().dec();
-}
-
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : parent_(parent),
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
       remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()) {
 
-  parent_.conn_connect_ms_.reset(new Stats::Timespan(
-      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem()));
+  parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan>(
+      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem());
   Upstream::Host::CreateConnectionData data =
       parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_);
   real_host_description_ = data.host_description_;
@@ -325,8 +295,8 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.host_->cluster().stats().upstream_cx_http1_total_.inc();
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();
-  conn_length_.reset(new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_length_ms_,
-                                         parent_.dispatcher_.timeSystem()));
+  conn_length_ = std::make_unique<Stats::Timespan>(
+      parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSystem());
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
 

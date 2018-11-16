@@ -1,8 +1,10 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
+#include "common/api/api_impl.h"
 #include "common/common/fmt.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/utility.h"
@@ -53,10 +55,10 @@ public:
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
-    cluster_manager_factory_.reset(new Upstream::ValidationClusterManagerFactory(
+    cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
-        server_.secretManager()));
+        server_.secretManager(), api_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -89,6 +91,7 @@ public:
     server_.thread_local_.shutdownThread();
   }
 
+  Api::Impl api_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;

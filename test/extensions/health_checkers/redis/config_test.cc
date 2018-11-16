@@ -62,6 +62,30 @@ TEST(HealthCheckerFactoryTest, createRedisWithoutKey) {
               .get()));
 }
 
+TEST(HealthCheckerFactoryTest, createRedisWithLogHCFailure) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    custom_health_check:
+      name: envoy.health_checkers.redis
+      config:
+    always_log_health_check_failures: true
+    )EOF";
+
+  NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
+
+  RedisHealthCheckerFactory factory;
+  EXPECT_NE(
+      nullptr,
+      dynamic_cast<CustomRedisHealthChecker*>(
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
+              .get()));
+}
+
 TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
   const std::string yaml = R"EOF(
     timeout: 1s

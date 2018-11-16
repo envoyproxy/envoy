@@ -39,12 +39,11 @@ bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connec
   return matched == allowed_if_matched_;
 }
 
-bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection) const {
+bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection,
+                                               const envoy::api::v2::core::Metadata& metadata,
+                                               std::string* effective_policy_id) const {
   static const Http::HeaderMapImpl* empty_header = new Http::HeaderMapImpl();
-  static const envoy::api::v2::core::Metadata* empty_metadata =
-      new envoy::api::v2::core::Metadata();
-
-  return allowed(connection, *empty_header, *empty_metadata, nullptr);
+  return allowed(connection, *empty_header, metadata, effective_policy_id);
 }
 
 } // namespace RBAC

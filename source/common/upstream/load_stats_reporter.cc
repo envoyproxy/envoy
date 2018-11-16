@@ -90,7 +90,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   stats_.responses_.inc();
   // When the connection is established, the message has not yet been read so we
   // will not have a load reporting period.
-  if (message_.get()) {
+  if (message_) {
     startLoadReportPeriod();
   }
 }

@@ -1,5 +1,7 @@
 #include "common/compressor/zlib_compressor_impl.h"
 
+#include <memory>
+
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
@@ -89,7 +91,7 @@ void ZlibCompressorImpl::updateOutput(Buffer::Instance& output_buffer) {
   if (n_output > 0) {
     output_buffer.add(static_cast<void*>(chunk_char_ptr_.get()), n_output);
   }
-  chunk_char_ptr_.reset(new unsigned char[chunk_size_]);
+  chunk_char_ptr_ = std::make_unique<unsigned char[]>(chunk_size_);
   zstream_ptr_->avail_out = chunk_size_;
   zstream_ptr_->next_out = chunk_char_ptr_.get();
 }

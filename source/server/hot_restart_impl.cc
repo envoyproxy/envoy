@@ -6,6 +6,7 @@
 #include <sys/un.h>
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/event/dispatcher.h"
@@ -130,8 +131,8 @@ HotRestartImpl::HotRestartImpl(Options& options)
     // We must hold the stat lock when attaching to an existing memory segment
     // because it might be actively written to while we sanityCheck it.
     Thread::LockGuard lock(stat_lock_);
-    stats_set_.reset(new RawStatDataSet(stats_set_options_, options.restartEpoch() == 0,
-                                        shmem_.stats_set_data_, options_.statsOptions()));
+    stats_set_ = std::make_unique<RawStatDataSet>(stats_set_options_, options.restartEpoch() == 0,
+                                                  shmem_.stats_set_data_, options_.statsOptions());
   }
   stat_allocator_ = std::make_unique<Stats::RawStatDataAllocator(stat_lock_, *stat_set_);
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());

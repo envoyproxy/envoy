@@ -1,10 +1,8 @@
 #pragma once
 
-#include <string>
+#include "envoy/config/trace/v2/trace.pb.validate.h"
 
-#include "envoy/server/instance.h"
-
-#include "server/configuration_impl.h"
+#include "extensions/tracers/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,17 +12,16 @@ namespace DynamicOt {
 /**
  * Config registration for the dynamic opentracing tracer. @see TracerFactory.
  */
-class DynamicOpenTracingTracerFactory : public Server::Configuration::TracerFactory {
+class DynamicOpenTracingTracerFactory
+    : public Common::FactoryBase<envoy::config::trace::v2::DynamicOtConfig> {
 public:
-  // TracerFactory
-  Tracing::HttpTracerPtr createHttpTracer(const envoy::config::trace::v2::Tracing& configuration,
-                                          Server::Instance& server) override;
+  DynamicOpenTracingTracerFactory();
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::trace::v2::DynamicOtConfig>();
-  }
-
-  std::string name() override;
+private:
+  // FactoryBase
+  Tracing::HttpTracerPtr
+  createHttpTracerTyped(const envoy::config::trace::v2::DynamicOtConfig& configuration,
+                        Server::Instance& server) override;
 };
 
 } // namespace DynamicOt

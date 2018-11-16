@@ -1,6 +1,7 @@
 #include "server/worker_impl.h"
 
 #include <functional>
+#include <memory>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -19,13 +20,14 @@ WorkerPtr ProdWorkerFactory::createWorker(OverloadManager& overload_manager) {
   return WorkerPtr{new WorkerImpl(
       tls_, hooks_, std::move(dispatcher),
       Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher)},
-      overload_manager)};
+      overload_manager, api_)};
 }
 
 WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, TestHooks& hooks,
                        Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler,
-                       OverloadManager& overload_manager)
-    : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)) {
+                       OverloadManager& overload_manager, Api::Api& api)
+    : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
+      api_(api) {
   tls_.registerThread(*dispatcher_, false);
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
@@ -69,7 +71,7 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
 
 void WorkerImpl::start(GuardDog& guard_dog) {
   ASSERT(!thread_);
-  thread_.reset(new Thread::Thread([this, &guard_dog]() -> void { threadRoutine(guard_dog); }));
+  thread_ = api_.createThread([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
 }
 
 void WorkerImpl::stop() {
@@ -94,7 +96,7 @@ void WorkerImpl::stopListeners() {
 
 void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   ENVOY_LOG(debug, "worker entering dispatch loop");
-  auto watchdog = guard_dog.createWatchDog(Thread::Thread::currentThreadId());
+  auto watchdog = guard_dog.createWatchDog(Thread::currentThreadId());
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(debug, "worker exited dispatch loop");

@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
@@ -54,8 +56,8 @@ class ListenerManagerImplTest : public testing::Test {
 public:
   ListenerManagerImplTest() {
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
-    manager_.reset(
-        new ListenerManagerImpl(server_, listener_factory_, worker_factory_, time_system_));
+    manager_ = std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
+                                                     time_system_);
   }
 
   /**
@@ -138,7 +140,7 @@ public:
               return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
                                                                                     context);
             }));
-    socket_.reset(new NiceMock<Network::MockConnectionSocket>());
+    socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
   }
 
@@ -342,6 +344,20 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
 
   EXPECT_EQ(1UL, server_.stats_store_.counter("bar").value());
   EXPECT_EQ(1UL, server_.stats_store_.counter("listener.127.0.0.1_1234.foo").value());
+}
+
+TEST_F(ListenerManagerImplTest, ReversedWriteFilterOrder) {
+  const std::string json = R"EOF(
+    name: "foo"
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 10000 }
+    filter_chains:
+    - filters:
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(json), "", true));
+  EXPECT_TRUE(manager_->listeners().front().get().reverseWriteFilterOrder());
 }
 
 TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {

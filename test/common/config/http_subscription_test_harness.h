@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/http/async_client.h"
 
@@ -41,9 +43,9 @@ public:
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    subscription_.reset(new HttpEdsSubscriptionImpl(
+    subscription_ = std::make_unique<HttpEdsSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
-        std::chrono::milliseconds(1000), *method_descriptor_, stats_));
+        std::chrono::milliseconds(1000), *method_descriptor_, stats_);
   }
 
   ~HttpSubscriptionTestHarness() {
@@ -57,11 +59,10 @@ public:
                          const std::string& version) override {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([this, cluster_names, version](
-                             Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                             const absl::optional<std::chrono::milliseconds>& timeout) {
+        .WillOnce(Invoke([this, cluster_names, version](Http::MessagePtr& request,
+                                                        Http::AsyncClient::Callbacks& callbacks,
+                                                        const Http::AsyncClient::RequestOptions&) {
           http_callbacks_ = &callbacks;
-          UNREFERENCED_PARAMETER(timeout);
           EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
                     std::string(request->headers().ContentType()->value().c_str()));
@@ -114,7 +115,7 @@ public:
     EXPECT_TRUE(Protobuf::util::JsonStringToMessage(response_json, &response_pb).ok());
     Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
-    message->body().reset(new Buffer::OwnedImpl(response_json));
+    message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(
                     RepeatedProtoEq(

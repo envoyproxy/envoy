@@ -35,3 +35,17 @@ owning HTTP connection manager.
   denied, Counter, Total requests that were denied access
   shadow_allowed, Counter, Total requests that would be allowed access by the filter's shadow rules
   shadow_denied, Counter, Total requests that would be denied access by the filter's shadow rules
+
+.. _config_http_filters_rbac_dynamic_metadata:
+
+Dynamic Metadata
+----------------
+
+The RBAC filter emits the following dynamic metadata.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  shadow_effective_policy_id, string, The effective shadow policy ID matching the action (if any).
+  shadow_engine_result, string, The engine result for the shadow rules (i.e. either `allowed` or `denied`).

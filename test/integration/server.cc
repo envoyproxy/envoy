@@ -1,5 +1,6 @@
 #include "test/integration/server.h"
 
+#include <memory>
 #include <string>
 
 #include "envoy/http/header_map.h"
@@ -47,8 +48,9 @@ IntegrationTestServerPtr
 IntegrationTestServer::create(const std::string& config_path,
                               const Network::Address::IpVersion version,
                               std::function<void()> pre_worker_start_test_steps, bool deterministic,
-                              Event::TestTimeSystem& time_system) {
-  IntegrationTestServerPtr server{new IntegrationTestServer(time_system, config_path)};
+                              Event::TestTimeSystem& time_system, Api::Api& api) {
+  IntegrationTestServerPtr server{
+      std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
   server->start(version, pre_worker_start_test_steps, deterministic);
   return server;
 }
@@ -58,8 +60,8 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
                                   bool deterministic) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_.reset(new Thread::Thread(
-      [version, deterministic, this]() -> void { threadRoutine(version, deterministic); }));
+  thread_ = api_.createThread(
+      [version, deterministic, this]() -> void { threadRoutine(version, deterministic); });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
   if (pre_worker_start_test_steps != nullptr) {
@@ -99,14 +101,7 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
 }
 
 IntegrationTestServer::~IntegrationTestServer() {
-  ENVOY_LOG(info, "stopping integration test server");
-
-  if (admin_address_ != nullptr) {
-    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-        admin_address_, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
-    EXPECT_TRUE(response->complete());
-    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  }
+  // Derived class must have shutdown server.
   thread_->join();
 }
 
@@ -128,36 +123,62 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
   }
 }
 
+void IntegrationTestServer::serverReady() {
+  pending_listeners_ = server().listenerManager().listeners().size();
+  server_set_.setReady();
+}
+
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic) {
   OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version));
-  Server::HotRestartNopImpl restarter;
   Thread::MutexBasicLockable lock;
 
-  ThreadLocal::InstanceImpl tls;
-  Stats::HeapStatDataAllocator stats_allocator;
-  Stats::StatsOptionsImpl stats_options;
-  Stats::ThreadLocalStoreImpl stats_store(stats_options, stats_allocator);
-  stat_store_ = &stats_store;
   Runtime::RandomGeneratorPtr random_generator;
   if (deterministic) {
     random_generator = std::make_unique<testing::NiceMock<Runtime::MockRandomGenerator>>();
   } else {
     random_generator = std::make_unique<Runtime::RandomGeneratorImpl>();
   }
-  server_.reset(new Server::InstanceImpl(
-      options, time_system_, Network::Utility::getLocalAddress(version), *this, restarter,
-      stats_store, lock, *this, std::move(random_generator), tls));
-  pending_listeners_ = server_->listenerManager().listeners().size();
-  ENVOY_LOG(info, "waiting for {} test server listeners", pending_listeners_);
+  createAndRunEnvoyServer(options, time_system_, Network::Utility::getLocalAddress(version), *this,
+                          lock, *this, std::move(random_generator));
+}
+
+void IntegrationTestServerImpl::createAndRunEnvoyServer(
+    OptionsImpl& options, Event::TimeSystem& time_system,
+    Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
+    Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
+    Runtime::RandomGeneratorPtr&& random_generator) {
+  Server::HotRestartNopImpl restarter;
+  ThreadLocal::InstanceImpl tls;
+  Stats::HeapStatDataAllocator stats_allocator;
+  Stats::ThreadLocalStoreImpl stat_store(options.statsOptions(), stats_allocator);
+
+  Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
+                              access_log_lock, component_factory, std::move(random_generator), tls);
   // This is technically thread unsafe (assigning to a shared_ptr accessed
-  // across threads), but because we synchronize below on server_set, the only
-  // consumer on the main test thread in ~IntegrationTestServer will not race.
-  admin_address_ = server_->admin().socket().localAddress();
-  server_set_.setReady();
-  server_->run();
-  server_.reset();
+  // across threads), but because we synchronize below through serverReady(), the only
+  // consumer on the main test thread in ~IntegrationTestServerImpl will not race.
+  admin_address_ = server.admin().socket().localAddress();
+  server_ = &server;
+  stat_store_ = &stat_store;
+  serverReady();
+  server.run();
+}
+
+IntegrationTestServerImpl::~IntegrationTestServerImpl() {
+  ENVOY_LOG(info, "stopping integration test server");
+
+  Network::Address::InstanceConstSharedPtr admin_address(admin_address_);
+  admin_address_ = nullptr;
+  server_ = nullptr;
   stat_store_ = nullptr;
+
+  if (admin_address != nullptr) {
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
+    EXPECT_TRUE(response->complete());
+    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  }
 }
 
 } // namespace Envoy

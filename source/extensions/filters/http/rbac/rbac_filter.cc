@@ -11,11 +11,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
-static const std::string resp_code_200 = "200";
-static const std::string resp_code_403 = "403";
-static const std::string shadow_policy_id_field = "shadow_effective_policyID";
-static const std::string shadow_resp_code_field = "shadow_response_code";
-
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope)
@@ -71,7 +66,8 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Shadow);
 
   if (shadow_engine.has_value()) {
-    std::string shadow_resp_code = resp_code_200;
+    std::string shadow_resp_code =
+        Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
     if (shadow_engine->allowed(*callbacks_->connection(), headers,
                                callbacks_->streamInfo().dynamicMetadata(), &effective_policy_id)) {
       ENVOY_LOG(debug, "shadow allowed");
@@ -79,17 +75,21 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
     } else {
       ENVOY_LOG(debug, "shadow denied");
       config_->stats().shadow_denied_.inc();
-      shadow_resp_code = resp_code_403;
+      shadow_resp_code =
+          Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
     }
 
     ProtobufWkt::Struct metrics;
 
     auto& fields = *metrics.mutable_fields();
     if (!effective_policy_id.empty()) {
-      *fields[shadow_policy_id_field].mutable_string_value() = effective_policy_id;
+      *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get()
+                  .ShadowEffectivePolicyIdField]
+           .mutable_string_value() = effective_policy_id;
     }
 
-    *fields[shadow_resp_code_field].mutable_string_value() = shadow_resp_code;
+    *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField]
+         .mutable_string_value() = shadow_resp_code;
 
     callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
   }
@@ -104,7 +104,8 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
       return Http::FilterHeadersStatus::Continue;
     } else {
       ENVOY_LOG(debug, "enforced denied");
-      callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr);
+      callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
+                                 absl::nullopt);
       config_->stats().denied_.inc();
       return Http::FilterHeadersStatus::StopIteration;
     }

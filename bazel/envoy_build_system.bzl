@@ -4,6 +4,28 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
 
+# A genrule variant that can output a directory. This is useful when doing things like
+# generating a fuzz corpus mechanically.
+def _envoy_directory_genrule_impl(ctx):
+    tree = ctx.actions.declare_directory(ctx.attr.name + ".outputs")
+    ctx.actions.run_shell(
+        inputs = ctx.files.srcs,
+        tools = ctx.files.tools,
+        outputs = [tree],
+        command = "mkdir -p " + tree.path + " && " + ctx.expand_location(ctx.attr.cmd),
+        env = {"GENRULE_OUTPUT_DIR": tree.path},
+    )
+    return [DefaultInfo(files = depset([tree]))]
+
+envoy_directory_genrule = rule(
+    implementation = _envoy_directory_genrule_impl,
+    attrs = {
+        "srcs": attr.label_list(),
+        "cmd": attr.string(),
+        "tools": attr.label_list(),
+    },
+)
+
 # Compute the final copts based on various options.
 def envoy_copts(repository, test = False):
     posix_options = [
@@ -161,6 +183,45 @@ def envoy_include_prefix(path):
 def envoy_basic_cc_library(name, **kargs):
     native.cc_library(name = name, **kargs)
 
+# Used to select a dependency that has different implementations on POSIX vs Windows.
+# The platform-specific implementations should be specified with envoy_cc_posix_library
+# and envoy_cc_win32_library respectively
+def envoy_cc_platform_dep(name):
+    return select({
+        "@envoy//bazel:windows_x86_64": [name + "_win32"],
+        "//conditions:default": [name + "_posix"],
+    })
+
+# Used to specify a library that only builds on POSIX
+def envoy_cc_posix_library(name, srcs = [], hdrs = [], **kargs):
+    envoy_cc_library(
+        name = name + "_posix",
+        srcs = select({
+            "@envoy//bazel:windows_x86_64": [],
+            "//conditions:default": srcs,
+        }),
+        hdrs = select({
+            "@envoy//bazel:windows_x86_64": [],
+            "//conditions:default": hdrs,
+        }),
+        **kargs
+    )
+
+# Used to specify a library that only builds on Windows
+def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
+    envoy_cc_library(
+        name = name + "_win32",
+        srcs = select({
+            "@envoy//bazel:windows_x86_64": srcs,
+            "//conditions:default": [],
+        }),
+        hdrs = select({
+            "@envoy//bazel:windows_x86_64": hdrs,
+            "//conditions:default": [],
+        }),
+        **kargs
+    )
+
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(
         name,
@@ -236,12 +297,27 @@ def envoy_cc_binary(
         deps = deps,
     )
 
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
+
 # Envoy C++ fuzz test targes. These are not included in coverage runs.
 def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
+    if not (corpus.startswith("//") or corpus.startswith(":")):
+        corpus_name = name + "_corpus"
+        corpus = native.glob([corpus + "/**"])
+        native.filegroup(
+            name = corpus_name,
+            srcs = corpus,
+        )
+    else:
+        corpus_name = corpus
+    pkg_tar(
+        name = name + "_corpus_tar",
+        srcs = [corpus_name],
+        testonly = 1,
+    )
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
-        data = native.glob([corpus + "/**"]),
         deps = deps + ["//test/fuzz:fuzz_runner_lib"],
         **kwargs
     )
@@ -250,7 +326,8 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         copts = envoy_copts("@envoy", test = True),
         linkopts = envoy_test_linkopts(),
         linkstatic = 1,
-        args = [PACKAGE_NAME + "/" + corpus],
+        args = ["$(locations %s)" % corpus_name],
+        data = [corpus_name],
         # No fuzzing on OS X.
         deps = select({
             "@bazel_tools//tools/osx:darwin": ["//test:dummy_main"],

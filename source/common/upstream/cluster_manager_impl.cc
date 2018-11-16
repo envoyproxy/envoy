@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <list>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -173,7 +174,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                                        const LocalInfo::LocalInfo& local_info,
                                        AccessLog::AccessLogManager& log_manager,
                                        Event::Dispatcher& main_thread_dispatcher,
-                                       Server::Admin& admin)
+                                       Server::Admin& admin, Api::Api& api)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), log_manager_(log_manager),
       bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
@@ -182,7 +183,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
       time_source_(main_thread_dispatcher.timeSystem()), dispatcher_(main_thread_dispatcher) {
-  async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls, time_source_);
+  async_client_manager_ =
+      std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls, time_source_, api);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
@@ -210,7 +212,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
 
   // Now setup ADS if needed, this might rely on a primary cluster.
   if (bootstrap.dynamic_resources().has_ads_config()) {
-    ads_mux_.reset(new Config::GrpcMuxImpl(
+    ads_mux_ = std::make_unique<Config::GrpcMuxImpl>(
         local_info,
         Config::Utility::factoryForGrpcApiConfigSource(
             *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
@@ -219,10 +221,9 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
         random_, stats_,
-        Envoy::Config::Utility::parseRateLimitSettings(
-            bootstrap.dynamic_resources().ads_config())));
+        Envoy::Config::Utility::parseRateLimitSettings(bootstrap.dynamic_resources().ads_config()));
   } else {
-    ads_mux_.reset(new Config::NullGrpcMuxImpl());
+    ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
   }
 
   // After ADS is initialized, load EDS static clusters as EDS config may potentially need ADS.
@@ -302,12 +303,12 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
 
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
-    load_stats_reporter_.reset(
-        new LoadStatsReporter(local_info, *this, stats,
-                              Config::Utility::factoryForGrpcApiConfigSource(
-                                  *async_client_manager_, load_stats_config, stats)
-                                  ->create(),
-                              main_thread_dispatcher));
+    load_stats_reporter_ =
+        std::make_unique<LoadStatsReporter>(local_info, *this, stats,
+                                            Config::Utility::factoryForGrpcApiConfigSource(
+                                                *async_client_manager_, load_stats_config, stats)
+                                                ->create(),
+                                            main_thread_dispatcher);
   }
 }
 
@@ -347,14 +348,15 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     //
     // See https://github.com/envoyproxy/envoy/pull/3941 for more context.
     bool scheduled = false;
-    const bool merging_enabled = cluster.info()->lbConfig().has_update_merge_window();
+    const auto merge_timeout =
+        PROTOBUF_GET_MS_OR_DEFAULT(cluster.info()->lbConfig(), update_merge_window, 1000);
     // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
     const bool is_mergeable = !hosts_added.size() && !hosts_removed.size();
 
-    if (merging_enabled) {
+    if (merge_timeout > 0) {
       // If this is not mergeable, we should cancel any scheduled updates since
       // we'll deliver it immediately.
-      scheduled = scheduleUpdate(cluster, priority, is_mergeable);
+      scheduled = scheduleUpdate(cluster, priority, is_mergeable, merge_timeout);
     }
 
     // If an update was not scheduled for later, deliver it immediately.
@@ -374,20 +376,18 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 }
 
-bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable) {
-  const auto& update_merge_window = cluster.info()->lbConfig().update_merge_window();
-  const auto timeout = DurationUtil::durationToMilliseconds(update_merge_window);
-
+bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable,
+                                        const uint64_t timeout) {
   // Find pending updates for this cluster.
   auto& updates_by_prio = updates_map_[cluster.info()->name()];
   if (!updates_by_prio) {
-    updates_by_prio.reset(new PendingUpdatesByPriorityMap());
+    updates_by_prio = std::make_unique<PendingUpdatesByPriorityMap>();
   }
 
   // Find pending updates for this priority.
   auto& updates = (*updates_by_prio)[priority];
   if (!updates) {
-    updates.reset(new PendingUpdates());
+    updates = std::make_unique<PendingUpdates>();
   }
 
   // Has an update_merge_window gone by since the last update? If so, don't schedule
@@ -800,8 +800,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
   if (local_cluster_name) {
     ENVOY_LOG(debug, "adding TLS local cluster {}", local_cluster_name.value());
     auto& local_cluster = parent.active_clusters_.at(local_cluster_name.value());
-    thread_local_clusters_[local_cluster_name.value()].reset(new ClusterEntry(
-        *this, local_cluster->cluster_->info(), local_cluster->loadBalancerFactory()));
+    thread_local_clusters_[local_cluster_name.value()] = std::make_unique<ClusterEntry>(
+        *this, local_cluster->cluster_->info(), local_cluster->loadBalancerFactory());
   }
 
   local_priority_set_ = local_cluster_name
@@ -816,8 +816,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
 
     ENVOY_LOG(debug, "adding TLS initial cluster {}", cluster.first);
     ASSERT(thread_local_clusters_.count(cluster.first) == 0);
-    thread_local_clusters_[cluster.first].reset(new ClusterEntry(
-        *this, cluster.second->cluster_->info(), cluster.second->loadBalancerFactory()));
+    thread_local_clusters_[cluster.first] = std::make_unique<ClusterEntry>(
+        *this, cluster.second->cluster_->info(), cluster.second->loadBalancerFactory());
   }
 }
 
@@ -1026,31 +1026,31 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
   // benefit given the healthy panic, locality, and priority calculations that take place.
   if (cluster->lbSubsetInfo().isEnabled()) {
-    lb_.reset(new SubsetLoadBalancer(cluster->lbType(), priority_set_, parent_.local_priority_set_,
-                                     cluster->stats(), parent.parent_.runtime_,
-                                     parent.parent_.random_, cluster->lbSubsetInfo(),
-                                     cluster->lbRingHashConfig(), cluster->lbConfig()));
+    lb_ = std::make_unique<SubsetLoadBalancer>(
+        cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
+        parent.parent_.runtime_, parent.parent_.random_, cluster->lbSubsetInfo(),
+        cluster->lbRingHashConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig());
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
       ASSERT(lb_factory_ == nullptr);
-      lb_.reset(new LeastRequestLoadBalancer(priority_set_, parent_.local_priority_set_,
-                                             cluster->stats(), parent.parent_.runtime_,
-                                             parent.parent_.random_, cluster->lbConfig()));
+      lb_ = std::make_unique<LeastRequestLoadBalancer>(
+          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
+          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig());
       break;
     }
     case LoadBalancerType::Random: {
       ASSERT(lb_factory_ == nullptr);
-      lb_.reset(new RandomLoadBalancer(priority_set_, parent_.local_priority_set_, cluster->stats(),
-                                       parent.parent_.runtime_, parent.parent_.random_,
-                                       cluster->lbConfig()));
+      lb_ = std::make_unique<RandomLoadBalancer>(priority_set_, parent_.local_priority_set_,
+                                                 cluster->stats(), parent.parent_.runtime_,
+                                                 parent.parent_.random_, cluster->lbConfig());
       break;
     }
     case LoadBalancerType::RoundRobin: {
       ASSERT(lb_factory_ == nullptr);
-      lb_.reset(new RoundRobinLoadBalancer(priority_set_, parent_.local_priority_set_,
-                                           cluster->stats(), parent.parent_.runtime_,
-                                           parent.parent_.random_, cluster->lbConfig()));
+      lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set_, parent_.local_priority_set_,
+                                                     cluster->stats(), parent.parent_.runtime_,
+                                                     parent.parent_.random_, cluster->lbConfig());
       break;
     }
     case LoadBalancerType::RingHash:
@@ -1061,9 +1061,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     }
     case LoadBalancerType::OriginalDst: {
       ASSERT(lb_factory_ == nullptr);
-      lb_.reset(new OriginalDstCluster::LoadBalancer(
+      lb_ = std::make_unique<OriginalDstCluster::LoadBalancer>(
           priority_set_, parent.parent_.active_clusters_.at(cluster->name())->cluster_,
-          cluster->lbOriginalDstConfig()));
+          cluster->lbOriginalDstConfig());
       break;
     }
     }
@@ -1173,7 +1173,7 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     Server::Admin& admin) {
   return ClusterManagerPtr{new ClusterManagerImpl(bootstrap, *this, stats, tls, runtime, random,
                                                   local_info, log_manager, main_thread_dispatcher_,
-                                                  admin)};
+                                                  admin, api_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(

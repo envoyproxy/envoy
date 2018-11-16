@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/stats/scope.h"
@@ -27,7 +29,8 @@ namespace Config {
 class SubscriptionFactoryTest : public ::testing::Test {
 public:
   SubscriptionFactoryTest() : http_request_(&cm_.async_client_) {
-    legacy_subscription_.reset(new MockSubscription<envoy::api::v2::ClusterLoadAssignment>());
+    legacy_subscription_ =
+        std::make_unique<MockSubscription<envoy::api::v2::ClusterLoadAssignment>>();
   }
 
   std::unique_ptr<Subscription<envoy::api::v2::ClusterLoadAssignment>>
@@ -230,7 +233,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
   EXPECT_CALL(
       cm_.async_client_,
-      send_(_, _, absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(5000))));
+      send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(5000))));
   subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_);
 }
 
@@ -249,10 +252,8 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke([this](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                              const absl::optional<std::chrono::milliseconds>& timeout) {
-        UNREFERENCED_PARAMETER(callbacks);
-        UNREFERENCED_PARAMETER(timeout);
+      .WillOnce(Invoke([this](Http::MessagePtr& request, Http::AsyncClient::Callbacks&,
+                              const Http::AsyncClient::RequestOptions&) {
         EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));
         EXPECT_EQ("static_cluster", std::string(request->headers().Host()->value().c_str()));
         EXPECT_EQ("/v2/discovery:endpoints",

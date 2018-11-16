@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "dispatcher_impl_test",
     srcs = ["dispatcher_impl_test.cc"],
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//test/mocks:common_lib",
@@ -37,6 +38,7 @@ envoy_cc_test(
     name = "dispatched_thread_impl_test",
     srcs = ["dispatched_thread_impl_test.cc"],
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/common:utility_lib",
         "//source/common/event:dispatched_thread_lib",
         "//source/server:guarddog_lib",

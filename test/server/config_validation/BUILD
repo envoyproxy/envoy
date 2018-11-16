@@ -28,6 +28,7 @@ envoy_cc_test(
     deps = [
         "//include/envoy/upstream:resource_manager_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/api:api_lib",
         "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",
         "//source/server/config_validation:cluster_manager_lib",
@@ -83,7 +84,7 @@ envoy_cc_test(
 envoy_cc_fuzz_test(
     name = "config_fuzz_test",
     srcs = ["config_fuzz_test.cc"],
-    corpus = "config_corpus",
+    corpus = "//test/server:server_fuzz_test_corpus",
     deps = [
         "//source/server/config_validation:server_lib",
         "//source/server:proto_descriptors_lib",

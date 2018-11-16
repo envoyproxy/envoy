@@ -1,3 +1,4 @@
+#include <memory>
 #include <string>
 
 #include "common/http/header_map_impl.h"
@@ -37,7 +38,7 @@ TEST(HeaderStringTest, All) {
     HeaderString string1(static_string);
     HeaderString string2(std::move(string1));
     EXPECT_STREQ("HELLO", string2.c_str());
-    EXPECT_EQ(static_string.c_str(), string1.c_str());
+    EXPECT_EQ(static_string.c_str(), string1.c_str()); // NOLINT(bugprone-use-after-move)
     EXPECT_EQ(static_string.c_str(), string2.c_str());
     EXPECT_EQ(5U, string1.size());
     EXPECT_EQ(5U, string2.size());
@@ -49,7 +50,7 @@ TEST(HeaderStringTest, All) {
     string.setCopy("hello", 5);
     EXPECT_EQ(HeaderString::Type::Inline, string.type());
     HeaderString string2(std::move(string));
-    EXPECT_TRUE(string.empty());
+    EXPECT_TRUE(string.empty()); // NOLINT(bugprone-use-after-move)
     EXPECT_EQ(HeaderString::Type::Inline, string.type());
     EXPECT_EQ(HeaderString::Type::Inline, string2.type());
     string.append("world", 5);
@@ -66,7 +67,7 @@ TEST(HeaderStringTest, All) {
     string.setCopy(large.c_str(), large.size());
     EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
     HeaderString string2(std::move(string));
-    EXPECT_TRUE(string.empty());
+    EXPECT_TRUE(string.empty()); // NOLINT(bugprone-use-after-move)
     EXPECT_EQ(HeaderString::Type::Inline, string.type());
     EXPECT_EQ(HeaderString::Type::Dynamic, string2.type());
     string.append("b", 1);
@@ -515,7 +516,7 @@ TEST(HeaderMapImplTest, AddCopy) {
 
   // Build "hello" with string concatenation to make it unlikely that the
   // compiler is just reusing the same string constant for everything.
-  lcKeyPtr.reset(new LowerCaseString(std::string("he") + "llo"));
+  lcKeyPtr = std::make_unique<LowerCaseString>(std::string("he") + "llo");
   EXPECT_STREQ("hello", lcKeyPtr->get().c_str());
 
   headers.addCopy(*lcKeyPtr, 42);
