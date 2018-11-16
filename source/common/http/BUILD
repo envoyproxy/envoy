@@ -299,3 +299,12 @@ envoy_cc_library(
         "@envoy_api//envoy/type:range_cc",
     ],
 )
+
+envoy_cc_library(
+    name = "wrapped_connection_pool_lib",
+    srcs = ["wrapped_connection_pool.cc"],
+    hdrs = ["wrapped_connection_pool.h"],
+    deps = [
+        "//include/envoy/http:conn_pool_interface",
+    ],
+)
