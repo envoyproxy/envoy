@@ -27,19 +27,19 @@ void ClientLogin::SetDB(std::string& db) { db_ = db; }
 
 void ClientLogin::SetAuthResp(std::string& auth_resp) { auth_resp_.assign(auth_resp); }
 
-bool ClientLogin::IsResponse41() { return client_cap_ & MYSQL_CLIENT_CAPAB_41VS320; }
+bool ClientLogin::IsResponse41() const { return client_cap_ & MYSQL_CLIENT_CAPAB_41VS320; }
 
-bool ClientLogin::IsResponse320() { return !(client_cap_ & MYSQL_CLIENT_CAPAB_41VS320); }
+bool ClientLogin::IsResponse320() const { return !(client_cap_ & MYSQL_CLIENT_CAPAB_41VS320); }
 
-bool ClientLogin::IsSSLRequest() { return client_cap_ & MYSQL_CLIENT_CAPAB_SSL; }
+bool ClientLogin::IsSSLRequest() const { return client_cap_ & MYSQL_CLIENT_CAPAB_SSL; }
 
-bool ClientLogin::IsConnectWithDb() { return client_cap_ & MYSQL_CLIENT_CONNECT_WITH_DB; }
+bool ClientLogin::IsConnectWithDb() const { return client_cap_ & MYSQL_CLIENT_CONNECT_WITH_DB; }
 
-bool ClientLogin::IsClientAuthLenClData() {
+bool ClientLogin::IsClientAuthLenClData() const {
   return extended_client_cap_ & MYSQL_EXT_CL_PLG_AUTH_CL_DATA;
 }
 
-bool ClientLogin::IsClientSecureConnection() {
+bool ClientLogin::IsClientSecureConnection() const {
   return extended_client_cap_ & MYSQL_EXT_CL_SECURE_CONNECTION;
 }
 

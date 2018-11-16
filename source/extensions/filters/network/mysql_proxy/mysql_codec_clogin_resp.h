@@ -16,11 +16,11 @@ public:
   int Decode(Buffer::Instance& buffer) override;
   std::string Encode() override;
 
-  uint8_t GetRespCode() { return resp_code_; }
-  uint8_t GetAffectedRows() { return affected_rows_; }
-  uint8_t GetLastInsertId() { return last_insert_id_; }
-  uint16_t GetServerStatus() { return server_status_; }
-  uint16_t GetWarnings() { return warnings_; }
+  uint8_t GetRespCode() const { return resp_code_; }
+  uint8_t GetAffectedRows() const { return affected_rows_; }
+  uint8_t GetLastInsertId() const { return last_insert_id_; }
+  uint16_t GetServerStatus() const { return server_status_; }
+  uint16_t GetWarnings() const { return warnings_; }
   void SetRespCode(uint8_t resp_code);
   void SetAffectedRows(uint8_t affected_rows);
   void SetLastInsertId(uint8_t last_insert_id);

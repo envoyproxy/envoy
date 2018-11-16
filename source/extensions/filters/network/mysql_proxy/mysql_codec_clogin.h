@@ -15,19 +15,19 @@ public:
   int Decode(Buffer::Instance& buffer) override;
   std::string Encode() override;
 
-  int GetClientCap() { return client_cap_; }
-  int GetExtendedClientCap() { return extended_client_cap_; }
-  int GetMaxPacket() { return max_packet_; }
-  int GetCharset() { return charset_; }
-  std::string& GetUsername() { return username_; }
-  std::string& GetAuthResp() { return auth_resp_; }
-  std::string& GetDB() { return db_; }
-  bool IsResponse41();
-  bool IsResponse320();
-  bool IsSSLRequest();
-  bool IsConnectWithDb();
-  bool IsClientAuthLenClData();
-  bool IsClientSecureConnection();
+  int GetClientCap() const { return client_cap_; }
+  int GetExtendedClientCap() const { return extended_client_cap_; }
+  int GetMaxPacket() const { return max_packet_; }
+  int GetCharset() const { return charset_; }
+  const std::string& GetUsername() const { return username_; }
+  const std::string& GetAuthResp() const { return auth_resp_; }
+  const std::string& GetDB() const { return db_; }
+  bool IsResponse41() const;
+  bool IsResponse320() const;
+  bool IsSSLRequest() const;
+  bool IsConnectWithDb() const;
+  bool IsClientAuthLenClData() const;
+  bool IsClientSecureConnection() const;
   void SetClientCap(int client_cap);
   void SetExtendedClientCap(int extended_client_cap);
   void SetMaxPacket(int max_packet);

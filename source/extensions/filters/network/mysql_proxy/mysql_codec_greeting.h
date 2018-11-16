@@ -14,14 +14,14 @@ public:
   int Decode(Buffer::Instance& buffer) override;
   std::string Encode() override;
 
-  int GetProtocol() { return protocol_; }
-  std::string& GetVersion() { return version_; }
-  int GetThreadId() { return thread_id_; }
-  std::string& GetSalt() { return salt_; };
-  int GetServerCap() { return server_cap_; }
-  int GetServerLanguage() { return server_language_; }
-  int GetServerStatus() { return server_status_; }
-  int GetExtServerCap() { return ext_server_cap_; }
+  int GetProtocol() const { return protocol_; }
+  const std::string& GetVersion() const { return version_; }
+  int GetThreadId() const { return thread_id_; }
+  const std::string& GetSalt() const { return salt_; };
+  int GetServerCap() const { return server_cap_; }
+  int GetServerLanguage() const { return server_language_; }
+  int GetServerStatus() const { return server_status_; }
+  int GetExtServerCap() const { return ext_server_cap_; }
   void SetProtocol(int protocol);
   void SetVersion(std::string& version);
   void SetThreadId(int thread_id);

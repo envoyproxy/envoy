@@ -14,9 +14,9 @@ public:
   int Decode(Buffer::Instance& buffer) override;
   std::string Encode() override;
 
-  int GetSeq() { return seq_; }
+  int GetSeq() const { return seq_; }
   void SetSeq(int seq);
-  std::string& GetAuthPluginResp() { return auth_plugin_resp_; }
+  const std::string& GetAuthPluginResp() const { return auth_plugin_resp_; }
   void SetAuthPluginResp(std::string& auth_swith_resp);
 
 private:
