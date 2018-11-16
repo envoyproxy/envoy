@@ -6,9 +6,9 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
-class MysqlSession : Logger::Loggable<Logger::Id::filter> {
+class MySQLSession : Logger::Loggable<Logger::Id::filter> {
 public:
   enum class State {
     MYSQL_INIT = 0,
@@ -26,24 +26,24 @@ public:
     MYSQL_ERROR = 12,
   };
 
-  MysqlSession() { cinfo_ = {}; };
+  MySQLSession() { cinfo_ = {}; };
   uint64_t GetId() { return cinfo_.id; }
   void SetId(uint64_t id) { cinfo_.id = id; }
-  void SetState(MysqlSession::State state) { cinfo_.state = state; }
-  MysqlSession::State GetState() { return cinfo_.state; }
+  void SetState(MySQLSession::State state) { cinfo_.state = state; }
+  MySQLSession::State GetState() { return cinfo_.state; }
   int GetExpectedSeq() { return cinfo_.expected_seq; }
   void SetExpectedSeq(int seq) { cinfo_.expected_seq = seq; }
 
 private:
   struct ConnInfo {
     uint64_t id;
-    MysqlSession::State state;
+    MySQLSession::State state;
     int expected_seq;
   };
   ConnInfo cinfo_;
 };
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

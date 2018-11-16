@@ -9,9 +9,9 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
-class MysqlCodec : public Logger::Loggable<Logger::Id::filter> {
+class MySQLCodec : public Logger::Loggable<Logger::Id::filter> {
 #define MYSQL_MAX_STR_SIZE 256
 #define MYSQL_PKT_SIZE 1500
 #define MYSQL_HDR_SIZE 4
@@ -131,13 +131,13 @@ public:
     uint32_t seq : 8;
   });
 
-  union MysqlHeader {
+  union MySQLHeader {
     header_fields fields;
     uint32_t bits;
   };
 
-  MysqlCodec::Cmd ParseCmd(Buffer::Instance& data);
-  MysqlCodec::PktType CheckPktType(Buffer::Instance& data);
+  MySQLCodec::Cmd ParseCmd(Buffer::Instance& data);
+  MySQLCodec::PktType CheckPktType(Buffer::Instance& data);
   int BufUint8Drain(Buffer::Instance& buffer, uint8_t& val);
   int BufUint16Drain(Buffer::Instance& buffer, uint16_t& val);
   int BufUint32Drain(Buffer::Instance& buffer, uint32_t& val);
@@ -163,7 +163,7 @@ private:
   int seq_;
 };
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

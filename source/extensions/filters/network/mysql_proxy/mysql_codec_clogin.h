@@ -6,9 +6,9 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
-class ClientLogin : public MysqlCodec {
+class ClientLogin : public MySQLCodec {
 private:
 #define UNSET_BYTES 23
 
@@ -45,7 +45,7 @@ public:
   void SetDB(std::string& db);
 };
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

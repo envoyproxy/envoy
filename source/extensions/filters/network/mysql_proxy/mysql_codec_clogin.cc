@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
 void ClientLogin::SetClientCap(int client_cap) { client_cap_ = client_cap; }
 
@@ -160,7 +160,7 @@ std::string ClientLogin::Encode() {
   return e_string;
 }
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

@@ -10,23 +10,23 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
 /**
  * Config registration for the mysql proxy filter.
  */
-class MysqlConfigFactory : public Common::FactoryBase<
-                               envoy::config::filter::network::mysql_proxy::v1alpha1::MysqlProxy> {
+class MySQLConfigFactory : public Common::FactoryBase<
+                               envoy::config::filter::network::mysql_proxy::v1alpha1::MySQLProxy> {
 public:
-  MysqlConfigFactory() : FactoryBase(NetworkFilterNames::get().MysqlProxy) {}
+  MySQLConfigFactory() : FactoryBase(NetworkFilterNames::get().MySQLProxy) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::network::mysql_proxy::v1alpha1::MysqlProxy& proto_config,
+      const envoy::config::filter::network::mysql_proxy::v1alpha1::MySQLProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

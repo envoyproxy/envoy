@@ -7,26 +7,26 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
-MysqlFilterConfig::MysqlFilterConfig(const std::string& stat_prefix, Stats::Scope& scope)
+MySQLFilterConfig::MySQLFilterConfig(const std::string& stat_prefix, Stats::Scope& scope)
     : scope_(scope), stat_prefix_(stat_prefix), stats_(generateStats(stat_prefix, scope)) {}
 
-MysqlFilter::MysqlFilter(MysqlFilterConfigSharedPtr config) : config_(std::move(config)) {}
+MySQLFilter::MySQLFilter(MySQLFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
-void MysqlFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+void MySQLFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
 }
 
-Network::FilterStatus MysqlFilter::onWrite(Buffer::Instance& data, bool end_stream) {
+Network::FilterStatus MySQLFilter::onWrite(Buffer::Instance& data, bool end_stream) {
   return Process(data, end_stream);
 }
 
-Network::FilterStatus MysqlFilter::onData(Buffer::Instance& data, bool end_stream) {
+Network::FilterStatus MySQLFilter::onData(Buffer::Instance& data, bool end_stream) {
   return Process(data, end_stream);
 }
 
-Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stream) {
+Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "onData, len {}, end_stream {}", read_callbacks_->connection(),
                  data.length(), end_stream);
   if (!data.length()) {
@@ -38,19 +38,19 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
   switch (session_.GetState()) {
 
   // expect Server Challenge packet
-  case MysqlSession::State::MYSQL_INIT: {
+  case MySQLSession::State::MYSQL_INIT: {
     ServerGreeting greeting{};
     greeting.Decode(data);
     if (greeting.GetSeq() != GREETING_SEQ_NUM) {
       config_->stats_.protocol_errors_.inc();
       break;
     }
-    session_.SetState(MysqlSession::State::MYSQL_CHALLENGE_REQ);
+    session_.SetState(MySQLSession::State::MYSQL_CHALLENGE_REQ);
     break;
   }
 
   // Process Client Handshake Response
-  case MysqlSession::State::MYSQL_CHALLENGE_REQ: {
+  case MySQLSession::State::MYSQL_CHALLENGE_REQ: {
     config_->stats_.login_attempts_.inc();
     ClientLogin client_login{};
     client_login.Decode(data);
@@ -59,21 +59,21 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
       break;
     }
     if (client_login.IsSSLRequest()) {
-      session_.SetState(MysqlSession::State::MYSQL_SSL_PT);
+      session_.SetState(MySQLSession::State::MYSQL_SSL_PT);
       config_->stats_.upgraded_to_ssl_.inc();
     } else if (client_login.IsResponse41()) {
-      session_.SetState(MysqlSession::State::MYSQL_CHALLENGE_RESP_41);
+      session_.SetState(MySQLSession::State::MYSQL_CHALLENGE_RESP_41);
     } else {
-      session_.SetState(MysqlSession::State::MYSQL_CHALLENGE_RESP_320);
+      session_.SetState(MySQLSession::State::MYSQL_CHALLENGE_RESP_320);
     }
     break;
   }
 
-  case MysqlSession::State::MYSQL_SSL_PT:
+  case MySQLSession::State::MYSQL_SSL_PT:
     return Network::FilterStatus::Continue;
 
-  case MysqlSession::State::MYSQL_CHALLENGE_RESP_41:
-  case MysqlSession::State::MYSQL_CHALLENGE_RESP_320: {
+  case MySQLSession::State::MYSQL_CHALLENGE_RESP_41:
+  case MySQLSession::State::MYSQL_CHALLENGE_RESP_320: {
     ClientLoginResponse client_login_resp{};
     client_login_resp.Decode(data);
     if (client_login_resp.GetSeq() != CHALLENGE_RESP_SEQ_NUM) {
@@ -81,33 +81,33 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
       break;
     }
     if (client_login_resp.GetRespCode() == MYSQL_RESP_OK) {
-      session_.SetState(MysqlSession::State::MYSQL_REQ);
+      session_.SetState(MySQLSession::State::MYSQL_REQ);
     } else if (client_login_resp.GetRespCode() == MYSQL_RESP_AUTH_SWITCH) {
       config_->stats_.auth_switch_request_.inc();
-      session_.SetState(MysqlSession::State::MYSQL_AUTH_SWITCH_RESP);
+      session_.SetState(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP);
       session_.SetExpectedSeq(client_login_resp.GetSeq() + 1);
     } else if (client_login_resp.GetRespCode() == MYSQL_RESP_ERR) {
       config_->stats_.login_failures_.inc();
-      session_.SetState(MysqlSession::State::MYSQL_ERROR);
+      session_.SetState(MySQLSession::State::MYSQL_ERROR);
     } else {
-      session_.SetState(MysqlSession::State::MYSQL_NOT_HANDLED);
+      session_.SetState(MySQLSession::State::MYSQL_NOT_HANDLED);
     }
     break;
   }
 
-  case MysqlSession::State::MYSQL_AUTH_SWITCH_RESP: {
+  case MySQLSession::State::MYSQL_AUTH_SWITCH_RESP: {
     ClientSwitchResponse client_switch_resp{};
     client_switch_resp.Decode(data);
     if ((client_switch_resp.GetSeq() != session_.GetExpectedSeq())) {
       config_->stats_.protocol_errors_.inc();
       break;
     }
-    session_.SetState(MysqlSession::State::MYSQL_AUTH_SWITCH_MORE);
+    session_.SetState(MySQLSession::State::MYSQL_AUTH_SWITCH_MORE);
     session_.SetExpectedSeq(client_switch_resp.GetSeq() + 1);
     break;
   }
 
-  case MysqlSession::State::MYSQL_AUTH_SWITCH_MORE: {
+  case MySQLSession::State::MYSQL_AUTH_SWITCH_MORE: {
     ClientLoginResponse client_login_resp{};
     client_login_resp.Decode(data);
     if (client_login_resp.GetSeq() != session_.GetExpectedSeq()) {
@@ -115,31 +115,31 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
       break;
     }
     if (client_login_resp.GetRespCode() == MYSQL_RESP_OK) {
-      session_.SetState(MysqlSession::State::MYSQL_REQ);
+      session_.SetState(MySQLSession::State::MYSQL_REQ);
     } else if (client_login_resp.GetRespCode() == MYSQL_RESP_MORE) {
-      session_.SetState(MysqlSession::State::MYSQL_AUTH_SWITCH_RESP);
+      session_.SetState(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP);
       session_.SetExpectedSeq(client_login_resp.GetSeq() + 1);
     } else if (client_login_resp.GetRespCode() == MYSQL_RESP_ERR) {
       config_->stats_.login_failures_.inc();
-      session_.SetState(MysqlSession::State::MYSQL_ERROR);
+      session_.SetState(MySQLSession::State::MYSQL_ERROR);
     } else {
-      session_.SetState(MysqlSession::State::MYSQL_NOT_HANDLED);
+      session_.SetState(MySQLSession::State::MYSQL_NOT_HANDLED);
     }
     break;
   }
 
   // Process Query
-  case MysqlSession::State::MYSQL_REQ:
-    session_.SetState(MysqlSession::State::MYSQL_REQ_RESP);
+  case MySQLSession::State::MYSQL_REQ:
+    session_.SetState(MySQLSession::State::MYSQL_REQ_RESP);
     break;
 
   // Process Query Response
-  case MysqlSession::State::MYSQL_REQ_RESP:
-    session_.SetState(MysqlSession::State::MYSQL_REQ);
+  case MySQLSession::State::MYSQL_REQ_RESP:
+    session_.SetState(MySQLSession::State::MYSQL_REQ);
     break;
 
-  case MysqlSession::State::MYSQL_ERROR:
-  case MysqlSession::State::MYSQL_NOT_HANDLED:
+  case MySQLSession::State::MYSQL_ERROR:
+  case MySQLSession::State::MYSQL_NOT_HANDLED:
   default:
     break;
   }
@@ -150,13 +150,13 @@ Network::FilterStatus MysqlFilter::Process(Buffer::Instance& data, bool end_stre
   return Network::FilterStatus::Continue;
 }
 
-Network::FilterStatus MysqlFilter::onNewConnection() {
+Network::FilterStatus MySQLFilter::onNewConnection() {
   config_->stats_.sessions_.inc();
   session_.SetId(read_callbacks_->connection().id());
   return Network::FilterStatus::Continue;
 }
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

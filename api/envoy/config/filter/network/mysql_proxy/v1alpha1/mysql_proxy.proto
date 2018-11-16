@@ -5,15 +5,15 @@ option go_package = "v2";
 
 import "validate/validate.proto";
 
-// [#protodoc-title: Mysql proxy
-// Mysql Proxy :ref:`configuration overview <config_network_filters_mysql_proxy>`.
+// [#protodoc-title: MySQL proxy
+// MySQL Proxy :ref:`configuration overview <config_network_filters_mysql_proxy>`.
 
-message MysqlProxy {
+message MySQLProxy {
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_mysql_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
 
-  // [#not-implemented-hide:] The optional path to use for writing Mysql access logs.
+  // [#not-implemented-hide:] The optional path to use for writing MySQL access logs.
   // If the access log field is empty, access logs will not be written.
   string access_log = 2;
 }

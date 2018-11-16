@@ -21,7 +21,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
 /**
  * All mysql proxy stats. @see stats_macros.h
@@ -39,40 +39,40 @@ namespace MysqlProxy {
 /**
  * Struct definition for all mongo proxy stats. @see stats_macros.h
  */
-struct MysqlProxyStats {
+struct MySQLProxyStats {
   ALL_MYSQL_PROXY_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
  * Configuration for the mysql proxy filter.
  */
-class MysqlFilterConfig {
+class MySQLFilterConfig {
 public:
-  MysqlFilterConfig(const std::string &stat_prefix, Stats::Scope& scope);
+  MySQLFilterConfig(const std::string &stat_prefix, Stats::Scope& scope);
 
   Stats::Scope& scope_;
   const std::string stat_prefix_;
-  const MysqlProxyStats& stats() { return stats_; }
-  MysqlProxyStats stats_;
+  const MySQLProxyStats& stats() { return stats_; }
+  MySQLProxyStats stats_;
 
 private:
-  MysqlProxyStats generateStats(const std::string& prefix,
+  MySQLProxyStats generateStats(const std::string& prefix,
                                 Stats::Scope& scope) {
-    return MysqlProxyStats{
+    return MySQLProxyStats{
         ALL_MYSQL_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 };
 
-using MysqlFilterConfigSharedPtr = std::shared_ptr<MysqlFilterConfig>;
+using MySQLFilterConfigSharedPtr = std::shared_ptr<MySQLFilterConfig>;
 
 /**
  * Implementation of mysql network filter.
  */
-class MysqlFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
+class MySQLFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
  public:
-   MysqlFilter(MysqlFilterConfigSharedPtr config);
-   MysqlSession& getSession() { return session_; }
-  ~MysqlFilter() override = default;
+   MySQLFilter(MySQLFilterConfigSharedPtr config);
+   MySQLSession& getSession() { return session_; }
+  ~MySQLFilter() override = default;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data,
@@ -86,11 +86,11 @@ class MysqlFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter>
  private:
   Network::FilterStatus Process(Buffer::Instance& data, bool end_stream);
   Network::ReadFilterCallbacks* read_callbacks_{};
-  MysqlFilterConfigSharedPtr config_;
-  MysqlSession session_;
+  MySQLFilterConfigSharedPtr config_;
+  MySQLSession session_;
 };
 
-}  // namespace MysqlProxy
+}  // namespace MySQLProxy
 }  // namespace NetworkFilters
 }  // namespace Extensions
 }  // namespace Envoy

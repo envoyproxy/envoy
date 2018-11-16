@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
 void ClientSwitchResponse::SetSeq(int seq) { seq_ = seq; }
 
@@ -32,7 +32,7 @@ std::string ClientSwitchResponse::Encode() {
   return e_string;
 }
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

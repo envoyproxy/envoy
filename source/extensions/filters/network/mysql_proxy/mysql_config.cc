@@ -13,36 +13,36 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
 /**
  * Config registration for the mysql filter. @see
  * NamedNetworkFilterConfigFactory.
  */
 Network::FilterFactoryCb
-NetworkFilters::MysqlProxy::MysqlConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::network::mysql_proxy::v1alpha1::MysqlProxy& proto_config,
+NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoTyped(
+    const envoy::config::filter::network::mysql_proxy::v1alpha1::MySQLProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
 
   const std::string stat_prefix = fmt::format("mysql.{}.", proto_config.stat_prefix());
 
-  MysqlFilterConfigSharedPtr filter_config(
-      std::make_shared<MysqlFilterConfig>(stat_prefix, context.scope()));
+  MySQLFilterConfigSharedPtr filter_config(
+      std::make_shared<MySQLFilterConfig>(stat_prefix, context.scope()));
   return [filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addFilter(std::make_shared<MysqlFilter>(filter_config));
+    filter_manager.addFilter(std::make_shared<MySQLFilter>(filter_config));
   };
 }
 
 /**
  * Static registration for the mysql filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<MysqlConfigFactory,
+static Registry::RegisterFactory<MySQLConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     registered_;
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

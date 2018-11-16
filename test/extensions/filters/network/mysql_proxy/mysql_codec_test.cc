@@ -11,22 +11,22 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
 #define MYSQL_UT_RESP_OK 0
 #define MYSQL_UT_LAST_ID 0
 #define MYSQL_UT_SERVER_OK 0
 #define MYSQL_UT_SERVER_WARNINGS 0x0001
 
-class MysqlCodecTest : public MysqlTestUtils, public testing::Test {};
+class MySQLCodecTest : public MySQLTestUtils, public testing::Test {};
 
-TEST_F(MysqlCodecTest, MysqlServerChallengeV9EncDec) {
+TEST_F(MySQLCodecTest, MySQLServerChallengeV9EncDec) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.SetProtocol(MYSQL_PROTOCOL_9);
-  std::string ver(MysqlTestUtils::GetVersion());
+  std::string ver(MySQLTestUtils::GetVersion());
   mysql_greet_encode.SetVersion(ver);
   mysql_greet_encode.SetThreadId(MYSQL_THREAD_ID);
-  std::string salt(MysqlTestUtils::GetSalt());
+  std::string salt(MySQLTestUtils::GetSalt());
   mysql_greet_encode.SetSalt(salt);
   std::string data = mysql_greet_encode.Encode();
   std::string mysql_msg = mysql_greet_encode.EncodeHdr(data, 0);
@@ -49,13 +49,13 @@ TEST_F(MysqlCodecTest, MysqlServerChallengeV9EncDec) {
  * - message is encoded using the ServerGreeting class
  * - message is decoded using the ServerGreeting class
  */
-TEST_F(MysqlCodecTest, MysqlServerChallengeV10EncDec) {
+TEST_F(MySQLCodecTest, MySQLServerChallengeV10EncDec) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.SetProtocol(MYSQL_PROTOCOL_10);
-  std::string ver(MysqlTestUtils::GetVersion());
+  std::string ver(MySQLTestUtils::GetVersion());
   mysql_greet_encode.SetVersion(ver);
   mysql_greet_encode.SetThreadId(MYSQL_THREAD_ID);
-  std::string salt(MysqlTestUtils::GetSalt());
+  std::string salt(MySQLTestUtils::GetSalt());
   mysql_greet_encode.SetSalt(salt);
   mysql_greet_encode.SetServerCap(MYSQL_SERVER_CAPAB);
   mysql_greet_encode.SetServerLanguage(MYSQL_SERVER_LANGUAGE);
@@ -83,7 +83,7 @@ TEST_F(MysqlCodecTest, MysqlServerChallengeV10EncDec) {
  *   - CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA set
  * - message is decoded using the ClientLogin class
  */
-TEST_F(MysqlCodecTest, MysqlClLoginV41PluginAuthEncDec) {
+TEST_F(MySQLCodecTest, MySQLClLoginV41PluginAuthEncDec) {
   ClientLogin mysql_clogin_encode{};
   uint16_t client_capab = 0;
   client_capab |= (MYSQL_CLIENT_CONNECT_WITH_DB | MYSQL_CLIENT_CAPAB_41VS320);
@@ -93,7 +93,7 @@ TEST_F(MysqlCodecTest, MysqlClLoginV41PluginAuthEncDec) {
   mysql_clogin_encode.SetCharset(MYSQL_CHARSET);
   std::string user("user1");
   mysql_clogin_encode.SetUsername(user);
-  std::string passwd = MysqlTestUtils::GetAuthResp();
+  std::string passwd = MySQLTestUtils::GetAuthResp();
   mysql_clogin_encode.SetAuthResp(passwd);
   std::string db = "mysql_db";
   mysql_clogin_encode.SetDB(db);
@@ -119,7 +119,7 @@ TEST_F(MysqlCodecTest, MysqlClLoginV41PluginAuthEncDec) {
  *   - CLIENT_SECURE_CONNECTION set
  * - message is decoded using the ClientLogin class
  */
-TEST_F(MysqlCodecTest, MysqlClientLogin41SecureConnEncDec) {
+TEST_F(MySQLCodecTest, MySQLClientLogin41SecureConnEncDec) {
   ClientLogin mysql_clogin_encode{};
   uint16_t client_capab = 0;
   client_capab |= (MYSQL_CLIENT_CONNECT_WITH_DB | MYSQL_CLIENT_CAPAB_41VS320);
@@ -129,7 +129,7 @@ TEST_F(MysqlCodecTest, MysqlClientLogin41SecureConnEncDec) {
   mysql_clogin_encode.SetCharset(MYSQL_CHARSET);
   std::string user("user1");
   mysql_clogin_encode.SetUsername(user);
-  std::string passwd = MysqlTestUtils::GetAuthResp();
+  std::string passwd = MySQLTestUtils::GetAuthResp();
   mysql_clogin_encode.SetAuthResp(passwd);
   std::string db = "mysql_db";
   mysql_clogin_encode.SetDB(db);
@@ -154,7 +154,7 @@ TEST_F(MysqlCodecTest, MysqlClientLogin41SecureConnEncDec) {
  * - message is encoded using the ClientLogin class
  * - message is decoded using the ClientLogin class
  */
-TEST_F(MysqlCodecTest, MysqlClientLogin41EncDec) {
+TEST_F(MySQLCodecTest, MySQLClientLogin41EncDec) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.SetClientCap(MYSQL_CLIENT_CAPAB_41VS320);
   mysql_clogin_encode.SetExtendedClientCap(0);
@@ -162,7 +162,7 @@ TEST_F(MysqlCodecTest, MysqlClientLogin41EncDec) {
   mysql_clogin_encode.SetCharset(MYSQL_CHARSET);
   std::string user("user1");
   mysql_clogin_encode.SetUsername(user);
-  std::string passwd = MysqlTestUtils::GetAuthResp();
+  std::string passwd = MySQLTestUtils::GetAuthResp();
   mysql_clogin_encode.SetAuthResp(passwd);
   std::string data = mysql_clogin_encode.Encode();
   std::string mysql_msg = mysql_clogin_encode.EncodeHdr(data, 1);
@@ -184,7 +184,7 @@ TEST_F(MysqlCodecTest, MysqlClientLogin41EncDec) {
  * - message is encoded using the ClientLogin class
  * - message is decoded using the ClientLogin class
  */
-TEST_F(MysqlCodecTest, MysqlClientLogin320EncDec) {
+TEST_F(MySQLCodecTest, MySQLClientLogin320EncDec) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.SetClientCap(0);
   mysql_clogin_encode.SetExtendedClientCap(MYSQL_EXT_CL_PLG_AUTH_CL_DATA);
@@ -192,7 +192,7 @@ TEST_F(MysqlCodecTest, MysqlClientLogin320EncDec) {
   mysql_clogin_encode.SetCharset(MYSQL_CHARSET);
   std::string user("user1");
   mysql_clogin_encode.SetUsername(user);
-  std::string passwd = MysqlTestUtils::GetAuthResp();
+  std::string passwd = MySQLTestUtils::GetAuthResp();
   mysql_clogin_encode.SetAuthResp(passwd);
   std::string data = mysql_clogin_encode.Encode();
   std::string mysql_msg = mysql_clogin_encode.EncodeHdr(data, 1);
@@ -214,7 +214,7 @@ TEST_F(MysqlCodecTest, MysqlClientLogin320EncDec) {
  * - message is encoded using the ClientLogin class
  * - message is decoded using the ClientLogin class
  */
-TEST_F(MysqlCodecTest, MysqlClientLoginSSLEncDec) {
+TEST_F(MySQLCodecTest, MySQLClientLoginSSLEncDec) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.SetClientCap(MYSQL_CLIENT_CAPAB_SSL | MYSQL_CLIENT_CAPAB_41VS320);
   mysql_clogin_encode.SetExtendedClientCap(MYSQL_EXT_CL_PLG_AUTH_CL_DATA);
@@ -222,7 +222,7 @@ TEST_F(MysqlCodecTest, MysqlClientLoginSSLEncDec) {
   mysql_clogin_encode.SetCharset(MYSQL_CHARSET);
   std::string user("user1");
   mysql_clogin_encode.SetUsername(user);
-  std::string passwd = MysqlTestUtils::GetAuthResp();
+  std::string passwd = MySQLTestUtils::GetAuthResp();
   mysql_clogin_encode.SetAuthResp(passwd);
   std::string data = mysql_clogin_encode.Encode();
   std::string mysql_msg = mysql_clogin_encode.EncodeHdr(data, 1);
@@ -241,7 +241,7 @@ TEST_F(MysqlCodecTest, MysqlClientLoginSSLEncDec) {
  * - message is encoded using the ClientLoginResponse class
  * - message is decoded using the ClientLoginResponse class
  */
-TEST_F(MysqlCodecTest, MysqlLoginOkEncDec) {
+TEST_F(MySQLCodecTest, MySQLLoginOkEncDec) {
   ClientLoginResponse mysql_loginok_encode{};
   mysql_loginok_encode.SetRespCode(MYSQL_UT_RESP_OK);
   mysql_loginok_encode.SetAffectedRows(1);
@@ -261,7 +261,7 @@ TEST_F(MysqlCodecTest, MysqlLoginOkEncDec) {
   EXPECT_EQ(mysql_loginok_decode.GetWarnings(), mysql_loginok_encode.GetWarnings());
 }
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

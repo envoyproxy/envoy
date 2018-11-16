@@ -22,11 +22,11 @@ using namespace rapidjson;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
 #define SESSIONS 5
 
-class MysqlIntegrationTest : public MysqlTestUtils,
+class MySQLIntegrationTest : public MySQLTestUtils,
                              public BaseIntegrationTest,
                              public testing::TestWithParam<Network::Address::IpVersion> {
   std::string mysqlConfig() {
@@ -35,7 +35,7 @@ class MysqlIntegrationTest : public MysqlTestUtils,
   }
 
 public:
-  MysqlIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()){};
+  MySQLIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()){};
 
   // Initializer for an individual integration test.
   void SetUp() override { BaseIntegrationTest::initialize(); }
@@ -60,14 +60,14 @@ int mysqlGetCounterValueFromStats(const std::string& msg, const std::string& mys
   return -1;
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, MysqlIntegrationTest,
+INSTANTIATE_TEST_CASE_P(IpVersions, MySQLIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 /**
  * NewSession Test:
  * Attempt a New Session and verify it is received by mysql onNewConnection.
  */
-TEST_P(MysqlIntegrationTest, MysqlStatsNewSessionTest) {
+TEST_P(MySQLIntegrationTest, MySQLStatsNewSessionTest) {
   for (int idx = 0; idx < SESSIONS; idx++) {
     IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
     FakeRawConnectionPtr fake_upstream_connection;
@@ -96,7 +96,7 @@ TEST_P(MysqlIntegrationTest, MysqlStatsNewSessionTest) {
  * - correct number of attempts
  * - no failures
  */
-TEST_P(MysqlIntegrationTest, MysqLoginTest) {
+TEST_P(MySQLIntegrationTest, MysqLoginTest) {
   std::string str;
   std::string rcvd_data;
   std::string user = "user1";
@@ -147,7 +147,7 @@ TEST_P(MysqlIntegrationTest, MysqLoginTest) {
  * - correct number of attempts
  * - no failures
  */
-TEST_P(MysqlIntegrationTest, MysqlUnitTestMultiClientsLoop) {
+TEST_P(MySQLIntegrationTest, MySQLUnitTestMultiClientsLoop) {
   int idx;
   std::string rcvd_data;
   std::string str;
@@ -196,7 +196,7 @@ TEST_P(MysqlIntegrationTest, MysqlUnitTestMultiClientsLoop) {
   EXPECT_EQ(counter, 0);
 }
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

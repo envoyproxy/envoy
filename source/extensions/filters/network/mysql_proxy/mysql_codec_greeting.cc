@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
 void ServerGreeting::SetProtocol(int protocol) { protocol_ = protocol; }
 
@@ -111,7 +111,7 @@ std::string ServerGreeting::Encode() {
   return e_string;
 }
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

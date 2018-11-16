@@ -6,9 +6,9 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
-class ClientSwitchResponse : public MysqlCodec {
+class ClientSwitchResponse : public MySQLCodec {
 private:
   std::string auth_plugin_resp_;
   int seq_;
@@ -22,7 +22,7 @@ public:
   std::string Encode();
 };
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

@@ -6,9 +6,9 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
-class ServerGreeting : public MysqlCodec {
+class ServerGreeting : public MySQLCodec {
 private:
   int protocol_;
   std::string version_;
@@ -40,7 +40,7 @@ public:
   void SetExtServerCap(int ext_server_cap);
 };
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

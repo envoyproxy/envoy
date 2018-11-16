@@ -9,12 +9,12 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
-std::string MysqlTestUtils::EncodeServerGreeting(int protocol) {
+std::string MySQLTestUtils::EncodeServerGreeting(int protocol) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.SetProtocol(protocol);
-  std::string ver(MysqlTestUtils::GetVersion());
+  std::string ver(MySQLTestUtils::GetVersion());
   mysql_greet_encode.SetVersion(ver);
   mysql_greet_encode.SetThreadId(MYSQL_THREAD_ID);
   std::string salt(GetSalt());
@@ -28,7 +28,7 @@ std::string MysqlTestUtils::EncodeServerGreeting(int protocol) {
   return mysql_msg;
 }
 
-std::string MysqlTestUtils::EncodeClientLogin(uint16_t client_cap, std::string user) {
+std::string MySQLTestUtils::EncodeClientLogin(uint16_t client_cap, std::string user) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.SetClientCap(client_cap);
   mysql_clogin_encode.SetExtendedClientCap(MYSQL_EXT_CLIENT_CAPAB);
@@ -42,7 +42,7 @@ std::string MysqlTestUtils::EncodeClientLogin(uint16_t client_cap, std::string u
   return mysql_msg;
 }
 
-std::string MysqlTestUtils::EncodeClientLoginResp(uint8_t srv_resp, int it) {
+std::string MySQLTestUtils::EncodeClientLoginResp(uint8_t srv_resp, int it) {
   ClientLoginResponse mysql_loginok_encode{};
   mysql_loginok_encode.SetRespCode(srv_resp);
   mysql_loginok_encode.SetAffectedRows(MYSQL_SM_AFFECTED_ROWS);
@@ -55,7 +55,7 @@ std::string MysqlTestUtils::EncodeClientLoginResp(uint8_t srv_resp, int it) {
   return mysql_msg;
 }
 
-std::string MysqlTestUtils::EncodeAuthSwitchResp() {
+std::string MySQLTestUtils::EncodeAuthSwitchResp() {
   ClientSwitchResponse mysql_switch_resp_encode{};
   std::string resp_opaque_data("mysql_opaque");
   mysql_switch_resp_encode.SetAuthPluginResp(resp_opaque_data);
@@ -64,7 +64,7 @@ std::string MysqlTestUtils::EncodeAuthSwitchResp() {
   return mysql_msg;
 }
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

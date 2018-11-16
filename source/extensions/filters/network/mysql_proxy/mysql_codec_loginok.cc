@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
 void ClientLoginResponse::SetRespCode(uint8_t resp_code) { resp_code_ = resp_code; }
 
@@ -79,7 +79,7 @@ std::string ClientLoginResponse::Encode() {
   return e_string;
 }
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

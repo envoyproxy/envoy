@@ -5,9 +5,9 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
-int MysqlCodec::BufUint8Drain(Buffer::Instance& buffer, uint8_t& val) {
+int MySQLCodec::BufUint8Drain(Buffer::Instance& buffer, uint8_t& val) {
   if (buffer.length() < (offset_ + sizeof(uint8_t))) {
     return MYSQL_FAILURE;
   }
@@ -16,7 +16,7 @@ int MysqlCodec::BufUint8Drain(Buffer::Instance& buffer, uint8_t& val) {
   return MYSQL_SUCCESS;
 }
 
-int MysqlCodec::BufUint16Drain(Buffer::Instance& buffer, uint16_t& val) {
+int MySQLCodec::BufUint16Drain(Buffer::Instance& buffer, uint16_t& val) {
   if (buffer.length() < (offset_ + sizeof(uint16_t))) {
     return MYSQL_FAILURE;
   }
@@ -25,7 +25,7 @@ int MysqlCodec::BufUint16Drain(Buffer::Instance& buffer, uint16_t& val) {
   return MYSQL_SUCCESS;
 }
 
-int MysqlCodec::BufUint32Drain(Buffer::Instance& buffer, uint32_t& val) {
+int MySQLCodec::BufUint32Drain(Buffer::Instance& buffer, uint32_t& val) {
   if (buffer.length() < (offset_ + sizeof(uint32_t))) {
     return MYSQL_FAILURE;
   }
@@ -34,7 +34,7 @@ int MysqlCodec::BufUint32Drain(Buffer::Instance& buffer, uint32_t& val) {
   return MYSQL_SUCCESS;
 }
 
-int MysqlCodec::BufUint64Drain(Buffer::Instance& buffer, uint64_t& val) {
+int MySQLCodec::BufUint64Drain(Buffer::Instance& buffer, uint64_t& val) {
   if (buffer.length() < (offset_ + sizeof(uint64_t))) {
     return MYSQL_FAILURE;
   }
@@ -43,7 +43,7 @@ int MysqlCodec::BufUint64Drain(Buffer::Instance& buffer, uint64_t& val) {
   return MYSQL_SUCCESS;
 }
 
-int MysqlCodec::BufReadBySizeDrain(Buffer::Instance& buffer, int len, int& val) {
+int MySQLCodec::BufReadBySizeDrain(Buffer::Instance& buffer, int len, int& val) {
   if (buffer.length() < (offset_ + len)) {
     return MYSQL_FAILURE;
   }
@@ -52,7 +52,7 @@ int MysqlCodec::BufReadBySizeDrain(Buffer::Instance& buffer, int len, int& val) 
   return MYSQL_SUCCESS;
 }
 
-int MysqlCodec::DrainBytes(Buffer::Instance& buffer, int skip_bytes) {
+int MySQLCodec::DrainBytes(Buffer::Instance& buffer, int skip_bytes) {
   if (buffer.length() < (offset_ + skip_bytes)) {
     return MYSQL_FAILURE;
   }
@@ -60,9 +60,9 @@ int MysqlCodec::DrainBytes(Buffer::Instance& buffer, int skip_bytes) {
   return MYSQL_SUCCESS;
 }
 
-// Implementation of Mysql lenenc encoder based on
+// Implementation of MySQL lenenc encoder based on
 // https://dev.mysql.com/doc/internals/en/integer.html#packet-Protocol::LengthEncodedInteger
-int MysqlCodec::ReadLengthEncodedIntegerDrain(Buffer::Instance& buffer, int& val) {
+int MySQLCodec::ReadLengthEncodedIntegerDrain(Buffer::Instance& buffer, int& val) {
   int size = 0;
   uint8_t byte_val = 0;
   if (BufUint8Drain(buffer, byte_val) == MYSQL_FAILURE) {
@@ -88,7 +88,7 @@ int MysqlCodec::ReadLengthEncodedIntegerDrain(Buffer::Instance& buffer, int& val
   return MYSQL_SUCCESS;
 }
 
-int MysqlCodec::BufStringDrain(Buffer::Instance& buffer, std::string& str) {
+int MySQLCodec::BufStringDrain(Buffer::Instance& buffer, std::string& str) {
   char end = MYSQL_STR_END;
   ssize_t index = buffer.search(&end, sizeof(end), offset_);
   if (index == -1) {
@@ -103,7 +103,7 @@ int MysqlCodec::BufStringDrain(Buffer::Instance& buffer, std::string& str) {
   return MYSQL_SUCCESS;
 }
 
-int MysqlCodec::BufStringDrainBySize(Buffer::Instance& buffer, std::string& str, int len) {
+int MySQLCodec::BufStringDrainBySize(Buffer::Instance& buffer, std::string& str, int len) {
   if (buffer.length() < (offset_ + len)) {
     return MYSQL_FAILURE;
   }
@@ -113,16 +113,16 @@ int MysqlCodec::BufStringDrainBySize(Buffer::Instance& buffer, std::string& str,
   return MYSQL_SUCCESS;
 }
 
-std::string MysqlCodec::BufToString(Buffer::Instance& buffer) {
+std::string MySQLCodec::BufToString(Buffer::Instance& buffer) {
   char* data = static_cast<char*>(buffer.linearize(buffer.length()));
   std::string s = std::string(data, buffer.length());
   return s;
 }
 
-void MysqlCodec::SetSeq(int seq) { seq_ = seq; }
+void MySQLCodec::SetSeq(int seq) { seq_ = seq; }
 
-std::string MysqlCodec::EncodeHdr(const std::string& cmd_str, int seq) {
-  MysqlCodec::MysqlHeader mysqlhdr;
+std::string MySQLCodec::EncodeHdr(const std::string& cmd_str, int seq) {
+  MySQLCodec::MySQLHeader mysqlhdr;
   Buffer::OwnedImpl buffer;
 
   mysqlhdr.fields.length = cmd_str.length();
@@ -133,7 +133,7 @@ std::string MysqlCodec::EncodeHdr(const std::string& cmd_str, int seq) {
   return e_string;
 }
 
-int MysqlCodec::HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq) {
+int MySQLCodec::HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq) {
   uint32_t val = 0;
   if (BufUint32Drain(buffer, val) != MYSQL_SUCCESS) {
     return MYSQL_FAILURE;
@@ -144,9 +144,9 @@ int MysqlCodec::HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq) {
   return MYSQL_SUCCESS;
 }
 
-bool MysqlCodec::EndOfBuffer(Buffer::Instance& buffer) { return (buffer.length() == offset_); }
+bool MySQLCodec::EndOfBuffer(Buffer::Instance& buffer) { return (buffer.length() == offset_); }
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

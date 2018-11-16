@@ -8,9 +8,9 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
-class ClientLoginResponse : public MysqlCodec {
+class ClientLoginResponse : public MySQLCodec {
 private:
 #define RESP_OK_PACKET 0x0
   uint8_t resp_code_;
@@ -34,7 +34,7 @@ public:
   void SetWarnings(uint16_t warnings);
 };
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

@@ -8,15 +8,15 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
-class MysqlCodecSrvResp : public MysqlCodec {
+class MySQLCodecSrvResp : public MySQLCodec {
 private:
   uint16_t server_status_;
   uint16_t warnings_;
 
 public:
-  MysqlCodecSrvResp();
+  MySQLCodecSrvResp();
   int Decode(Buffer::Instance& buffer);
   std::string& Encode();
   uint16_t GetServerStatus() { return server_status_; }
@@ -25,7 +25,7 @@ public:
   void SetWarnings(uint16_t warnings);
 };
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

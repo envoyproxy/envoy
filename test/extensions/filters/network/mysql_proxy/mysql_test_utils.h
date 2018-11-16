@@ -4,7 +4,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace MysqlProxy {
+namespace MySQLProxy {
 
 #define MYSQL_VER_MAJOR 5
 #define MYSQL_VER_MINOR 0
@@ -16,7 +16,7 @@ namespace MysqlProxy {
 #define CLIENT_NUM 10
 #define PARALLEL_SESSIONS 4
 
-class MysqlTestUtils {
+class MySQLTestUtils {
 
 public:
   static std::string GetSalt() { return "!@salt#$"; }
@@ -36,7 +36,7 @@ public:
   std::string EncodeAuthSwitchResp();
 };
 
-} // namespace MysqlProxy
+} // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
