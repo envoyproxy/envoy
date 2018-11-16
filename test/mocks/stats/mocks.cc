@@ -1,6 +1,6 @@
-#include <memory>
-
 #include "mocks.h"
+
+#include <memory>
 
 #include "common/stats/symbol_table_impl.h"
 
@@ -155,14 +155,10 @@ void SymbolTableSingleton::release() {
 
 MockSymbolTable::MockSymbolTable() : singleton_(SymbolTableSingleton::get()) {}
 
-MockSymbolTable::~MockSymbolTable() {
-  singleton_.release();
-}
+MockSymbolTable::~MockSymbolTable() { singleton_.release(); }
 
 MockIsolatedStatsStore::MockIsolatedStatsStore() : IsolatedStoreImpl(symbol_table_) {}
-MockIsolatedStatsStore::~MockIsolatedStatsStore() {
-  IsolatedStoreImpl::clear();
-}
+MockIsolatedStatsStore::~MockIsolatedStatsStore() { IsolatedStoreImpl::clear(); }
 
 } // namespace Stats
 } // namespace Envoy

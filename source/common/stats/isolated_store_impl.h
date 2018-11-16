@@ -52,7 +52,6 @@ public:
 
   void clear() { stats_.clear(); }
 
-
 private:
   StatNameHashMap<std::shared_ptr<Base>> stats_;
   Allocator alloc_;

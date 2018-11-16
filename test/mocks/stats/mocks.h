@@ -192,19 +192,19 @@ public:
 };
 
 class SymbolTableSingleton : public SymbolTableImpl {
- public:
+public:
   static SymbolTableSingleton& get();
   void release();
 
- private:
+private:
   SymbolTableSingleton(Thread::MutexBasicLockable& mutex);
   static SymbolTableSingleton* singleton_;
-  Thread::MutexBasicLockable& mutex_;  // Lock guards don't work as mutex outlives object.
+  Thread::MutexBasicLockable& mutex_; // Lock guards don't work as mutex outlives object.
   uint64_t ref_count_;
 };
 
 class MockSymbolTable : public SymbolTable {
- public:
+public:
   MockSymbolTable();
   ~MockSymbolTable();
 
@@ -226,7 +226,7 @@ class MockSymbolTable : public SymbolTable {
   void debugPrint() const override { singleton_.debugPrint(); }
 #endif
 
- private:
+private:
   SymbolTableSingleton& singleton_;
 };
 
@@ -241,7 +241,7 @@ public:
 
   MOCK_METHOD2(deliverHistogramToSinks, void(const Histogram& histogram, uint64_t value));
 
- private:
+private:
   MockSymbolTable symbol_table_;
 };
 

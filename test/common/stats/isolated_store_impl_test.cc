@@ -11,8 +11,8 @@
 namespace Envoy {
 namespace Stats {
 
-class StatsIsolatedStoreImplTest: public testing::Test {
- protected:
+class StatsIsolatedStoreImplTest : public testing::Test {
+protected:
   IsolatedStoreImpl store_;
 };
 
