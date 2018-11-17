@@ -154,6 +154,7 @@ private:
   const size_t max_session_keys_;
   absl::Mutex session_keys_mu_;
   std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ GUARDED_BY(session_keys_mu_);
+  bool session_keys_single_use_{false};
 };
 
 class ServerContextImpl : public ContextImpl, public ServerContext {

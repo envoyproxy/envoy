@@ -521,15 +521,27 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() {
   }
 
   if (max_session_keys_ > 0) {
-    absl::WriterMutexLock l(&session_keys_mu_);
-    if (!session_keys_.empty()) {
-      // Use the most recently stored session key, since it has the highest
-      // probability of still being recognized/accepted by the server.
-      SSL_SESSION* session = session_keys_.front().get();
-      SSL_set_session(ssl_con.get(), session);
-      // Remove single-use (TLS v1.3) session key after first use.
-      if (SSL_SESSION_should_be_single_use(session)) {
-        session_keys_.pop_front();
+    if (session_keys_single_use_) {
+      // Stored single-use session keys, use write/write locks.
+      absl::WriterMutexLock l(&session_keys_mu_);
+      if (!session_keys_.empty()) {
+        // Use the most recently stored session key, since it has the highest
+        // probability of still being recognized/accepted by the server.
+        SSL_SESSION* session = session_keys_.front().get();
+        SSL_set_session(ssl_con.get(), session);
+        // Remove single-use session key (TLS 1.3) after first use.
+        if (SSL_SESSION_should_be_single_use(session)) {
+          session_keys_.pop_front();
+        }
+      }
+    } else {
+      // Never stored single-use session keys, use read/write locks.
+      absl::ReaderMutexLock l(&session_keys_mu_);
+      if (!session_keys_.empty()) {
+        // Use the most recently stored session key, since it has the highest
+        // probability of still being recognized/accepted by the server.
+        SSL_SESSION* session = session_keys_.front().get();
+        SSL_set_session(ssl_con.get(), session);
       }
     }
   }
@@ -538,6 +550,11 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() {
 }
 
 int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
+  // In case we ever store single-use session key (TLS 1.3),
+  // we need to switch to using write/write locks.
+  if (SSL_SESSION_should_be_single_use(session)) {
+    session_keys_single_use_ = true;
+  }
   absl::WriterMutexLock l(&session_keys_mu_);
   // Evict oldest entries.
   while (session_keys_.size() >= max_session_keys_) {
