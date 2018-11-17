@@ -11,15 +11,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
-class DynamicMetadataKeys {
-public:
-  const std::string ResponseCode200{"200"};
-  const std::string ResponseCode403{"403"};
-  const std::string ShadowResponseCodeField{"shadow_response_code"};
-};
-
-typedef ConstSingleton<DynamicMetadataKeys> DynamicMetadataKeysSingleton;
-
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope)
@@ -75,7 +66,8 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Shadow);
 
   if (shadow_engine.has_value()) {
-    std::string shadow_resp_code = DynamicMetadataKeysSingleton::get().ResponseCode200;
+    std::string shadow_resp_code =
+        Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
     if (shadow_engine->allowed(*callbacks_->connection(), headers,
                                callbacks_->streamInfo().dynamicMetadata(), &effective_policy_id)) {
       ENVOY_LOG(debug, "shadow allowed");
@@ -83,19 +75,21 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
     } else {
       ENVOY_LOG(debug, "shadow denied");
       config_->stats().shadow_denied_.inc();
-      shadow_resp_code = DynamicMetadataKeysSingleton::get().ResponseCode403;
+      shadow_resp_code =
+          Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
     }
 
     ProtobufWkt::Struct metrics;
 
     auto& fields = *metrics.mutable_fields();
     if (!effective_policy_id.empty()) {
-      *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowPolicyIdField]
+      *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get()
+                  .ShadowEffectivePolicyIdField]
            .mutable_string_value() = effective_policy_id;
     }
 
-    *fields[DynamicMetadataKeysSingleton::get().ShadowResponseCodeField].mutable_string_value() =
-        shadow_resp_code;
+    *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField]
+         .mutable_string_value() = shadow_resp_code;
 
     callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
   }
