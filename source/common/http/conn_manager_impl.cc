@@ -648,6 +648,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   decodeHeaders(nullptr, *request_headers_, end_stream);
 
+  // Normally we end decode at the start of this function, but if the request was turned into
+  // a header only request we need to set this flag here.
+  if (encoding_headers_only_) {
+    maybeEndDecode(true);
+  }
+
   // Reset it here for both global and overridden cases.
   resetIdleTimer();
 }
@@ -1135,6 +1141,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     (*continue_data_entry)->stopped_ = true;
     (*continue_data_entry)->continueEncoding();
   } else {
+    // End encoding if this is a header only response, either due to a filter converting it to one
+    // or due to the upstream returning headers only.
     maybeEndEncode(encoding_headers_only_ || end_stream);
   }
 }
