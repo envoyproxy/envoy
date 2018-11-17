@@ -19,7 +19,7 @@ message ServerInfo {
     DRAINING = 1;
     // Server has not yet started cluster manager initialization.
     PRE_INITIALIZING = 2;
-    // Server is initalizing the cluster manager.
+    // Server is initializing the cluster manager.
     INITIALIZING = 3;
   }
 
