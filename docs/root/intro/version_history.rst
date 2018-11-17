@@ -25,9 +25,9 @@ Version history
   See `#3611 <https://github.com/envoyproxy/envoy/issues/3611>`_ for details.
 * http: augmented the `sendLocalReply` filter API to accept an optional `GrpcStatus`
   value to override the default HTTP to gRPC status mapping.
-* listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using :ref:`source_type <envoy_api_field_listener.FilterChainMatch.source_type>`.
 * http: no longer close the TCP connection when a HTTP/1 request is retried due
   to a response with empty body.
+* listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using :ref:`source_type <envoy_api_field_listener.FilterChainMatch.source_type>`.
 * load balancer: added a `configuration <envoy_api_msg_Cluster.LeastRequestLbConfig>` option to specify the number of choices made in P2C.
 * network: removed the reference to `FilterState` in `Connection` in favor of `StreamInfo`.
 * logging: added missing [ in log prefix.
