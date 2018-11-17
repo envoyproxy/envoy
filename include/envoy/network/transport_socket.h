@@ -147,8 +147,10 @@ public:
 
   /**
    * @return the const optional server name to set in the transport socket, for example SNI for
-   *         SSL, regardless of the upstream cluster configuration. The filters like tcp_proxy
-   *         should override the server name in the upstream cluster configuration with that value.
+   *         SSL, regardless of the upstream cluster configuration. Filters that influence
+   *         upstream connection selection, such as tcp_proxy, should take this option into account
+   *         and should pass it through to the connection pool to ensure the correct endpoints are
+   *         selected and the upstream connection is set up accordingly.
    */
   virtual const absl::optional<std::string>& serverNameOverride() const PURE;
 
