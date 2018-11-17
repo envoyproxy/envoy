@@ -7,6 +7,7 @@
 
 #include "common/common/hex.h"
 #include "absl/types/optional.h"
+#include "common/common/logger.h"
 
 #include "extensions/tracers/xray/tracer_interface.h"
 
@@ -150,7 +151,7 @@ namespace Envoy {
 
                 typedef std::unique_ptr<Span> SpanPtr;
 
-                class Span : public XRayBase {
+                class Span : public XRayBase, Logger::Loggable<Logger::Id::tracing> {
                 public:
                     /**
                      * Copy constructor.

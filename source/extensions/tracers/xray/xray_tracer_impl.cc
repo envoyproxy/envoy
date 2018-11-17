@@ -110,6 +110,8 @@ namespace Envoy {
                         collector_endpoint = xray_config.collector_endpoint();
                     }
 
+                    ENVOY_LOG(info, "sending X-Ray generated segments to daemon address on {}", collector_endpoint);
+
                     tls_->set([this, collector_endpoint, &random_generator](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
                         TracerPtr tracer(new Tracer(local_info_.clusterName(), random_generator));
 
@@ -140,6 +142,7 @@ namespace Envoy {
                     }
 
 		            if (!xrayHeader.traceId().empty() || !xrayHeader.parentId().empty()) {
+                        ENVOY_LOG(debug, "starting generate a segment based on downstream xray header.");
                         uint64_t span_id(0);
                         uint64_t parent_id(0);
 
@@ -159,6 +162,7 @@ namespace Envoy {
 
                     } else {
                         // Create a root XRay span. No context was found in the headers.
+                        ENVOY_LOG(debug, "starting generate a root segment.");
                         new_xray_span = tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time);
                         new_xray_span->setSampled(sampled);
 

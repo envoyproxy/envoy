@@ -16,8 +16,8 @@ namespace Envoy {
                     const std::string HTTP_PATH = "http.path";
                     const std::string HTTP_URL = "http.url";
                     const std::string HTTP_STATUS_CODE = "http.status_code";
-                    const std::string HTTP_REQUEST_SIZE = "request.size";
-                    const std::string HTTP_RESPONSE_SIZE = "response.size";
+                    const std::string HTTP_REQUEST_SIZE = "request_size";
+                    const std::string HTTP_RESPONSE_SIZE = "response_size";
                     const std::string HTTP_USER_AGENT = "user_agent";
                     const std::string UPSTREAM_CLUSTER = "upstream_cluster";
                     const std::string ERROR = "error";

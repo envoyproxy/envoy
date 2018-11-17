@@ -8,6 +8,7 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
+#include "common/common/logger.h"
 
 #include "extensions/tracers/xray/tracer.h"
 
@@ -103,7 +104,7 @@ namespace Envoy {
                 /**
                 * Class for a XRay-specific Driver.
                 */
-                class Driver : public Tracing::Driver {
+                class Driver : public Tracing::Driver, Logger::Loggable<Logger::Id::tracing> {
                 public:
                     /**
                      * Constructor. It adds itself and a newly-created XRay::Tracer object to a thread-local store.
