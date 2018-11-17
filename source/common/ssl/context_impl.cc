@@ -523,6 +523,8 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() {
   if (max_session_keys_ > 0) {
     absl::WriterMutexLock l(&session_keys_mu_);
     if (!session_keys_.empty()) {
+      // Use the most recently stored session key, since it has the highest
+      // probability of still being recognized/accepted by the server.
       SSL_SESSION* session = session_keys_.front().get();
       SSL_set_session(ssl_con.get(), session);
       // Remove single-use (TLS v1.3) session key after first use.
@@ -541,6 +543,7 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
   while (session_keys_.size() >= max_session_keys_) {
     session_keys_.pop_back();
   }
+  // Add new session key at the front of the queue, so that it's used first.
   session_keys_.push_front(bssl::UniquePtr<SSL_SESSION>(session));
   return 1; // Tell BoringSSL that we took ownership of the session.
 }
