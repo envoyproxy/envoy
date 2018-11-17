@@ -1467,9 +1467,8 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
   TestLoadBalancerContext context({{"version", "1.1"}});
 
   // Since we scale the locality weights by number of hosts removed, we expect to see the second
-  // locality to be selected less because we've excluded more hosts than in the first locality.
-  // Since we respect locality weights, the second locality is selected.
-
+  // locality to be selected less because we've excluded more hosts in that locality than in the
+  // first.
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
