@@ -34,6 +34,13 @@ public:
    * each target at some point in the future.
    */
   virtual void registerTarget(Target& target) PURE;
+
+  enum class State { NotInitialized, Initializing, Initialized };
+
+  /**
+   * Returns the current state of the init manager.
+   */
+  virtual State state() const PURE;
 };
 
 } // namespace Init
