@@ -117,7 +117,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
                                empty_locality_map, priority_state_manager, updated_hosts);
   }
 
-  updateHostMap(std::move(updated_hosts));
+  all_hosts_ = std::move(updated_hosts);
 
   if (!cluster_rebuilt) {
     info_->stats().update_no_rebuild_.inc();
@@ -148,7 +148,7 @@ bool EdsClusterImpl::updateHostsPerLocality(
   // improve performance and scalability of locality weight updates.
   if (host_set.overprovisioning_factor() != overprovisioning_factor ||
       updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
-                            updated_hosts) ||
+                            updated_hosts, all_hosts_) ||
       locality_weights_map != new_locality_weights_map) {
     ASSERT(std::all_of(current_hosts_copy->begin(), current_hosts_copy->end(),
                        [&](const auto& host) { return host->priority() == priority; }));

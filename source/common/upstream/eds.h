@@ -50,6 +50,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
+  HostMap all_hosts_;
 };
 
 } // namespace Upstream

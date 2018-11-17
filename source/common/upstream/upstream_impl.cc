@@ -902,10 +902,12 @@ void StaticClusterImpl::startPreInit() {
   onPreInitComplete();
 }
 
-bool BaseDynamicClusterImpl::updateDynamicHostList(
-    const HostVector& new_hosts, HostVector& current_priority_hosts,
-    HostVector& hosts_added_to_current_priority, HostVector& hosts_removed_from_current_priority,
-    std::unordered_map<std::string, HostSharedPtr>& updated_hosts) {
+bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
+                                                   HostVector& current_priority_hosts,
+                                                   HostVector& hosts_added_to_current_priority,
+                                                   HostVector& hosts_removed_from_current_priority,
+                                                   HostMap& updated_hosts,
+                                                   const HostMap& all_hosts) {
   uint64_t max_host_weight = 1;
 
   // Did hosts change?
@@ -941,8 +943,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     }
 
     // To match a new host with an existing host means comparing their addresses.
-    auto existing_host = all_hosts_.find(host->address()->asString());
-    const bool existing_host_found = existing_host != all_hosts_.end();
+    auto existing_host = all_hosts.find(host->address()->asString());
+    const bool existing_host_found = existing_host != all_hosts.end();
 
     // Check if in-place host update should be skipped, i.e. when the following criteria are met
     // (currently there is only one criterion, but we might add more in the future):
@@ -1203,7 +1205,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         HostVector hosts_added;
         HostVector hosts_removed;
         if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                          updated_hosts)) {
+                                          updated_hosts, all_hosts_)) {
           ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
           ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
             return host->priority() == locality_lb_endpoint_.priority();
@@ -1230,7 +1232,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
             updated_hosts.insert({host->address()->asString(), host});
           }
         }
-        parent_.updateHostMap(std::move(updated_hosts));
+        all_hosts_ = std::move(updated_hosts);
 
         // If there is an initialize callback, fire it now. Note that if the cluster refers to
         // multiple DNS names, this will return initialized after a single DNS resolution

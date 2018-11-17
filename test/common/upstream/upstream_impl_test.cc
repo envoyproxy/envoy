@@ -243,6 +243,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
      },
     "hosts": [{"url": "tcp://localhost1:11001"},
               {"url": "tcp://localhost2:11002"}]
+              
   }
   )EOF";
 
@@ -418,6 +419,7 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Runtime::MockRandomGenerator> random;
   // gmock matches in LIFO order which is why these are swapped.
+  ResolverData resolver3(*dns_resolver, dispatcher);
   ResolverData resolver2(*dns_resolver, dispatcher);
   ResolverData resolver1(*dns_resolver, dispatcher);
 
@@ -463,6 +465,13 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
             address:
               socket_address:
                 address: localhost2
+                port_value: 11002
+            health_check_config:
+              port_value: 8000
+        - endpoint:
+            address:
+              socket_address:
+                address: localhost3
                 port_value: 11002
             health_check_config:
               port_value: 8000
@@ -581,6 +590,25 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ(1UL,
             cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
+  // Make sure that we *don't* de-dup between resolve targets.
+  EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  EXPECT_CALL(membership_updated, ready());
+  resolver3.dns_callback_(TestUtility::makeDnsResponse({"10.0.0.1"}));
+
+  const auto hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_THAT(std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002", "10.0.0.1:11002"}),
+              ContainerEq(hostListToAddresses(hosts)));
+
+  EXPECT_EQ(3UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(1UL,
+            cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
+
+  // Ensure that all host objects in the host list are unique.
+  for (const auto host : hosts) {
+    EXPECT_EQ(1, std::count(hosts.begin(), hosts.end(), host));
+  }
+
   for (const HostSharedPtr& host : cluster.prioritySet().hostSetsPerPriority()[0]->hosts()) {
     EXPECT_EQ(cluster.info().get(), &host->cluster());
   }
@@ -590,9 +618,12 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   resolver1.timer_->callback_();
   resolver2.expectResolve(*dns_resolver);
   resolver2.timer_->callback_();
+  resolver3.expectResolve(*dns_resolver);
+  resolver3.timer_->callback_();
 
   EXPECT_CALL(resolver1.active_dns_query_, cancel());
   EXPECT_CALL(resolver2.active_dns_query_, cancel());
+  EXPECT_CALL(resolver3.active_dns_query_, cancel());
 }
 
 TEST(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
