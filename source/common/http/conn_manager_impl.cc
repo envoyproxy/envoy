@@ -1419,6 +1419,7 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterHeadersCall
     // Set headers_only to true so we know to end early if necessary,
     // but continue filter iteration so we actually write the headers/run the cleanup code.
     headers_only = true;
+    ENVOY_STREAM_LOG(debug, "converting to headers only", parent_);
     return true;
   } else {
     ASSERT(status == FilterHeadersStatus::Continue);
