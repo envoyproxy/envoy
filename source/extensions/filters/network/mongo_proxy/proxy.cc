@@ -82,7 +82,11 @@ ProxyFilter::~ProxyFilter() { ASSERT(!delay_timer_); }
 
 void ProxyFilter::setDynamicMetadata(std::string op, absl::optional<std::string> db,
                                      absl::optional<std::string> collection) {
-  ProtobufWkt::Struct metadata;
+  ProtobufWkt::Struct metadata(
+      (*read_callbacks_->connection()
+            .streamInfo()
+            .dynamicMetadata()
+            .mutable_filter_metadata())[NetworkFilterNames::get().MongoProxy]);
   auto& fields = *metadata.mutable_fields();
   auto& list = *fields[DynamicMetadataKeysSingleton::get().MessagesField].mutable_list_value();
   auto& message = *list.add_values()->mutable_struct_value()->mutable_fields();
@@ -337,11 +341,11 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
 
   // Clear dynamic metadata
   if (emit_dynamic_metadata_) {
-    (*read_callbacks_->connection()
-          .streamInfo()
-          .dynamicMetadata()
-          .mutable_filter_metadata())[NetworkFilterNames::get().MongoProxy]
-        .clear_fields();
+    auto& metadata = (*read_callbacks_->connection()
+                           .streamInfo()
+                           .dynamicMetadata()
+                           .mutable_filter_metadata())[NetworkFilterNames::get().MongoProxy];
+    metadata.mutable_fields()->clear();
   }
 
   if (!decoder_) {

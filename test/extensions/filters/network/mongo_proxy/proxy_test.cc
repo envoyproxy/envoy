@@ -296,6 +296,34 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
   auto& command_reply_message =
       metadata.fields().at("messages").list_value().values(0).struct_value();
   EXPECT_EQ("OP_COMMANDREPLY", command_reply_message.fields().at("operation").string_value());
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    QueryMessagePtr message1(new QueryMessageImpl(0, 0));
+    message1->fullCollectionName("db1.test1");
+    message1->flags(0b1110010);
+    message1->query(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeQuery(std::move(message1));
+
+    InsertMessagePtr message2(new InsertMessageImpl(0, 0));
+    message2->fullCollectionName("db2.test2");
+    message2->documents().push_back(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeInsert(std::move(message2));
+  }));
+  filter_->onData(fake_data_, false);
+
+  auto& multiple_messages = metadata.fields().at("messages").list_value();
+  EXPECT_EQ("OP_QUERY",
+            multiple_messages.values(0).struct_value().fields().at("operation").string_value());
+  EXPECT_EQ("db1",
+            multiple_messages.values(0).struct_value().fields().at("database").string_value());
+  EXPECT_EQ("test1",
+            multiple_messages.values(0).struct_value().fields().at("collection").string_value());
+  EXPECT_EQ("OP_INSERT",
+            multiple_messages.values(1).struct_value().fields().at("operation").string_value());
+  EXPECT_EQ("db2",
+            multiple_messages.values(1).struct_value().fields().at("database").string_value());
+  EXPECT_EQ("test2",
+            multiple_messages.values(1).struct_value().fields().at("collection").string_value());
 }
 
 TEST_F(MongoProxyFilterTest, Stats) {
