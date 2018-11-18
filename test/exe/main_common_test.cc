@@ -105,7 +105,7 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   EXPECT_TRUE(main_common.run());
 }
 
-// Ensurees that existing users of main_common() can link.
+// Ensure that existing users of main_common() can link.
 TEST_P(MainCommonTest, LegacyMain) {
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
