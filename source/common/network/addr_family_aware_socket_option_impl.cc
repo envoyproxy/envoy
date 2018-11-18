@@ -30,7 +30,7 @@ bool AddrFamilyAwareSocketOptionImpl::setIpSocketOption(
     if (socket.localAddress()) {
       ip = socket.localAddress()->ip();
     } else {
-      address = Address::addressFromFd(socket.ioHandle());
+      address = Address::addressFromFd(socket.ioHandle()->fd());
       ip = address->ip();
     }
   } catch (const EnvoyException&) {

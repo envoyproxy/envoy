@@ -130,10 +130,7 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   EXPECT_NE(nullptr, Utility::getLocalAddress(GetParam()));
 }
 
-TEST(NetworkUtility, GetOriginalDst) {
-  IoHandle io_handle;
-  EXPECT_EQ(nullptr, Utility::getOriginalDst(io_handle));
-}
+TEST(NetworkUtility, GetOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
 
 TEST(NetworkUtility, InternalAddress) {
   EXPECT_TRUE(Utility::isInternalAddress(Address::Ipv4Instance("127.0.0.1")));

@@ -1,4 +1,5 @@
 #pragma once
+#include "envoy/network/io_handle.h"
 #include "envoy/network/transport_socket.h"
 
 namespace Envoy {
@@ -19,7 +20,8 @@ public:
   explicit NoOpTransportSocketCallbacks(Network::TransportSocketCallbacks& parent)
       : parent_(parent) {}
 
-  IoHandle& ioHandle() override { return parent_.ioHandle(); }
+  Network::IoHandlePtr& ioHandle() override { return parent_.ioHandle(); }
+  const Network::IoHandleConstPtr& ioHandle() const override { return parent_.ioHandle(); }
   Network::Connection& connection() override { return parent_.connection(); }
   bool shouldDrainReadBuffer() override { return false; }
   /*

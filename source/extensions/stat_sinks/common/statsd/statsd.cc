@@ -22,20 +22,20 @@ namespace Statsd {
 
 Writer::Writer(Network::Address::InstanceConstSharedPtr address) {
   io_handle_ = address->socket(Network::Address::SocketType::Datagram);
-  ASSERT(io_handle_ != -1);
+  ASSERT(io_handle_->fd() != -1);
 
-  const Api::SysCallIntResult result = address->connect(io_handle_);
+  const Api::SysCallIntResult result = address->connect(io_handle_->fd());
   ASSERT(result.rc_ != -1);
 }
 
 Writer::~Writer() {
-  if (io_handle_ != -1) {
-    RELEASE_ASSERT(close(io_handle_) == 0, "");
+  if (io_handle_->fd() != -1) {
+    RELEASE_ASSERT(close(io_handle_->fd()) == 0, "");
   }
 }
 
 void Writer::write(const std::string& message) {
-  ::send(io_handle_, message.c_str(), message.size(), MSG_DONTWAIT);
+  ::send(io_handle_->fd(), message.c_str(), message.size(), MSG_DONTWAIT);
 }
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,

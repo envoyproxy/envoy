@@ -1,37 +1,35 @@
 #pragma once
 
-#include "envoy/common/pure.h"
 #include <memory>
+
+#include "envoy/common/pure.h"
 
 namespace Envoy {
 namespace Network {
 
 /**
- * IoHandle
+ * IoHandle: an abstract interface for all I/O operations
  */
 class IoHandle {
 public:
-  IoHandle(int fd=-1):fd_(fd) { }
-  virtual ~IoHandle() { }
+  IoHandle() {}
 
-  int fd() const { return fd_; }
+  virtual ~IoHandle() {}
 
-  // implicit cast operator
-  operator int() const { return fd_; }
+  // TODO(sbelair2) remove fd() method
+  virtual int fd() const PURE;
 
-  // Assignment operators
-  void operator = (int fd) { fd_ = fd; }
-  void operator = (const IoHandle& ioHandle) { fd_ = ioHandle.fd(); }
-
-  // Logical operators
-  bool	operator == (int fd) const { return fd==fd_; }
-  bool	operator != (int fd) const { return fd!=fd_; }
-
-private:
-  int fd_;
+  /**
+   * @param the socket file descriptor to set in the handle. Assigns an fd from
+   * an external socket operation such as from libevent or the dispatcher after construction
+   *
+   * TODO(sbelair2):  To be removed when the IoSocketHandle derivative is integrated
+   * and the fd is fully abstracted from clients.
+   */
+  virtual void operator=(int fd) PURE;
 };
-typedef std::unique_ptr<IoHandle> IoHandlePtr;
-
+typedef std::shared_ptr<IoHandle> IoHandlePtr;
+typedef std::shared_ptr<IoHandle> IoHandleConstPtr;
 
 } // namespace Network
 } // namespace Envoy
