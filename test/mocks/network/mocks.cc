@@ -181,10 +181,11 @@ MockFilterChainFactory::MockFilterChainFactory() {
 }
 MockFilterChainFactory::~MockFilterChainFactory() {}
 
-MockListenSocket::MockListenSocket() : local_address_(new Address::Ipv4Instance(80)) {
+MockListenSocket::MockListenSocket()
+    : ioHandle_(new IoSocketHandle()), local_address_(new Address::Ipv4Instance(80)) {
   ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
-  ON_CALL(*this, fd()).WillByDefault(Return(-1));
+  ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(ioHandle_));
 }
 
 MockListenSocket::~MockListenSocket() {}
@@ -195,8 +196,10 @@ MockSocketOption::MockSocketOption() {
 
 MockSocketOption::~MockSocketOption() {}
 
-MockConnectionSocket::MockConnectionSocket() : local_address_(new Address::Ipv4Instance(80)) {
+MockConnectionSocket::MockConnectionSocket()
+    : ioHandle_(new IoSocketHandle()), local_address_(new Address::Ipv4Instance(80)) {
   ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
+  ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(ioHandle_));
 }
 
 MockConnectionSocket::~MockConnectionSocket() {}

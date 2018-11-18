@@ -130,11 +130,10 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
     }
   }
   return addressFromSockAddr(ss, ss_len);
-}
+} // namespace Address
 
-int InstanceBase::socketFromSocketType(SocketType socketType) const {
-#if defined(__APPLE__)
-  int flags = 0;
+IoHandlePtr InstanceBase::socketFromSocketType(SocketType socketType) const {
+#if defined(__APPLE__) int flags = 0;
 #else
   int flags = SOCK_NONBLOCK;
 #endif
@@ -159,12 +158,12 @@ int InstanceBase::socketFromSocketType(SocketType socketType) const {
     domain = AF_UNIX;
   }
 
-  int fd = ::socket(domain, flags, 0);
-  RELEASE_ASSERT(fd != -1, "");
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(::socket(domain, flags, 0));
+  RELEASE_ASSERT(io_handle->fd() != -1, "");
 
 #ifdef __APPLE__
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
-  RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1, "");
+  RELEASE_ASSERT(fcntl(io_handle->fd(), F_SETFL, O_NONBLOCK) != -1, "");
 #endif
 
   return fd;
@@ -223,7 +222,10 @@ Api::SysCallIntResult Ipv4Instance::connect(int fd) const {
   return {rc, errno};
 }
 
-int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
+IoHandlePtr Ipv4Instance::socket(SocketType type) const {
+  IoHandlePtr io_handle = socketFromSocketType(type);
+  return io_handle;
+}
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
@@ -288,12 +290,13 @@ Api::SysCallIntResult Ipv6Instance::connect(int fd) const {
   return {rc, errno};
 }
 
-int Ipv6Instance::socket(SocketType type) const {
-  const int fd = socketFromSocketType(type);
+IoHandlePtr Ipv6Instance::socket(SocketType type) const {
+  IoHandlePtr io_handle = socketFromSocketType(type);
   // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
   const int v6only = ip_.v6only_;
-  RELEASE_ASSERT(::setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1, "");
-  return fd;
+  RELEASE_ASSERT(
+      ::setsockopt(io_handle->fd(), IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1, "");
+  return io_handle;
 }
 
 PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
@@ -359,7 +362,10 @@ Api::SysCallIntResult PipeInstance::connect(int fd) const {
   return {rc, errno};
 }
 
-int PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
+IoHandlePtr PipeInstance::socket(SocketType type) const {
+  IoHandlePtr io_handle = socketFromSocketType(type);
+  return io_handle;
+}
 
 } // namespace Address
 } // namespace Network

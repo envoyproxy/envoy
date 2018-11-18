@@ -32,6 +32,7 @@ envoy_cc_test(
     srcs = ["udp_statsd_test.cc"],
     deps = [
         "//source/common/network:address_lib",
+        "//source/common/network:io_socket_handle_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/stat_sinks/common/statsd:statsd_lib",
         "//test/mocks/stats:stats_mocks",

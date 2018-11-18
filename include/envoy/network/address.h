@@ -151,10 +151,10 @@ public:
   /**
    * Create a socket for this address.
    * @param type supplies the socket type to create.
-   * @return the file descriptor naming the socket. In case of a failure, the program would be
-   *   aborted.
+   * @return the IoHandl;e address naming the socket.In case of a failure, the program
+   *  would be aborted.
    */
-  virtual int socket(SocketType type) const PURE;
+  virtual IoHandlePtr socket(SocketType type) const PURE;
 
   /**
    * @return the type of address.
