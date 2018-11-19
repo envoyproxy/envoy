@@ -22,6 +22,7 @@ void ThreadAwareLoadBalancerBase::refresh() {
   auto per_priority_state_vector = std::make_shared<std::vector<PerPriorityStatePtr>>(
       priority_set_.hostSetsPerPriority().size());
   auto per_priority_load = std::make_shared<std::vector<uint32_t>>(per_priority_load_);
+  auto degraded_per_priority_load = std::make_shared<std::vector<uint32_t>>(degraded_per_priority_load_);
 
   for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
     const uint32_t priority = host_set->priority();
@@ -37,6 +38,7 @@ void ThreadAwareLoadBalancerBase::refresh() {
   {
     absl::WriterMutexLock lock(&factory_->mutex_);
     factory_->per_priority_load_ = per_priority_load;
+    factory_->degraded_per_priority_load_ = degraded_per_priority_load;
     factory_->per_priority_state_ = per_priority_state_vector;
   }
 }
@@ -57,7 +59,12 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   }
   const uint64_t h = hash ? hash.value() : random_.random();
 
-  const uint32_t priority = LoadBalancerBase::choosePriority(h, *per_priority_load_);
+  // TODO(snowp): Since we don't keep track of whether we selected from a dregraded priority
+  // or a healthy priority, host selection when both healthy and degraded priorities are 
+  // considered (ie during spillover) gets a bit weird. Once a priority is selected, it
+  // will consider all healthy (including degraded) hosts in that priority even if it was 
+  // selected from the degraded priority.
+  const uint32_t priority = LoadBalancerBase::choosePriority(h, *per_priority_load_, *degraded_per_priority_load_).first;
   const auto& per_priority_state = (*per_priority_state_)[priority];
   if (per_priority_state->global_panic_) {
     stats_.lb_healthy_panic_.inc();

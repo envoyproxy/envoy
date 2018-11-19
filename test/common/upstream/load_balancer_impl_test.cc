@@ -113,7 +113,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   // unhealthy primary host.
   EXPECT_EQ(100, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(1));
-  EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context));
+  EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context).first);
 
   // Update the priority set with a new priority level P=2 and ensure the host
   // is chosen
@@ -123,7 +123,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   EXPECT_EQ(0, lb_.percentageLoad(1));
   EXPECT_EQ(100, lb_.percentageLoad(2));
   priority_load = {0, 0, 100};
-  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context));
+  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context).first);
 
   // Now add a healthy host in P=0 and make sure it is immediately selected.
   updateHostSet(host_set_, 1 /* num_hosts */, 1 /* num_healthy_hosts */);
@@ -132,14 +132,14 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   EXPECT_EQ(100, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(2));
   priority_load = {100, 0, 0};
-  EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context));
+  EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context).first);
 
   // Remove the healthy host and ensure we fail back over to tertiary_host_set_
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   EXPECT_EQ(0, lb_.percentageLoad(0));
   EXPECT_EQ(100, lb_.percentageLoad(2));
   priority_load = {0, 0, 100};
-  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context));
+  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context).first);
 }
 
 // Test of host set selection with priority filter
@@ -154,7 +154,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelectionWithFilter) {
   updateHostSet(failover_host_set_, 1, 1);
 
   // Since we've excluded P0, we should pick the failover host set
-  EXPECT_EQ(failover_host_set_.priority(), lb_.chooseHostSet(&context).priority());
+  EXPECT_EQ(failover_host_set_.priority(), lb_.chooseHostSet(&context).first.priority());
 }
 
 TEST_P(LoadBalancerBaseTest, OverProvisioningFactor) {
@@ -411,8 +411,8 @@ TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
   // Update the local hosts. We're not doing locality based routing in this
   // test, but it should at least do no harm.
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82")}));
-  local_priority_set_->getOrCreateHostSet(0).updateHosts(hosts, hosts, empty_locality_,
-                                                         empty_locality_, {}, empty_host_vector_,
+  local_priority_set_->getOrCreateHostSet(0).updateHosts(hosts, hosts, std::make_shared<const HostVector>(), empty_locality_,
+                                                         empty_locality_,empty_locality_, {}, empty_host_vector_,
                                                          empty_host_vector_, absl::nullopt);
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
 }
@@ -650,7 +650,7 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(98);
   common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(7);
   init(true);
-  local_host_set_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, {},
+  local_host_set_->updateHosts(hosts, hosts, std::make_shared<const HostVector>(), hosts_per_locality, hosts_per_locality,hosts_per_locality, {},
                                empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 0))
@@ -674,7 +674,7 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 7))
       .WillRepeatedly(Return(1));
   // Trigger reload.
-  local_host_set_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, {},
+  local_host_set_->updateHosts(hosts, hosts, std::make_shared<const HostVector>(), hosts_per_locality,hosts_per_locality, hosts_per_locality, {},
                                empty_host_vector_, empty_host_vector_, absl::nullopt);
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
 }
@@ -700,7 +700,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
   common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(98);
   common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(7);
   init(true);
-  local_host_set_->updateHosts(hosts, hosts, local_hosts_per_locality, local_hosts_per_locality, {},
+  local_host_set_->updateHosts(hosts, hosts, std::make_shared<const HostVector>(), local_hosts_per_locality, local_hosts_per_locality,local_hosts_per_locality, {},
                                empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 100))
@@ -737,7 +737,7 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(true);
-  local_host_set_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, {},
+  local_host_set_->updateHosts(hosts, hosts, std::make_shared<const HostVector>(), hosts_per_locality, hosts_per_locality, hosts_per_locality, {},
                                empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   // There is only one host in the given zone for zone aware routing.
@@ -785,8 +785,8 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
   hostSet().hosts_ = *upstream_hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   init(true);
-  local_host_set_->updateHosts(local_hosts, local_hosts, local_hosts_per_locality,
-                               local_hosts_per_locality, {}, empty_host_vector_, empty_host_vector_,
+  local_host_set_->updateHosts(local_hosts, local_hosts, std::make_shared<const HostVector>(), local_hosts_per_locality,
+                               local_hosts_per_locality, local_hosts_per_locality, {}, empty_host_vector_, empty_host_vector_,
                                absl::nullopt);
 
   // There is only one host in the given zone for zone aware routing.
@@ -856,8 +856,8 @@ TEST_P(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
 
   // To trigger update callback.
   auto local_hosts_per_locality_shared = makeHostsPerLocality(std::move(local_hosts_per_locality));
-  local_host_set_->updateHosts(local_hosts, local_hosts, local_hosts_per_locality_shared,
-                               local_hosts_per_locality_shared, {}, empty_host_vector_,
+  local_host_set_->updateHosts(local_hosts, local_hosts, std::make_shared<const HostVector>(), local_hosts_per_locality_shared,
+                               local_hosts_per_locality_shared, local_hosts_per_locality_shared, {}, empty_host_vector_,
                                empty_host_vector_, absl::nullopt);
 
   // Force request out of small zone and to randomly select zone.
@@ -878,7 +878,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(true);
-  local_host_set_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, {},
+  local_host_set_->updateHosts(hosts, hosts, std::make_shared<const HostVector>(), hosts_per_locality, hosts_per_locality, hosts_per_locality, {},
                                empty_host_vector_, empty_host_vector_, absl::nullopt);
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
 }
@@ -893,7 +893,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNotHealthy) {
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(true);
-  local_host_set_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, {},
+  local_host_set_->updateHosts(hosts, hosts, std::make_shared<const HostVector>(), hosts_per_locality, hosts_per_locality, hosts_per_locality, {},
                                empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   // local zone has no healthy hosts, take from the all healthy hosts.
@@ -924,8 +924,8 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   hostSet().hosts_ = *upstream_hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   init(true);
-  local_host_set_->updateHosts(local_hosts, local_hosts, local_hosts_per_locality,
-                               local_hosts_per_locality, {}, empty_host_vector_, empty_host_vector_,
+  local_host_set_->updateHosts(local_hosts, local_hosts, std::make_shared<const HostVector>(), local_hosts_per_locality,
+                               local_hosts_per_locality, local_hosts_per_locality, {}, empty_host_vector_, empty_host_vector_,
                                absl::nullopt);
 
   // Local cluster is not OK, we'll do regular routing.
@@ -953,8 +953,8 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
   hostSet().hosts_ = *upstream_hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   init(true);
-  local_host_set_->updateHosts(local_hosts, local_hosts, local_hosts_per_locality,
-                               local_hosts_per_locality, {}, empty_host_vector_, empty_host_vector_,
+  local_host_set_->updateHosts(local_hosts, local_hosts, std::make_shared<const HostVector>(), local_hosts_per_locality,
+                               local_hosts_per_locality, local_hosts_per_locality, {}, empty_host_vector_, empty_host_vector_,
                                absl::nullopt);
 
   // Local cluster is not OK, we'll do regular routing.

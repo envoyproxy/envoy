@@ -503,6 +503,7 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
 
   HostVectorSharedPtr hosts(new HostVector());
   HostVectorSharedPtr healthy_hosts(new HostVector());
+  HostVectorSharedPtr degraded_hosts(new HostVector());
 
   // It's possible that hosts_added == original_host_set_.hosts(), e.g.: when
   // calling refreshSubsets() if only metadata change. If so, we can avoid the
@@ -511,8 +512,11 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     bool host_seen = predicate_added.count(host) == 1;
     if (host_seen || predicate(*host)) {
       hosts->emplace_back(host);
-      if (host->healthy()) {
+      if (host->healthy() && !host->degraded()) {
         healthy_hosts->emplace_back(host);
+      }
+      if (host->degraded()) {
+        degraded_hosts->emplace_back(host);
       }
     }
   }
@@ -535,14 +539,16 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   }
 
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
-      hosts_per_locality->filter([](const Host& host) { return host.healthy(); });
+      hosts_per_locality->filter([](const Host& host) { return host.healthy() && !host.degraded(); });
+  HostsPerLocalityConstSharedPtr degraded_hosts_per_locality =
+      hosts_per_locality->filter([](const Host& host) { return host.degraded(); });
 
   if (locality_weight_aware_) {
-    HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
+    HostSetImpl::updateHosts(hosts, healthy_hosts, degraded_hosts, hosts_per_locality, healthy_hosts_per_locality, degraded_hosts_per_locality,
                              original_host_set_.localityWeights(), filtered_added,
                              filtered_removed);
   } else {
-    HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
+    HostSetImpl::updateHosts(hosts, healthy_hosts, degraded_hosts, hosts_per_locality, healthy_hosts_per_locality, degraded_hosts_per_locality,
                              {}, filtered_added, filtered_removed);
   }
 }

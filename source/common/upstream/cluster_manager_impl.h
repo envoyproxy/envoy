@@ -308,8 +308,10 @@ private:
     static void updateClusterMembership(const std::string& name, uint32_t priority,
                                         HostVectorConstSharedPtr hosts,
                                         HostVectorConstSharedPtr healthy_hosts,
+                                        HostVectorConstSharedPtr degraded_hosts,
                                         HostsPerLocalityConstSharedPtr hosts_per_locality,
                                         HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                                        HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
                                         LocalityWeightsConstSharedPtr locality_weights,
                                         const HostVector& hosts_added,
                                         const HostVector& hosts_removed, ThreadLocal::Slot& tls);
