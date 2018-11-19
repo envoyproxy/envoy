@@ -33,6 +33,7 @@
 #include "openssl/ssl.h"
 
 using testing::_;
+using testing::DoAll;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
