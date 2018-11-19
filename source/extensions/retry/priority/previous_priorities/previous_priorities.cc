@@ -39,7 +39,7 @@ bool PreviousPrioritiesRetryPriority::adjustForAttemptedPriorities(
   auto adjustedHealthAndSum = adjustedHealth();
   // If there are no healthy priorities left, we reset the attempted priorities and recompute the
   // adjusted health.
-  // This allows us to fall back to the unmodified priority load when we run out of priorites
+  // This allows us to fall back to the unmodified priority load when we run out of priorities
   // instead of failing to route requests.
   if (adjustedHealthAndSum.second == 0) {
     for (size_t i = 0; i < excluded_priorities_.size(); ++i) {
