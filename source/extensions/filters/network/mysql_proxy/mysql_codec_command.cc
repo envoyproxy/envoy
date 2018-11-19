@@ -25,7 +25,8 @@ int Command::Decode(Buffer::Instance& buffer) {
     return MYSQL_FAILURE;
   }
 
-  BufStringDrain(buffer, data_);
+  // query string starts after mysql_hdr + one byte for comm type
+  BufStringDrainBySize(buffer, data_, buffer.length() - (sizeof(uint8_t) + MYSQL_HDR_SIZE));
   return MYSQL_SUCCESS;
 }
 

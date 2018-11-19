@@ -134,33 +134,26 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, bool end_stre
 
   // Process Command
   case MySQLSession::State::MYSQL_REQ: {
-    char* data_str = static_cast<char*>(data.linearize(data.length()));    
     Command command{};
     command.Decode(data);
     session_.SetState(MySQLSession::State::MYSQL_REQ_RESP);
-    const std::string& query = command.GetData();
-    fprintf(stderr, "data is %s, command: %d, query len is %lu\n", data_str, static_cast<int>(command.GetCmd()), query.length());
     // parse a given query
     hsql::SQLParserResult result;
-    hsql::SQLParser::parse(query, &result);
+    hsql::SQLParser::parse(command.GetData(), &result);
+
+    ENVOY_CONN_LOG(warn, "mysql msg processed {}", read_callbacks_->connection(),
+                   command.GetData());    
 
     // check whether the parsing was successful
     if (result.isValid()) {
-      std::cout<<"Parsed successfully!\n";
       for (auto i = 0u; i < result.size(); ++i) {
-        // Print a statement summary.
-        hsql::printStatementInfo(result.getStatement(i));
+        hsql::TableAccessMap t;
+        result.getStatement(i)->tablesAccessed(t);
+        for (auto it = t.begin(); it != t.end(); ++it) {
+          std::cout << it->first << ":" << static_cast<int>(it->second) << "\n";
+        }
       }
-    } else {
-      fprintf(stderr, "Given string is not a valid SQL query.\n");
-      fprintf(stderr, "%s (L%d:%d)\n",
-              result.errorMsg(),
-              result.errorLine(),
-              result.errorColumn());
     }
-    
-    ENVOY_CONN_LOG(warn, "mysql msg processed {}", read_callbacks_->connection(),
-                   command.GetData());    
     break;
   }
 
