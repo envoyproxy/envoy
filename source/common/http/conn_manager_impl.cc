@@ -498,6 +498,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     is_head_request_ = true;
   }
 
+  // We end the decode here only if the request is header only. If we convert the request to a
+  // header only, the stream will be marked as done once a subsequent decodeData/decodeTrailers is
+  // called with end_stream=true.
   maybeEndDecode(end_stream);
 
   // Drop new requests when overloaded as soon as we have decoded the headers.
@@ -647,12 +650,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   decodeHeaders(nullptr, *request_headers_, end_stream);
-
-  // Normally we end decode at the start of this function, but if the request was turned into
-  // a header only request we need to set this flag here.
-  if (encoding_headers_only_) {
-    maybeEndDecode(true);
-  }
 
   // Reset it here for both global and overridden cases.
   resetIdleTimer();
