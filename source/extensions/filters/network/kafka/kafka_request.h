@@ -10,6 +10,7 @@
 #include "extensions/filters/network/kafka/kafka_protocol.h"
 #include "extensions/filters/network/kafka/parser.h"
 #include "extensions/filters/network/kafka/serialization.h"
+#include "extensions/filters/network/kafka/serialization_composite.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -131,31 +132,14 @@ private:
   Int32Deserializer request_length_;
 };
 
+// clang-format off
 /**
  * Deserializer that extracts request header
  * @see http://kafka.apache.org/protocol.html#protocol_messages
  */
-class RequestHeaderDeserializer : public Deserializer<RequestHeader> {
-public:
-  size_t feed(const char*& buffer, uint64_t& remaining) {
-    size_t consumed = 0;
-    consumed += api_key_.feed(buffer, remaining);
-    consumed += api_version_.feed(buffer, remaining);
-    consumed += correlation_id_.feed(buffer, remaining);
-    consumed += client_id_.feed(buffer, remaining);
-    return consumed;
-  }
-  bool ready() const { return client_id_.ready(); }
-  RequestHeader get() const {
-    return {api_key_.get(), api_version_.get(), correlation_id_.get(), client_id_.get()};
-  }
-
-protected:
-  Int16Deserializer api_key_;
-  Int16Deserializer api_version_;
-  Int32Deserializer correlation_id_;
-  NullableStringDeserializer client_id_;
-};
+class RequestHeaderDeserializer
+    : public CompositeDeserializerWith4Delegates<RequestHeader, Int16Deserializer, Int16Deserializer, Int32Deserializer, NullableStringDeserializer> {};
+// clang-format on
 
 /**
  * Parser responsible for computing request header and updating the context with data resolved
@@ -216,13 +200,13 @@ ParseResponse RequestParser<RT, BT>::parse(const char*& buffer, uint64_t& remain
 }
 
 /**
- * Macro defining RequestParser that uses the underlying Buffer
+ * Macro defining RequestParser that uses the underlying Deserializer
  * Aware of versioning
- * Names of Buffers/Parsers are influenced by org.apache.kafka.common.protocol.Protocol names
+ * Names of Deserializers/Parsers are influenced by org.apache.kafka.common.protocol.Protocol names
  */
 #define DEFINE_REQUEST_PARSER(REQUEST_TYPE, VERSION)                                               \
   class REQUEST_TYPE##VERSION##Parser                                                              \
-      : public RequestParser<REQUEST_TYPE, REQUEST_TYPE##VERSION##Buffer> {                        \
+      : public RequestParser<REQUEST_TYPE, REQUEST_TYPE##VERSION##Deserializer> {                  \
   public:                                                                                          \
     REQUEST_TYPE##VERSION##Parser(RequestContextSharedPtr ctx) : RequestParser{ctx} {};            \
   };

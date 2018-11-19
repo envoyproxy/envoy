@@ -61,7 +61,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "serialization_lib",
-    hdrs = ["serialization.h"],
+    hdrs = [
+        "serialization.h",
+        "serialization_composite.h",
+    ],
     deps = [
         ":kafka_protocol_lib",
         "//include/envoy/buffer:buffer_interface",

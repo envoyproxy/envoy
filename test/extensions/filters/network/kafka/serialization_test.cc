@@ -1,6 +1,7 @@
 #include "common/common/stack_array.h"
 
 #include "extensions/filters/network/kafka/serialization.h"
+#include "extensions/filters/network/kafka/serialization_composite.h"
 
 #include "test/mocks/server/mocks.h"
 
@@ -34,6 +35,38 @@ TEST_EmptyDeserializerShouldNotBeReady(Int64Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(BoolBuffer);
 TEST_EmptyDeserializerShouldNotBeReady(StringDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(NullableStringDeserializer);
+TEST(CompositeDeserializerWith2Delegates, EmptyBufferShouldNotBeReady) {
+  // given
+  struct CompositeResult {
+    CompositeResult(int8_t, int16_t){};
+  };
+  const CompositeDeserializerWith2Delegates<CompositeResult, Int8Deserializer, Int16Deserializer>
+      testee{};
+  // when, then
+  ASSERT_EQ(testee.ready(), false);
+}
+TEST(CompositeDeserializerWith3Delegates, EmptyBufferShouldNotBeReady) {
+  // given
+  struct CompositeResult {
+    CompositeResult(int8_t, int16_t, int32_t){};
+  };
+  const CompositeDeserializerWith3Delegates<CompositeResult, Int8Deserializer, Int16Deserializer,
+                                            Int32Deserializer>
+      testee{};
+  // when, then
+  ASSERT_EQ(testee.ready(), false);
+}
+TEST(CompositeDeserializerWith4Delegates, EmptyBufferShouldNotBeReady) {
+  // given
+  struct CompositeResult {
+    CompositeResult(int8_t, int16_t, int32_t, std::string){};
+  };
+  const CompositeDeserializerWith4Delegates<CompositeResult, Int8Deserializer, Int16Deserializer,
+                                            Int32Deserializer, StringDeserializer>
+      testee{};
+  // when, then
+  ASSERT_EQ(testee.ready(), false);
+}
 TEST(ArrayDeserializer, EmptyBufferShouldNotBeReady) {
   // given
   const ArrayDeserializer<int8_t, Int8Deserializer> testee{};
@@ -240,6 +273,92 @@ TEST(ArrayDeserializer, ShouldThrowOnInvalidLength) {
   // when
   // then
   EXPECT_THROW(testee.feed(data, remaining), EnvoyException);
+}
+
+// tests for composite deserializers
+
+struct CompositeResultWith2Fields {
+  std::string field1_;
+  NullableArray<int32_t> field2_;
+
+  size_t encode(Buffer::Instance& dst, EncodingContext& encoder) const {
+    size_t written{0};
+    written += encoder.encode(field1_, dst);
+    written += encoder.encode(field2_, dst);
+    return written;
+  }
+
+  bool operator==(const CompositeResultWith2Fields& rhs) const {
+    return (field1_ == rhs.field1_) && (field2_ == rhs.field2_);
+  }
+};
+
+struct CompositeResultWith3Fields {
+  std::string field1_;
+  NullableArray<int32_t> field2_;
+  int16_t field3_;
+
+  size_t encode(Buffer::Instance& dst, EncodingContext& encoder) const {
+    size_t written{0};
+    written += encoder.encode(field1_, dst);
+    written += encoder.encode(field2_, dst);
+    written += encoder.encode(field3_, dst);
+    return written;
+  }
+
+  bool operator==(const CompositeResultWith3Fields& rhs) const {
+    return (field1_ == rhs.field1_) && (field2_ == rhs.field2_) && (field3_ == rhs.field3_);
+  }
+};
+
+struct CompositeResultWith4Fields {
+  std::string field1_;
+  NullableArray<int32_t> field2_;
+  int16_t field3_;
+  std::string field4_;
+
+  size_t encode(Buffer::Instance& dst, EncodingContext& encoder) const {
+    size_t written{0};
+    written += encoder.encode(field1_, dst);
+    written += encoder.encode(field2_, dst);
+    written += encoder.encode(field3_, dst);
+    written += encoder.encode(field4_, dst);
+    return written;
+  }
+
+  bool operator==(const CompositeResultWith4Fields& rhs) const {
+    return (field1_ == rhs.field1_) && (field2_ == rhs.field2_) && (field3_ == rhs.field3_) &&
+           (field4_ == rhs.field4_);
+  }
+};
+
+typedef CompositeDeserializerWith2Delegates<CompositeResultWith2Fields, StringDeserializer,
+                                            ArrayDeserializer<int32_t, Int32Deserializer>>
+    TestCompositeDeserializer2;
+
+typedef CompositeDeserializerWith3Delegates<CompositeResultWith3Fields, StringDeserializer,
+                                            ArrayDeserializer<int32_t, Int32Deserializer>,
+                                            Int16Deserializer>
+    TestCompositeDeserializer3;
+
+typedef CompositeDeserializerWith4Delegates<CompositeResultWith4Fields, StringDeserializer,
+                                            ArrayDeserializer<int32_t, Int32Deserializer>,
+                                            Int16Deserializer, StringDeserializer>
+    TestCompositeDeserializer4;
+
+TEST(CompositeDeserializerWith2Delegates, ShouldDeserialize) {
+  const CompositeResultWith2Fields expected{"zzzzz", {{10, 20, 30, 40, 50}}};
+  serializeThenDeserializeAndCheckEquality<TestCompositeDeserializer2>(expected);
+}
+
+TEST(CompositeDeserializerWith3Delegates, ShouldDeserialize) {
+  const CompositeResultWith3Fields expected{"zzzzz", {{10, 20, 30, 40, 50}}, 1234};
+  serializeThenDeserializeAndCheckEquality<TestCompositeDeserializer3>(expected);
+}
+
+TEST(CompositeDeserializerWith4Delegates, ShouldDeserialize) {
+  const CompositeResultWith4Fields expected{"zzzzz", {{10, 20, 30, 40, 50}}, 1234, "aaa"};
+  serializeThenDeserializeAndCheckEquality<TestCompositeDeserializer4>(expected);
 }
 
 } // namespace Kafka

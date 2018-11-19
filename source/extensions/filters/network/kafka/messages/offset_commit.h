@@ -131,156 +131,48 @@ private:
   const NullableArray<OffsetCommitTopic> topics_;
 };
 
-/**
- * Deserializes bytes into OffsetCommitPartition (api version 0)
- */
-class OffsetCommitPartitionV0Buffer : public Deserializer<OffsetCommitPartition> {
-public:
-  size_t feed(const char*& buffer, uint64_t& remaining) {
-    size_t consumed = 0;
-    consumed += partition_.feed(buffer, remaining);
-    consumed += offset_.feed(buffer, remaining);
-    consumed += metadata_.feed(buffer, remaining);
-    return consumed;
-  }
-  bool ready() const { return metadata_.ready(); }
-  OffsetCommitPartition get() const { return {partition_.get(), offset_.get(), metadata_.get()}; }
+// clang-format off
 
-protected:
-  Int32Deserializer partition_;
-  Int64Deserializer offset_;
-  NullableStringDeserializer metadata_;
-};
+// api version 0
 
-/**
- * Deserializes bytes into OffsetCommitPartition (api version 1)
- */
-class OffsetCommitPartitionV1Buffer : public Deserializer<OffsetCommitPartition> {
-public:
-  size_t feed(const char*& buffer, uint64_t& remaining) {
-    size_t consumed = 0;
-    consumed += partition_.feed(buffer, remaining);
-    consumed += offset_.feed(buffer, remaining);
-    consumed += timestamp_.feed(buffer, remaining);
-    consumed += metadata_.feed(buffer, remaining);
-    return consumed;
-  }
-  bool ready() const { return metadata_.ready(); }
-  OffsetCommitPartition get() const {
-    return {partition_.get(), offset_.get(), timestamp_.get(), metadata_.get()};
-  }
-
-protected:
-  Int32Deserializer partition_;
-  Int64Deserializer offset_;
-  Int64Deserializer timestamp_;
-  NullableStringDeserializer metadata_;
-};
-
-/**
- * Deserializes array of OffsetCommitPartition-s v0
- */
+// Deserializes bytes into OffsetCommitPartition (api version 0): partition, offset, metadata
+class OffsetCommitPartitionV0Buffer
+    : public CompositeDeserializerWith3Delegates<OffsetCommitPartition, Int32Deserializer, Int64Deserializer, NullableStringDeserializer> {};
+// Deserializes array of OffsetCommitPartition-s v0
 class OffsetCommitPartitionV0ArrayBuffer
     : public ArrayDeserializer<OffsetCommitPartition, OffsetCommitPartitionV0Buffer> {};
-
-/**
- * Deserializes array of OffsetCommitPartition-s v1
- */
-class OffsetCommitPartitionV1ArrayBuffer
-    : public ArrayDeserializer<OffsetCommitPartition, OffsetCommitPartitionV1Buffer> {};
-
-/**
- * Deserializes bytes into OffsetCommitTopic v0 (which is composed of topic name + array of v0
- * partitions)
- */
-class OffsetCommitTopicV0Buffer : public Deserializer<OffsetCommitTopic> {
-public:
-  size_t feed(const char*& buffer, uint64_t& remaining) {
-    size_t consumed = 0;
-    consumed += topic_.feed(buffer, remaining);
-    consumed += partitions_.feed(buffer, remaining);
-    return consumed;
-  }
-  bool ready() const { return partitions_.ready(); }
-  OffsetCommitTopic get() const { return {topic_.get(), partitions_.get()}; }
-
-protected:
-  StringDeserializer topic_;
-  OffsetCommitPartitionV0ArrayBuffer partitions_;
-};
-
-/**
- * Deserializes bytes into OffsetCommitTopic v1 (which is composed of topic name + array of v1
- * partitions)
- */
-class OffsetCommitTopicV1Buffer : public Deserializer<OffsetCommitTopic> {
-public:
-  size_t feed(const char*& buffer, uint64_t& remaining) {
-    size_t consumed = 0;
-    consumed += topic_.feed(buffer, remaining);
-    consumed += partitions_.feed(buffer, remaining);
-    return consumed;
-  }
-  bool ready() const { return partitions_.ready(); }
-  OffsetCommitTopic get() const { return {topic_.get(), partitions_.get()}; }
-
-protected:
-  StringDeserializer topic_;
-  OffsetCommitPartitionV1ArrayBuffer partitions_;
-};
-
-/**
- * Deserializes array of OffsetCommitTopic-s v0
- */
+// Deserializes bytes into OffsetCommitTopic (api version 0): topic name, partitions (v0)
+class OffsetCommitTopicV0Buffer
+    : public CompositeDeserializerWith2Delegates<OffsetCommitTopic, StringDeserializer, OffsetCommitPartitionV0ArrayBuffer> {};
+// Deserializes array of OffsetCommitTopic-s v0
 class OffsetCommitTopicV0ArrayBuffer
     : public ArrayDeserializer<OffsetCommitTopic, OffsetCommitTopicV0Buffer> {};
+// Deserializes bytes into OffsetCommitRequest (api version 0): group_id, topics (v0)
+class OffsetCommitRequestV0Deserializer
+    : public CompositeDeserializerWith2Delegates<OffsetCommitRequest, StringDeserializer, OffsetCommitTopicV0ArrayBuffer> {};
 
-/**
- * Deserializes array of OffsetCommitTopic-s v1
- */
+// api version 1
+
+// Deserializes bytes into OffsetCommitPartition (api version 1): partition, offset, timestamp, metadata
+class OffsetCommitPartitionV1Buffer
+    : public CompositeDeserializerWith4Delegates<OffsetCommitPartition, Int32Deserializer, Int64Deserializer, Int64Deserializer, NullableStringDeserializer> {};
+// Deserializes array of OffsetCommitPartition-s v1
+class OffsetCommitPartitionV1ArrayBuffer
+    : public ArrayDeserializer<OffsetCommitPartition, OffsetCommitPartitionV1Buffer> {};
+// Deserializes bytes into OffsetCommitTopic (api version 1): topic name, partitions (v1)
+class OffsetCommitTopicV1Buffer
+    : public CompositeDeserializerWith2Delegates<OffsetCommitTopic, StringDeserializer, OffsetCommitPartitionV1ArrayBuffer> {};
+// Deserializes array of OffsetCommitTopic-s v1
 class OffsetCommitTopicV1ArrayBuffer
     : public ArrayDeserializer<OffsetCommitTopic, OffsetCommitTopicV1Buffer> {};
+// Deserializes bytes into OffsetCommitRequest (api version 1): group_id, generation_id, member_id, topics (v1)
+class OffsetCommitRequestV1Deserializer
+    : public CompositeDeserializerWith4Delegates<OffsetCommitRequest, StringDeserializer, Int32Deserializer, StringDeserializer, OffsetCommitTopicV1ArrayBuffer> {};
 
-class OffsetCommitRequestV0Buffer : public Deserializer<OffsetCommitRequest> {
-public:
-  size_t feed(const char*& buffer, uint64_t& remaining) {
-    size_t consumed = 0;
-    consumed += group_id_.feed(buffer, remaining);
-    consumed += topics_.feed(buffer, remaining);
-    return consumed;
-  }
-  bool ready() const { return topics_.ready(); }
-  OffsetCommitRequest get() const { return {group_id_.get(), topics_.get()}; }
-
-protected:
-  StringDeserializer group_id_;
-  OffsetCommitTopicV0ArrayBuffer topics_;
-};
-
-class OffsetCommitRequestV1Buffer : public Deserializer<OffsetCommitRequest> {
-public:
-  size_t feed(const char*& buffer, uint64_t& remaining) {
-    size_t consumed = 0;
-    consumed += group_id_.feed(buffer, remaining);
-    consumed += generation_id_.feed(buffer, remaining);
-    consumed += member_id_.feed(buffer, remaining);
-    consumed += topics_.feed(buffer, remaining);
-    return consumed;
-  }
-  bool ready() const { return topics_.ready(); }
-  OffsetCommitRequest get() const {
-    return {group_id_.get(), generation_id_.get(), member_id_.get(), topics_.get()};
-  }
-
-protected:
-  StringDeserializer group_id_;
-  Int32Deserializer generation_id_;
-  StringDeserializer member_id_;
-  OffsetCommitTopicV1ArrayBuffer topics_;
-};
+// clang-format on
 
 /**
- * Define Parsers that wrap the corresponding buffers
+ * Define Parsers that wrap the corresponding deserializers
  */
 
 DEFINE_REQUEST_PARSER(OffsetCommitRequest, V0);
