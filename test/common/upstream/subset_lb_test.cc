@@ -1469,10 +1469,16 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
   // Since we scale the locality weights by number of hosts removed, we expect to see the second
   // locality to be selected less because we've excluded more hosts in that locality than in the
   // first.
+  // The localities are split 50/50, but because of the scaling we expect to see 66/33 instead.
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
 }
 
 TEST_P(SubsetLoadBalancerTest, GaugesUpdatedOnDestroy) {

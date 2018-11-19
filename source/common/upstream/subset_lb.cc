@@ -555,7 +555,7 @@ LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocal
       auto scaled_locality_weights = std::make_shared<LocalityWeights>(original_weights.size());
       for (uint32_t i = 0; i < original_weights.size(); ++i) {
         // If the original locality has zero hosts, skip it. This leaves the weight at zero.
-        if (original_hosts_per_locality[i].size() == 0) {
+        if (original_hosts_per_locality[i].empty()) {
           continue;
         }
 
@@ -565,16 +565,12 @@ LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocal
                                         original_hosts_per_locality[i].size();
       }
 
-      std::cerr << "weights!" << std::endl;
-      std::cerr << scaled_locality_weights->at(0) << std::endl;
-      std::cerr << scaled_locality_weights->at(1) << std::endl;
       return scaled_locality_weights;
     } else {
       return original_host_set_.localityWeights();
     }
-  } else {
-    return {};
   }
+  return {};
 }
 
 HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
