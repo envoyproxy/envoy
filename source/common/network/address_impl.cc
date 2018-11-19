@@ -133,7 +133,8 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
 } // namespace Address
 
 IoHandlePtr InstanceBase::socketFromSocketType(SocketType socketType) const {
-#if defined(__APPLE__) int flags = 0;
+#if defined(__APPLE__)
+  int flags = 0;
 #else
   int flags = SOCK_NONBLOCK;
 #endif
@@ -166,7 +167,7 @@ IoHandlePtr InstanceBase::socketFromSocketType(SocketType socketType) const {
   RELEASE_ASSERT(fcntl(io_handle->fd(), F_SETFL, O_NONBLOCK) != -1, "");
 #endif
 
-  return fd;
+  return io_handle;
 }
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) {
@@ -352,7 +353,7 @@ Api::SysCallIntResult PipeInstance::bind(int fd) const {
   return {rc, errno};
 }
 
-Api::SysCallIntResult PipeInstance::connect(int fd) const {
+Api::SysCallIntResult PipeInstance::connect(const int fd) const {
   if (abstract_namespace_) {
     const int rc = ::connect(fd, reinterpret_cast<const sockaddr*>(&address_),
                              offsetof(struct sockaddr_un, sun_path) + address_length_);

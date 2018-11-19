@@ -10,6 +10,7 @@
 
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/io_handle.h"
 
 #include "absl/numeric/int128.h"
 
@@ -151,8 +152,8 @@ public:
   /**
    * Create a socket for this address.
    * @param type supplies the socket type to create.
-   * @return the IoHandl;e address naming the socket.In case of a failure, the program
-   *  would be aborted.
+   * @return the fd naming the socket. In case of a failure, the program would be
+   *   aborted.
    */
   virtual IoHandlePtr socket(SocketType type) const PURE;
 
