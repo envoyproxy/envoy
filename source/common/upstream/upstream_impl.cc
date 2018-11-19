@@ -605,7 +605,7 @@ HostVectorConstSharedPtr ClusterImplBase::createDegradedHostList(const HostVecto
 
 HostsPerLocalityConstSharedPtr
 ClusterImplBase::createHealthyHostLists(const HostsPerLocality& hosts) {
-  return hosts.filter([](const Host& host) { return host.healthy(); });
+  return hosts.filter([](const Host& host) { return host.healthy() && !host.degraded(); });
 }
 
 HostsPerLocalityConstSharedPtr

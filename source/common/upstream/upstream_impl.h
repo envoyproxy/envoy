@@ -278,7 +278,7 @@ public:
   const HostVector& healthyHosts() const override { return *healthy_hosts_.hosts_; }
   const HostVector& degradedHosts() const override { return *degraded_hosts_.hosts_; }
   const HostsPerLocality& hostsPerLocality() const override {
-    return *healthy_hosts_.hosts_per_locality_;
+    return *all_hosts_.hosts_per_locality_;
   }
   const HostsPerLocality& healthyHostsPerLocality() const override {
     return *healthy_hosts_.hosts_per_locality_;

@@ -52,6 +52,7 @@ public:
          const envoy::api::v2::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config) {}
   using LoadBalancerBase::chooseHostSet;
+  using LoadBalancerBase::degradedPercentageLoad;
   using LoadBalancerBase::isInPanic;
   using LoadBalancerBase::percentageLoad;
 
@@ -62,16 +63,22 @@ public:
 
 class LoadBalancerBaseTest : public LoadBalancerTestBase {
 public:
-  void updateHostSet(MockHostSet& host_set, uint32_t num_hosts, uint32_t num_healthy_hosts) {
+  void updateHostSet(MockHostSet& host_set, uint32_t num_hosts, uint32_t num_healthy_hosts,
+                     uint32_t num_degraded_hosts = 0) {
     ASSERT(num_healthy_hosts <= num_hosts);
+    ASSERT(num_degraded_hosts <= num_healthy_hosts);
 
     host_set.hosts_.clear();
     host_set.healthy_hosts_.clear();
+    host_set.degraded_hosts_.clear();
     for (uint32_t i = 0; i < num_hosts; ++i) {
       host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:80"));
     }
     for (uint32_t i = 0; i < num_healthy_hosts; ++i) {
       host_set.healthy_hosts_.push_back(host_set.hosts_[i]);
+    }
+    for (uint32_t i = 0; i < num_degraded_hosts; ++i) {
+      host_set.degraded_hosts_.push_back(host_set.hosts_[i]);
     }
     host_set.runCallbacks({}, {});
   }
@@ -89,6 +96,10 @@ public:
 
   std::vector<uint32_t> getLoadPercentage() {
     return aggregatePrioritySetsValues<uint32_t>(lb_, &TestLb::percentageLoad);
+  }
+
+  std::vector<uint32_t> getDegradedLoadPercentage() {
+    return aggregatePrioritySetsValues<uint32_t>(lb_, &TestLb::degradedPercentageLoad);
   }
 
   std::vector<bool> getPanic() {
@@ -140,6 +151,21 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   EXPECT_EQ(100, lb_.percentageLoad(2));
   priority_load = {0, 0, 100};
   EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context).first);
+
+  // Add a degraded host to P1 and observe that it does not affect priority load.
+  updateHostSet(failover_host_set_, 1 /* num_hosts */, 1 /* num_healthy_hosts */,
+                1 /* num degraded hosts */);
+  EXPECT_EQ(0, lb_.percentageLoad(0));
+  EXPECT_EQ(100, lb_.percentageLoad(2));
+  priority_load = {0, 0, 100};
+  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context).first);
+
+  // Mark the host in tertiarty_host_set_ as unhealthy and observe that we hit the degraded host.
+  updateHostSet(tertiary_host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
+  EXPECT_EQ(0, lb_.percentageLoad(0));
+  EXPECT_EQ(0, lb_.percentageLoad(2));
+  priority_load = {0, 0, 0};
+  EXPECT_EQ(&failover_host_set_, &lb_.chooseHostSet(&context).first);
 }
 
 // Test of host set selection with priority filter
@@ -200,6 +226,26 @@ TEST_P(LoadBalancerBaseTest, GentleFailover) {
   updateHostSet(host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(50, 50));
+  ASSERT_THAT(getPanic(), ElementsAre(true, true));
+
+  // Health P=0 == 0 P=1 == 35
+  // Degraded P=0 = 65. Total health > 100, so none of the levels are in panic mode.
+  updateHostSet(host_set_, 4 /* num_hosts */, 4 /* num_healthy_hosts */,
+                4 /* num degraded hosts */);
+  updateHostSet(failover_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 35));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(65, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false));
+
+  // Health P=0 == 0 P=1 == 35
+  // Degraded P=0 = 35.
+  // Health is then scald up by (100 / (35 + 35) == 50).
+  // Total health > 100, so none of the levels are in panic mode.
+  updateHostSet(host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */,
+                1 /* num degraded hosts */);
+  updateHostSet(failover_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 50));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(50, 0));
   ASSERT_THAT(getPanic(), ElementsAre(true, true));
 }
 

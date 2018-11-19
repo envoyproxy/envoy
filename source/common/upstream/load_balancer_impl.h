@@ -68,6 +68,9 @@ protected:
   std::pair<HostSet&, PriorityType> chooseHostSet(LoadBalancerContext* context);
 
   uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_[priority]; }
+  uint32_t degradedPercentageLoad(uint32_t priority) const {
+    return degraded_per_priority_load_[priority];
+  }
   bool isInPanic(uint32_t priority) const { return per_priority_panic_[priority]; }
 
   ClusterStats& stats_;
