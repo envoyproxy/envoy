@@ -49,7 +49,7 @@ public:
 
     Thread::BasicLockable& mutex_;
     uint64_t ref_count_; // Effectively guarded by mutex_, but not analyzable due to aliasing.
-    void* ptr_; // Chanting ptr_ is done under mutex_, but accessing it is not.
+    void* ptr_;          // Chanting ptr_ is done under mutex_, but accessing it is not.
   };
 
   /**
