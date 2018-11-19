@@ -3,28 +3,25 @@
 namespace Envoy {
 namespace Http {
 
-WrappedConnectionPool::WrappedConnectionPool(
-  std::function<Http::ConnectionPool::InstancePtr()> builder):
-  builder_(builder)
-{
+WrappedConnectionPool::WrappedConnectionPool(std::unique_ptr<ConnectionMapper> mapper,
+                                             Protocol protocol)
+    : mapper_(std::move(mapper)), protocol_(protocol) {}
 
-}
-
-Http::Protocol WrappedConnectionPool::protocol() const {
-  // TODO(klarose): Get from sub-pool somehow
-  return Http::Protocol::Http11;
-}
-void WrappedConnectionPool::addDrainedCallback(DrainedCb /*unused*/) {
-}
-void WrappedConnectionPool::drainConnections() {
-
-}
+Http::Protocol WrappedConnectionPool::protocol() const { return protocol_; }
+void WrappedConnectionPool::addDrainedCallback(DrainedCb /*unused*/) {}
+void WrappedConnectionPool::drainConnections() {}
 
 ConnectionPool::Cancellable*
- WrappedConnectionPool::newStream(Http::StreamDecoder& /* unused */,
-                                  ConnectionPool::Callbacks& /*unused */) {
+WrappedConnectionPool::newStream(Http::StreamDecoder& /* unused */,
+                                 ConnectionPool::Callbacks& /*unused */) {
   return nullptr;
 }
 
+ConnectionPool::Cancellable*
+WrappedConnectionPool::newStream(Http::StreamDecoder& /* unused */,
+                                 ConnectionPool::Callbacks& /*unused */,
+                                 const Upstream::LoadBalancerContext& /*unused */) {
+  return nullptr;
+}
 } // namespace Http
 } // namespace Envoy

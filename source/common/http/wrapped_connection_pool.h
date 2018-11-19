@@ -1,22 +1,31 @@
 #pragma once
 
-#include <utility>
+#include <functional>
+#include <memory>
 
 #include "envoy/http/conn_pool.h"
+
+#include "common/http/connection_mapper.h"
 
 namespace Envoy {
 namespace Http {
 
-class WrappedConnectionPool: public ConnectionPool::Instance {
+class WrappedConnectionPool : public ConnectionPool::Instance {
 public:
-  WrappedConnectionPool(std::function<Http::ConnectionPool::InstancePtr()> builder);
-  Http::Protocol protocol() const override;
+  WrappedConnectionPool(std::unique_ptr<ConnectionMapper> mapper, Protocol protocol);
+  Protocol protocol() const override;
   void addDrainedCallback(DrainedCb cb) override;
   void drainConnections() override;
   ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
+
+  ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
+                                         ConnectionPool::Callbacks& callbacks,
+                                         const Upstream::LoadBalancerContext& context) override;
+
 private:
-  std::function<Http::ConnectionPool::InstancePtr()> builder_;
+  std::unique_ptr<ConnectionMapper> mapper_;
+  Protocol protocol_;
 };
 
 } // namespace Http
