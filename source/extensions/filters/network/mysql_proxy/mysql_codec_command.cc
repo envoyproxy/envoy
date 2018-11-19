@@ -25,6 +25,7 @@ int Command::Decode(Buffer::Instance& buffer) {
     return MYSQL_FAILURE;
   }
 
+  BufStringDrain(buffer, data_);
   return MYSQL_SUCCESS;
 }
 

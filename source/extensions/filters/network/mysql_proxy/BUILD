@@ -32,6 +32,7 @@ envoy_cc_library(
         "mysql_filter.h",
         "mysql_session.h",
     ],
+    external_deps = ["sqlparser"],
     deps = [
         "//include/envoy/network:filter_interface",
         "//include/envoy/server:filter_config_interface",

@@ -288,6 +288,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_tencent_rapidjson()
     _com_google_googletest()
     _com_google_protobuf()
+    _com_github_rshriram_sqlparser()
 
     # Used for bundling gcovr into a relocatable .par file.
     _repository_impl("subpar")
@@ -332,6 +333,16 @@ def _com_github_cyan4973_xxhash():
     native.bind(
         name = "xxhash",
         actual = "@com_github_cyan4973_xxhash//:xxhash",
+    )
+
+def _com_github_rshriram_sqlparser():
+    _repository_impl(
+        name = "com_github_rshriram_sqlparser",
+        build_file = "@envoy//bazel/external:sqlparser.BUILD",
+    )
+    native.bind(
+        name = "sqlparser",
+        actual = "@com_github_rshriram_sqlparser//:sqlparser",
     )
 
 def _com_github_eile_tclap():
