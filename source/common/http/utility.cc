@@ -19,7 +19,6 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
-#include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -43,7 +42,8 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
       (u.field_set & (1 << UF_SCHEMA)) != (1 << UF_SCHEMA)) {
     return false;
   }
-  scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off, u.field_data[UF_SCHEMA].len);
+  scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
+                              u.field_data[UF_SCHEMA].len);
 
   uint16_t authority_len = u.field_data[UF_HOST].len;
   if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
@@ -52,9 +52,10 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
   host_ = absl::string_view(absolute_url.data() + u.field_data[UF_HOST].off, authority_len);
 
   // RFC allows the absolute-uri to not end in /, but the absolute path form
-  // must start with 
+  // must start with
   if ((u.field_set & (1 << UF_PATH)) == (1 << UF_PATH) && u.field_data[UF_PATH].len > 0) {
-    path_ = absl::string_view(absolute_url.data() + u.field_data[UF_PATH].off, u.field_data[UF_PATH].len);
+    path_ = absl::string_view(absolute_url.data() + u.field_data[UF_PATH].off,
+                              u.field_data[UF_PATH].len);
   } else {
     path_ = absl::string_view(kDefaultPath, 1);
   }

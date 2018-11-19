@@ -202,7 +202,10 @@ public:
  * RetryStatus whether request should be retried or not.
  */
 enum class RetryStatus { No, NoOverflow, Yes };
-// FIXME doc
+
+/**
+ * InternalRedirectAction from the RetryPolicy
+ */
 enum class InternalRedirectAction { Reject, PassThrough, Handle };
 
 /**
@@ -627,7 +630,9 @@ public:
    */
   virtual bool includeAttemptCount() const PURE;
 
-  // FIXME doc
+  /**
+   * @returns the internal redirect action which should be taken on this route.
+   */
   virtual InternalRedirectAction internalRedirectAction() const PURE;
 };
 

@@ -357,7 +357,7 @@ private:
                           Upstream::HostDescriptionConstSharedPtr upstream_host, bool dropped);
   void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host,
                           bool dropped);
-  void cleanup();
+  void cleanup(bool reset_stream = false);
   virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
                                          Http::HeaderMap& request_headers,
                                          const Upstream::ClusterInfo& cluster,

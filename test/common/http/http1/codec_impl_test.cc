@@ -56,7 +56,7 @@ void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_ur
   }
 
   Http::MockStreamDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
@@ -75,7 +75,7 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
   }
 
   Http::MockStreamDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
 
   codec_->dispatch(buffer);
@@ -89,7 +89,7 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
   InSequence sequence;
 
   Http::MockStreamDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{
       {"Test", ""},
@@ -110,7 +110,7 @@ TEST_F(Http1ServerConnectionImplTest, Http10) {
   InSequence sequence;
 
   Http::MockStreamDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
@@ -228,7 +228,7 @@ TEST_F(Http1ServerConnectionImplTest, SimpleGet) {
   InSequence sequence;
 
   Http::MockStreamDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
@@ -256,7 +256,7 @@ TEST_F(Http1ServerConnectionImplTest, BadRequestStartedStream) {
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
 
   Http::MockStreamDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("G");
   codec_->dispatch(buffer);
@@ -272,7 +272,7 @@ TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   InSequence sequence;
 
   Http::MockStreamDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{{":authority", "hello"}, {":path", "/"}, {":method", "GET"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
@@ -288,7 +288,7 @@ TEST_F(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
   InSequence sequence;
 
   Http::MockStreamDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{{"content-length", "5"}, {":path", "/"}, {":method", "POST"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false))
@@ -308,7 +308,7 @@ TEST_F(Http1ServerConnectionImplTest, PostWithContentLength) {
   InSequence sequence;
 
   Http::MockStreamDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{{"content-length", "5"}, {":path", "/"}, {":method", "POST"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false)).Times(1);
@@ -329,8 +329,8 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponse) {
 
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamEncoder& encoder) -> Http::StreamDecoder& {
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
         response_encoder = &encoder;
         return decoder;
       }));
@@ -352,8 +352,8 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
 
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamEncoder& encoder) -> Http::StreamDecoder& {
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
         response_encoder = &encoder;
         return decoder;
       }));
@@ -379,8 +379,8 @@ TEST_F(Http1ServerConnectionImplTest, ContentLengthResponse) {
 
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamEncoder& encoder) -> Http::StreamDecoder& {
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
         response_encoder = &encoder;
         return decoder;
       }));
@@ -405,8 +405,8 @@ TEST_F(Http1ServerConnectionImplTest, HeadRequestResponse) {
 
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamEncoder& encoder) -> Http::StreamDecoder& {
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
         response_encoder = &encoder;
         return decoder;
       }));
@@ -428,8 +428,8 @@ TEST_F(Http1ServerConnectionImplTest, HeadChunkedRequestResponse) {
 
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamEncoder& encoder) -> Http::StreamDecoder& {
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
         response_encoder = &encoder;
         return decoder;
       }));
@@ -451,9 +451,9 @@ TEST_F(Http1ServerConnectionImplTest, DoubleRequest) {
 
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_))
+  EXPECT_CALL(callbacks_, newStream(_, _))
       .Times(2)
-      .WillRepeatedly(Invoke([&](Http::StreamEncoder& encoder) -> Http::StreamDecoder& {
+      .WillRepeatedly(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
         response_encoder = &encoder;
         return decoder;
       }));
@@ -476,8 +476,8 @@ TEST_F(Http1ServerConnectionImplTest, RequestWithTrailers) {
 
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamEncoder& encoder) -> Http::StreamDecoder& {
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
         response_encoder = &encoder;
         return decoder;
       }));
@@ -493,7 +493,7 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequest) {
 
   InSequence sequence;
   NiceMock<Http::MockStreamDecoder> decoder;
-  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false)).Times(1);
   Buffer::OwnedImpl buffer(
@@ -516,7 +516,7 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithEarlyData) {
 
   InSequence sequence;
   NiceMock<Http::MockStreamDecoder> decoder;
-  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl expected_data("12345abcd");
   EXPECT_CALL(decoder, decodeHeaders_(_, false)).Times(1);
@@ -531,7 +531,7 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithTEChunked) {
 
   InSequence sequence;
   NiceMock<Http::MockStreamDecoder> decoder;
-  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   // Even with T-E chunked, the data should neither be inspected for (the not
   // present in this unit test) chunks, but simply passed through.
@@ -548,7 +548,7 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithNoBody) {
 
   InSequence sequence;
   NiceMock<Http::MockStreamDecoder> decoder;
-  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   // Make sure we avoid the deferred_end_stream_headers_ optimization for
   // requests-with-no-body.
@@ -566,8 +566,8 @@ TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
 
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamEncoder& encoder) -> Http::StreamDecoder& {
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
         response_encoder = &encoder;
         return decoder;
       }));
@@ -911,8 +911,8 @@ TEST_F(Http1ServerConnectionImplTest, TestCodecHeaderLimits) {
   std::string exception_reason;
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamEncoder& encoder) -> Http::StreamDecoder& {
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
         response_encoder = &encoder;
         return decoder;
       }));

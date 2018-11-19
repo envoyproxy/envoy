@@ -49,16 +49,16 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
   }
 
   ASSERT(downstream_headers.ForwardedProto());
-  if (downstream_headers.ForwardedProto()->value().c_str() == Http::Headers::get().SchemeValues.Http &&
-      absolute_url.scheme() == Http::Headers::get().SchemeValues.Https ) {
+  if (downstream_headers.ForwardedProto()->value().c_str() ==
+          Http::Headers::get().SchemeValues.Http &&
+      absolute_url.scheme() == Http::Headers::get().SchemeValues.Https) {
     // Don't allow serving HTTP responses over TLS.
     return false;
   }
 
   // Preserve the original request URL for the second pass.
   downstream_headers.insertEnvoyOriginalUrl().value(
-      absl::StrCat(downstream_headers.ForwardedProto()->value().getStringView(),
-                   "://",
+      absl::StrCat(downstream_headers.ForwardedProto()->value().getStringView(), "://",
                    downstream_headers.Host()->value().getStringView(),
                    downstream_headers.Path()->value().getStringView()));
 
@@ -69,7 +69,6 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
 
   return true;
 }
-
 
 } // namespace
 
@@ -433,7 +432,10 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   buffer_limit_ = callbacks_->decoderBufferLimit();
 }
 
-void Filter::cleanup() {
+void Filter::cleanup(bool reset_stream) {
+  if (reset_stream) {
+    upstream_request_->resetStream();
+  }
   upstream_request_.reset();
   retry_state_.reset();
   if (response_timeout_) {
@@ -668,29 +670,29 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
     retry_state_.reset();
   }
 
-
   if (headers->EnvoyInternalRedirect()) {
     switch (route_entry_->internalRedirectAction()) {
-      case InternalRedirectAction::Reject:
-        // Upstream asked for an internal redirect when internal redirects are not
-        // configured on.
-        cluster_->stats().upstream_internal_redirect_rejected_total_.inc();
-        headers->removeEnvoyInternalRedirect();  // Just to be paranoid.
+    case InternalRedirectAction::Reject:
+      // Upstream asked for an internal redirect when internal redirects are not
+      // configured on.
+      cleanup(!end_stream);
+      cluster_->stats().upstream_internal_redirect_rejected_total_.inc();
+      headers->removeEnvoyInternalRedirect(); // Just to be paranoid.
+      callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr);
+      return;
+    case InternalRedirectAction::Handle:
+      cleanup(!end_stream);
+      if (!setupInternalRedirect(headers, end_stream)) {
+        cluster_->stats().upstream_internal_redirect_failed_total_.inc();
+        headers->removeEnvoyInternalRedirect();
         callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr);
-        return;
-      case InternalRedirectAction::Handle:
-        if (!setupInternalRedirect(headers, end_stream)) {
-          cluster_->stats().upstream_internal_redirect_failed_total_.inc();
-          headers->removeEnvoyInternalRedirect();
-          callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr);
-        } else {
-          cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
-        }
-        // Either we've set up an internal redirect, or sent a failure reply.
-        return;
-      case InternalRedirectAction::PassThrough:
-        // Pass the redirect through to frontline Envoy instances.
-        break;
+        ENVOY_STREAM_LOG(debug, "failing redirect", *callbacks_);
+      }
+      // Either we've set up an internal redirect, or sent a failure reply.
+      return;
+    case InternalRedirectAction::PassThrough:
+      // Pass the redirect through to frontline Envoy instances.
+      break;
     }
   }
 
@@ -838,21 +840,18 @@ bool Filter::setupInternalRedirect(const Http::HeaderMapPtr& headers, bool end_s
   if (!downstream_end_stream_ ||
       callbacks_->decodingBuffer() || // Redirects woth body not yet supported.
       !convertRequestHeadersForInternalRedirect(*downstream_headers_, *internal_redirect)) {
-    ENVOY_STREAM_LOG(debug, "failing redirect", *callbacks_);
     return false;
   }
 
-  // FIXME reselect route or fail with 404, or defer?
-
-  // FIXME for now this acts as a retry, and does not rerun the filter chain.
-  // Fix this.
   setupRetry(end_stream);
-  doRetry();
-  return true;
+  // At this point barring an bug with recreateStream, the redirect will occur.
+  cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
+  ENVOY_STREAM_LOG(debug, "performing redirect", *callbacks_);
+  return callbacks_->recreateStream();
 }
 
 void Filter::doRetry() {
-  //FIXME is_retry_ = true;
+  is_retry_ = true;
   attempt_count_++;
   Http::ConnectionPool::Instance* conn_pool = getConnPool();
   if (!conn_pool) {

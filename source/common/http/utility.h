@@ -20,14 +20,18 @@ namespace Envoy {
 namespace Http {
 namespace Utility {
 
+/**
+ * Given a fully qualified URL, splits the string_view provided into scheme,
+ * host and path components.
+ */
 class Url {
- public:
+public:
   bool initialize(absl::string_view absolute_url);
   absl::string_view scheme() { return scheme_; }
   absl::string_view host() { return host_; }
   absl::string_view path() { return path_; }
 
- private:
+private:
   absl::string_view scheme_;
   absl::string_view host_;
   absl::string_view path_;

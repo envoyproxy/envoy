@@ -71,7 +71,8 @@ public:
   void onGoAway() override;
 
   // Http::ServerConnectionCallbacks
-  StreamDecoder& newStream(StreamEncoder& response_encoder) override;
+  StreamDecoder& newStream(StreamEncoder& response_encoder,
+                           bool is_internally_created = false) override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -189,6 +190,7 @@ private:
     removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
     void setDecoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
     uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
+    bool recreateStream() override;
 
     // Each decoder filter instance checks if the request passed to the filter is gRPC
     // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -354,7 +356,7 @@ private:
     struct State {
       State()
           : remote_complete_(false), local_complete_(false), saw_connection_close_(false),
-            successful_upgrade_(false) {}
+            successful_upgrade_(false), is_internally_created_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -367,6 +369,14 @@ private:
       bool local_complete_ : 1;
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
+
+      // True if this stream is internally created. Currently only used for
+      // internal redirects, though filters can force this via recreateStream().
+      //
+      // We can't infer redirect state from headers, as we don't want to allow untrusted users to
+      // set x-envoy-original-url and need internally initiated streams to be able to set it on
+      // requests from untrusted origins so it is an explicit parameter for newStream.
+      bool is_internally_created_ : 1;
     };
 
     // Possibly increases buffer_limit_ to the value of limit.

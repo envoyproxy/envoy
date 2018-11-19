@@ -180,6 +180,21 @@ public:
     router_.onDestroy();
   }
 
+  void sendRequest() {
+    EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+        .WillOnce(Invoke(
+            [&](Http::StreamDecoder& decoder,
+                Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+              response_decoder_ = &decoder;
+              callbacks.onPoolReady(original_encoder_, cm_.conn_pool_.host_);
+              return nullptr;
+            }));
+    expectResponseTimerCreate();
+    Http::TestHeaderMapImpl headers{};
+    HttpTestUtility::addDefaultHeaders(headers);
+    router_.decodeHeaders(headers, true);
+  }
+
   DangerousDeprecatedTestTime test_time_;
   std::string upstream_zone_{"to_az"};
   envoy::api::v2::core::Locality upstream_locality_;
@@ -197,6 +212,9 @@ public:
   Event::MockTimer* per_try_timeout_{};
   Network::Address::InstanceConstSharedPtr host_address_{
       Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
+  NiceMock<Http::MockStreamEncoder> original_encoder_;
+  NiceMock<Http::MockStreamEncoder> second_encoder_;
+  Http::StreamDecoder* response_decoder_ = nullptr;
 };
 
 class RouterTest : public RouterTestBase {
@@ -1824,6 +1842,15 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+}
+
+TEST_F(RouterTest, InternalRedirect) {
+  sendRequest();
+
+  Http::HeaderMapPtr response_headers(
+      new Http::TestHeaderMapImpl{{":status", "302"}, {"x-envoy-internal-redirect", "foo"}});
+  EXPECT_CALL(original_encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
 }
 
 TEST_F(RouterTest, Shadow) {

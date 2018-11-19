@@ -723,7 +723,7 @@ message RouteAction {
   // time gaps between gRPC request and response in gRPC streaming mode.
   google.protobuf.Duration max_grpc_timeout = 23 [(gogoproto.stdduration) = true];
 
-  // [#not-implemented-hide:]
+  // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
   enum InternalRedirectAction {
     REJECT = 0;
     PASS_THROUGH = 1;

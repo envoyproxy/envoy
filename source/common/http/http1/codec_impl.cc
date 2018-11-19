@@ -499,8 +499,7 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   Utility::Url absolute_url;
   if (!absolute_url.initialize(active_request_->request_url_.getStringView())) {
     sendProtocolError();
-    throw CodecProtocolException(
-        "http/1.1 protocol error: invalid url in request line");
+    throw CodecProtocolException("http/1.1 protocol error: invalid url in request line");
   }
   // RFC7230#5.7
   // When a proxy receives a request with an absolute-form of

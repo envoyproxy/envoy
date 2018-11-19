@@ -111,6 +111,51 @@ previously attempted priorities.
 
 Envoy can be extended with custom retry plugins similar to how custom filters can be added.
 
+.. _arch_overview_internal_redirects:
+
+Internal redirects
+--------------------------
+
+Envoy supports "internal redirects", that is capturing 302-redirect responses internally,
+synthesizing a new request, sending it to the upstream specified by the new route match, and
+returning the redirected response as the response of the original request.
+
+Internal redirects are configured via the :ref:`internal redirect action
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.internal_redirect_action>`
+in the HTTP Connection Manager Config.
+
+Redirect handling is triggered by an upstream server sending a 302 response with an
+x-envoy-internal-redirect header containing the fully qualified URL (http://host/path) to redirect
+to. If the Envoy receiving this response is not configured for internal redirects, or is
+explicitly configured to REJECT, the 302 will be converted into a 500 and the
+x-envoy-internal-redirect will be removed, to prevent leaking potentially private URLs to untrusted
+clients. If the Envoy receiving the response is configured to PASS_THROUGH it will ignore the
+header and pass the response through, so that users with multi-level Envoy deployments can configure
+which layers of Envoy capture and handle the internal redirect. If the Envoy is configured to
+HANDLE, it will validate the redirect and modify the request headers as described below, and send
+the modified request through a new filter chain to a new upstream as selected by the route
+associated with the new URL.
+
+For a redirect to be successful it must pass the following checks
+1. Be a 302 response
+1. Have an x-envoy-internal-redirect with a valid, fully qualified URL matching the scheme of the original request.
+1. The request must have been fully processed by Envoy.
+1. The request must not have a body
+1. The request must have not been previously redirected, as determined by the presence of an x-envoy-original-url header
+Any failure will result in a 500 being sent downstream.
+
+Once the redirect has passed these checks, the request headers which were shipped to the original
+upstream will be modified by
+1. Putting the fully qualified original request URL in the x-envoy-original-url header
+2. Replacing the Authority/Host, Scheme, and Path headers with the values from x-envoy-internal-redirect header
+
+The altered request headers will then have a new route selected, be sent through a new filter chain,
+and then shipped upstream with all of the normal Envoy request sanitization taking place. Note that
+HTTP connection manager sanitization such as clearing untrusted headers will only be applied once,
+per-route header modifications will be applied on both the original route and the second route, even
+if they are the same, so be mindful configuring header modification rules to avoid duplicating
+undesired header values.
+
 Timeouts
 --------
 
