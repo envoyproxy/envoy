@@ -23,7 +23,7 @@ std::string Globals::describeActiveSingletonsHelper() {
   return ret;
 }
 
-Globals::Singleton& Globals::get(const std::string& type_name, MakeObjectFn make_object) {
+Globals::Singleton& Globals::get(const std::string& type_name, const MakeObjectFn& make_object) {
   Thread::ReleasableLockGuard map_lock(map_mutex_);
   std::unique_ptr<Singleton>& singleton = singleton_map_[type_name];
 
@@ -49,7 +49,7 @@ Globals::Singleton& Globals::get(const std::string& type_name, MakeObjectFn make
   return *singleton;
 }
 
-void Globals::Singleton::releaseHelper(DeleteObjectFn delete_object) {
+void Globals::Singleton::releaseHelper(const DeleteObjectFn& delete_object) {
   void* obj_to_delete = nullptr;
   {
     Thread::LockGuard singleton_lock(mutex_);

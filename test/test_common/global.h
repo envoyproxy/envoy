@@ -45,7 +45,7 @@ public:
     template <class Type> void release() {
       releaseHelper([](void* p) { delete static_cast<Type*>(p); });
     }
-    void releaseHelper(DeleteObjectFn delete_object);
+    void releaseHelper(const DeleteObjectFn& delete_object);
 
     Thread::BasicLockable& mutex_;
     uint64_t ref_count_; // Effectively guarded by mutex_, but not analyzable due to aliasing.
@@ -65,9 +65,10 @@ public:
     return instance().get(typeid(Type).name(), make_object);
   }
 
+  ~Globals() = delete; // GlobalHeler is constructed once and never destroyed.
+
 private:
-  Globals() {}         // Construct via Globals::helper().
-  ~Globals() = delete; // GlobalHeler is constructed once and never destryed.
+  Globals() = default; // Construct via Globals::helper().
 
   /**
    * @return Globals& a singleton for Globals.
@@ -76,7 +77,7 @@ private:
 
   std::string describeActiveSingletonsHelper();
 
-  Singleton& get(const std::string& type_name, MakeObjectFn make_object);
+  Singleton& get(const std::string& type_name, const MakeObjectFn& make_object);
 
   Thread::MutexBasicLockable map_mutex_;
   absl::flat_hash_map<std::string, std::unique_ptr<Singleton>>
