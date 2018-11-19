@@ -159,7 +159,6 @@ int main_common(OptionsImpl& options) {
   } catch (EnvoyException& e) {
     return EXIT_FAILURE;
   }
-  return EXIT_SUCCESS;
 }
 
 } // namespace Envoy
