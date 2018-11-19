@@ -76,6 +76,7 @@ envoy_cc_library(
         "//source/common/filesystem:filesystem_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/http:async_client_lib",
+        "//source/common/http:connection_mapper_factory_lib",
         "//source/common/http:wrapped_connection_pool_lib",
         "//source/common/http/http1:conn_pool_lib",
         "//source/common/http/http2:conn_pool_lib",

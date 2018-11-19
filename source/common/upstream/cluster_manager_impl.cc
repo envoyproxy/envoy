@@ -22,8 +22,10 @@
 #include "common/filesystem/filesystem_impl.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/async_client_impl.h"
+#include "common/http/connection_mapper_factory.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
+#include "common/http/wrapped_connection_pool.h"
 #include "common/json/config_schemas.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
@@ -36,7 +38,6 @@
 #include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
-#include "common/http/wrapped_connection_pool.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -1130,8 +1131,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
       container.pools_[hash_key] = parent_.parent_.factory_.allocateTransparentConnPool(
           parent_.thread_local_dispatcher_, host, priority, protocol,
           have_options ? context->downstreamConnection()->socketOptions() : nullptr);
-    }
-    else {
+    } else {
       container.pools_[hash_key] = parent_.parent_.factory_.allocateConnPool(
           parent_.thread_local_dispatcher_, host, priority, protocol,
           have_options ? context->downstreamConnection()->socketOptions() : nullptr);
@@ -1211,18 +1211,15 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTransparentConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options) {
-      auto builder = [&]() {
-        if (protocol == Http::Protocol::Http2 &&
-            runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
-          return Http::ConnectionPool::InstancePtr{
-              new Http::Http2::ProdConnPoolImpl(dispatcher, host, priority, options)};
-        } else {
-          return Http::ConnectionPool::InstancePtr{
-              new Http::Http1::ConnPoolImplProd(dispatcher, host, priority, options)};
-        }
-      };
+  auto builder = [this, &dispatcher, &host, &priority, &protocol,
+                  &options]() -> Http::ConnectionPool::InstancePtr {
+    return this->allocateConnPool(dispatcher, host, priority, protocol, options);
+  };
 
-      return Http::ConnectionPool::InstancePtr{ new Http::WrappedConnectionPool(builder) };
+  auto& factory = Http::ConnectionMapperFactorySingleton::get();
+  auto mapper = factory.createSrcTransparentMapper(builder);
+  return Http::ConnectionPool::InstancePtr{
+      new Http::WrappedConnectionPool{std::move(mapper), protocol}};
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(

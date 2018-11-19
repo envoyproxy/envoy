@@ -8,6 +8,9 @@
 #include "common/api/api_impl.h"
 #include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
+#include "common/http/connection_mapper.h"
+#include "common/http/connection_mapper_factory.h"
+#include "common/http/wrapped_connection_pool.h"
 #include "common/network/socket_option_impl.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
@@ -17,12 +20,15 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -2300,7 +2306,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
 // Tests that httpConnPoolForCluster with the transparency options sets tells the factory to build a
 // transparent cluster.
 TEST_F(ClusterManagerImplTest, TransparentCluster) {
-  //createWithLocalClusterUpdate();
+  // createWithLocalClusterUpdate();
   const std::string json = R"EOF(
   {
     "clusters": []
@@ -2313,8 +2319,7 @@ TEST_F(ClusterManagerImplTest, TransparentCluster) {
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
   cluster1->info_->name_ = "cluster_1";
   cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
-    makeTestHost(cluster1->info_, "tcp://127.0.0.1:11001")
-  };
+      makeTestHost(cluster1->info_, "tcp://127.0.0.1:11001")};
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
 
@@ -2328,8 +2333,7 @@ TEST_F(ClusterManagerImplTest, TransparentCluster) {
   EXPECT_CALL(factory_, allocateTransparentConnPool_(_)).WillOnce(Return(mock_pool));
 
   // Not being called. Steppy Steppy!
-  auto new_pool = cluster_manager_->httpConnPoolForCluster("cluster_1",
-                                                           ResourcePriority::Default,
+  auto new_pool = cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
                                                            Http::Protocol::Http11, nullptr);
   EXPECT_EQ(new_pool, mock_pool);
   cluster_manager_.reset();
@@ -2868,6 +2872,106 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
   )EOF";
   initialize(yaml);
   expectSetsockoptSoKeepalive(7, 4, 1);
+}
+
+class FakeConnectionMapper : public Http::ConnectionMapper {
+public:
+  Http::ConnectionMapperFactory::ConnPoolBuilder builder_ = [] {
+    return Http::ConnectionPool::InstancePtr();
+  };
+
+  MOCK_METHOD1(assignPool,
+               Http::ConnectionPool::Instance*(const Upstream::LoadBalancerContext& context));
+  MOCK_METHOD1(poolIdle, void(const Http::ConnectionPool::Instance& idlePool));
+};
+
+class MockConnectionMapperFactory : public Http::ConnectionMapperFactory {
+public:
+  Http::ConnectionMapperPtr createSrcTransparentMapper(const ConnPoolBuilder& builder) override {
+    std::unique_ptr<FakeConnectionMapper> mapper{createSrcTransparentMapper_()};
+    mapper->builder_ = builder;
+    return mapper;
+  }
+
+  MOCK_METHOD0(createSrcTransparentMapper_, FakeConnectionMapper*());
+};
+
+class ProdClusterManagerFactoryTest : public testing::Test {
+public:
+  ProdClusterManagerFactoryTest() : mapper_factory_{&mapper_factory_mock_} {
+
+    auto info = std::make_shared<MockClusterInfo>();
+    info->name_ = "test_cluster";
+    host_ = makeTestHost(info, "tcp://10.0.0.1:80");
+  }
+
+  std::unique_ptr<ProdClusterManagerFactory> makeFactory() {
+    mock_dns_resolver_.reset(new NiceMock<Network::MockDnsResolver>());
+
+    return absl::make_unique<ProdClusterManagerFactory>(
+        mock_loader_, mock_stats_store_, mock_tls_, mock_random_generator_, mock_dns_resolver_,
+        mock_context_manager_, mock_dispatcher_, mock_local_info_, mock_secret_manager_, mock_api_);
+  }
+
+  MockConnectionMapperFactory mapper_factory_mock_;
+  TestThreadsafeSingletonInjector<Envoy::Http::ConnectionMapperFactory> mapper_factory_;
+  HostSharedPtr host_;
+
+  NiceMock<Runtime::MockLoader> mock_loader_;
+  NiceMock<Stats::MockStore> mock_stats_store_;
+  NiceMock<ThreadLocal::MockInstance> mock_tls_;
+  NiceMock<Runtime::MockRandomGenerator> mock_random_generator_;
+  std::shared_ptr<NiceMock<Network::MockDnsResolver>> mock_dns_resolver_;
+  NiceMock<Ssl::MockContextManager> mock_context_manager_;
+  NiceMock<Event::MockDispatcher> mock_dispatcher_;
+  NiceMock<LocalInfo::MockLocalInfo> mock_local_info_;
+  NiceMock<Secret::MockSecretManager> mock_secret_manager_;
+  NiceMock<Api::MockApi> mock_api_;
+};
+
+// a simple test to show that we create wrapped connection pools.
+TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentBuildsConnPool) {
+  auto factory = makeFactory();
+
+  FakeConnectionMapper* mapper_fake = new FakeConnectionMapper();
+  EXPECT_CALL(mapper_factory_mock_, createSrcTransparentMapper_).WillOnce(Return(mapper_fake));
+
+  auto conn_pool = factory->allocateTransparentConnPool(
+      mock_dispatcher_, host_, ResourcePriority::Default, Http::Protocol::Http2,
+      Network::ConnectionSocket::OptionsSharedPtr());
+  EXPECT_NE(nullptr, dynamic_cast<Http::WrappedConnectionPool*>(conn_pool.get()));
+  EXPECT_NE(nullptr, mapper_fake->builder_);
+}
+
+// Shows that the builder created for the wrapper allocates the proper http2 connection pools.
+TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentHttp2) {
+  auto factory = makeFactory();
+
+  FakeConnectionMapper* mapper_fake = new FakeConnectionMapper();
+  EXPECT_CALL(mapper_factory_mock_, createSrcTransparentMapper_).WillOnce(Return(mapper_fake));
+
+  EXPECT_CALL(mock_loader_.snapshot_, featureEnabled("upstream.use_http2", 100))
+      .WillOnce(Return(true));
+
+  auto conn_pool = factory->allocateTransparentConnPool(
+      mock_dispatcher_, host_, ResourcePriority::Default, Http::Protocol::Http2,
+      Network::ConnectionSocket::OptionsSharedPtr());
+  auto sub_pool = mapper_fake->builder_();
+  EXPECT_EQ(sub_pool->protocol(), Http::Protocol::Http2);
+}
+
+// Shows that the builder created for the wrapper allocates the proper non-http2 connection pools.
+TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentHtt) {
+  auto factory = makeFactory();
+
+  FakeConnectionMapper* mapper_fake = new FakeConnectionMapper();
+  EXPECT_CALL(mapper_factory_mock_, createSrcTransparentMapper_).WillOnce(Return(mapper_fake));
+
+  auto conn_pool = factory->allocateTransparentConnPool(
+      mock_dispatcher_, host_, ResourcePriority::Default, Http::Protocol::Http11,
+      Network::ConnectionSocket::OptionsSharedPtr());
+  auto sub_pool = mapper_fake->builder_();
+  EXPECT_EQ(sub_pool->protocol(), Http::Protocol::Http11);
 }
 
 } // namespace
