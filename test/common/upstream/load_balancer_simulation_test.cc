@@ -53,8 +53,9 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   }
   HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
   HostsPerLocalitySharedPtr updated_locality_hosts{new HostsPerLocalityImpl(hosts)};
-  host_set.updateHosts(updated_hosts, updated_hosts, std::make_shared<const HostVector>(), updated_locality_hosts, updated_locality_hosts,updated_locality_hosts,
-                       {}, hosts, {}, absl::nullopt);
+  host_set.updateHosts(updated_hosts, updated_hosts, std::make_shared<const HostVector>(),
+                       updated_locality_hosts, updated_locality_hosts, updated_locality_hosts, {},
+                       hosts, {}, absl::nullopt);
 
   Stats::IsolatedStoreImpl stats_store;
   ClusterStats stats{ClusterInfoImpl::generateStats(stats_store)};
@@ -156,8 +157,9 @@ public:
       }
       auto per_zone_local_shared = makeHostsPerLocality(std::move(per_zone_local));
       local_priority_set_->getOrCreateHostSet(0).updateHosts(
-          originating_hosts, originating_hosts, std::make_shared<const HostVector>(), per_zone_local_shared, per_zone_local_shared, per_zone_local_shared, {},
-          empty_vector_, empty_vector_, absl::nullopt);
+          originating_hosts, originating_hosts, std::make_shared<const HostVector>(),
+          per_zone_local_shared, per_zone_local_shared, per_zone_local_shared, {}, empty_vector_,
+          empty_vector_, absl::nullopt);
 
       HostConstSharedPtr selected = lb.chooseHost(nullptr);
       hits[selected->address()->asString()]++;

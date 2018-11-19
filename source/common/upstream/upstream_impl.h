@@ -251,11 +251,9 @@ public:
   HostSetImpl(uint32_t priority, absl::optional<uint32_t> overprovisioning_factor)
       : priority_(priority), overprovisioning_factor_(overprovisioning_factor.has_value()
                                                           ? overprovisioning_factor.value()
-                                                          : kDefaultOverProvisioningFactor)
-  {}
-  void updateHosts(HostVectorConstSharedPtr hosts, 
-      HostVectorConstSharedPtr healthy_hosts,
-      HostVectorConstSharedPtr degraded_hosts,
+                                                          : kDefaultOverProvisioningFactor) {}
+  void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
+                   HostVectorConstSharedPtr degraded_hosts,
                    HostsPerLocalityConstSharedPtr hosts_per_locality,
                    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
@@ -279,7 +277,9 @@ public:
   const HostVector& hosts() const override { return *all_hosts_.hosts_; }
   const HostVector& healthyHosts() const override { return *healthy_hosts_.hosts_; }
   const HostVector& degradedHosts() const override { return *degraded_hosts_.hosts_; }
-  const HostsPerLocality& hostsPerLocality() const override { return *healthy_hosts_.hosts_per_locality_; }
+  const HostsPerLocality& hostsPerLocality() const override {
+    return *healthy_hosts_.hosts_per_locality_;
+  }
   const HostsPerLocality& healthyHostsPerLocality() const override {
     return *healthy_hosts_.hosts_per_locality_;
   }

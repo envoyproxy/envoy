@@ -58,14 +58,14 @@ public:
   MOCK_METHOD0(chooseLocality, absl::optional<uint32_t>());
   MOCK_METHOD0(chooseLocalityDegraded, absl::optional<uint32_t>());
   MOCK_METHOD10(updateHosts, void(std::shared_ptr<const HostVector> hosts,
-                                 std::shared_ptr<const HostVector> healthy_hosts,
-                                 std::shared_ptr<const HostVector> degraded_hosts,
-                                 HostsPerLocalityConstSharedPtr hosts_per_locality,
-                                 HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
-                                 HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
-                                 LocalityWeightsConstSharedPtr locality_weights,
-                                 const HostVector& hosts_added, const HostVector& hosts_removed,
-                                 absl::optional<uint32_t> overprovisioning_factor));
+                                  std::shared_ptr<const HostVector> healthy_hosts,
+                                  std::shared_ptr<const HostVector> degraded_hosts,
+                                  HostsPerLocalityConstSharedPtr hosts_per_locality,
+                                  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                                  HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
+                                  LocalityWeightsConstSharedPtr locality_weights,
+                                  const HostVector& hosts_added, const HostVector& hosts_removed,
+                                  absl::optional<uint32_t> overprovisioning_factor));
   MOCK_CONST_METHOD0(priority, uint32_t());
   uint32_t overprovisioning_factor() const override { return overprovisioning_factor_; }
   void set_overprovisioning_factor(const uint32_t overprovisioning_factor) {

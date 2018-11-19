@@ -289,7 +289,7 @@ public:
    * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
    */
   virtual void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
-      HostVectorConstSharedPtr degraded_hosts,
+                           HostVectorConstSharedPtr degraded_hosts,
                            HostsPerLocalityConstSharedPtr hosts_per_locality,
                            HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                            HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,

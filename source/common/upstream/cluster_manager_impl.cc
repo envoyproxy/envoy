@@ -694,16 +694,16 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
   HostsPerLocalityConstSharedPtr degraded_hosts_per_locality_copy =
       host_set->degradedHostsPerLocality().clone();
 
-  tls_->runOnAllThreads(
-      [this, name = cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,
-      degraded_hosts_copy,
-       hosts_per_locality_copy, healthy_hosts_per_locality_copy,
-       degraded_hosts_per_locality_copy,
-       locality_weights = host_set->localityWeights(), hosts_added, hosts_removed]() {
-        ThreadLocalClusterManagerImpl::updateClusterMembership(
-            name, priority, hosts_copy, healthy_hosts_copy, degraded_hosts_copy, hosts_per_locality_copy,
-            healthy_hosts_per_locality_copy, degraded_hosts_per_locality_copy, locality_weights, hosts_added, hosts_removed, *tls_);
-      });
+  tls_->runOnAllThreads([this, name = cluster.info()->name(), priority, hosts_copy,
+                         healthy_hosts_copy, degraded_hosts_copy, hosts_per_locality_copy,
+                         healthy_hosts_per_locality_copy, degraded_hosts_per_locality_copy,
+                         locality_weights = host_set->localityWeights(), hosts_added,
+                         hosts_removed]() {
+    ThreadLocalClusterManagerImpl::updateClusterMembership(
+        name, priority, hosts_copy, healthy_hosts_copy, degraded_hosts_copy,
+        hosts_per_locality_copy, healthy_hosts_per_locality_copy, degraded_hosts_per_locality_copy,
+        locality_weights, hosts_added, hosts_removed, *tls_);
+  });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
@@ -945,7 +945,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeTcpConn(
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority, HostVectorConstSharedPtr hosts,
-    HostVectorConstSharedPtr healthy_hosts, HostVectorConstSharedPtr degraded_hosts, HostsPerLocalityConstSharedPtr hosts_per_locality,
+    HostVectorConstSharedPtr healthy_hosts, HostVectorConstSharedPtr degraded_hosts,
+    HostsPerLocalityConstSharedPtr hosts_per_locality,
     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
@@ -957,10 +958,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
   const auto& cluster_entry = config.thread_local_clusters_[name];
   ENVOY_LOG(debug, "membership update for TLS cluster {}", name);
   cluster_entry->priority_set_.getOrCreateHostSet(priority).updateHosts(
-      std::move(hosts), std::move(healthy_hosts), std::move(degraded_hosts), 
+      std::move(hosts), std::move(healthy_hosts), std::move(degraded_hosts),
       std::move(hosts_per_locality), std::move(healthy_hosts_per_locality),
-      std::move(degraded_hosts_per_locality),
-      std::move(locality_weights), hosts_added,
+      std::move(degraded_hosts_per_locality), std::move(locality_weights), hosts_added,
       hosts_removed, absl::nullopt);
 
   // If an LB is thread aware, create a new worker local LB on membership changes.

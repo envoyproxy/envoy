@@ -221,7 +221,7 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
   healthy_hosts_ = {std::move(healthy_hosts), std::move(healthy_hosts_per_locality)};
   degraded_hosts_ = {std::move(degraded_hosts), std::move(degraded_hosts_per_locality)};
   locality_weights_ = std::move(locality_weights);
-  
+
   // Rebuild the locality scheduler by computing the effective weight of each
   // locality in this priority. The scheduler is reset by default, and is rebuilt only if we have
   // locality weights (i.e. using EDS) and there is at least one healthy host in this priority.
@@ -248,18 +248,19 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
     for (uint32_t i = 0; i < all_hosts_.hosts_per_locality_->get().size(); ++i) {
       // First populate the scheduler entries for the healthy hosts.
       {
-      const double effective_weight = effectiveLocalityWeight(i, healthy_hosts_);
-      if (effective_weight > 0) {
-        locality_entries_.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
-        locality_scheduler_->add(effective_weight, locality_entries_.back());
-      }
+        const double effective_weight = effectiveLocalityWeight(i, healthy_hosts_);
+        if (effective_weight > 0) {
+          locality_entries_.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
+          locality_scheduler_->add(effective_weight, locality_entries_.back());
+        }
       }
 
       // Then populate the scheduler entires for the degraded hosts.
       // TOOD(snowp): extract function
       const double effective_weight = effectiveLocalityWeight(i, degraded_hosts_);
       if (effective_weight > 0) {
-        degraded_locality_entries_.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
+        degraded_locality_entries_.emplace_back(
+            std::make_shared<LocalityEntry>(i, effective_weight));
         degraded_locality_scheduler_->add(effective_weight, degraded_locality_entries_.back());
       }
     }
@@ -267,7 +268,7 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
     if (locality_scheduler_->empty()) {
       locality_scheduler_ = nullptr;
     }
-    
+
     // If all effective weights were zero, reset the scheduler.
     if (degraded_locality_scheduler_->empty()) {
       degraded_locality_scheduler_ = nullptr;
@@ -303,7 +304,8 @@ absl::optional<uint32_t> HostSetImpl::chooseLocalityDegraded() {
   return locality->index_;
 }
 
-double HostSetImpl::effectiveLocalityWeight(uint32_t index, const Subset& eligibile_hosts_subset) const {
+double HostSetImpl::effectiveLocalityWeight(uint32_t index,
+                                            const Subset& eligibile_hosts_subset) const {
   ASSERT(locality_weights_ != nullptr);
   ASSERT(all_hosts_.hosts_per_locality_ != nullptr);
   const auto& locality_hosts = all_hosts_.hosts_per_locality_->get()[index];
@@ -311,7 +313,8 @@ double HostSetImpl::effectiveLocalityWeight(uint32_t index, const Subset& eligib
   if (locality_hosts.empty()) {
     return 0.0;
   }
-  const double locality_eligibility_ratio = 1.0 * locality_eligibile_hosts.size() / locality_hosts.size();
+  const double locality_eligibility_ratio =
+      1.0 * locality_eligibile_hosts.size() / locality_hosts.size();
   const uint32_t weight = (*locality_weights_)[index];
   // Weight ranges from 0-1.0, and is the ratio of eligible hosts to total hosts, modified by the
   // overprovisioning factor.
@@ -712,8 +715,7 @@ void ClusterImplBase::reloadHealthyHosts() {
     HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
     host_set->updateHosts(hosts_copy, createHealthyHostList(host_set->hosts()),
-        createDegradedHostList(host_set->hosts()),
-                          hosts_per_locality_copy,
+                          createDegradedHostList(host_set->hosts()), hosts_per_locality_copy,
                           createHealthyHostLists(host_set->hostsPerLocality()),
                           createDegradedHostLists(host_set->hostsPerLocality()),
                           host_set->localityWeights(), {}, {}, absl::nullopt);
@@ -911,7 +913,8 @@ void PriorityStateManager::updateClusterPrioritySet(
 
   auto& host_set = static_cast<PrioritySetImpl&>(parent_.prioritySet())
                        .getOrCreateHostSet(priority, overprovisioning_factor);
-  host_set.updateHosts(hosts, ClusterImplBase::createHealthyHostList(*hosts), ClusterImplBase::createDegradedHostList(*hosts), per_locality_shared,
+  host_set.updateHosts(hosts, ClusterImplBase::createHealthyHostList(*hosts),
+                       ClusterImplBase::createDegradedHostList(*hosts), per_locality_shared,
                        ClusterImplBase::createHealthyHostLists(*per_locality_shared),
                        ClusterImplBase::createDegradedHostLists(*per_locality_shared),
                        std::move(locality_weights), hosts_added.value_or(*hosts),

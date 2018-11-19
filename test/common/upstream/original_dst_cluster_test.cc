@@ -446,19 +446,19 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   setupFromJson(json);
 
   PrioritySetImpl second;
-  cluster_->prioritySet().addMemberUpdateCb(
-      [&](uint32_t, const HostVector& added, const HostVector& removed) -> void {
-        // Update second hostset accordingly;
-        HostVectorSharedPtr new_hosts(
-            new HostVector(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
-        HostVectorSharedPtr healthy_hosts(
-            new HostVector(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
-        const HostsPerLocalityConstSharedPtr empty_hosts_per_locality{new HostsPerLocalityImpl()};
+  cluster_->prioritySet().addMemberUpdateCb([&](uint32_t, const HostVector& added,
+                                                const HostVector& removed) -> void {
+    // Update second hostset accordingly;
+    HostVectorSharedPtr new_hosts(
+        new HostVector(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
+    HostVectorSharedPtr healthy_hosts(
+        new HostVector(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
+    const HostsPerLocalityConstSharedPtr empty_hosts_per_locality{new HostsPerLocalityImpl()};
 
-        second.getOrCreateHostSet(0).updateHosts(new_hosts, healthy_hosts, std::make_shared<const HostVector>(), empty_hosts_per_locality,
-                                                 empty_hosts_per_locality, empty_hosts_per_locality, {}, added, removed,
-                                                 absl::nullopt);
-      });
+    second.getOrCreateHostSet(0).updateHosts(
+        new_hosts, healthy_hosts, std::make_shared<const HostVector>(), empty_hosts_per_locality,
+        empty_hosts_per_locality, empty_hosts_per_locality, {}, added, removed, absl::nullopt);
+  });
 
   EXPECT_CALL(membership_updated_, ready());
 
