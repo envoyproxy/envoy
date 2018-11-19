@@ -110,6 +110,11 @@ public:
   virtual bool healthy() const PURE;
 
   /**
+   * @return whether in aggregate a host is degraded and should be deprioritized during routing.
+   */
+  virtual bool degraded() const PURE;
+
+  /**
    * Returns the host's ActiveHealthFailureType. Types are specified in ActiveHealthFailureType.
    */
   virtual ActiveHealthFailureType getActiveHealthFailureType() const PURE;
@@ -235,6 +240,12 @@ public:
   virtual const HostVector& healthyHosts() const PURE;
 
   /**
+   * @return all degraded hosts contained in the set at the current time. NOTE: This set is
+   *         eventually consistent and has the same guarantees as healthyHosts().
+   */
+  virtual const HostVector& degradedHosts() const PURE;
+
+  /**
    * @return hosts per locality.
    */
   virtual const HostsPerLocality& hostsPerLocality() const PURE;
@@ -245,6 +256,11 @@ public:
   virtual const HostsPerLocality& healthyHostsPerLocality() const PURE;
 
   /**
+   * @return same as hostsPerLocality but only contains healthy hosts.
+   */
+  virtual const HostsPerLocality& degradedHostsPerLocality() const PURE;
+
+  /**
    * @return weights for each locality in the host set.
    */
   virtual LocalityWeightsConstSharedPtr localityWeights() const PURE;
@@ -253,6 +269,12 @@ public:
    * @return next locality index to route to if performing locality weighted balancing.
    */
   virtual absl::optional<uint32_t> chooseLocality() PURE;
+
+  /**
+   * @return next locality index to route to if performing locality weighted balancing
+   * to degraded hosts.
+   */
+  virtual absl::optional<uint32_t> chooseLocalityDegraded() PURE;
 
   /**
    * Updates the hosts in a given host set.
@@ -267,8 +289,10 @@ public:
    * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
    */
   virtual void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
+      HostVectorConstSharedPtr degraded_hosts,
                            HostsPerLocalityConstSharedPtr hosts_per_locality,
                            HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                           HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
                            absl::optional<uint32_t> overprovisioning_factor) PURE;

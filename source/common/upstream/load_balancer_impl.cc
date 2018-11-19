@@ -21,8 +21,9 @@ static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_clus
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
 } // namespace
 
-uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
-                                          const std::vector<uint32_t>& per_priority_load) {
+std::pair<uint32_t, EdfLoadBalancerBase::PriorityType> LoadBalancerBase::choosePriority(uint64_t hash,
+                                          const PriorityLoad& per_priority_load,
+                                          const PriorityLoad& degraded_per_priority_load) {
   hash = hash % 100 + 1; // 1-100
   uint32_t aggregate_percentage_load = 0;
   // As with tryChooseLocalLocalityHosts, this can be refactored for efficiency
@@ -31,7 +32,13 @@ uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
   for (size_t priority = 0; priority < per_priority_load.size(); ++priority) {
     aggregate_percentage_load += per_priority_load[priority];
     if (hash <= aggregate_percentage_load) {
-      return priority;
+      return {priority, EdfLoadBalancerBase::PriorityType::HEALTHY};
+    }
+  }
+  for (size_t priority = 0; priority < degraded_per_priority_load.size(); ++priority) {
+    aggregate_percentage_load += degraded_per_priority_load[priority];
+    if (hash <= aggregate_percentage_load) {
+      return {priority, EdfLoadBalancerBase::PriorityType::DEGRADED};
     }
   }
   // The percentages should always add up to 100 but we have to have a return for the compiler.
@@ -47,14 +54,15 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
       priority_set_(priority_set) {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     recalculatePerPriorityState(host_set->priority(), priority_set_, per_priority_load_,
-                                per_priority_health_);
+                                per_priority_health_, degraded_per_priority_load_, per_priority_degraded_);
   }
   // Reclaculate panic mode for all levels.
   recalculatePerPriorityPanic();
 
   priority_set_.addMemberUpdateCb([this](uint32_t priority, const HostVector&,
                                          const HostVector&) -> void {
-    recalculatePerPriorityState(priority, priority_set_, per_priority_load_, per_priority_health_);
+    recalculatePerPriorityState(priority, priority_set_, per_priority_load_,
+                                per_priority_health_, degraded_per_priority_load_, per_priority_degraded_);
   });
   priority_set_.addMemberUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
@@ -74,28 +82,37 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
 //   if # of healthy hosts in priority set is low.
 // - normalized total health is 0%. All hosts are down. Redirect 100% of traffic to P=0 and enable
 // panic mode.
-
 void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    const PrioritySet& priority_set,
                                                    PriorityLoad& per_priority_load,
-                                                   std::vector<uint32_t>& per_priority_health) {
+                                                   std::vector<uint32_t>& per_priority_health,
+                                                   PriorityLoad& degraded_per_priority_load,
+                                                   std::vector<uint32_t>& per_priority_degraded) {
   per_priority_load.resize(priority_set.hostSetsPerPriority().size());
   per_priority_health.resize(priority_set.hostSetsPerPriority().size());
+  degraded_per_priority_load.resize(priority_set.hostSetsPerPriority().size());
+  per_priority_degraded.resize(priority_set.hostSetsPerPriority().size());
 
   // Determine the health of the newly modified priority level.
   // Health ranges from 0-100, and is the ratio of healthy hosts to total hosts, modified by the
   // overprovisioning factor.
   HostSet& host_set = *priority_set.hostSetsPerPriority()[priority];
   per_priority_health[priority] = 0;
+  per_priority_degraded[priority] = 0;
   if (host_set.hosts().size() > 0) {
-    // Each priority level's health is ratio of healthy hosts to total number of hosts in a priority
+    // Each priority level's health is ratio of healthy and not degraded hosts to total number of hosts in a priority
     // multiplied by overprovisioning factor of 1.4 and capped at 100%. It means that if all
     // hosts are healthy that priority's health is 100%*1.4=140% and is capped at 100% which results
     // in 100%. If 80% of hosts are healty, that priority's health is still 100% (80%*1.4=112% and
     // capped at 100%).
     per_priority_health[priority] =
         std::min<uint32_t>(100, (host_set.overprovisioning_factor() *
-                                 host_set.healthyHosts().size() / host_set.hosts().size()));
+                                 (host_set.healthyHosts().size() - host_set.degradedHosts().size()) / host_set.hosts().size()));
+
+    // Priority degraded is computed similarily but only looks at degraded hosts.
+    per_priority_degraded[priority] =
+        std::min<uint32_t>(100, (host_set.overprovisioning_factor() *
+                                 host_set.degradedHosts().size() / host_set.hosts().size()));
   }
 
   // Now that we've updated health for the changed priority level, we need to calculate percentage
@@ -107,11 +124,11 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   // adds up to 100.
   // Sum of priority levels' health values may exceed 100, so it is capped at 100 and referred as
   // normalized total health.
-  const uint32_t normalized_total_health = calcNormalizedTotalHealth(per_priority_health);
+  const uint32_t normalized_total_health = calcNormalizedTotalHealth(per_priority_health, per_priority_degraded);
   if (normalized_total_health == 0) {
     // Everything is terrible. Send all load to P=0.
     // In this one case sumEntries(per_priority_load) != 100 since we sinkhole all traffic in P=0.
-    per_priority_load[0] = 100;
+     per_priority_load[0] = 100;
     return;
   }
 
@@ -128,11 +145,28 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
     total_load -= per_priority_load[i];
   }
 
+  int32_t first_degraded_priority = -1;
+  for (size_t i = 0; i < per_priority_degraded.size(); ++i) {
+    if (first_degraded_priority < 0 && per_priority_degraded[i] > 0) {
+      first_degraded_priority = i;
+    }
+    // Now assign as much load as possible to the high priority levels and cease assigning load
+    // when total_load runs out.
+    degraded_per_priority_load[i] =
+        std::min<uint32_t>(total_load, per_priority_degraded[i] * 100 / normalized_total_health);
+    total_load -= degraded_per_priority_load[i];
+  }
+
   if (total_load != 0) {
-    ASSERT(first_healthy_priority != -1);
+    ASSERT(first_healthy_priority != -1 || first_degraded_priority != -1);
     // Account for rounding errors by assigning it to the first healthy priority.
     ASSERT(total_load < per_priority_load.size());
-    per_priority_load[first_healthy_priority] += total_load;
+
+    if (first_healthy_priority != -1) {
+      per_priority_load[first_healthy_priority] += total_load;
+    } else {
+      degraded_per_priority_load[first_degraded_priority] += total_load;
+    }
   }
 }
 
@@ -140,7 +174,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
 void LoadBalancerBase::recalculatePerPriorityPanic() {
   per_priority_panic_.resize(priority_set_.hostSetsPerPriority().size());
 
-  const uint32_t normalized_total_health = calcNormalizedTotalHealth(per_priority_health_);
+  const uint32_t normalized_total_health = calcNormalizedTotalHealth(per_priority_health_, per_priority_degraded_);
 
   if (normalized_total_health == 0) {
     // Everything is terrible. All load should be to P=0. Turn on panic mode.
@@ -159,17 +193,18 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
   }
 }
 
-HostSet& LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
+std::pair<HostSet&, EdfLoadBalancerBase::PriorityType> LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
   if (context) {
     const auto& per_priority_load =
         context->determinePriorityLoad(priority_set_, per_priority_load_);
 
-    const uint32_t priority = choosePriority(random_.random(), per_priority_load);
-    return *priority_set_.hostSetsPerPriority()[priority];
+    // TODO(snowp): pass the degraded load to plugin.
+    const auto typeAndPriority = choosePriority(random_.random(), per_priority_load, degraded_per_priority_load_);
+    return {*priority_set_.hostSetsPerPriority()[typeAndPriority.first], typeAndPriority.second};
   }
 
-  const uint32_t priority = choosePriority(random_.random(), per_priority_load_);
-  return *priority_set_.hostSetsPerPriority()[priority];
+  const auto typeAndPriority = choosePriority(random_.random(), per_priority_load_, degraded_per_priority_load_);
+  return {*priority_set_.hostSetsPerPriority()[typeAndPriority.first], typeAndPriority.second};
 }
 
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
@@ -436,9 +471,17 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
 
 ZoneAwareLoadBalancerBase::HostsSource
 ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
-  HostSet& host_set = chooseHostSet(context);
+  auto host_set_and_type = chooseHostSet(context);
+  auto& host_set = host_set_and_type.first;
   HostsSource hosts_source;
-  hosts_source.priority_ = host_set.priority();
+  hosts_source.priority_ = host_set_and_type.first.priority();
+
+  HostsSource::SourceType locality_source_type{HostsSource::SourceType::LocalityHealthyHosts};
+  HostsSource::SourceType hosts_source_type{HostsSource::SourceType::HealthyHosts};
+  if (host_set_and_type.second == EdfLoadBalancerBase::PriorityType::DEGRADED) {
+  locality_source_type = HostsSource::SourceType::LocalityDegradedHosts;
+  hosts_source_type = HostsSource::SourceType::DegradedHosts;
+  }
 
   // If the selected host set has insufficient healthy hosts, return all hosts.
   if (per_priority_panic_[hosts_source.priority_]) {
@@ -447,10 +490,17 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
     return hosts_source;
   }
 
+
   // If we're doing locality weighted balancing, pick locality.
-  const absl::optional<uint32_t> locality = host_set.chooseLocality();
-  if (locality.has_value()) {
-    hosts_source.source_type_ = HostsSource::SourceType::LocalityHealthyHosts;
+  absl::optional<uint32_t> locality;
+  if (host_set_and_type.second == EdfLoadBalancerBase::PriorityType::DEGRADED) {
+    locality = host_set.chooseLocalityDegraded();
+  } else {
+    locality = host_set.chooseLocality();
+  }
+
+  if (locality) {
+    hosts_source.source_type_ = locality_source_type;
     hosts_source.locality_index_ = locality.value();
     return hosts_source;
   }
@@ -459,13 +509,13 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   // host set.
   if (per_priority_state_[host_set.priority()]->locality_routing_state_ ==
       LocalityRoutingState::NoLocalityRouting) {
-    hosts_source.source_type_ = HostsSource::SourceType::HealthyHosts;
+    hosts_source.source_type_ = hosts_source_type;
     return hosts_source;
   }
 
   // Determine if the load balancer should do zone based routing for this pick.
   if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, routing_enabled_)) {
-    hosts_source.source_type_ = HostsSource::SourceType::HealthyHosts;
+    hosts_source.source_type_ = hosts_source_type;
     return hosts_source;
   }
 
@@ -473,10 +523,11 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
     stats_.lb_local_cluster_not_ok_.inc();
     // If the local Envoy instances are in global panic, do not do locality
     // based routing.
-    hosts_source.source_type_ = HostsSource::SourceType::HealthyHosts;
+    hosts_source.source_type_ = hosts_source_type;
     return hosts_source;
   }
 
+  // TODO(snowp): Make zone aware routing handle degraded hosts.
   hosts_source.source_type_ = HostsSource::SourceType::LocalityHealthyHosts;
   hosts_source.locality_index_ = tryChooseLocalLocalityHosts(host_set);
   return hosts_source;

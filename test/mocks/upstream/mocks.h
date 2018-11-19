@@ -50,14 +50,19 @@ public:
   // Upstream::HostSet
   MOCK_CONST_METHOD0(hosts, const HostVector&());
   MOCK_CONST_METHOD0(healthyHosts, const HostVector&());
+  MOCK_CONST_METHOD0(degradedHosts, const HostVector&());
   MOCK_CONST_METHOD0(hostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(healthyHostsPerLocality, const HostsPerLocality&());
+  MOCK_CONST_METHOD0(degradedHostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(localityWeights, LocalityWeightsConstSharedPtr());
   MOCK_METHOD0(chooseLocality, absl::optional<uint32_t>());
-  MOCK_METHOD8(updateHosts, void(std::shared_ptr<const HostVector> hosts,
+  MOCK_METHOD0(chooseLocalityDegraded, absl::optional<uint32_t>());
+  MOCK_METHOD10(updateHosts, void(std::shared_ptr<const HostVector> hosts,
                                  std::shared_ptr<const HostVector> healthy_hosts,
+                                 std::shared_ptr<const HostVector> degraded_hosts,
                                  HostsPerLocalityConstSharedPtr hosts_per_locality,
                                  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                                 HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
                                  absl::optional<uint32_t> overprovisioning_factor));

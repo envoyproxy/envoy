@@ -194,6 +194,7 @@ public:
     outlier_detector_ = std::move(outlier_detector);
   }
   bool healthy() const override { return !health_flags_; }
+  bool degraded() const override { return false; }
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight) override;
   bool used() const override { return used_; }
@@ -250,12 +251,14 @@ public:
   HostSetImpl(uint32_t priority, absl::optional<uint32_t> overprovisioning_factor)
       : priority_(priority), overprovisioning_factor_(overprovisioning_factor.has_value()
                                                           ? overprovisioning_factor.value()
-                                                          : kDefaultOverProvisioningFactor),
-        hosts_(new HostVector()), healthy_hosts_(new HostVector()) {}
-
-  void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
+                                                          : kDefaultOverProvisioningFactor)
+  {}
+  void updateHosts(HostVectorConstSharedPtr hosts, 
+      HostVectorConstSharedPtr healthy_hosts,
+      HostVectorConstSharedPtr degraded_hosts,
                    HostsPerLocalityConstSharedPtr hosts_per_locality,
                    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                   HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                    const HostVector& hosts_removed,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
@@ -273,14 +276,19 @@ public:
   }
 
   // Upstream::HostSet
-  const HostVector& hosts() const override { return *hosts_; }
-  const HostVector& healthyHosts() const override { return *healthy_hosts_; }
-  const HostsPerLocality& hostsPerLocality() const override { return *hosts_per_locality_; }
+  const HostVector& hosts() const override { return *all_hosts_.hosts_; }
+  const HostVector& healthyHosts() const override { return *healthy_hosts_.hosts_; }
+  const HostVector& degradedHosts() const override { return *degraded_hosts_.hosts_; }
+  const HostsPerLocality& hostsPerLocality() const override { return *healthy_hosts_.hosts_per_locality_; }
   const HostsPerLocality& healthyHostsPerLocality() const override {
-    return *healthy_hosts_per_locality_;
+    return *healthy_hosts_.hosts_per_locality_;
+  }
+  const HostsPerLocality& degradedHostsPerLocality() const override {
+    return *degraded_hosts_.hosts_per_locality_;
   }
   LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
   absl::optional<uint32_t> chooseLocality() override;
+  absl::optional<uint32_t> chooseLocalityDegraded() override;
   uint32_t priority() const override { return priority_; }
   uint32_t overprovisioning_factor() const override { return overprovisioning_factor_; }
 
@@ -290,20 +298,6 @@ protected:
   }
 
 private:
-  // Weight for a locality taking into account health status.
-  double effectiveLocalityWeight(uint32_t index) const;
-
-  uint32_t priority_;
-  uint32_t overprovisioning_factor_;
-  HostVectorConstSharedPtr hosts_;
-  HostVectorConstSharedPtr healthy_hosts_;
-  HostsPerLocalityConstSharedPtr hosts_per_locality_{HostsPerLocalityImpl::empty()};
-  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_{HostsPerLocalityImpl::empty()};
-  // TODO(mattklein123): Remove mutable.
-  mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
-      member_update_cb_helper_;
-  // Locality weights (used to build WRR locality_scheduler_);
-  LocalityWeightsConstSharedPtr locality_weights_;
   // WRR locality scheduler state.
   struct LocalityEntry {
     LocalityEntry(uint32_t index, double effective_weight)
@@ -311,8 +305,36 @@ private:
     const uint32_t index_;
     const double effective_weight_;
   };
+
+  // Describes a specific host subset of a given HostSet. Subsets may overlap.
+  struct Subset {
+    HostVectorConstSharedPtr hosts_{new HostVector()};
+    HostsPerLocalityConstSharedPtr hosts_per_locality_{HostsPerLocalityImpl::empty()};
+  };
+
+  using LocalityEntries = std::vector<std::shared_ptr<LocalityEntry>>;
+  using LocalityScheduler = EdfScheduler<LocalityEntry>;
+
+  // Weight for a locality taking into account how many elgibile hosts are present in the locality.
+  double effectiveLocalityWeight(uint32_t index, const Subset& eligible_hosts_subset) const;
+
+  uint32_t priority_;
+  uint32_t overprovisioning_factor_;
+  Subset all_hosts_;
+  Subset healthy_hosts_;
+  Subset degraded_hosts_;
+  // TODO(mattklein123): Remove mutable.
+  mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
+      member_update_cb_helper_;
+  // Locality weights (used to build WRR locality_scheduler_);
+  LocalityWeightsConstSharedPtr locality_weights_;
+
+  // We need to double up on these data structures because the locality weights between
+  // healthy hosts and degraded hosts might be different.
   std::vector<std::shared_ptr<LocalityEntry>> locality_entries_;
   std::unique_ptr<EdfScheduler<LocalityEntry>> locality_scheduler_;
+  std::vector<std::shared_ptr<LocalityEntry>> degraded_locality_entries_;
+  std::unique_ptr<EdfScheduler<LocalityEntry>> degraded_locality_scheduler_;
 };
 
 typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
@@ -518,6 +540,8 @@ public:
 
   static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
   static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
+  static HostVectorConstSharedPtr createDegradedHostList(const HostVector& hosts);
+  static HostsPerLocalityConstSharedPtr createDegradedHostLists(const HostsPerLocality& hosts);
 
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }
