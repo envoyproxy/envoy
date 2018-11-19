@@ -613,6 +613,28 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
     EXPECT_EQ(cluster.info().get(), &host->cluster());
   }
 
+  // Remove the duplicated hosts from both resolve targets and ensure that we don't see the same
+  // host multiple times.
+  std::unordered_set<HostSharedPtr> removed_hosts;
+  cluster.prioritySet().addMemberUpdateCb(
+      [&](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
+        for (const auto& host : hosts_removed) {
+          EXPECT_EQ(removed_hosts.end(), removed_hosts.find(host));
+          removed_hosts.insert(host);
+        }
+      });
+
+  EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  EXPECT_CALL(membership_updated, ready());
+  resolver2.dns_callback_(TestUtility::makeDnsResponse({}));
+
+  EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  EXPECT_CALL(membership_updated, ready());
+  resolver3.dns_callback_(TestUtility::makeDnsResponse({}));
+
+  // Ensure that we called the update membership callback.
+  EXPECT_EQ(2, removed_hosts.size());
+
   // Make sure we cancel.
   resolver1.expectResolve(*dns_resolver);
   resolver1.timer_->callback_();
