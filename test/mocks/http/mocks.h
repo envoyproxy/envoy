@@ -461,6 +461,9 @@ public:
   MOCK_METHOD0(drainConnections, void());
   MOCK_METHOD2(newStream, Cancellable*(Http::StreamDecoder& response_decoder,
                                        Http::ConnectionPool::Callbacks& callbacks));
+  MOCK_METHOD3(newStream, Cancellable*(Http::StreamDecoder& response_decoder,
+                                       Http::ConnectionPool::Callbacks& callbacks,
+                                       const Upstream::LoadBalancerContext& context));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};

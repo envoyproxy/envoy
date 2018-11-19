@@ -36,6 +36,10 @@ public:
   ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
 
+  ConnectionPool::Cancellable* newStream(StreamDecoder& response_decoder,
+                                         ConnectionPool::Callbacks& callbacks,
+                                         const Upstream::LoadBalancerContext& context) override;
+
 protected:
   struct ActiveClient : public Network::ConnectionCallbacks,
                         public CodecClientCallbacks,

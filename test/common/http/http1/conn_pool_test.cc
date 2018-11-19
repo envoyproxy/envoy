@@ -399,6 +399,31 @@ TEST_F(Http1ConnPoolImplTest, CancelBeforeBound) {
 }
 
 /**
+ * Test that calling with an LB context still creates and returns a proper stream.
+ */
+TEST_F(Http1ConnPoolImplTest, ConnPoolWithLBContext) {
+  InSequence s;
+
+  // Request 1 should kick off a new connection.
+  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  // we expect no calls to this at all.
+  Upstream::MockLoadBalancerContext mock_context;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate();
+  Http::ConnectionPool::Cancellable* handle =
+      conn_pool_.newStream(outer_decoder, callbacks, mock_context);
+  EXPECT_NE(nullptr, handle);
+
+  handle->cancel();
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Cause the connection to go away.
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
  * Test an upstream disconnection while there is a bound request.
  */
 TEST_F(Http1ConnPoolImplTest, DisconnectWhileBound) {

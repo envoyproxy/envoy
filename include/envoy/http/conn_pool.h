@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
+#include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
@@ -109,6 +110,24 @@ public:
    *                      should be done by resetting the stream.
    */
   virtual Cancellable* newStream(Http::StreamDecoder& response_decoder, Callbacks& callbacks) PURE;
+
+  /**
+   * Create a new stream on the pool.
+   * @param response_decoder supplies the decoder events to fire when the response is
+   *                         available.
+   * @param cb supplies the callbacks to invoke when the connection is ready or has failed. The
+   *           callbacks may be invoked immediately within the context of this call if there is a
+   *           ready connection or an immediate failure. In this case, the routine returns nullptr.
+   * @param context The load balancer context used to decide how to map this stream to a connection
+   *                pool, if necessary.
+   * @return Cancellable* If no connection is ready, the callback is not invoked, and a handle
+   *                      is returned that can be used to cancel the request. Otherwise, one of the
+   *                      callbacks is called and the routine returns nullptr. NOTE: Once a callback
+   *                      is called, the handle is no longer valid and any further cancellation
+   *                      should be done by resetting the stream.
+   */
+  virtual Cancellable* newStream(Http::StreamDecoder& response_decoder, Callbacks& callbacks,
+                                 const Upstream::LoadBalancerContext& context) PURE;
 };
 
 typedef std::unique_ptr<Instance> InstancePtr;

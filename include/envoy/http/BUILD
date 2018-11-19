@@ -40,6 +40,7 @@ envoy_cc_library(
     deps = [
         ":codec_interface",
         "//include/envoy/event:deferred_deletable",
+        "//include/envoy/upstream:load_balancer_interface",
         "//include/envoy/upstream:upstream_interface",
     ],
 )

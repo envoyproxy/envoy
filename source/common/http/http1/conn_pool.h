@@ -43,6 +43,9 @@ public:
   ConnectionPool::Cancellable* newStream(StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
 
+  ConnectionPool::Cancellable* newStream(StreamDecoder& response_decoder,
+                                         ConnectionPool::Callbacks& callbacks,
+                                         const Upstream::LoadBalancerContext& context) override;
   // ConnPoolImplBase
   void checkForDrained() override;
 

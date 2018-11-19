@@ -139,10 +139,20 @@ public:
     }
   }
 
+  ActiveTestRequest() {}
   Http::MockStreamDecoder decoder_;
   ConnPoolCallbacks callbacks_;
   Http::StreamDecoder* inner_decoder_{};
   NiceMock<Http::MockStreamEncoder> inner_encoder_;
+};
+
+//! Used to invoke the LBContext version of newStream while still providing the ActiveTestRequest
+//! interface.
+class LBContextActiveTestRequest : public ActiveTestRequest {
+public:
+  LBContextActiveTestRequest(Http2ConnPoolImplTest& test) {
+    EXPECT_NE(nullptr, test.pool_.newStream(decoder_, callbacks_));
+  }
 };
 
 void Http2ConnPoolImplTest::expectClientConnect(size_t index, ActiveTestRequest& r) {
@@ -200,6 +210,25 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+/**
+ * Verify that connections are drained when requested after creating streams using the LBContext
+ * version of newStream.
+ */
+TEST_F(Http2ConnPoolImplTest, DrainConnectionsLBContext) {
+  InSequence s;
+  pool_.max_streams_ = 1;
+
+  expectClientCreate();
+  LBContextActiveTestRequest r1(*this);
+  expectClientConnect(0, r1);
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  r1.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+
+  // This will destroy draining.
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*this, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
 // Verifies that requests are queued up in the conn pool until the connection becomes ready.
 TEST_F(Http2ConnPoolImplTest, PendingRequests) {
   InSequence s;

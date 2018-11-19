@@ -129,6 +129,13 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
   return nullptr;
 }
 
+ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_decoder,
+                                                     ConnectionPool::Callbacks& callbacks,
+                                                     const Upstream::LoadBalancerContext& /*un*/) {
+  // This connection pool does not need to partition. Just send create the stream normally.
+  return newStream(response_decoder, callbacks);
+}
+
 void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
