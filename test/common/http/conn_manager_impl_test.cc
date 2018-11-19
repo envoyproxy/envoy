@@ -55,12 +55,11 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 using testing::Sequence;
-using testing::Test;
 
 namespace Envoy {
 namespace Http {
 
-class HttpConnectionManagerImplTest : public Test, public ConnectionManagerConfig {
+class HttpConnectionManagerImplTest : public testing::Test, public ConnectionManagerConfig {
 public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
     RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}

@@ -26,7 +26,6 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::SetArgReferee;
 using testing::StrictMock;
-using testing::Test;
 using testing::TestParamInfo;
 using testing::TestWithParam;
 using testing::Values;
@@ -206,7 +205,7 @@ INSTANTIATE_TEST_CASE_P(NonValueProtocolStates, DecoderStateMachineNonValueTest,
                                ProtocolState::SetBegin, ProtocolState::SetEnd),
                         protoStateParamToString);
 
-class DecoderStateMachineTest : public DecoderStateMachineTestBase, public Test {};
+class DecoderStateMachineTest : public DecoderStateMachineTestBase, public testing::Test {};
 
 class DecoderStateMachineValueTest : public DecoderStateMachineTestBase,
                                      public TestWithParam<FieldType> {};
