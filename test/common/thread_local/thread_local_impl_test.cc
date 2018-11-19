@@ -116,7 +116,6 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
 
-  Thread::ThreadSystemImpl thread_system;
   DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl main_dispatcher(test_time.timeSystem());
   Event::DispatcherImpl thread_dispatcher(test_time.timeSystem());
@@ -129,12 +128,13 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   // Verify we have the expected dispatcher for the main thread.
   EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
 
-  Thread::ThreadPtr thread = thread_system.createThread([&thread_dispatcher, &tls]() {
-    // Ensure that the dispatcher update in tls posted during the above registerThread happens.
-    thread_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
-    // Verify we have the expected dispatcher for the new thread thread.
-    EXPECT_EQ(&thread_dispatcher, &tls.dispatcher());
-  });
+  Thread::ThreadPtr thread =
+      Thread::threadSystemForTest().createThread([&thread_dispatcher, &tls]() {
+        // Ensure that the dispatcher update in tls posted during the above registerThread happens.
+        thread_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+        // Verify we have the expected dispatcher for the new thread thread.
+        EXPECT_EQ(&thread_dispatcher, &tls.dispatcher());
+      });
   thread->join();
 
   // Verify we still have the expected dispatcher for the main thread.

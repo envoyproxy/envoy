@@ -1,5 +1,7 @@
 #include "test/test_common/contention.h"
 
+#include "test/test_common/utility.h"
+
 namespace Envoy {
 namespace Thread {
 namespace TestUtil {

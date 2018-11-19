@@ -22,10 +22,12 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
 
+#include "common/api/api_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
 #include "common/common/stack_array.h"
+#include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/config/bootstrap_json.h"
 #include "common/json/json_loader.h"
@@ -341,5 +343,22 @@ MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options)
 MockedTestAllocator::~MockedTestAllocator() {}
 
 } // namespace Stats
+
+namespace Thread {
+
+ThreadSystem& threadSystemForTest() {
+  static ThreadSystemImpl* thread_system = new ThreadSystemImpl();
+  return *thread_system;
+}
+
+} // namespace Thread
+
+namespace Api {
+
+ApiPtr createApiForTest() {
+  return std::make_unique<Impl>(std::chrono::milliseconds(1000), Thread::threadSystemForTest());
+}
+
+} // namespace Api
 
 } // namespace Envoy

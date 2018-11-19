@@ -45,11 +45,6 @@ ThreadPtr ThreadSystemImpl::createThread(std::function<void()> thread_routine) {
   return std::make_unique<ThreadImpl>(thread_routine);
 }
 
-ThreadSystem& threadSystemForTest() {
-  static ThreadSystemImpl thread_system;
-  return thread_system;
-}
-
 int32_t currentThreadId() {
 #ifdef __linux__
   return syscall(SYS_gettid);

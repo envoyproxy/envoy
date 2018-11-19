@@ -9,6 +9,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -46,20 +47,20 @@ public:
 class EnvoyGoogleAsyncClientImplTest : public testing::Test {
 public:
   EnvoyGoogleAsyncClientImplTest()
-      : dispatcher_(test_time_.timeSystem()),
+      : dispatcher_(test_time_.timeSystem()), api_(Api::createApiForTest()),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     envoy::api::v2::core::GrpcService config;
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_target_uri("fake_address");
     google_grpc->set_stat_prefix("test_cluster");
-    tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(api_);
+    tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *tls_, stub_factory_,
                                                            stats_store_, config);
   }
 
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
-  Api::Impl api_;
+  Api::ApiPtr api_;
   std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
   MockStubFactory stub_factory_;
   const Protobuf::MethodDescriptor* method_descriptor_;

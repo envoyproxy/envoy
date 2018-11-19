@@ -2,6 +2,7 @@
 #include "common/event/libevent.h"
 
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 #include "event2/event.h"
 #include "gtest/gtest.h"

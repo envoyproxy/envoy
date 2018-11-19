@@ -5,6 +5,7 @@
 #include "common/singleton/threadsafe_singleton.h"
 
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -42,7 +43,7 @@ public:
 class AddTen {
 public:
   AddTen() {
-    thread_ = thread_system_.createThread([this]() -> void { threadRoutine(); });
+    thread_ = Thread::threadSystemForTest().createThread([this]() -> void { threadRoutine(); });
   }
   ~AddTen() {
     thread_->join();
@@ -56,7 +57,6 @@ private:
       singleton.addOne();
     }
   }
-  Thread::ThreadSystemImpl thread_system_;
   Thread::ThreadPtr thread_;
 };
 

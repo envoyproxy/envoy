@@ -16,8 +16,6 @@ namespace Api {
  */
 class Impl : public Api::Api {
 public:
-  // Convenience no-arg constructor for integration and unit tests
-  Impl();
   Impl(std::chrono::milliseconds file_flush_interval_msec, Thread::ThreadSystem& thread_system);
 
   // Api::Api

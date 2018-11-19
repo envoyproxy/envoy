@@ -18,11 +18,6 @@ typedef int32_t ThreadId;
 ThreadId currentThreadId();
 
 /**
- * Convenience method for tests to get a statically allocated ThreadSystem.
- */
-ThreadSystem& threadSystemForTest();
-
-/**
  * Implementation of ThreadSystem
  */
 class ThreadSystemImpl : public ThreadSystem {

@@ -10,7 +10,6 @@
 namespace Envoy {
 namespace Api {
 
-Impl::Impl() : Impl(std::chrono::milliseconds(1000), Thread::threadSystemForTest()) {}
 Impl::Impl(std::chrono::milliseconds file_flush_interval_msec, Thread::ThreadSystem& thread_system)
     : file_flush_interval_msec_(file_flush_interval_msec), thread_system_(thread_system) {}
 

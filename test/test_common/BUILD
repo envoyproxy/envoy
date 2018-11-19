@@ -57,6 +57,7 @@ envoy_cc_test_library(
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:thread_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -89,6 +90,7 @@ envoy_cc_test_library(
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:address_interface",
+        "//source/common/api:api_lib",
         "//source/common/common:empty_string",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
@@ -162,7 +164,10 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "simulated_time_system_test",
     srcs = ["simulated_time_system_test.cc"],
-    deps = [":simulated_time_system_lib"],
+    deps = [
+        ":simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
 )
 
 envoy_cc_library(
