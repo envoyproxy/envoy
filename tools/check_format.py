@@ -289,6 +289,7 @@ def checkSourceLine(line, file_path, reportError):
   if line.startswith('using testing::Test;'):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
 
+
 def checkBuildLine(line, file_path, reportError):
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
