@@ -38,7 +38,7 @@ public:
    * Manages Singleton objects that are cleaned up after all references are dropped.
    */
   struct Singleton {
-    Singleton(void* ptr) : ref_count_(1), ptr_(ptr) {}
+    Singleton(void* ptr, Thread::BasicLockable& mutex) : mutex_(mutex), ref_count_(1), ptr_(ptr) {}
 
     template <class Type> Type* ptr() { return static_cast<Type*>(ptr_); }
     template <class Type> Type& ref() { return *ptr<Type>(); }
@@ -47,8 +47,8 @@ public:
     }
     void releaseHelper(DeleteObjectFn delete_object);
 
-    Thread::MutexBasicLockable mutex_;
-    uint64_t ref_count_ GUARDED_BY(mutex_);
+    Thread::BasicLockable& mutex_;
+    uint64_t ref_count_; // Effectively guarded by mutex_, but not analyzable due to aliasing.
     void* ptr_; // Chanting ptr_ is done under mutex_, but accessing it is not.
   };
 

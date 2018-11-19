@@ -33,8 +33,7 @@ Globals::Singleton& Globals::get(const std::string& type_name, MakeObjectFn make
     // so no need to take the singleton's mutex. But we do need to hold
     // the map mutex as we are installing the singleton object in the
     // singleton_map.
-    singleton = std::make_unique<Singleton>(make_object());
-    map_lock.release();
+    singleton = std::make_unique<Singleton>(make_object(), map_mutex_);
     return *singleton;
   }
 
@@ -42,7 +41,6 @@ Globals::Singleton& Globals::get(const std::string& type_name, MakeObjectFn make
   // .second. However, we can relinquish map_mutex_ as we are no longer
   // modifying the map; just the .second of the MutexSingleton pointed to by the
   // map.
-  Thread::LockGuard singleton_lock(singleton->mutex_);
   if (singleton->ptr_ == nullptr) {
     ASSERT(singleton->ref_count_ == 0);
     singleton->ptr_ = make_object();
