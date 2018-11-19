@@ -372,7 +372,14 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
   for (const auto upgrade_config : route.route().upgrade_configs()) {
     bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
-    upgrade_map_.emplace(std::make_pair(upgrade_config.upgrade_type(), enabled));
+    bool success =
+        upgrade_map_
+            .emplace(std::make_pair(
+                Envoy::Http::LowerCaseString(upgrade_config.upgrade_type()).get(), enabled))
+            .second;
+    if (!success) {
+      throw EnvoyException(fmt::format("Duplicate upgrade {}", upgrade_config.upgrade_type()));
+    }
   }
 }
 

@@ -548,6 +548,7 @@ private:
   std::vector<Http::HeaderUtility::HeaderData> config_headers_;
   std::vector<ConfigUtility::QueryParameterMatcher> config_query_parameters_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
+
   UpgradeMap upgrade_map_;
   const uint64_t total_cluster_weight_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
