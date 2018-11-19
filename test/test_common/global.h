@@ -9,10 +9,7 @@ namespace Envoy {
 namespace Test {
 
 /**
- * Helper class for managing Globals. This is not intended for external use.
- * It is not nested in under class Global because the helper class needs to stay
- * un-templatized. so that it's easier to put the interesting code in a .cc
- * file and hold its single instance there.
+ * Helper class for managing Global<Type>s.
  *
  * This class is instantiated as a process-scoped singleton. It manages a map
  * from type-name to GlobalHelper::Singleton. That map accumulates over a process
@@ -20,11 +17,23 @@ namespace Test {
  * a reference-counted class-instance pointer that is deleted and nulled after
  * all references drop, so that each unit-test gets a fresh start.
  */
-class GlobalHelper {
+class Globals {
   using MakeObjectFn = std::function<void*()>;
   using DeleteObjectFn = std::function<void(void*)>;
 
 public:
+  /**
+   * Walks through all global singletons and ensures that none of them are
+   * active. No singletons should be allocaed at the end of unit tests, so
+   * this is called at the end of Envoy::TestRunner::RunTests().
+   *
+   * @return std::string empty string if quiescent, otherwise newline-separated
+   *    error messages.
+   */
+  static std::string describeActiveSingletons() {
+    return instance().describeActiveSingletonsHelper();
+  }
+
   /**
    * Manages Singleton objects that are cleaned up after all references are dropped.
    */
@@ -57,13 +66,15 @@ public:
   }
 
 private:
-  GlobalHelper() {}         // Construct via GlobalHelper::helper().
-  ~GlobalHelper() = delete; // GlobalHeler is constructed once and never destryed.
+  Globals() {}         // Construct via Globals::helper().
+  ~Globals() = delete; // GlobalHeler is constructed once and never destryed.
 
   /**
-   * @return GlobalHelper& a singleton for GlobalHelper.
+   * @return Globals& a singleton for Globals.
    */
-  static GlobalHelper& instance();
+  static Globals& instance();
+
+  std::string describeActiveSingletonsHelper();
 
   Singleton& get(const std::string& type_name, MakeObjectFn make_object);
 
@@ -96,14 +107,14 @@ private:
  */
 template <class Type> class Global {
 public:
-  Global() : singleton_(GlobalHelper::get<Type>()) {}
+  Global() : singleton_(Globals::get<Type>()) {}
   ~Global() { singleton_.release<Type>(); }
   Type& get() { return singleton_.ref<Type>(); }
   Type* operator->() { return singleton_.ptr<Type>(); }
   Type& operator*() { return singleton_.ref<Type>(); }
 
 private:
-  GlobalHelper::Singleton& singleton_;
+  Globals::Singleton& singleton_;
 };
 
 } // namespace Test

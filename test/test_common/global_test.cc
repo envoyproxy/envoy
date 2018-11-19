@@ -28,12 +28,18 @@ TEST_F(GlobalTest, SingletonStringAndVector) {
     EXPECT_EQ(42, (*v2)[0]);
   }
 
+  // The system is now quiescent, having dropped all references to the globals.
+  EXPECT_EQ("", Globals::describeActiveSingletons());
+
   // After the globals went out of scope, referencing them again we start
   // from clean objects;
   Global<std::string> s3;
   Global<std::vector<int>> v3;
   EXPECT_EQ("", *s3);
   EXPECT_TRUE(v3->empty());
+
+  // With s3 and v3 on the stack, there are active singletons.
+  EXPECT_NE("", Globals::describeActiveSingletons());
 }
 
 } // namespace Test

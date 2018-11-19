@@ -5,12 +5,25 @@
 namespace Envoy {
 namespace Test {
 
-GlobalHelper& GlobalHelper::instance() {
-  static GlobalHelper* h = new GlobalHelper;
+Globals& Globals::instance() {
+  static Globals* h = new Globals;
   return *h;
 }
 
-GlobalHelper::Singleton& GlobalHelper::get(const std::string& type_name, MakeObjectFn make_object) {
+std::string Globals::describeActiveSingletonsHelper() {
+  std::string ret;
+  Thread::ReleasableLockGuard map_lock(map_mutex_);
+  for (auto& p : singleton_map_) {
+    std::unique_ptr<Singleton>& singleton = p.second;
+    ASSERT(singleton != nullptr);
+    if (singleton->ptr_ != nullptr) {
+      absl::StrAppend(&ret, "Unexpected active singleton: ", p.first, "\n");
+    }
+  }
+  return ret;
+}
+
+Globals::Singleton& Globals::get(const std::string& type_name, MakeObjectFn make_object) {
   Thread::ReleasableLockGuard map_lock(map_mutex_);
   std::unique_ptr<Singleton>& singleton = singleton_map_[type_name];
 
@@ -38,7 +51,7 @@ GlobalHelper::Singleton& GlobalHelper::get(const std::string& type_name, MakeObj
   return *singleton;
 }
 
-void GlobalHelper::Singleton::releaseHelper(DeleteObjectFn delete_object) {
+void Globals::Singleton::releaseHelper(DeleteObjectFn delete_object) {
   void* obj_to_delete = nullptr;
   {
     Thread::LockGuard singleton_lock(mutex_);
