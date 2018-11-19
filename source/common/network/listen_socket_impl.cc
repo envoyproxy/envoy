@@ -7,6 +7,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
@@ -65,15 +66,10 @@ UdpListenSocket::UdpListenSocket(const Address::InstanceConstSharedPtr& address,
     : ListenSocketImpl(address->socket(Address::SocketType::Datagram), address) {
   RELEASE_ASSERT(fd_ != -1, "");
 
-  // TODO(htuch): This might benefit from moving to SocketOptionImpl.
-  // TODO(cmluciano): Analyze special options to be enabled/disabled for UDP
   int on = 1;
-  int rc = setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-  RELEASE_ASSERT(rc != -1, fmt::format("failed to set UDP SO_REUSEADDR socket option"));
-  rc = setsockopt(fd_, SOL_SOCKET, SO_SNDBUF, &on, sizeof(on));
-  RELEASE_ASSERT(rc != -1, fmt::format("failed to set UDP send buffer to {} bytes", sizeof(on)));
-  rc = setsockopt(fd_, SOL_SOCKET, SO_RCVBUF, &on, sizeof(on));
-  RELEASE_ASSERT(rc != -1, fmt::format("failed to set UDP send buffer to {} bytes", sizeof(on)));
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  Api::SysCallIntResult status = os_syscalls.setsockopt(fd_, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on));
+  RELEASE_ASSERT(status.rc_ != -1, fmt::format("failed to set UDP SO_REUSEPORT socket option"));
 
   setListenSocketOptions(options);
 }
