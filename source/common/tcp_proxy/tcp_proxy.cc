@@ -24,8 +24,13 @@
 namespace Envoy {
 namespace TcpProxy {
 
-const std::string PerConnectionCluster::Key = "envoy.tcp_proxy.cluster";
 using ::Envoy::Network::UpstreamServerName;
+
+absl::string_view PerConnectionCluster::key() {
+  // Construct On First Use Idiom: https://isocpp.org/wiki/faq/ctors#static-init-order-on-first-use
+  static const char* cstring_key = "envoy.tcp_proxy.cluster";
+  return absl::string_view(cstring_key);
+}
 
 Config::Route::Route(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute& config) {
@@ -115,10 +120,10 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
 const std::string& Config::getRegularRouteFromEntries(Network::Connection& connection) {
   // First check if the per-connection state to see if we need to route to a pre-selected cluster
   if (connection.streamInfo().filterState().hasData<PerConnectionCluster>(
-          PerConnectionCluster::Key)) {
+          PerConnectionCluster::key())) {
     const PerConnectionCluster& per_connection_cluster =
         connection.streamInfo().filterState().getDataReadOnly<PerConnectionCluster>(
-            PerConnectionCluster::Key);
+            PerConnectionCluster::key());
     return per_connection_cluster.value();
   }
 
@@ -365,10 +370,10 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 
   if (downstreamConnection() &&
       downstreamConnection()->streamInfo().filterState().hasData<UpstreamServerName>(
-          UpstreamServerName::Key)) {
+          UpstreamServerName::key())) {
     const auto& original_requested_server_name =
         downstreamConnection()->streamInfo().filterState().getDataReadOnly<UpstreamServerName>(
-            UpstreamServerName::Key);
+            UpstreamServerName::key());
     transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
         original_requested_server_name.value());
   }

@@ -3,7 +3,10 @@
 namespace Envoy {
 namespace Network {
 
-const std::string UpstreamServerName::Key = "envoy.network.upstream_server_name";
-
+absl::string_view UpstreamServerName::key() {
+  // Construct On First Use Idiom: https://isocpp.org/wiki/faq/ctors#static-init-order-on-first-use
+  static const char* cstring_key = "envoy.network.upstream_server_name";
+  return absl::string_view(cstring_key);
+}
 } // namespace Network
 } // namespace Envoy
