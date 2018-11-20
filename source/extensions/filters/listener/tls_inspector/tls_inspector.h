@@ -76,6 +76,7 @@ private:
   void done(bool success);
   void onALPN(const unsigned char* data, unsigned int len);
   void onServername(absl::string_view name);
+  void extractEcdsaCipherSuites(const SSL_CLIENT_HELLO* ctx);
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_;

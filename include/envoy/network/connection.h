@@ -192,6 +192,11 @@ public:
   virtual absl::string_view requestedServerName() const PURE;
 
   /**
+   * @return requested ECDSA cipher suite(s), if any.
+   */
+  virtual const std::vector<uint16_t>& ecdsaCipherSuites() const PURE;
+
+  /**
    * @return State the current state of the connection.
    */
   virtual State state() const PURE;

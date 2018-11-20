@@ -170,6 +170,16 @@ public:
    * @return requested server name (e.g. SNI in TLS), if any.
    */
   virtual absl::string_view requestedServerName() const PURE;
+
+  /**
+   * Set requested ECDSA cipher suite(s).
+   */
+  virtual void setEcdsaCipherSuites(const std::vector<uint16_t>& cipher_suites) PURE;
+
+  /**
+   * @return requested ECDSA cipher suite(s), if any.
+   */
+  virtual const std::vector<uint16_t>& ecdsaCipherSuites() const PURE;
 };
 
 typedef std::unique_ptr<ConnectionSocket> ConnectionSocketPtr;

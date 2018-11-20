@@ -117,12 +117,20 @@ public:
   }
   absl::string_view requestedServerName() const override { return server_name_; }
 
+  void setEcdsaCipherSuites(const std::vector<uint16_t>& cipher_suites) override {
+    ecdsa_cipher_suites_.clear();
+    ecdsa_cipher_suites_.insert(ecdsa_cipher_suites_.begin(), cipher_suites.cbegin(),
+                                cipher_suites.cend());
+  }
+  const std::vector<uint16_t>& ecdsaCipherSuites() const override { return ecdsa_cipher_suites_; }
+
 protected:
   Address::InstanceConstSharedPtr remote_address_;
   bool local_address_restored_{false};
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
   std::string server_name_;
+  std::vector<uint16_t> ecdsa_cipher_suites_;
 };
 
 // ConnectionSocket used with server connections.

@@ -93,6 +93,9 @@ public:
     return socket_->options();
   }
   absl::string_view requestedServerName() const override { return socket_->requestedServerName(); }
+  const std::vector<uint16_t>& ecdsaCipherSuites() const override {
+    return socket_->ecdsaCipherSuites();
+  }
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   void setWriteFilterOrder(bool reversed) override { reverse_write_filter_order_ = reversed; }

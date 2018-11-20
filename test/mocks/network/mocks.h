@@ -81,6 +81,7 @@ public:
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
+  MOCK_CONST_METHOD0(ecdsaCipherSuites, const std::vector<uint16_t>&());
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
@@ -130,6 +131,7 @@ public:
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
+  MOCK_CONST_METHOD0(ecdsaCipherSuites, const std::vector<uint16_t>&());
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
@@ -354,6 +356,8 @@ public:
   MOCK_CONST_METHOD0(requestedApplicationProtocols, const std::vector<std::string>&());
   MOCK_METHOD1(setRequestedServerName, void(absl::string_view));
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
+  MOCK_METHOD1(setEcdsaCipherSuites, void(const std::vector<uint16_t>& cipher_suites));
+  MOCK_CONST_METHOD0(ecdsaCipherSuites, const std::vector<uint16_t>&());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr&));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr&));
   MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());

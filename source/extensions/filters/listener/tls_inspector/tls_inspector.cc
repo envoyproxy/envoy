@@ -28,7 +28,6 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
       max_client_hello_size_(max_client_hello_size) {
-
   if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
     throw EnvoyException(fmt::format("max_client_hello_size of {} is greater than maximum of {}.",
                                      max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
@@ -40,11 +39,12 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
       ssl_ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
         const uint8_t* data;
         size_t len;
+        Filter* filter = static_cast<Filter*>(SSL_get_app_data(client_hello->ssl));
         if (SSL_early_callback_ctx_extension_get(
                 client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &len)) {
-          Filter* filter = static_cast<Filter*>(SSL_get_app_data(client_hello->ssl));
           filter->onALPN(data, len);
         }
+        filter->extractEcdsaCipherSuites(client_hello);
         return ssl_select_cert_success;
       });
   SSL_CTX_set_tlsext_servername_callback(
@@ -128,6 +128,81 @@ void Filter::onServername(absl::string_view name) {
     config_->stats().sni_not_found_.inc();
   }
   clienthello_success_ = true;
+}
+
+void Filter::extractEcdsaCipherSuites(const SSL_CLIENT_HELLO* ctx) {
+  CBS client_hello;
+  CBS_init(&client_hello, ctx->client_hello, ctx->client_hello_len);
+
+  uint16_t client_version;
+  if (!CBS_get_u16(&client_hello, &client_version)) {
+    // Don't produce errors, let the real TLS stack do it.
+    return;
+  }
+
+  // https://tools.ietf.org/html/rfc4492#section-5.1.1
+  const uint8_t* curvelist_data;
+  size_t curvelist_len;
+  if (!SSL_early_callback_ctx_extension_get(ctx, TLSEXT_TYPE_supported_groups, &curvelist_data,
+                                            &curvelist_len)) {
+    // Don't produce errors, let the real TLS stack do it.
+    return;
+  }
+
+  CBS curvelist;
+  CBS_init(&curvelist, curvelist_data, curvelist_len);
+
+  bool p256_ok = false;
+  while (CBS_len(&curvelist) > 0) {
+    uint16_t named_curve;
+    if (!CBS_get_u16(&curvelist, &named_curve)) {
+      // Don't produce errors, let the real TLS stack do it.
+      return;
+    }
+
+    if (named_curve == 23 /* secp256r1 */) {
+      p256_ok = true;
+      break;
+    }
+  }
+
+  if (!p256_ok) {
+    return;
+  }
+
+  // The client must have offered an ECDSA ciphersuite that we like.
+  CBS cipher_suites;
+  CBS_init(&cipher_suites, ctx->cipher_suites, ctx->cipher_suites_len);
+  std::vector<uint16_t> ecdsa_cipher_suites;
+
+  while (CBS_len(&cipher_suites) > 0) {
+    uint16_t cipher_id;
+    if (!CBS_get_u16(&cipher_suites, &cipher_id)) {
+      // Don't produce errors, let the real TLS stack do it.
+      return;
+    }
+
+    const SSL_CIPHER* c = SSL_get_cipher_by_value(cipher_id);
+    if (c == nullptr) {
+      continue;
+    }
+
+    // Skip TLS 1.2 only ciphersuites unless the client supports it.
+    if (SSL_CIPHER_get_min_version(c) > client_version) {
+      continue;
+    }
+
+    if (SSL_CIPHER_get_auth_nid(c) == NID_auth_ecdsa) {
+      ecdsa_cipher_suites.emplace_back(cipher_id);
+    }
+  }
+
+  // At this point, we know which ECDSA cipher suites the client has offered, but don't know whether
+  // they match those configured on the real SSL context. We defer to the TLS transport socket for
+  // this, providing the ECDSA cipher suite list for this purpose.
+  if (!ecdsa_cipher_suites.empty()) {
+    cb_->socket().setEcdsaCipherSuites(ecdsa_cipher_suites);
+  }
 }
 
 void Filter::onRead() {
