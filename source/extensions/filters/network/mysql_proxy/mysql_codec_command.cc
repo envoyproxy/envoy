@@ -9,6 +9,8 @@ namespace MySQLProxy {
 
 void Command::SetCmd(MySQLCodec::Cmd cmd) { cmd_ = cmd; }
 
+void Command::SetDb(std::string db) { db_ = db; }
+
 int Command::Decode(Buffer::Instance& buffer) {
   int len = 0;
   int seq = 0;
@@ -24,9 +26,24 @@ int Command::Decode(Buffer::Instance& buffer) {
   if (cmd == MySQLCodec::Cmd::COM_NULL) {
     return MYSQL_FAILURE;
   }
+  switch (cmd) {
+    case MySQLCodec::Cmd::COM_INIT_DB:
+    case MySQLCodec::Cmd::COM_CREATE_DB:
+    case MySQLCodec::Cmd::COM_DROP_DB: {
+      std::string db = "";
+      BufStringDrainBySize(buffer, db, len - 1);
+      SetDb(db);
+      break;
+    }
+    case MySQLCodec::Cmd::COM_QUERY:
+      run_query_parser_ = true;
+      // query string starts after mysql_hdr + one byte for comm type
+      BufStringDrainBySize(buffer, data_, buffer.length() - (sizeof(uint8_t) + MYSQL_HDR_SIZE));
+    default:
+      SetDb("");
+      break;
+  }
 
-  // query string starts after mysql_hdr + one byte for comm type
-  BufStringDrainBySize(buffer, data_, buffer.length() - (sizeof(uint8_t) + MYSQL_HDR_SIZE));
   return MYSQL_SUCCESS;
 }
 

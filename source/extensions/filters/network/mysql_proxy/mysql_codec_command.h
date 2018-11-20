@@ -17,12 +17,17 @@ public:
 
   MySQLCodec::Cmd GetCmd() const { return cmd_; }
   const std::string& GetData() const { return data_; }
+  std::string& GetDb() { return db_; }
   void SetCmd(MySQLCodec::Cmd cmd);
   void SetData(std::string& data);
+  void SetDb(std::string db);
+  bool RunQueryParser() { return run_query_parser_; }
 
 private:
   MySQLCodec::Cmd cmd_;
   std::string data_;
+  std::string db_;
+  bool run_query_parser_;
 };
 
 class CommandResp : public MySQLCodec {
