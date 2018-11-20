@@ -6,8 +6,8 @@ namespace Envoy {
 namespace Test {
 
 Globals& Globals::instance() {
-  static Globals* h = new Globals;
-  return *h;
+  static Globals* globals = new Globals;
+  return *globals;
 }
 
 std::string Globals::describeActiveSingletonsHelper() {

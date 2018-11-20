@@ -12,10 +12,11 @@ namespace Test {
  * Helper class for managing Global<Type>s.
  *
  * This class is instantiated as a process-scoped singleton. It manages a map
- * from type-name to GlobalHelper::Singleton. That map accumulates over a
- * process lifetime and never shrinks. However, the Singleton objects themselves
- * hold a reference-counted class-instance pointer that is deleted and nulled
- * after all references drop, so that each unit-test gets a fresh start.
+ * from type-name to weak_ptr<GlobalHelper::Singleton>. That map accumulates
+ * over a process lifetime and never shrinks. However, the weak_ptr will
+ * generally be cleared after each test, as all shared_ptr references held in
+ * Global<Type> instances are destroyed. This way, each unit-test gets a fresh
+ * start.
  */
 class Globals {
   using MakeObjectFn = std::function<void*()>;
