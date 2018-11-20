@@ -63,7 +63,7 @@ public:
                                  absl::optional<uint32_t> overprovisioning_factor));
   MOCK_CONST_METHOD0(priority, uint32_t());
   uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
-  void set_overprovisioningFactor(const uint32_t overprovisioning_factor) {
+  void setOverprovisioningFactor(const uint32_t overprovisioning_factor) {
     overprovisioning_factor_ = overprovisioning_factor;
   }
 

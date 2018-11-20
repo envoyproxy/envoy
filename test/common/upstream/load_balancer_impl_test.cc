@@ -164,9 +164,9 @@ TEST_P(LoadBalancerBaseTest, OverProvisioningFactor) {
   ASSERT_THAT(getLoadPercentage(), ElementsAre(70, 30));
 
   // Set overprovisioning factor to 1, now it should be proportioned to healthy ratio.
-  host_set_.set_overprovisioning_factor(100);
+  host_set_.setOverprovisioningFactor(100);
   updateHostSet(host_set_, 4, 2);
-  failover_host_set_.set_overprovisioning_factor(100);
+  failover_host_set_.setOverprovisioningFactor(100);
   updateHostSet(failover_host_set_, 4, 2);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(50, 50));
 }
