@@ -33,4 +33,3 @@ inline std::ostream& operator<<(std::ostream& out, const Envoy::Http::MetadataMa
   }
   return out;
 }
-
