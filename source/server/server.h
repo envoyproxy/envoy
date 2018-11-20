@@ -138,7 +138,7 @@ public:
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
-               Thread::ThreadSystem& thread_system);
+               Thread::ThreadFactory& thread_factory);
 
   ~InstanceImpl() override;
 

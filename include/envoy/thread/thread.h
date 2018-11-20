@@ -25,9 +25,9 @@ typedef std::unique_ptr<Thread> ThreadPtr;
 /**
  * Interface providing a mechanism for creating threads.
  */
-class ThreadSystem {
+class ThreadFactory {
 public:
-  virtual ~ThreadSystem() {}
+  virtual ~ThreadFactory() {}
 
   /**
    * Create a thread.

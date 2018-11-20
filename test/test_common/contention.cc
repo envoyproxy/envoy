@@ -16,7 +16,7 @@ void ContentionGenerator::generateContention(MutexTracerImpl& tracer) {
 
 Envoy::Thread::ThreadPtr ContentionGenerator::launchThread(MutexTracerImpl& tracer,
                                                            MutexBasicLockable* mu) {
-  return threadSystemForTest().createThread(
+  return threadFactoryForTest().createThread(
       [&tracer, mu]() -> void { holdUntilContention(tracer, mu); });
 }
 

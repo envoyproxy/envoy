@@ -43,7 +43,7 @@ public:
 class AddTen {
 public:
   AddTen() {
-    thread_ = Thread::threadSystemForTest().createThread([this]() -> void { threadRoutine(); });
+    thread_ = Thread::threadFactoryForTest().createThread([this]() -> void { threadRoutine(); });
   }
   ~AddTen() {
     thread_->join();

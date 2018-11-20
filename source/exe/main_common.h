@@ -34,7 +34,7 @@ public:
   MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_system, TestHooks& test_hooks,
                  Server::ComponentFactory& component_factory,
                  std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
-                 Thread::ThreadSystem& thread_system);
+                 Thread::ThreadFactory& thread_factory);
   ~MainCommonBase();
 
   bool run();
@@ -64,7 +64,7 @@ protected:
   Envoy::OptionsImpl& options_;
 
   Server::ComponentFactory& component_factory_;
-  Thread::ThreadSystem& thread_system_;
+  Thread::ThreadFactory& thread_factory_;
 
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
@@ -110,7 +110,7 @@ private:
   Event::RealTimeSystem real_time_system_;
   DefaultTestHooks default_test_hooks_;
   ProdComponentFactory prod_component_factory_;
-  Thread::ThreadSystemImpl thread_system_;
+  Thread::ThreadFactoryImpl thread_factory_;
   MainCommonBase base_;
 };
 

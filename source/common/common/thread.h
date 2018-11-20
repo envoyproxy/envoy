@@ -18,11 +18,11 @@ typedef int32_t ThreadId;
 ThreadId currentThreadId();
 
 /**
- * Implementation of ThreadSystem
+ * Implementation of ThreadFactory
  */
-class ThreadSystemImpl : public ThreadSystem {
+class ThreadFactoryImpl : public ThreadFactory {
 public:
-  ThreadSystemImpl() {}
+  ThreadFactoryImpl() {}
 
   ThreadPtr createThread(std::function<void()> thread_routine) override;
 };

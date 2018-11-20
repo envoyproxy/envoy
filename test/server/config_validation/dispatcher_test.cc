@@ -24,7 +24,7 @@ public:
     Event::Libevent::Global::initialize();
 
     validation_ = std::make_unique<Api::ValidationImpl>(std::chrono::milliseconds(1000),
-                                                        Thread::threadSystemForTest());
+                                                        Thread::threadFactoryForTest());
     dispatcher_ = validation_->allocateDispatcher(test_time_.timeSystem());
   }
 

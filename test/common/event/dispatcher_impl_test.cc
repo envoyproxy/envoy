@@ -63,7 +63,7 @@ protected:
   DispatcherImplTest()
       : dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSystem())),
         work_finished_(false) {
-    dispatcher_thread_ = Thread::threadSystemForTest().createThread([this]() {
+    dispatcher_thread_ = Thread::threadFactoryForTest().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);
       keepalive_timer_ = dispatcher_->createTimer(

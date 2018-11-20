@@ -16,7 +16,7 @@ namespace Api {
  */
 class Impl : public Api::Api {
 public:
-  Impl(std::chrono::milliseconds file_flush_interval_msec, Thread::ThreadSystem& thread_system);
+  Impl(std::chrono::milliseconds file_flush_interval_msec, Thread::ThreadFactory& thread_factory);
 
   // Api::Api
   Event::DispatcherPtr allocateDispatcher(Event::TimeSystem& time_system) override;
@@ -29,7 +29,7 @@ public:
 
 private:
   std::chrono::milliseconds file_flush_interval_msec_;
-  Thread::ThreadSystem& thread_system_;
+  Thread::ThreadFactory& thread_factory_;
 };
 
 } // namespace Api

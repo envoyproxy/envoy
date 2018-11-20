@@ -50,7 +50,7 @@ public:
 
 TEST_P(ValidationServerTest, Validate) {
   EXPECT_TRUE(validateConfig(options_, Network::Address::InstanceConstSharedPtr(),
-                             component_factory_, Thread::threadSystemForTest()));
+                             component_factory_, Thread::threadFactoryForTest()));
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
@@ -65,7 +65,7 @@ INSTANTIATE_TEST_CASE_P(ValidConfigs, ValidationServerTest,
 // may not be successful, but there should be no crash.
 TEST_P(ValidationServerTest_1, RunWithoutCrash) {
   validateConfig(options_, Network::Address::InstanceConstSharedPtr(), component_factory_,
-                 Thread::threadSystemForTest());
+                 Thread::threadFactoryForTest());
   SUCCEED();
 }
 

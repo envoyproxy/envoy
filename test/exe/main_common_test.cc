@@ -157,7 +157,7 @@ protected:
 
   // Initiates Envoy running in its own thread.
   void startEnvoy() {
-    envoy_thread_ = Thread::threadSystemForTest().createThread([this]() {
+    envoy_thread_ = Thread::threadFactoryForTest().createThread([this]() {
       // Note: main_common_ is accessed in the testing thread, but
       // is race-free, as MainCommon::run() does not return until
       // triggered with an adminRequest POST to /quitquitquit, which

@@ -41,7 +41,7 @@ private:
   pthread_t thread_id_;
 };
 
-ThreadPtr ThreadSystemImpl::createThread(std::function<void()> thread_routine) {
+ThreadPtr ThreadFactoryImpl::createThread(std::function<void()> thread_routine) {
   return std::make_unique<ThreadImpl>(thread_routine);
 }
 

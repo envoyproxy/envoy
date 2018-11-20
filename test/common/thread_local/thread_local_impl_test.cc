@@ -129,7 +129,7 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
 
   Thread::ThreadPtr thread =
-      Thread::threadSystemForTest().createThread([&thread_dispatcher, &tls]() {
+      Thread::threadFactoryForTest().createThread([&thread_dispatcher, &tls]() {
         // Ensure that the dispatcher update in tls posted during the above registerThread happens.
         thread_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
         // Verify we have the expected dispatcher for the new thread thread.

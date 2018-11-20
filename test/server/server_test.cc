@@ -127,7 +127,7 @@ protected:
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
-        Thread::threadSystemForTest());
+        Thread::threadFactoryForTest());
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
@@ -144,7 +144,7 @@ protected:
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
-        Thread::threadSystemForTest());
+        Thread::threadFactoryForTest());
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
@@ -340,7 +340,7 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
       hooks_, restart_, stats_store_, fakelock_, component_factory_,
       std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
-      Thread::threadSystemForTest())));
+      Thread::threadFactoryForTest())));
 }
 
 // Validate that when std::exception is unexpectedly thrown, we exit safely.

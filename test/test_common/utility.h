@@ -454,7 +454,7 @@ public:
 } // namespace Stats
 
 namespace Thread {
-ThreadSystem& threadSystemForTest();
+ThreadFactory& threadFactoryForTest();
 } // namespace Thread
 
 namespace Api {

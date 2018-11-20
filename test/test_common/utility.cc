@@ -346,9 +346,9 @@ MockedTestAllocator::~MockedTestAllocator() {}
 
 namespace Thread {
 
-ThreadSystem& threadSystemForTest() {
-  static ThreadSystemImpl* thread_system = new ThreadSystemImpl();
-  return *thread_system;
+ThreadFactory& threadFactoryForTest() {
+  static ThreadFactoryImpl* thread_factory = new ThreadFactoryImpl();
+  return *thread_factory;
 }
 
 } // namespace Thread
@@ -356,7 +356,7 @@ ThreadSystem& threadSystemForTest() {
 namespace Api {
 
 ApiPtr createApiForTest() {
-  return std::make_unique<Impl>(std::chrono::milliseconds(1000), Thread::threadSystemForTest());
+  return std::make_unique<Impl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest());
 }
 
 } // namespace Api
