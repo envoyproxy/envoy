@@ -2,13 +2,13 @@
 #include <string>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/http/connection_mapper.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/api/api_impl.h"
 #include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
-#include "common/http/connection_mapper.h"
 #include "common/http/connection_mapper_factory.h"
 #include "common/http/wrapped_connection_pool.h"
 #include "common/network/socket_option_impl.h"
@@ -21,6 +21,7 @@
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/mock_connection_mapper.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -2874,26 +2875,16 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
   expectSetsockoptSoKeepalive(7, 4, 1);
 }
 
-class FakeConnectionMapper : public Http::ConnectionMapper {
-public:
-  Http::ConnectionMapperFactory::ConnPoolBuilder builder_ = [] {
-    return Http::ConnectionPool::InstancePtr();
-  };
-
-  MOCK_METHOD1(assignPool,
-               Http::ConnectionPool::Instance*(const Upstream::LoadBalancerContext& context));
-  MOCK_METHOD1(poolIdle, void(const Http::ConnectionPool::Instance& idlePool));
-};
-
 class MockConnectionMapperFactory : public Http::ConnectionMapperFactory {
 public:
-  Http::ConnectionMapperPtr createSrcTransparentMapper(const ConnPoolBuilder& builder) override {
-    std::unique_ptr<FakeConnectionMapper> mapper{createSrcTransparentMapper_()};
+  Http::ConnectionMapperPtr
+  createSrcTransparentMapper(const Http::ConnPoolBuilder& builder) override {
+    std::unique_ptr<Http::MockConnectionMapper> mapper{createSrcTransparentMapper_()};
     mapper->builder_ = builder;
     return mapper;
   }
 
-  MOCK_METHOD0(createSrcTransparentMapper_, FakeConnectionMapper*());
+  MOCK_METHOD0(createSrcTransparentMapper_, Http::MockConnectionMapper*());
 };
 
 class ProdClusterManagerFactoryTest : public testing::Test {
@@ -2933,7 +2924,7 @@ public:
 TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentBuildsConnPool) {
   auto factory = makeFactory();
 
-  FakeConnectionMapper* mapper_fake = new FakeConnectionMapper();
+  Http::MockConnectionMapper* mapper_fake = new Http::MockConnectionMapper();
   EXPECT_CALL(mapper_factory_mock_, createSrcTransparentMapper_).WillOnce(Return(mapper_fake));
 
   auto conn_pool = factory->allocateTransparentConnPool(
@@ -2947,7 +2938,7 @@ TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentBuildsConnPool) {
 TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentHttp2) {
   auto factory = makeFactory();
 
-  FakeConnectionMapper* mapper_fake = new FakeConnectionMapper();
+  Http::MockConnectionMapper* mapper_fake = new Http::MockConnectionMapper();
   EXPECT_CALL(mapper_factory_mock_, createSrcTransparentMapper_).WillOnce(Return(mapper_fake));
 
   EXPECT_CALL(mock_loader_.snapshot_, featureEnabled("upstream.use_http2", 100))
@@ -2964,7 +2955,7 @@ TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentHttp2) {
 TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentHtt) {
   auto factory = makeFactory();
 
-  FakeConnectionMapper* mapper_fake = new FakeConnectionMapper();
+  Http::MockConnectionMapper* mapper_fake = new Http::MockConnectionMapper();
   EXPECT_CALL(mapper_factory_mock_, createSrcTransparentMapper_).WillOnce(Return(mapper_fake));
 
   auto conn_pool = factory->allocateTransparentConnPool(

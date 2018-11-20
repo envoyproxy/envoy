@@ -46,6 +46,13 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "connection_mapper_interface",
+    hdrs = ["connection_mapper.h"],
+    deps = [
+    ],
+)
+
+envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
     external_deps = ["abseil_optional"],

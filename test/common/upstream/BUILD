@@ -30,6 +30,7 @@ envoy_cc_test(
     srcs = ["cluster_manager_impl_test.cc"],
     deps = [
         ":utility_lib",
+        "//include/envoy/http:connection_mapper_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/api:api_lib",
@@ -37,7 +38,6 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:connection_mapper_factory_lib",
-        "//source/common/http:connection_mapper_lib",
         "//source/common/network:socket_option_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
@@ -49,6 +49,7 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/http:mock_connection_mapper",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",

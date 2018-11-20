@@ -71,20 +71,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "connection_mapper_lib",
-    srcs = ["connection_mapper.cc"],
-    hdrs = ["connection_mapper.h"],
-    deps = [
-    ],
-)
-
-envoy_cc_library(
     name = "connection_mapper_factory_lib",
     srcs = ["connection_mapper_factory.cc"],
     hdrs = ["connection_mapper_factory.h"],
     deps = [
         "//include/envoy/http:conn_pool_interface",
-        "//source/common/http:connection_mapper_lib",
+        "//include/envoy/http:connection_mapper_interface",
         "//source/common/singleton:threadsafe_singleton",
     ],
 )
@@ -324,7 +316,7 @@ envoy_cc_library(
     srcs = ["wrapped_connection_pool.cc"],
     hdrs = ["wrapped_connection_pool.h"],
     deps = [
-        ":connection_mapper_lib",
         "//include/envoy/http:conn_pool_interface",
+        "//include/envoy/http:connection_mapper_interface",
     ],
 )

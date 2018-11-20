@@ -35,6 +35,16 @@ envoy_cc_mock(
     ],
 )
 
+envoy_cc_mock(
+    name = "mock_connection_mapper",
+    srcs = ["mock_connection_mapper.cc"],
+    hdrs = ["mock_connection_mapper.h"],
+    deps = [
+        "//include/envoy/http:conn_pool_interface",
+        "//include/envoy/http:connection_mapper_interface",
+    ],
+)
+
 envoy_cc_test(
     name = "http_mocks_test",
     srcs = ["mocks_test.cc"],

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 
 #include "envoy/common/pure.h"
@@ -48,6 +49,7 @@ public:
   // Figure out drained callback stuff.
 };
 
+using ConnPoolBuilder = std::function<std::unique_ptr<ConnectionPool::Instance>()>;
 using ConnectionMapperPtr = std::unique_ptr<ConnectionMapper>;
 } // namespace Http
 } // namespace Envoy

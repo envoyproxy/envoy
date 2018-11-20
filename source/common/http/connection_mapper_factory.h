@@ -1,10 +1,8 @@
 #pragma once
 
-#include <functional>
-
 #include "envoy/http/conn_pool.h"
+#include "envoy/http/connection_mapper.h"
 
-#include "common/http/connection_mapper.h"
 #include "common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
@@ -20,8 +18,6 @@ namespace Http {
  */
 class ConnectionMapperFactory {
 public:
-  using ConnPoolBuilder = std::function<ConnectionPool::InstancePtr()>;
-
   virtual ~ConnectionMapperFactory();
 
   virtual ConnectionMapperPtr createSrcTransparentMapper(const ConnPoolBuilder& builder);
