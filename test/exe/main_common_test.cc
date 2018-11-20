@@ -1,6 +1,5 @@
 #include <unistd.h>
 
-#include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/thread.h"
@@ -193,7 +192,6 @@ protected:
     return envoy_return_;
   }
 
-  Api::Impl api_;
   std::unique_ptr<Thread::Thread> envoy_thread_;
   std::unique_ptr<MainCommon> main_common_;
   absl::Notification started_;
