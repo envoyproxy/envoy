@@ -17,9 +17,9 @@ message ServerInfo {
     LIVE = 0;
     // Server is draining listeners in response to external health checks failing.
     DRAINING = 1;
-    // Server has not yet started cluster manager initialization.
+    // Server has not yet completed cluster manager initialization.
     PRE_INITIALIZING = 2;
-    // Server is initializing the cluster manager.
+    // Server is running the cluster manager initialization callbacks.
     INITIALIZING = 3;
   }
 
