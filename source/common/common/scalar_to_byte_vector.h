@@ -1,5 +1,9 @@
 #pragma once
 
+#include <inttypes.h>
+
+#include <vector>
+
 namespace Envoy {
 template <typename T> void pushScalarToByteVector(T val, std::vector<uint8_t>& bytes) {
   uint8_t* byte_ptr = reinterpret_cast<uint8_t*>(&val);
