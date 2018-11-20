@@ -140,6 +140,9 @@ bazel test //test/... --test_env=HEAPCHECK=
 bazel test //test/... --test_env=HEAPCHECK=minimal
 ```
 
+If you see a leak detected, by default the reported offsets will require `addr2line` interpretation.
+You can run under `--config=clang-asan` to have this automatically applied.
+
 Bazel will by default cache successful test results. To force it to rerun tests:
 
 ```

@@ -1,5 +1,6 @@
 #include <unistd.h>
 
+#include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/thread.h"
@@ -74,7 +75,7 @@ protected:
     argv_.push_back(nullptr);
   }
 
-  // Adds options to make Envoy exit immediately after initializtion.
+  // Adds options to make Envoy exit immediately after initialization.
   void initOnly() {
     addArg("--mode");
     addArg("init_only");
@@ -104,7 +105,7 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   EXPECT_TRUE(main_common.run());
 }
 
-// Ensurees that existing users of main_common() can link.
+// Ensure that existing users of main_common() can link.
 TEST_P(MainCommonTest, LegacyMain) {
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
@@ -158,7 +159,7 @@ protected:
   // Initiates Envoy running in its own thread.
   void startEnvoy() {
     envoy_thread_ = Thread::threadSystemForTest().createThread([this]() {
-      // Note: main_common_ is accesesed in the testing thread, but
+      // Note: main_common_ is accessed in the testing thread, but
       // is race-free, as MainCommon::run() does not return until
       // triggered with an adminRequest POST to /quitquitquit, which
       // is done in the testing thread.
@@ -192,6 +193,7 @@ protected:
     return envoy_return_;
   }
 
+  Api::Impl api_;
   std::unique_ptr<Thread::Thread> envoy_thread_;
   std::unique_ptr<MainCommon> main_common_;
   absl::Notification started_;
