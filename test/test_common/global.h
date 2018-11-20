@@ -12,10 +12,10 @@ namespace Test {
  * Helper class for managing Global<Type>s.
  *
  * This class is instantiated as a process-scoped singleton. It manages a map
- * from type-name to GlobalHelper::Singleton. That map accumulates over a process
- * lifetime and never shrinks. However, the Singleton objects themselves hold
- * a reference-counted class-instance pointer that is deleted and nulled after
- * all references drop, so that each unit-test gets a fresh start.
+ * from type-name to GlobalHelper::Singleton. That map accumulates over a
+ * process lifetime and never shrinks. However, the Singleton objects themselves
+ * hold a reference-counted class-instance pointer that is deleted and nulled
+ * after all references drop, so that each unit-test gets a fresh start.
  */
 class Globals {
   using MakeObjectFn = std::function<void*()>;
@@ -48,8 +48,13 @@ public:
     void releaseHelper(const DeleteObjectFn& delete_object);
 
     Thread::BasicLockable& mutex_;
+
+    // Singleton is manually reference-counted. It would also be possible to use
+    // weak_ptr but we'd have to hold onto the DeleteObjectFn in the structure
+    // so that when the Singleton was deleted we would properly delete the
+    // instatiated class instance.
     uint64_t ref_count_; // Effectively guarded by mutex_, but not analyzable due to aliasing.
-    void* ptr_;          // Chanting ptr_ is done under mutex_, but accessing it is not.
+    void* ptr_;          // Changing ptr_ is done under mutex_, but accessing it is not.
   };
 
   /**
@@ -58,10 +63,9 @@ public:
   template <class Type> static Singleton& get() {
     MakeObjectFn make_object = []() -> void* { return new Type; };
 
-    // The real work here is done by a non-inlined function that carefully
-    // manages two levels of mutexes: one for singleton_map_ and one for each
-    // type of singleton. That function works with void* so that it doesn't need
-    // to be templatized; the casting is done here in the templatized wrapper.
+    // The real work here is done by a non-inlined function. That function works
+    // with void* so that it doesn't need to be templatized; the casting is done
+    // here in the templatized wrapper.
     return instance().get(typeid(Type).name(), make_object);
   }
 

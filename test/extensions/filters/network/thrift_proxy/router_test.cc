@@ -331,12 +331,10 @@ public:
 
 class ThriftRouterTest : public ThriftRouterTestBase, public testing::Test {
 public:
-  ThriftRouterTest() = default;
 };
 
 class ThriftRouterFieldTypeTest : public ThriftRouterTestBase, public TestWithParam<FieldType> {
 public:
-  ThriftRouterFieldTypeTest() = default;
 };
 
 INSTANTIATE_TEST_CASE_P(PrimitiveFieldTypes, ThriftRouterFieldTypeTest,
@@ -346,7 +344,6 @@ INSTANTIATE_TEST_CASE_P(PrimitiveFieldTypes, ThriftRouterFieldTypeTest,
 
 class ThriftRouterContainerTest : public ThriftRouterTestBase, public TestWithParam<FieldType> {
 public:
-  ThriftRouterContainerTest() = default;
 };
 
 INSTANTIATE_TEST_CASE_P(ContainerFieldTypes, ThriftRouterContainerTest,

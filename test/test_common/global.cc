@@ -37,10 +37,6 @@ Globals::Singleton& Globals::get(const std::string& type_name, const MakeObjectF
     return *singleton;
   }
 
-  // Subsequent accesses will must lock the singleton's mutex to safely populate
-  // .second. However, we can relinquish map_mutex_ as we are no longer
-  // modifying the map; just the .second of the MutexSingleton pointed to by the
-  // map.
   if (singleton->ptr_ == nullptr) {
     ASSERT(singleton->ref_count_ == 0);
     singleton->ptr_ = make_object();
