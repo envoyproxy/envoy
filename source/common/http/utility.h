@@ -248,8 +248,6 @@ const Router::RouteSpecificFilterConfig*
 resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
                                           const Router::RouteConstSharedPtr& route);
 
-
-
 /**
  * Retreives the route specific config. Route specific config can be in a few
  * places, that are checked in order. The first config found is returned. The

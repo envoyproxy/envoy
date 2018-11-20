@@ -494,7 +494,7 @@ void Utility::traversePerFilterConfigGeneric(
 
 std::string Utility::metadataMapToString(const MetadataMap& metadata_map) {
   std::string out = "metadata map:";
-  for (auto &metadata : metadata_map) {
+  for (auto& metadata : metadata_map) {
     absl::StrAppend(&out, "\nkey: ", metadata.first, ", value: ", metadata.second);
   }
   return out;
