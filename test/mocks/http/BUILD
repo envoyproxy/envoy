@@ -10,6 +10,16 @@ load(
 envoy_package()
 
 envoy_cc_mock(
+    name = "conn_pool_mocks",
+    srcs = ["conn_pool.cc"],
+    hdrs = ["conn_pool.h"],
+    deps = [
+        "//include/envoy/http:conn_pool_interface",
+        "//test/mocks/upstream:host_mocks",
+    ],
+)
+
+envoy_cc_mock(
     name = "http_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
@@ -17,6 +27,8 @@ envoy_cc_mock(
         "abseil_strings",
     ],
     deps = [
+        ":conn_pool_mocks",
+        ":stream_decoder_mock",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -42,6 +54,15 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/http:conn_pool_interface",
         "//include/envoy/http:connection_mapper_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "stream_decoder_mock",
+    srcs = ["stream_decoder.cc"],
+    hdrs = ["stream_decoder.h"],
+    deps = [
+        "//include/envoy/http:codec_interface",
     ],
 )
 

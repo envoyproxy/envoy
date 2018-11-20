@@ -19,6 +19,8 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/conn_pool.h"
+#include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -51,29 +53,6 @@ public:
 
   // Http::ServerConnectionCallbacks
   MOCK_METHOD1(newStream, StreamDecoder&(StreamEncoder& response_encoder));
-};
-
-class MockStreamDecoder : public StreamDecoder {
-public:
-  MockStreamDecoder();
-  ~MockStreamDecoder();
-
-  void decode100ContinueHeaders(HeaderMapPtr&& headers) override {
-    decode100ContinueHeaders_(headers);
-  }
-  void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override {
-    decodeHeaders_(headers, end_stream);
-  }
-  void decodeTrailers(HeaderMapPtr&& trailers) override { decodeTrailers_(trailers); }
-
-  void decodeMetadata(MetadataMapPtr&& metadata_map) override { decodeMetadata_(metadata_map); }
-
-  // Http::StreamDecoder
-  MOCK_METHOD2(decodeHeaders_, void(HeaderMapPtr& headers, bool end_stream));
-  MOCK_METHOD1(decode100ContinueHeaders_, void(HeaderMapPtr& headers));
-  MOCK_METHOD2(decodeData, void(Buffer::Instance& data, bool end_stream));
-  MOCK_METHOD1(decodeTrailers_, void(HeaderMapPtr& trailers));
-  MOCK_METHOD1(decodeMetadata_, void(MetadataMapPtr& metadata_map));
 };
 
 class MockStreamCallbacks : public StreamCallbacks {
@@ -439,37 +418,6 @@ public:
 } // namespace Http
 
 namespace Http {
-namespace ConnectionPool {
-
-class MockCancellable : public Cancellable {
-public:
-  MockCancellable();
-  ~MockCancellable();
-
-  // Http::ConnectionPool::Cancellable
-  MOCK_METHOD0(cancel, void());
-};
-
-class MockInstance : public Instance {
-public:
-  MockInstance();
-  ~MockInstance();
-
-  // Http::ConnectionPool::Instance
-  MOCK_CONST_METHOD0(protocol, Http::Protocol());
-  MOCK_METHOD1(addDrainedCallback, void(DrainedCb cb));
-  MOCK_METHOD0(drainConnections, void());
-  MOCK_METHOD2(newStream, Cancellable*(Http::StreamDecoder& response_decoder,
-                                       Http::ConnectionPool::Callbacks& callbacks));
-  MOCK_METHOD3(newStream, Cancellable*(Http::StreamDecoder& response_decoder,
-                                       Http::ConnectionPool::Callbacks& callbacks,
-                                       const Upstream::LoadBalancerContext& context));
-
-  std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
-      new testing::NiceMock<Upstream::MockHostDescription>()};
-};
-
-} // namespace ConnectionPool
 
 template <typename HeaderMapT>
 class HeaderValueOfMatcherImpl : public testing::MatcherInterface<HeaderMapT> {
