@@ -422,16 +422,16 @@ For example, you can use [You Complete Me](https://valloric.github.io/YouComplet
 
 # Advanced caching setup
 
-Setting up an HTTP cache for bazel output helps optimize bazel performance and resource usage when
+Setting up an HTTP cache for Bazel output helps optimize Bazel performance and resource usage when
 using multiple compilation modes or multiple trees.
 
 ## Setup common `envoy_deps`
 
-This step setup common `envoy_deps` allowing HTTP or disk cache (described below) works across
-working tree in different paths. Also it allows new working trees to skip dependency compilation.
-The drawback is that the cached dependencies won't be updated automatically, so make sure all
-your working tree have same (or compatible) dependencies, and run this step periodically to update
-them.
+This step sets up the common `envoy_deps` allowing HTTP or disk cache (described below) to work
+across working trees in different paths. Also it allows new working trees to skip dependency
+compilation. The drawback is that the cached dependencies won't be updated automatically, so make
+sure all your working trees have same (or compatible) dependencies, and run this step periodically
+to update them.
 
 Make sure you don't have `--override_repository` in your `.bazelrc` when you run this step.
 
@@ -440,7 +440,7 @@ bazel fetch //test/...
 cp -LR $(bazel info output_base)/external/envoy_deps ${HOME}/envoy_deps_cache
 ```
 
-Adding the following parameter to bazel everytime or persist them in `.bazelrc`, note you will need to expand
+Adding the following parameter to Bazel everytime or persist them in `.bazelrc`, note you will need to expand
 the environment variables for `.bazelrc`.
 
 ```
@@ -459,14 +459,14 @@ if you don't have one.
 go run github.com/buchgr/bazel-remote --dir ${HOME}/bazel_cache --host 127.0.0.1 --port 28080 --max_size 64
 ```
 
-See [bazel remote cache](github.com/buchgr/bazel-remote) for more information on the parameters.
+See [Bazel remote cache](github.com/buchgr/bazel-remote) for more information on the parameters.
 The command above will setup a maximum 64 GiB cache at `~/bazel_cache` on port 28080. You might
 want to setup a larger cache if you run ASAN builds.
 
 NOTE: Using docker to run remote cache server described in remote cache docs will likely have
-slower cache performance on macOS due to slow Docker for Mac disk performance.
+slower cache performance on macOS due to slow disk performance for Docker on Mac.
 
-Adding the following parameter to bazel everytime or persist them in `.bazelrc`.
+Adding the following parameter to Bazel everytime or persist them in `.bazelrc`.
 
 ```
 --remote_http_cache=http://127.0.0.1:28080/
@@ -474,9 +474,9 @@ Adding the following parameter to bazel everytime or persist them in `.bazelrc`.
 
 ## Restrict environment variables
 
-You might need following parameters for bazel or persist in `.bazelrc` as well to make cache more
-efficient. This will let Bazel use an environment with a static value for PATH and does not inherit
-LD_LIBRARY_PATH or TMPDIR. See
+You might need the following parameters for Bazel or persist in `.bazelrc` as well to make cache
+more efficient. This will let Bazel use an environment with a static value for _PATH_ and does
+not inherit _LD_LIBRARY_PATH_ or _TMPDIR_. See
 [Bazel Command-Line References](https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_strict_action_env)
 for more information.
 
