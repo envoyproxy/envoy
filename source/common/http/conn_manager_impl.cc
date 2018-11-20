@@ -1166,7 +1166,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilter* filter,
-                                                         MetadataMapPtr metadata_map) {
+                                                         MetadataMapPtr&& metadata_map) {
   resetIdleTimer();
 
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, false);
@@ -1174,8 +1174,7 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
     // TODO(soya3129): Add filters here.
   }
 
-  ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this,
-                   Utility::metadataMapToString(*metadata_map));
+  ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, *metadata_map);
 
   // Now encode metadata via the codec.
   if (!metadata_map->empty()) {

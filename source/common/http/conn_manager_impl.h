@@ -292,7 +292,7 @@ private:
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
-    void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr metadata_map);
+    void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map);
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
 

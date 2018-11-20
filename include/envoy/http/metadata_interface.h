@@ -25,3 +25,12 @@ using MetadataCallback = std::function<void(std::unique_ptr<MetadataMap>)>;
 
 } // namespace Http
 } // namespace Envoy
+
+inline std::ostream& operator<<(std::ostream& out, const Envoy::Http::MetadataMap& metadata_map) {
+  out << "metadata map:";
+  for (const auto& metadata : metadata_map) {
+    out << "\nkey: " << metadata.first << ", value: " << metadata.second << std::endl;
+  }
+  return out;
+}
+
