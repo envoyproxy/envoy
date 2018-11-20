@@ -286,3 +286,19 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "wrapped_connection_pool_test",
+    srcs = ["wrapped_connection_pool_test.cc"],
+    deps = [
+        ":common_lib",
+        "//include/envoy/http:codec_interface",
+        "//source/common/http:wrapped_connection_pool_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/http:conn_pool_mocks",
+        "//test/mocks/http:mock_connection_mapper",
+        "//test/mocks/http:stream_decoder_mock",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
+    ],
+)

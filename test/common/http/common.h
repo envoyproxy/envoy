@@ -46,14 +46,16 @@ struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
     pool_ready_.ready();
   }
 
-  void onPoolFailure(Http::ConnectionPool::PoolFailureReason,
+  void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
                      Upstream::HostDescriptionConstSharedPtr host) override {
     host_ = host;
+    failure_reason_ = reason;
     pool_failure_.ready();
   }
 
   ReadyWatcher pool_failure_;
   ReadyWatcher pool_ready_;
+  absl::optional<Http::ConnectionPool::PoolFailureReason> failure_reason_;
   Http::StreamEncoder* outer_encoder_{};
   Upstream::HostDescriptionConstSharedPtr host_;
 };

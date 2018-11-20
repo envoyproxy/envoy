@@ -316,6 +316,7 @@ envoy_cc_library(
     srcs = ["wrapped_connection_pool.cc"],
     hdrs = ["wrapped_connection_pool.h"],
     deps = [
+        ":conn_pool_base_lib",
         "//include/envoy/http:conn_pool_interface",
         "//include/envoy/http:connection_mapper_interface",
     ],
