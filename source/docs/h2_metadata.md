@@ -27,6 +27,9 @@ between response data or after response data. If metadata frames have to be sent
 users must put the end of stream in an empty data frame and send the empty data frame after metadata frames.
 TODO(soya3129): add more conditions for metadata in requests.
 
+Envoy only allows up to 1M metadata to be sent per stream. If the accumulated
+metadata size exceeds the limit, the stream will be reset.
+
 ### Envoy metadata handling
 
 Envoy provides the functionality to proxy, process and add metadata.

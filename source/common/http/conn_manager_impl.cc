@@ -1166,7 +1166,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilter* filter,
-                                                         MetadataMap& metadata_map) {
+                                                         MetadataMapPtr metadata_map) {
   resetIdleTimer();
 
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, false);
@@ -1174,12 +1174,14 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
     // TODO(soya3129): Add filters here.
   }
 
-  ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n", *this);
+  ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this,
+                   Utility::metadataMapToString(*metadata_map));
 
   // Now encode metadata via the codec.
-  if (!metadata_map.empty()) {
-    response_encoder_->encodeMetadata(metadata_map);
+  if (!metadata_map->empty()) {
+    response_encoder_->encodeMetadata(*metadata_map);
   }
+  // metadata_map destroyed when function returns.
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
@@ -1600,8 +1602,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeTrailers(HeaderMapP
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeMetadata(
     MetadataMapPtr&& metadata_map) {
-  parent_.response_metadata_map_ = std::move(metadata_map);
-  parent_.encodeMetadata(nullptr, *parent_.response_metadata_map_);
+  parent_.encodeMetadata(nullptr, std::move(metadata_map));
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::

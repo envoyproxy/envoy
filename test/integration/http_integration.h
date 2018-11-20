@@ -180,6 +180,7 @@ protected:
   void testEnvoyProxyMetadataInResponse();
   void testEnvoyProxyMultipleMetadata();
   void testEnvoyProxyInvalidMetadata();
+  void testEnvoyMultipleMetadataReachSizeLimit();
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
                                     const std::string& via = "");
   void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,

@@ -10,6 +10,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/message.h"
+#include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
 
 #include "common/json/json_loader.h"
@@ -247,6 +248,8 @@ const Router::RouteSpecificFilterConfig*
 resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
                                           const Router::RouteConstSharedPtr& route);
 
+
+
 /**
  * Retreives the route specific config. Route specific config can be in a few
  * places, that are checked in order. The first config found is returned. The
@@ -341,6 +344,11 @@ getMergedPerFilterConfig(const std::string& filter_name, const Router::RouteCons
 
   return merged;
 }
+
+/**
+ * Serialize metadata map into a string.
+ */
+std::string metadataMapToString(const MetadataMap& metadata_map);
 
 } // namespace Utility
 } // namespace Http

@@ -1207,6 +1207,29 @@ void HttpIntegrationTest::testEnvoyProxyInvalidMetadata() {
   EXPECT_EQ(response->metadata_map().size(), 0);
 }
 
+void HttpIntegrationTest::testEnvoyMultipleMetadataReachSizeLimit() {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Sends a request.
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  waitForNextUpstreamRequest();
+
+  // Sends multiple metadata after response header until max size limit is reached.
+  const std::string key = "key";
+  std::string value = std::string(10000, 'a');
+  Http::MetadataMap metadata_map = {{key, value}};
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  for (int i = 0; i < 200; i++) {
+    upstream_request_->encodeMetadata(metadata_map);
+  }
+  upstream_request_->encodeData(12, true);
+
+  // Verifies reset is received.
+  response->waitForReset();
+  ASSERT_FALSE(response->complete());
+}
+
 void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_from_upstream,
                                                        const std::string& via) {
   initialize();

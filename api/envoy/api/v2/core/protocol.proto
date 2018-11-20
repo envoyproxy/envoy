@@ -83,7 +83,7 @@ message Http2ProtocolOptions {
   // [#not-implemented-hide:] Hiding until envoy has full metadata support.
   // Still under implementation. DO NOT USE.
   //
-  // Allows metadata. See source/docs/h2_metadata.md for more information.
+  // Allows metadata. See [metadata docs](https://github.com/envoyproxy/envoy/blob/master/source/docs/h2_metadata.md) for more information.
   bool allow_metadata = 6;
 }
 
