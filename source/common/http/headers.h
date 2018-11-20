@@ -45,6 +45,7 @@ public:
   const LowerCaseString EnvoyOriginalDstHost{"x-envoy-original-dst-host"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
   const LowerCaseString EnvoyOverloaded{"x-envoy-overloaded"};
+  const LowerCaseString EnvoyRateLimited{"x-envoy-ratelimited"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
   const LowerCaseString EnvoyRetryGrpcOn{"x-envoy-retry-grpc-on"};
   const LowerCaseString EnvoyRetriableStatusCodes{"x-envoy-retriable-status-codes"};
@@ -135,6 +136,10 @@ public:
   struct {
     const std::string True{"true"};
   } EnvoyOverloadedValues;
+
+  struct {
+    const std::string True{"true"};
+  } EnvoyRateLimitedValues;
 
   struct {
     const std::string _5xx{"5xx"};

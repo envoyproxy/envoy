@@ -28,6 +28,7 @@ envoy_cc_test(
     deps = [
         "//include/envoy/upstream:resource_manager_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/api:api_lib",
         "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",
         "//source/server/config_validation:cluster_manager_lib",

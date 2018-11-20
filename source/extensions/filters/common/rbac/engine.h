@@ -36,8 +36,13 @@ public:
    * Returns whether or not the current action is permitted.
    *
    * @param connection the downstream connection used to identify the action/principal.
+   * @param metadata   the metadata with additional information about the action/principal.
+   * @param effective_policy_id  it will be filled by the matching policy's ID,
+   *                   which is used to identity the source of the allow/deny.
    */
-  virtual bool allowed(const Network::Connection& connection) const PURE;
+  virtual bool allowed(const Network::Connection& connection,
+                       const envoy::api::v2::core::Metadata& metadata,
+                       std::string* effective_policy_id) const PURE;
 };
 
 } // namespace RBAC

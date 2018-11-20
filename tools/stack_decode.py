@@ -28,8 +28,7 @@ def decode_stacktrace_log(input_source):
   # Match something like [backtrace]
   # bazel-out/local-dbg/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:84]
   backtrace_marker = "\[backtrace\] [^\s]+"
-  trace_begin_re = re.compile(
-      "^(.+)%s Backtrace thr<(\d+)> obj<(.+)>" % backtrace_marker)
+  trace_begin_re = re.compile("^(.+)%s Backtrace thr<(\d+)> obj<(.+)>" % backtrace_marker)
   stackaddr_re = re.compile("%s thr<(\d+)> #\d+ (0x[0-9a-fA-F]+) " % backtrace_marker)
   new_object_re = re.compile("%s thr<(\d+)> obj<(.+)>$" % backtrace_marker)
   trace_end_re = re.compile("%s end backtrace thread (\d+)" % backtrace_marker)
@@ -44,8 +43,7 @@ def decode_stacktrace_log(input_source):
       if begin_trace_match:
         log_prefix, thread_id, objfile = begin_trace_match.groups()
         traces[thread_id] = Backtrace(log_prefix=log_prefix, obj_list=[])
-        traces[thread_id].obj_list.append(
-            AddressList(obj_file=objfile, addresses=[]))
+        traces[thread_id].obj_list.append(AddressList(obj_file=objfile, addresses=[]))
         continue
       stackaddr_match = stackaddr_re.search(line)
       if stackaddr_match:
@@ -55,8 +53,7 @@ def decode_stacktrace_log(input_source):
       new_object_match = new_object_re.search(line)
       if new_object_match:
         thread_id, newobj = new_object_match.groups()
-        traces[thread_id].obj_list.append(
-            AddressList(obj_file=newobj, addresses=[]))
+        traces[thread_id].obj_list.append(AddressList(obj_file=newobj, addresses=[]))
         continue
       trace_end_match = trace_end_re.search(line)
       if trace_end_match:
@@ -74,10 +71,9 @@ def decode_stacktrace_log(input_source):
 #
 # Returns list of result lines
 def run_addr2line(obj_file, piped_input):
-  addr2line = subprocess.Popen(
-      ["addr2line", "-Cpisfe", obj_file],
-      stdin=subprocess.PIPE,
-      stdout=subprocess.PIPE)
+  addr2line = subprocess.Popen(["addr2line", "-Cpisfe", obj_file],
+                               stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE)
   output_stdout, _ = addr2line.communicate(piped_input)
   return output_stdout.split("\n")
 
@@ -94,19 +90,18 @@ def output_stacktrace(thread_id, traceinfo):
     output_lines += run_addr2line(obj_name, piped_input)
 
   resolved_stack_frames = enumerate(output_lines, start=1)
-  sys.stdout.write("%s Backtrace (most recent call first) from thread %s:\n" %
-                   (traceinfo.log_prefix, thread_id))
+  sys.stdout.write(
+      "%s Backtrace (most recent call first) from thread %s:\n" % (traceinfo.log_prefix, thread_id))
   for stack_frame in resolved_stack_frames:
     sys.stdout.write("  #%s %s\n" % stack_frame)
 
 
 if __name__ == "__main__":
   if len(sys.argv) > 1:
-    rununder = subprocess.Popen(
-        sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    rununder = subprocess.Popen(sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     decode_stacktrace_log(rununder.stdout)
     rununder.wait()
-    sys.exit(rununder.returncode) # Pass back test pass/fail result
+    sys.exit(rununder.returncode)  # Pass back test pass/fail result
   else:
     decode_stacktrace_log(sys.stdin)
   sys.exit(0)

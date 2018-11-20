@@ -47,11 +47,9 @@ public:
 
   // Http::AsyncClient
   Request* send(MessagePtr&& request, Callbacks& callbacks,
-                const absl::optional<std::chrono::milliseconds>& timeout) override;
+                const AsyncClient::RequestOptions& options) override;
 
-  Stream* start(StreamCallbacks& callbacks,
-                const absl::optional<std::chrono::milliseconds>& timeout,
-                bool buffer_body_for_retry) override;
+  Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
@@ -76,8 +74,7 @@ class AsyncStreamImpl : public AsyncClient::Stream,
                         LinkedObject<AsyncStreamImpl> {
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
-                  const absl::optional<std::chrono::milliseconds>& timeout,
-                  bool buffer_body_for_retry);
+                  const AsyncClient::StreamOptions& options);
 
   // Http::AsyncClient::Stream
   void sendHeaders(HeaderMap& headers, bool end_stream) override;
@@ -286,7 +283,8 @@ private:
   void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void sendLocalReply(Code code, const std::string& body,
-                      std::function<void(HeaderMap& headers)> modify_headers) override {
+                      std::function<void(HeaderMap& headers)> modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
     Utility::sendLocalReply(
         is_grpc_request_,
         [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
@@ -296,7 +294,7 @@ private:
           encodeHeaders(std::move(headers), end_stream);
         },
         [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
-        remote_closed_, code, body, is_head_request_);
+        remote_closed_, code, body, grpc_status, is_head_request_);
   }
   // The async client won't pause if sending an Expect: 100-Continue so simply
   // swallows any incoming encode100Continue.
@@ -323,6 +321,7 @@ private:
   Buffer::InstancePtr buffered_body_;
   bool is_grpc_request_{};
   bool is_head_request_{false};
+  bool send_xff_{true};
   friend class AsyncClientImpl;
 };
 
@@ -331,7 +330,7 @@ class AsyncRequestImpl final : public AsyncClient::Request,
                                AsyncClient::StreamCallbacks {
 public:
   AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
-                   const absl::optional<std::chrono::milliseconds>& timeout);
+                   const AsyncClient::RequestOptions& options);
 
   // AsyncClient::Request
   virtual void cancel() override;

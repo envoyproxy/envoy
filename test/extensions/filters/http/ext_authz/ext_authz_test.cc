@@ -14,6 +14,7 @@
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/ext_authz/ext_authz.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -43,6 +44,41 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
+// Test that the per route config is properly merged: more specific keys override previous keys.
+TEST(HttpExtAuthzFilterConfigPerRouteTest, MergeConfig) {
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settings;
+  auto&& extensions = settings.mutable_check_settings()->mutable_context_extensions();
+
+  // First config base config with one base value, and one value to be overriden.
+  (*extensions)["base_key"] = "base_value";
+  (*extensions)["merged_key"] = "base_value";
+  FilterConfigPerRoute base_config(settings);
+
+  // Construct a config to merge, that provides one value and overrides one value.
+  settings.Clear();
+  auto&& specific_extensions = settings.mutable_check_settings()->mutable_context_extensions();
+  (*specific_extensions)["merged_key"] = "value";
+  (*specific_extensions)["key"] = "value";
+  FilterConfigPerRoute specific_config(settings);
+
+  // Perform the merge:
+  base_config.merge(specific_config);
+
+  settings.Clear();
+  settings.set_disabled(true);
+  FilterConfigPerRoute disabled_config(settings);
+
+  // Perform a merge with disabled config:
+  base_config.merge(disabled_config);
+
+  // Make sure all values were merged:
+  EXPECT_TRUE(base_config.disabled());
+  auto&& merged_extensions = base_config.contextExtensions();
+  EXPECT_EQ("base_value", merged_extensions.at("base_key"));
+  EXPECT_EQ("value", merged_extensions.at("merged_key"));
+  EXPECT_EQ("value", merged_extensions.at("key"));
+}
+
 class HttpExtAuthzFilterTestBase {
 public:
   HttpExtAuthzFilterTestBase() {}
@@ -60,6 +96,12 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
+
+  void prepareCheck() {
+    ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+    EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+    EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  }
 };
 
 class HttpExtAuthzFilterTest : public testing::Test, public HttpExtAuthzFilterTestBase {
@@ -142,6 +184,85 @@ TEST_F(HttpExtAuthzFilterTest, TestAllowedRequestHeaders) {
             1);
 }
 
+// Test that context extensions make it into the check request.
+TEST_F(HttpExtAuthzFilterTest, ContextExtensions) {
+  initialize(filter_config_);
+
+  // Place something in the context extensions on the virtualhost.
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settingsvhost;
+  (*settingsvhost.mutable_check_settings()->mutable_context_extensions())["key_vhost"] =
+      "value_vhost";
+  // add a default route value to see it overriden
+  (*settingsvhost.mutable_check_settings()->mutable_context_extensions())["key_route"] =
+      "default_route_value";
+  // Initialize the virtual host's per filter config.
+  FilterConfigPerRoute auth_per_vhost(settingsvhost);
+  ON_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
+          perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+      .WillByDefault(Return(&auth_per_vhost));
+
+  // Place something in the context extensions on the route.
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settingsroute;
+  (*settingsroute.mutable_check_settings()->mutable_context_extensions())["key_route"] =
+      "value_route";
+  // Initialize the route's per filter config.
+  FilterConfigPerRoute auth_per_route(settingsroute);
+  ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+      .WillByDefault(Return(&auth_per_route));
+
+  prepareCheck();
+
+  // Save the check request from the check call.
+  envoy::service::auth::v2alpha::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(WithArgs<1>(
+          Invoke([&](const envoy::service::auth::v2alpha::CheckRequest& check_param) -> void {
+            check_request = check_param;
+          })));
+
+  // Engage the filter so that check is called.
+  filter_->decodeHeaders(request_headers_, false);
+
+  // Make sure that the extensions appear in the check request issued by the filter.
+  EXPECT_EQ("value_vhost", check_request.attributes().context_extensions().at("key_vhost"));
+  EXPECT_EQ("value_route", check_request.attributes().context_extensions().at("key_route"));
+}
+
+// Test that filter can be disabled with route config.
+TEST_F(HttpExtAuthzFilterTest, DisabledOnRoute) {
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settings;
+  FilterConfigPerRoute auth_per_route(settings);
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(addr_));
+  ON_CALL(connection_, localAddress()).WillByDefault(ReturnRef(addr_));
+
+  ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+      .WillByDefault(Return(&auth_per_route));
+
+  auto test_disable = [&](bool disabled) {
+    initialize(filter_config_);
+    // Set disabled
+    settings.set_disabled(disabled);
+    // Initialize the route's per filter config.
+    auth_per_route = FilterConfigPerRoute(settings);
+  };
+
+  // baseline: make sure that when not disabled, check is called
+  test_disable(false);
+  EXPECT_CALL(*client_, check(_, _, _)).Times(1);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  // test that disabling works
+  test_disable(true);
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
 // Test that the request continues when the filter_callbacks has no route.
 TEST_P(HttpExtAuthzFilterParamTest, NoRoute) {
 
@@ -166,9 +287,7 @@ TEST_P(HttpExtAuthzFilterParamTest, NoCluster) {
 TEST_P(HttpExtAuthzFilterParamTest, OkResponse) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
       .WillOnce(
@@ -198,9 +317,7 @@ TEST_P(HttpExtAuthzFilterParamTest, OkResponse) {
 TEST_P(HttpExtAuthzFilterParamTest, ImmediateOkResponse) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
@@ -224,9 +341,7 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateOkResponse) {
 TEST_P(HttpExtAuthzFilterParamTest, ImmediateDeniedResponseWithHttpAttributes) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
@@ -266,9 +381,7 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateOkResponseWithHttpAttributes) {
   const Http::LowerCaseString key_to_override{"foobar"};
   request_headers_.addCopy("foobar", "foo");
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
@@ -298,9 +411,7 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateOkResponseWithHttpAttributes) {
 TEST_P(HttpExtAuthzFilterParamTest, ImmediateDeniedResponse) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
@@ -323,9 +434,7 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateDeniedResponse) {
 TEST_P(HttpExtAuthzFilterParamTest, DeniedResponseWith401) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -356,9 +465,7 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponseWith401) {
 TEST_P(HttpExtAuthzFilterParamTest, DeniedResponseWith403) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -397,9 +504,7 @@ TEST_P(HttpExtAuthzFilterParamTest, DestroyResponseBeforeSendLocalReply) {
   Filters::Common::ExtAuthz::ResponsePtr response_ptr =
       std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -447,9 +552,7 @@ TEST_P(HttpExtAuthzFilterParamTest, OverrideEncodingHeaders) {
   Filters::Common::ExtAuthz::ResponsePtr response_ptr =
       std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -494,9 +597,7 @@ TEST_P(HttpExtAuthzFilterParamTest, OverrideEncodingHeaders) {
 TEST_P(HttpExtAuthzFilterParamTest, ResetDuringCall) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -537,9 +638,7 @@ TEST_F(HttpExtAuthzFilterTest, ErrorFailClose) {
   initialize(fail_close_config);
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -562,9 +661,7 @@ TEST_F(HttpExtAuthzFilterTest, ErrorOpen) {
   initialize(filter_config_);
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -587,9 +684,7 @@ TEST_F(HttpExtAuthzFilterTest, ImmediateErrorOpen) {
   initialize(filter_config_);
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;

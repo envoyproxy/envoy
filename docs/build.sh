@@ -52,6 +52,7 @@ PROTO_RST="
   /envoy/admin/v2alpha/config_dump/envoy/admin/v2alpha/config_dump.proto.rst
   /envoy/admin/v2alpha/memory/envoy/admin/v2alpha/memory.proto.rst
   /envoy/admin/v2alpha/clusters/envoy/admin/v2alpha/metrics.proto.rst
+  /envoy/admin/v2alpha/mutex_stats/envoy/admin/v2alpha/mutex_stats.proto.rst
   /envoy/admin/v2alpha/server_info/envoy/admin/v2alpha/server_info.proto.rst
   /envoy/api/v2/core/address/envoy/api/v2/core/address.proto.rst
   /envoy/api/v2/core/base/envoy/api/v2/core/base.proto.rst
@@ -119,6 +120,7 @@ PROTO_RST="
   /envoy/service/accesslog/v2/als/envoy/service/accesslog/v2/als.proto.rst
   /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/attribute_context.proto.rst
   /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/external_auth.proto.rst
+  /envoy/service/ratelimit/v2/rls/envoy/service/ratelimit/v2/rls.proto.rst
   /envoy/type/http_status/envoy/type/http_status.proto.rst
   /envoy/type/percent/envoy/type/percent.proto.rst
   /envoy/type/range/envoy/type/range.proto.rst

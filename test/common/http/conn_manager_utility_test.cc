@@ -53,6 +53,7 @@ public:
   MOCK_METHOD0(generateRequestId, bool());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(requestTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider&());
   MOCK_METHOD0(serverName, const std::string&());

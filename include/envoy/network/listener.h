@@ -72,6 +72,14 @@ public:
    * @return const std::string& the listener's name.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return bool indicates whether write filters should be in the reversed order of the filter
+   *         chain config.
+   */
+  // TODO(qiannawang): this method is deprecated and to be moved soon. See
+  // https://github.com/envoyproxy/envoy/pull/4889 for more details.
+  virtual bool reverseWriteFilterOrder() const PURE;
 };
 
 /**

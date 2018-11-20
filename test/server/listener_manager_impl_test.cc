@@ -346,6 +346,20 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
   EXPECT_EQ(1UL, server_.stats_store_.counter("listener.127.0.0.1_1234.foo").value());
 }
 
+TEST_F(ListenerManagerImplTest, ReversedWriteFilterOrder) {
+  const std::string json = R"EOF(
+    name: "foo"
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 10000 }
+    filter_chains:
+    - filters:
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(json), "", true));
+  EXPECT_TRUE(manager_->listeners().front().get().reverseWriteFilterOrder());
+}
+
 TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
   InSequence s;
 

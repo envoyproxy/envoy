@@ -160,11 +160,12 @@ void HdsDelegate::onReceiveMessage(
   // Reset
   hds_clusters_.clear();
 
+  // Set response
+  server_response_ms_ = PROTOBUF_GET_MS_REQUIRED(*message, interval);
+
   // Process the HealthCheckSpecifier message
   processMessage(std::move(message));
 
-  // Set response
-  server_response_ms_ = PROTOBUF_GET_MS_REQUIRED(*message, interval);
   setHdsStreamResponseTimer();
 }
 

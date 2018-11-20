@@ -20,6 +20,7 @@
 
 #include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/config/bootstrap_json.h"
@@ -60,7 +61,9 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks, time_system),
       dns_resolver_(dispatcher_->createDnsResolver({})),
-      access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false) {
+      access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false),
+      mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
+                                                  : nullptr) {
 
   try {
     if (!options.logPath().empty()) {
@@ -304,7 +307,7 @@ void InstanceImpl::initialize(Options& options,
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo(), secretManager());
+      localInfo(), secretManager(), api());
 
   // Now the configuration gets parsed. The configuration may start setting thread local data
   // per above. See MainImpl::initialize() for why we do this pointer dance.
@@ -321,7 +324,7 @@ void InstanceImpl::initialize(Options& options,
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        clusterManager(), thread_local_, time_system_);
+        clusterManager(), thread_local_, time_system_, api());
     hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
         bootstrap_.node(), stats(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
@@ -341,7 +344,7 @@ void InstanceImpl::initialize(Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, *config_, time_system_);
+  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, *config_, time_system_, api());
 }
 
 void InstanceImpl::startWorkers() {
@@ -363,11 +366,9 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
         config.runtime()->overrideSubdirectory() + "/" + server.localInfo().clusterName();
     ENVOY_LOG(info, "runtime override subdirectory: {}", override_subdirectory);
 
-    Api::OsSysCallsPtr os_sys_calls(new Api::OsSysCallsImpl);
     return std::make_unique<Runtime::DiskBackedLoaderImpl>(
         server.dispatcher(), server.threadLocal(), config.runtime()->symlinkRoot(),
-        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random(),
-        std::move(os_sys_calls));
+        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random());
   } else {
     return std::make_unique<Runtime::LoaderImpl>(server.random(), server.stats(),
                                                  server.threadLocal());
@@ -454,7 +455,7 @@ void InstanceImpl::run() {
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
-  auto watchdog = guard_dog_->createWatchDog(Thread::Thread::currentThreadId());
+  auto watchdog = guard_dog_->createWatchDog(Thread::currentThreadId());
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");

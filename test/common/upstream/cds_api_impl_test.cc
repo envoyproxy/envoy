@@ -75,9 +75,9 @@ public:
   void expectRequest() {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("foo_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke(
-            [&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+        .WillOnce(
+            Invoke([&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
+                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
               EXPECT_EQ(
                   (Http::TestHeaderMapImpl{
                       {":method", v2_rest_ ? "POST" : "GET"},

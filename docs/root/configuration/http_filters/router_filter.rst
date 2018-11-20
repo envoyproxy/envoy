@@ -226,6 +226,15 @@ x-envoy-overloaded
 If this header is set by upstream, Envoy will not retry. Currently the value of the header is not
 looked at, only its presence.
 
+.. _config_http_filters_router_x-envoy-ratelimited:
+
+x-envoy-ratelimited
+^^^^^^^^^^^^^^^^^^^
+
+If this header is set by upstream, Envoy will not retry. Currently the value of the header is not
+looked at, only its presence. This header is set by :ref:`rate limit filter<config_http_filters_rate_limit>`
+when the request is rate limited. 
+
 .. _config_http_filters_router_x-envoy-decorator-operation:
 
 x-envoy-decorator-operation

@@ -29,6 +29,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/stat_sinks/statsd:config",
@@ -93,6 +94,7 @@ envoy_cc_test(
     srcs = ["guarddog_impl_test.cc"],
     deps = [
         "//include/envoy/common:time_interface",
+        "//source/common/api:api_lib",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/server:guarddog_lib",
@@ -237,6 +239,7 @@ envoy_cc_test(
     name = "worker_impl_test",
     srcs = ["worker_impl_test.cc"],
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
         "//source/server:worker_lib",
         "//test/mocks/network:network_mocks",

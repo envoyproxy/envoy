@@ -32,6 +32,7 @@ envoy_cc_test(
         ":utility_lib",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/api:api_lib",
         "//source/common/config:bootstrap_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",

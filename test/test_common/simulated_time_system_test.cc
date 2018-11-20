@@ -60,7 +60,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
 
   // Run an event loop in the background to activate timers.
   std::atomic<bool> done(false);
-  auto thread = std::make_unique<Thread::Thread>([this, &done]() {
+  auto thread = std::make_unique<Thread::ThreadImpl>([this, &done]() {
     while (!done) {
       event_base_loop(event_system_.get(), 0);
     }

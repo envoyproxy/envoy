@@ -6,6 +6,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/common/mutex_tracer.h"
 #include "envoy/event/timer.h"
 #include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
@@ -115,6 +116,11 @@ public:
    * @return the server's listener manager.
    */
   virtual ListenerManager& listenerManager() PURE;
+
+  /**
+   * @return the server's global mutex tracer, if it was instantiated. Nullptr otherwise.
+   */
+  virtual Envoy::MutexTracer* mutexTracer() PURE;
 
   /**
    * @return the server's overload manager.

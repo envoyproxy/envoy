@@ -31,8 +31,7 @@ INTERFACE_SYNTHETIC_ROOT = "include-envoy"
 # also the name of a subdirectory of 'include' -- the only
 # subdirectory of 'include' currently, so it's easier just to treat
 # that as a single element.
-fname = sys.argv[1].replace("/" + INTERFACE_REAL_ROOT + "/",
-                            "/" + INTERFACE_SYNTHETIC_ROOT + "/")
+fname = sys.argv[1].replace("/" + INTERFACE_REAL_ROOT + "/", "/" + INTERFACE_SYNTHETIC_ROOT + "/")
 
 # Parse the absolute location of this repo, its relative path, and
 # file extension, exiting with no output along the way any time there
@@ -52,16 +51,18 @@ if dot == -1 or dot == len(leaf) - 1:
   sys.exit(0)
 ext = leaf[dot:]
 
+
 # Transforms the input filename based on some transformation rules. Nothing
 # is emitted if the input path or extension does not match the expected pattern,
 # or if the file doesn't exist.
 def emit(source_path, dest_path, source_ending, dest_ending):
   if fname.endswith(source_ending) and path.startswith(source_path + "/"):
     path_len = len(path) - len(source_path) - len(source_ending)
-    new_path = (absolute_location + dest_path +
-                path[len(source_path):-len(source_ending)] + dest_ending)
+    new_path = (
+        absolute_location + dest_path + path[len(source_path):-len(source_ending)] + dest_ending)
     if os.path.isfile(new_path):
       print(new_path)
+
 
 # Depending on which type of file is passed into the script: test, cc,
 # h, or interface, emit any related ones in cyclic order.
