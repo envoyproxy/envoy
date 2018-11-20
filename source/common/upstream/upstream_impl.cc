@@ -256,7 +256,7 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
       }
 
       // Then populate the scheduler entires for the degraded hosts.
-      // TOOD(snowp): extract function
+      // TODO(snowp): extract function
       const double effective_weight = effectiveLocalityWeight(i, degraded_hosts_);
       if (effective_weight > 0) {
         degraded_locality_entries_.emplace_back(

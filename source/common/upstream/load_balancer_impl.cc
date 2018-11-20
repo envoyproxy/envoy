@@ -111,7 +111,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
               (host_set.healthyHosts().size() - host_set.degradedHosts().size()) /
               host_set.hosts().size()));
 
-    // Priority degraded is computed similarily but only looks at degraded hosts.
+    // Priority degraded is computed similarly but only looks at degraded hosts.
     per_priority_degraded[priority] =
         std::min<uint32_t>(100, (host_set.overprovisioning_factor() *
                                  host_set.degradedHosts().size() / host_set.hosts().size()));
