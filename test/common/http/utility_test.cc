@@ -726,13 +726,5 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
   EXPECT_EQ(2, merged_cfg.value().state_);
 }
 
-TEST(HttpUtility, MetadataMapToString) {
-  EXPECT_EQ("metadata map:", Utility::metadataMapToString({}));
-  EXPECT_EQ("metadata map:\nkey: key, value: value",
-            Utility::metadataMapToString(MetadataMap({{"key", "value"}})));
-  EXPECT_EQ("metadata map:\nkey: b, value: 2\nkey: a, value: 1",
-            Utility::metadataMapToString(MetadataMap({{"a", "1"}, {"b", "2"}})));
-}
-
 } // namespace Http
 } // namespace Envoy

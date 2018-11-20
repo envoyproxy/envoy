@@ -343,11 +343,6 @@ getMergedPerFilterConfig(const std::string& filter_name, const Router::RouteCons
   return merged;
 }
 
-/**
- * Serialize metadata map into a string.
- */
-std::string metadataMapToString(const MetadataMap& metadata_map);
-
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy
