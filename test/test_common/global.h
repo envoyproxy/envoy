@@ -34,7 +34,7 @@ public:
 
   /**
    * Manages Singleton objects that are cleaned up after all references are
-   * dropped. This class must not be templatized becuase as a map value where
+   * dropped. This class must not be templatized because as a map value where
    * every singleton in the map represents a different type. Instead we
    * templatize the ptr() and ref() methods.
    */
