@@ -14,5 +14,6 @@ envoy_cc_test(
     deps = [
         "//source/common/api:api_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
     ],
 )

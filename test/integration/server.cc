@@ -5,6 +5,7 @@
 
 #include "envoy/http/header_map.h"
 
+#include "common/common/thread.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
@@ -154,7 +155,8 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
   Stats::ThreadLocalStoreImpl stat_store(options.statsOptions(), stats_allocator);
 
   Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
-                              access_log_lock, component_factory, std::move(random_generator), tls);
+                              access_log_lock, component_factory, std::move(random_generator), tls,
+                              Thread::threadFactoryForTest());
   // This is technically thread unsafe (assigning to a shared_ptr accessed
   // across threads), but because we synchronize below through serverReady(), the only
   // consumer on the main test thread in ~IntegrationTestServerImpl will not race.
