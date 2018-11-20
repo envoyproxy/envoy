@@ -33,7 +33,10 @@ public:
   }
 
   /**
-   * Manages Singleton objects that are cleaned up after all references are dropped.
+   * Manages Singleton objects that are cleaned up after all references are
+   * dropped. This class must not be templatized becuase as a map value where
+   * every singleton in the map represents a different type. Instead we
+   * templatize the ptr() and ref() methods.
    */
   struct Singleton {
     virtual ~Singleton() = default;
@@ -43,6 +46,14 @@ public:
   };
   using SingletonSharedPtr = std::shared_ptr<Singleton>;
 
+  /**
+   * @return Type a singleton instance of Type. T must be default-constructible.
+   */
+  template <class Type> static SingletonSharedPtr get() { return instance().getHelper<Type>(); }
+
+  ~Globals() = delete; // GlobalHeler is constructed once and never destroyed.
+
+private:
   /**
    * Templatized derived class of Singleton which holds the Type object and is
    * responsible for deleting it using the correct destructor.
@@ -55,15 +66,7 @@ public:
     std::unique_ptr<Type> ptr_{std::make_unique<Type>()};
   };
 
-  /**
-   * @return Type a singleton instance of Type. T must be default-constructible.
-   */
-  template <class Type> static SingletonSharedPtr get() { return instance().getHelper<Type>(); }
-
-  ~Globals() = delete; // GlobalHeler is constructed once and never destroyed.
-
-private:
-  Globals() = default; // Construct via Globals::helper().
+  Globals() = default; // Construct via Globals::instance().
 
   /**
    * @return Globals& a singleton for Globals.
