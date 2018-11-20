@@ -81,10 +81,6 @@ MockCluster::MockCluster() {
 
 MockCluster::~MockCluster() = default;
 
-MockLoadBalancerContext::MockLoadBalancerContext() = default;
-
-MockLoadBalancerContext::~MockLoadBalancerContext() = default;
-
 MockLoadBalancer::MockLoadBalancer() { ON_CALL(*this, chooseHost(_)).WillByDefault(Return(host_)); }
 
 MockLoadBalancer::~MockLoadBalancer() = default;

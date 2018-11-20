@@ -25,9 +25,6 @@ MockConnectionCallbacks::~MockConnectionCallbacks() {}
 MockServerConnectionCallbacks::MockServerConnectionCallbacks() {}
 MockServerConnectionCallbacks::~MockServerConnectionCallbacks() {}
 
-MockStreamDecoder::MockStreamDecoder() {}
-MockStreamDecoder::~MockStreamDecoder() {}
-
 MockStreamCallbacks::MockStreamCallbacks() {}
 MockStreamCallbacks::~MockStreamCallbacks() {}
 
@@ -157,15 +154,6 @@ MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() {}
 } // namespace Http
 
 namespace Http {
-namespace ConnectionPool {
-
-MockCancellable::MockCancellable() {}
-MockCancellable::~MockCancellable() {}
-
-MockInstance::MockInstance() {}
-MockInstance::~MockInstance() {}
-
-} // namespace ConnectionPool
 
 IsSubsetOfHeadersMatcher IsSubsetOfHeaders(const HeaderMap& expected_headers) {
   return IsSubsetOfHeadersMatcher(expected_headers);
