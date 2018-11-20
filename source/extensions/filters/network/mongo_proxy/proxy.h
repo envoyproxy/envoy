@@ -210,7 +210,7 @@ private:
   Event::TimerPtr delay_timer_;
   Event::TimerPtr drain_close_timer_;
   Event::TimeSystem& time_system_;
-  bool emit_dynamic_metadata_;
+  const bool emit_dynamic_metadata_;
 };
 
 class ProdProxyFilter : public ProxyFilter {

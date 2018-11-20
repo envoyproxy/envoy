@@ -81,10 +81,10 @@ public:
     access_log_.reset(new AccessLog("test", log_manager_, dispatcher_.timeSystem()));
   }
 
-  void initializeFilter() {
+  void initializeFilter(bool emit_dynamic_metadata = false) {
     filter_ = std::make_unique<TestProxyFilter>("test.", store_, runtime_, access_log_,
                                                 fault_config_, drain_decision_, generator_,
-                                                dispatcher_.timeSystem(), true);
+                                                dispatcher_.timeSystem(), emit_dynamic_metadata);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -201,7 +201,7 @@ TEST_F(MongoProxyFilterTest, DelayFaultsRuntimeDisabled) {
 }
 
 TEST_F(MongoProxyFilterTest, DynamicMetadata) {
-  initializeFilter();
+  initializeFilter(true);
 
   EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
 
@@ -324,6 +324,93 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
             multiple_messages.values(1).struct_value().fields().at("database").string_value());
   EXPECT_EQ("test2",
             multiple_messages.values(1).struct_value().fields().at("collection").string_value());
+}
+
+TEST_F(MongoProxyFilterTest, DynamicMetadataDisabled) {
+  initializeFilter(false);
+
+  EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    QueryMessagePtr message(new QueryMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b1110010);
+    message->query(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeQuery(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(
+                   NetworkFilterNames::get().MongoProxy));
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    ReplyMessagePtr message(new ReplyMessageImpl(0, 0));
+    message->flags(0b11);
+    message->cursorId(1);
+    message->documents().push_back(Bson::DocumentImpl::create()->addString("hello", "world"));
+    filter_->callbacks_->decodeReply(std::move(message));
+  }));
+  filter_->onWrite(fake_data_, false);
+
+  EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(
+                   NetworkFilterNames::get().MongoProxy));
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    GetMoreMessagePtr message(new GetMoreMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->cursorId(1);
+    filter_->callbacks_->decodeGetMore(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(
+                   NetworkFilterNames::get().MongoProxy));
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    InsertMessagePtr message(new InsertMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->documents().push_back(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeInsert(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(
+                   NetworkFilterNames::get().MongoProxy));
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    KillCursorsMessagePtr message(new KillCursorsMessageImpl(0, 0));
+    message->numberOfCursorIds(1);
+    message->cursorIds({1});
+    filter_->callbacks_->decodeKillCursors(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(
+                   NetworkFilterNames::get().MongoProxy));
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    CommandMessagePtr message(new CommandMessageImpl(0, 0));
+    message->database(std::string("db"));
+    message->commandName(std::string("command"));
+    message->metadata(Bson::DocumentImpl::create());
+    message->commandArgs(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeCommand(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(
+                   NetworkFilterNames::get().MongoProxy));
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    CommandReplyMessagePtr message(new CommandReplyMessageImpl(0, 0));
+    message->metadata(Bson::DocumentImpl::create());
+    message->commandReply(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeCommandReply(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(
+                   NetworkFilterNames::get().MongoProxy));
 }
 
 TEST_F(MongoProxyFilterTest, Stats) {
