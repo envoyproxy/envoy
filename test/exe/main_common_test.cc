@@ -75,7 +75,7 @@ protected:
     argv_.push_back(nullptr);
   }
 
-  // Adds options to make Envoy exit immediately after initializtion.
+  // Adds options to make Envoy exit immediately after initialization.
   void initOnly() {
     addArg("--mode");
     addArg("init_only");
@@ -159,7 +159,7 @@ protected:
   // Initiates Envoy running in its own thread.
   void startEnvoy() {
     envoy_thread_ = api_.createThread([this]() {
-      // Note: main_common_ is accesesed in the testing thread, but
+      // Note: main_common_ is accessed in the testing thread, but
       // is race-free, as MainCommon::run() does not return until
       // triggered with an adminRequest POST to /quitquitquit, which
       // is done in the testing thread.
