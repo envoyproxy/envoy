@@ -22,19 +22,5 @@ std::string Globals::describeActiveSingletonsHelper() {
   return ret;
 }
 
-Globals::SingletonSharedPtr Globals::get(const std::string& type_name,
-                                         const MakeObjectFn& make_object,
-                                         const DeleteObjectFn& delete_object) {
-  Thread::LockGuard map_lock(map_mutex_);
-  std::weak_ptr<Singleton>& weak_singleton_ref = singleton_map_[type_name];
-  SingletonSharedPtr singleton = weak_singleton_ref.lock();
-
-  if (singleton == nullptr) {
-    singleton = std::make_shared<Singleton>(make_object(), delete_object);
-    weak_singleton_ref = singleton;
-  }
-  return singleton;
-}
-
 } // namespace Test
 } // namespace Envoy

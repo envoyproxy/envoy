@@ -19,9 +19,6 @@ namespace Test {
  * start.
  */
 class Globals {
-  using MakeObjectFn = std::function<void*()>;
-  using DeleteObjectFn = std::function<void(void*)>;
-
 public:
   /**
    * Walks through all global singletons and ensures that none of them are
@@ -39,30 +36,29 @@ public:
    * Manages Singleton objects that are cleaned up after all references are dropped.
    */
   struct Singleton {
-    Singleton(void* ptr, const DeleteObjectFn& delete_obj) : ptr_(ptr), delete_obj_(delete_obj) {}
-    ~Singleton() { delete_obj_(ptr_); }
-
-    template <class Type> Type* ptr() { return static_cast<Type*>(ptr_); }
+    virtual ~Singleton() = default;
+    virtual void* ptrHelper() PURE;
+    template <class Type> Type* ptr() { return static_cast<Type*>(ptrHelper()); }
     template <class Type> Type& ref() { return *ptr<Type>(); }
-
-  private:
-    void* ptr_;
-    DeleteObjectFn delete_obj_;
   };
   using SingletonSharedPtr = std::shared_ptr<Singleton>;
 
   /**
+   * Templatized derived class of Singleton which holds the Type object and is
+   * responsible for deleting it using the correct destructor.
+   */
+  template <class Type> struct TypedSingleton : public Singleton {
+    ~TypedSingleton() override = default;
+    void* ptrHelper() override { return ptr_.get(); }
+
+  private:
+    std::unique_ptr<Type> ptr_{std::make_unique<Type>()};
+  };
+
+  /**
    * @return Type a singleton instance of Type. T must be default-constructible.
    */
-  template <class Type> static SingletonSharedPtr get() {
-    MakeObjectFn make_object = []() -> void* { return new Type; };
-    DeleteObjectFn delete_object = [](void* ptr) { delete static_cast<Type*>(ptr); };
-
-    // The real work here is done by a non-inlined function. That function works
-    // with void* so that it doesn't need to be templatized; the casting is done
-    // here in the templatized wrapper.
-    return instance().get(typeid(Type).name(), make_object, delete_object);
-  }
+  template <class Type> static SingletonSharedPtr get() { return instance().getHelper<Type>(); }
 
   ~Globals() = delete; // GlobalHeler is constructed once and never destroyed.
 
@@ -74,10 +70,19 @@ private:
    */
   static Globals& instance();
 
-  std::string describeActiveSingletonsHelper();
+  template <class Type> SingletonSharedPtr getHelper() {
+    Thread::LockGuard map_lock(map_mutex_);
+    std::weak_ptr<Singleton>& weak_singleton_ref = singleton_map_[typeid(Type).name()];
+    SingletonSharedPtr singleton = weak_singleton_ref.lock();
 
-  SingletonSharedPtr get(const std::string& type_name, const MakeObjectFn& make_object,
-                         const DeleteObjectFn& delete_obj);
+    if (singleton == nullptr) {
+      singleton = std::make_shared<TypedSingleton<Type>>();
+      weak_singleton_ref = singleton;
+    }
+    return singleton;
+  }
+
+  std::string describeActiveSingletonsHelper();
 
   Thread::MutexBasicLockable map_mutex_;
   absl::flat_hash_map<std::string, std::weak_ptr<Singleton>> singleton_map_ GUARDED_BY(map_mutex_);
