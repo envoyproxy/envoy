@@ -8,6 +8,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
+// abstract codecs for requests and responses
+
 /**
  * Kafka message decoder
  * @tparam MT message type (Kafka request or Kafka response)

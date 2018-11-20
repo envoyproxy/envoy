@@ -31,7 +31,7 @@ TEST(RequestParserResolver, ShouldReturnSentinelIfRequestTypeIsNotRegistered) {
 
 TEST(RequestParserResolver, ShouldReturnSentinelIfRequestVersionIsNotRegistered) {
   // given
-  GeneratorFunction generator = [](RequestContextSharedPtr arg) -> ParserSharedPtr {
+  ParserGeneratorFunction generator = [](RequestContextSharedPtr arg) -> ParserSharedPtr {
     return std::make_shared<OffsetCommitRequestV0Parser>(arg);
   };
   RequestParserResolver testee{{{0, {0, 1}, generator}}};
@@ -48,7 +48,7 @@ TEST(RequestParserResolver, ShouldReturnSentinelIfRequestVersionIsNotRegistered)
 
 TEST(RequestParserResolver, ShouldInvokeGeneratorFunctionOnMatch) {
   // given
-  GeneratorFunction generator = [](RequestContextSharedPtr arg) -> ParserSharedPtr {
+  ParserGeneratorFunction generator = [](RequestContextSharedPtr arg) -> ParserSharedPtr {
     return std::make_shared<OffsetCommitRequestV0Parser>(arg);
   };
   RequestParserResolver testee{{{0, {0, 1, 2, 3}, generator}}};

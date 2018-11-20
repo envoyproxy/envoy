@@ -12,7 +12,7 @@ namespace NetworkFilters {
 namespace Kafka {
 
 /**
- * Kafka request type identifier
+ * Kafka request type identifier (int16_t value present in header of every request)
  * @see http://kafka.apache.org/protocol.html#protocol_api_keys
  */
 enum RequestType : int16_t {

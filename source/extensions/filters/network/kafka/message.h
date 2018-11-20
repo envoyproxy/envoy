@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <sstream>
 
 #include "envoy/common/pure.h"

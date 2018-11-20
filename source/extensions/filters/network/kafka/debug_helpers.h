@@ -12,6 +12,7 @@ namespace Kafka {
 // functions present in this header are used by request / response objects to print their fields
 // nicely
 
+// prints out std::vector
 template <typename T> std::ostream& operator<<(std::ostream& os, const std::vector<T>& arg) {
   os << "[";
   for (auto iter = arg.begin(); iter != arg.end(); iter++) {
@@ -24,6 +25,7 @@ template <typename T> std::ostream& operator<<(std::ostream& os, const std::vect
   return os;
 }
 
+// prints out absl::optional
 template <typename T> std::ostream& operator<<(std::ostream& os, const absl::optional<T>& arg) {
   if (arg.has_value()) {
     os << *arg;

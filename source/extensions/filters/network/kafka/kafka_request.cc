@@ -10,9 +10,9 @@ namespace NetworkFilters {
 namespace Kafka {
 
 // helper function that generates a map from specs looking like { api_key, api_versions... }
-GeneratorMap computeGeneratorMap(const GeneratorMap& original,
-                                 const std::vector<ParserSpec> specs) {
-  GeneratorMap result{original};
+ParserGenerators computeGeneratorMap(const ParserGenerators& original,
+                                     const std::vector<ParserSpec> specs) {
+  ParserGenerators result{original};
   for (auto& spec : specs) {
     auto& generators = result[spec.api_key_];
     for (int16_t api_version : spec.api_versions_) {
@@ -23,13 +23,16 @@ GeneratorMap computeGeneratorMap(const GeneratorMap& original,
   return result;
 }
 
-RequestParserResolver::RequestParserResolver(const std::vector<ParserSpec> arg)
-    : generators_{computeGeneratorMap({}, arg)} {};
+RequestParserResolver::RequestParserResolver(const std::vector<ParserSpec> specs)
+    : generators_{computeGeneratorMap({}, specs)} {};
 
 RequestParserResolver::RequestParserResolver(const RequestParserResolver& original,
-                                             const std::vector<ParserSpec> arg)
-    : generators_{computeGeneratorMap(original.generators_, arg)} {};
+                                             const std::vector<ParserSpec> specs)
+    : generators_{computeGeneratorMap(original.generators_, specs)} {};
 
+// helper macro binding request type & api versions to Deserializers
+// the rendered function will create a new instance of (REQUEST)RequestV(Version)Parser
+// e.g. OffsetCommitRequestV0Parser
 #define PARSER_SPEC(REQUEST_NAME, PARSER_VERSION, ...)                                             \
   ParserSpec {                                                                                     \
     RequestType::REQUEST_NAME, {__VA_ARGS__}, [](RequestContextSharedPtr arg) -> ParserSharedPtr { \
@@ -56,7 +59,8 @@ ParserSharedPtr RequestParserResolver::createParser(int16_t api_key, int16_t api
   if (generators_.end() == api_versions_ptr) {
     return std::make_shared<SentinelParser>(context);
   }
-  const std::unordered_map<int16_t, GeneratorFunction>& api_versions = api_versions_ptr->second;
+  const std::unordered_map<int16_t, ParserGeneratorFunction>& api_versions =
+      api_versions_ptr->second;
 
   // api_version
   const auto generator_ptr = api_versions.find(api_version);
@@ -65,7 +69,7 @@ ParserSharedPtr RequestParserResolver::createParser(int16_t api_key, int16_t api
   }
 
   // found matching parser generator, create parser
-  const GeneratorFunction generator = generator_ptr->second;
+  const ParserGeneratorFunction generator = generator_ptr->second;
   return generator(context);
 }
 

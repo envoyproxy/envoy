@@ -10,6 +10,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
+// convert buffer to slices and pass them to `doParse`
 void RequestDecoder::onData(Buffer::Instance& data) {
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
@@ -19,6 +20,16 @@ void RequestDecoder::onData(Buffer::Instance& data) {
   }
 }
 
+/**
+ * Main parse loop:
+ * - forward data to current parser
+ * - receive parser response:
+ * -- if still waiting, do nothing
+ * -- if next parser, replace parser, and keep feeding, if still have data
+ * -- if parser message:
+ * --- notify callbacks
+ * --- replace parser with new start parser, as we are going to parse another request
+ */
 void RequestDecoder::doParse(ParserSharedPtr& parser, const Buffer::RawSlice& slice) {
   const char* buffer = reinterpret_cast<const char*>(slice.mem_);
   uint64_t remaining = slice.len_;

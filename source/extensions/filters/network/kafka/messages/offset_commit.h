@@ -12,8 +12,7 @@ namespace Kafka {
  */
 
 /**
- * Holds the partition node (leaf)
- * Supports all versions (some fields are not used in some versions)
+ * Holds the partition data: partition, offset, timestamp, metadata
  */
 struct OffsetCommitPartition {
   const int32_t partition_;
@@ -53,7 +52,7 @@ struct OffsetCommitPartition {
 };
 
 /**
- * Holds the topic node (contains multiple partitions)
+ * Holds the topic data: topic name and partitions in that topic
  */
 struct OffsetCommitTopic {
   const std::string topic_;
@@ -76,7 +75,7 @@ struct OffsetCommitTopic {
 };
 
 /**
- * Holds the request (contains multiple topics)
+ * Holds the request: group id, generation id, member id, retention time, topics
  */
 class OffsetCommitRequest : public Request {
 public:

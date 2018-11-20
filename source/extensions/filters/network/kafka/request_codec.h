@@ -31,14 +31,28 @@ typedef std::shared_ptr<RequestCallback> RequestCallbackSharedPtr;
  *
  * This decoder uses chain of parsers to parse fragments of a request
  * Each parser along the line returns the fully parsed message or the next parser
+ * Stores parse state (have `onData` invoked multiple times for messages that are larger than single
+ * buffer)
  */
 class RequestDecoder : public MessageDecoder<Request>, public Logger::Loggable<Logger::Id::kafka> {
 public:
+  /**
+   * Creates a decoder that can decode requests specified by RequestParserResolver, notifying
+   * callbacks on successful decoding
+   * @param parserResolver supported parser resolver
+   * @param callbacks callbacks to be invoked (in order)
+   */
   RequestDecoder(const RequestParserResolver parserResolver,
                  const std::vector<RequestCallbackSharedPtr> callbacks)
       : parser_resolver_{parserResolver}, callbacks_{callbacks},
         current_parser_{new RequestStartParser(parser_resolver_)} {};
 
+  /**
+   * Consumes all data present in a buffer
+   * If a request can be successfully parsed, then callbacks get notified with parsed request
+   * Updates decoder state
+   * impl note: similar to redis codec, which also keeps state
+   */
   void onData(Buffer::Instance& data);
 
 private:
@@ -55,7 +69,14 @@ private:
  */
 class RequestEncoder : public MessageEncoder<Request> {
 public:
+  /**
+   * Wraps buffer with encoder
+   */
   RequestEncoder(Buffer::Instance& output) : output_(output) {}
+
+  /**
+   * Encodes request into wrapped buffer
+   */
   void encode(const Request& message) override;
 
 private:

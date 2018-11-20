@@ -57,21 +57,22 @@ typedef std::shared_ptr<RequestContext> RequestContextSharedPtr;
 /**
  * Function generating a parser with given context
  */
-typedef std::function<ParserSharedPtr(RequestContextSharedPtr)> GeneratorFunction;
+typedef std::function<ParserSharedPtr(RequestContextSharedPtr)> ParserGeneratorFunction;
 
 /**
- * Structure responsible for mapping [api_key, api_version] -> GeneratorFunction
+ * Structure responsible for mapping [api_key, api_version] -> ParserGeneratorFunction
  */
-typedef std::unordered_map<int16_t, std::unordered_map<int16_t, GeneratorFunction>> GeneratorMap;
+typedef std::unordered_map<int16_t, std::unordered_map<int16_t, ParserGeneratorFunction>>
+    ParserGenerators;
 
 /**
- * Trivial structure specifying which generator function should be used
+ * Trivial structure specifying which parser generator function should be used
  * for which api_key & api_version
  */
 struct ParserSpec {
   const int16_t api_key_;
   const std::vector<int16_t> api_versions_;
-  const GeneratorFunction generator_;
+  const ParserGeneratorFunction generator_;
 };
 
 /**
@@ -81,8 +82,17 @@ struct ParserSpec {
  */
 class RequestParserResolver {
 public:
-  RequestParserResolver(const std::vector<ParserSpec> arg);
-  RequestParserResolver(const RequestParserResolver& original, const std::vector<ParserSpec> arg);
+  /**
+   * Creates a resolver that uses generator functions provided by given specifications
+   */
+  RequestParserResolver(const std::vector<ParserSpec> specs);
+
+  /**
+   * Creates a resolver that uses generator functions provided by original resolver and then
+   * expanded by specifications
+   */
+  RequestParserResolver(const RequestParserResolver& original, const std::vector<ParserSpec> specs);
+
   virtual ~RequestParserResolver() = default;
 
   /**
@@ -106,7 +116,7 @@ public:
   static const RequestParserResolver KAFKA_1_0;
 
 private:
-  GeneratorMap generators_;
+  ParserGenerators generators_;
 };
 
 /**
@@ -166,7 +176,7 @@ private:
 };
 
 /**
- * Buffered parser uses a single deserializer to construct a response
+ * Request parser uses a single deserializer to construct a request object
  * This parser is responsible for consuming request-specific data (e.g. topic names) and always
  * returns a parsed message
  * @param RT request class
@@ -175,34 +185,41 @@ private:
  */
 template <typename RT, typename BT> class RequestParser : public Parser {
 public:
+  /**
+   * Create a parser with given context
+   * @param context parse context containing request header
+   */
   RequestParser(RequestContextSharedPtr context) : context_{context} {};
-  ParseResponse parse(const char*& buffer, uint64_t& remaining) override;
+
+  /**
+   * Consume enough data to fill in deserializer and receive the parsed request
+   * Fill in request's header with data stored in context
+   */
+  ParseResponse parse(const char*& buffer, uint64_t& remaining) {
+    context_->remaining_request_size_ -= deserializer.feed(buffer, remaining);
+    if (deserializer.ready()) {
+      // after a successful parse, there should be nothing left - we have consumed all the bytes
+      ASSERT(0 == context_->remaining_request_size_);
+      RT request = deserializer.get();
+      request.header() = context_->request_header_;
+      ENVOY_LOG(trace, "parsed request {}: {}", *context_, request);
+      MessageSharedPtr msg = std::make_shared<RT>(request);
+      return ParseResponse::parsedMessage(msg);
+    } else {
+      return ParseResponse::stillWaiting();
+    }
+  }
 
 protected:
   RequestContextSharedPtr context_;
   BT deserializer; // underlying request-specific deserializer
 };
 
-template <typename RT, typename BT>
-ParseResponse RequestParser<RT, BT>::parse(const char*& buffer, uint64_t& remaining) {
-  context_->remaining_request_size_ -= deserializer.feed(buffer, remaining);
-  if (deserializer.ready()) {
-    // after a successful parse, there should be nothing left - we have consumed all the bytes
-    ASSERT(0 == context_->remaining_request_size_);
-    RT request = deserializer.get();
-    request.header() = context_->request_header_;
-    ENVOY_LOG(trace, "parsed request {}: {}", *context_, request);
-    MessageSharedPtr msg = std::make_shared<RT>(request);
-    return ParseResponse::parsedMessage(msg);
-  } else {
-    return ParseResponse::stillWaiting();
-  }
-}
-
 /**
- * Macro defining RequestParser that uses the underlying Deserializer
+ * Helper macro defining RequestParser that uses the underlying Deserializer
  * Aware of versioning
  * Names of Deserializers/Parsers are influenced by org.apache.kafka.common.protocol.Protocol names
+ * Renders class named (Request)(Version)Parser e.g. OffsetCommitRequestV0Parser
  */
 #define DEFINE_REQUEST_PARSER(REQUEST_TYPE, VERSION)                                               \
   class REQUEST_TYPE##VERSION##Parser                                                              \
