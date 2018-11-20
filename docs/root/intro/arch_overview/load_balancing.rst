@@ -482,7 +482,7 @@ and values. Therefore when using structured values, a route's match criteria wil
 identical structured value appears in the host's metadata.
 
 Subsets may be used alongside locality weights by specifying the
-:ref:`locality_aware <envoy_api_field_Cluster.LbSubsetConfig.locality_aware>` flag.
+:ref:`locality_aware <envoy_api_field_Cluster.LbSubsetConfig.locality_weight_aware>` flag.
 This will route to each locality based on the original locality weights declared for the cluster.
 The :ref:`scale_locality_weight <envoy_api_field_Cluster.LbSubsetConfig.scale_locality_weight>` can
 be used to scale the locality weights based on the fraction of hosts remaining in the locality
