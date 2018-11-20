@@ -1,5 +1,6 @@
 #include "common/network/transport_socket_options_impl.h"
 
+#include "common/common/scalar_to_byte_vector.h"
 #include "common/common/utility.h"
 
 namespace Envoy {
@@ -9,13 +10,7 @@ void TransportSocketOptionsImpl::hashKey(std::vector<uint8_t>& key) const {
     return;
   }
 
-  uint64_t hash = StringUtil::CaseInsensitiveHash()(override_server_name_.value());
-
-  uint8_t* byte_ptr = reinterpret_cast<uint8_t*>(&hash);
-  for (uint byte_index = 0; byte_index < sizeof hash; byte_index++) {
-    key.push_back(*byte_ptr);
-    byte_ptr++;
-  }
+  pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(override_server_name_.value()), key);
 }
 } // namespace Network
 } // namespace Envoy
