@@ -15,6 +15,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/network/transport_socket_options_impl.h"
@@ -26,10 +27,8 @@ namespace TcpProxy {
 
 using ::Envoy::Network::UpstreamServerName;
 
-absl::string_view PerConnectionCluster::key() {
-  // Construct On First Use Idiom: https://isocpp.org/wiki/faq/ctors#static-init-order-on-first-use
-  static const char* cstring_key = "envoy.tcp_proxy.cluster";
-  return absl::string_view(cstring_key);
+const std::string& PerConnectionCluster::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
 }
 
 Config::Route::Route(
