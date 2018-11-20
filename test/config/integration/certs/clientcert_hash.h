@@ -1,4 +1,4 @@
 // NOLINT(namespace-envoy)
 #define TEST_CLIENT_CERT_HASH                                                                      \
-  "72:68:C8:8B:7D:45:21:0F:F1:6D:FF:8C:CA:32:5B:53:23:B6:8A:97:6B:13:AA:29:57:11:D8:A1:1D:99:AF:"  \
-  "BE"
+  "75:A7:96:B7:3A:14:B9:24:02:D9:AB:D0:D1:B8:D8:41:71:00:7B:4A:E1:C0:C1:67:72:00:19:5C:5C:BA:A1:"  \
+  "DB"
