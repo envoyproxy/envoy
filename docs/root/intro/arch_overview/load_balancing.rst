@@ -557,13 +557,14 @@ v: 1.0                (none)                           v: 1.0
 ====================  ===============================  ====================
 
 Scaled Locality Weights
-***********************
+-----------------------
 
 When both locality weight and locality weight scaling is enabled, the weight
 of each locality will depend on the fraction of endpoints removed from the locality
 due to the subsetting.
 
-Consider the following
+Consider the following:
+
 ======  ======== ========
 Host    Metadata Locality
 ======  ======== ========
