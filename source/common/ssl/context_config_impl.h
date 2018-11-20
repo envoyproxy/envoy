@@ -11,6 +11,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/json/json_loader.h"
+#include "common/ssl/tls_certificate_config_impl.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -25,8 +26,13 @@ public:
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
-  const TlsCertificateConfig* tlsCertificate() const override {
-    return tls_certificate_config_.get();
+  // TODO(htuch): This needs to be made const again and/or zero copy and/or callers fixed.
+  std::vector<std::reference_wrapper<const TlsCertificateConfig>> tlsCertificates() const override {
+    std::vector<std::reference_wrapper<const TlsCertificateConfig>> configs;
+    for (const auto& config : tls_certificate_configs_) {
+      configs.push_back(config);
+    }
+    return configs;
   }
   const CertificateValidationContextConfig* certificateValidationContext() const override {
     return validation_context_config_.get();
@@ -36,7 +42,7 @@ public:
 
   bool isReady() const override {
     const bool tls_is_ready =
-        (tls_certficate_provider_ == nullptr || tls_certificate_config_ != nullptr);
+        (tls_certficate_providers_.empty() || !tls_certificate_configs_.empty());
     const bool combined_cvc_is_ready =
         (default_cvc_ == nullptr || validation_context_config_ != nullptr);
     const bool cvc_is_ready = (certficate_validation_context_provider_ == nullptr ||
@@ -65,13 +71,13 @@ private:
   const std::string cipher_suites_;
   const std::string ecdh_curves_;
 
-  Ssl::TlsCertificateConfigPtr tls_certificate_config_;
+  std::vector<Ssl::TlsCertificateConfigImpl> tls_certificate_configs_;
   Ssl::CertificateValidationContextConfigPtr validation_context_config_;
   // If certificate validation context type is combined_validation_context. default_cvc_
   // holds a copy of CombinedCertificateValidationContext::default_validation_context.
   // Otherwise, default_cvc_ is nullptr.
   std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext> default_cvc_;
-  Secret::TlsCertificateConfigProviderSharedPtr tls_certficate_provider_;
+  std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certficate_providers_;
   // Handle for TLS certificate dyanmic secret callback.
   Common::CallbackHandle* tc_update_callback_handle_{};
   Secret::CertificateValidationContextConfigProviderSharedPtr
