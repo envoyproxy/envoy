@@ -17,6 +17,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//test/mocks:common_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -46,5 +47,6 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
     ],
 )
