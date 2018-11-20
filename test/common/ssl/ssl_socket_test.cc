@@ -45,6 +45,7 @@ namespace Ssl {
 
 namespace {
 
+// TODO replace the long parameter list with an options object
 void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_yaml,
               const std::string& expected_digest, const std::string& expected_uri,
               const std::string& expected_local_uri, const std::string& expected_serial_number,
@@ -156,6 +157,7 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
   }
 }
 
+// TODO replace the long parameter list with an options object
 const std::string testUtilV2(
     const envoy::api::v2::Listener& server_proto,
     const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto,
