@@ -12,7 +12,7 @@ void TransportSocketOptionsImpl::hashKey(std::vector<uint8_t>& key) const {
   uint64_t hash = StringUtil::CaseInsensitiveHash()(override_server_name_.value());
 
   uint8_t* byte_ptr = reinterpret_cast<uint8_t*>(&hash);
-  for (int byte_index = 0; byte_index < 8; byte_index++) {
+  for (uint byte_index = 0; byte_index < sizeof hash; byte_index++) {
     key.push_back(*byte_ptr);
     byte_ptr++;
   }
