@@ -561,8 +561,9 @@ LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocal
 
         // Otherwise, scale it proportionally to the number of hosts removed by the subset
         // predicate.
-        (*scaled_locality_weights)[i] = (original_weights[i] * hosts_per_locality.get()[i].size()) /
-                                        original_hosts_per_locality[i].size();
+        (*scaled_locality_weights)[i] =
+            std::ceil(float((original_weights[i] * hosts_per_locality.get()[i].size())) /
+                      original_hosts_per_locality[i].size());
       }
 
       return scaled_locality_weights;
