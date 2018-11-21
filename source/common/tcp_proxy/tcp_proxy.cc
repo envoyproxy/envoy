@@ -15,14 +15,21 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
+#include "common/network/transport_socket_options_impl.h"
+#include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {
 
-const std::string PerConnectionCluster::Key = "envoy.tcp_proxy.cluster";
+using ::Envoy::Network::UpstreamServerName;
+
+const std::string& PerConnectionCluster::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
+}
 
 Config::Route::Route(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute& config) {
@@ -112,10 +119,10 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
 const std::string& Config::getRegularRouteFromEntries(Network::Connection& connection) {
   // First check if the per-connection state to see if we need to route to a pre-selected cluster
   if (connection.streamInfo().filterState().hasData<PerConnectionCluster>(
-          PerConnectionCluster::Key)) {
+          PerConnectionCluster::key())) {
     const PerConnectionCluster& per_connection_cluster =
         connection.streamInfo().filterState().getDataReadOnly<PerConnectionCluster>(
-            PerConnectionCluster::Key);
+            PerConnectionCluster::key());
     return per_connection_cluster.value();
   }
 
@@ -358,8 +365,20 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
+  Network::TransportSocketOptionsSharedPtr transport_socket_options;
+
+  if (downstreamConnection() &&
+      downstreamConnection()->streamInfo().filterState().hasData<UpstreamServerName>(
+          UpstreamServerName::key())) {
+    const auto& original_requested_server_name =
+        downstreamConnection()->streamInfo().filterState().getDataReadOnly<UpstreamServerName>(
+            UpstreamServerName::key());
+    transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+        original_requested_server_name.value());
+  }
+
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      cluster_name, Upstream::ResourcePriority::Default, this);
+      cluster_name, Upstream::ResourcePriority::Default, this, transport_socket_options);
   if (!conn_pool) {
     // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
     // cluster->stats().upstream_cx_none_healthy in the latter case.

@@ -477,7 +477,7 @@ public:
     ON_CALL(*mock_cluster_info_, transportSocketFactory())
         .WillByDefault(ReturnRef(*mock_cluster_info_->transport_socket_factory_));
     async_client_transport_socket_ =
-        mock_cluster_info_->transport_socket_factory_->createTransportSocket();
+        mock_cluster_info_->transport_socket_factory_->createTransportSocket(nullptr);
     fake_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
                                                     FakeHttpConnection::Type::HTTP2, ipVersion(),
                                                     test_time_.timeSystem());

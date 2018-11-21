@@ -73,7 +73,8 @@ public:
    */
   virtual CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options) const PURE;
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
 
   /**
    * Create a health check connection for this host.
