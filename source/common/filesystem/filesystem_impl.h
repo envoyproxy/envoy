@@ -37,8 +37,8 @@ namespace Filesystem {
  */
 class Instance {
 public:
-  Instance(std::chrono::milliseconds file_flush_interval_msec, Thread::ThreadFactory& thread_factory,
-           Stats::Store& store);
+  Instance(std::chrono::milliseconds file_flush_interval_msec,
+           Thread::ThreadFactory& thread_factory, Stats::Store& store);
 
   /**
    * Creates a file, overriding the flush-interval set in the class.
