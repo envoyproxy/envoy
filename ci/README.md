@@ -76,7 +76,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang.
 * `bazel.debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `bazel.debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
-* `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with gcc.
+* `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with clang.
 * `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt` with gcc.
 * `bazel.release <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt` with gcc.
 * `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with gcc.

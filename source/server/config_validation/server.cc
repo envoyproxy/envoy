@@ -20,14 +20,14 @@ namespace Envoy {
 namespace Server {
 
 bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                    ComponentFactory& component_factory) {
+                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
 
   try {
     Event::RealTimeSystem time_system;
     ValidationInstance server(options, time_system, local_address, stats_store, access_log_lock,
-                              component_factory);
+                              component_factory, thread_factory);
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
     server.shutdown();
     return true;
@@ -40,9 +40,10 @@ ValidationInstance::ValidationInstance(Options& options, Event::TimeSystem& time
                                        Network::Address::InstanceConstSharedPtr local_address,
                                        Stats::IsolatedStoreImpl& store,
                                        Thread::BasicLockable& access_log_lock,
-                                       ComponentFactory& component_factory)
+                                       ComponentFactory& component_factory,
+                                       Thread::ThreadFactory& thread_factory)
     : options_(options), time_system_(time_system), stats_store_(store),
-      api_(new Api::ValidationImpl(options.fileFlushIntervalMsec())),
+      api_(new Api::ValidationImpl(options.fileFlushIntervalMsec(), thread_factory)),
       dispatcher_(api_->allocateDispatcher(time_system)),
       singleton_manager_(new Singleton::ManagerImpl()),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store), mutex_tracer_(nullptr) {
@@ -90,7 +91,7 @@ void ValidationInstance::initialize(Options& options,
   ssl_context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(time_system_);
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo(), *secret_manager_);
+      localInfo(), *secret_manager_, api());
 
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);

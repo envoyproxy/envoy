@@ -66,9 +66,11 @@ void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& reques
       lightstep::CollectorMethodName(), absl::optional<std::chrono::milliseconds>(timeout));
   message->body() = Grpc::Common::serializeBody(request);
 
-  active_request_ = driver_.clusterManager()
-                        .httpAsyncClientForCluster(driver_.cluster()->name())
-                        .send(std::move(message), *this, std::chrono::milliseconds(timeout));
+  active_request_ =
+      driver_.clusterManager()
+          .httpAsyncClientForCluster(driver_.cluster()->name())
+          .send(std::move(message), *this,
+                Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
 }
 
 void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& response) {

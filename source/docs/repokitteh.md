@@ -61,6 +61,27 @@ Example:
 ```
 /wait
 ```
-Sets the label `waiting` on a PR. When a new comment is submitted or a new commit is pushed the label will be removed.
+Sets the label `waiting` on a PR. When a new commit is pushed the label will be removed.
 
-[Demo PR](https://github.com/envoyproxy/envoybot/pull/9)
+[Demo PR](https://github.com/envoyproxy/envoybot/pull/14)
+
+It is also possible to wait until any comment is submitted and/or a new commit is pushed.
+
+Example:
+```
+/wait-any
+```
+Sets the label `waiting:any` on a PR. When a new commit is pushed or any comment is submitted the label will be removed.
+
+[Demo PR](https://github.com/envoyproxy/envoybot/pull/15)
+
+### [CircleCI Retest](https://github.com/repokitteh/modules/blob/master/circleci.star)
+Restart failed CircleCI tests.
+
+Example:
+```
+/retest
+```
+Restarts all failed CircleCI tests, as reported in the commit statuses.
+
+[Demo PR](https://github.com/envoyproxy/envoy/pull/5060#issuecomment-439285928)

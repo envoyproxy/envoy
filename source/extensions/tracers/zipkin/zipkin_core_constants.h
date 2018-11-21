@@ -32,11 +32,11 @@ public:
   const std::string SERVER_ADDR = "sa";
 
   // Zipkin B3 headers
-  const Http::LowerCaseString X_B3_TRACE_ID{"X-B3-TraceId"};
-  const Http::LowerCaseString X_B3_SPAN_ID{"X-B3-SpanId"};
-  const Http::LowerCaseString X_B3_PARENT_SPAN_ID{"X-B3-ParentSpanId"};
-  const Http::LowerCaseString X_B3_SAMPLED{"X-B3-Sampled"};
-  const Http::LowerCaseString X_B3_FLAGS{"X-B3-Flags"};
+  const Http::LowerCaseString X_B3_TRACE_ID{"x-b3-traceid"};
+  const Http::LowerCaseString X_B3_SPAN_ID{"x-b3-spanid"};
+  const Http::LowerCaseString X_B3_PARENT_SPAN_ID{"x-b3-parentspanid"};
+  const Http::LowerCaseString X_B3_SAMPLED{"x-b3-sampled"};
+  const Http::LowerCaseString X_B3_FLAGS{"x-b3-flags"};
 
   // Zipkin b3 single header
   const Http::LowerCaseString B3{"b3"};

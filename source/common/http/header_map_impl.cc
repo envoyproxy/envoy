@@ -404,7 +404,7 @@ void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, uint64_t value) 
   HeaderString new_value;
   new_value.setInteger(value);
   insertByKey(std::move(ref_key), std::move(new_value));
-  ASSERT(new_value.empty());
+  ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
 }
 
 void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, const std::string& value) {
@@ -412,7 +412,7 @@ void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, const std::strin
   HeaderString new_value;
   new_value.setCopy(value.c_str(), value.size());
   insertByKey(std::move(ref_key), std::move(new_value));
-  ASSERT(new_value.empty());
+  ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
 }
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
@@ -428,8 +428,8 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
   HeaderString new_value;
   new_value.setInteger(value);
   insertByKey(std::move(new_key), std::move(new_value));
-  ASSERT(new_key.empty());
-  ASSERT(new_value.empty());
+  ASSERT(new_key.empty());   // NOLINT(bugprone-use-after-move)
+  ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
 }
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value) {
@@ -443,8 +443,8 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value
   HeaderString new_value;
   new_value.setCopy(value.c_str(), value.size());
   insertByKey(std::move(new_key), std::move(new_value));
-  ASSERT(new_key.empty());
-  ASSERT(new_value.empty());
+  ASSERT(new_key.empty());   // NOLINT(bugprone-use-after-move)
+  ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
 }
 
 void HeaderMapImpl::setReference(const LowerCaseString& key, const std::string& value) {
@@ -460,7 +460,7 @@ void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, const std::strin
   new_value.setCopy(value.c_str(), value.size());
   remove(key);
   insertByKey(std::move(ref_key), std::move(new_value));
-  ASSERT(new_value.empty());
+  ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
 }
 
 uint64_t HeaderMapImpl::byteSize() const {

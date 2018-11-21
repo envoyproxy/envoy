@@ -449,7 +449,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
 
   // Test setSourceServiceName and setDestinationServiceName
 
-  ann.setValue(Zipkin::ZipkinCoreConstants::get().CLIENT_RECV);
+  ann.setValue(Zipkin::ZipkinCoreConstants::get().CLIENT_RECV); // NOLINT(bugprone-use-after-move)
   span.addAnnotation(ann);
   span.setServiceName("NEW_SERVICE_NAME");
   EXPECT_EQ(R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +

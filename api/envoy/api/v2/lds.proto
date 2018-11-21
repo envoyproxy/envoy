@@ -163,4 +163,12 @@ message Listener {
   // On macOS, only values of 0, 1, and unset are valid; other values may result in an error.
   // To set the queue length on macOS, set the net.inet.tcp.fastopen_backlog kernel parameter.
   google.protobuf.UInt32Value tcp_fast_open_queue_length = 12;
+
+  // If true, the order of write filters will be reversed to that of filters
+  // configured in the filter chain. Otherwise, it will keep the existing
+  // order. Note: this is a bug fix for Envoy, which is designed to have the
+  // reversed order of write filters to that of read ones, (see
+  // https://github.com/envoyproxy/envoy/issues/4599 for details). When we
+  // remove this field, Envoy will have the same behavior when it sets true.
+  google.protobuf.BoolValue bugfix_reverse_write_filter_order = 14 [deprecated = true];
 }
