@@ -1179,7 +1179,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
 
   // IPv4 client connects to unknown port - no match.
   auto filter_chain = findFilterChain(1234, false, "127.0.0.1", false, "", false, "tls", false, {},
-                                      false, "8.8.8.8", false, true);
+                                      false, "8.8.8.8", false, false);
   EXPECT_EQ(filter_chain, nullptr);
 
   // IPv4 client connects to valid port - using 1st filter chain.
@@ -1195,7 +1195,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
 
   // UDS client - no match.
   filter_chain = findFilterChain(0, false, "/tmp/test.sock", false, "", false, "tls", false, {},
-                                 false, "/tmp/test.sock", false, true);
+                                 false, "/tmp/test.sock", false, false);
   EXPECT_EQ(filter_chain, nullptr);
 }
 
@@ -1224,7 +1224,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
 
   // IPv4 client connects to unknown IP - no match.
   auto filter_chain = findFilterChain(1234, true, "1.2.3.4", false, "", false, "tls", false, {},
-                                      false, "8.8.8.8", false, true);
+                                      false, "8.8.8.8", false, false);
   EXPECT_EQ(filter_chain, nullptr);
 
   // IPv4 client connects to valid IP - using 1st filter chain.
@@ -1240,7 +1240,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
 
   // UDS client - no match.
   filter_chain = findFilterChain(0, true, "/tmp/test.sock", false, "", false, "tls", false, {},
-                                 false, "/tmp/test.sock", false, true);
+                                 false, "/tmp/test.sock", false, false);
   EXPECT_EQ(filter_chain, nullptr);
 }
 
@@ -1269,12 +1269,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
 
   // TLS client without SNI - no match.
   auto filter_chain = findFilterChain(1234, true, "127.0.0.1", true, "", false, "tls", false, {},
-                                      false, "8.8.8.8", false, true);
+                                      false, "8.8.8.8", false, false);
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client without matching SNI - no match.
   filter_chain = findFilterChain(1234, true, "127.0.0.1", true, "www.example.com", false, "tls",
-                                 false, {}, false, "8.8.8.8", false, true);
+                                 false, {}, false, "8.8.8.8", false, false);
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client with matching SNI - using 1st filter chain.
@@ -1314,7 +1314,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
 
   // TCP client - no match.
   auto filter_chain = findFilterChain(1234, true, "127.0.0.1", true, "", true, "raw_buffer", false,
-                                      {}, false, "8.8.8.8", false, true);
+                                      {}, false, "8.8.8.8", false, false);
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client - using 1st filter chain.
@@ -1355,7 +1355,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
 
   // TLS client without ALPN - no match.
   auto filter_chain = findFilterChain(1234, true, "127.0.0.1", true, "", true, "tls", true, {},
-                                      false, "8.8.8.8", false, true);
+                                      false, "8.8.8.8", false, false);
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client with "http/1.1" ALPN - using 1st filter chain.
@@ -1870,7 +1870,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
 
   // TLS client with exact SNI match but without ALPN - no match (SNI blackholed by configuration).
   filter_chain = findFilterChain(1234, true, "127.0.0.1", true, "server1.example.com", true, "tls",
-                                 true, {}, false, "127.0.0.1", false, true);
+                                 true, {}, false, "127.0.0.1", false, false);
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client with ALPN match but without SNI - using 1st filter chain.
