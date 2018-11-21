@@ -5,6 +5,7 @@ option go_package = "v2";
 
 import "envoy/config/filter/network/thrift_proxy/v2alpha1/route.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
@@ -89,9 +90,14 @@ message ThriftFilter {
   // * :ref:`envoy.filters.thrift.rate_limit <config_thrift_filters_rate_limit>`
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
-  // Filter specific configuration which depends on the filter being
-  // instantiated. See the supported filters for further documentation.
-  google.protobuf.Struct config = 2;
+  // Filter specific configuration which depends on the filter being instantiated. See the supported
+  // filters for further documentation.
+  oneof config_type {
+    google.protobuf.Struct config = 2;
+
+    // [#not-implemented-hide:]
+    google.protobuf.Any typed_config = 3;
+  }
 }
 
 // ThriftProtocolOptions specifies Thrift upstream protocol options. This object is used in

@@ -246,7 +246,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
       ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
       error_ = true;
       decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, request_status.error_message(),
-                                         nullptr);
+                                         nullptr, absl::nullopt);
 
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -282,7 +282,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
     ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
     error_ = true;
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, request_status.error_message(),
-                                       nullptr);
+                                       nullptr, absl::nullopt);
 
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }

@@ -81,7 +81,7 @@ public:
   void createSyncMockAuthsAndVerifier(const StatusMap& statuses) {
     for (const auto& it : statuses) {
       auto mock_auth = std::make_unique<MockAuthenticator>();
-      EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _, _))
+      EXPECT_CALL(*mock_auth, doVerify(_, _, _, _))
           .WillOnce(Invoke([issuer = it.first, status = it.second](
                                Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
                                SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
@@ -91,7 +91,7 @@ public:
             }
             callback(status);
           }));
-      EXPECT_CALL(*mock_auth.get(), onDestroy()).Times(1);
+      EXPECT_CALL(*mock_auth, onDestroy()).Times(1);
       mock_auths_[it.first] = std::move(mock_auth);
     }
     createVerifier();
@@ -114,13 +114,13 @@ public:
     std::unordered_map<std::string, AuthenticatorCallback> callbacks;
     for (std::size_t i = 0; i < providers.size(); ++i) {
       auto mock_auth = std::make_unique<MockAuthenticator>();
-      EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _, _))
+      EXPECT_CALL(*mock_auth, doVerify(_, _, _, _))
           .WillOnce(Invoke(
               [&callbacks, iss = providers[i]](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
                                                SetPayloadCallback, AuthenticatorCallback callback) {
                 callbacks[iss] = std::move(callback);
               }));
-      EXPECT_CALL(*mock_auth.get(), onDestroy()).Times(1);
+      EXPECT_CALL(*mock_auth, onDestroy()).Times(1);
       mock_auths_[providers[i]] = std::move(mock_auth);
     }
     createVerifier();
@@ -206,7 +206,7 @@ rules:
 )";
   MessageUtil::loadFromYaml(config, proto_config_);
   auto mock_auth = std::make_unique<MockAuthenticator>();
-  EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _, _)).Times(0);
+  EXPECT_CALL(*mock_auth, doVerify(_, _, _, _)).Times(0);
   mock_auths_["example_provider"] = std::move(mock_auth);
   createVerifier();
 
@@ -516,11 +516,11 @@ TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowAll) {
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"example_provider", "other_provider"});
   auto mock_auth = std::make_unique<MockAuthenticator>();
-  EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _, _))
+  EXPECT_CALL(*mock_auth, doVerify(_, _, _, _))
       .WillOnce(Invoke(
           [&](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*, SetPayloadCallback,
               AuthenticatorCallback callback) { callbacks[allowfailed] = std::move(callback); }));
-  EXPECT_CALL(*mock_auth.get(), onDestroy()).Times(1);
+  EXPECT_CALL(*mock_auth, onDestroy()).Times(1);
   mock_auths_[allowfailed] = std::move(mock_auth);
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
 

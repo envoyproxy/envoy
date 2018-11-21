@@ -60,6 +60,7 @@ void SdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&)
 
   const uint64_t new_hash = MessageUtil::hash(secret);
   if (new_hash != secret_hash_) {
+    validateConfig(secret);
     secret_hash_ = new_hash;
     setSecret(secret);
     update_callback_manager_.runCallbacks();

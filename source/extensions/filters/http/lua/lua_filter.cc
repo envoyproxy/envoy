@@ -191,7 +191,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   }
 
   http_request_ = filter_.clusterManager().httpAsyncClientForCluster(cluster).send(
-      std::move(message), *this, timeout);
+      std::move(message), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout));
   if (http_request_) {
     state_ = State::HttpCall;
     return lua_yield(state, 0);

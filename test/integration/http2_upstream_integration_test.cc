@@ -291,8 +291,7 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBacku
 
 TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
-  TestRandomGenerator rand;
-  const uint32_t num_requests = rand.random() % 50 + 1;
+  const uint32_t num_requests = 20;
   std::vector<Http::StreamEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<FakeStreamPtr> upstream_requests;
@@ -306,6 +305,17 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
                                                             {":authority", "host"}});
     encoders.push_back(&encoder_decoder.first);
     responses.push_back(std::move(encoder_decoder.second));
+
+    // Ensure that we're establishing a connection after the first request, before we issue
+    // any of the resets. This is necessary in order to know a priori that all requests will
+    // create a stream on the connection, regardless of whether they are reset or not. Resets
+    // that occur before a connection has been established does not create a stream on the
+    // connection.
+    if (i == 0) {
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    }
+
     // Reset a few streams to test how reset and watermark interact.
     if (i % 15 == 0) {
       codec_client_->sendReset(*encoders[i]);
@@ -313,9 +323,7 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
       codec_client_->sendData(*encoders[i], 0, true);
     }
   }
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   for (uint32_t i = 0; i < num_requests; ++i) {
-    FakeStreamPtr stream;
     upstream_requests.emplace_back();
     ASSERT_TRUE(
         fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests.back()));

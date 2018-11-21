@@ -11,10 +11,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/boringssl/archive/060e9a583976e73d1ea8b2bfe8b9cab33c62fa17.tar.gz"],
     ),
     com_google_absl = dict(
-        sha256 = "c682f37375783028d400e45d0ba930181142c5b50de140f61710ee82aac8f659",
-        strip_prefix = "abseil-cpp-94c298e2a0ae409e283cab96c954a685bd865a70",
-        # 2018-10-24
-        urls = ["https://github.com/abseil/abseil-cpp/archive/94c298e2a0ae409e283cab96c954a685bd865a70.tar.gz"],
+        sha256 = "e35082e88b9da04f4d68094c05ba112502a5063712f3021adfa465306d238c76",
+        strip_prefix = "abseil-cpp-cc8dcd307b76a575d2e3e0958a4fe4c7193c2f68",
+        # 2018-10-31
+        urls = ["https://github.com/abseil/abseil-cpp/archive/cc8dcd307b76a575d2e3e0958a4fe4c7193c2f68.tar.gz"],
     ),
     com_github_apache_thrift = dict(
         sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",
@@ -89,6 +89,16 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "googleapis-d6f78d948c53f3b400bb46996eb3084359914f9b",
         # From: https://github.com/lightstep/lightstep-tracer-cpp/blob/v0.8.0/lightstep-tracer-common/third_party/googleapis/README.lightstep-tracer-common#L6
         urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
+    ),
+    com_github_datadog_dd_opentracing_cpp = dict(
+        sha256 = "733e9b698a232cfd3aa35b4e27c59641bf1fa78e52e71d29e230af4f2070cdf5",
+        strip_prefix = "dd-opentracing-cpp-0.3.5",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.5.tar.gz"],
+    ),
+    com_github_msgpack_msgpack_c = dict(
+        sha256 = "bda49f996a73d2c6080ff0523e7b535917cd28c8a79c3a5da54fc29332d61d1e",
+        strip_prefix = "msgpack-c-cpp-3.1.1",
+        urls = ["https://github.com/msgpack/msgpack-c/archive/cpp-3.1.1.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
         sha256 = "499f1e145c19f33031eb8fc6452d5d391b4cecfdeda23e2055386a3b33be4d41",

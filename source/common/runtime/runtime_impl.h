@@ -1,13 +1,10 @@
 #pragma once
 
-#include <dirent.h>
-
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
-#include "envoy/api/os_sys_calls.h"
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
@@ -144,26 +141,12 @@ private:
  */
 class DiskLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
-  DiskLayer(const std::string& name, const std::string& path, Api::OsSysCalls& os_sys_calls);
+  DiskLayer(const std::string& name, const std::string& path);
 
 private:
-  struct Directory {
-    Directory(const std::string& path) {
-      dir_ = opendir(path.c_str());
-      if (!dir_) {
-        throw EnvoyException(fmt::format("unable to open directory: {}", path));
-      }
-    }
-
-    ~Directory() { closedir(dir_); }
-
-    DIR* dir_;
-  };
-
   void walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth);
 
   const std::string path_;
-  Api::OsSysCalls& os_sys_calls_;
   // Maximum recursion depth for walkDirectory().
   const uint32_t MaxWalkDepth = 16;
 };
@@ -214,7 +197,7 @@ public:
   DiskBackedLoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
                        const std::string& root_symlink_path, const std::string& subdir,
                        const std::string& override_dir, Stats::Store& store,
-                       RandomGenerator& generator, Api::OsSysCallsPtr os_sys_calls);
+                       RandomGenerator& generator);
 
 private:
   std::unique_ptr<SnapshotImpl> createNewSnapshot() override;
@@ -222,7 +205,6 @@ private:
   const Filesystem::WatcherPtr watcher_;
   const std::string root_path_;
   const std::string override_path_;
-  const Api::OsSysCallsPtr os_sys_calls_;
 };
 
 } // namespace Runtime

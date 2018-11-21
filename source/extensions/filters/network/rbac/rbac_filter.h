@@ -46,6 +46,7 @@ typedef std::shared_ptr<RoleBasedAccessControlFilterConfig>
  */
 class RoleBasedAccessControlFilter : public Network::ReadFilter,
                                      public Logger::Loggable<Logger::Id::rbac> {
+
 public:
   RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfigSharedPtr config)
       : config_(config) {}
@@ -57,6 +58,8 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
   }
+
+  void setDynamicMetadata(std::string shadow_engine_result, std::string shadow_policy_id);
 
 private:
   RoleBasedAccessControlFilterConfigSharedPtr config_;

@@ -14,7 +14,8 @@ sources of latency. Envoy supports three features related to system wide tracing
   x-request-id header for unified logging as well as tracing.
 * **External trace service integration**: Envoy supports pluggable external trace visualization
   providers. Currently Envoy supports `LightStep <http://lightstep.com/>`_, `Zipkin <http://zipkin.io/>`_
-  or any Zipkin compatible backends (e.g. `Jaeger <https://github.com/jaegertracing/>`_).
+  or any Zipkin compatible backends (e.g. `Jaeger <https://github.com/jaegertracing/>`_), and
+  `Datadog <https://datadoghq.com>`_.
   However, support for other tracing providers would not be difficult to add.
 * **Client trace ID joining**: The :ref:`config_http_conn_man_headers_x-client-trace-id` header can
   be used to join untrusted request IDs to the trusted internal
@@ -71,6 +72,12 @@ Alternatively the trace context can be manually propagated by the service:
   request. In addition, the single :ref:`config_http_conn_man_headers_b3` header propagation format is
   supported, which is a more compressed format.
 
+* When using the Datadog tracer, Envoy relies on the service to propagate the
+  Datadog-specific HTTP headers (
+  :ref:`config_http_conn_man_headers_x-datadog-trace-id`,
+  :ref:`config_http_conn_man_headers_x-datadog-parent-id`,
+  :ref:`config_http_conn_man_headers_x-datadog-sampling-priority`).
+
 What data each trace contains
 -----------------------------
 An end-to-end trace is comprised of one or more spans. A
@@ -95,7 +102,7 @@ the route. The name can also be overridden using the
 Envoy automatically sends spans to tracing collectors. Depending on the tracing collector,
 multiple spans are stitched together using common information such as the globally unique
 request ID :ref:`config_http_conn_man_headers_x-request-id` (LightStep) or
-the trace ID configuration (Zipkin). See
+the trace ID configuration (Zipkin and Datadog). See
 
 * :ref:`v2 API reference <envoy_api_msg_config.trace.v2.Tracing>`
 

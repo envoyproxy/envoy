@@ -56,17 +56,13 @@ public:
 
   RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const override {
     absl::optional<std::string> corpus_path =
-        TestEnvironment::getOptionalEnvVar("ROUTE_CORPUS_PATH");
+        TestEnvironment::getOptionalEnvVar("GENRULE_OUTPUT_DIR");
     if (corpus_path) {
       static uint32_t n;
-      const uint32_t max_test_cases =
-          std::atoi(TestEnvironment::getCheckedEnvVar("ROUTE_CORPUS_MAX").c_str());
       test::common::router::RouteTestCase route_test_case;
       route_test_case.mutable_config()->MergeFrom(config_);
       route_test_case.mutable_headers()->MergeFrom(Fuzz::toHeaders(headers));
       route_test_case.set_random_value(random_value);
-      RELEASE_ASSERT(n < max_test_cases,
-                     "ROUTE_CORPUS_MAX is too low, consider increasing in build rule");
       const std::string path = fmt::format("{}/generated_corpus_{}", corpus_path.value(), n++);
       const std::string corpus = route_test_case.DebugString();
       {

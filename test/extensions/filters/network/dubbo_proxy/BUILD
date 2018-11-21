@@ -69,3 +69,24 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_name = "envoy.filters.network.dubbo_proxy",
+    deps = [
+        "//source/extensions/filters/network/dubbo_proxy:config",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "filter_test",
+    srcs = ["filter_test.cc"],
+    extension_name = "envoy.filters.network.dubbo_proxy",
+    deps = [
+        ":utility_lib",
+        "//source/extensions/filters/network/dubbo_proxy:filter_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)

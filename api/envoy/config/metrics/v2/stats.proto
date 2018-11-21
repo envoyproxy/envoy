@@ -9,6 +9,7 @@ option go_package = "v2";
 import "envoy/api/v2/core/address.proto";
 import "envoy/type/matcher/string.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -27,10 +28,14 @@ message StatsSink {
   // Sinks optionally support tagged/multiple dimensional metrics.
   string name = 1;
 
-  // Stats sink specific configuration which depends on the sink being
-  // instantiated. See :ref:`StatsdSink <envoy_api_msg_config.metrics.v2.StatsdSink>` for an
-  // example.
-  google.protobuf.Struct config = 2;
+  // Stats sink specific configuration which depends on the sink being instantiated. See
+  // :ref:`StatsdSink <envoy_api_msg_config.metrics.v2.StatsdSink>` for an example.
+  oneof config_type {
+    google.protobuf.Struct config = 2;
+
+    // [#not-implemented-hide:]
+    google.protobuf.Any typed_config = 3;
+  }
 }
 
 // Statistics configuration such as tagging.

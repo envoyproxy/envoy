@@ -8,6 +8,7 @@
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -392,9 +393,7 @@ void ConfigHelper::initializeTls(envoy::api::v2::auth::CommonTlsContext& common_
   auto* validation_context = common_tls_context.mutable_validation_context();
   validation_context->mutable_trusted_ca()->set_filename(
       TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-  validation_context->add_verify_certificate_hash(
-      "E0:F3:C8:CE:5E:2E:A3:05:F0:70:1F:F5:12:E3:6E:2E:"
-      "97:92:82:84:A2:28:BC:F7:73:32:D3:39:30:A1:B6:FD");
+  validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
 
   auto* tls_certificate = common_tls_context.add_tls_certificates();
   tls_certificate->mutable_certificate_chain()->set_filename(

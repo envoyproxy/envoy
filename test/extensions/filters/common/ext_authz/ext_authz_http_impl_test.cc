@@ -60,7 +60,7 @@ public:
     EXPECT_CALL(async_client_, send_(_, _, _))
         .WillOnce(Invoke(
             [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks&,
-                const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+                const Envoy::Http::AsyncClient::RequestOptions) -> Http::AsyncClient::Request* {
               message_ptr = std::move(message);
               return nullptr;
             }));

@@ -837,8 +837,12 @@ TEST_P(AdminInstanceTest, Memory) {
   const std::string output_json = response.toString();
   envoy::admin::v2alpha::Memory output_proto;
   MessageUtil::loadFromJson(output_json, output_proto);
-  EXPECT_THAT(output_proto, AllOf(Property(&envoy::admin::v2alpha::Memory::allocated, Ge(0)),
-                                  Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0))));
+  EXPECT_THAT(output_proto,
+              AllOf(Property(&envoy::admin::v2alpha::Memory::allocated, Ge(0)),
+                    Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0)),
+                    Property(&envoy::admin::v2alpha::Memory::pageheap_unmapped, Ge(0)),
+                    Property(&envoy::admin::v2alpha::Memory::pageheap_free, Ge(0)),
+                    Property(&envoy::admin::v2alpha::Memory::total_thread_cache, Ge(0))));
 }
 
 TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
@@ -1096,6 +1100,14 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 TEST_P(AdminInstanceTest, GetRequest) {
   Http::HeaderMapImpl response_headers;
   std::string body;
+
+  EXPECT_CALL(server_.options_, toCommandLineOptions()).WillOnce(Invoke([] {
+    Server::CommandLineOptionsPtr command_line_options =
+        std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
+    command_line_options->set_restart_epoch(2);
+    command_line_options->set_service_cluster("cluster");
+    return command_line_options;
+  }));
   EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
   envoy::admin::v2alpha::ServerInfo server_info_proto;
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
@@ -1105,6 +1117,8 @@ TEST_P(AdminInstanceTest, GetRequest) {
   // values such as timestamps + Envoy version are tricky to test for.
   MessageUtil::loadFromJson(body, server_info_proto);
   EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::LIVE);
+  EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
+  EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
 }
 
 TEST_P(AdminInstanceTest, GetRequestJson) {

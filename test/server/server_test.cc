@@ -16,12 +16,14 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Assign;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Property;
 using testing::Ref;
+using testing::Return;
 using testing::SaveArg;
 using testing::StrictMock;
 
@@ -53,7 +55,7 @@ TEST(ServerInstanceUtil, flushHelper) {
 
 class RunHelperTest : public testing::Test {
 public:
-  RunHelperTest() {
+  RunHelperTest() : shutdown_(false) {
     InSequence s;
 
     sigterm_ = new Event::MockSignalEvent(&dispatcher_);
@@ -61,15 +63,17 @@ public:
     sighup_ = new Event::MockSignalEvent(&dispatcher_);
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
     EXPECT_CALL(overload_manager_, start());
+    ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
 
-    helper_ = std::make_unique<RunHelper>(dispatcher_, cm_, hot_restart_, access_log_manager_,
+    helper_ = std::make_unique<RunHelper>(server_, options_, dispatcher_, cm_, access_log_manager_,
                                           init_manager_, overload_manager_,
                                           [this] { start_workers_.ready(); });
   }
 
+  NiceMock<MockInstance> server_;
+  testing::NiceMock<MockOptions> options_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<MockHotRestart> hot_restart_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   NiceMock<MockOverloadManager> overload_manager_;
   InitManagerImpl init_manager_;
@@ -79,6 +83,7 @@ public:
   Event::MockSignalEvent* sigterm_;
   Event::MockSignalEvent* sigusr1_;
   Event::MockSignalEvent* sighup_;
+  bool shutdown_ = false;
 };
 
 TEST_F(RunHelperTest, Normal) {
@@ -89,6 +94,7 @@ TEST_F(RunHelperTest, Normal) {
 TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
   EXPECT_CALL(start_workers_, ready()).Times(0);
   sigterm_->callback_();
+  EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   cm_init_callback_();
 }
 
@@ -99,6 +105,7 @@ TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
   EXPECT_CALL(target, initialize(_));
   cm_init_callback_();
   sigterm_->callback_();
+  EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   target.callback_();
 }
 
@@ -119,7 +126,8 @@ protected:
         options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_);
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
+        Thread::threadFactoryForTest());
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
@@ -135,7 +143,8 @@ protected:
         options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_);
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
+        Thread::threadFactoryForTest());
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
@@ -330,7 +339,8 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
       options_, test_time_.timeSystem(),
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
       hooks_, restart_, stats_store_, fakelock_, component_factory_,
-      std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_)));
+      std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
+      Thread::threadFactoryForTest())));
 }
 
 // Validate that when std::exception is unexpectedly thrown, we exit safely.
@@ -359,6 +369,13 @@ TEST_P(ServerInstanceImplTest, UnknownExceptionThrowInConstructor) {
     throw(FakeException("foobar"));
   }));
   EXPECT_THROW_WITH_MESSAGE(initialize("test/server/node_bootstrap.yaml"), FakeException, "foobar");
+}
+
+TEST_P(ServerInstanceImplTest, MutexContentionEnabled) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.mutex_tracing_enabled_ = true;
+  EXPECT_NO_THROW(initialize(std::string()));
 }
 
 } // namespace Server

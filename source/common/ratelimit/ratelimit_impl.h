@@ -17,8 +17,6 @@
 #include "common/common/logger.h"
 #include "common/singleton/const_singleton.h"
 
-#include "source/common/ratelimit/ratelimit.pb.h"
-
 namespace Envoy {
 namespace RateLimit {
 
@@ -41,8 +39,7 @@ class GrpcClientImpl : public Client,
                        public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout,
-                 const std::string& method_name);
+                 const absl::optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl();
 
   static void createRequest(envoy::service::ratelimit::v2::RateLimitRequest& request,
@@ -78,7 +75,6 @@ public:
 
 private:
   Grpc::AsyncClientFactoryPtr async_client_factory_;
-  const bool use_data_plane_proto_;
 };
 
 class NullClientImpl : public Client {

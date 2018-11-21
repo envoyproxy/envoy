@@ -14,6 +14,7 @@
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/ext_authz/ext_authz.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -70,6 +71,12 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
+
+  void prepareCheck() {
+    ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+    EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+    EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  }
 };
 
 class HttpFilterTest : public HttpFilterTestBase<testing::Test> {};
@@ -107,6 +114,41 @@ envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz GetFilterConfig() {
 INSTANTIATE_TEST_CASE_P(ParameterizedFilterConfig, HttpFilterTestParam,
                         Values(&GetFilterConfig<true, true>, &GetFilterConfig<false, false>,
                                &GetFilterConfig<true, false>, &GetFilterConfig<false, true>));
+
+// Test that the per route config is properly merged: more specific keys override previous keys.
+TEST_F(HttpFilterTest, MergeConfig) {
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settings;
+  auto&& extensions = settings.mutable_check_settings()->mutable_context_extensions();
+
+  // First config base config with one base value, and one value to be overriden.
+  (*extensions)["base_key"] = "base_value";
+  (*extensions)["merged_key"] = "base_value";
+  FilterConfigPerRoute base_config(settings);
+
+  // Construct a config to merge, that provides one value and overrides one value.
+  settings.Clear();
+  auto&& specific_extensions = settings.mutable_check_settings()->mutable_context_extensions();
+  (*specific_extensions)["merged_key"] = "value";
+  (*specific_extensions)["key"] = "value";
+  FilterConfigPerRoute specific_config(settings);
+
+  // Perform the merge:
+  base_config.merge(specific_config);
+
+  settings.Clear();
+  settings.set_disabled(true);
+  FilterConfigPerRoute disabled_config(settings);
+
+  // Perform a merge with disabled config:
+  base_config.merge(disabled_config);
+
+  // Make sure all values were merged:
+  EXPECT_TRUE(base_config.disabled());
+  auto&& merged_extensions = base_config.contextExtensions();
+  EXPECT_EQ("base_value", merged_extensions.at("base_key"));
+  EXPECT_EQ("value", merged_extensions.at("merged_key"));
+  EXPECT_EQ("value", merged_extensions.at("key"));
+}
 
 // Test when failure_mode_allow is NOT set and the response from the authorization service is Error
 // that the request is not allowed to continue.
@@ -293,8 +335,85 @@ TEST_F(HttpFilterTest, TestDefaultAllowedHeaders) {
 // Parameterized Tests
 // -------------------
 
+// Test that context extensions make it into the check request.
+TEST_F(HttpFilterTestParam, ContextExtensions) {
+  // Place something in the context extensions on the virtualhost.
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settingsvhost;
+  (*settingsvhost.mutable_check_settings()->mutable_context_extensions())["key_vhost"] =
+      "value_vhost";
+  // add a default route value to see it overriden
+  (*settingsvhost.mutable_check_settings()->mutable_context_extensions())["key_route"] =
+      "default_route_value";
+  // Initialize the virtual host's per filter config.
+  FilterConfigPerRoute auth_per_vhost(settingsvhost);
+  ON_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
+          perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+      .WillByDefault(Return(&auth_per_vhost));
+
+  // Place something in the context extensions on the route.
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settingsroute;
+  (*settingsroute.mutable_check_settings()->mutable_context_extensions())["key_route"] =
+      "value_route";
+  // Initialize the route's per filter config.
+  FilterConfigPerRoute auth_per_route(settingsroute);
+  ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+      .WillByDefault(Return(&auth_per_route));
+
+  prepareCheck();
+
+  // Save the check request from the check call.
+  envoy::service::auth::v2alpha::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(WithArgs<1>(
+          Invoke([&](const envoy::service::auth::v2alpha::CheckRequest& check_param) -> void {
+            check_request = check_param;
+          })));
+
+  // Engage the filter so that check is called.
+  filter_->decodeHeaders(request_headers_, false);
+
+  // Make sure that the extensions appear in the check request issued by the filter.
+  EXPECT_EQ("value_vhost", check_request.attributes().context_extensions().at("key_vhost"));
+  EXPECT_EQ("value_route", check_request.attributes().context_extensions().at("key_route"));
+}
+
+// Test that filter can be disabled with route config.
+TEST_F(HttpFilterTestParam, DisabledOnRoute) {
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settings;
+  FilterConfigPerRoute auth_per_route(settings);
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(addr_));
+  ON_CALL(connection_, localAddress()).WillByDefault(ReturnRef(addr_));
+
+  ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+      .WillByDefault(Return(&auth_per_route));
+
+  auto test_disable = [&](bool disabled) {
+    initialize("");
+    // Set disabled
+    settings.set_disabled(disabled);
+    // Initialize the route's per filter config.
+    auth_per_route = FilterConfigPerRoute(settings);
+  };
+
+  // baseline: make sure that when not disabled, check is called
+  test_disable(false);
+  EXPECT_CALL(*client_, check(_, _, _)).Times(1);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  // test that disabling works
+  test_disable(true);
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
 // Test that the request continues when the filter_callbacks has no route.
-TEST_P(HttpFilterTestParam, NoRoute) {
+TEST_F(HttpFilterTestParam, NoRoute) {
   EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -302,7 +421,7 @@ TEST_P(HttpFilterTestParam, NoRoute) {
 }
 
 // Test that the request continues when the authorization service cluster is not present.
-TEST_P(HttpFilterTestParam, NoCluster) {
+TEST_F(HttpFilterTestParam, NoCluster) {
   EXPECT_CALL(filter_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -310,12 +429,11 @@ TEST_P(HttpFilterTestParam, NoCluster) {
 }
 
 // Test that the request is stopped till there is an OK response back after which it continues on.
-TEST_P(HttpFilterTestParam, OkResponse) {
+TEST_F(HttpFilterTestParam, OkResponse) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
+
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -338,12 +456,10 @@ TEST_P(HttpFilterTestParam, OkResponse) {
 
 // Test that an synchronous OK response from the authorization service, on the call stack, results
 // in request continuing on.
-TEST_P(HttpFilterTestParam, ImmediateOkResponse) {
+TEST_F(HttpFilterTestParam, ImmediateOkResponse) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
@@ -362,12 +478,10 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponse) {
 
 // Test that an synchronous denied response from the authorization service passing additional HTTP
 // attributes to the downstream.
-TEST_P(HttpFilterTestParam, ImmediateDeniedResponseWithHttpAttributes) {
+TEST_F(HttpFilterTestParam, ImmediateDeniedResponseWithHttpAttributes) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
@@ -392,7 +506,7 @@ TEST_P(HttpFilterTestParam, ImmediateDeniedResponseWithHttpAttributes) {
 
 // Test that an synchronous ok response from the authorization service passing additional HTTP
 // attributes to the upstream.
-TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
+TEST_F(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   InSequence s;
 
   // `bar` will be appended to this header.
@@ -406,9 +520,7 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   const Http::LowerCaseString key_to_override{"foobar"};
   request_headers_.addCopy("foobar", "foo");
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
@@ -434,12 +546,10 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
 
 // Test that an synchronous denied response from the authorization service, on the call stack,
 // results in request not continuing.
-TEST_P(HttpFilterTestParam, ImmediateDeniedResponse) {
+TEST_F(HttpFilterTestParam, ImmediateDeniedResponse) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
@@ -457,12 +567,10 @@ TEST_P(HttpFilterTestParam, ImmediateDeniedResponse) {
 }
 
 // Test that a denied response results in the connection closing with a 401 response to the client.
-TEST_P(HttpFilterTestParam, DeniedResponseWith401) {
+TEST_F(HttpFilterTestParam, DeniedResponseWith401) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -486,12 +594,10 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith401) {
 }
 
 // Test that a denied response results in the connection closing with a 403 response to the client.
-TEST_P(HttpFilterTestParam, DeniedResponseWith403) {
+TEST_F(HttpFilterTestParam, DeniedResponseWith403) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -516,7 +622,7 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith403) {
 }
 
 // Verify that authz response memory is not used after free.
-TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
+TEST_F(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   InSequence s;
 
   Filters::Common::ExtAuthz::Response response{};
@@ -528,9 +634,7 @@ TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   Filters::Common::ExtAuthz::ResponsePtr response_ptr =
       std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -563,7 +667,7 @@ TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
 }
 
 // Verify that authz denied response headers overrides the existing encoding headers.
-TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
+TEST_F(HttpFilterTestParam, OverrideEncodingHeaders) {
   InSequence s;
 
   Filters::Common::ExtAuthz::Response response{};
@@ -575,9 +679,7 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
   Filters::Common::ExtAuthz::ResponsePtr response_ptr =
       std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -616,12 +718,10 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
 
 // Test that when a connection awaiting a authorization response is canceled then the
 // authorization call is closed.
-TEST_P(HttpFilterTestParam, ResetDuringCall) {
+TEST_F(HttpFilterTestParam, ResetDuringCall) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {

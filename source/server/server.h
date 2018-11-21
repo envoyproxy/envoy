@@ -12,6 +12,7 @@
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/tracing/http_tracer.h"
@@ -113,19 +114,15 @@ public:
  */
 class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
-  RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, HotRestart& hot_restart,
-            AccessLog::AccessLogManager& access_log_manager, InitManagerImpl& init_manager,
-            OverloadManager& overload_manager, std::function<void()> workers_start_cb);
-
-  // Helper function to inititate a shutdown. This can be triggered either by catching SIGTERM
-  // or be called from ServerImpl::shutdown().
-  void shutdown(Event::Dispatcher& dispatcher, HotRestart& hot_restart);
+  RunHelper(Instance& instance, Options& options, Event::Dispatcher& dispatcher,
+            Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
+            InitManagerImpl& init_manager, OverloadManager& overload_manager,
+            std::function<void()> workers_start_cb);
 
 private:
   Event::SignalEventPtr sigterm_;
   Event::SignalEventPtr sig_usr_1_;
   Event::SignalEventPtr sig_hup_;
-  bool shutdown_{};
 };
 
 /**
@@ -140,7 +137,8 @@ public:
                Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
-               Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls);
+               Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
+               Thread::ThreadFactory& thread_factory);
 
   ~InstanceImpl() override;
 
@@ -162,6 +160,7 @@ public:
   Init::Manager& initManager() override { return init_manager_; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
+  Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
   Runtime::RandomGenerator& random() override { return *random_generator_; }
   RateLimit::ClientPtr
@@ -170,6 +169,7 @@ public:
   }
   Runtime::Loader& runtime() override;
   void shutdown() override;
+  bool isShutdown() override final { return shutdown_; }
   void shutdownAdmin() override;
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override;
@@ -196,6 +196,7 @@ private:
   void startWorkers();
   void terminate();
 
+  bool shutdown_;
   Options& options_;
   Event::TimeSystem& time_system_;
   HotRestart& restarter_;
@@ -235,6 +236,7 @@ private:
   Upstream::HdsDelegatePtr hds_delegate_;
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
   std::unique_ptr<RunHelper> run_helper_;
+  Envoy::MutexTracer* mutex_tracer_;
 };
 
 } // namespace Server

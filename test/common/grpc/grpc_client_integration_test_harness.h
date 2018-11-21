@@ -2,6 +2,7 @@
 
 #include "envoy/stats/scope.h"
 
+#include "common/api/api_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/grpc/google_async_client_impl.h"
@@ -22,6 +23,7 @@
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::Invoke;
@@ -207,7 +209,7 @@ class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        dispatcher_(test_time_.timeSystem()) {}
+        dispatcher_(test_time_.timeSystem()), api_(Api::createApiForTest()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -293,7 +295,7 @@ public:
 
   AsyncClientPtr createGoogleAsyncClientImpl() {
 #ifdef ENVOY_GOOGLE_GRPC
-    google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>();
+    google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
     return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stub_factory,
                                                    stats_scope_, createGoogleGrpcConfig());
@@ -401,6 +403,7 @@ public:
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   DispatcherHelper dispatcher_helper_{dispatcher_};
+  Api::ApiPtr api_;
   Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
   TestMetadata service_wide_initial_metadata_;
