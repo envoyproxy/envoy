@@ -8,6 +8,7 @@
 
 #include "test/mocks/common.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -62,7 +63,7 @@ protected:
   DispatcherImplTest()
       : dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSystem())),
         work_finished_(false) {
-    dispatcher_thread_ = api_.createThread([this]() {
+    dispatcher_thread_ = Thread::threadFactoryForTest().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);
       keepalive_timer_ = dispatcher_->createTimer(
@@ -80,7 +81,6 @@ protected:
 
   DangerousDeprecatedTestTime test_time_;
 
-  Api::Impl api_;
   Thread::ThreadPtr dispatcher_thread_;
   DispatcherPtr dispatcher_;
   Thread::MutexBasicLockable mu_;

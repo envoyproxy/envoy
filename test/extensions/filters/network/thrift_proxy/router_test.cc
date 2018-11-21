@@ -29,7 +29,6 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Test;
 using testing::TestWithParam;
 using testing::Values;
 
@@ -330,14 +329,12 @@ public:
   NiceMock<Network::MockClientConnection> upstream_connection_;
 };
 
-class ThriftRouterTest : public ThriftRouterTestBase, public Test {
+class ThriftRouterTest : public ThriftRouterTestBase, public testing::Test {
 public:
-  ThriftRouterTest() {}
 };
 
 class ThriftRouterFieldTypeTest : public ThriftRouterTestBase, public TestWithParam<FieldType> {
 public:
-  ThriftRouterFieldTypeTest() {}
 };
 
 INSTANTIATE_TEST_CASE_P(PrimitiveFieldTypes, ThriftRouterFieldTypeTest,
@@ -347,7 +344,6 @@ INSTANTIATE_TEST_CASE_P(PrimitiveFieldTypes, ThriftRouterFieldTypeTest,
 
 class ThriftRouterContainerTest : public ThriftRouterTestBase, public TestWithParam<FieldType> {
 public:
-  ThriftRouterContainerTest() {}
 };
 
 INSTANTIATE_TEST_CASE_P(ContainerFieldTypes, ThriftRouterContainerTest,

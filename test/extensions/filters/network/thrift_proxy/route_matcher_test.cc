@@ -10,7 +10,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Test;
 
 namespace Envoy {
 namespace Extensions {
