@@ -1,12 +1,13 @@
 #include "extensions/filters/network/mysql_proxy/mysql_filter.h"
 
+#include <stdlib.h>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 
 #include "src/SQLParser.h"
 #include "src/util/sqlhelper.h"
-#include <stdlib.h>
 
 namespace Envoy {
 namespace Extensions {
@@ -146,7 +147,7 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, bool end_stre
     hsql::SQLParser::parse(command.GetData(), &result);
 
     ENVOY_CONN_LOG(warn, "mysql msg processed {}", read_callbacks_->connection(),
-                   command.GetData());    
+                   command.GetData());
 
     // check whether the parsing was successful
     if (result.isValid()) {

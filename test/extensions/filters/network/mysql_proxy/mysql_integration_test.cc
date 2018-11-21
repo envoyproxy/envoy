@@ -35,7 +35,7 @@ class MySQLIntegrationTest : public MySQLTestUtils,
   }
 
 public:
-  MySQLIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()){};
+  MySQLIntegrationTest() : BaseIntegrationTest(GetParam(), realTime(), mysqlConfig()){};
 
   // Initializer for an individual integration test.
   void SetUp() override { BaseIntegrationTest::initialize(); }
