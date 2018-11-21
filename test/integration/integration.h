@@ -126,14 +126,6 @@ public:
   BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr time_system,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
 
-  // TODO(jmarantz): this alternate constructor is a temporary hack to allow
-  // envoy-filter-example/echo2_integration_test.cc to compile so CI for #4512
-  // can pass. Once that passes, we can up update filter-examples so it can see
-  // the 3-arg version of BaseIntegrationTest, and remove this constructor
-  // variant.
-  BaseIntegrationTest(Network::Address::IpVersion version, const std::string& config)
-      : BaseIntegrationTest(version, realTime(), config) {}
-
   virtual ~BaseIntegrationTest() {}
 
   /**
