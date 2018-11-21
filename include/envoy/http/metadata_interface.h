@@ -1,8 +1,8 @@
 #pragma once
 
 #include <functional>
-#include <memory>
 #include <iostream>
+#include <memory>
 #include <unordered_map>
 
 namespace Envoy {
