@@ -58,7 +58,7 @@ do
     # assumes for these variables correspond to real binaries on the system. If
     # either of these things aren't true, the check fails.
     for i in $(git diff --name-only $RANGE --diff-filter=ACMR 2>&1); do
-      echo "  Checking format for $i"
+      echo -ne "  Checking format for $i - "
       "$SCRIPT_DIR"/check_format.py check $i
       if [[ $? -ne 0 ]]; then
         exit 1
