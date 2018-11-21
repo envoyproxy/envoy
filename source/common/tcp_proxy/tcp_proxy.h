@@ -162,7 +162,7 @@ class PerConnectionCluster : public StreamInfo::FilterState::Object {
 public:
   PerConnectionCluster(absl::string_view cluster) : cluster_(cluster) {}
   const std::string& value() const { return cluster_; }
-  static const std::string Key;
+  static const std::string& key();
 
 private:
   const std::string cluster_;

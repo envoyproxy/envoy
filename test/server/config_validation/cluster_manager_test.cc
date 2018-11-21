@@ -46,7 +46,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
       bootstrap, stats, tls, runtime, random, local_info, log_manager, admin);
   EXPECT_EQ(nullptr, cluster_manager->httpConnPoolForCluster("cluster", ResourcePriority::Default,
                                                              Http::Protocol::Http11, nullptr));
-  Host::CreateConnectionData data = cluster_manager->tcpConnForCluster("cluster", nullptr);
+  Host::CreateConnectionData data = cluster_manager->tcpConnForCluster("cluster", nullptr, nullptr);
   EXPECT_EQ(nullptr, data.connection_);
   EXPECT_EQ(nullptr, data.host_description_);
 
