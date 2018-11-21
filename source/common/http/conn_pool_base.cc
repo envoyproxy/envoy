@@ -3,8 +3,9 @@
 namespace Envoy {
 namespace Http {
 ConnPoolImplBase::PendingRequest::PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
-                                                 ConnectionPool::Callbacks& callbacks)
-    : parent_(parent), decoder_(decoder), callbacks_(callbacks) {
+                                                 ConnectionPool::Callbacks& callbacks,
+                                                 const Upstream::LoadBalancerContext* lb_context)
+    : parent_(parent), decoder_(decoder), callbacks_(callbacks), lb_context_(lb_context) {
   parent_.host_->cluster().stats().upstream_rq_pending_total_.inc();
   parent_.host_->cluster().stats().upstream_rq_pending_active_.inc();
   parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().inc();
@@ -16,9 +17,10 @@ ConnPoolImplBase::PendingRequest::~PendingRequest() {
 }
 
 ConnectionPool::Cancellable*
-ConnPoolImplBase::newPendingRequest(StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks) {
+ConnPoolImplBase::newPendingRequest(StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+                                    const Upstream::LoadBalancerContext* context) {
   ENVOY_LOG(debug, "queueing request due to no available connections");
-  PendingRequestPtr pending_request(new PendingRequest(*this, decoder, callbacks));
+  PendingRequestPtr pending_request(new PendingRequest(*this, decoder, callbacks, context));
   pending_request->moveIntoList(std::move(pending_request), pending_requests_);
   return pending_requests_.front().get();
 }
