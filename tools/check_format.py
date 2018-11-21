@@ -286,6 +286,8 @@ def checkSourceLine(line, file_path, reportError):
   if ' ?: ' in line:
     # The ?: operator is non-standard, it is a GCC extension
     reportError("Don't use the '?:' operator, it is a non-standard GCC extension")
+  if line.startswith('using testing::Test;'):
+    reportError("Don't use 'using testing::Test;, elaborate the type instead")
 
 
 def checkBuildLine(line, file_path, reportError):

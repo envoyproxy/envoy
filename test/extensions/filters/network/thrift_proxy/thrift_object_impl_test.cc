@@ -18,7 +18,6 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Test;
 using testing::TestWithParam;
 using testing::Values;
 
@@ -144,7 +143,7 @@ public:
   Buffer::OwnedImpl buffer_;
 };
 
-class ThriftObjectImplTest : public ThriftObjectImplTestBase, public Test {};
+class ThriftObjectImplTest : public ThriftObjectImplTestBase, public testing::Test {};
 
 // Test parsing an empty struct (just a stop field).
 TEST_F(ThriftObjectImplTest, ParseEmptyStruct) {
