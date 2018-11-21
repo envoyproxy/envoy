@@ -169,12 +169,14 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 
 class ClusterManagerImplTest : public testing::Test {
 public:
-  ClusterManagerImplTest() { factory_.dispatcher_.setTimeSystem(time_system_); }
+  ClusterManagerImplTest() : api_(Api::createApiForTest()) {
+    factory_.dispatcher_.setTimeSystem(time_system_);
+  }
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<ClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, api_, code_stats_);
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_, code_stats_);
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -208,7 +210,7 @@ public:
 
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, api_,
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_,
         local_cluster_update_, code_stats_);
   }
 
@@ -243,7 +245,7 @@ public:
     return metadata;
   }
 
-  Api::Impl api_;
+  Api::ApiPtr api_;
   NiceMock<TestClusterManagerFactory> factory_;
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;

@@ -3,10 +3,13 @@
 #include <memory>
 #include <string>
 
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
 
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_replace.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -22,7 +25,8 @@ public:
       "By=spiffe://lyft.com/frontend;Hash=123456;URI=spiffe://lyft.com/testclient";
   const std::string current_xfcc_by_hash_ =
       "By=spiffe://lyft.com/"
-      "backend-team;Hash=e0f3c8ce5e2ea305f0701ff512e36e2e97928284a228bcf77332d33930a1b6fd";
+      "backend-team;Hash=" +
+      absl::AsciiStrToLower(absl::StrReplaceAll(TEST_CLIENT_CERT_HASH, {{":", ""}}));
   const std::string client_subject_ =
       "Subject=\""
       "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,"

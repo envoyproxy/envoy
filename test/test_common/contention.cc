@@ -1,5 +1,7 @@
 #include "test/test_common/contention.h"
 
+#include "test/test_common/utility.h"
+
 namespace Envoy {
 namespace Thread {
 namespace TestUtil {
@@ -14,7 +16,7 @@ void ContentionGenerator::generateContention(MutexTracerImpl& tracer) {
 
 Envoy::Thread::ThreadPtr ContentionGenerator::launchThread(MutexTracerImpl& tracer,
                                                            MutexBasicLockable* mu) {
-  return std::make_unique<Envoy::Thread::ThreadImpl>(
+  return threadFactoryForTest().createThread(
       [&tracer, mu]() -> void { holdUntilContention(tracer, mu); });
 }
 
