@@ -127,38 +127,8 @@ MockStore::MockStore(SymbolTable& symbol_table)
 }
 MockStore::~MockStore() {}
 
-SymbolTableSingleton* SymbolTableSingleton::singleton_ = nullptr;
-
-SymbolTableSingleton::SymbolTableSingleton(Thread::MutexBasicLockable& mutex)
-    : mutex_(mutex), ref_count_(1) {}
-
-SymbolTableSingleton& SymbolTableSingleton::get() {
-  static Thread::MutexBasicLockable* mutex = new Thread::MutexBasicLockable;
-  Thread::LockGuard lock(*mutex);
-  if (singleton_ == nullptr) {
-    singleton_ = new SymbolTableSingleton(*mutex);
-  } else {
-    ++singleton_->ref_count_;
-  }
-  return *singleton_;
-}
-
-void SymbolTableSingleton::release() {
-  Thread::LockGuard lock(mutex_);
-  ASSERT(singleton_ != nullptr);
-  ASSERT(singleton_ == this);
-  if (--singleton_->ref_count_ == 0) {
-    singleton_ = nullptr;
-    delete this;
-  }
-}
-
-MockSymbolTable::MockSymbolTable() : singleton_(SymbolTableSingleton::get()) {}
-
-MockSymbolTable::~MockSymbolTable() { singleton_.release(); }
-
-//MockIsolatedStatsStore::MockIsolatedStatsStore() : IsolatedStoreImpl(symbol_table_) {}
-MockIsolatedStatsStore::MockIsolatedStatsStore() {}
+MockIsolatedStatsStore::MockIsolatedStatsStore()
+    : IsolatedStoreImpl(Test::Global<Stats::SymbolTableImpl>::get()) {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() { IsolatedStoreImpl::clear(); }
 
 } // namespace Stats

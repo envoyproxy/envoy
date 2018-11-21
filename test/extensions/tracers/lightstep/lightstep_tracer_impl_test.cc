@@ -33,14 +33,13 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Test;
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Lightstep {
 
-class LightStepDriverTest : public Test {
+class LightStepDriverTest : public testing::Test {
 public:
   void setup(envoy::config::trace::v2::LightstepConfig& lightstep_config, bool init_timer,
              Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =

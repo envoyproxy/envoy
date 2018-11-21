@@ -32,14 +32,13 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Test;
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
-class DatadogDriverTest : public Test {
+class DatadogDriverTest : public testing::Test {
 public:
   void setup(envoy::config::trace::v2::DatadogConfig& datadog_config, bool init_timer) {
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))

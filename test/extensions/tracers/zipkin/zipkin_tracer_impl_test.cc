@@ -31,14 +31,13 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Test;
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-class ZipkinDriverTest : public Test {
+class ZipkinDriverTest : public testing::Test {
 public:
   ZipkinDriverTest() : time_source_(test_time_.timeSystem()) {}
 

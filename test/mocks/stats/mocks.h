@@ -17,6 +17,8 @@
 #include "common/stats/histogram_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "test/test_common/global.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -191,58 +193,17 @@ public:
   StatsOptionsImpl stats_options_;
 };
 
-class SymbolTableSingleton : public SymbolTableImpl {
-public:
-  static SymbolTableSingleton& get();
-  void release();
-
-private:
-  SymbolTableSingleton(Thread::MutexBasicLockable& mutex);
-  static SymbolTableSingleton* singleton_;
-  Thread::MutexBasicLockable& mutex_; // Lock guards don't work as mutex outlives object.
-  uint64_t ref_count_;
-};
-
-class MockSymbolTable : public SymbolTable {
-public:
-  MockSymbolTable();
-  ~MockSymbolTable();
-
-  SymbolEncoding encode(absl::string_view name) override { return singleton_.encode(name); }
-  uint64_t numSymbols() const override { return singleton_.numSymbols(); }
-  bool lessThan(const StatName& a, const StatName& b) const override {
-    return singleton_.lessThan(a, b);
-  }
-  void free(StatName stat_name) override { singleton_.free(stat_name); }
-  void incRefCount(StatName stat_name) override { singleton_.incRefCount(stat_name); }
-  std::string decode(const SymbolStorage symbol_vec, uint64_t size) const override {
-    return singleton_.decode(symbol_vec, size);
-  }
-  bool interoperable(const SymbolTable& other) const override {
-    return dynamic_cast<const MockSymbolTable*>(&other) != nullptr;
-  }
-
-#ifndef ENVOY_CONFIG_COVERAGE
-  void debugPrint() const override { singleton_.debugPrint(); }
-#endif
-
-private:
-  SymbolTableSingleton& singleton_;
-};
-
 /**
  * With IsolatedStoreImpl it's hard to test timing stats.
  * MockIsolatedStatsStore mocks only deliverHistogramToSinks for better testing.
  */
-class MockIsolatedStatsStore : public IsolatedStoreImpl {
+class MockIsolatedStatsStore : private Test::Global<Stats::SymbolTableImpl>,
+                               public IsolatedStoreImpl {
 public:
   MockIsolatedStatsStore();
   ~MockIsolatedStatsStore();
 
   MOCK_METHOD2(deliverHistogramToSinks, void(const Histogram& histogram, uint64_t value));
-
-private:
-  //MockSymbolTable symbol_table_;
 };
 
 } // namespace Stats

@@ -21,5 +21,6 @@ envoy_cc_mock(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks:common_lib",
+        "//test/test_common:global_lib",
     ],
 )
