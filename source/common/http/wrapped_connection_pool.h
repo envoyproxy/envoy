@@ -48,6 +48,9 @@ private:
   //! @return true if there is nothing going on so we can drain any connections
   bool drainable() const;
 
+  //! Tries to allocate any pending requests
+  void allocatePendingRequests();
+
   std::unique_ptr<ConnectionMapper> mapper_;
   Protocol protocol_;
   std::vector<DrainedCb> drained_callbacks_;

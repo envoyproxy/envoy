@@ -1,12 +1,16 @@
 #include "common/http/wrapped_connection_pool.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace Http {
 
 WrappedConnectionPool::WrappedConnectionPool(std::unique_ptr<ConnectionMapper> mapper,
                                              Protocol protocol, Upstream::HostConstSharedPtr host,
                                              Upstream::ResourcePriority priority)
-    : ConnPoolImplBase(host, priority), mapper_(std::move(mapper)), protocol_(protocol) {}
+    : ConnPoolImplBase(host, priority), mapper_(std::move(mapper)), protocol_(protocol) {
+  mapper_->addIdleCallback([this] { allocatePendingRequests(); });
+}
 
 Http::Protocol WrappedConnectionPool::protocol() const { return protocol_; }
 
@@ -32,7 +36,7 @@ WrappedConnectionPool::newStream(Http::StreamDecoder& decoder, ConnectionPool::C
 ConnectionPool::Cancellable*
 WrappedConnectionPool::pushPending(Http::StreamDecoder& response_decoder,
                                    ConnectionPool::Callbacks& callbacks,
-                                   const Upstream::LoadBalancerContext& /*unused*/) {
+                                   const Upstream::LoadBalancerContext& lb_context) {
   ENVOY_LOG(debug, "queueing request due to no available connection pools");
 
   /*
@@ -43,7 +47,7 @@ WrappedConnectionPool::pushPending(Http::StreamDecoder& response_decoder,
   non-destructive way to poll for a pool being idle. Maybe add a different type of callback.
   */
   if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
-    return newPendingRequest(response_decoder, callbacks);
+    return newPendingRequest(response_decoder, callbacks, &lb_context);
   }
 
   ENVOY_LOG(debug, "max pending requests overflow");
@@ -74,6 +78,51 @@ size_t WrappedConnectionPool::numPendingStreams() const { return pending_request
 bool WrappedConnectionPool::drainable() const {
   // TODO(klarose: check whether we have any active pools as well)
   return !drained_callbacks_.empty() && pending_requests_.empty();
+}
+
+void WrappedConnectionPool::allocatePendingRequests() {
+  // for simplicitly, we simply iterate through each pending request and see if it can be assigned.
+  // we do this, since we don't know which requests will be assigned to which pools. It's possible
+  // that every request could be assigned to a single free pool, so go through them all at the
+  // expense of potentially processing more than necessary.
+  auto pending_itr = pending_requests_.begin();
+  while (pending_itr != pending_requests_.end()) {
+    auto& pending = *pending_itr;
+    const Upstream::LoadBalancerContext* context = pending->lb_context_;
+    // context should never be null. It should only get here from us calling newPendingRequest
+    // with the pointer from the reference in newStream. However, assert for good measure in case
+    // somebody changes ConnPoolImplBase's behaviour.
+    ASSERT(context != nullptr);
+    ConnectionPool::Instance* pool = mapper_->assignPool(*context);
+
+    if (!pool) {
+      ++pending_itr;
+      continue;
+    }
+
+    StreamDecoder& decoder = pending->decoder_;
+    ConnectionPool::Callbacks& callbacks = pending->callbacks_;
+
+    pool->newStream(decoder, callbacks, *context);
+    pending_itr = pending_requests_.erase(pending_itr);
+  }
+
+  // TODO(klarose: How do we handle the pool returning a cancellable?)
+  /*
+  1. Wrap the cancelable in our own.
+  2. That cancellable will have a secondary callout which is invoked on cancel.
+  3. By default it is the original cancellable (from the base)
+  4. When we assign to a new stream, if return another cancelable, we update.
+  5. Problem: how do we know when the connection is established to free up the pending thing?
+      --Need to insert ourselves into the callbacks. But, that is in itself nasty. But, I guess,
+      necessary.
+  6. To do 5, it looks like we need to do two things:
+      a) We move the pending request into a new list for sub-pending requests.
+      b) When we create a new request, we add ourself as the callback
+      c) The callback will be called with a failure or a ready.
+      d) In both cases we clean up the internal resources in the sub-pending request
+      e) Then we call out with the original call.
+  */
 }
 
 } // namespace Http

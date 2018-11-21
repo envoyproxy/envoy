@@ -23,14 +23,17 @@ public:
   std::unique_ptr<WrappedConnectionPool> createWrappedPool(Protocol protocol = Protocol::Http11) {
     auto mapper_mock = std::make_unique<MockConnectionMapper>();
     conn_mapper_mock_ = mapper_mock.get();
+
+    EXPECT_CALL(*conn_mapper_mock_, addIdleCallback_);
     return std::make_unique<WrappedConnectionPool>(std::move(mapper_mock), protocol, host_,
                                                    Upstream::ResourcePriority::Default);
   }
 
   //! Sets the test up to return @c wrapped_pool_ from conn_mapper_mock
-  void expectSimpleConnPoolReturn() {
+  void expectSimpleConnPoolReturn(size_t num_times = 1) {
     EXPECT_CALL(*conn_mapper_mock_, assignPool_(&lb_context_mock_))
-        .WillOnce(Return(&wrapped_pool_));
+        .Times(num_times)
+        .WillRepeatedly(Return(&wrapped_pool_));
   }
 
   //! Sets the test up for the mapper to "fail" by returning nullptr
@@ -183,6 +186,76 @@ TEST_F(WrappedConnectionPoolTest, TestOverflowPending) {
   EXPECT_EQ(host_->stats().rq_total_.value(), 1);
   EXPECT_EQ(callbacks_.failure_reason_, ConnectionPool::PoolFailureReason::Overflow);
   EXPECT_EQ(callbacks_.host_, nullptr);
+  expectNumPending(1);
+}
+
+//! Makes sure that we register ourselves for an idle callback on construction
+TEST_F(WrappedConnectionPoolTest, TestIdleCallbackRegistered) {
+
+  auto pool = createWrappedPool();
+
+  EXPECT_EQ(conn_mapper_mock_->idle_callbacks_.size(), 1);
+}
+
+//! If there aren't any pending requests, we don't expect any calls to allocate if a pool
+//! is idle.
+TEST_F(WrappedConnectionPoolTest, TestIdleCallbackNoPending) {
+
+  auto pool = createWrappedPool();
+  expectNoConnPoolReturn(0);
+
+  conn_mapper_mock_->idle_callbacks_[0]();
+}
+
+//! Tests that if there is a single pending request, we'll call back with it when told that here are
+//! idle pools.
+TEST_F(WrappedConnectionPoolTest, TestIdleCallbackWithSinglePending) {
+
+  auto pool = createWrappedPool();
+  expectNoConnPoolReturn(1);
+
+  pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
+
+  expectSimpleConnPoolReturn();
+  EXPECT_CALL(wrapped_pool_, newStream(_, _, _)).WillOnce(Return(nullptr));
+
+  conn_mapper_mock_->idle_callbacks_[0]();
+  expectNumPending(0);
+}
+
+//! Tests that if there is more than a single pending request, we can handle them all when we're
+//! told that there are idle pools.
+TEST_F(WrappedConnectionPoolTest, TestIdleCallbackWithTwoPending) {
+
+  auto pool = createWrappedPool();
+  expectNoConnPoolReturn(2);
+
+  pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
+  pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
+
+  expectSimpleConnPoolReturn(2);
+  EXPECT_CALL(wrapped_pool_, newStream(_, _, _)).Times(2).WillRepeatedly(Return(nullptr));
+
+  conn_mapper_mock_->idle_callbacks_[0]();
+  expectNumPending(0);
+}
+
+//! Tests that if we skip a request for assignment, we properly move to the next.
+TEST_F(WrappedConnectionPoolTest, TestIdleCallbackOneSkippedOneAssigned) {
+
+  auto pool = createWrappedPool();
+  expectNoConnPoolReturn(2);
+
+  pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
+  pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
+  {
+    testing::InSequence sequence;
+    expectNoConnPoolReturn();
+    expectSimpleConnPoolReturn();
+    EXPECT_CALL(wrapped_pool_, newStream(_, _, _)).WillOnce(Return(nullptr));
+    conn_mapper_mock_->idle_callbacks_[0]();
+  }
+
   expectNumPending(1);
 }
 } // namespace Http

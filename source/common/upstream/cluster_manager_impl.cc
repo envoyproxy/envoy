@@ -1219,7 +1219,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTransparent
   auto& factory = Http::ConnectionMapperFactorySingleton::get();
   auto mapper = factory.createSrcTransparentMapper(builder);
   return Http::ConnectionPool::InstancePtr{
-      new Http::WrappedConnectionPool{std::move(mapper), protocol}};
+      new Http::WrappedConnectionPool{std::move(mapper), protocol, host, priority}};
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
