@@ -32,6 +32,8 @@ class ConnectionMapper {
 public:
   virtual ~ConnectionMapper() = default;
 
+  using IdleCb = std::function<void()>;
+
   //! Assigns a request to a partitioned connection pool.
   //! @param context The load balancer context for the request to be assigned. Will be used to
   //!        choose the partition.
@@ -40,13 +42,9 @@ public:
   //!         pool was not assigned. Note that ownership is retained by @c this.
   virtual ConnectionPool::Instance* assignPool(const Upstream::LoadBalancerContext& context) PURE;
 
-  //! Informs the connection mapper that the pool has no more work to do. This is used to allow the
-  //! mapper to reuse pools for other partitions.
-  //!
-  //! @param idlePool the pool which is now idle.
-  virtual void poolIdle(const ConnectionPool::Instance& idlePool) PURE;
-
-  // Figure out drained callback stuff.
+  //! Registers a for when pool has no more work to do. This is used to allow the callback
+  //! to kickstart operations which were waiting for an idle pool.
+  virtual void addIdleCallback(IdleCb callback) PURE;
 };
 
 using ConnPoolBuilder = std::function<std::unique_ptr<ConnectionPool::Instance>()>;

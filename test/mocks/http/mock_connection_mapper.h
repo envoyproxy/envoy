@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "envoy/http/connection_mapper.h"
 
 #include "gmock/gmock.h"
@@ -15,11 +17,18 @@ public:
     return assignPool_(&context);
   }
 
+  void addIdleCallback(ConnectionMapper::IdleCb cb) override {
+    idle_callbacks_.push_back(cb);
+    addIdleCallback_();
+  }
+
   MOCK_METHOD1(assignPool_,
                ConnectionPool::Instance*(const Upstream::LoadBalancerContext* context));
-  MOCK_METHOD1(poolIdle, void(const Http::ConnectionPool::Instance& idlePool));
+  MOCK_METHOD0(addIdleCallback_, void());
 
+  //! May be used to track the builder passed to a mapper on construction.
   ConnPoolBuilder builder_;
+  std::vector<ConnectionMapper::IdleCb> idle_callbacks_;
 };
 
 } // namespace Http
