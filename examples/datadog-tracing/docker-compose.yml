@@ -1,0 +1,70 @@
+version: '2'
+services:
+
+  front-envoy:
+    depends_on:
+      - dd-agent
+    build:
+      context: ../front-proxy
+      dockerfile: Dockerfile-frontenvoy
+    volumes:
+      - ./front-envoy-datadog.yaml:/etc/front-envoy.yaml
+    networks:
+      - envoymesh
+    expose:
+      - "80"
+      - "8001"
+    ports:
+      - "8000:80"
+      - "8001:8001"
+
+  service1:
+    build:
+      context: ../front-proxy
+      dockerfile: Dockerfile-service
+    volumes:
+      - ./service1-envoy-datadog.yaml:/etc/service-envoy.yaml
+    networks:
+      envoymesh:
+        aliases:
+          - service1
+    environment:
+      - SERVICE_NAME=1
+      - TRACER=datadog
+      - DATADOG_TRACE_AGENT_HOSTNAME=dd-agent
+    expose:
+      - "80"
+
+  service2:
+    build:
+      context: ../front-proxy
+      dockerfile: Dockerfile-service
+    volumes:
+      - ./service2-envoy-datadog.yaml:/etc/service-envoy.yaml
+    networks:
+      envoymesh:
+        aliases:
+          - service2
+    environment:
+      - SERVICE_NAME=2
+      - TRACER=datadog
+      - DATADOG_TRACE_AGENT_HOSTNAME=dd-agent
+    expose:
+      - "80"
+
+  dd-agent:
+    image: datadog/agent:6.6.0
+    networks:
+      envoymesh:
+        aliases:
+          - dd-agent
+    environment:
+      - DD_API_KEY
+      - DD_APM_ENABLED=true
+      - DD_APM_NON_LOCAL_TRAFFIC=true
+    ports:
+      - "8125:8125/udp"
+      - "8126:8126"
+
+networks:
+  envoymesh: {}
