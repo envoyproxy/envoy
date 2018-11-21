@@ -1,12 +1,12 @@
 #include <memory>
 
-#include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/singleton/threadsafe_singleton.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -43,8 +43,8 @@ public:
 
 class AddTen {
 public:
-  AddTen() : api_(stat_store_) {
-    thread_ = api_.createThread([this]() -> void { threadRoutine(); });
+  AddTen() {
+    thread_ = Thread::threadFactoryForTest().createThread([this]() -> void { threadRoutine(); });
   }
   ~AddTen() {
     thread_->join();
@@ -58,8 +58,6 @@ private:
       singleton.addOne();
     }
   }
-  Stats::IsolatedStoreImpl stat_store_;
-  Api::Impl api_;
   Thread::ThreadPtr thread_;
 };
 

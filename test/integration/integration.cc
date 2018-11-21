@@ -350,7 +350,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
     test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
     registerTestServerPorts(port_names);
   }
-  api_ = std::make_unique<Api::Impl>(test_server_->stat_store());
+  api_ = Api::createApiForTest(test_server_->stat_store());
 }
 
 void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,

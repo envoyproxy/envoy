@@ -320,6 +320,9 @@ public:
                                        envoy::data::core::v2alpha::HealthCheckFailureType));
   MOCK_METHOD3(logAddHealthy, void(envoy::data::core::v2alpha::HealthCheckerType,
                                    const HostDescriptionConstSharedPtr&, bool));
+  MOCK_METHOD4(logUnhealthy, void(envoy::data::core::v2alpha::HealthCheckerType,
+                                  const HostDescriptionConstSharedPtr&,
+                                  envoy::data::core::v2alpha::HealthCheckFailureType, bool));
 };
 
 class MockCdsApi : public CdsApi {

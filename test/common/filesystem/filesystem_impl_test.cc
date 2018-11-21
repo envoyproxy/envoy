@@ -14,6 +14,7 @@
 #include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -32,11 +33,11 @@ namespace Envoy {
 class FileSystemImplTest : public testing::Test {
 protected:
   FileSystemImplTest()
-      : api_(stats_store_, std::chrono::milliseconds(10000)), file_system_(api_.fileSystem()) {}
+      : file_system_(std::chrono::milliseconds(10000), Thread::threadFactoryForTest(),
+                     stats_store_) {}
 
   const std::chrono::milliseconds timeout_40ms_{40};
   Stats::IsolatedStoreImpl stats_store_;
-  Api::Impl api_;
   Filesystem::Instance file_system_;
 };
 

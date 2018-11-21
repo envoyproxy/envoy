@@ -63,7 +63,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                    const std::string& host, const std::string& content_type) {
 
   NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
-  Api::Impl api(mock_stats_store, std::chrono::milliseconds(9000));
+  Api::Impl api(std::chrono::milliseconds(9000), Thread::threadFactoryForTest(), mock_stats_store);
   Event::DispatcherPtr dispatcher(api.allocateDispatcher(evil_singleton_test_time_.timeSystem()));
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{
@@ -111,7 +111,7 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
                                          ReadCallback data_callback,
                                          Network::Address::IpVersion version) {
-  api_ = std::make_unique<Api::Impl>(stats_store_, std::chrono::milliseconds(10000));
+  api_ = Api::createApiForTest(stats_store_);
   dispatcher_ = api_->allocateDispatcher(IntegrationUtil::evil_singleton_test_time_.timeSystem());
   callbacks_ = std::make_unique<ConnectionCallbacks>();
   client_ = dispatcher_->createClientConnection(

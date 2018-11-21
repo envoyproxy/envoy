@@ -23,8 +23,8 @@ namespace Envoy {
 namespace Upstream {
 
 TEST(ValidationClusterManagerTest, MockedMethods) {
-  Stats::IsolatedStoreImpl stats;
-  Api::Impl api(stats);
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api(Api::createApiForTest(stats_store));
   NiceMock<Runtime::MockLoader> runtime;
   Event::SimulatedTimeSystem time_system;
   NiceMock<ThreadLocal::MockInstance> tls;
@@ -38,7 +38,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
 
   ValidationClusterManagerFactory factory(runtime, stats, tls, random, dns_resolver,
                                           ssl_context_manager, dispatcher, local_info,
-                                          secret_manager, api);
+                                          secret_manager, *api);
 
   AccessLog::MockAccessLogManager log_manager;
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;

@@ -47,7 +47,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 37]
+// [#comment:next free field: 38]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -381,6 +381,13 @@ message Cluster {
   // Configuration for load balancing subsetting.
   LbSubsetConfig lb_subset_config = 22;
 
+  // Specific configuration for the LeastRequest load balancing policy.
+  message LeastRequestLbConfig {
+    // The number of random healthy hosts from which the host with the fewest active requests will
+    // be chosen. Defaults to 2 so that we perform two-choice selection if the field is not set.
+    google.protobuf.UInt32Value choice_count = 1 [(validate.rules).uint32.gte = 2];
+  }
+
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
   // load balancing policy.
   message RingHashLbConfig {
@@ -422,16 +429,18 @@ message Cluster {
 
   // Optional configuration for the load balancing algorithm selected by
   // LbPolicy. Currently only
-  // :ref:`RING_HASH<envoy_api_enum_value_Cluster.LbPolicy.RING_HASH>`
+  // :ref:`RING_HASH<envoy_api_enum_value_Cluster.LbPolicy.RING_HASH>` and
+  // :ref:`LEAST_REQUEST<envoy_api_enum_value_Cluster.LbPolicy.LEAST_REQUEST>`
   // has additional configuration options.
-  // Specifying ring_hash_lb_config without setting the LbPolicy to
-  // :ref:`RING_HASH<envoy_api_enum_value_Cluster.LbPolicy.RING_HASH>`
-  // will generate an error at runtime.
+  // Specifying ring_hash_lb_config or least_request_lb_config without setting the corresponding
+  // LbPolicy will generate an error at runtime.
   oneof lb_config {
     // Optional configuration for the Ring Hash load balancing policy.
     RingHashLbConfig ring_hash_lb_config = 23;
     // Optional configuration for the Original Destination load balancing policy.
     OriginalDstLbConfig original_dst_lb_config = 34;
+    // Optional configuration for the LeastRequest load balancing policy.
+    LeastRequestLbConfig least_request_lb_config = 37;
   }
 
   // Common configuration for all load balancer implementations.

@@ -218,6 +218,11 @@ message HealthCheck {
   // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
   // If empty, no event log will be written.
   string event_log_path = 17;
+
+  // If set to true, health check failure events will always be logged. If set to false, only the
+  // initial health check failure event will be logged.
+  // The default value is false.
+  bool always_log_health_check_failures = 19;
 }
 
 // Endpoint health status.

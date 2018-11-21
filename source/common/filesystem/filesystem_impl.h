@@ -37,7 +37,8 @@ namespace Filesystem {
  */
 class Instance {
 public:
-  Instance(std::chrono::milliseconds file_flush_interval_msec, Stats::Store& store, Api::Api& api);
+  Instance(std::chrono::milliseconds file_flush_interval_msec, Thread::ThreadFactory& thread_factory,
+           Stats::Store& store);
 
   /**
    * Creates a file, overriding the flush-interval set in the class.
@@ -66,7 +67,7 @@ public:
 private:
   std::chrono::milliseconds file_flush_interval_msec_;
   FileSystemStats file_stats_;
-  Api::Api& api_; // Needed to create threads.
+  Thread::ThreadFactory& thread_factory_;
 };
 
 /**
@@ -120,7 +121,8 @@ bool illegalPath(const std::string& path);
 class FileImpl : public File {
 public:
   FileImpl(const std::string& path, Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
-           FileSystemStats& stats_, std::chrono::milliseconds flush_interval_msec, Api::Api& api);
+           FileSystemStats& stats_, std::chrono::milliseconds flush_interval_msec,
+           Thread::ThreadFactory& thread_factory);
   ~FileImpl();
 
   // Filesystem::File
@@ -184,7 +186,7 @@ private:
                                             // final write to disk.
   Event::TimerPtr flush_timer_;
   Api::OsSysCalls& os_sys_calls_;
-  Api::Api& api_;
+  Thread::ThreadFactory& thread_factory_;
   const std::chrono::milliseconds flush_interval_msec_; // Time interval buffer gets flushed no
                                                         // matter if it reached the MIN_FLUSH_SIZE
                                                         // or not.

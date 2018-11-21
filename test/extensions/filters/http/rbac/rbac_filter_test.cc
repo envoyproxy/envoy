@@ -128,8 +128,8 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   EXPECT_EQ(1U, config_->stats().shadow_allowed_.value());
 
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
-  EXPECT_EQ("200", filter_meta.fields().at("shadow_response_code").string_value());
-  EXPECT_EQ("bar", filter_meta.fields().at("shadow_effective_policyID").string_value());
+  EXPECT_EQ("allowed", filter_meta.fields().at("shadow_engine_result").string_value());
+  EXPECT_EQ("bar", filter_meta.fields().at("shadow_effective_policy_id").string_value());
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {

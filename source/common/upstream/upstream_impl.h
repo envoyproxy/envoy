@@ -389,6 +389,10 @@ public:
   extensionProtocolOptions(const std::string& name) const override;
   LoadBalancerType lbType() const override { return lb_type_; }
   envoy::api::v2::Cluster::DiscoveryType type() const override { return type_; }
+  const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>&
+  lbLeastRequestConfig() const override {
+    return lb_least_request_config_;
+  }
   const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&
   lbRingHashConfig() const override {
     return lb_ring_hash_config_;
@@ -452,6 +456,7 @@ private:
   const std::string maintenance_mode_runtime_key_;
   const Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_;
+  absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig> lb_least_request_config_;
   absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
   const bool added_via_api_;
