@@ -1063,10 +1063,9 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTimerTriggerTest) {
   EXPECT_CALL(stats.delayed_close_timeouts_, inc()).Times(1);
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose)).Times(1);
   EXPECT_CALL(*client_read_filter, onData(_, false))
-    .Times(1)
-    .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
-	return FilterStatus::StopIteration;
-      }));
+      .Times(1)
+      .WillOnce(Invoke(
+          [&](Buffer::Instance&, bool) -> FilterStatus { return FilterStatus::StopIteration; }));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .Times(1)
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
