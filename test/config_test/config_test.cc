@@ -91,10 +91,10 @@ public:
     server_.thread_local_.shutdownThread();
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
-  Stats::IsolatedStoreImpl stats_store_;
   OptionsImpl options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Server::MockListenerComponentFactory> component_factory_;

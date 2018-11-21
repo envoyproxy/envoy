@@ -53,7 +53,7 @@ public:
                            std::chrono::milliseconds file_flush_interval_msec);
 
   /**
-   * Creates a file, using the default flush-interval for the class..
+   * Creates a file, using the default flush-interval for the class.
    *
    * @param path The path of the file to open.
    * @param dispatcher The dispatcher used for set up timers to run flush().
