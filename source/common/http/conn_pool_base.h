@@ -32,7 +32,7 @@ protected:
   typedef std::unique_ptr<PendingRequest> PendingRequestPtr;
 
   // Creates a new PendingRequest and enqueues it into the request queue.
-  ConnectionPool::Cancellable*
+  ConnPoolImplBase::PendingRequest*
   newPendingRequest(StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks,
                     const Upstream::LoadBalancerContext* lb_context = nullptr);
   // Removes the PendingRequest from the list of requests. Called when the PendingRequest is

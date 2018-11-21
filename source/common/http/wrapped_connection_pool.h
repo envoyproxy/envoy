@@ -32,10 +32,37 @@ public:
   // ConnPoolImplBase
   void checkForDrained() override;
 
-  //! @ return the number of streams waiting to be assigned to a pool
-  size_t numPendingStreams() const;
+  //! @ return the number of streams waiting to be processed after being assigned a pool
+  size_t numWaitingStreams() const;
 
 private:
+  //! This lets us invoke different cancellation logic depending on in what stage of a request
+  //! lifetime we're in. For example, on an initial request, we may just want to remove from the
+  //! pending list. However, later we may want to remove from a pending list elsewhere, due to the
+  //! ownership of the request actually changing. This lets us do so while keeping the original
+  //! cancellable object in tact for the original caller.
+  class PendingWrapper : public LinkedObject<PendingWrapper>, public ConnectionPool::Cancellable {
+  public:
+    PendingWrapper(ConnPoolImplBase::PendingRequest& to_wrap, WrappedConnectionPool& parent);
+    ~PendingWrapper();
+
+    void cancel() override;
+
+    //! Tries to allocate a pending request if there is one.
+    //! @param mapper The mapper to use to allocate the pool for the request
+    //! @param pending_list the list owning any pending requests so we can cleanup when done.
+    //! @return true if a request was allocated to a pool. False otherwise.
+    bool allocatePending(ConnectionMapper& mapper,
+                         std::list<ConnPoolImplBase::PendingRequestPtr>& pending_list);
+
+  private:
+    ConnPoolImplBase::PendingRequest* wrapped_pending_;
+    ConnectionPool::Cancellable* wrapped_cancel_;
+    WrappedConnectionPool& parent_;
+  };
+
+  using PendingWrapperPtr = std::unique_ptr<PendingWrapper>;
+
   /*
    * Stores a connection request for later processing, if possible.
    *
@@ -51,9 +78,17 @@ private:
   //! Tries to allocate any pending requests
   void allocatePendingRequests();
 
+  //! Called when a wrapped request has been cancelled so we can free it up.
+  void onWrappedRequestPendingCancel(PendingWrapper& wrapper);
+
+  //! Called when a wrapped request has either been cancelled, or finished waiting.
+  void onWrappedRequestWaitingFinished(PendingWrapper& wrapper);
+
   std::unique_ptr<ConnectionMapper> mapper_;
   Protocol protocol_;
   std::vector<DrainedCb> drained_callbacks_;
+  std::list<PendingWrapperPtr> wrapped_pending_;
+  std::list<PendingWrapperPtr> wrapped_waiting_;
 };
 
 } // namespace Http

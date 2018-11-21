@@ -258,5 +258,26 @@ TEST_F(WrappedConnectionPoolTest, TestIdleCallbackOneSkippedOneAssigned) {
 
   expectNumPending(1);
 }
+
+//! Tests that if the partitioned pool returns a pending response, and the response is cancelled,
+//! then the partitioned pool is informed by calling the callback it provided.
+TEST_F(WrappedConnectionPoolTest, TestPendingToPendingThenCancel) {
+
+  auto pool = createWrappedPool();
+
+  expectNoConnPoolReturn();
+
+  auto cancellable = pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
+
+  expectSimpleConnPoolReturn();
+  EXPECT_CALL(wrapped_pool_, newStream(_, _, _)).WillOnce(Return(&cancellable_mock_));
+  EXPECT_CALL(cancellable_mock_, cancel());
+
+  conn_mapper_mock_->idle_callbacks_[0]();
+
+  cancellable->cancel();
+  EXPECT_EQ(pool->numWaitingStreams(), 0);
+}
+
 } // namespace Http
 } // namespace Envoy

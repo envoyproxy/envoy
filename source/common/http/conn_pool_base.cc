@@ -16,7 +16,7 @@ ConnPoolImplBase::PendingRequest::~PendingRequest() {
   parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().dec();
 }
 
-ConnectionPool::Cancellable*
+ConnPoolImplBase::PendingRequest*
 ConnPoolImplBase::newPendingRequest(StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks,
                                     const Upstream::LoadBalancerContext* context) {
   ENVOY_LOG(debug, "queueing request due to no available connections");
