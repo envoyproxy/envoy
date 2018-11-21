@@ -11,8 +11,6 @@
 #include "opentracing/mocktracer/in_memory_recorder.h"
 #include "opentracing/mocktracer/tracer.h"
 
-using testing::Test;
-
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -46,7 +44,7 @@ private:
   std::shared_ptr<opentracing::mocktracer::MockTracer> tracer_;
 };
 
-class OpenTracingDriverTest : public Test {
+class OpenTracingDriverTest : public testing::Test {
 public:
   void
   setupValidDriver(OpenTracingDriver::PropagationMode propagation_mode =
