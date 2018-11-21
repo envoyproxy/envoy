@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <iostream>
 #include <unordered_map>
 
 namespace Envoy {
