@@ -290,6 +290,66 @@ TEST_F(Http1ConnPoolImplTest, MultipleRequestAndResponse) {
 }
 
 /**
+ * Test when we overflow max pending connections.
+ */
+TEST_F(Http1ConnPoolImplTest, MaxPendingConnections) {
+  cluster_->resetResourceManager(1, 1024, 1024, 1024, 1);
+
+  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.cx_pending_open_.value());
+
+  // Make first connection
+  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate();
+  EXPECT_CALL(callbacks.pool_failure_, ready());
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
+  EXPECT_NE(nullptr, handle);
+
+  // Second connection should fail to be established
+  NiceMock<Http::MockStreamDecoder> outer_decoder2;
+  ConnPoolCallbacks callbacks2;
+  EXPECT_CALL(callbacks2.pool_failure_, ready());
+  Http::ConnectionPool::Cancellable* handle2 = conn_pool_.newStream(outer_decoder, callbacks2);
+  EXPECT_NE(nullptr, handle2);
+
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_pending_overflow_.value());
+}
+
+/**
+ * Test that if the first connection connects, the second one can as well
+ */
+TEST_F(Http1ConnPoolImplTest, MaxPendingConnectionsConnected) {
+  cluster_->resetResourceManager(1, 1024, 1024, 1024, 1);
+
+  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.cx_pending_open_.value());
+
+  // Make first connection
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+
+  // Second connection should get established successfully
+  NiceMock<Http::MockStreamDecoder> outer_decoder2;
+  ConnPoolCallbacks callbacks2;
+  conn_pool_.expectClientCreate();
+  Http::ConnectionPool::Cancellable* handle2 = conn_pool_.newStream(outer_decoder2, callbacks2);
+  EXPECT_NE(nullptr, handle2);
+  EXPECT_EQ(2U, cluster_->stats_.upstream_cx_total_.value());
+  EXPECT_EQ(1U, cluster_->circuit_breakers_stats_.cx_pending_open_.value());
+  handle2->cancel();
+
+  EXPECT_CALL(conn_pool_, onClientDestroy()).Times(2);
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  conn_pool_.test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_pending_overflow_.value());
+}
+
+/**
  * Test when we overflow max pending requests.
  */
 TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
