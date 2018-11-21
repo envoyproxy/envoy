@@ -18,10 +18,9 @@ ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
     ThreadLocal::Instance& tls, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
     Server::Admin& admin, Http::CodeStats& code_stats) {
-  return std::make_unique<ValidationClusterManager>(bootstrap, *this, stats, tls, runtime, random,
-                                                    local_info, log_manager,
-                                                    main_thread_dispatcher_, admin, api_,
-                                                    code_stats);
+  return std::make_unique<ValidationClusterManager>(
+      bootstrap, *this, stats, tls, runtime, random, local_info, log_manager,
+      main_thread_dispatcher_, admin, api_, code_stats);
 }
 
 CdsApiPtr ValidationClusterManagerFactory::createCds(
