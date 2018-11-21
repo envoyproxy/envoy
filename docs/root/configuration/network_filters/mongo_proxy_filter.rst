@@ -187,6 +187,5 @@ This dynamic metadata is available as one struct per message under a list named 
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  collection, string, The collection on which the operation will be executed.
-  database, string, The database on which the operation will be executed.
   operation, string, The operation to be executed.
+  resource, string, The resource name in *db.collection* format on which the operation is to be executed.

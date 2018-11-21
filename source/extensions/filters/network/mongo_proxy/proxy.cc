@@ -26,17 +26,11 @@ namespace MongoProxy {
 
 class DynamicMetadataKeys {
 public:
-  const std::string CollectionField{"collection"};
-  const std::string DatabaseField{"database"};
   const std::string MessagesField{"messages"};
   const std::string OperationField{"operation"};
-  const std::string OperationCommand{"OP_COMMAND"};
-  const std::string OperationCommandReply{"OP_COMMANDREPLY"};
-  const std::string OperationGetMore{"OP_GET_MORE"};
   const std::string OperationInsert{"OP_INSERT"};
-  const std::string OperationKillCursors{"OP_KILL_CURSORS"};
   const std::string OperationQuery{"OP_QUERY"};
-  const std::string OperationReply{"OP_REPLY"};
+  const std::string ResourceField{"resource"};
 };
 
 typedef ConstSingleton<DynamicMetadataKeys> DynamicMetadataKeysSingleton;
@@ -80,8 +74,7 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
 
 ProxyFilter::~ProxyFilter() { ASSERT(!delay_timer_); }
 
-void ProxyFilter::setDynamicMetadata(std::string op, absl::optional<std::string> db,
-                                     absl::optional<std::string> collection) {
+void ProxyFilter::setDynamicMetadata(std::string operation, std::string resource) {
   ProtobufWkt::Struct metadata(
       (*read_callbacks_->connection()
             .streamInfo()
@@ -91,14 +84,8 @@ void ProxyFilter::setDynamicMetadata(std::string op, absl::optional<std::string>
   auto& list = *fields[DynamicMetadataKeysSingleton::get().MessagesField].mutable_list_value();
   auto& message = *list.add_values()->mutable_struct_value()->mutable_fields();
 
-  message[DynamicMetadataKeysSingleton::get().OperationField].set_string_value(op);
-  if (db) {
-    message[DynamicMetadataKeysSingleton::get().DatabaseField].set_string_value(db.value());
-  }
-  if (collection) {
-    message[DynamicMetadataKeysSingleton::get().CollectionField].set_string_value(
-        collection.value());
-  }
+  message[DynamicMetadataKeysSingleton::get().OperationField].set_string_value(operation);
+  message[DynamicMetadataKeysSingleton::get().ResourceField].set_string_value(resource);
 
   read_callbacks_->connection().streamInfo().setDynamicMetadata(
       NetworkFilterNames::get().MongoProxy, metadata);
@@ -106,12 +93,6 @@ void ProxyFilter::setDynamicMetadata(std::string op, absl::optional<std::string>
 
 void ProxyFilter::decodeGetMore(GetMoreMessagePtr&& message) {
   tryInjectDelay();
-
-  if (emit_dynamic_metadata_) {
-    std::vector<std::string> names = absl::StrSplit(message->fullCollectionName(), '.');
-    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationGetMore,
-                       absl::make_optional(names[0]), absl::make_optional(names[1]));
-  }
 
   stats_.op_get_more_.inc();
   logMessage(*message, true);
@@ -122,9 +103,8 @@ void ProxyFilter::decodeInsert(InsertMessagePtr&& message) {
   tryInjectDelay();
 
   if (emit_dynamic_metadata_) {
-    std::vector<std::string> names = absl::StrSplit(message->fullCollectionName(), '.');
     setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationInsert,
-                       absl::make_optional(names[0]), absl::make_optional(names[1]));
+                       message->fullCollectionName());
   }
 
   stats_.op_insert_.inc();
@@ -135,11 +115,6 @@ void ProxyFilter::decodeInsert(InsertMessagePtr&& message) {
 void ProxyFilter::decodeKillCursors(KillCursorsMessagePtr&& message) {
   tryInjectDelay();
 
-  if (emit_dynamic_metadata_) {
-    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationKillCursors, absl::nullopt,
-                       absl::nullopt);
-  }
-
   stats_.op_kill_cursors_.inc();
   logMessage(*message, true);
   ENVOY_LOG(debug, "decoded KILL_CURSORS: {}", message->toString(true));
@@ -149,9 +124,8 @@ void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
   tryInjectDelay();
 
   if (emit_dynamic_metadata_) {
-    std::vector<std::string> names = absl::StrSplit(message->fullCollectionName(), '.');
     setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationQuery,
-                       absl::make_optional(names[0]), absl::make_optional(names[1]));
+                       message->fullCollectionName());
   }
 
   stats_.op_query_.inc();
@@ -216,11 +190,6 @@ void ProxyFilter::chargeQueryStats(const std::string& prefix,
 }
 
 void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
-  if (emit_dynamic_metadata_) {
-    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationReply, absl::nullopt,
-                       absl::nullopt);
-  }
-
   stats_.op_reply_.inc();
   logMessage(*message, false);
   ENVOY_LOG(debug, "decoded REPLY: {}", message->toString(true));
@@ -287,11 +256,6 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
 void ProxyFilter::decodeCommand(CommandMessagePtr&& message) {
   tryInjectDelay();
 
-  if (emit_dynamic_metadata_) {
-    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationCommand,
-                       absl::make_optional(message->database()), absl::nullopt);
-  }
-
   stats_.op_command_.inc();
   logMessage(*message, true);
   ENVOY_LOG(debug, "decoded COMMAND: {}", message->toString(true));
@@ -299,11 +263,6 @@ void ProxyFilter::decodeCommand(CommandMessagePtr&& message) {
 
 void ProxyFilter::decodeCommandReply(CommandReplyMessagePtr&& message) {
   tryInjectDelay();
-
-  if (emit_dynamic_metadata_) {
-    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationCommandReply, absl::nullopt,
-                       absl::nullopt);
-  }
 
   stats_.op_command_reply_.inc();
   logMessage(*message, true);
