@@ -20,7 +20,7 @@ envoy_extension_cc_test(
         "//source/common/common:empty_string",
         "//source/common/config:filter_json_lib",
         "//source/common/http:headers_lib",
-        "//source/common/ratelimit:ratelimit_lib",
+        "//source/extensions/common/ratelimit:ratelimit_lib",
         "//source/extensions/filters/http/ratelimit:ratelimit_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",

@@ -3,6 +3,7 @@
 #include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.h"
 #include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.validate.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit.h"
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -27,6 +28,8 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::rate_limit::v2::RateLimit& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+  Envoy::Extensions::Filters::Common::RateLimit::ClientFactoryPtr ratelimit_client_factory_;
+  RateLimit::RateLimitServiceConfigSharedPtr ratelimit_service_config_;
 };
 
 } // namespace RateLimitFilter

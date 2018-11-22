@@ -77,10 +77,6 @@ public:
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
-  RateLimit::ClientPtr
-  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
-    return config_->rateLimitClientFactory().create(timeout);
-  }
   Runtime::Loader& runtime() override { return *runtime_loader_; }
   void shutdown() override;
   bool isShutdown() override { return false; }

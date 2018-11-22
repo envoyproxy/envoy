@@ -1,4 +1,4 @@
-#include "common/ratelimit/ratelimit_impl.h"
+#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "envoy/api/v2/ratelimit/ratelimit.pb.h"
+#include "envoy/registry/registry.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -13,7 +15,13 @@
 #include "common/http/headers.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace RateLimit {
+
+// Singleton registration via macro defined in envoy/singleton/manager.h
+SINGLETON_MANAGER_REGISTRATION(ratelimit_client);
 
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout)
@@ -31,11 +39,11 @@ void GrpcClientImpl::cancel() {
 
 void GrpcClientImpl::createRequest(envoy::service::ratelimit::v2::RateLimitRequest& request,
                                    const std::string& domain,
-                                   const std::vector<Descriptor>& descriptors) {
+                                   const std::vector<Envoy::RateLimit::Descriptor>& descriptors) {
   request.set_domain(domain);
-  for (const Descriptor& descriptor : descriptors) {
+  for (const Envoy::RateLimit::Descriptor& descriptor : descriptors) {
     envoy::api::v2::ratelimit::RateLimitDescriptor* new_descriptor = request.add_descriptors();
-    for (const DescriptorEntry& entry : descriptor.entries_) {
+    for (const Envoy::RateLimit::DescriptorEntry& entry : descriptor.entries_) {
       envoy::api::v2::ratelimit::RateLimitDescriptor::Entry* new_entry =
           new_descriptor->add_entries();
       new_entry->set_key(entry.key_);
@@ -45,7 +53,8 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v2::RateLimitReque
 }
 
 void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
-                           const std::vector<Descriptor>& descriptors, Tracing::Span& parent_span) {
+                           const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                           Tracing::Span& parent_span) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
@@ -98,9 +107,18 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitSe
   async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }
 
-ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout) {
-  return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout);
+ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout,
+                                  Server::Configuration::FactoryContext& context) {
+  ClientPtr ratelimit_client =
+      context.singletonManager().getTyped<Envoy::Extensions::Filters::Common::RateLimit::Client>(
+          SINGLETON_MANAGER_REGISTERED_NAME(ratelimit_client), [timeout, this] {
+            return std::make_shared<GrpcClientImpl>(async_client_factory_->create(), timeout);
+          });
+  return ratelimit_client;
 }
 
 } // namespace RateLimit
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy

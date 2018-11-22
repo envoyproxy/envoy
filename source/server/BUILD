@@ -42,7 +42,6 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/ratelimit:ratelimit_lib",
         "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/api/v2:lds_cc",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",

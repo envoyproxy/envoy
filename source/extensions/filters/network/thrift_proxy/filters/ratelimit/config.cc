@@ -8,6 +8,7 @@
 
 #include "common/protobuf/utility.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
 #include "extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
 
 namespace Envoy {
@@ -25,10 +26,24 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
   ConfigSharedPtr config(new Config(proto_config, context.localInfo(), context.scope(),
                                     context.runtime(), context.clusterManager()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
-  return [config, timeout_ms,
-          &context](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
+  // TODO(ramaraochavali): Figure out how to get the registered name here and also see if this code
+  // can be used across filters.
+
+  ratelimit_service_config_ =
+      context.singletonManager().getTyped<RateLimit::RateLimitServiceConfig>(
+          "ratelimit_service_config_singleton_name", [] { return nullptr; });
+  if (ratelimit_service_config_) {
+    ratelimit_client_factory_ = std::make_unique<Filters::Common::RateLimit::GrpcFactoryImpl>(
+        ratelimit_service_config_->config_, context.clusterManager().grpcAsyncClientManager(),
+        context.scope());
+  } else {
+    ratelimit_client_factory_ = std::make_unique<Filters::Common::RateLimit::NullFactoryImpl>();
+  }
+
+  return [config, timeout_ms, &context,
+          this](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addDecoderFilter(std::make_shared<Filter>(
-        config, context.rateLimitClient(std::chrono::milliseconds(timeout_ms))));
+        config, ratelimit_client_factory_->create(std::chrono::milliseconds(timeout_ms), context)));
   };
 }
 

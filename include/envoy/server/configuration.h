@@ -61,11 +61,6 @@ public:
   virtual Tracing::HttpTracer& httpTracer() PURE;
 
   /**
-   * @return RateLimit::ClientFactory& the global rate limit service client factory.
-   */
-  virtual RateLimit::ClientFactory& rateLimitClientFactory() PURE;
-
-  /**
    * @return std::list<Stats::SinkPtr>& the list of stats sinks initialized from the configuration.
    */
   virtual std::list<Stats::SinkPtr>& statsSinks() PURE;

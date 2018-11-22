@@ -18,12 +18,14 @@
 #include "common/config/lds_json.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/ratelimit/ratelimit_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+
+// Singleton registration via macro defined in envoy/singleton/manager.h
+SINGLETON_MANAGER_REGISTRATION(ratelimit_service_config);
 
 bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager,
                                           const std::vector<Network::FilterFactoryCb>& factories) {
@@ -81,10 +83,12 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
   initializeTracers(bootstrap.tracing(), server);
 
   if (bootstrap.has_rate_limit_service()) {
-    ratelimit_client_factory_ = std::make_unique<RateLimit::GrpcFactoryImpl>(
-        bootstrap.rate_limit_service(), cluster_manager_->grpcAsyncClientManager(), server.stats());
-  } else {
-    ratelimit_client_factory_ = std::make_unique<RateLimit::NullFactoryImpl>();
+    ratelimit_service_config_ =
+        server.singletonManager().getTyped<Envoy::RateLimit::RateLimitServiceConfig>(
+            SINGLETON_MANAGER_REGISTERED_NAME(ratelimit_service_config), [&bootstrap] {
+              return std::make_shared<Envoy::RateLimit::RateLimitServiceConfig>(
+                  bootstrap.rate_limit_service());
+            });
   }
 
   initializeStatsSinks(bootstrap, server);

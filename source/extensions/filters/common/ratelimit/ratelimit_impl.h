@@ -17,7 +17,12 @@
 #include "common/common/logger.h"
 #include "common/singleton/const_singleton.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit.h"
+
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace RateLimit {
 
 typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::ratelimit::v2::RateLimitResponse>
@@ -43,12 +48,14 @@ public:
   ~GrpcClientImpl();
 
   static void createRequest(envoy::service::ratelimit::v2::RateLimitRequest& request,
-                            const std::string& domain, const std::vector<Descriptor>& descriptors);
+                            const std::string& domain,
+                            const std::vector<Envoy::RateLimit::Descriptor>& descriptors);
 
   // RateLimit::Client
   void cancel() override;
   void limit(RequestCallbacks& callbacks, const std::string& domain,
-             const std::vector<Descriptor>& descriptors, Tracing::Span& parent_span) override;
+             const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+             Tracing::Span& parent_span) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::HeaderMap&) override {}
@@ -71,7 +78,8 @@ public:
                   Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope);
 
   // RateLimit::ClientFactory
-  ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout) override;
+  ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout,
+                   Server::Configuration::FactoryContext& context) override;
 
 private:
   Grpc::AsyncClientFactoryPtr async_client_factory_;
@@ -81,8 +89,8 @@ class NullClientImpl : public Client {
 public:
   // RateLimit::Client
   void cancel() override {}
-  void limit(RequestCallbacks& callbacks, const std::string&, const std::vector<Descriptor>&,
-             Tracing::Span&) override {
+  void limit(RequestCallbacks& callbacks, const std::string&,
+             const std::vector<Envoy::RateLimit::Descriptor>&, Tracing::Span&) override {
     callbacks.complete(LimitStatus::OK, nullptr);
   }
 };
@@ -90,10 +98,14 @@ public:
 class NullFactoryImpl : public ClientFactory {
 public:
   // RateLimit::ClientFactory
-  ClientPtr create(const absl::optional<std::chrono::milliseconds>&) override {
+  ClientPtr create(const absl::optional<std::chrono::milliseconds>&,
+                   Server::Configuration::FactoryContext&) override {
     return ClientPtr{new NullClientImpl()};
   }
 };
 
 } // namespace RateLimit
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy
