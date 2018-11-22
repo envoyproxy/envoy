@@ -11,6 +11,17 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "src_ip_transparent_mapper_test",
+    srcs = ["src_ip_transparent_mapper_test.cc"],
+    deps = [
+        "//include/envoy/http:conn_pool_interface",
+        "//source/common/http/wrapped:src_ip_transparent_mapper_lib",
+        "//test/mocks/http:conn_pool_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
+    ],
+)
+
+envoy_cc_test(
     name = "wrapped_connection_pool_test",
     srcs = ["wrapped_connection_pool_test.cc"],
     deps = [
