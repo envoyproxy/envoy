@@ -46,6 +46,15 @@ public:
         .WillRepeatedly(Return(nullptr));
   }
 
+  void expectWrappedPoolNewStreamImmediateCallback() {
+    auto callout = [this](Http::StreamDecoder&, ConnectionPool::Callbacks& callbacks,
+                          const Upstream::LoadBalancerContext&) {
+      callbacks.onPoolReady(stream_encoder_mock_, host_);
+      return nullptr;
+    };
+    EXPECT_CALL(wrapped_pool_, newStream(_, _, _)).WillOnce(Invoke(callout));
+  }
+
   void expectNumPending(size_t number) {
     EXPECT_EQ(cluster_->stats_.upstream_rq_pending_active_.value(), number);
   }
@@ -387,8 +396,8 @@ TEST_F(WrappedConnectionPoolTest, PoolAssignedCancellableClearsWaiting) {
   EXPECT_EQ(pool->numPendingStreams(), 0);
 }
 
-// Shows that if there is a waiting and a pending connections, a cancel on the pending one won't
-// lead to a drain callback, and the waiting connection is left alone.
+//! Shows that if there is a waiting and a pending connections, a cancel on the pending one won't
+//! lead to a drain callback, and the waiting connection is left alone.
 TEST_F(WrappedConnectionPoolTest, OneCancelOneWaitingNoDrain) {
   auto pool = createWrappedPool();
 
@@ -406,6 +415,40 @@ TEST_F(WrappedConnectionPoolTest, OneCancelOneWaitingNoDrain) {
   expectNumPending(0);
   EXPECT_EQ(pool->numPendingStreams(), 0);
   EXPECT_EQ(pool->numWaitingStreams(), 1);
+}
+
+//! Shows that if the pool returned by the initial allocatePool calls back as part of its newStream,
+//! we properly forward the callback and clean up.
+TEST_F(WrappedConnectionPoolTest, ImmediateCallbackOnFirstAssignment) {
+  auto pool = createWrappedPool();
+
+  expectSimpleConnPoolReturn();
+  expectWrappedPoolNewStreamImmediateCallback();
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+
+  auto cancellable = pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
+
+  EXPECT_EQ(cancellable, nullptr);
+  EXPECT_EQ(pool->numPendingStreams(), 0);
+  EXPECT_EQ(pool->numWaitingStreams(), 0);
+}
+
+//! Shows that if the pool returned by the pending allocatePool calls back as part of its newStream,
+//! we properly forward the callback and clean up.
+TEST_F(WrappedConnectionPoolTest, ImmediateCallbackOnPendingAssignment) {
+  auto pool = createWrappedPool();
+
+  expectNoConnPoolReturn();
+  pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
+
+  expectSimpleConnPoolReturn();
+  expectWrappedPoolNewStreamImmediateCallback();
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+
+  conn_mapper_mock_->idle_callbacks_[0]();
+
+  EXPECT_EQ(pool->numPendingStreams(), 0);
+  EXPECT_EQ(pool->numWaitingStreams(), 0);
 }
 } // namespace Http
 } // namespace Envoy

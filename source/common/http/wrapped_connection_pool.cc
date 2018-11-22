@@ -30,14 +30,7 @@ WrappedConnectionPool::newStream(Http::StreamDecoder& decoder, ConnectionPool::C
   // grab a reference so when we move it into the list, we still have it!
   PendingWrapper& wrapper_ref = *wrapper;
   wrapper->moveIntoList(std::move(wrapper), wrapped_waiting_);
-  ConnectionPool::Cancellable* cancellable = pool->newStream(decoder, wrapper_ref, context);
-
-  if (cancellable) {
-    wrapper_ref.setWaitingCancelCallback(*cancellable);
-    return &wrapper_ref;
-  }
-
-  return nullptr;
+  return wrapper_ref.newStreamWrapped(*pool);
 }
 
 void WrappedConnectionPool::checkForDrained() {
@@ -91,25 +84,35 @@ void WrappedConnectionPool::PendingWrapper::onPoolReady(
   parent_.onWrappedRequestWaitingFinished(*this);
 }
 
-bool WrappedConnectionPool::PendingWrapper::allocatePending(
+ConnectionPool::Cancellable*
+WrappedConnectionPool::PendingWrapper::newStreamWrapped(ConnectionPool::Instance& pool) {
+  ConnectionPool::Cancellable* cancellable = pool.newStream(decoder_, *this, context_);
+
+  // we need to be careful at this point. If cancellable is null, this may no longer be valid.
+  if (!cancellable) {
+    return nullptr;
+  }
+
+  waiting_cancel_ = cancellable;
+  return this;
+}
+
+ConnectionPool::Instance* WrappedConnectionPool::PendingWrapper::allocatePending(
     ConnectionMapper& mapper, std::list<ConnPoolImplBase::PendingRequestPtr>& pending_list) {
   if (!wrapped_pending_) {
-    return false;
+    return nullptr;
   }
 
   Instance* pool = mapper.assignPool(context_);
 
   if (!pool) {
-    return false;
+    return nullptr;
   }
 
   wrapped_pending_->removeFromList(pending_list);
   wrapped_pending_ = nullptr;
 
-  ConnectionPool::Cancellable* cancellable = pool->newStream(decoder_, *this, context_);
-
-  waiting_cancel_ = cancellable;
-  return true;
+  return pool;
 }
 
 ConnectionPool::Cancellable* WrappedConnectionPool::pushPending(
@@ -149,15 +152,17 @@ void WrappedConnectionPool::allocatePendingRequests() {
   // expense of potentially processing more than necessary.
   auto pending_itr = wrapped_pending_.begin();
   while (pending_itr != wrapped_pending_.end()) {
-    if (!(*pending_itr)->allocatePending(*mapper_, pending_requests_)) {
+    ConnectionPool::Instance* pool = (*pending_itr)->allocatePending(*mapper_, pending_requests_);
+    if (!pool) {
       ++pending_itr;
       continue;
     }
+
+    // If we're at this stage, we're waiting no matter whether the sub-pool returns a cancellable or
+    // not
     PendingWrapper* to_move = (pending_itr++)->get();
-    // UGHUGHUGH. This won't work. :( We need to be in wrapped_waiting_ when the "ready" comes from
-    // the pool. It could come immediately. So, we either need to handle this not being in the list,
-    // which is hard, or we need to do this first. Probably best to do it first.
     to_move->moveBetweenLists(wrapped_pending_, wrapped_waiting_);
+    to_move->newStreamWrapped(*pool);
   }
 }
 

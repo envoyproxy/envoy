@@ -70,12 +70,19 @@ private:
       waiting_cancel_ = &cancellable;
     }
 
+    //! Assigns a new stream in the given pool with the wrapped stream parameters.
+    //! @param pool the pool on which to assign the new stream
+    //! @return the result of creating the new stream. May be nullptr with all the semantics of
+    //!         ConnectionPool::Instance::newStream.
+    ConnectionPool::Cancellable* newStreamWrapped(ConnectionPool::Instance& pool);
+
     //! Tries to allocate a pending request if there is one.
     //! @param mapper The mapper to use to allocate the pool for the request
     //! @param pending_list the list owning any pending requests so we can cleanup when done.
-    //! @return true if a request was allocated to a pool. False otherwise.
-    bool allocatePending(ConnectionMapper& mapper,
-                         std::list<ConnPoolImplBase::PendingRequestPtr>& pending_list);
+    //! @return The connection pool one was allocated. False otherwise.
+    ConnectionPool::Instance*
+    allocatePending(ConnectionMapper& mapper,
+                    std::list<ConnPoolImplBase::PendingRequestPtr>& pending_list);
 
   private:
     Http::StreamDecoder& decoder_;
