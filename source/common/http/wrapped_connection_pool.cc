@@ -18,8 +18,6 @@ void WrappedConnectionPool::addDrainedCallback(DrainedCb cb) { drained_callbacks
 
 void WrappedConnectionPool::drainConnections() {}
 
-// TODO(klarose: Add an onPool Idle function so we know to deal with pending requests)
-
 ConnectionPool::Cancellable*
 WrappedConnectionPool::newStream(Http::StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks,
                                  const Upstream::LoadBalancerContext& context) {
@@ -119,13 +117,6 @@ ConnectionPool::Cancellable* WrappedConnectionPool::pushPending(
     ConnectionPool::Callbacks& callbacks, const Upstream::LoadBalancerContext& lb_context) {
   ENVOY_LOG(debug, "queueing request due to no available connection pools");
 
-  /*
-  USE ConnPoolBase for this? May just do everything we need.
-  if can_queue: use ConnPoolBase
-  Answer for now: the mapper takes a callback list. It invokes when a pool is free.
-  On pool creation, registers itself with the pool as a drained callback. Future: look into a
-  non-destructive way to poll for a pool being idle. Maybe add a different type of callback.
-  */
   if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
     ConnPoolImplBase::PendingRequest* pending =
         newPendingRequest(response_decoder, callbacks, &lb_context);
@@ -148,7 +139,7 @@ ConnectionPool::Cancellable* WrappedConnectionPool::pushPending(
 
 bool WrappedConnectionPool::drainable() const {
   // TODO(klarose: check whether we have any active pools as well)
-  return !drained_callbacks_.empty() && pending_requests_.empty();
+  return !drained_callbacks_.empty() && pending_requests_.empty() && wrapped_waiting_.empty();
 }
 
 void WrappedConnectionPool::allocatePendingRequests() {
@@ -168,24 +159,6 @@ void WrappedConnectionPool::allocatePendingRequests() {
     // which is hard, or we need to do this first. Probably best to do it first.
     to_move->moveBetweenLists(wrapped_pending_, wrapped_waiting_);
   }
-
-  // TODO(klarose: How do we handle the pool returning a cancellable?)
-  /*
-  1. Wrap the cancelable in our own.
-  2. That cancellable will have a secondary callout which is invoked on cancel.
-  3. By default it is the original cancellable (from the base)
-  4. When we assign to a new stream, if return another cancelable, we update.
-  ^ Done. Next up:
-  5. Problem: how do we know when the connection is established to free up the pending thing?
-      --Need to insert ourselves into the callbacks. But, that is in itself nasty. But, I guess,
-      necessary.
-  6. To do 5, it looks like we need to do two things:
-      a) We move the pending request into a new list for sub-pending requests.
-      b) When we create a new request, we add ourself as the callback
-      c) The callback will be called with a failure or a ready.
-      d) In both cases we clean up the internal resources in the sub-pending request
-      e) Then we call out with the original call.
-  */
 }
 
 void WrappedConnectionPool::onWrappedRequestPendingCancel(PendingWrapper& wrapper) {

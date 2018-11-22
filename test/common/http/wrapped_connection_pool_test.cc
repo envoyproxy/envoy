@@ -386,5 +386,26 @@ TEST_F(WrappedConnectionPoolTest, PoolAssignedCancellableClearsWaiting) {
   EXPECT_EQ(pool->numWaitingStreams(), 0);
   EXPECT_EQ(pool->numPendingStreams(), 0);
 }
+
+// Shows that if there is a waiting and a pending connections, a cancel on the pending one won't
+// lead to a drain callback, and the waiting connection is left alone.
+TEST_F(WrappedConnectionPoolTest, OneCancelOneWaitingNoDrain) {
+  auto pool = createWrappedPool();
+
+  ReadyWatcher drained;
+  pool->addDrainedCallback([&drained]() -> void { drained.ready(); });
+  setupPendingToWaiting(*pool);
+
+  expectNoConnPoolReturn(1);
+  auto cancellable = pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
+
+  EXPECT_CALL(drained, ready()).Times(0);
+
+  cancellable->cancel();
+
+  expectNumPending(0);
+  EXPECT_EQ(pool->numPendingStreams(), 0);
+  EXPECT_EQ(pool->numWaitingStreams(), 1);
+}
 } // namespace Http
 } // namespace Envoy
