@@ -7,11 +7,13 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
+#include "envoy/thread/thread.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/c_smart_ptr.h"
@@ -450,6 +452,14 @@ public:
 };
 
 } // namespace Stats
+
+namespace Thread {
+ThreadFactory& threadFactoryForTest();
+} // namespace Thread
+
+namespace Api {
+ApiPtr createApiForTest();
+} // namespace Api
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, rhs, "") {
   *result_listener << *rhs << " is not equal to " << *arg;

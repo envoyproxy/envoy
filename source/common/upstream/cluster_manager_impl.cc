@@ -665,9 +665,9 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   return entry->second->connPool(priority, protocol, context);
 }
 
-Tcp::ConnectionPool::Instance*
-ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                                          LoadBalancerContext* context) {
+Tcp::ConnectionPool::Instance* ClusterManagerImpl::tcpConnPoolForCluster(
+    const std::string& cluster, ResourcePriority priority, LoadBalancerContext* context,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -676,7 +676,7 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
   }
 
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->tcpConnPool(priority, context);
+  return entry->second->tcpConnPool(priority, context, transport_socket_options);
 }
 
 void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
@@ -706,8 +706,9 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
       [this, host] { ThreadLocalClusterManagerImpl::onHostHealthFailure(host, *tls_); });
 }
 
-Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster,
-                                                                 LoadBalancerContext* context) {
+Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(
+    const std::string& cluster, LoadBalancerContext* context,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -717,8 +718,8 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
 
   HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(context);
   if (logical_host) {
-    auto conn_info =
-        logical_host->createConnection(cluster_manager.thread_local_dispatcher_, nullptr);
+    auto conn_info = logical_host->createConnection(cluster_manager.thread_local_dispatcher_,
+                                                    nullptr, transport_socket_options);
     if ((entry->second->cluster_info_->features() &
          ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) &&
         conn_info.connection_ != nullptr) {
@@ -1130,7 +1131,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
-    ResourcePriority priority, LoadBalancerContext* context) {
+    ResourcePriority priority, LoadBalancerContext* context,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   HostConstSharedPtr host = lb_->chooseHost(context);
   if (!host) {
     ENVOY_LOG(debug, "no healthy host for TCP connection pool");
@@ -1156,11 +1158,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     }
   }
 
+  if (transport_socket_options != nullptr) {
+    transport_socket_options->hashKey(hash_key);
+  }
+
   TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];
   if (!container.pools_[hash_key]) {
     container.pools_[hash_key] = parent_.parent_.factory_.allocateTcpConnPool(
         parent_.thread_local_dispatcher_, host, priority,
-        have_options ? context->downstreamConnection()->socketOptions() : nullptr);
+        have_options ? context->downstreamConnection()->socketOptions() : nullptr,
+        transport_socket_options);
   }
 
   return container.pools_[hash_key].get();
@@ -1191,9 +1198,10 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
-    const Network::ConnectionSocket::OptionsSharedPtr& options) {
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   return Tcp::ConnectionPool::InstancePtr{
-      new Tcp::ConnPoolImpl(dispatcher, host, priority, options)};
+      new Tcp::ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options)};
 }
 
 ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(

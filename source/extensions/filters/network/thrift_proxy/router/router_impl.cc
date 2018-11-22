@@ -246,7 +246,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   ASSERT(protocol != ProtocolType::Auto);
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      route_entry_->clusterName(), Upstream::ResourcePriority::Default, this);
+      route_entry_->clusterName(), Upstream::ResourcePriority::Default, this, nullptr);
   if (!conn_pool) {
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
