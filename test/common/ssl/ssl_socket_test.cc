@@ -100,9 +100,12 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
 
-  size_t counter = 0;
-  auto stopSecondTime = [&]() {
-    if (++counter == 2) {
+  size_t connect_count = 0;
+  auto connect_second_time = [&connect_count, &dispatcher, &server_connection, &client_connection,
+                              expected_digest, expected_uri, expected_local_uri,
+                              expected_serial_number, expected_subject, expected_local_subject,
+                              expected_peer_cert]() {
+    if (++connect_count == 2) {
       if (!expected_digest.empty()) {
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(expected_digest, server_connection->ssl()->sha256PeerCertificateDigest());
@@ -131,24 +134,26 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
       dispatcher.exit();
     }
   };
-  auto closeSecondTime = [&]() {
-    if (++counter == 2) {
+
+  size_t close_count = 0;
+  auto close_second_time = [&close_count, &dispatcher]() {
+    if (++close_count == 2) {
       dispatcher.exit();
     }
   };
 
   if (expect_success) {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { stopSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { stopSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   } else {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
   }
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
@@ -236,9 +241,12 @@ const std::string testUtilV2(
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
 
-  size_t counter = 0;
-  auto stopSecondTime = [&]() {
-    if (++counter == 2) {
+  size_t connect_count = 0;
+  auto connect_second_time = [&connect_count, &dispatcher, &server_connection, &client_connection,
+                              &new_session, expected_server_cert_digest, expected_alpn_protocol,
+                              expected_client_cert_uri, expected_protocol_version,
+                              expected_requested_server_name]() {
+    if (++connect_count == 2) {
       if (!expected_server_cert_digest.empty()) {
         EXPECT_EQ(expected_server_cert_digest,
                   client_connection->ssl()->sha256PeerCertificateDigest());
@@ -283,27 +291,29 @@ const std::string testUtilV2(
       dispatcher.exit();
     }
   };
-  auto closeSecondTime = [&]() {
-    if (++counter == 2) {
+
+  size_t close_count = 0;
+  auto close_second_time = [&close_count, &dispatcher]() {
+    if (++close_count == 2) {
       dispatcher.exit();
     }
   };
 
   if (expect_success) {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { stopSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
           EXPECT_EQ(expected_requested_server_name, server_connection->requestedServerName());
-          stopSecondTime();
+          connect_second_time();
         }));
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   } else {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
   }
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
@@ -2037,8 +2047,9 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   // Different tests have different order of whether client or server gets Connected event
   // first, so always wait until both have happened.
-  unsigned connect_count = 0;
-  auto stopSecondTime = [&]() {
+  size_t connect_count = 0;
+  auto connect_second_time = [&connect_count, &dispatcher, &server_connection,
+                              &client_connection]() {
     connect_count++;
     if (connect_count == 2) {
       client_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -2048,9 +2059,9 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   };
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { stopSecondTime(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { stopSecondTime(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
 
@@ -2511,27 +2522,27 @@ void testClientSessionResumption(const std::string& server_ctx_yaml,
   client_connection->connect();
 
   size_t connect_count = 0;
-  auto connectSecondTime = [&]() {
+  auto connect_second_time = [&connect_count, &server_connection]() {
     if (++connect_count == 2) {
       server_connection->close(Network::ConnectionCloseType::NoFlush);
     }
   };
 
   size_t close_count = 0;
-  auto closeSecondTime = [&]() {
+  auto close_second_time = [&close_count, &dispatcher]() {
     if (++close_count == 2) {
       dispatcher.exit();
     }
   };
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connectSecondTime(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connectSecondTime(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
 
@@ -2548,13 +2559,13 @@ void testClientSessionResumption(const std::string& server_ctx_yaml,
   client_connection->connect();
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connectSecondTime(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connectSecondTime(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
 
