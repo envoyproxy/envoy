@@ -9,8 +9,8 @@
 #include "common/api/api_impl.h"
 #include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
-#include "common/http/connection_mapper_factory.h"
-#include "common/http/wrapped_connection_pool.h"
+#include "common/http/wrapped/connection_mapper_factory.h"
+#include "common/http/wrapped/wrapped_connection_pool.h"
 #include "common/network/socket_option_impl.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
@@ -2924,7 +2924,7 @@ public:
 TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentBuildsConnPool) {
   auto factory = makeFactory();
 
-  Http::MockConnectionMapper* mapper_fake = new Http::MockConnectionMapper();
+  NiceMock<Http::MockConnectionMapper>* mapper_fake = new NiceMock<Http::MockConnectionMapper>();
   EXPECT_CALL(mapper_factory_mock_, createSrcTransparentMapper_).WillOnce(Return(mapper_fake));
 
   auto conn_pool = factory->allocateTransparentConnPool(
@@ -2938,7 +2938,7 @@ TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentBuildsConnPool) {
 TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentHttp2) {
   auto factory = makeFactory();
 
-  Http::MockConnectionMapper* mapper_fake = new Http::MockConnectionMapper();
+  NiceMock<Http::MockConnectionMapper>* mapper_fake = new NiceMock<Http::MockConnectionMapper>();
   EXPECT_CALL(mapper_factory_mock_, createSrcTransparentMapper_).WillOnce(Return(mapper_fake));
 
   EXPECT_CALL(mock_loader_.snapshot_, featureEnabled("upstream.use_http2", 100))
@@ -2955,7 +2955,7 @@ TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentHttp2) {
 TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentHtt) {
   auto factory = makeFactory();
 
-  Http::MockConnectionMapper* mapper_fake = new Http::MockConnectionMapper();
+  NiceMock<Http::MockConnectionMapper>* mapper_fake = new NiceMock<Http::MockConnectionMapper>();
   EXPECT_CALL(mapper_factory_mock_, createSrcTransparentMapper_).WillOnce(Return(mapper_fake));
 
   auto conn_pool = factory->allocateTransparentConnPool(

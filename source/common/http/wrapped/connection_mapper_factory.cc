@@ -1,4 +1,4 @@
-#include "common/http/connection_mapper_factory.h"
+#include "common/http/wrapped/connection_mapper_factory.h"
 
 namespace Envoy {
 namespace Http {

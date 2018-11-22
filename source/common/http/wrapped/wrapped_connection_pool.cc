@@ -1,4 +1,4 @@
-#include "common/http/wrapped_connection_pool.h"
+#include "common/http/wrapped/wrapped_connection_pool.h"
 
 #include "common/common/assert.h"
 

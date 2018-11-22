@@ -37,7 +37,7 @@ envoy_cc_test(
         "//source/common/config:bootstrap_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",
-        "//source/common/http:connection_mapper_factory_lib",
+        "//source/common/http/wrapped:connection_mapper_factory_lib",
         "//source/common/network:socket_option_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",

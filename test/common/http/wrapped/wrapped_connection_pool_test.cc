@@ -1,6 +1,6 @@
 #include "envoy/http/codec.h"
 
-#include "common/http/wrapped_connection_pool.h"
+#include "common/http/wrapped/wrapped_connection_pool.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"

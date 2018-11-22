@@ -71,17 +71,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "connection_mapper_factory_lib",
-    srcs = ["connection_mapper_factory.cc"],
-    hdrs = ["connection_mapper_factory.h"],
-    deps = [
-        "//include/envoy/http:conn_pool_interface",
-        "//include/envoy/http:connection_mapper_interface",
-        "//source/common/singleton:threadsafe_singleton",
-    ],
-)
-
-envoy_cc_library(
     name = "codec_wrappers_lib",
     hdrs = ["codec_wrappers.h"],
     deps = ["//include/envoy/http:codec_interface"],
@@ -308,16 +297,5 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/route:route_cc",
         "@envoy_api//envoy/type:range_cc",
-    ],
-)
-
-envoy_cc_library(
-    name = "wrapped_connection_pool_lib",
-    srcs = ["wrapped_connection_pool.cc"],
-    hdrs = ["wrapped_connection_pool.h"],
-    deps = [
-        ":conn_pool_base_lib",
-        "//include/envoy/http:conn_pool_interface",
-        "//include/envoy/http:connection_mapper_interface",
     ],
 )
