@@ -100,7 +100,8 @@ ClientFactory ::rateLimitClientFactory(Server::Configuration::FactoryContext& co
   Envoy::RateLimit::RateLimitServiceConfigSharedPtr ratelimit_service_config =
       context.singletonManager().getTyped<Envoy::RateLimit::RateLimitServiceConfig>(
           "ratelimit_service_config_singleton_name", [] { return nullptr; });
-  ClientFactoryPtr client_factory;
+  // if bootstrap config has rate limiting service defined, we expect singleton manager to have it because
+  // it is loaded at the startup.
   if (ratelimit_service_config) {
     return std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::GrpcFactoryImpl>(
         ratelimit_service_config->config_, context.clusterManager().grpcAsyncClientManager(),
