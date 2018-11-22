@@ -32,8 +32,11 @@ public:
   // ConnPoolImplBase
   void checkForDrained() override;
 
-  //! @ return the number of streams waiting to be processed after being assigned a pool
+  //! @return The number of streams waiting to be processed after being assigned a pool
   size_t numWaitingStreams() const;
+
+  //! @return The number of wrappers in the pending state.
+  size_t numPendingStreams() const;
 
 private:
   //! This lets us invoke different cancellation logic depending on in what stage of a request

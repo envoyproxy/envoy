@@ -30,9 +30,16 @@ WrappedConnectionPool::newStream(Http::StreamDecoder& decoder, ConnectionPool::C
   }
 
   // grab a reference so when we move it into the list, we still have it!
-  ConnectionPool::Callbacks& wrapper_as_callback = *wrapper;
+  PendingWrapper& wrapper_ref = *wrapper;
   wrapper->moveIntoList(std::move(wrapper), wrapped_waiting_);
-  return pool->newStream(decoder, wrapper_as_callback, context);
+  ConnectionPool::Cancellable* cancellable = pool->newStream(decoder, wrapper_ref, context);
+
+  if (cancellable) {
+    wrapper_ref.setWaitingCancelCallback(*cancellable);
+    return &wrapper_ref;
+  }
+
+  return nullptr;
 }
 
 void WrappedConnectionPool::checkForDrained() {
@@ -49,6 +56,7 @@ void WrappedConnectionPool::checkForDrained() {
 }
 
 size_t WrappedConnectionPool::numWaitingStreams() const { return wrapped_waiting_.size(); }
+size_t WrappedConnectionPool::numPendingStreams() const { return wrapped_pending_.size(); }
 
 WrappedConnectionPool::PendingWrapper::PendingWrapper(Http::StreamDecoder& decoder,
                                                       ConnectionPool::Callbacks& callbacks,

@@ -113,7 +113,7 @@ TEST_F(WrappedConnectionPoolTest, PoolAssignedCancellable) {
 
   const auto cancellable = pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
 
-  EXPECT_EQ(cancellable, &cancellable_mock_);
+  EXPECT_NE(cancellable, nullptr);
   expectNumPending(0);
 }
 
@@ -148,6 +148,7 @@ TEST_F(WrappedConnectionPoolTest, TwoAssignFailuresQueuesThemUp) {
 
   EXPECT_NE(pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_), nullptr);
   expectNumPending(2);
+  EXPECT_EQ(pool->numPendingStreams(), 2);
 }
 
 TEST_F(WrappedConnectionPoolTest, PendingCancelledCausesDrain) {
@@ -162,6 +163,7 @@ TEST_F(WrappedConnectionPoolTest, PendingCancelledCausesDrain) {
   cancellable->cancel();
 
   expectNumPending(0);
+  EXPECT_EQ(pool->numPendingStreams(), 0);
 }
 
 // Shows that if there are still pending connections, a cancel won't lead to a drain callback.
@@ -178,6 +180,7 @@ TEST_F(WrappedConnectionPoolTest, OneCancelTwoPendingNoDrain) {
   cancellable1->cancel();
 
   expectNumPending(1);
+  EXPECT_EQ(pool->numPendingStreams(), 1);
 }
 
 // Since we know that a single cancel doesn't cause a drain, if a second cancel causes a drain, then
@@ -365,6 +368,23 @@ TEST_F(WrappedConnectionPoolTest, TestWaitingPoolOverflowFromSubPool) {
   EXPECT_EQ(callbacks_.failure_reason_, ConnectionPool::PoolFailureReason::Overflow);
   EXPECT_EQ(pool->numWaitingStreams(), 0);
 }
-// TODO(klarose: add test showing that we clean up on cancel from wrapped pool)
+
+//! Tests that we have neither waiting nor pending connections after cancel is called.
+TEST_F(WrappedConnectionPoolTest, PoolAssignedCancellableClearsWaiting) {
+  auto pool = createWrappedPool();
+
+  expectSimpleConnPoolReturn();
+  EXPECT_CALL(wrapped_pool_, newStream(_, _, _)).WillOnce(Return(&cancellable_mock_));
+
+  const auto cancellable = pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
+
+  EXPECT_CALL(cancellable_mock_, cancel());
+
+  cancellable->cancel();
+
+  expectNumPending(0);
+  EXPECT_EQ(pool->numWaitingStreams(), 0);
+  EXPECT_EQ(pool->numPendingStreams(), 0);
+}
 } // namespace Http
 } // namespace Envoy
