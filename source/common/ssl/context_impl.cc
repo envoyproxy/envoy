@@ -510,8 +510,7 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
   }
 }
 
-bssl::UniquePtr<SSL>
-ClientContextImpl::newSsl(absl::optional<std::string> override_server_name) {
+bssl::UniquePtr<SSL> ClientContextImpl::newSsl(absl::optional<std::string> override_server_name) {
   bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(absl::nullopt));
 
   std::string server_name_indication =
