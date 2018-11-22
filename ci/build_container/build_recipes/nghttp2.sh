@@ -8,7 +8,7 @@ source "${SCRIPT_DIR}/versions.sh"
 curl "$NGHTTP2_FILE_URL" -sLo nghttp2-"$NGHTTP2_VERSION".tar.gz \
   && echo "$NGHTTP2_FILE_SHA256" nghttp2-"$NGHTTP2_VERSION".tar.gz | sha256sum --check
 tar xf nghttp2-"$NGHTTP2_VERSION".tar.gz
-cd nghttp2-"$NGHTTP2_VERSION"
+cd "$NGHTTP2_FILE_PREFIX"
 
 # Allow nghttp2 to build as static lib on Windows
 # TODO: remove once https://github.com/nghttp2/nghttp2/pull/1198 is merged

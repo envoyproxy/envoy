@@ -24,6 +24,7 @@ def parseRecipeDetails(name, text):
   scans = {
     prefix + '_FILE_SHA256': 'file-sha256',
     prefix + '_FILE_URL': 'file-url',
+    prefix + '_FILE_PREFIX': 'file-prefix',
   }
 
   for env_var, json_key in scans.items():
@@ -57,6 +58,7 @@ if __name__ == '__main__':
       'identifier': key,
       'file-sha256': loc.get('sha256'),
       'file-url': loc.get('urls')[0],
+      'file-prefix' : loc.get('strip_prefix', ''),
     })
 
   for key, name in RECIPES.TARGET_RECIPES.items():

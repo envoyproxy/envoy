@@ -14,7 +14,7 @@ CFLAGS="$(for f in $CXXFLAGS; do if [[ ! $f =~ -D.* ]]; then echo $f; fi; done |
 curl "$CARES_FILE_URL" -sLo c-ares-"$CARES_VERSION".tar.gz \
   && echo "$CARES_FILE_SHA256" c-ares-"$CARES_VERSION".tar.gz | sha256sum --check
 tar xf c-ares-"$CARES_VERSION".tar.gz
-cd c-ares-"$CARES_VERSION"
+cd "$CARES_FILE_PREFIX"
 
 mkdir build
 cd build

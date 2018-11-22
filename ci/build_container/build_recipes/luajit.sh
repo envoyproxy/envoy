@@ -8,7 +8,7 @@ source "${SCRIPT_DIR}/versions.sh"
 curl "$LUAJIT_FILE_URL" -sLo LuaJIT-"$LUAJIT_VERSION".tar.gz \
   && echo "$LUAJIT_FILE_SHA256" LuaJIT-"$LUAJIT_VERSION".tar.gz | sha256sum --check
 tar xf LuaJIT-"$LUAJIT_VERSION".tar.gz
-cd LuaJIT-"$LUAJIT_VERSION"
+cd "$LUAJIT_FILE_PREFIX"
 
 
 # Fixup Makefile with things that cannot be set via env var.

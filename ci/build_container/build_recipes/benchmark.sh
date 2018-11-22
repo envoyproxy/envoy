@@ -8,7 +8,7 @@ source "${SCRIPT_DIR}/versions.sh"
 curl "$BENCHMARK_FILE_URL" -sLo benchmark-"$BENCHMARK_GIT_SHA".tar.gz \
   && echo "$BENCHMARK_FILE_SHA256" benchmark-"$BENCHMARK_GIT_SHA".tar.gz | sha256sum --check
 tar xf benchmark-"$BENCHMARK_GIT_SHA".tar.gz
-cd benchmark-"$BENCHMARK_GIT_SHA"
+cd "$BENCHMARK_FILE_PREFIX"
 
 mkdir build
 cd build

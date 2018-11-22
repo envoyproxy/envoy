@@ -8,7 +8,7 @@ source "${SCRIPT_DIR}/versions.sh"
 curl "$YAMLCPP_FILE_URL" -sLo yaml-cpp-"$YAMLCPP_GIT_SHA".tar.gz \
   && echo "$YAMLCPP_FILE_SHA256" yaml-cpp-"$YAMLCPP_GIT_SHA".tar.gz | sha256sum --check
 tar xf yaml-cpp-"$YAMLCPP_GIT_SHA".tar.gz
-cd yaml-cpp-"$YAMLCPP_GIT_SHA"
+cd "$YAMLCPP_FILE_PREFIX"
 
 mkdir build
 cd build

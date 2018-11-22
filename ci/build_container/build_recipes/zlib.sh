@@ -8,7 +8,8 @@ source "${SCRIPT_DIR}/versions.sh"
 curl "$ZLIB_FILE_URL" -sLo zlib-"$ZLIB_VERSION".tar.gz \
   && echo "$ZLIB_FILE_SHA256" zlib-"$ZLIB_VERSION".tar.gz | sha256sum --check
 tar xf zlib-"$ZLIB_VERSION".tar.gz
-cd zlib-"$ZLIB_VERSION"
+cd "$ZLIB_FILE_PREFIX"
+
 
 mkdir build
 cd build

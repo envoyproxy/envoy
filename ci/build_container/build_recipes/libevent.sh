@@ -9,7 +9,8 @@ source "${SCRIPT_DIR}/versions.sh"
 curl "$LIBEVENT_FILE_URL" -sLo libevent-"$LIBEVENT_TAG".tar.gz \
   && echo "$LIBEVENT_FILE_SHA256" libevent-"$LIBEVENT_TAG".tar.gz | sha256sum --check
 tar xf libevent-"$LIBEVENT_TAG".tar.gz
-cd libevent-"$LIBEVENT_TAG"
+cd "$LIBEVENT_FILE_PREFIX"
+
 
 mkdir build
 cd build
