@@ -563,7 +563,7 @@ LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocal
         // predicate.
         (*scaled_locality_weights)[i] =
             std::round(float((original_weights[i] * hosts_per_locality.get()[i].size())) /
-                      original_hosts_per_locality[i].size());
+                       original_hosts_per_locality[i].size());
       }
 
       return scaled_locality_weights;
