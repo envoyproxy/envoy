@@ -161,13 +161,15 @@ TEST(RateLimitGrpcFactoryTest, CreateLegacy) {
       .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   GrpcFactoryImpl factory(config, async_client_manager, scope);
-  factory.create(absl::optional<std::chrono::milliseconds>());
+  factory.create(absl::optional<std::chrono::milliseconds>(),context);
 }
 
 TEST(RateLimitNullFactoryTest, Basic) {
   NullFactoryImpl factory;
-  ClientPtr client = factory.create(absl::optional<std::chrono::milliseconds>());
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  ClientPtr client = factory.create(absl::optional<std::chrono::milliseconds>(), context);
   MockRequestCallbacks request_callbacks;
   EXPECT_CALL(request_callbacks, complete_(LimitStatus::OK, _));
   client->limit(request_callbacks, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance());
