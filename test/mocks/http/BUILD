@@ -29,6 +29,8 @@ envoy_cc_mock(
     deps = [
         ":conn_pool_mocks",
         ":stream_decoder_mock",
+        ":stream_encoder_mock",
+        ":stream_mock",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -58,10 +60,29 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "stream_mock",
+    srcs = ["stream.cc"],
+    hdrs = ["stream.h"],
+    deps = [
+        "//include/envoy/http:codec_interface",
+    ],
+)
+
+envoy_cc_mock(
     name = "stream_decoder_mock",
     srcs = ["stream_decoder.cc"],
     hdrs = ["stream_decoder.h"],
     deps = [
+        "//include/envoy/http:codec_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "stream_encoder_mock",
+    srcs = ["stream_encoder.cc"],
+    hdrs = ["stream_encoder.h"],
+    deps = [
+        ":stream_mock",
         "//include/envoy/http:codec_interface",
     ],
 )

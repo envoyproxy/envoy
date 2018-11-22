@@ -11,6 +11,7 @@ class MockHostDescription;
 } // namespace Upstream
 
 namespace Http {
+
 namespace ConnectionPool {
 class MockCancellable : public Cancellable {
 
