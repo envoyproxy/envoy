@@ -21,14 +21,14 @@ void WrappedConnectionPool::drainConnections() {}
 ConnectionPool::Cancellable*
 WrappedConnectionPool::newStream(Http::StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks,
                                  const Upstream::LoadBalancerContext& context) {
-  auto wrapper = std::make_unique<PendingWrapper>(decoder, callbacks, context, *this);
+  auto wrapper = std::make_unique<StreamWrapper>(decoder, callbacks, context, *this);
   Instance* pool = mapper_->assignPool(context);
   if (!pool) {
     return pushPending(std::move(wrapper), decoder, callbacks, context);
   }
 
   // grab a reference so when we move it into the list, we still have it!
-  PendingWrapper& wrapper_ref = *wrapper;
+  StreamWrapper& wrapper_ref = *wrapper;
   wrapper->moveIntoList(std::move(wrapper), wrapped_waiting_);
   return wrapper_ref.newStreamWrapped(*pool);
 }
@@ -49,16 +49,16 @@ void WrappedConnectionPool::checkForDrained() {
 size_t WrappedConnectionPool::numWaitingStreams() const { return wrapped_waiting_.size(); }
 size_t WrappedConnectionPool::numPendingStreams() const { return wrapped_pending_.size(); }
 
-WrappedConnectionPool::PendingWrapper::PendingWrapper(Http::StreamDecoder& decoder,
-                                                      ConnectionPool::Callbacks& callbacks,
-                                                      const Upstream::LoadBalancerContext& context,
-                                                      WrappedConnectionPool& parent)
+WrappedConnectionPool::StreamWrapper::StreamWrapper(Http::StreamDecoder& decoder,
+                                                    ConnectionPool::Callbacks& callbacks,
+                                                    const Upstream::LoadBalancerContext& context,
+                                                    WrappedConnectionPool& parent)
     : decoder_(decoder), wrapped_callbacks_(callbacks), context_(context),
       wrapped_pending_(nullptr), waiting_cancel_(nullptr), parent_(parent) {}
 
-WrappedConnectionPool::PendingWrapper::~PendingWrapper() = default;
+WrappedConnectionPool::StreamWrapper::~StreamWrapper() = default;
 
-void WrappedConnectionPool::PendingWrapper::cancel() {
+void WrappedConnectionPool::StreamWrapper::cancel() {
   // we should only be called in a state where wrapped_cancel is not null.
   ASSERT(wrapped_pending_ != nullptr || waiting_cancel_ != nullptr);
   if (wrapped_pending_) {
@@ -73,19 +73,19 @@ void WrappedConnectionPool::PendingWrapper::cancel() {
 
   parent_.onWrappedRequestWaitingFinished(*this);
 }
-void WrappedConnectionPool::PendingWrapper::onPoolFailure(
+void WrappedConnectionPool::StreamWrapper::onPoolFailure(
     ConnectionPool::PoolFailureReason reason, Upstream::HostDescriptionConstSharedPtr host) {
   wrapped_callbacks_.onPoolFailure(reason, std::move(host));
   parent_.onWrappedRequestWaitingFinished(*this);
 }
-void WrappedConnectionPool::PendingWrapper::onPoolReady(
+void WrappedConnectionPool::StreamWrapper::onPoolReady(
     Http::StreamEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host) {
   wrapped_callbacks_.onPoolReady(encoder, std::move(host));
   parent_.onWrappedRequestWaitingFinished(*this);
 }
 
 ConnectionPool::Cancellable*
-WrappedConnectionPool::PendingWrapper::newStreamWrapped(ConnectionPool::Instance& pool) {
+WrappedConnectionPool::StreamWrapper::newStreamWrapped(ConnectionPool::Instance& pool) {
   ConnectionPool::Cancellable* cancellable = pool.newStream(decoder_, *this, context_);
 
   // we need to be careful at this point. If cancellable is null, this may no longer be valid.
@@ -97,7 +97,7 @@ WrappedConnectionPool::PendingWrapper::newStreamWrapped(ConnectionPool::Instance
   return this;
 }
 
-ConnectionPool::Instance* WrappedConnectionPool::PendingWrapper::allocatePending(
+ConnectionPool::Instance* WrappedConnectionPool::StreamWrapper::allocatePending(
     ConnectionMapper& mapper, std::list<ConnPoolImplBase::PendingRequestPtr>& pending_list) {
   if (!wrapped_pending_) {
     return nullptr;
@@ -116,7 +116,7 @@ ConnectionPool::Instance* WrappedConnectionPool::PendingWrapper::allocatePending
 }
 
 ConnectionPool::Cancellable* WrappedConnectionPool::pushPending(
-    std::unique_ptr<PendingWrapper> wrapper, Http::StreamDecoder& response_decoder,
+    std::unique_ptr<StreamWrapper> wrapper, Http::StreamDecoder& response_decoder,
     ConnectionPool::Callbacks& callbacks, const Upstream::LoadBalancerContext& lb_context) {
   ENVOY_LOG(debug, "queueing request due to no available connection pools");
 
@@ -160,17 +160,17 @@ void WrappedConnectionPool::allocatePendingRequests() {
 
     // If we're at this stage, we're waiting no matter whether the sub-pool returns a cancellable or
     // not
-    PendingWrapper* to_move = (pending_itr++)->get();
+    StreamWrapper* to_move = (pending_itr++)->get();
     to_move->moveBetweenLists(wrapped_pending_, wrapped_waiting_);
     to_move->newStreamWrapped(*pool);
   }
 }
 
-void WrappedConnectionPool::onWrappedRequestPendingCancel(PendingWrapper& wrapper) {
+void WrappedConnectionPool::onWrappedRequestPendingCancel(StreamWrapper& wrapper) {
   wrapper.removeFromList(wrapped_pending_);
 }
 
-void WrappedConnectionPool::onWrappedRequestWaitingFinished(PendingWrapper& wrapper) {
+void WrappedConnectionPool::onWrappedRequestWaitingFinished(StreamWrapper& wrapper) {
   wrapper.removeFromList(wrapped_waiting_);
 }
 } // namespace Http

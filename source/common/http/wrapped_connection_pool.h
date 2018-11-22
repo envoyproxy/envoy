@@ -44,13 +44,13 @@ private:
   //! pending list. However, later we may want to remove from a pending list elsewhere, due to the
   //! ownership of the request actually changing. This lets us do so while keeping the original
   //! cancellable object in tact for the original caller.
-  class PendingWrapper : public LinkedObject<PendingWrapper>,
-                         public ConnectionPool::Cancellable,
-                         public ConnectionPool::Callbacks {
+  class StreamWrapper : public LinkedObject<StreamWrapper>,
+                        public ConnectionPool::Cancellable,
+                        public ConnectionPool::Callbacks {
   public:
-    PendingWrapper(Http::StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks,
-                   const Upstream::LoadBalancerContext& context, WrappedConnectionPool& parent);
-    ~PendingWrapper();
+    StreamWrapper(Http::StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+                  const Upstream::LoadBalancerContext& context, WrappedConnectionPool& parent);
+    ~StreamWrapper();
 
     //! ConnectionPool::Cancellable
     void cancel() override;
@@ -71,6 +71,8 @@ private:
     }
 
     //! Assigns a new stream in the given pool with the wrapped stream parameters.
+    //! Note: *this should be considered "waiting" at this point, since invoking this function
+    //! may invalidate it, which will assume it is in the waiting state.
     //! @param pool the pool on which to assign the new stream
     //! @return the result of creating the new stream. May be nullptr with all the semantics of
     //!         ConnectionPool::Instance::newStream.
@@ -93,14 +95,14 @@ private:
     WrappedConnectionPool& parent_;
   };
 
-  using PendingWrapperPtr = std::unique_ptr<PendingWrapper>;
+  using StreamWrapperPtr = std::unique_ptr<StreamWrapper>;
 
   /*
    * Stores a connection request for later processing, if possible.
    *
    * @ return A handle for possible canceling of the pending request.
    */
-  ConnectionPool::Cancellable* pushPending(std::unique_ptr<PendingWrapper> wrapper,
+  ConnectionPool::Cancellable* pushPending(std::unique_ptr<StreamWrapper> wrapper,
                                            Http::StreamDecoder& response_decoder,
                                            ConnectionPool::Callbacks& callbacks,
                                            const Upstream::LoadBalancerContext& context);
@@ -112,16 +114,16 @@ private:
   void allocatePendingRequests();
 
   //! Called when a wrapped request has been cancelled so we can free it up.
-  void onWrappedRequestPendingCancel(PendingWrapper& wrapper);
+  void onWrappedRequestPendingCancel(StreamWrapper& wrapper);
 
   //! Called when a wrapped request has either been cancelled, or finished waiting.
-  void onWrappedRequestWaitingFinished(PendingWrapper& wrapper);
+  void onWrappedRequestWaitingFinished(StreamWrapper& wrapper);
 
   std::unique_ptr<ConnectionMapper> mapper_;
   Protocol protocol_;
   std::vector<DrainedCb> drained_callbacks_;
-  std::list<PendingWrapperPtr> wrapped_pending_;
-  std::list<PendingWrapperPtr> wrapped_waiting_;
+  std::list<StreamWrapperPtr> wrapped_pending_;
+  std::list<StreamWrapperPtr> wrapped_waiting_;
 };
 
 } // namespace Http
