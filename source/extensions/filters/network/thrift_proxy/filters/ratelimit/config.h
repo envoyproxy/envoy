@@ -27,8 +27,6 @@ private:
   ThriftProxy::ThriftFilters::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::thrift::rate_limit::v2alpha1::RateLimit& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
-  Envoy::Extensions::Filters::Common::RateLimit::ClientFactoryPtr ratelimit_client_factory_;
-  RateLimit::RateLimitServiceConfigSharedPtr ratelimit_service_config_;
 };
 
 } // namespace RateLimitFilter

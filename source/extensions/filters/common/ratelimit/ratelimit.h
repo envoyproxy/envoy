@@ -87,6 +87,13 @@ public:
    */
   virtual ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout,
                            Server::Configuration::FactoryContext& context) PURE;
+
+  /**
+   * Returns ClientFactory constructed from the RateLimitServiceConfig available in singleton
+   * manager.
+   */
+  static std::unique_ptr<ClientFactory>
+  rateLimitClientFactory(Server::Configuration::FactoryContext& context);
 };
 
 typedef std::unique_ptr<ClientFactory> ClientFactoryPtr;

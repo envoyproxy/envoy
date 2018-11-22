@@ -94,6 +94,21 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   callbacks_ = nullptr;
 }
 
+ClientFactoryPtr
+ClientFactory ::rateLimitClientFactory(Server::Configuration::FactoryContext& context) {
+  // TODO(ramaraochavali): Figure out how to get the registered name here.
+  Envoy::RateLimit::RateLimitServiceConfigSharedPtr ratelimit_service_config =
+      context.singletonManager().getTyped<Envoy::RateLimit::RateLimitServiceConfig>(
+          "ratelimit_service_config_singleton_name", [] { return nullptr; });
+  ClientFactoryPtr client_factory;
+  if (ratelimit_service_config) {
+    return std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::GrpcFactoryImpl>(
+        ratelimit_service_config->config_, context.clusterManager().grpcAsyncClientManager(),
+        context.scope());
+  }
+  return std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::NullFactoryImpl>();
+}
+
 GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitServiceConfig& config,
                                  Grpc::AsyncClientManager& async_client_manager,
                                  Stats::Scope& scope) {
