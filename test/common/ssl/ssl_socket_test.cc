@@ -2563,6 +2563,7 @@ void testClientSessionResumption(const std::string& server_ctx_yaml,
   EXPECT_EQ(expect_reuse ? 1UL : 0UL, client_stats_store.counter("ssl.session_reused").value());
 }
 
+// Test client session resumption using default settings (should be enabled).
 TEST_P(SslSocketTest, ClientSessionResumptionDefault) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
@@ -2580,6 +2581,7 @@ TEST_P(SslSocketTest, ClientSessionResumptionDefault) {
   testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, true, GetParam());
 }
 
+// Make sure client session resumption is not happening when it's disabled.
 TEST_P(SslSocketTest, ClientSessionResumptionDisabled) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
@@ -2598,6 +2600,7 @@ TEST_P(SslSocketTest, ClientSessionResumptionDisabled) {
   testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, false, GetParam());
 }
 
+// Test client session resumption with TLS 1.0-1.2.
 TEST_P(SslSocketTest, ClientSessionResumptionEnabledTls12) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
@@ -2622,6 +2625,7 @@ TEST_P(SslSocketTest, ClientSessionResumptionEnabledTls12) {
   testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, true, GetParam());
 }
 
+// Test client session resumption with TLS 1.3 (it's different than in older versions of TLS).
 TEST_P(SslSocketTest, ClientSessionResumptionEnabledTls13) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
