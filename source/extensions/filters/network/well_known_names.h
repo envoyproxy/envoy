@@ -23,7 +23,7 @@ public:
   // Mongo proxy filter
   const std::string MongoProxy = "envoy.mongo_proxy";
   // Rate limit filter
-  const std::string RateLimit = "envoy.rate_limit";
+  const std::string RateLimit = "envoy.ratelimit";
   // Redis proxy filter
   const std::string RedisProxy = "envoy.redis_proxy";
   // IP tagging filter
