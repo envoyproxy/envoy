@@ -16,7 +16,7 @@ Http::Protocol WrappedConnectionPool::protocol() const { return protocol_; }
 
 void WrappedConnectionPool::addDrainedCallback(DrainedCb cb) { drained_callbacks_.push_back(cb); }
 
-void WrappedConnectionPool::drainConnections() {}
+void WrappedConnectionPool::drainConnections() { mapper_->drainPools(); }
 
 ConnectionPool::Cancellable*
 WrappedConnectionPool::newStream(Http::StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks,
@@ -38,9 +38,8 @@ void WrappedConnectionPool::checkForDrained() {
     return;
   }
 
-  // TODO(klarose: we shouldn't need to recursively notify sub-pools. By registering a callback,
-  // we'll be notified when they're all cleaned up, so we can move them directly into the empty
-  // pool. Note: This may not be desireable from a perf perspective)
+  mapper_->drainPools();
+
   for (const DrainedCb& cb : drained_callbacks_) {
     cb();
   }
@@ -141,8 +140,8 @@ ConnectionPool::Cancellable* WrappedConnectionPool::pushPending(
 }
 
 bool WrappedConnectionPool::drainable() const {
-  // TODO(klarose: check whether we have any active pools as well)
-  return !drained_callbacks_.empty() && pending_requests_.empty() && wrapped_waiting_.empty();
+  return !drained_callbacks_.empty() && pending_requests_.empty() && wrapped_waiting_.empty() &&
+         mapper_->allPoolsIdle();
 }
 
 void WrappedConnectionPool::allocatePendingRequests() {

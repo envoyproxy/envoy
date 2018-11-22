@@ -25,6 +25,8 @@ public:
   MOCK_METHOD1(assignPool_,
                ConnectionPool::Instance*(const Upstream::LoadBalancerContext* context));
   MOCK_METHOD0(addIdleCallback_, void());
+  MOCK_METHOD0(drainPools, void());
+  MOCK_CONST_METHOD0(allPoolsIdle, bool());
 
   //! May be used to track the builder passed to a mapper on construction.
   ConnPoolBuilder builder_;

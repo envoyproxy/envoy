@@ -13,6 +13,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::AtLeast;
 using testing::DoAll;
 using testing::NiceMock;
 using testing::Return;
@@ -27,6 +28,7 @@ public:
     auto mapper_mock = std::make_unique<MockConnectionMapper>();
     conn_mapper_mock_ = mapper_mock.get();
 
+    EXPECT_CALL(*conn_mapper_mock_, allPoolsIdle()).Times(AtLeast(0)).WillRepeatedly(Return(true));
     EXPECT_CALL(*conn_mapper_mock_, addIdleCallback_);
     return std::make_unique<WrappedConnectionPool>(std::move(mapper_mock), protocol, host_,
                                                    Upstream::ResourcePriority::Default);
@@ -166,6 +168,7 @@ TEST_F(WrappedConnectionPoolTest, PendingCancelledCausesDrain) {
   expectNoConnPoolReturn(1);
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready());
+  EXPECT_CALL(*conn_mapper_mock_, drainPools());
   pool->addDrainedCallback([&drained]() -> void { drained.ready(); });
 
   auto cancellable = pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
@@ -201,6 +204,7 @@ TEST_F(WrappedConnectionPoolTest, TwoCancelTwoPendingDrains) {
   expectNoConnPoolReturn(2);
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready()).Times(1);
+  EXPECT_CALL(*conn_mapper_mock_, drainPools()).Times(1);
   pool->addDrainedCallback([&drained]() -> void { drained.ready(); });
 
   auto cancellable1 = pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
@@ -450,5 +454,33 @@ TEST_F(WrappedConnectionPoolTest, ImmediateCallbackOnPendingAssignment) {
   EXPECT_EQ(pool->numPendingStreams(), 0);
   EXPECT_EQ(pool->numWaitingStreams(), 0);
 }
+
+TEST_F(WrappedConnectionPoolTest, DrainConnections) {
+  auto pool = createWrappedPool();
+  EXPECT_CALL(*conn_mapper_mock_, drainPools());
+
+  pool->drainConnections();
+}
+
+//! Shows that if we cancel a connection while there are still active pools in the mapper, we don't
+//! drain.
+TEST_F(WrappedConnectionPoolTest, CancelWithBusyPoolNoDrain) {
+  auto pool = createWrappedPool();
+
+  ReadyWatcher drained;
+  pool->addDrainedCallback([&drained]() -> void { drained.ready(); });
+
+  expectNoConnPoolReturn(1);
+  auto cancellable = pool->newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
+
+  EXPECT_CALL(drained, ready()).Times(0);
+  EXPECT_CALL(*conn_mapper_mock_, allPoolsIdle()).WillOnce(Return(false));
+  cancellable->cancel();
+
+  expectNumPending(0);
+  EXPECT_EQ(pool->numPendingStreams(), 0);
+  EXPECT_EQ(pool->numWaitingStreams(), 0);
+}
+
 } // namespace Http
 } // namespace Envoy

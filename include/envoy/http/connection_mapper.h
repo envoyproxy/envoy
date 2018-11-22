@@ -42,9 +42,15 @@ public:
   //!         pool was not assigned. Note that ownership is retained by @c this.
   virtual ConnectionPool::Instance* assignPool(const Upstream::LoadBalancerContext& context) PURE;
 
-  //! Registers a for when pool has no more work to do. This is used to allow the callback
+  //! Registers a callback for when pool has no more work to do. This is used to allow the callback
   //! to kickstart operations which were waiting for an idle pool.
   virtual void addIdleCallback(IdleCb callback) PURE;
+
+  //! Drains any allocated connection pools
+  virtual void drainPools() PURE;
+
+  //! @return true when no pools owned by the mapper are doing any work
+  virtual bool allPoolsIdle() const PURE;
 };
 
 using ConnPoolBuilder = std::function<std::unique_ptr<ConnectionPool::Instance>()>;
