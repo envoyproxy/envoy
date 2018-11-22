@@ -41,12 +41,31 @@ private:
   //! pending list. However, later we may want to remove from a pending list elsewhere, due to the
   //! ownership of the request actually changing. This lets us do so while keeping the original
   //! cancellable object in tact for the original caller.
-  class PendingWrapper : public LinkedObject<PendingWrapper>, public ConnectionPool::Cancellable {
+  class PendingWrapper : public LinkedObject<PendingWrapper>,
+                         public ConnectionPool::Cancellable,
+                         public ConnectionPool::Callbacks {
   public:
-    PendingWrapper(ConnPoolImplBase::PendingRequest& to_wrap, WrappedConnectionPool& parent);
+    PendingWrapper(Http::StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+                   const Upstream::LoadBalancerContext& context, WrappedConnectionPool& parent);
     ~PendingWrapper();
 
+    //! ConnectionPool::Cancellable
     void cancel() override;
+
+    //! ConnectionPool::Callbacks
+    void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                       Upstream::HostDescriptionConstSharedPtr host) override;
+
+    void onPoolReady(Http::StreamEncoder& encoder,
+                     Upstream::HostDescriptionConstSharedPtr host) override;
+
+    void setPendingRequest(ConnPoolImplBase::PendingRequest& request) {
+      wrapped_pending_ = &request;
+    }
+
+    void setWaitingCancelCallback(ConnectionPool::Cancellable& cancellable) {
+      waiting_cancel_ = &cancellable;
+    }
 
     //! Tries to allocate a pending request if there is one.
     //! @param mapper The mapper to use to allocate the pool for the request
@@ -56,8 +75,11 @@ private:
                          std::list<ConnPoolImplBase::PendingRequestPtr>& pending_list);
 
   private:
+    Http::StreamDecoder& decoder_;
+    ConnectionPool::Callbacks& wrapped_callbacks_;
+    const Upstream::LoadBalancerContext& context_;
     ConnPoolImplBase::PendingRequest* wrapped_pending_;
-    ConnectionPool::Cancellable* wrapped_cancel_;
+    ConnectionPool::Cancellable* waiting_cancel_;
     WrappedConnectionPool& parent_;
   };
 
@@ -68,7 +90,8 @@ private:
    *
    * @ return A handle for possible canceling of the pending request.
    */
-  ConnectionPool::Cancellable* pushPending(Http::StreamDecoder& response_decoder,
+  ConnectionPool::Cancellable* pushPending(std::unique_ptr<PendingWrapper> wrapper,
+                                           Http::StreamDecoder& response_decoder,
                                            ConnectionPool::Callbacks& callbacks,
                                            const Upstream::LoadBalancerContext& context);
 

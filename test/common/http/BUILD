@@ -298,6 +298,7 @@ envoy_cc_test(
         "//test/mocks/http:conn_pool_mocks",
         "//test/mocks/http:mock_connection_mapper",
         "//test/mocks/http:stream_decoder_mock",
+        "//test/mocks/http:stream_encoder_mock",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
     ],

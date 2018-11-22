@@ -23,14 +23,16 @@ void WrappedConnectionPool::drainConnections() {}
 ConnectionPool::Cancellable*
 WrappedConnectionPool::newStream(Http::StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks,
                                  const Upstream::LoadBalancerContext& context) {
-  // TODO(klarose: Next up. Figure out how to register with the connection pool for idle
-  // connections.
+  auto wrapper = std::make_unique<PendingWrapper>(decoder, callbacks, context, *this);
   Instance* pool = mapper_->assignPool(context);
   if (!pool) {
-    return pushPending(decoder, callbacks, context);
+    return pushPending(std::move(wrapper), decoder, callbacks, context);
   }
 
-  return pool->newStream(decoder, callbacks, context);
+  // grab a reference so when we move it into the list, we still have it!
+  ConnectionPool::Callbacks& wrapper_as_callback = *wrapper;
+  wrapper->moveIntoList(std::move(wrapper), wrapped_waiting_);
+  return pool->newStream(decoder, wrapper_as_callback, context);
 }
 
 void WrappedConnectionPool::checkForDrained() {
@@ -48,21 +50,39 @@ void WrappedConnectionPool::checkForDrained() {
 
 size_t WrappedConnectionPool::numWaitingStreams() const { return wrapped_waiting_.size(); }
 
-WrappedConnectionPool::PendingWrapper::PendingWrapper(ConnPoolImplBase::PendingRequest& to_wrap,
+WrappedConnectionPool::PendingWrapper::PendingWrapper(Http::StreamDecoder& decoder,
+                                                      ConnectionPool::Callbacks& callbacks,
+                                                      const Upstream::LoadBalancerContext& context,
                                                       WrappedConnectionPool& parent)
-    : wrapped_pending_(&to_wrap), wrapped_cancel_(&to_wrap), parent_(parent) {}
+    : decoder_(decoder), wrapped_callbacks_(callbacks), context_(context),
+      wrapped_pending_(nullptr), waiting_cancel_(nullptr), parent_(parent) {}
 
 WrappedConnectionPool::PendingWrapper::~PendingWrapper() = default;
 
 void WrappedConnectionPool::PendingWrapper::cancel() {
   // we should only be called in a state where wrapped_cancel is not null.
-  ASSERT(wrapped_cancel_ != nullptr);
-  wrapped_cancel_->cancel();
+  ASSERT(wrapped_pending_ != nullptr || waiting_cancel_ != nullptr);
   if (wrapped_pending_) {
+    wrapped_pending_->cancel();
     parent_.onWrappedRequestPendingCancel(*this);
-  } else {
-    parent_.onWrappedRequestWaitingFinished(*this);
+    return;
   }
+
+  if (waiting_cancel_) {
+    waiting_cancel_->cancel();
+  }
+
+  parent_.onWrappedRequestWaitingFinished(*this);
+}
+void WrappedConnectionPool::PendingWrapper::onPoolFailure(
+    ConnectionPool::PoolFailureReason reason, Upstream::HostDescriptionConstSharedPtr host) {
+  wrapped_callbacks_.onPoolFailure(reason, std::move(host));
+  parent_.onWrappedRequestWaitingFinished(*this);
+}
+void WrappedConnectionPool::PendingWrapper::onPoolReady(
+    Http::StreamEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host) {
+  wrapped_callbacks_.onPoolReady(encoder, std::move(host));
+  parent_.onWrappedRequestWaitingFinished(*this);
 }
 
 bool WrappedConnectionPool::PendingWrapper::allocatePending(
@@ -71,29 +91,24 @@ bool WrappedConnectionPool::PendingWrapper::allocatePending(
     return false;
   }
 
-  const Upstream::LoadBalancerContext* context = wrapped_pending_->lb_context_;
-  // context should never be null. It should only get here from us calling newPendingRequest
-  // with the pointer from the reference in newStream. However, assert for good measure in case
-  // somebody changes ConnPoolImplBase's behaviour.
-  ASSERT(context != nullptr);
-  Instance* pool = mapper.assignPool(*context);
+  Instance* pool = mapper.assignPool(context_);
 
   if (!pool) {
     return false;
   }
 
-  ConnectionPool::Cancellable* cancellable =
-      pool->newStream(wrapped_pending_->decoder_, wrapped_pending_->callbacks_, *context);
-  wrapped_cancel_ = cancellable;
   wrapped_pending_->removeFromList(pending_list);
   wrapped_pending_ = nullptr;
+
+  ConnectionPool::Cancellable* cancellable = pool->newStream(decoder_, *this, context_);
+
+  waiting_cancel_ = cancellable;
   return true;
 }
 
-ConnectionPool::Cancellable*
-WrappedConnectionPool::pushPending(Http::StreamDecoder& response_decoder,
-                                   ConnectionPool::Callbacks& callbacks,
-                                   const Upstream::LoadBalancerContext& lb_context) {
+ConnectionPool::Cancellable* WrappedConnectionPool::pushPending(
+    std::unique_ptr<PendingWrapper> wrapper, Http::StreamDecoder& response_decoder,
+    ConnectionPool::Callbacks& callbacks, const Upstream::LoadBalancerContext& lb_context) {
   ENVOY_LOG(debug, "queueing request due to no available connection pools");
 
   /*
@@ -106,7 +121,7 @@ WrappedConnectionPool::pushPending(Http::StreamDecoder& response_decoder,
   if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
     ConnPoolImplBase::PendingRequest* pending =
         newPendingRequest(response_decoder, callbacks, &lb_context);
-    PendingWrapperPtr wrapper = std::make_unique<PendingWrapper>(*pending, *this);
+    wrapper->setPendingRequest(*pending);
     wrapper->moveIntoList(std::move(wrapper), wrapped_pending_);
     return wrapped_pending_.front().get();
   }
@@ -118,6 +133,8 @@ WrappedConnectionPool::pushPending(Http::StreamDecoder& response_decoder,
   host_->stats().rq_total_.inc();
   callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
   host_->cluster().stats().upstream_rq_pending_overflow_.inc();
+
+  // note: at this point the wrapper is blown away due to the unique_ptr going out of scope.
   return nullptr;
 }
 
@@ -138,6 +155,9 @@ void WrappedConnectionPool::allocatePendingRequests() {
       continue;
     }
     PendingWrapper* to_move = (pending_itr++)->get();
+    // UGHUGHUGH. This won't work. :( We need to be in wrapped_waiting_ when the "ready" comes from
+    // the pool. It could come immediately. So, we either need to handle this not being in the list,
+    // which is hard, or we need to do this first. Probably best to do it first.
     to_move->moveBetweenLists(wrapped_pending_, wrapped_waiting_);
   }
 

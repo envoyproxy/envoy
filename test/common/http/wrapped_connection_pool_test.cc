@@ -7,13 +7,16 @@
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/http/mock_connection_mapper.h"
 #include "test/mocks/http/stream_decoder.h"
+#include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 
 #include "gtest/gtest.h"
 
+using testing::DoAll;
 using testing::NiceMock;
 using testing::Return;
+using testing::WithArg;
 
 namespace Envoy {
 namespace Http {
@@ -47,9 +50,42 @@ public:
     EXPECT_EQ(cluster_->stats_.upstream_rq_pending_active_.value(), number);
   }
 
+  //! Sets up a request that has moved through pending to either waiting or pending in the sub pool.
+  std::pair<ConnectionPool::Cancellable*, ConnectionPool::Callbacks*>
+  setupPendingToEither(WrappedConnectionPool& pool, ConnectionPool::Cancellable* from_sub_pool) {
+    expectNoConnPoolReturn();
+
+    auto cancellable = pool.newStream(stream_decoder_mock_, callbacks_, lb_context_mock_);
+
+    ConnectionPool::Callbacks* callbacks_to_wrapped = nullptr;
+    expectSimpleConnPoolReturn();
+    EXPECT_CALL(wrapped_pool_, newStream(_, _, _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callbacks_to_wrapped)), Return(from_sub_pool)));
+
+    conn_mapper_mock_->idle_callbacks_[0]();
+
+    return std::make_pair(cancellable, callbacks_to_wrapped);
+  }
+
+  //! Sets up the wrapper to have a stream in the pending state.
+  //! @return a pair: first: the cancellable returned by the first newStream,
+  //!                 second: the callbacks provided to the inner connection pool.
+  std::pair<ConnectionPool::Cancellable*, ConnectionPool::Callbacks*>
+  setupPendingToPending(WrappedConnectionPool& pool) {
+    return setupPendingToEither(pool, &cancellable_mock_);
+  }
+
+  //! Sets up the wrapper to have a stream in the waiting state after first moving through pending
+  //! @return a pair: first: the cancellable returned by the first newStream,
+  //!                 second: the callbacks provided to the inner connection pool.
+  ConnectionPool::Callbacks* setupPendingToWaiting(WrappedConnectionPool& pool) {
+    return setupPendingToEither(pool, nullptr).second;
+  }
+
   Upstream::MockLoadBalancerContext lb_context_mock_;
   MockConnectionMapper* conn_mapper_mock_ = nullptr;
   MockStreamDecoder stream_decoder_mock_;
+  MockStreamEncoder stream_encoder_mock_;
   ConnPoolCallbacks callbacks_;
   ConnectionPool::MockInstance wrapped_pool_;
   NiceMock<ConnectionPool::MockCancellable> cancellable_mock_;
@@ -115,7 +151,6 @@ TEST_F(WrappedConnectionPoolTest, TwoAssignFailuresQueuesThemUp) {
 }
 
 TEST_F(WrappedConnectionPoolTest, PendingCancelledCausesDrain) {
-
   auto pool = createWrappedPool();
 
   expectNoConnPoolReturn(1);
@@ -131,7 +166,6 @@ TEST_F(WrappedConnectionPoolTest, PendingCancelledCausesDrain) {
 
 // Shows that if there are still pending connections, a cancel won't lead to a drain callback.
 TEST_F(WrappedConnectionPoolTest, OneCancelTwoPendingNoDrain) {
-
   auto pool = createWrappedPool();
 
   expectNoConnPoolReturn(2);
@@ -150,7 +184,6 @@ TEST_F(WrappedConnectionPoolTest, OneCancelTwoPendingNoDrain) {
 // we know that the implementation waits for all pending requests to be cancelled before invoking
 // the callback.
 TEST_F(WrappedConnectionPoolTest, TwoCancelTwoPendingDrains) {
-
   auto pool = createWrappedPool();
 
   expectNoConnPoolReturn(2);
@@ -191,7 +224,6 @@ TEST_F(WrappedConnectionPoolTest, TestOverflowPending) {
 
 //! Makes sure that we register ourselves for an idle callback on construction
 TEST_F(WrappedConnectionPoolTest, TestIdleCallbackRegistered) {
-
   auto pool = createWrappedPool();
 
   EXPECT_EQ(conn_mapper_mock_->idle_callbacks_.size(), 1);
@@ -200,7 +232,6 @@ TEST_F(WrappedConnectionPoolTest, TestIdleCallbackRegistered) {
 //! If there aren't any pending requests, we don't expect any calls to allocate if a pool
 //! is idle.
 TEST_F(WrappedConnectionPoolTest, TestIdleCallbackNoPending) {
-
   auto pool = createWrappedPool();
   expectNoConnPoolReturn(0);
 
@@ -210,7 +241,6 @@ TEST_F(WrappedConnectionPoolTest, TestIdleCallbackNoPending) {
 //! Tests that if there is a single pending request, we'll call back with it when told that here are
 //! idle pools.
 TEST_F(WrappedConnectionPoolTest, TestIdleCallbackWithSinglePending) {
-
   auto pool = createWrappedPool();
   expectNoConnPoolReturn(1);
 
@@ -226,7 +256,6 @@ TEST_F(WrappedConnectionPoolTest, TestIdleCallbackWithSinglePending) {
 //! Tests that if there is more than a single pending request, we can handle them all when we're
 //! told that there are idle pools.
 TEST_F(WrappedConnectionPoolTest, TestIdleCallbackWithTwoPending) {
-
   auto pool = createWrappedPool();
   expectNoConnPoolReturn(2);
 
@@ -242,7 +271,6 @@ TEST_F(WrappedConnectionPoolTest, TestIdleCallbackWithTwoPending) {
 
 //! Tests that if we skip a request for assignment, we properly move to the next.
 TEST_F(WrappedConnectionPoolTest, TestIdleCallbackOneSkippedOneAssigned) {
-
   auto pool = createWrappedPool();
   expectNoConnPoolReturn(2);
 
@@ -262,7 +290,6 @@ TEST_F(WrappedConnectionPoolTest, TestIdleCallbackOneSkippedOneAssigned) {
 //! Tests that if the partitioned pool returns a pending response, and the response is cancelled,
 //! then the partitioned pool is informed by calling the callback it provided.
 TEST_F(WrappedConnectionPoolTest, TestPendingToPendingThenCancel) {
-
   auto pool = createWrappedPool();
 
   expectNoConnPoolReturn();
@@ -271,13 +298,73 @@ TEST_F(WrappedConnectionPoolTest, TestPendingToPendingThenCancel) {
 
   expectSimpleConnPoolReturn();
   EXPECT_CALL(wrapped_pool_, newStream(_, _, _)).WillOnce(Return(&cancellable_mock_));
-  EXPECT_CALL(cancellable_mock_, cancel());
 
   conn_mapper_mock_->idle_callbacks_[0]();
 
+  EXPECT_CALL(cancellable_mock_, cancel());
   cancellable->cancel();
   EXPECT_EQ(pool->numWaitingStreams(), 0);
 }
 
+//! Tests that if the subpool indicates it is ready, we removing any tracking entries we have for
+//! it and forward on the ready.
+TEST_F(WrappedConnectionPoolTest, TestPendingPoolReadyFromSubPool) {
+  auto pool = createWrappedPool();
+
+  auto cancel_and_callbacks = setupPendingToPending(*pool);
+  ConnectionPool::Callbacks* callbacks_to_wrapped = cancel_and_callbacks.second;
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+
+  callbacks_to_wrapped->onPoolReady(stream_encoder_mock_, host_);
+
+  EXPECT_EQ(callbacks_.outer_encoder_, &stream_encoder_mock_);
+  EXPECT_EQ(callbacks_.host_, host_);
+  EXPECT_EQ(pool->numWaitingStreams(), 0);
+}
+
+//! Tests that if the subpool indicates it is has failed, we removing any tracking entries we have
+//! for it, and forward on the failure.
+TEST_F(WrappedConnectionPoolTest, TestPendingPoolFailureFromSubPool) {
+  auto pool = createWrappedPool();
+
+  auto cancel_and_callbacks = setupPendingToPending(*pool);
+  ConnectionPool::Callbacks* callbacks_to_wrapped = cancel_and_callbacks.second;
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+
+  callbacks_to_wrapped->onPoolFailure(ConnectionPool::PoolFailureReason::ConnectionFailure, host_);
+
+  EXPECT_EQ(callbacks_.failure_reason_, ConnectionPool::PoolFailureReason::ConnectionFailure);
+  EXPECT_EQ(callbacks_.host_, host_);
+  EXPECT_EQ(pool->numWaitingStreams(), 0);
+}
+
+//! Tests that if the even if the subpool doesn't return a cancellable, we still pass on failures.
+//! for it, and forward on the failure.
+TEST_F(WrappedConnectionPoolTest, TestWaitingPoolFailureFromSubPool) {
+  auto pool = createWrappedPool();
+
+  ConnectionPool::Callbacks* callbacks_to_wrapped = setupPendingToWaiting(*pool);
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+
+  callbacks_to_wrapped->onPoolFailure(ConnectionPool::PoolFailureReason::ConnectionFailure, host_);
+
+  EXPECT_EQ(callbacks_.failure_reason_, ConnectionPool::PoolFailureReason::ConnectionFailure);
+  EXPECT_EQ(callbacks_.host_, host_);
+  EXPECT_EQ(pool->numWaitingStreams(), 0);
+}
+
+//! Tests that if we get an overflow, we pass it through, even when waiting for the conn pool
+TEST_F(WrappedConnectionPoolTest, TestWaitingPoolOverflowFromSubPool) {
+  auto pool = createWrappedPool();
+
+  ConnectionPool::Callbacks* callbacks_to_wrapped = setupPendingToWaiting(*pool);
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+
+  callbacks_to_wrapped->onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, host_);
+
+  EXPECT_EQ(callbacks_.failure_reason_, ConnectionPool::PoolFailureReason::Overflow);
+  EXPECT_EQ(pool->numWaitingStreams(), 0);
+}
+// TODO(klarose: add test showing that we clean up on cancel from wrapped pool)
 } // namespace Http
 } // namespace Envoy
