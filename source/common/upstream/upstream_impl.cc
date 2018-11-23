@@ -703,7 +703,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
                                         Stats::Scope& stats_scope,
                                         const envoy::api::v2::core::RoutingPriority& priority) {
   uint64_t max_connections = 1024;
-  uint64_t max_pending_connections = 128;
+  uint64_t max_pending_connections = 1024;
   uint64_t max_pending_requests = 1024;
   uint64_t max_requests = 1024;
   uint64_t max_retries = 3;
