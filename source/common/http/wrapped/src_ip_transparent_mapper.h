@@ -44,6 +44,7 @@ private:
 
   //! Assigns a pool to the provided address. While the pool is assigned, any new assignments from
   //! this address will be to that pool.
+  //! @pre: !idle_pools_.empty()
   //! @param address The ip address to which to assign the pool. May be IPv4 or IPv6.
   //! @return the assigned pool
   ConnectionPool::Instance* assignPool(const Network::Address::Ip& address);
@@ -54,12 +55,9 @@ private:
   ConnectionPool::Instance* allocateAndAssignPool(const Network::Address::Ip& address);
 
   //! Creates a new pool and registers it to be tracked internally.
-  ConnectionPool::Instance* registerNewPool();
+  void registerNewPool();
 
   void poolDrained(ConnectionPool::Instance& drained_pool);
-
-  ConnPoolBuilder builder_;
-  const size_t max_num_pools_;
 
   //! Allows us to track a given connection pool -- i.e. is it pending or active. Is it assigned
   //! a v4 or v6 address?
@@ -69,10 +67,12 @@ private:
     absl::optional<uint32_t> v4_address_;
   };
 
+  ConnPoolBuilder builder_;
+  const size_t max_num_pools_;
+  std::vector<IdleCb> idle_callbacks_;
   std::unordered_map<ConnectionPool::Instance*, PoolTracker> active_pools_;
   std::stack<PoolTracker, std::vector<PoolTracker>> idle_pools_;
   std::unordered_map<uint32_t, ConnectionPool::Instance*> v4_assigned_;
-
   // TODO(klarose: research a better hash. V6 addresses aren't always that random in all bits)
   std::unordered_map<absl::uint128, ConnectionPool::Instance*, absl::Hash<absl::uint128>>
       v6_assigned_;

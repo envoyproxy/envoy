@@ -1,8 +1,11 @@
+#include <functional>
+
 #include "envoy/http/conn_pool.h"
 
 #include "common/http/wrapped/src_ip_transparent_mapper.h"
 #include "common/network/utility.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/upstream/load_balancer_context.h"
@@ -345,5 +348,41 @@ TEST_F(SrcIpTransparentMapperTest, idlePoolsNotDrained) {
   mapper->drainPools();
 }
 
+//! Test that if a pool goes idle, a callback is invoked.
+TEST_F(SrcIpTransparentMapperTest, idleCallbackInvoked) {
+  auto mapper = makeDefaultMapper();
+  ReadyWatcher callback;
+
+  mapper->addIdleCallback(std::bind(&ReadyWatcher::ready, &callback));
+  mapper->assignPool(lb_context_mock_);
+
+  EXPECT_CALL(callback, ready());
+  drainPool(0);
+}
+
+TEST_F(SrcIpTransparentMapperTest, idlePoolsAndActiveMeansNotAllPoolsIdle) {
+  auto mapper = makeDefaultMapper();
+
+  setRemoteAddressToUse("1.0.0.2:123");
+  mapper->assignPool(lb_context_mock_);
+  setRemoteAddressToUse("[12::34]:8541");
+  mapper->assignPool(lb_context_mock_);
+
+  drainPool(0);
+  EXPECT_FALSE(mapper->allPoolsIdle());
+}
+
+TEST_F(SrcIpTransparentMapperTest, idlePoolsAndNoActiveMeansPoolsIdle) {
+  auto mapper = makeDefaultMapper();
+
+  setRemoteAddressToUse("1.0.0.2:123");
+  mapper->assignPool(lb_context_mock_);
+  setRemoteAddressToUse("[12::34]:8541");
+  mapper->assignPool(lb_context_mock_);
+
+  drainPool(0);
+  drainPool(1);
+  EXPECT_TRUE(mapper->allPoolsIdle());
+}
 } // namespace Http
 } // namespace Envoy

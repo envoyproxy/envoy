@@ -30,6 +30,7 @@ SrcIpTransparentMapper::assignPool(const Upstream::LoadBalancerContext& context)
     return pool;
   }
 
+  // If we didn't find an assigned pool for the provided context, and we're at the limit, fail.
   if (active_pools_.size() >= max_num_pools_) {
     return nullptr;
   }
@@ -37,16 +38,11 @@ SrcIpTransparentMapper::assignPool(const Upstream::LoadBalancerContext& context)
   return allocateAndAssignPool(*ip);
 }
 
-void SrcIpTransparentMapper::addIdleCallback(IdleCb) {
-  /* Callback when we get a callback from the pools we own
-   * Register *that* callback on pool creation
-   */
-}
+void SrcIpTransparentMapper::addIdleCallback(IdleCb cb) { idle_callbacks_.push_back(cb); }
 
 void SrcIpTransparentMapper::drainPools() {
-  for (auto& pool : active_pools_) {
-    pool.second.instance_->drainConnections();
-  }
+  std::for_each(active_pools_.begin(), active_pools_.end(),
+                [](auto& pool_iter) { pool_iter.second.instance_->drainConnections(); });
 }
 
 bool SrcIpTransparentMapper::allPoolsIdle() const { return active_pools_.empty(); }
@@ -114,13 +110,14 @@ ConnectionPool::Instance* SrcIpTransparentMapper::assignPool(const Ip& address) 
 
 ConnectionPool::Instance* SrcIpTransparentMapper::allocateAndAssignPool(const Ip& address) {
   if (idle_pools_.empty()) {
+    // make sure we have a free pool!
     registerNewPool();
   }
 
   return assignPool(address);
 }
 
-ConnectionPool::Instance* SrcIpTransparentMapper::registerNewPool() {
+void SrcIpTransparentMapper::registerNewPool() {
   auto new_pool = builder_();
   ConnectionPool::Instance* to_return = new_pool.get();
   // Register a callback so we may be notified when the pool is drained. We will consider it idle at
@@ -129,7 +126,6 @@ ConnectionPool::Instance* SrcIpTransparentMapper::registerNewPool() {
   PoolTracker tracker;
   tracker.instance_ = std::move(new_pool);
   idle_pools_.emplace(std::move(tracker));
-  return to_return;
 }
 
 void SrcIpTransparentMapper::poolDrained(ConnectionPool::Instance& instance) {
@@ -148,6 +144,8 @@ void SrcIpTransparentMapper::poolDrained(ConnectionPool::Instance& instance) {
 
   idle_pools_.emplace(std::move(active_iter->second));
   active_pools_.erase(active_iter);
+
+  std::for_each(idle_callbacks_.begin(), idle_callbacks_.end(), [](auto& callback) { callback(); });
 }
 
 } // namespace Http

@@ -17,6 +17,7 @@ envoy_cc_test(
         "//include/envoy/http:conn_pool_interface",
         "//source/common/http/wrapped:src_ip_transparent_mapper_lib",
         "//source/common/network:utility_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/http:conn_pool_mocks",
         "//test/mocks/network:connection_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
