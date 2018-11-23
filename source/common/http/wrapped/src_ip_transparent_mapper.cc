@@ -53,11 +53,19 @@ bool SrcIpTransparentMapper::allPoolsIdle() const { return active_pools_.empty()
 
 ConnectionPool::Instance* SrcIpTransparentMapper::findActivePool(const Ip& ip) const {
   const Network::Address::Ipv4* v4_addr = ip.ipv4();
-  if (!v4_addr) {
-    return nullptr;
+  if (v4_addr) {
+    return findActiveV4(*v4_addr);
   }
 
-  const uint32_t addr_as_int = v4_addr->address();
+  const Network::Address::Ipv6* v6_addr = ip.ipv6();
+  ASSERT(v6_addr); // we expect an address to be either v4 or v6.
+  return findActiveV6(*v6_addr);
+}
+
+ConnectionPool::Instance*
+SrcIpTransparentMapper::findActiveV4(const Network::Address::Ipv4& v4_addr) const {
+
+  const uint32_t addr_as_int = v4_addr.address();
   const auto& v4_iter = v4_assigned_.find(addr_as_int);
 
   if (v4_iter == v4_assigned_.end()) {
@@ -67,11 +75,27 @@ ConnectionPool::Instance* SrcIpTransparentMapper::findActivePool(const Ip& ip) c
   return v4_iter->second;
 }
 
+ConnectionPool::Instance*
+SrcIpTransparentMapper::findActiveV6(const Network::Address::Ipv6& v6_addr) const {
+
+  const absl::uint128 addr_as_int = v6_addr.address();
+  const auto& v6_iter = v6_assigned_.find(addr_as_int);
+
+  if (v6_iter == v6_assigned_.end()) {
+    return nullptr;
+  }
+
+  return v6_iter->second;
+}
+
 void SrcIpTransparentMapper::assignPool(const Ip& address, ConnectionPool::Instance& instance) {
   const Network::Address::Ipv4* v4_addr = address.ipv4();
-  ASSERT(v4_addr);
-
-  v4_assigned_[v4_addr->address()] = &instance;
+  if (v4_addr) {
+    v4_assigned_[v4_addr->address()] = &instance;
+  } else {
+    const Network::Address::Ipv6* v6_addr = address.ipv6();
+    v6_assigned_[v6_addr->address()] = &instance;
+  }
 }
 
 } // namespace Http

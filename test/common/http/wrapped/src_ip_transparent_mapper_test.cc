@@ -177,5 +177,29 @@ TEST_F(SrcIpTransparentMapperTest, sameIpsAtLimitGivesAssigned) {
   EXPECT_EQ(pool1, pool2);
 }
 
+//! Test that if we return different IPs from the LB Context, we return different pools
+TEST_F(SrcIpTransparentMapperTest, differentIpsDifferentPoolsV6) {
+  auto mapper = makeDefaultMapper();
+
+  setRemoteAddressToUse("[1::1]:123");
+  auto pool1 = mapper->assignPool(lb_context_mock_);
+  setRemoteAddressToUse("[2::2]:123");
+  auto pool2 = mapper->assignPool(lb_context_mock_);
+
+  EXPECT_NE(pool1, pool2);
+}
+
+//! Test that if we use the same IP, we get the same pool
+TEST_F(SrcIpTransparentMapperTest, sameIpsSamePoolsV6) {
+  auto mapper = makeDefaultMapper();
+
+  setRemoteAddressToUse("[10::1]:123");
+  auto pool1 = mapper->assignPool(lb_context_mock_);
+  setRemoteAddressToUse("[10::1]:123");
+  auto pool2 = mapper->assignPool(lb_context_mock_);
+
+  EXPECT_NE(nullptr, pool1);
+  EXPECT_EQ(pool1, pool2);
+}
 } // namespace Http
 } // namespace Envoy
