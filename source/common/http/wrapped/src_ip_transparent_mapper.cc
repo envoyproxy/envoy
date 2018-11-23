@@ -1,5 +1,7 @@
 #include "common/http/wrapped/src_ip_transparent_mapper.h"
 
+#include <algorithm>
+
 #include "envoy/network/address.h"
 
 using Envoy::Network::Address::Ip;
@@ -18,9 +20,12 @@ SrcIpTransparentMapper::assignPool(const Upstream::LoadBalancerContext& context)
   // and
   //                return it?)
   const auto& address = context.downstreamConnection()->remoteAddress();
-  // TODO(klarose -- handle address not being IP. Same as above.
-  const auto& ip = *address->ip();
-  ConnectionPool::Instance* pool = findActivePool(ip);
+  ASSERT(address.get());
+
+  // TODO(klarose: handle address not being IP. Same as above.
+  const auto ip = address->ip();
+  ASSERT(ip);
+  ConnectionPool::Instance* pool = findActivePool(*ip);
   if (pool) {
     return pool;
   }
@@ -29,12 +34,7 @@ SrcIpTransparentMapper::assignPool(const Upstream::LoadBalancerContext& context)
     return nullptr;
   }
 
-  auto new_pool = builder_();
-  ConnectionPool::Instance* to_return = new_pool.get();
-  active_pools_.emplace_back(std::move(new_pool));
-  assignPool(ip, *to_return);
-
-  return to_return;
+  return allocateAndAssignPool(*ip);
 }
 
 void SrcIpTransparentMapper::addIdleCallback(IdleCb) {
@@ -45,7 +45,7 @@ void SrcIpTransparentMapper::addIdleCallback(IdleCb) {
 
 void SrcIpTransparentMapper::drainPools() {
   for (auto& pool : active_pools_) {
-    pool->drainConnections();
+    pool.second.instance_->drainConnections();
   }
 }
 
@@ -88,14 +88,66 @@ SrcIpTransparentMapper::findActiveV6(const Network::Address::Ipv6& v6_addr) cons
   return v6_iter->second;
 }
 
-void SrcIpTransparentMapper::assignPool(const Ip& address, ConnectionPool::Instance& instance) {
+ConnectionPool::Instance* SrcIpTransparentMapper::assignPool(const Ip& address) {
+  // This should only be called if we've guranteed there's an idle pool.
+  ASSERT(!idle_pools_.empty());
+
+  PoolTracker next_up = std::move(idle_pools_.top());
+  idle_pools_.pop();
+
+  ConnectionPool::Instance* to_return = next_up.instance_.get();
   const Network::Address::Ipv4* v4_addr = address.ipv4();
   if (v4_addr) {
-    v4_assigned_[v4_addr->address()] = &instance;
+    const uint32_t raw = v4_addr->address();
+    v4_assigned_[raw] = to_return;
+    next_up.v4_address_ = raw;
   } else {
     const Network::Address::Ipv6* v6_addr = address.ipv6();
-    v6_assigned_[v6_addr->address()] = &instance;
+    const absl::uint128 raw = v6_addr->address();
+    v6_assigned_[raw] = to_return;
+    next_up.v6_address_ = raw;
   }
+
+  active_pools_.emplace(to_return, std::move(next_up));
+  return to_return;
+}
+
+ConnectionPool::Instance* SrcIpTransparentMapper::allocateAndAssignPool(const Ip& address) {
+  if (idle_pools_.empty()) {
+    registerNewPool();
+  }
+
+  return assignPool(address);
+}
+
+ConnectionPool::Instance* SrcIpTransparentMapper::registerNewPool() {
+  auto new_pool = builder_();
+  ConnectionPool::Instance* to_return = new_pool.get();
+  // Register a callback so we may be notified when the pool is drained. We will consider it idle at
+  // that point.
+  to_return->addDrainedCallback([this, to_return] { poolDrained(*to_return); });
+  PoolTracker tracker;
+  tracker.instance_ = std::move(new_pool);
+  idle_pools_.emplace(std::move(tracker));
+  return to_return;
+}
+
+void SrcIpTransparentMapper::poolDrained(ConnectionPool::Instance& instance) {
+  const auto& active_iter = active_pools_.find(&instance);
+  ASSERT(active_iter != active_pools_.end());
+
+  // first clean up any assignments.
+  if (active_iter->second.v4_address_.has_value()) {
+    v4_assigned_.erase(active_iter->second.v4_address_.value());
+  }
+
+  // while these should be mutually exclusive, can't hurt to be safe.
+  if (active_iter->second.v6_address_.has_value()) {
+    v6_assigned_.erase(active_iter->second.v6_address_.value());
+  }
+
+  idle_pools_.emplace(std::move(active_iter->second));
+  active_pools_.erase(active_iter);
 }
 
 } // namespace Http
