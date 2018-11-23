@@ -27,10 +27,10 @@ class ResourceManagerImpl : public ResourceManager {
 public:
   ResourceManagerImpl(Runtime::Loader& runtime, const std::string& runtime_key,
                       uint64_t max_pending_connections, uint64_t max_connections,
-                      uint64_t max_pending_requests, uint64_t max_requests,
-                      uint64_t max_retries, ClusterCircuitBreakersStats
-                      cb_stats)
-      : pending_connections_(max_pending_connections, runtime, runtime_key + "max_pending_connections", cb_stats.cx_pending_open_),
+                      uint64_t max_pending_requests, uint64_t max_requests, uint64_t max_retries,
+                      ClusterCircuitBreakersStats cb_stats)
+      : pending_connections_(max_pending_connections, runtime,
+                             runtime_key + "max_pending_connections", cb_stats.cx_pending_open_),
         connections_(max_connections, runtime, runtime_key + "max_connections", cb_stats.cx_open_),
         pending_requests_(max_pending_requests, runtime, runtime_key + "max_pending_requests",
                           cb_stats.rq_pending_open_),

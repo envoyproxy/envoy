@@ -105,7 +105,8 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
     }
 
     // If we have no connections at all, make one no matter what so we don't starve.
-    if ((ready_clients_.size() == 0 && busy_clients_.size() == 0) || (can_create_connection && can_create_pending_connection)) {
+    if ((ready_clients_.size() == 0 && busy_clients_.size() == 0) ||
+        (can_create_connection && can_create_pending_connection)) {
       createNewConnection();
     }
 
