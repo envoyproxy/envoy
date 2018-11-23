@@ -42,8 +42,8 @@ Version history
   to a response with empty body.
 * load balancer: added a :ref:`configuration <envoy_api_msg_Cluster.LeastRequestLbConfig>` option
   to specify the number of choices made in P2C.
-* network: removed the reference to `FilterState` in `Connection` in favor of `StreamInfo`.
 * logging: added missing [ in log prefix.
+* network: removed the reference to `FilterState` in `Connection` in favor of `StreamInfo`.
 * rate-limit: added :ref:`configuration
   <envoy_api_field_config.filter.http.rate_limit.v2.RateLimit.rate_limited_as_resource_exhausted>`
   to specify whether the `GrpcStatus` status returned should be `RESOURCE_EXHAUSTED` or
@@ -262,6 +262,11 @@ Version history
   <envoy_api_msg_core.GrpcService.GoogleGrpc.CallCredentials>`.
 * gzip filter: added :ref:`stats <gzip-statistics>` to the filter.
 * gzip filter: sending *accept-encoding* header as *identity* no longer compresses the payload.
+* header to metadata: added :ref:`HTTP Header to Metadata
+  filter<config_http_filters_header_to_metadata>`.
+* health check http filter: added :ref:`generic header matching
+  <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.headers>` to trigger health check
+  response. Deprecated the endpoint option.
 * health check: added ability to set :ref:`additional HTTP headers
   <envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers_to_add>` for HTTP health check.
 * health check: added support for EDS delivered :ref:`endpoint health status
@@ -273,9 +278,6 @@ Version history
 * health check: added support for :ref:`custom health check
   <envoy_api_field_core.HealthCheck.custom_health_check>`.
 * health check: health check connections can now be configured to use http/2.
-* health check http filter: added :ref:`generic header matching
-  <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.headers>` to trigger health check
-  response. Deprecated the endpoint option.
 * http: filters can now optionally support
   :ref:`virtual host <envoy_api_field_route.VirtualHost.per_filter_config>`,
   :ref:`route <envoy_api_field_route.Route.per_filter_config>`, and
@@ -381,12 +383,10 @@ Version history
   and if to use it. For example, if the :ref:`x-b3-sampled
   <config_http_conn_man_headers_x-b3-sampled>` header is supplied with the client request, its value
   will override any sampling decision made by the Envoy proxy.
-* websocket: support configuring idle_timeout and max_connect_attempts.
 * upstream: added support for host override for a request in
   :ref:`Original destination host request header
   <arch_overview_load_balancing_types_original_destination_request_header>`.
-* header to metadata: added :ref:`HTTP Header to Metadata
-  filter<config_http_filters_header_to_metadata>`.
+* websocket: support configuring idle_timeout and max_connect_attempts.
 
 1.6.0 (March 20, 2018)
 ======================
@@ -412,10 +412,10 @@ Version history
 * config: added restrictions for the backing :ref:`config sources <envoy_api_msg_core.ConfigSource>`
   of xDS resources. For filesystem based xDS the file must exist at configuration time. For cluster
   based xDS the backing cluster must be statically defined and be of non-EDS type.
-* grpc: the Google gRPC C++ library client is now supported as specified in the :ref:`gRPC services
-  overview <arch_overview_grpc_services>` and :ref:`GrpcService <envoy_api_msg_core.GrpcService>`.
 * grpc-json: added support for :ref:`inline descriptors
   <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.proto_descriptor_bin>`.
+* grpc: the Google gRPC C++ library client is now supported as specified in the :ref:`gRPC services
+  overview <arch_overview_grpc_services>` and :ref:`GrpcService <envoy_api_msg_core.GrpcService>`.
 * health check: added :ref:`gRPC health check <envoy_api_field_core.HealthCheck.grpc_health_check>`
   based on `grpc.health.v1.Health
   <https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto>`_ service.
@@ -426,6 +426,8 @@ Version history
   <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.cluster_min_healthy_percentages>`.
 * health check: added setting for :ref:`no-traffic
   interval<envoy_api_field_core.HealthCheck.no_traffic_interval>`.
+* hot restart: added SIGTERM propagation to children to :ref:`hot-restarter.py
+  <operations_hot_restarter>`, which enables using it as a parent of containers.
 * http: added idle timeout for :ref:`upstream http connections
   <envoy_api_field_core.HttpProtocolOptions.idle_timeout>`.
 * http: added support for :ref:`proxying 100-Continue responses
@@ -436,8 +438,6 @@ Version history
   :ref:`config_http_conn_man_headers_x-forwarded-for` request header.
 * http: added support for :ref:`incoming HTTP/1.0
   <envoy_api_field_core.Http1ProtocolOptions.accept_http_10>`.
-* hot restart: added SIGTERM propagation to children to :ref:`hot-restarter.py
-  <operations_hot_restarter>`, which enables using it as a parent of containers.
 * ip tagging: added :ref:`HTTP IP Tagging filter<config_http_filters_ip_tagging>`.
 * listeners: added support for :ref:`listening for both IPv4 and IPv6
   <envoy_api_field_core.SocketAddress.ipv4_compat>` when binding to ::.
@@ -529,13 +529,13 @@ Version history
   option.
 * http: added :ref:`per-listener stats <config_http_conn_man_stats_per_listener>`.
 * http: end-to-end HTTP flow control is now complete across both connections, streams, and filters.
+* listeners: added :ref:`drain_type <envoy_api_field_Listener.drain_type>` option.
 * load balancer: added :ref:`subset load balancer <arch_overview_load_balancer_subsets>`.
 * load balancer: added ring size and hash :ref:`configuration options
   <envoy_api_msg_Cluster.RingHashLbConfig>`. This used to be configurable via runtime. The runtime
   configuration was deleted without deprecation as we are fairly certain no one is using it.
 * log: added the ability to optionally log to a file instead of stderr via the
   :option:`--log-path` option.
-* listeners: added :ref:`drain_type <envoy_api_field_Listener.drain_type>` option.
 * lua: added experimental :ref:`Lua filter <config_http_filters_lua>`.
 * mongo filter: added :ref:`fault injection <config_network_filters_mongo_proxy_fault_injection>`.
 * mongo filter: added :ref:`"drain close" <arch_overview_draining>` support.
