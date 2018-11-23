@@ -76,8 +76,8 @@ public:
 
 constexpr size_t SrcIpTransparentMapperTest::DefaultMaxNumPools;
 
-//! A simple test to show that we can assign pools using the provided builder and that it
-//! actually works.
+// A simple test to show that we can assign pools using the provided builder and that it
+// actually works.
 TEST_F(SrcIpTransparentMapperTest, AssignPoolBasic) {
   auto mapper = makeDefaultMapper();
 
@@ -88,8 +88,8 @@ TEST_F(SrcIpTransparentMapperTest, AssignPoolBasic) {
   EXPECT_EQ(pool->protocol(), Http::Protocol::Http2);
 }
 
-//! A simple test to show that we can assign multiple pools using the provided builder and that it
-//! actually works.
+// A simple test to show that we can assign multiple pools using the provided builder and that it
+// actually works.
 TEST_F(SrcIpTransparentMapperTest, AssignPoolMulipleBasic) {
   auto mapper = makeDefaultMapper();
 
@@ -104,16 +104,16 @@ TEST_F(SrcIpTransparentMapperTest, AssignPoolMulipleBasic) {
   EXPECT_EQ(pool2->protocol(), Http::Protocol::Http11);
 }
 
-//! A simple test to show that if drainPools is called and we have no pools, nothing unsavoury
-//! occurs.
+// A simple test to show that if drainPools is called and we have no pools, nothing unsavoury
+// occurs.
 TEST_F(SrcIpTransparentMapperTest, drainPoolsNoPools) {
   auto mapper = makeDefaultMapper();
 
   mapper->drainPools();
 }
 
-//! A simple test to show that if drainPools is called and we have single pool, it is properly
-//! drained.
+// A simple test to show that if drainPools is called and we have single pool, it is properly
+// drained.
 TEST_F(SrcIpTransparentMapperTest, drainPoolsSinglePool) {
   auto mapper = makeDefaultMapper();
 
@@ -123,7 +123,7 @@ TEST_F(SrcIpTransparentMapperTest, drainPoolsSinglePool) {
   mapper->drainPools();
 }
 
-//! Multiple pools? Multiple drains.
+// Multiple pools? Multiple drains.
 TEST_F(SrcIpTransparentMapperTest, drainPoolsMultiplePools) {
   auto mapper = makeDefaultMapper();
 
@@ -137,14 +137,14 @@ TEST_F(SrcIpTransparentMapperTest, drainPoolsMultiplePools) {
   mapper->drainPools();
 }
 
-//! If we haven't assigned anything, all pools are idle.
+// If we haven't assigned anything, all pools are idle.
 TEST_F(SrcIpTransparentMapperTest, noPoolsImpliesIdlePools) {
   auto mapper = makeDefaultMapper();
 
   EXPECT_TRUE(mapper->allPoolsIdle());
 }
 
-//! If we hit the limit on the number of pools, nullptr is returned.
+// If we hit the limit on the number of pools, nullptr is returned.
 TEST_F(SrcIpTransparentMapperTest, poolLimitHit) {
   auto mapper = makeMapperCustomSize(1);
 
@@ -154,7 +154,7 @@ TEST_F(SrcIpTransparentMapperTest, poolLimitHit) {
   EXPECT_EQ(mapper->assignPool(lb_context_mock_), nullptr);
 }
 
-//! Test that if we return different IPs from the LB Context, we return different pools
+// Test that if we return different IPs from the LB Context, we return different pools
 TEST_F(SrcIpTransparentMapperTest, differentIpsDifferentPools) {
   auto mapper = makeDefaultMapper();
 
@@ -166,7 +166,7 @@ TEST_F(SrcIpTransparentMapperTest, differentIpsDifferentPools) {
   EXPECT_NE(pool1, pool2);
 }
 
-//! Test that if we use the same IP, we get the same pool
+// Test that if we use the same IP, we get the same pool
 TEST_F(SrcIpTransparentMapperTest, sameIpsSamePools) {
   auto mapper = makeDefaultMapper();
 
@@ -179,8 +179,8 @@ TEST_F(SrcIpTransparentMapperTest, sameIpsSamePools) {
   EXPECT_EQ(pool1, pool2);
 }
 
-//! Test that if hit the limit on the number of pools, but we don't need to allocate a new one, we
-//! get the previously assigned pool back.
+// Test that if hit the limit on the number of pools, but we don't need to allocate a new one, we
+// get the previously assigned pool back.
 TEST_F(SrcIpTransparentMapperTest, sameIpsAtLimitGivesAssigned) {
   auto mapper = makeMapperCustomSize(1);
 
@@ -193,7 +193,7 @@ TEST_F(SrcIpTransparentMapperTest, sameIpsAtLimitGivesAssigned) {
   EXPECT_EQ(pool1, pool2);
 }
 
-//! Test that if we return different IPs from the LB Context, we return different pools
+// Test that if we return different IPs from the LB Context, we return different pools
 TEST_F(SrcIpTransparentMapperTest, differentIpsDifferentPoolsV6) {
   auto mapper = makeDefaultMapper();
 
@@ -205,7 +205,7 @@ TEST_F(SrcIpTransparentMapperTest, differentIpsDifferentPoolsV6) {
   EXPECT_NE(pool1, pool2);
 }
 
-//! Test that if we use the same IP, we get the same pool
+// Test that if we use the same IP, we get the same pool
 TEST_F(SrcIpTransparentMapperTest, sameIpsSamePoolsV6) {
   auto mapper = makeDefaultMapper();
 
@@ -218,7 +218,7 @@ TEST_F(SrcIpTransparentMapperTest, sameIpsSamePoolsV6) {
   EXPECT_EQ(pool1, pool2);
 }
 
-//! Test that we drain properly against both v4 and 6
+// Test that we drain properly against both v4 and 6
 TEST_F(SrcIpTransparentMapperTest, drainPoolsMixedV4AndV6) {
   auto mapper = makeDefaultMapper();
 
@@ -232,7 +232,7 @@ TEST_F(SrcIpTransparentMapperTest, drainPoolsMixedV4AndV6) {
   mapper->drainPools();
 }
 
-//! Test that if a pool indicates it is idle, it will later be reused
+// Test that if a pool indicates it is idle, it will later be reused
 TEST_F(SrcIpTransparentMapperTest, idlePoolIsReused) {
   auto mapper = makeDefaultMapper();
 
@@ -246,8 +246,8 @@ TEST_F(SrcIpTransparentMapperTest, idlePoolIsReused) {
   EXPECT_EQ(pool1, pool2);
 }
 
-//! Test that if a pool indicates it is idle, then it is assigned, it won't be reused for the same
-//! ipv4 address
+// Test that if a pool indicates it is idle, then it is assigned, it won't be reused for the same
+// ipv4 address
 TEST_F(SrcIpTransparentMapperTest, reassignedIdlePoolIsNotReused) {
   auto mapper = makeDefaultMapper();
 
@@ -265,8 +265,8 @@ TEST_F(SrcIpTransparentMapperTest, reassignedIdlePoolIsNotReused) {
   EXPECT_NE(pool3, pool2);
 }
 
-//! Test that if a pool indicates it is idle, then it is assigned, it won't be reused for the same
-//! ipv6 address
+// Test that if a pool indicates it is idle, then it is assigned, it won't be reused for the same
+// ipv6 address
 TEST_F(SrcIpTransparentMapperTest, reassignedIdlePoolIsNotReusedV6) {
   auto mapper = makeDefaultMapper();
 
@@ -284,8 +284,8 @@ TEST_F(SrcIpTransparentMapperTest, reassignedIdlePoolIsNotReusedV6) {
   EXPECT_NE(pool3, pool2);
 }
 
-//! Show that if multiple pools are idle, they are both reassigned. Also make sure they don't get
-//! destroyed by accessing one of their members.
+// Show that if multiple pools are idle, they are both reassigned. Also make sure they don't get
+// destroyed by accessing one of their members.
 TEST_F(SrcIpTransparentMapperTest, testMultipleIdle) {
   auto mapper = makeDefaultMapper();
 
@@ -313,7 +313,7 @@ TEST_F(SrcIpTransparentMapperTest, testMultipleIdle) {
 }
 
 //! Show that we do not prevent assignment if # idle + # active is greater than the maximum
-//! destroyed by accessing one of their members.
+// destroyed by accessing one of their members.
 TEST_F(SrcIpTransparentMapperTest, testIdleAndActiveAboveMax) {
   auto mapper = makeMapperCustomSize(2);
 
@@ -331,7 +331,7 @@ TEST_F(SrcIpTransparentMapperTest, testIdleAndActiveAboveMax) {
   EXPECT_EQ(pool1, second_pool1);
 }
 
-//! Show that we only drain active pools.
+// Show that we only drain active pools.
 TEST_F(SrcIpTransparentMapperTest, idlePoolsNotDrained) {
   auto mapper = makeDefaultMapper();
 
@@ -348,7 +348,7 @@ TEST_F(SrcIpTransparentMapperTest, idlePoolsNotDrained) {
   mapper->drainPools();
 }
 
-//! Test that if a pool goes idle, a callback is invoked.
+// Test that if a pool goes idle, a callback is invoked.
 TEST_F(SrcIpTransparentMapperTest, idleCallbackInvoked) {
   auto mapper = makeDefaultMapper();
   ReadyWatcher callback;
@@ -397,6 +397,48 @@ TEST_F(SrcIpTransparentMapperTest, noIpAddressThrows) {
 
   connection_mock_.remote_address_ = Network::Utility::resolveUrl("unix://foo/bar");
   EXPECT_THROW(mapper->assignPool(lb_context_mock_), BadDownstreamConnectionException);
+}
+
+// Show that we don't accidentally "idle" pools whose earlier assignments are mapped to new pools.
+TEST_F(SrcIpTransparentMapperTest, noLingeringStateAfterIdle) {
+  auto mapper = makeDefaultMapper();
+
+  setRemoteAddressToUse("1.2.3.4:567");
+  mapper->assignPool(lb_context_mock_);
+  drainPool(0);
+
+  setRemoteAddressToUse("[1234::6789]:123");
+  mapper->assignPool(lb_context_mock_);
+
+  setRemoteAddressToUse("1.2.3.4:567");
+  auto new_pool_old_addr = mapper->assignPool(lb_context_mock_);
+  drainPool(0);
+
+  setRemoteAddressToUse("1.2.3.4:567");
+  auto should_be_same = mapper->assignPool(lb_context_mock_);
+
+  EXPECT_EQ(new_pool_old_addr, should_be_same);
+}
+
+// Show that we don't accidentally "idle" pools whose earlier assignments are mapped to new pools.
+TEST_F(SrcIpTransparentMapperTest, noLingeringStateAfterIdlev6) {
+  auto mapper = makeDefaultMapper();
+
+  setRemoteAddressToUse("[1234::6789]:123");
+  mapper->assignPool(lb_context_mock_);
+  drainPool(0);
+
+  setRemoteAddressToUse("1.2.3.4:567");
+  mapper->assignPool(lb_context_mock_);
+
+  setRemoteAddressToUse("[1234::6789]:123");
+  auto new_pool_old_addr = mapper->assignPool(lb_context_mock_);
+  drainPool(0);
+
+  setRemoteAddressToUse("[1234::6789]:123");
+  auto should_be_same = mapper->assignPool(lb_context_mock_);
+
+  EXPECT_EQ(new_pool_old_addr, should_be_same);
 }
 } // namespace Http
 } // namespace Envoy

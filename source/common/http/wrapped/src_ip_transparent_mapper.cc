@@ -127,11 +127,13 @@ void SrcIpTransparentMapper::poolDrained(ConnectionPool::Instance& instance) {
   // first clean up any assignments.
   if (active_iter->second.v4_address_.has_value()) {
     v4_assigned_.erase(active_iter->second.v4_address_.value());
+    active_iter->second.v4_address_.reset();
   }
 
   // while these should be mutually exclusive, can't hurt to be safe.
   if (active_iter->second.v6_address_.has_value()) {
     v6_assigned_.erase(active_iter->second.v6_address_.value());
+    active_iter->second.v6_address_.reset();
   }
 
   idle_pools_.emplace(std::move(active_iter->second));
