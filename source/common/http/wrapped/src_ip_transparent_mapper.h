@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/common/exception.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/connection_mapper.h"
 
@@ -59,6 +60,12 @@ private:
 
   void poolDrained(ConnectionPool::Instance& drained_pool);
 
+  //! Get the downstream source IP from the provided context, or throws an exception if it can't.
+  //! @throws BadDownstreamConnectionException if the context didn't have a valid downstream IP.
+  //! @return a reference to the context's source IP.
+  const Network::Address::Ip&
+  getDownstreamSrcIp(const Upstream::LoadBalancerContext& context) const;
+
   //! Allows us to track a given connection pool -- i.e. is it pending or active. Is it assigned
   //! a v4 or v6 address?
   struct PoolTracker {
@@ -73,9 +80,14 @@ private:
   std::unordered_map<ConnectionPool::Instance*, PoolTracker> active_pools_;
   std::stack<PoolTracker, std::vector<PoolTracker>> idle_pools_;
   std::unordered_map<uint32_t, ConnectionPool::Instance*> v4_assigned_;
-  // TODO(klarose: research a better hash. V6 addresses aren't always that random in all bits)
+  // TODO(klarose): research a better hash. V6 addresses aren't always that random in all bits
   std::unordered_map<absl::uint128, ConnectionPool::Instance*, absl::Hash<absl::uint128>>
       v6_assigned_;
+};
+
+class BadDownstreamConnectionException : public EnvoyException {
+public:
+  BadDownstreamConnectionException(const std::string& message) : EnvoyException(message) {}
 };
 
 } // namespace Http

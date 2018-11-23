@@ -384,5 +384,19 @@ TEST_F(SrcIpTransparentMapperTest, idlePoolsAndNoActiveMeansPoolsIdle) {
   drainPool(1);
   EXPECT_TRUE(mapper->allPoolsIdle());
 }
+
+TEST_F(SrcIpTransparentMapperTest, noDownstreamAddressThrows) {
+  auto mapper = makeDefaultMapper();
+
+  EXPECT_CALL(lb_context_mock_, downstreamConnection()).WillOnce(Return(nullptr));
+  EXPECT_THROW(mapper->assignPool(lb_context_mock_), BadDownstreamConnectionException);
+}
+
+TEST_F(SrcIpTransparentMapperTest, noIpAddressThrows) {
+  auto mapper = makeDefaultMapper();
+
+  connection_mock_.remote_address_ = Network::Utility::resolveUrl("unix://foo/bar");
+  EXPECT_THROW(mapper->assignPool(lb_context_mock_), BadDownstreamConnectionException);
+}
 } // namespace Http
 } // namespace Envoy

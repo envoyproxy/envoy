@@ -16,16 +16,8 @@ SrcIpTransparentMapper::~SrcIpTransparentMapper() = default;
 
 ConnectionPool::Instance*
 SrcIpTransparentMapper::assignPool(const Upstream::LoadBalancerContext& context) {
-  // TODO(klarose: handle downstreaConnection being empty. Maybe reserve a connpool for this case
-  // and
-  //                return it?)
-  const auto& address = context.downstreamConnection()->remoteAddress();
-  ASSERT(address.get());
-
-  // TODO(klarose: handle address not being IP. Same as above.
-  const auto ip = address->ip();
-  ASSERT(ip);
-  ConnectionPool::Instance* pool = findActivePool(*ip);
+  const Ip& ip = getDownstreamSrcIp(context);
+  ConnectionPool::Instance* pool = findActivePool(ip);
   if (pool) {
     return pool;
   }
@@ -35,7 +27,7 @@ SrcIpTransparentMapper::assignPool(const Upstream::LoadBalancerContext& context)
     return nullptr;
   }
 
-  return allocateAndAssignPool(*ip);
+  return allocateAndAssignPool(ip);
 }
 
 void SrcIpTransparentMapper::addIdleCallback(IdleCb cb) { idle_callbacks_.push_back(cb); }
@@ -148,5 +140,25 @@ void SrcIpTransparentMapper::poolDrained(ConnectionPool::Instance& instance) {
   std::for_each(idle_callbacks_.begin(), idle_callbacks_.end(), [](auto& callback) { callback(); });
 }
 
+const Ip&
+SrcIpTransparentMapper::getDownstreamSrcIp(const Upstream::LoadBalancerContext& context) const {
+  const Network::Connection* downstream = context.downstreamConnection();
+  // TODO (klarose): Is this really a good idea? This will just blow up the process... How much
+  //       control do we have over the downstream? What else is reasonable error handling here...
+  //       maybe we should just return an error alognside the instance pointer. Ugly API, but better
+  //       than exploding? We can kill the downstream connection and log+count if it happens.
+  if (!downstream) {
+    throw BadDownstreamConnectionException("No downstream connection on transparent IP pool"
+                                           " assignment");
+  }
+  const auto& address = downstream->remoteAddress();
+
+  const auto ip = address->ip();
+  if (!ip) {
+    throw BadDownstreamConnectionException("Downstream connection is not IP!");
+  }
+
+  return *ip;
+}
 } // namespace Http
 } // namespace Envoy
