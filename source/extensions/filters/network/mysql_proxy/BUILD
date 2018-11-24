@@ -40,6 +40,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//source/common/config:filter_json_lib",
         "//source/common/network:filter_lib",
+        "//source/extensions/filters/network:well_known_names",
     ],
 )
 

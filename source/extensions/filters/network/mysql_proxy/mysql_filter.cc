@@ -1,4 +1,5 @@
 #include "extensions/filters/network/mysql_proxy/mysql_filter.h"
+#include "extensions/filters/network/well_known_names.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -11,6 +12,14 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
+class DynamicMetadataKeys {
+  public:
+    const std::string MessagesField{"messages"};
+    const std::string OperationField{"operation"};
+    const std::string ResourceField{"resource"};
+};
+typedef ConstSingleton<DynamicMetadataKeys> DynamicMetadataKeysSingleton;
+  
 MySQLFilterConfig::MySQLFilterConfig(const std::string& stat_prefix, Stats::Scope& scope)
     : scope_(scope), stat_prefix_(stat_prefix), stats_(generateStats(stat_prefix, scope)) {}
 
@@ -148,14 +157,26 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, bool end_stre
 
     // check whether the parsing was successful
     if (result.isValid()) {
+      auto& dynamic_metadata = const_cast<envoy::api::v2::core::Metadata&>(read_callbacks_->connection().streamInfo().dynamicMetadata());
+
+      ProtobufWkt::Struct metadata((*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy]);
+      auto& fields = *metadata.mutable_fields();
+      auto& list = *fields[DynamicMetadataKeysSingleton::get().MessagesField].mutable_list_value();
+
       for (auto i = 0u; i < result.size(); ++i) {
-        hsql::TableAccessMap t;
-        result.getStatement(i)->tablesAccessed(t);
-        for (auto it = t.begin(); it != t.end(); ++it) {
-          // FIXME
-          std::cout << it->first << ":" << static_cast<int>(it->second) << "\n";
+        hsql::TableAccessMap table_access_map;
+        result.getStatement(i)->tablesAccessed(table_access_map);
+        for (auto it = table_access_map.begin(); it != table_access_map.end(); ++it) {
+          auto& message = *list.add_values()->mutable_struct_value()->mutable_fields();
+          message[DynamicMetadataKeysSingleton::get().ResourceField].set_string_value(it->first);
+          auto& operations = *message[DynamicMetadataKeysSingleton::get().OperationField].mutable_list_value();
+          for (auto ot = it->second.begin(); ot != it->second.end(); ++ot) {
+            operations.add_values()->set_string_value(*ot);
+          }
         }
       }
+
+      read_callbacks_->connection().streamInfo().setDynamicMetadata(NetworkFilterNames::get().MySQLProxy, metadata);
     }
     break;
   }

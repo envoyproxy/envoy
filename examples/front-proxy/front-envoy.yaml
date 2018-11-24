@@ -11,6 +11,11 @@ static_resources:
           stat_prefix: mysql
       - name: envoy.tcp_proxy
         config:
+          access_log:
+          - name: envoy.file_access_log
+            config:
+              path: /tmp/mysql.log
+              format: "%DYNAMIC_METADATA(envoy.filters.network.mysql_proxy)%"
           stat_prefix: tcp
           cluster: mysql
   clusters:
