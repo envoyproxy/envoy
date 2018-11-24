@@ -134,6 +134,24 @@ envoy_cc_library(
 )
 
 envoy_cc_test_library(
+    name = "global_lib",
+    srcs = ["global.cc"],
+    hdrs = ["global.h"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:thread_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "global_test",
+    srcs = ["global_test.cc"],
+    deps = [
+        ":global_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "test_time_lib",
     srcs = ["test_time.cc"],
     hdrs = ["test_time.h"],

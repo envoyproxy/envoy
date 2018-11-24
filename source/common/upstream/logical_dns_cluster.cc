@@ -141,12 +141,12 @@ void LogicalDnsCluster::startResolve() {
 }
 
 Upstream::Host::CreateConnectionData LogicalDnsCluster::LogicalHost::createConnection(
-    Event::Dispatcher& dispatcher,
-    const Network::ConnectionSocket::OptionsSharedPtr& options) const {
+    Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
   PerThreadCurrentHostData& data = parent_.tls_->getTyped<PerThreadCurrentHostData>();
   ASSERT(data.current_resolved_address_);
   return {HostImpl::createConnection(dispatcher, *parent_.info_, data.current_resolved_address_,
-                                     options),
+                                     options, transport_socket_options),
           HostDescriptionConstSharedPtr{
               new RealHostDescription(data.current_resolved_address_, parent_.localityLbEndpoint(),
                                       parent_.lbEndpoint(), shared_from_this())}};
