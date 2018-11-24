@@ -26,6 +26,7 @@ int Command::Decode(Buffer::Instance& buffer) {
   if (cmd == MySQLCodec::Cmd::COM_NULL) {
     return MYSQL_FAILURE;
   }
+
   switch (cmd) {
   case MySQLCodec::Cmd::COM_INIT_DB:
   case MySQLCodec::Cmd::COM_CREATE_DB:
@@ -35,10 +36,14 @@ int Command::Decode(Buffer::Instance& buffer) {
     SetDb(db);
     break;
   }
+
   case MySQLCodec::Cmd::COM_QUERY:
     run_query_parser_ = true;
     // query string starts after mysql_hdr + one byte for comm type
     BufStringDrainBySize(buffer, data_, buffer.length() - (sizeof(uint8_t) + MYSQL_HDR_SIZE));
+    SetDb("");
+    break;
+
   default:
     SetDb("");
     break;

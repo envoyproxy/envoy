@@ -16,8 +16,7 @@ namespace NetworkFilters {
 namespace MySQLProxy {
 
 /**
- * Config registration for the mysql filter. @see
- * NamedNetworkFilterConfigFactory.
+ * Config registration for the MySQL proxy filter. @see NamedNetworkFilterConfigFactory.
  */
 Network::FilterFactoryCb
 NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoTyped(
@@ -36,7 +35,7 @@ NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoType
 }
 
 /**
- * Static registration for the mysql filter. @see RegisterFactory.
+ * Static registration for the MySQL proxy filter. @see RegisterFactory.
  */
 static Registry::RegisterFactory<MySQLConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>

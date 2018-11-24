@@ -152,6 +152,7 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, bool end_stre
         hsql::TableAccessMap t;
         result.getStatement(i)->tablesAccessed(t);
         for (auto it = t.begin(); it != t.end(); ++it) {
+          // FIXME
           std::cout << it->first << ":" << static_cast<int>(it->second) << "\n";
         }
       }

@@ -23,7 +23,7 @@ namespace NetworkFilters {
 namespace MySQLProxy {
 
 /**
- * All mysql proxy stats. @see stats_macros.h
+ * All MySQL proxy stats. @see stats_macros.h
  */
 // clang-format off
 #define ALL_MYSQL_PROXY_STATS(COUNTER)                                           \
@@ -43,7 +43,7 @@ struct MySQLProxyStats {
 };
 
 /**
- * Configuration for the mysql proxy filter.
+ * Configuration for the MySQL proxy filter.
  */
 class MySQLFilterConfig {
 public:
@@ -65,7 +65,7 @@ private:
 using MySQLFilterConfigSharedPtr = std::shared_ptr<MySQLFilterConfig>;
 
 /**
- * Implementation of mysql network filter.
+ * Implementation of MySQL proxy filter.
  */
 class MySQLFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
  public:
