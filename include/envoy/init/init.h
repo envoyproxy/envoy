@@ -35,7 +35,20 @@ public:
    */
   virtual void registerTarget(Target& target) PURE;
 
-  enum class State { NotInitialized, Initializing, Initialized };
+  enum class State {
+    /**
+     * Targets have not been initialized.
+     */
+    NotInitialized,
+    /**
+     * Targets are currently being initialized.
+     */
+    Initializing,
+    /**
+     * All targets have been initialized.
+     */
+    Initialized
+  };
 
   /**
    * Returns the current state of the init manager.

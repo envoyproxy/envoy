@@ -19,7 +19,7 @@ message ServerInfo {
     DRAINING = 1;
     // Server has not yet completed cluster manager initialization.
     PRE_INITIALIZING = 2;
-    // Server is running the cluster manager initialization callbacks.
+    // Server is running the cluster manager initialization callbacks (e.g., RDS).
     INITIALIZING = 3;
   }
 
