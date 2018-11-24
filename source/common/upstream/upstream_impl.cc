@@ -146,22 +146,24 @@ parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
 
 } // namespace
 
-Host::CreateConnectionData
-HostImpl::createConnection(Event::Dispatcher& dispatcher,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options) const {
-  return {createConnection(dispatcher, *cluster_, address_, options), shared_from_this()};
+Host::CreateConnectionData HostImpl::createConnection(
+    Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
+  return {createConnection(dispatcher, *cluster_, address_, options, transport_socket_options),
+          shared_from_this()};
 }
 
 Host::CreateConnectionData
 HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), nullptr),
+  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), nullptr, nullptr),
           shared_from_this()};
 }
 
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                            Network::Address::InstanceConstSharedPtr address,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options) {
+                           const Network::ConnectionSocket::OptionsSharedPtr& options,
+                           Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
   if (cluster.clusterSocketOptions() != nullptr) {
     if (options) {
@@ -177,7 +179,8 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   }
 
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
+      address, cluster.sourceAddress(),
+      cluster.transportSocketFactory().createTransportSocket(transport_socket_options),
       connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;

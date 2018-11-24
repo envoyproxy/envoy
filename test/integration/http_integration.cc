@@ -1708,6 +1708,160 @@ void HttpIntegrationTest::testUpstreamProtocolError() {
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
 }
 
+void HttpIntegrationTest::testHeadersOnlyFilterEncoding() {
+  config_helper_.addFilter(R"EOF(
+name: encode-headers-only
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         128);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+  response->waitForEndStream();
+  EXPECT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  }
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ(0, response->body().size());
+}
+
+void HttpIntegrationTest::testHeadersOnlyFilterDecoding() {
+  config_helper_.addFilter(R"EOF(
+name: decode-headers-only
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         128);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+  upstream_request_->encodeData(128, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ(128, response->body().size());
+}
+
+void HttpIntegrationTest::testHeadersOnlyFilterEncodingIntermediateFilters() {
+  config_helper_.addFilter(R"EOF(
+name: passthrough-filter
+)EOF");
+  config_helper_.addFilter(R"EOF(
+name: encode-headers-only
+)EOF");
+  config_helper_.addFilter(R"EOF(
+name: passthrough-filter
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         128);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+  response->waitForEndStream();
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  }
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ(0, response->body().size());
+}
+
+void HttpIntegrationTest::testHeadersOnlyFilterDecodingIntermediateFilters() {
+  config_helper_.addFilter(R"EOF(
+name: passthrough-filter
+)EOF");
+  config_helper_.addFilter(R"EOF(
+name: decode-headers-only
+)EOF");
+  config_helper_.addFilter(R"EOF(
+name: passthrough-filter
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         128);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+  upstream_request_->encodeData(128, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ(128, response->body().size());
+}
+
+// Verifies behavior when request data is encoded after the request has been
+// turned into a headers-only request and the response has already begun.
+void HttpIntegrationTest::testHeadersOnlyFilterInterleaved() {
+  config_helper_.addFilter(R"EOF(
+name: decode-headers-only
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // First send the request headers. The filter should turn this into a header-only
+  // request.
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Wait for the upstream request and begin sending a response with end_stream = false.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+
+  // Simulate additional data after the request has been turned into a headers only request.
+  Buffer::OwnedImpl data(std::string(128, 'a'));
+  request_encoder_->encodeData(data, false);
+
+  // End the response.
+  upstream_request_->encodeData(128, true);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ(0, upstream_request_->body().length());
+}
+
 void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
