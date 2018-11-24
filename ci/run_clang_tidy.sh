@@ -16,14 +16,20 @@ echo "build ${BAZEL_BUILD_OPTIONS}" >> .bazelrc
 mv ./compile_commands.json "${ENVOY_SRCDIR}/compile_commands.json"
 cd "${ENVOY_SRCDIR}"
 
+# Do not run incremental clang-tidy on check_format testdata files.
+function exclude_testdata() {
+  grep -v tools/testdata/check_format/
+}
+
 if [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
   echo "Running full clang-tidy..."
   run-clang-tidy-7
 elif [[ -z "${CIRCLE_PR_NUMBER}" && "$CIRCLE_BRANCH" == "master" ]]; then
   echo "On master branch, running clang-tidy-diff against previous commit..."
-  git diff HEAD^ | clang-tidy-diff-7.py -p 1
+  git diff HEAD^ | exclude_testdata | clang-tidy-diff-7.py -p 1
 else
   echo "Running clang-tidy-diff against master branch..."
   git fetch https://github.com/envoyproxy/envoy.git master
-  git diff $(git merge-base HEAD FETCH_HEAD)..HEAD | clang-tidy-diff-7.py -p 1
+  git diff $(git merge-base HEAD FETCH_HEAD)..HEAD | exclude_testdata | \
+    clang-tidy-diff-7.py -p 1
 fi

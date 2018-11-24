@@ -1,5 +1,6 @@
 #include <chrono>
 
+#include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
 #include "common/network/address_impl.h"
@@ -22,7 +23,8 @@ public:
   ConfigValidation() {
     Event::Libevent::Global::initialize();
 
-    validation_ = std::make_unique<Api::ValidationImpl>(std::chrono::milliseconds(1000));
+    validation_ = std::make_unique<Api::ValidationImpl>(std::chrono::milliseconds(1000),
+                                                        Thread::threadFactoryForTest());
     dispatcher_ = validation_->allocateDispatcher(test_time_.timeSystem());
   }
 

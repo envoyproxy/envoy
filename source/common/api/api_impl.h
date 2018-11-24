@@ -6,6 +6,7 @@
 #include "envoy/api/api.h"
 #include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Api {
@@ -15,7 +16,7 @@ namespace Api {
  */
 class Impl : public Api::Api {
 public:
-  Impl(std::chrono::milliseconds file_flush_interval_msec = std::chrono::milliseconds(1000));
+  Impl(std::chrono::milliseconds file_flush_interval_msec, Thread::ThreadFactory& thread_factory);
 
   // Api::Api
   Event::DispatcherPtr allocateDispatcher(Event::TimeSystem& time_system) override;
@@ -28,6 +29,7 @@ public:
 
 private:
   std::chrono::milliseconds file_flush_interval_msec_;
+  Thread::ThreadFactory& thread_factory_;
 };
 
 } // namespace Api

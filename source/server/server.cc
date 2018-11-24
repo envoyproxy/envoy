@@ -50,10 +50,10 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
                            Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
-                           ThreadLocal::Instance& tls)
+                           ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory)
     : shutdown_(false), options_(options), time_system_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
-      thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec())),
+      thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec(), thread_factory)),
       secret_manager_(std::make_unique<Secret::SecretManagerImpl>()),
       dispatcher_(api_->allocateDispatcher(time_system)),
       singleton_manager_(new Singleton::ManagerImpl()),

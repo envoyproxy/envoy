@@ -886,5 +886,62 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   }
 }
 
+class TruncatingAllocTest : public HeapStatsThreadLocalStoreTest {
+  class TruncatingHeapAlloc : public HeapStatDataAllocator {
+  public:
+    bool requiresBoundedStatNameSize() const override { return true; }
+  };
+
+protected:
+  TruncatingAllocTest() : long_name_(options_.maxNameLength() + 1, 'A') {}
+
+  void SetUp() override {
+    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, truncating_heap_alloc_);
+    // Do not call superclass SetUp.
+  }
+
+  TruncatingHeapAlloc truncating_heap_alloc_;
+  std::string long_name_;
+};
+
+TEST_F(TruncatingAllocTest, CounterNotTruncated) {
+  EXPECT_NO_LOGS({
+    Counter& counter = store_->counter("simple");
+    EXPECT_EQ(&counter, &store_->counter("simple"));
+  });
+}
+
+TEST_F(TruncatingAllocTest, GaugeNotTruncated) {
+  EXPECT_NO_LOGS({
+    Gauge& gauge = store_->gauge("simple");
+    EXPECT_EQ(&gauge, &store_->gauge("simple"));
+  });
+}
+
+TEST_F(TruncatingAllocTest, CounterTruncated) {
+  Counter* counter = nullptr;
+  EXPECT_LOG_CONTAINS("warning", "is too long with", {
+    Counter& c = store_->counter(long_name_);
+    counter = &c;
+  });
+  EXPECT_NO_LOGS(EXPECT_EQ(counter, &store_->counter(long_name_)));
+}
+
+TEST_F(TruncatingAllocTest, GaugeTruncated) {
+  Gauge* gauge = nullptr;
+  EXPECT_LOG_CONTAINS("warning", "is too long with", {
+    Gauge& g = store_->gauge(long_name_);
+    gauge = &g;
+  });
+  EXPECT_NO_LOGS(EXPECT_EQ(gauge, &store_->gauge(long_name_)));
+}
+
+TEST_F(TruncatingAllocTest, HistogramWithLongNameNotTruncated) {
+  EXPECT_NO_LOGS({
+    Histogram& histogram = store_->histogram(long_name_);
+    EXPECT_EQ(&histogram, &store_->histogram(long_name_));
+  });
+}
+
 } // namespace Stats
 } // namespace Envoy
