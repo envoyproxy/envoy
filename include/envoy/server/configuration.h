@@ -61,6 +61,11 @@ public:
   virtual Tracing::HttpTracer& httpTracer() PURE;
 
   /**
+   * @return RateLimit::RateLimitServiceConfigPtr for use by extensions.
+   */
+  virtual RateLimit::RateLimitServiceConfigPtr rateLimitServiceConfig() const PURE;
+
+  /**
    * @return std::list<Stats::SinkPtr>& the list of stats sinks initialized from the configuration.
    */
   virtual std::list<Stats::SinkPtr>& statsSinks() PURE;

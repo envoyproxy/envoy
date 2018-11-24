@@ -51,7 +51,7 @@ public:
                             const std::string& domain,
                             const std::vector<Envoy::RateLimit::Descriptor>& descriptors);
 
-  // RateLimit::Client
+  // Filters::Common::RateLimit::Client
   void cancel() override;
   void limit(RequestCallbacks& callbacks, const std::string& domain,
              const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
@@ -77,9 +77,8 @@ public:
   GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitServiceConfig& config,
                   Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope);
 
-  // RateLimit::ClientFactory
-  ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout,
-                   Server::Configuration::FactoryContext& context) override;
+  // Filters::Common::RateLimit::ClientFactory
+  ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout) override;
 
 private:
   Grpc::AsyncClientFactoryPtr async_client_factory_;
@@ -87,7 +86,7 @@ private:
 
 class NullClientImpl : public Client {
 public:
-  // RateLimit::Client
+  // Filters::Common::RateLimit::Client
   void cancel() override {}
   void limit(RequestCallbacks& callbacks, const std::string&,
              const std::vector<Envoy::RateLimit::Descriptor>&, Tracing::Span&) override {
@@ -97,9 +96,8 @@ public:
 
 class NullFactoryImpl : public ClientFactory {
 public:
-  // RateLimit::ClientFactory
-  ClientPtr create(const absl::optional<std::chrono::milliseconds>&,
-                   Server::Configuration::FactoryContext&) override {
+  // Filters::Common::RateLimit::ClientFactory
+  ClientPtr create(const absl::optional<std::chrono::milliseconds>&) override {
     return ClientPtr{new NullClientImpl()};
   }
 };

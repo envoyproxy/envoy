@@ -30,7 +30,7 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
           &context](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addDecoderFilter(std::make_shared<Filter>(
         config, Filters::Common::RateLimit::ClientFactory::rateLimitClientFactory(context)->create(
-                    std::chrono::milliseconds(timeout_ms), context)));
+                    std::chrono::milliseconds(timeout_ms))));
   };
 }
 

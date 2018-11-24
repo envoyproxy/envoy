@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_mock",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -19,5 +20,15 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_mock(
+    name = "ratelimit_mocks",
+    srcs = ["mocks.cc"],
+    hdrs = ["mocks.h"],
+    deps = [
+        "//include/envoy/ratelimit:ratelimit_interface",
+        "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
     ],
 )

@@ -14,8 +14,8 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/registry",
-        "//include/envoy/singleton:manager_interface",
         "//include/envoy/tracing:http_tracer_interface",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
         "@envoy_api//envoy/config/ratelimit/v2:rls_cc",
     ],
 )

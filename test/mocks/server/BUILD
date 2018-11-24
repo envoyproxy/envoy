@@ -13,6 +13,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/server:admin_interface",
         "//include/envoy/server:configuration_interface",

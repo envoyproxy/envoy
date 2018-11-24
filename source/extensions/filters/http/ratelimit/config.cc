@@ -29,7 +29,7 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
         callbacks.addStreamFilter(std::make_shared<Filter>(
             filter_config,
             Filters::Common::RateLimit::ClientFactory::rateLimitClientFactory(context)->create(
-                std::chrono::milliseconds(timeout_ms), context)));
+                std::chrono::milliseconds(timeout_ms))));
       };
 }
 

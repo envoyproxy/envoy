@@ -47,7 +47,7 @@ public:
 /**
  * A client used to query a centralized rate limit service.
  */
-class Client : public Singleton::Instance {
+class Client {
 public:
   virtual ~Client() {}
 
@@ -73,7 +73,7 @@ public:
                      Tracing::Span& parent_span) PURE;
 };
 
-typedef std::shared_ptr<Client> ClientPtr;
+typedef std::unique_ptr<Client> ClientPtr;
 
 /**
  * An interface for creating a rate limit client.
@@ -85,12 +85,11 @@ public:
   /**
    * Returns rate limit client from singleton manager.
    */
-  virtual ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout,
-                           Server::Configuration::FactoryContext& context) PURE;
+  virtual ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout) PURE;
 
   /**
-   * Returns ClientFactory constructed from the RateLimitServiceConfig available in singleton
-   * manager.
+   * Returns ClientFactory constructed from the RateLimitServiceConfig available in passed in
+   * FactoryContext.
    */
   static std::unique_ptr<ClientFactory>
   rateLimitClientFactory(Server::Configuration::FactoryContext& context);

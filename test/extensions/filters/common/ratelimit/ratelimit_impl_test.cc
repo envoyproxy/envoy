@@ -143,9 +143,8 @@ TEST(RateLimitGrpcFactoryTest, Create) {
       .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
-  NiceMock<Server::Configuration::MockFactoryContext> context;
   GrpcFactoryImpl factory(config, async_client_manager, scope);
-  factory.create(absl::optional<std::chrono::milliseconds>(), context);
+  factory.create(absl::optional<std::chrono::milliseconds>());
 }
 
 // TODO(htuch): cluster_name is deprecated, remove after 1.6.0.
@@ -161,15 +160,13 @@ TEST(RateLimitGrpcFactoryTest, CreateLegacy) {
       .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
-  NiceMock<Server::Configuration::MockFactoryContext> context;
   GrpcFactoryImpl factory(config, async_client_manager, scope);
-  factory.create(absl::optional<std::chrono::milliseconds>(),context);
+  factory.create(absl::optional<std::chrono::milliseconds>());
 }
 
 TEST(RateLimitNullFactoryTest, Basic) {
   NullFactoryImpl factory;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  ClientPtr client = factory.create(absl::optional<std::chrono::milliseconds>(), context);
+  ClientPtr client = factory.create(absl::optional<std::chrono::milliseconds>());
   MockRequestCallbacks request_callbacks;
   EXPECT_CALL(request_callbacks, complete_(LimitStatus::OK, _));
   client->limit(request_callbacks, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance());

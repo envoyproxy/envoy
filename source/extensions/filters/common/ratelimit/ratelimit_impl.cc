@@ -20,8 +20,15 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-// Singleton registration via macro defined in envoy/singleton/manager.h
-SINGLETON_MANAGER_REGISTRATION(ratelimit_client);
+ClientFactoryPtr
+ClientFactory ::rateLimitClientFactory(Server::Configuration::FactoryContext& context) {
+  if (context.rateLimitServiceConfig()) {
+    return std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::GrpcFactoryImpl>(
+        context.rateLimitServiceConfig()->config_,
+        context.clusterManager().grpcAsyncClientManager(), context.scope());
+  }
+  return std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::NullFactoryImpl>();
+}
 
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout)
@@ -94,22 +101,6 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   callbacks_ = nullptr;
 }
 
-ClientFactoryPtr
-ClientFactory ::rateLimitClientFactory(Server::Configuration::FactoryContext& context) {
-  // TODO(ramaraochavali): Figure out how to get the registered name here.
-  Envoy::RateLimit::RateLimitServiceConfigSharedPtr ratelimit_service_config =
-      context.singletonManager().getTyped<Envoy::RateLimit::RateLimitServiceConfig>(
-          "ratelimit_service_config_singleton_name", [] { return nullptr; });
-  // if bootstrap config has rate limiting service defined, we expect singleton manager to have it because
-  // it is loaded at the startup.
-  if (ratelimit_service_config) {
-    return std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::GrpcFactoryImpl>(
-        ratelimit_service_config->config_, context.clusterManager().grpcAsyncClientManager(),
-        context.scope());
-  }
-  return std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::NullFactoryImpl>();
-}
-
 GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitServiceConfig& config,
                                  Grpc::AsyncClientManager& async_client_manager,
                                  Stats::Scope& scope) {
@@ -123,14 +114,8 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitSe
   async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }
 
-ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout,
-                                  Server::Configuration::FactoryContext& context) {
-  ClientPtr ratelimit_client =
-      context.singletonManager().getTyped<Envoy::Extensions::Filters::Common::RateLimit::Client>(
-          SINGLETON_MANAGER_REGISTERED_NAME(ratelimit_client), [timeout, this] {
-            return std::make_shared<GrpcClientImpl>(async_client_factory_->create(), timeout);
-          });
-  return ratelimit_client;
+ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout) {
+  return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout);
 }
 
 } // namespace RateLimit

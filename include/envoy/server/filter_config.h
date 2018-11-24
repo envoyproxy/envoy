@@ -9,6 +9,7 @@
 #include "envoy/json/json_object.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
+#include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/overload_manager.h"
@@ -133,6 +134,11 @@ public:
    * @return OverloadManager& the overload manager for the server.
    */
   virtual OverloadManager& overloadManager() PURE;
+
+  /**
+   * @return RateLimit::RateLimitSErviceConfigPtr for use by extensions.
+   */
+  virtual RateLimit::RateLimitServiceConfigPtr rateLimitServiceConfig() const PURE;
 };
 
 class ListenerFactoryContext : public FactoryContext {

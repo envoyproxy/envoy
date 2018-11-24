@@ -181,6 +181,10 @@ public:
     return config_->statsFlushInterval();
   }
 
+  RateLimit::RateLimitServiceConfigPtr rateLimitServiceConfig() const override {
+    return config_->rateLimitServiceConfig();
+  }
+
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();

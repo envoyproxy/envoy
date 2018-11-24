@@ -81,6 +81,9 @@ public:
   void shutdown() override;
   bool isShutdown() override { return false; }
   void shutdownAdmin() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  RateLimit::RateLimitServiceConfigPtr rateLimitServiceConfig() const override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
   bool healthCheckFailed() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

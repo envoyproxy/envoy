@@ -147,6 +147,7 @@ envoy_cc_library(
         "//include/envoy/json:json_object_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:drain_decision_interface",
+        "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:overload_manager_interface",
         "//include/envoy/singleton:manager_interface",

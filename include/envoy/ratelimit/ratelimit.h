@@ -7,8 +7,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/registry/registry.h"
-#include "envoy/singleton/manager.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "absl/types/optional.h"
@@ -32,9 +30,9 @@ struct Descriptor {
 };
 
 /**
- * RateLimitServiceConfig that wraps the proto structure so that it can be registered as singleton.
+ * RateLimitServiceConfig that wraps the proto structure.
  */
-class RateLimitServiceConfig : public Singleton::Instance {
+class RateLimitServiceConfig {
 
 public:
   RateLimitServiceConfig(
@@ -44,7 +42,7 @@ public:
   const envoy::config::ratelimit::v2::RateLimitServiceConfig& config_;
 };
 
-typedef std::shared_ptr<RateLimitServiceConfig> RateLimitServiceConfigSharedPtr;
+typedef std::shared_ptr<RateLimitServiceConfig> RateLimitServiceConfigPtr;
 
 } // namespace RateLimit
 } // namespace Envoy

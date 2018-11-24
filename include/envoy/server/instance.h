@@ -206,6 +206,11 @@ public:
    * @return the flush interval of stats sinks.
    */
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
+
+  /**
+   * @return RateLimit::RateLimitServiceConfigPtr for use by extensions.
+   */
+  virtual RateLimit::RateLimitServiceConfigPtr rateLimitServiceConfig() const PURE;
 };
 
 } // namespace Server

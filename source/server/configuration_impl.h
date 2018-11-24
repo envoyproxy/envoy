@@ -97,6 +97,9 @@ public:
   Tracing::HttpTracer& httpTracer() override { return *http_tracer_; }
   std::list<Stats::SinkPtr>& statsSinks() override { return stats_sinks_; }
   std::chrono::milliseconds statsFlushInterval() const override { return stats_flush_interval_; }
+  RateLimit::RateLimitServiceConfigPtr rateLimitServiceConfig() const override {
+    return ratelimit_service_config_;
+  }
   std::chrono::milliseconds wdMissTimeout() const override { return watchdog_miss_timeout_; }
   std::chrono::milliseconds wdMegaMissTimeout() const override {
     return watchdog_megamiss_timeout_;
@@ -123,7 +126,7 @@ private:
   std::chrono::milliseconds watchdog_megamiss_timeout_;
   std::chrono::milliseconds watchdog_kill_timeout_;
   std::chrono::milliseconds watchdog_multikill_timeout_;
-  std::shared_ptr<Envoy::RateLimit::RateLimitServiceConfig> ratelimit_service_config_;
+  RateLimit::RateLimitServiceConfigPtr ratelimit_service_config_;
 };
 
 /**

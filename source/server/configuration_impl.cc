@@ -24,9 +24,6 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-// Singleton registration via macro defined in envoy/singleton/manager.h
-SINGLETON_MANAGER_REGISTRATION(ratelimit_service_config);
-
 bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager,
                                           const std::vector<Network::FilterFactoryCb>& factories) {
   for (const Network::FilterFactoryCb& factory : factories) {
@@ -56,6 +53,11 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
     server.secretManager().addStaticSecret(secrets[i]);
   }
 
+  if (bootstrap.has_rate_limit_service()) {
+    ratelimit_service_config_ =
+        std::make_shared<Envoy::RateLimit::RateLimitServiceConfig>(bootstrap.rate_limit_service());
+  }
+
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(
       bootstrap, server.stats(), server.threadLocal(), server.runtime(), server.random(),
@@ -81,16 +83,6 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
 
   initializeTracers(bootstrap.tracing(), server);
-
-  if (bootstrap.has_rate_limit_service()) {
-    ratelimit_service_config_ =
-        server.singletonManager().getTyped<Envoy::RateLimit::RateLimitServiceConfig>(
-            SINGLETON_MANAGER_REGISTERED_NAME(ratelimit_service_config), [&bootstrap] {
-              return std::make_shared<Envoy::RateLimit::RateLimitServiceConfig>(
-                  bootstrap.rate_limit_service());
-            });
-  }
-
   initializeStatsSinks(bootstrap, server);
 }
 
