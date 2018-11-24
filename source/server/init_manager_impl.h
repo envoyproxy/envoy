@@ -17,10 +17,9 @@ public:
 
   // Init::Manager
   void registerTarget(Init::Target& target) override;
+  State state() const override { return state_; }
 
 private:
-  enum class State { NotInitialized, Initializing, Initialized };
-
   void initializeTarget(Init::Target& target);
 
   std::list<Init::Target*> targets_;
