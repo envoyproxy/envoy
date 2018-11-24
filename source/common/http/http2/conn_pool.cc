@@ -262,7 +262,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan>(
       parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem());
   Upstream::Host::CreateConnectionData data =
-      parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_);
+      parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_, nullptr);
   real_host_description_ = data.host_description_;
   client_ = parent_.createCodecClient(data);
   client_->addConnectionCallbacks(*this);

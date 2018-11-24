@@ -23,7 +23,7 @@ namespace Envoy {
 namespace Upstream {
 
 TEST(ValidationClusterManagerTest, MockedMethods) {
-  Api::Impl api;
+  Api::ApiPtr api(Api::createApiForTest());
   NiceMock<Runtime::MockLoader> runtime;
   Event::SimulatedTimeSystem time_system;
   Stats::IsolatedStoreImpl stats;
@@ -38,7 +38,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
 
   ValidationClusterManagerFactory factory(runtime, stats, tls, random, dns_resolver,
                                           ssl_context_manager, dispatcher, local_info,
-                                          secret_manager, api);
+                                          secret_manager, *api);
 
   AccessLog::MockAccessLogManager log_manager;
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;
@@ -46,7 +46,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
       bootstrap, stats, tls, runtime, random, local_info, log_manager, admin);
   EXPECT_EQ(nullptr, cluster_manager->httpConnPoolForCluster("cluster", ResourcePriority::Default,
                                                              Http::Protocol::Http11, nullptr));
-  Host::CreateConnectionData data = cluster_manager->tcpConnForCluster("cluster", nullptr);
+  Host::CreateConnectionData data = cluster_manager->tcpConnForCluster("cluster", nullptr, nullptr);
   EXPECT_EQ(nullptr, data.connection_);
   EXPECT_EQ(nullptr, data.host_description_);
 

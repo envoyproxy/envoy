@@ -190,6 +190,8 @@ if __name__ == "__main__":
   errors += checkUnfixableError("attribute_packed.cc", "Don't use __attribute__((packed))")
   errors += checkUnfixableError("designated_initializers.cc", "Don't use designated initializers")
   errors += checkUnfixableError("elvis_operator.cc", "Don't use the '?:' operator")
+  errors += checkUnfixableError("testing_test.cc",
+                                "Don't use 'using testing::Test;, elaborate the type instead")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",

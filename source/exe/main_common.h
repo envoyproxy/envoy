@@ -3,6 +3,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
 
+#include "common/common/thread.h"
 #include "common/event/real_time_system.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -32,7 +33,8 @@ public:
   // destructed.
   MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_system, TestHooks& test_hooks,
                  Server::ComponentFactory& component_factory,
-                 std::unique_ptr<Runtime::RandomGenerator>&& random_generator);
+                 std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
+                 Thread::ThreadFactory& thread_factory);
   ~MainCommonBase();
 
   bool run();
@@ -62,6 +64,7 @@ protected:
   Envoy::OptionsImpl& options_;
 
   Server::ComponentFactory& component_factory_;
+  Thread::ThreadFactory& thread_factory_;
 
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
@@ -107,6 +110,7 @@ private:
   Event::RealTimeSystem real_time_system_;
   DefaultTestHooks default_test_hooks_;
   ProdComponentFactory prod_component_factory_;
+  Thread::ThreadFactoryImpl thread_factory_;
   MainCommonBase base_;
 };
 
