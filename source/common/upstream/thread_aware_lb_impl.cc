@@ -81,6 +81,7 @@ LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
   // threads. All complex processing has already been precalculated however.
   absl::ReaderMutexLock lock(&mutex_);
   lb->per_priority_load_ = per_priority_load_;
+  lb->degraded_per_priority_load_ = degraded_per_priority_load_;
   lb->per_priority_state_ = per_priority_state_;
 
   return std::move(lb);
