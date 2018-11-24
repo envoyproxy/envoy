@@ -173,3 +173,19 @@ message
 upstream_host
   The upstream host that the connection is proxying to, if available. This is populated if the
   filter is used along with the :ref:`TCP proxy filter <config_network_filters_tcp_proxy>`.
+
+.. _config_network_filters_mongo_proxy_dynamic_metadata:
+
+Dynamic Metadata
+----------------
+
+The Mongo filter emits the following dynamic metadata when enabled via the
+:ref:`configuration <envoy_api_field_config.filter.network.mongo_proxy.v2.MongoProxy.emit_dynamic_metadata>`.
+This dynamic metadata is available as one struct per message under a list named *messages*.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  operation, string, The operation to be executed.
+  resource, string, The resource name in *db.collection* format on which the operation is to be executed.
