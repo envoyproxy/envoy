@@ -144,7 +144,7 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, bool end_stre
     hsql::SQLParser::parse(command.GetData(), &result);
 
     ENVOY_CONN_LOG(warn, "mysql msg processed {}", read_callbacks_->connection(),
-                   command.GetData());    
+                   command.GetData());
 
     // check whether the parsing was successful
     if (result.isValid()) {
