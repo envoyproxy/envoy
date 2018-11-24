@@ -4,9 +4,7 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 
-#include "src/SQLParser.h"
-#include "src/util/sqlhelper.h"
-#include <stdlib.h>
+#include "include/sqlparser/SQLParser.h"
 
 namespace Envoy {
 namespace Extensions {
