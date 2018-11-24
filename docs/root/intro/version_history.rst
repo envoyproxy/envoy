@@ -7,6 +7,7 @@ Version history
 * access log: added dynamic metadata to access log messages streamed over gRPC.
 * admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * admin: :http:get:`/server_info` now responds with a JSON object instead of a single string.
+* admin: :http:get:`/server_info` now exposes what stage of initialization the server is currently in.
 * admin: added support for displaying command line options in :http:get:`/server_info` end point.
 * circuit-breaker: added cx_open, rq_pending_open, rq_open and rq_retry_open gauges to expose live
   state via :ref:`circuit breakers statistics <config_cluster_manager_cluster_stats_circuit_breakers>`.
@@ -63,6 +64,8 @@ Version history
 * tracing: added support for :ref:`Datadog <arch_overview_tracing>` tracer.
 * upstream: changed how load calculation for :ref:`priority levels<arch_overview_load_balancing_priority_levels>` and :ref:`panic thresholds<arch_overview_load_balancing_panic_threshold>` interact. As long as normalized total health is 100% panic thresholds are disregarded.
 * upstream: changed the default hash for :ref:`ring hash <envoy_api_msg_Cluster.RingHashLbConfig>` from std::hash to `xxHash <https://github.com/Cyan4973/xxHash>`_.
+* upstream: when using active health checking and STRICT_DNS with several addresses that resolve
+  to the same hosts, Envoy will now health check each host independently.
 
 1.8.0 (Oct 4, 2018)
 ===================
