@@ -65,7 +65,7 @@ public:
   }
 
 private:
-  std::chrono::milliseconds file_flush_interval_msec_;
+  const std::chrono::milliseconds file_flush_interval_msec_;
   FileSystemStats file_stats_;
   Thread::ThreadFactory& thread_factory_;
 };
