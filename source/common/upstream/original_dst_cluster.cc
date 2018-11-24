@@ -174,9 +174,10 @@ void OriginalDstCluster::cleanup() {
   }
 
   if (to_be_removed.size() > 0) {
-    host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts), {{}},
-                         HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(),
-                         HostsPerLocalityImpl::empty(), {}, {}, to_be_removed, absl::nullopt);
+    host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
+                         std::make_shared<const HostVector>(), HostsPerLocalityImpl::empty(),
+                         HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {}, {},
+                         to_be_removed, absl::nullopt);
   }
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
