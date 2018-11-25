@@ -12,6 +12,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
+#include "common/http/codes.h"
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
 
@@ -119,6 +120,7 @@ public:
   void startWorkers(GuardDog& guard_dog) override;
   void stopListeners() override;
   void stopWorkers() override;
+  Http::CodeStats& codeStats() override { return code_stats_; }
 
   Instance& server_;
   TimeSource& time_source_;
@@ -178,6 +180,7 @@ private:
   ListenerManagerStats stats_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   LdsApiPtr lds_api_;
+  Http::CodeStatsImpl code_stats_;
 };
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
@@ -206,7 +209,7 @@ public:
    */
   ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool modifiable,
-               bool workers_started, uint64_t hash);
+               bool workers_started, uint64_t hash, Http::CodeStats& code_stats);
   ~ListenerImpl();
 
   /**
@@ -290,7 +293,7 @@ public:
     ensureSocketOptions();
     Network::Socket::appendOptions(listen_socket_options_, options);
   }
-  Http::CodeStats& codeStats() override { return parent_.server_.codeStats(); }
+  Http::CodeStats& codeStats() override { return code_stats_; }
 
   // Network::DrainDecision
   bool drainClose() const override;
@@ -391,6 +394,7 @@ private:
   const envoy::api::v2::Listener config_;
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
+  Http::CodeStats& code_stats_;
 };
 
 class FilterChainImpl : public Network::FilterChain {

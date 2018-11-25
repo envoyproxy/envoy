@@ -94,10 +94,9 @@ public:
   clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin,
-                          Http::CodeStats& code_stats) override {
+                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin) override {
     return ClusterManagerPtr{clusterManagerFromProto_(bootstrap, stats, tls, runtime, random,
-                                                      local_info, log_manager, admin, code_stats)};
+                                                      local_info, log_manager, admin, code_stats_)};
   }
 
   Secret::SecretManager& secretManager() override { return secret_manager_; }
@@ -127,6 +126,7 @@ public:
   Ssl::ContextManagerImpl ssl_context_manager_{dispatcher_.timeSystem()};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Secret::MockSecretManager> secret_manager_;
+  Http::CodeStatsImpl code_stats_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.

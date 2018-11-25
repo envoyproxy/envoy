@@ -87,7 +87,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.random(), context.httpTracer(),
         context.runtime(), context.localInfo(), context.clusterManager(),
-        &context.overloadManager(), context.dispatcher().timeSystem())});
+        &context.overloadManager(), context.dispatcher().timeSystem(), context.codeStats())});
   };
 }
 

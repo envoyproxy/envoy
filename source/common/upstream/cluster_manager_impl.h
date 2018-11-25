@@ -22,6 +22,7 @@
 
 #include "common/config/grpc_mux_impl.h"
 #include "common/http/async_client_impl.h"
+#include "common/http/codes.h"
 #include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -50,8 +51,7 @@ public:
   clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin,
-                          Http::CodeStats& code_stats) override;
+                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin) override;
   Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, Http::Protocol protocol,
@@ -72,6 +72,7 @@ public:
 protected:
   Event::Dispatcher& main_thread_dispatcher_;
   Api::Api& api_;
+  Http::CodeStatsImpl code_stats_;
 
 private:
   Runtime::Loader& runtime_;

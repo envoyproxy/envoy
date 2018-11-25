@@ -156,6 +156,8 @@ public:
    * have exited.
    */
   virtual void stopWorkers() PURE;
+
+  virtual Http::CodeStats& codeStats() PURE;
 };
 
 } // namespace Server

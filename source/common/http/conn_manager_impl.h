@@ -11,6 +11,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
@@ -50,7 +51,8 @@ public:
                         Runtime::RandomGenerator& random_generator, Tracing::HttpTracer& tracer,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
-                        Server::OverloadManager* overload_manager, Event::TimeSystem& time_system);
+                        Server::OverloadManager* overload_manager, Event::TimeSystem& time_system,
+                        CodeStats& code_stats);
   ~ConnectionManagerImpl();
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -84,6 +86,7 @@ public:
   }
 
   Event::TimeSystem& timeSystem() { return time_system_; }
+  CodeStats& codeStats() { return code_stats_; }
 
 private:
   struct ActiveStream;
@@ -472,6 +475,7 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   Event::TimeSystem& time_system_;
+  CodeStats& code_stats_;
 };
 
 } // namespace Http

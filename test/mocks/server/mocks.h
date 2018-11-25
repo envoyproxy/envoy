@@ -244,6 +244,7 @@ public:
   MOCK_METHOD1(startWorkers, void(GuardDog& guard_dog));
   MOCK_METHOD0(stopListeners, void());
   MOCK_METHOD0(stopWorkers, void());
+  MOCK_METHOD0(codeStats, Http::CodeStats&());
 };
 
 class MockWorkerFactory : public WorkerFactory {
@@ -349,7 +350,6 @@ public:
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
   Event::TestTimeSystem& timeSystem() override { return test_time_.timeSystem(); }
-  Http::CodeStats& codeStats() override { return code_stats_; }
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -375,7 +375,6 @@ public:
   testing::NiceMock<MockListenerManager> listener_manager_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Singleton::ManagerPtr singleton_manager_;
-  Http::CodeStatsImpl code_stats_;
 };
 
 namespace Configuration {

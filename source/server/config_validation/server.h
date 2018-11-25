@@ -97,7 +97,6 @@ public:
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   Event::TimeSystem& timeSystem() override { return time_system_; }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
-  Http::CodeStats& codeStats() override { return code_stats_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_->statsFlushInterval();
@@ -161,7 +160,6 @@ private:
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
   MutexTracer* mutex_tracer_;
-  Http::CodeStatsImpl code_stats_;
 };
 
 } // namespace Server
