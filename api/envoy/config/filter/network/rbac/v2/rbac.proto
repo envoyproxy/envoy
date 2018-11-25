@@ -13,7 +13,7 @@ import "gogoproto/gogo.proto";
 
 // RBAC network filter config.
 //
-// Header and Metadata should not be used in rules/shadow_rules in RBAC network filter as
+// Header should not be used in rules/shadow_rules in RBAC network filter as
 // this information is only available in :ref:`RBAC http filter <config_http_filters_rbac>`.
 message RBAC {
   // Specify the RBAC rules to be applied globally.
