@@ -35,6 +35,7 @@ public:
   MOCK_CONST_METHOD0(defaultSubset, const ProtobufWkt::Struct&());
   MOCK_CONST_METHOD0(subsetKeys, const std::vector<std::set<std::string>>&());
   MOCK_CONST_METHOD0(localityWeightAware, bool());
+  MOCK_CONST_METHOD0(scaleLocalityWeight, bool());
 
   std::vector<std::set<std::string>> subset_keys_;
 };
