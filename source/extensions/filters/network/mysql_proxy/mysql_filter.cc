@@ -28,8 +28,9 @@ Network::FilterStatus MySQLFilter::onWrite(Buffer::Instance& data, bool end_stre
 
 Network::FilterStatus MySQLFilter::onData(Buffer::Instance& data, bool end_stream) {
   auto& dynamic_metadata = const_cast<envoy::api::v2::core::Metadata&>(
-          read_callbacks_->connection().streamInfo().dynamicMetadata());
-  auto& metadata = (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy];
+      read_callbacks_->connection().streamInfo().dynamicMetadata());
+  auto& metadata =
+      (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy];
   metadata.mutable_fields()->clear();
   return Process(data, end_stream);
 }
