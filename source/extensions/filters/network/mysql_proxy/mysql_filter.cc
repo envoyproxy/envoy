@@ -13,14 +13,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-class DynamicMetadataKeys {
-public:
-  const std::string MessagesField{"messages"};
-  const std::string OperationField{"operation"};
-  const std::string ResourceField{"resource"};
-};
-typedef ConstSingleton<DynamicMetadataKeys> DynamicMetadataKeysSingleton;
-
 MySQLFilterConfig::MySQLFilterConfig(const std::string& stat_prefix, Stats::Scope& scope)
     : scope_(scope), stat_prefix_(stat_prefix), stats_(generateStats(stat_prefix, scope)) {}
 
@@ -35,6 +27,10 @@ Network::FilterStatus MySQLFilter::onWrite(Buffer::Instance& data, bool end_stre
 }
 
 Network::FilterStatus MySQLFilter::onData(Buffer::Instance& data, bool end_stream) {
+  auto& dynamic_metadata = const_cast<envoy::api::v2::core::Metadata&>(
+          read_callbacks_->connection().streamInfo().dynamicMetadata());
+  auto& metadata = (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy];
+  metadata.mutable_fields()->clear();
   return Process(data, end_stream);
 }
 
@@ -153,27 +149,24 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, bool end_stre
     hsql::SQLParserResult result;
     hsql::SQLParser::parse(command.GetData(), &result);
 
-    ENVOY_CONN_LOG(warn, "mysql msg processed {}", read_callbacks_->connection(),
+    ENVOY_CONN_LOG(trace, "mysql msg processed {}", read_callbacks_->connection(),
                    command.GetData());
 
     // check whether the parsing was successful
     if (result.isValid()) {
+      // Temporary until Venil's PR is merged.
       auto& dynamic_metadata = const_cast<envoy::api::v2::core::Metadata&>(
           read_callbacks_->connection().streamInfo().dynamicMetadata());
 
       ProtobufWkt::Struct metadata(
           (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy]);
       auto& fields = *metadata.mutable_fields();
-      auto& list = *fields[DynamicMetadataKeysSingleton::get().MessagesField].mutable_list_value();
 
       for (auto i = 0u; i < result.size(); ++i) {
         hsql::TableAccessMap table_access_map;
         result.getStatement(i)->tablesAccessed(table_access_map);
         for (auto it = table_access_map.begin(); it != table_access_map.end(); ++it) {
-          auto& message = *list.add_values()->mutable_struct_value()->mutable_fields();
-          message[DynamicMetadataKeysSingleton::get().ResourceField].set_string_value(it->first);
-          auto& operations =
-              *message[DynamicMetadataKeysSingleton::get().OperationField].mutable_list_value();
+          auto& operations = *fields[it->first].mutable_list_value();
           for (auto ot = it->second.begin(); ot != it->second.end(); ++ot) {
             operations.add_values()->set_string_value(*ot);
           }
@@ -182,6 +175,9 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, bool end_stre
 
       read_callbacks_->connection().streamInfo().setDynamicMetadata(
           NetworkFilterNames::get().MySQLProxy, metadata);
+      // ProtobufTypes::String json;
+      // Protobuf::util::MessageToJsonString(metadata, &json);
+      // std::cout<<json<<'\n';
     }
     break;
   }

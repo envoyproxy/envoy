@@ -3,30 +3,50 @@ static_resources:
   - address:
       socket_address:
         address: 0.0.0.0
-        port_value: 3307
+        port_value: 80
     filter_chains:
     - filters:
-      - name: envoy.filters.network.mysql_proxy
+      - name: envoy.http_connection_manager
         config:
-          stat_prefix: mysql
-      - name: envoy.tcp_proxy
-        config:
-          access_log:
-          - name: envoy.file_access_log
-            config:
-              path: /tmp/mysql.log
-              format: "%DYNAMIC_METADATA(envoy.filters.network.mysql_proxy)%"
-          stat_prefix: tcp
-          cluster: mysql
+          codec_type: auto
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: backend
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/service/1"
+                route:
+                  cluster: service1
+              - match:
+                  prefix: "/service/2"
+                route:
+                  cluster: service2
+          http_filters:
+          - name: envoy.router
+            config: {}
   clusters:
-  - name: mysql
+  - name: service1
     connect_timeout: 0.25s
-    type: static
+    type: strict_dns
     lb_policy: round_robin
+    http2_protocol_options: {}
     hosts:
     - socket_address:
-        address: 127.0.0.1
-        port_value: 3306
+        address: service1
+        port_value: 80
+  - name: service2
+    connect_timeout: 0.25s
+    type: strict_dns
+    lb_policy: round_robin
+    http2_protocol_options: {}
+    hosts:
+    - socket_address:
+        address: service2
+        port_value: 80
 admin:
   access_log_path: "/dev/null"
   address:
