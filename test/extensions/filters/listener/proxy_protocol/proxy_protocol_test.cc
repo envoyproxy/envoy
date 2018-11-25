@@ -2,6 +2,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/network/address.h"
 #include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -44,6 +45,8 @@ namespace ProxyProtocol {
 
 // Build again on the basis of the connection_handler_test.cc
 
+// Adding templated test suite to allow TCP/UDP behavior to be templatized.
+template <Network::Address::SocketType S>
 class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
                           public Network::ListenerConfig,
                           public Network::FilterChainManager,
@@ -147,7 +150,7 @@ public:
 
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
-  Network::TcpListenSocket socket_;
+  Network::NetworkListenSocket<Network::NetworkSocketTrait<S>> socket_;
   Stats::IsolatedStoreImpl stats_store_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
@@ -160,12 +163,14 @@ public:
   const Network::FilterChainSharedPtr filter_chain_;
 };
 
+using ProxyProtocolTestTcp = ProxyProtocolTest<Network::Address::SocketType::Stream>;
+
 // Parameterize the listener socket address version.
-INSTANTIATE_TEST_CASE_P(IpVersions, ProxyProtocolTest,
+INSTANTIATE_TEST_CASE_P(IpVersions, ProxyProtocolTestTcp,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
-TEST_P(ProxyProtocolTest, v1Basic) {
+TEST_P(ProxyProtocolTestTcp, v1Basic) {
   connect();
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
 
@@ -177,7 +182,7 @@ TEST_P(ProxyProtocolTest, v1Basic) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v1Minimal) {
+TEST_P(ProxyProtocolTestTcp, v1Minimal) {
   connect();
   write("PROXY UNKNOWN\r\nmore data");
 
@@ -193,7 +198,7 @@ TEST_P(ProxyProtocolTest, v1Minimal) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2Basic) {
+TEST_P(ProxyProtocolTestTcp, v2Basic) {
   // A well-formed ipv4/tcp message, no extensions
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -210,7 +215,7 @@ TEST_P(ProxyProtocolTest, v2Basic) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, BasicV6) {
+TEST_P(ProxyProtocolTestTcp, BasicV6) {
   connect();
   write("PROXY TCP6 1:2:3::4 5:6::7:8 65535 1234\r\nmore data");
 
@@ -222,7 +227,7 @@ TEST_P(ProxyProtocolTest, BasicV6) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2BasicV6) {
+TEST_P(ProxyProtocolTestTcp, v2BasicV6) {
   // A well-formed ipv6/tcp message, no extensions
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
                                 0x0a, 0x21, 0x22, 0x00, 0x24, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03,
@@ -241,7 +246,7 @@ TEST_P(ProxyProtocolTest, v2BasicV6) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2UnsupportedAF) {
+TEST_P(ProxyProtocolTestTcp, v2UnsupportedAF) {
   // A well-formed message with an unsupported address family
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x41, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -253,7 +258,7 @@ TEST_P(ProxyProtocolTest, v2UnsupportedAF) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, errorRecv_2) {
+TEST_P(ProxyProtocolTestTcp, errorRecv_2) {
   // A well formed v4/tcp message, no extensions, but introduce an error on recv (e.g. socket close)
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -290,7 +295,7 @@ TEST_P(ProxyProtocolTest, errorRecv_2) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
+TEST_P(ProxyProtocolTestTcp, errorFIONREAD_1) {
   // A well formed v4/tcp message, no extensions, but introduce an error on ioctl(...FIONREAD...)
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -318,7 +323,7 @@ TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2NotLocalOrOnBehalf) {
+TEST_P(ProxyProtocolTestTcp, v2NotLocalOrOnBehalf) {
   // An illegal command type: neither 'local' nor 'proxy' command
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x23, 0x1f, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -330,7 +335,7 @@ TEST_P(ProxyProtocolTest, v2NotLocalOrOnBehalf) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2LocalConnection) {
+TEST_P(ProxyProtocolTestTcp, v2LocalConnection) {
   // A 'local' connection, e.g. health-checking, no address, no extensions
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55,
                                 0x49, 0x54, 0x0a, 0x20, 0x00, 0x00, 0x00, 'm',  'o',
@@ -349,7 +354,7 @@ TEST_P(ProxyProtocolTest, v2LocalConnection) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2LocalConnectionExtension) {
+TEST_P(ProxyProtocolTestTcp, v2LocalConnectionExtension) {
   // A 'local' connection, e.g. health-checking, no address, 1 TLV (0x00,0x00,0x01,0xff) is present.
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x20, 0x00, 0x00, 0x04, 0x00, 0x00, 0x01, 0xff,
@@ -368,7 +373,7 @@ TEST_P(ProxyProtocolTest, v2LocalConnectionExtension) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2ShortV4) {
+TEST_P(ProxyProtocolTestTcp, v2ShortV4) {
   // An ipv4/tcp connection that has incorrect addr-len encoded
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
@@ -379,7 +384,7 @@ TEST_P(ProxyProtocolTest, v2ShortV4) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2ShortAddrV4) {
+TEST_P(ProxyProtocolTestTcp, v2ShortAddrV4) {
   // An ipv4/tcp connection that has insufficient header-length encoded
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0b, 0x01, 0x02, 0x03, 0x04,
@@ -391,7 +396,7 @@ TEST_P(ProxyProtocolTest, v2ShortAddrV4) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2ShortV6) {
+TEST_P(ProxyProtocolTestTcp, v2ShortV6) {
   // An ipv6/tcp connection that has incorrect addr-len encoded
   constexpr uint8_t buffer[] = {
       0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21, 0x22, 0x00,
@@ -403,7 +408,7 @@ TEST_P(ProxyProtocolTest, v2ShortV6) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2ShortAddrV6) {
+TEST_P(ProxyProtocolTestTcp, v2ShortAddrV6) {
   // An ipv6/tcp connection that has insufficient header-length encoded
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
                                 0x0a, 0x21, 0x22, 0x00, 0x23, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03,
@@ -417,7 +422,7 @@ TEST_P(ProxyProtocolTest, v2ShortAddrV6) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2AF_UNIX) {
+TEST_P(ProxyProtocolTestTcp, v2AF_UNIX) {
   // A well-formed AF_UNIX (0x32 in b14) connection is rejected
   constexpr uint8_t buffer[] = {
       0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21, 0x32, 0x00,
@@ -429,7 +434,7 @@ TEST_P(ProxyProtocolTest, v2AF_UNIX) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2BadCommand) {
+TEST_P(ProxyProtocolTestTcp, v2BadCommand) {
   // A non local/proxy command (0x29 in b13) is rejected
   constexpr uint8_t buffer[] = {
       0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x29, 0x32, 0x00,
@@ -441,7 +446,7 @@ TEST_P(ProxyProtocolTest, v2BadCommand) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2WrongVersion) {
+TEST_P(ProxyProtocolTestTcp, v2WrongVersion) {
   // A non '2' version is rejected (0x93 in b13)
   constexpr uint8_t buffer[] = {
       0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21, 0x93, 0x00,
@@ -452,7 +457,7 @@ TEST_P(ProxyProtocolTest, v2WrongVersion) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v1TooLong) {
+TEST_P(ProxyProtocolTestTcp, v1TooLong) {
   constexpr uint8_t buffer[] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
   connect(false);
   write("PROXY TCP4 1.2.3.4 2.3.4.5 100 100");
@@ -462,7 +467,7 @@ TEST_P(ProxyProtocolTest, v1TooLong) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2ParseExtensions) {
+TEST_P(ProxyProtocolTestTcp, v2ParseExtensions) {
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x14, 0x01, 0x02, 0x03, 0x04,
@@ -482,7 +487,7 @@ TEST_P(ProxyProtocolTest, v2ParseExtensions) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
+TEST_P(ProxyProtocolTestTcp, v2ParseExtensionsIoctlError) {
   // A well-formed ipv4/tcp with a TLV extension. An error is created in the ioctl(...FIONREAD...)
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x10, 0x01, 0x02, 0x03, 0x04,
@@ -531,7 +536,7 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2ParseExtensionsFrag) {
+TEST_P(ProxyProtocolTestTcp, v2ParseExtensionsFrag) {
   // A well-formed ipv4/tcp header with 2 TLV/extenions, these are fragmented on delivery
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x14, 0x01, 0x02, 0x03, 0x04,
@@ -550,7 +555,7 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsFrag) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, Fragmented) {
+TEST_P(ProxyProtocolTestTcp, Fragmented) {
   connect();
   write("PROXY TCP4");
   write(" 254.254.2");
@@ -570,7 +575,7 @@ TEST_P(ProxyProtocolTest, Fragmented) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2Fragmented1) {
+TEST_P(ProxyProtocolTestTcp, v2Fragmented1) {
   // A well-formed ipv4/tcp header, delivering part of the signature, then part of
   // the address, then the remainder
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
@@ -591,7 +596,7 @@ TEST_P(ProxyProtocolTest, v2Fragmented1) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2Fragmented2) {
+TEST_P(ProxyProtocolTestTcp, v2Fragmented2) {
   // A well-formed ipv4/tcp header, delivering all of the signature + 1, then the remainder
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -612,7 +617,7 @@ TEST_P(ProxyProtocolTest, v2Fragmented2) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
+TEST_P(ProxyProtocolTestTcp, v2Fragmented3Error) {
   // A well-formed ipv4/tcp header, delivering all of the signature +1, w/ an error
   // simulated in recv() on the +1
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
@@ -658,7 +663,7 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
+TEST_P(ProxyProtocolTestTcp, v2Fragmented4Error) {
   // A well-formed ipv4/tcp header, part of the signature with an error introduced
   // in recv() on the remainder
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
@@ -706,7 +711,7 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, PartialRead) {
+TEST_P(ProxyProtocolTestTcp, PartialRead) {
   connect();
 
   write("PROXY TCP4");
@@ -726,7 +731,7 @@ TEST_P(ProxyProtocolTest, PartialRead) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2PartialRead) {
+TEST_P(ProxyProtocolTestTcp, v2PartialRead) {
   // A well-formed ipv4/tcp header, delivered with part of the signature,
   // part of the header, rest of header + body
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55,
@@ -750,7 +755,7 @@ TEST_P(ProxyProtocolTest, v2PartialRead) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, MalformedProxyLine) {
+TEST_P(ProxyProtocolTestTcp, MalformedProxyLine) {
   connect(false);
 
   write("BOGUS\r");
@@ -760,74 +765,74 @@ TEST_P(ProxyProtocolTest, MalformedProxyLine) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, ProxyLineTooLarge) {
+TEST_P(ProxyProtocolTestTcp, ProxyLineTooLarge) {
   connect(false);
   write("012345678901234567890123456789012345678901234567890123456789"
         "012345678901234567890123456789012345678901234567890123456789");
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, NotEnoughFields) {
+TEST_P(ProxyProtocolTestTcp, NotEnoughFields) {
   connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234\r\nmore data");
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, UnsupportedProto) {
+TEST_P(ProxyProtocolTestTcp, UnsupportedProto) {
   connect(false);
   write("PROXY UDP6 1:2:3::4 5:6::7:8 1234 5678\r\nmore data");
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, InvalidSrcAddress) {
+TEST_P(ProxyProtocolTestTcp, InvalidSrcAddress) {
   connect(false);
   write("PROXY TCP4 230.0.0.1 10.1.1.3 1234 5678\r\nmore data");
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, InvalidDstAddress) {
+TEST_P(ProxyProtocolTestTcp, InvalidDstAddress) {
   connect(false);
   write("PROXY TCP4 10.1.1.2 0.0.0.0 1234 5678\r\nmore data");
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, BadPort) {
+TEST_P(ProxyProtocolTestTcp, BadPort) {
   connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, NegativePort) {
+TEST_P(ProxyProtocolTestTcp, NegativePort) {
   connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 -1 1234\r\nmore data");
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, PortOutOfRange) {
+TEST_P(ProxyProtocolTestTcp, PortOutOfRange) {
   connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 66776 1234\r\nmore data");
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, BadAddress) {
+TEST_P(ProxyProtocolTestTcp, BadAddress) {
   connect(false);
   write("PROXY TCP6 1::2:3::4 5:6::7:8 1234 5678\r\nmore data");
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, AddressVersionsNotMatch) {
+TEST_P(ProxyProtocolTestTcp, AddressVersionsNotMatch) {
   connect(false);
   write("PROXY TCP4 [1:2:3::4] 1.2.3.4 1234 5678\r\nmore data");
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, AddressVersionsNotMatch2) {
+TEST_P(ProxyProtocolTestTcp, AddressVersionsNotMatch2) {
   connect(false);
   write("PROXY TCP4 1.2.3.4 [1:2:3: 1234 4]:5678\r\nmore data");
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, Truncated) {
+TEST_P(ProxyProtocolTestTcp, Truncated) {
   connect(false);
   write("PROXY TCP4 1.2.3.4 5.6.7.8 1234 5678");
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
@@ -839,7 +844,7 @@ TEST_P(ProxyProtocolTest, Truncated) {
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
-TEST_P(ProxyProtocolTest, Closed) {
+TEST_P(ProxyProtocolTestTcp, Closed) {
   connect(false);
   write("PROXY TCP4 1.2.3");
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
@@ -851,7 +856,7 @@ TEST_P(ProxyProtocolTest, Closed) {
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
-TEST_P(ProxyProtocolTest, ClosedEmpty) {
+TEST_P(ProxyProtocolTestTcp, ClosedEmpty) {
   // We may or may not get these, depending on the operating system timing.
   EXPECT_CALL(factory_, createListenerFilterChain(_)).Times(AtLeast(0));
   EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).Times(AtLeast(0));
@@ -993,6 +998,8 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
 
   disconnect();
 }
+
+// TODO (Jojy): Add tests for UDP ?
 
 } // namespace ProxyProtocol
 } // namespace ListenerFilters

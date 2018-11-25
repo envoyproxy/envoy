@@ -36,12 +36,8 @@ void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsShar
   }
 }
 
-TcpListenSocket::TcpListenSocket(const Address::InstanceConstSharedPtr& address,
-                                 const Network::Socket::OptionsSharedPtr& options,
-                                 bool bind_to_port)
-    : ListenSocketImpl(address->socket(Address::SocketType::Stream), address) {
-  RELEASE_ASSERT(fd_ != -1, "");
-
+void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& options,
+                                   bool bind_to_port) {
   // TODO(htuch): This might benefit from moving to SocketOptionImpl.
   int on = 1;
   int rc = setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
@@ -52,12 +48,6 @@ TcpListenSocket::TcpListenSocket(const Address::InstanceConstSharedPtr& address,
   if (bind_to_port) {
     doBind();
   }
-}
-
-TcpListenSocket::TcpListenSocket(int fd, const Address::InstanceConstSharedPtr& address,
-                                 const Network::Socket::OptionsSharedPtr& options)
-    : ListenSocketImpl(fd, address) {
-  setListenSocketOptions(options);
 }
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
