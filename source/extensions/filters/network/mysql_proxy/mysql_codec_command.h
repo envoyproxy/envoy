@@ -11,7 +11,6 @@ namespace MySQLProxy {
 class Command : public MySQLCodec {
 public:
   // MySQLCodec
-  // TODO(rshriram): plug in sql parser
   int Decode(Buffer::Instance&) override;
   std::string Encode() override;
 
@@ -33,7 +32,6 @@ private:
 class CommandResp : public MySQLCodec {
 public:
   // MySQLCodec
-  // TODO(rshriram): plug in sql parser
   int Decode(Buffer::Instance&) override { return 0; }
   std::string Encode() override { return ""; }
 
