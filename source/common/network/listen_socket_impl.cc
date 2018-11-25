@@ -38,16 +38,26 @@ void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsShar
 
 void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& options,
                                    bool bind_to_port) {
-  // TODO(htuch): This might benefit from moving to SocketOptionImpl.
-  int on = 1;
-  int rc = setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-  RELEASE_ASSERT(rc != -1, "");
-
   setListenSocketOptions(options);
 
   if (bind_to_port) {
     doBind();
   }
+}
+
+template <>
+void NetworkListenSocket<
+    NetworkSocketTrait<Address::SocketType::Stream>>::setProtocolSpecificSocketOptions() {
+  // TODO(htuch): This might benefit from moving to SocketOptionImpl.
+  int on = 1;
+  int rc = setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+  RELEASE_ASSERT(rc != -1, "");
+}
+
+template <>
+void NetworkListenSocket<
+    NetworkSocketTrait<Address::SocketType::Datagram>>::setProtocolSpecificSocketOptions() {
+  // TODO (Jojy): Do we need any UDP specific socket options?
 }
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
