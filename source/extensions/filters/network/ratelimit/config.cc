@@ -27,11 +27,16 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
 
   ConfigSharedPtr filter_config(new Config(proto_config, context.scope(), context.runtime()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
-  return [filter_config, timeout_ms, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<Filter>(
-        filter_config,
-        Filters::Common::RateLimit::ClientFactory::rateLimitClientFactory(context)->create(
-            std::chrono::milliseconds(timeout_ms))));
+  Filters::Common::RateLimit::ClientPtr ratelimit_client =
+      Filters::Common::RateLimit::ClientFactory::rateLimitClientFactory(context)->create(
+          std::chrono::milliseconds(timeout_ms), context);
+  std::shared_ptr<Filter> filter =
+      std::make_shared<Filter>(filter_config, std::move(ratelimit_client));
+  // This lambda captures the shared_ptrs created above, thus preserving the
+  // reference count. Moreover, keep in mind the capture list determines
+  // destruction order.
+  return [filter_config, filter, ratelimit_client](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(filter);
   };
 }
 

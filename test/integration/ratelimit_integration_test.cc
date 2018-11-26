@@ -140,12 +140,9 @@ public:
 
   void cleanup() {
     if (fake_ratelimit_connection_ != nullptr) {
-      if (clientType() != Grpc::ClientType::GoogleGrpc) {
-        // TODO(htuch) we should document the underlying cause of this difference and/or fix it.
-        AssertionResult result = fake_ratelimit_connection_->close();
-        RELEASE_ASSERT(result, result.message());
-      }
-      AssertionResult result = fake_ratelimit_connection_->waitForDisconnect();
+      AssertionResult result = fake_ratelimit_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_ratelimit_connection_->waitForDisconnect();
       RELEASE_ASSERT(result, result.message());
     }
     cleanupUpstreamAndDownstream();

@@ -18,6 +18,7 @@ envoy_cc_test(
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
