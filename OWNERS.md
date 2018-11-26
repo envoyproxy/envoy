@@ -22,8 +22,6 @@ routing PRs, questions, etc. to the right place.
 
 # Maintainers
 
-* Constance Caramanolis ([ccaraman](https://github.com/ccaraman)) (ccaramanolis@lyft.com)
-  * Rate limiting, IP tagging, HTTP routing, configuration/operational questions.
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
   * Outlier detection, HTTP routing, xDS, configuration/operational questions.
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
@@ -37,6 +35,7 @@ routing PRs, questions, etc. to the right place.
 
 # Emeritus maintainers
 
+* Constance Caramanolis ([ccaraman](https://github.com/ccaraman)) (ccaramanolis@lyft.com)
 * Roman Dzhabarov ([RomanDzhabarov](https://github.com/RomanDzhabarov)) (rdzhabarov@lyft.com)
 * Bill Gallagher ([wgallagher](https://github.com/wgallagher)) (bgallagher@lyft.com)
 
