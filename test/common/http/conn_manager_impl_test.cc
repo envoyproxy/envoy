@@ -1702,12 +1702,12 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
-  EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _))
-      .WillRepeatedly(
-          Invoke([&](absl::string_view, FilterChainFactoryCallbacks& callbacks) -> bool {
-            callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
-            return true;
-          }));
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
+      .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                                 FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
+        return true;
+      }));
 
   // When dispatch is called on the codec, we pretend to get a new stream and then fire a headers
   // only request into it. Then we respond into the filter.

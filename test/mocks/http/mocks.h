@@ -173,8 +173,9 @@ public:
 
   // Http::FilterChainFactory
   MOCK_METHOD1(createFilterChain, void(FilterChainFactoryCallbacks& callbacks));
-  MOCK_METHOD2(createUpgradeFilterChain,
-               bool(absl::string_view upgrade_type, FilterChainFactoryCallbacks& callbacks));
+  MOCK_METHOD3(createUpgradeFilterChain, bool(absl::string_view upgrade_type,
+                                              const FilterChainFactory::UpgradeMap* upgrade_map,
+                                              FilterChainFactoryCallbacks& callbacks));
 };
 
 class MockStreamFilterCallbacksBase {

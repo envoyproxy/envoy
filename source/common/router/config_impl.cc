@@ -370,6 +370,17 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   if (route.route().has_cors()) {
     cors_policy_ = std::make_unique<CorsPolicyImpl>(route.route().cors());
   }
+  for (const auto upgrade_config : route.route().upgrade_configs()) {
+    const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
+    const bool success =
+        upgrade_map_
+            .emplace(std::make_pair(
+                Envoy::Http::LowerCaseString(upgrade_config.upgrade_type()).get(), enabled))
+            .second;
+    if (!success) {
+      throw EnvoyException(fmt::format("Duplicate upgrade {}", upgrade_config.upgrade_type()));
+    }
+  }
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {

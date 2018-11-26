@@ -587,12 +587,15 @@ public:
   /**
    * Called when a new upgrade stream is created on the connection.
    * @param upgrade supplies the upgrade header from downstream
+   * @param per_route_upgrade_map supplies the upgrade map, if any, for this route.
    * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
    *                  FilterChainFactoryCallbacks.
    * @return true if upgrades of this type are allowed and the filter chain has been created.
    *    returns false if this upgrade type is not configured, and no filter chain is created.
    */
+  typedef std::map<std::string, bool> UpgradeMap;
   virtual bool createUpgradeFilterChain(absl::string_view upgrade,
+                                        const UpgradeMap* per_route_upgrade_map,
                                         FilterChainFactoryCallbacks& callbacks) PURE;
 };
 
