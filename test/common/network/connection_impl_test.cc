@@ -36,7 +36,6 @@ using testing::Return;
 using testing::SaveArg;
 using testing::Sequence;
 using testing::StrictMock;
-using testing::Test;
 
 namespace Envoy {
 namespace Network {
