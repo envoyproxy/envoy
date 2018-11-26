@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -12,7 +13,7 @@ filegroup(
     srcs = glob(["*.pem"]),
 )
 
-cc_library(
+envoy_cc_test_library(
     name = "hashes",
     hdrs = glob(["*hash.h"]),
 )
