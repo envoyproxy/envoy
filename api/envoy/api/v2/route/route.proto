@@ -406,7 +406,7 @@ message CorsPolicy {
   google.protobuf.BoolValue enabled = 7;
 }
 
-// [#comment:next free field: 25]
+// [#comment:next free field: 27]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -758,13 +758,29 @@ message RouteAction {
   // time gaps between gRPC request and response in gRPC streaming mode.
   google.protobuf.Duration max_grpc_timeout = 23 [(gogoproto.stdduration) = true];
 
+  // Allows enabling and disabling upgrades on a per-route basis.
+  // This overrides any enabled/disabled upgrade filter chain specified in the
+  // HttpConnectionManager
+  // :ref:upgrade_configs`
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`
+  // but does not affect any custom filter chain specified there.
+  message UpgradeConfig {
+    // The case-insensitive name of this upgrade, e.g. "websocket".
+    // For each upgrade type present in upgrade_configs, requests with
+    // Upgrade: [upgrade_type] will be proxied upstream.
+    string upgrade_type = 1;
+    // Determines if upgrades are available on this route. Defaults to true.
+    google.protobuf.BoolValue enabled = 2;
+  };
+  repeated UpgradeConfig upgrade_configs = 25;
+
   // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
   enum InternalRedirectAction {
     REJECT = 0;
     PASS_THROUGH = 1;
     HANDLE = 2;
   }
-  InternalRedirectAction internal_redirect_action = 25;
+  InternalRedirectAction internal_redirect_action = 26;
 }
 
 message RedirectAction {
