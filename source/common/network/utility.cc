@@ -52,9 +52,17 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   }
 }
 
-bool Utility::urlIsTcpScheme(const std::string& url) { return url.find(TCP_SCHEME) == 0; }
-bool Utility::urlIsUdpScheme(const std::string& url) { return url.find(UDP_SCHEME) == 0; }
-bool Utility::urlIsUnixScheme(const std::string& url) { return url.find(UNIX_SCHEME) == 0; }
+bool Utility::urlIsTcpScheme(const std::string& url) {
+  return StringUtil::startsWith(url.c_str(), TCP_SCHEME, true);
+}
+
+bool Utility::urlIsUdpScheme(const std::string& url) {
+  return StringUtil::startsWith(url.c_str(), UDP_SCHEME, true);
+}
+
+bool Utility::urlIsUnixScheme(const std::string& url) {
+  return StringUtil::startsWith(url.c_str(), UNIX_SCHEME, true);
+}
 
 namespace {
 
