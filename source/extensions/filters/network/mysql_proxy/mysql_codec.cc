@@ -154,6 +154,18 @@ int MySQLCodec::HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq) {
 
 bool MySQLCodec::EndOfBuffer(Buffer::Instance& buffer) { return (buffer.length() == offset_); }
 
+bool DecoderImpl::decode(Buffer::Instance& data) {
+  callbacks_.decode(data);
+  data.drain(data.length());
+  ENVOY_LOG(trace, "{} bytes remaining after decoding", data.length());
+  return false;
+}
+
+void DecoderImpl::onData(Buffer::Instance& data) {
+  while (data.length() > 0 && decode(data)) {
+  }
+}
+
 } // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions

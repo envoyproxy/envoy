@@ -161,6 +161,41 @@ private:
   int seq_;
 };
 
+/**
+ * General callbacks for dispatching decoded MySQL messages to a sink.
+ */
+class DecoderCallbacks {
+public:
+  virtual ~DecoderCallbacks() {}
+
+  virtual void decode(Buffer::Instance& message) PURE;
+};
+
+/**
+ * MySQL message decoder.
+ */
+class Decoder {
+public:
+  virtual ~Decoder() {}
+
+  virtual void onData(Buffer::Instance& data) PURE;
+};
+
+typedef std::unique_ptr<Decoder> DecoderPtr;
+
+class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
+public:
+  DecoderImpl(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
+
+  // MySQLProxy::Decoder
+  void onData(Buffer::Instance& data) override;
+
+private:
+  bool decode(Buffer::Instance& data);
+
+  DecoderCallbacks& callbacks_;
+};
+
 } // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions

@@ -30,13 +30,14 @@ namespace MySQLProxy {
   COUNTER(sessions)                                                              \
   COUNTER(login_attempts)                                                        \
   COUNTER(login_failures)                                                        \
+  COUNTER(decoder_errors)                                                        \
   COUNTER(protocol_errors)                                                       \
   COUNTER(upgraded_to_ssl)                                                       \
   COUNTER(auth_switch_request)                                                   \
 // clang-format on
 
 /**
- * Struct definition for all mongo proxy stats. @see stats_macros.h
+ * Struct definition for all MySQL proxy stats. @see stats_macros.h
  */
 struct MySQLProxyStats {
   ALL_MYSQL_PROXY_STATS(GENERATE_COUNTER_STRUCT)
@@ -67,26 +68,35 @@ using MySQLFilterConfigSharedPtr = std::shared_ptr<MySQLFilterConfig>;
 /**
  * Implementation of MySQL proxy filter.
  */
-class MySQLFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
- public:
-   MySQLFilter(MySQLFilterConfigSharedPtr config);
-   MySQLSession& getSession() { return session_; }
+class MySQLFilter : public Network::Filter, DecoderCallbacks, Logger::Loggable<Logger::Id::filter> {
+public:
+  MySQLFilter(MySQLFilterConfigSharedPtr config);
   ~MySQLFilter() override = default;
 
   // Network::ReadFilter
-  Network::FilterStatus onData(Buffer::Instance& data,
-                               bool end_stream) override;
+  Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
-  void initializeReadFilterCallbacks(
-      Network::ReadFilterCallbacks& callbacks) override;
-  Network::FilterStatus onWrite(Buffer::Instance& data,
-                                bool end_stream) override;
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
- private:
-  Network::FilterStatus Process(Buffer::Instance& data, bool end_stream);
+  // Network::WriteFilter
+  Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
+
+  // MySQLProxy::DecoderCallback
+  void decode(Buffer::Instance& message) override;
+
+  MySQLSession& getSession() { return session_; }
+  void doDecode(Buffer::Instance& buffer);
+  DecoderPtr createDecoder(DecoderCallbacks& callbacks);
+
+private:
+  Network::FilterStatus Process(Buffer::Instance& data);
   Network::ReadFilterCallbacks* read_callbacks_{};
   MySQLFilterConfigSharedPtr config_;
   MySQLSession session_;
+  Buffer::OwnedImpl read_buffer_;
+  Buffer::OwnedImpl write_buffer_;
+  std::unique_ptr<Decoder> decoder_;
+  bool sniffing_{true};
 };
 
 }  // namespace MySQLProxy

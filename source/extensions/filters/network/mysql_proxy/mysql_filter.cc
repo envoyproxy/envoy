@@ -22,22 +22,54 @@ void MySQLFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
   read_callbacks_ = &callbacks;
 }
 
-Network::FilterStatus MySQLFilter::onWrite(Buffer::Instance& data, bool end_stream) {
-  return Process(data, end_stream);
+Network::FilterStatus MySQLFilter::onData(Buffer::Instance& data, bool) {
+  read_buffer_.add(data);
+  doDecode(read_buffer_);
+  return Network::FilterStatus::Continue;
 }
 
-Network::FilterStatus MySQLFilter::onData(Buffer::Instance& data, bool end_stream) {
+Network::FilterStatus MySQLFilter::onWrite(Buffer::Instance& data, bool) {
+  write_buffer_.add(data);
+  doDecode(write_buffer_);
+  return Network::FilterStatus::Continue;
+}
+
+void MySQLFilter::doDecode(Buffer::Instance& buffer) {
+  if (!sniffing_) {
+    // Safety measure just to make sure that if we have a decoding error we keep going and lose
+    // stats. This can be removed once we are more confident of this code.
+    buffer.drain(buffer.length());
+    return;
+  }
+
+  // Clear dynamic metadata
   auto& dynamic_metadata = const_cast<envoy::api::v2::core::Metadata&>(
       read_callbacks_->connection().streamInfo().dynamicMetadata());
   auto& metadata =
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy];
   metadata.mutable_fields()->clear();
-  return Process(data, end_stream);
+
+  if (!decoder_) {
+    decoder_ = createDecoder(*this);
+  }
+
+  try {
+    decoder_->onData(buffer);
+  } catch (EnvoyException& e) {
+    ENVOY_LOG(info, "mysql decoding error: {}", e.what());
+    config_->stats_.decoder_errors_.inc();
+    sniffing_ = false;
+  }
 }
 
-Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, bool end_stream) {
-  ENVOY_CONN_LOG(trace, "onData, len {}, end_stream {}", read_callbacks_->connection(),
-                 data.length(), end_stream);
+DecoderPtr MySQLFilter::createDecoder(DecoderCallbacks& callbacks) {
+  return DecoderPtr{new DecoderImpl(callbacks)};
+}
+
+void MySQLFilter::decode(Buffer::Instance& message) { Process(message); }
+
+Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data) {
+  ENVOY_CONN_LOG(trace, "onData, len {}", read_callbacks_->connection(), data.length());
   if (!data.length()) {
     ENVOY_CONN_LOG(trace, "no data, return ", read_callbacks_->connection());
     return Network::FilterStatus::Continue;
