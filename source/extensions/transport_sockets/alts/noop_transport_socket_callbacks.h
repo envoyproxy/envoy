@@ -1,10 +1,13 @@
 #pragma once
+#include "envoy/network/io_handle.h"
 #include "envoy/network/transport_socket.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
+
+using Envoy::Network::IoHandle;
 
 /**
  * A TransportSocketCallbacks for wrapped TransportSocket object. Some
@@ -17,7 +20,8 @@ public:
   explicit NoOpTransportSocketCallbacks(Network::TransportSocketCallbacks& parent)
       : parent_(parent) {}
 
-  int fd() const override { return parent_.fd(); }
+  Network::IoHandlePtr& ioHandle() override { return parent_.ioHandle(); }
+  const Network::IoHandleConstPtr& ioHandle() const override { return parent_.ioHandle(); }
   Network::Connection& connection() override { return parent_.connection(); }
   bool shouldDrainReadBuffer() override { return false; }
   /*
