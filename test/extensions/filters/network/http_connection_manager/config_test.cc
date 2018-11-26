@@ -506,6 +506,7 @@ TEST_F(FilterChainTest, createFilterChain) {
   config.createFilterChain(callbacks);
 }
 
+// Tests where upgrades are configured on via the HCM.
 TEST_F(FilterChainTest, createUpgradeFilterChain) {
   auto hcm_config = parseHttpConnectionManagerFromJson(basic_config_);
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
@@ -513,17 +514,78 @@ TEST_F(FilterChainTest, createUpgradeFilterChain) {
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_);
 
-  Http::MockFilterChainFactoryCallbacks callbacks;
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+  // Check the case where WebSockets are configured in the HCM, and no router
+  // config is present. We should create an upgrade filter chain for
+  // WebSockets.
   {
     EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
     EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
-    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", callbacks));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks));
   }
 
+  // Check the case where WebSockets are configured in the HCM, and no router
+  // config is present. We should not create an upgrade filter chain for Foo
   {
     EXPECT_CALL(callbacks, addStreamFilter(_)).Times(0);
     EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(0);
-    EXPECT_FALSE(config.createUpgradeFilterChain("foo", callbacks));
+    EXPECT_FALSE(config.createUpgradeFilterChain("foo", nullptr, callbacks));
+  }
+
+  // Now override the HCM with a route-specific disabling of WebSocket to
+  // verify route-specific disabling works.
+  {
+    std::map<std::string, bool> upgrade_map;
+    upgrade_map.emplace(std::make_pair("WebSocket", false));
+    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
+  }
+
+  // For paranoia's sake make sure route-specific enabling doesn't break
+  // anything.
+  {
+    EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+    std::map<std::string, bool> upgrade_map;
+    upgrade_map.emplace(std::make_pair("WebSocket", true));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
+  }
+}
+
+// Tests where upgrades are configured off via the HCM.
+TEST_F(FilterChainTest, createUpgradeFilterChainHCMDisabled) {
+  auto hcm_config = parseHttpConnectionManagerFromJson(basic_config_);
+  hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
+  hcm_config.mutable_upgrade_configs(0)->mutable_enabled()->set_value(false);
+
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_);
+
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+  // Check the case where WebSockets are off in the HCM, and no router config is present.
+  { EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks)); }
+
+  // Check the case where WebSockets are off in the HCM and in router config.
+  {
+    std::map<std::string, bool> upgrade_map;
+    upgrade_map.emplace(std::make_pair("WebSocket", false));
+    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
+  }
+
+  // With a route-specific enabling for WebSocket, WebSocket should work.
+  {
+    std::map<std::string, bool> upgrade_map;
+    upgrade_map.emplace(std::make_pair("WebSocket", true));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
+  }
+
+  // With only a route-config we should do what the route config says.
+  {
+    std::map<std::string, bool> upgrade_map;
+    upgrade_map.emplace(std::make_pair("foo", true));
+    upgrade_map.emplace(std::make_pair("bar", false));
+    EXPECT_TRUE(config.createUpgradeFilterChain("foo", &upgrade_map, callbacks));
+    EXPECT_FALSE(config.createUpgradeFilterChain("bar", &upgrade_map, callbacks));
+    EXPECT_FALSE(config.createUpgradeFilterChain("eep", &upgrade_map, callbacks));
   }
 }
 
@@ -557,14 +619,14 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
     EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
-    EXPECT_TRUE(config.createUpgradeFilterChain("websocket", callbacks));
+    EXPECT_TRUE(config.createUpgradeFilterChain("websocket", nullptr, callbacks));
   }
 
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
     EXPECT_CALL(callbacks, addStreamDecoderFilter(_));   // Router
     EXPECT_CALL(callbacks, addStreamFilter(_)).Times(2); // Dynamo
-    EXPECT_TRUE(config.createUpgradeFilterChain("Foo", callbacks));
+    EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, callbacks));
   }
 }
 

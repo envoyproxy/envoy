@@ -229,6 +229,7 @@ Utility::parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& co
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, initial_connection_window_size,
                                       Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
   ret.allow_connect_ = config.allow_connect();
+  ret.allow_metadata_ = config.allow_metadata();
   return ret;
 }
 

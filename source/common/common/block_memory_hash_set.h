@@ -58,7 +58,7 @@ public:
 
   /**
    * Constructs a map control structure given a set of options, which cannot be changed.
-   * @param hash_set_options describes the parameters comtrolling set layout.
+   * @param hash_set_options describes the parameters controlling set layout.
    * @param init true if the memory should be initialized on construction. If false,
    *             the data in the table will be sanity checked, and an exception thrown if
    *             it is incoherent or mismatches the passed-in options.

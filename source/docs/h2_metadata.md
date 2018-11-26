@@ -11,11 +11,24 @@ are represented by a map.
 Note: the metadata implementation is still in progress, and the doc is in draft
 version.
 
-### Limitation
+### Limitation and conditions.
 
 For ease of implementation and compatibility purposes, metadata will only be
 supported in HTTP/2. Metadata sent in any other protocol should result in protocol
 errors or be ignored.
+
+To simplify the implementation, we don't allow metadata frames to carry end of
+stream flag. Because metadata frames must be associated with an existing frame, users must
+ensure metadata frames to be received before the end of stream is received by the
+peer.
+
+Metadata associated with a response can be sent before response headers, after response headers,
+between response data or after response data. If metadata frames have to be sent last,
+users must put the end of stream in an empty data frame and send the empty data frame after metadata frames.
+TODO(soya3129): add more conditions for metadata in requests.
+
+Envoy only allows up to 1M metadata to be sent per stream. If the accumulated
+metadata size exceeds the limit, the stream will be reset.
 
 ### Envoy metadata handling
 

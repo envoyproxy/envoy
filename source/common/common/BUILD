@@ -274,6 +274,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "scalar_to_byte_vector_lib",
+    hdrs = ["scalar_to_byte_vector.h"],
+)
+
+envoy_cc_library(
     name = "token_bucket_impl_lib",
     srcs = ["token_bucket_impl.cc"],
     hdrs = ["token_bucket_impl.h"],

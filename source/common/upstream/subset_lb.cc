@@ -31,7 +31,8 @@ SubsetLoadBalancer::SubsetLoadBalancer(
                                subsets.defaultSubset().fields().end()),
       subset_keys_(subsets.subsetKeys()), original_priority_set_(priority_set),
       original_local_priority_set_(local_priority_set),
-      locality_weight_aware_(subsets.localityWeightAware()) {
+      locality_weight_aware_(subsets.localityWeightAware()),
+      scale_locality_weight_(subsets.scaleLocalityWeight()) {
   ASSERT(subsets.isEnabled());
 
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
@@ -186,7 +187,7 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVecto
 
     fallback_subset_.reset(new LbSubsetEntry());
     fallback_subset_->priority_subset_.reset(
-        new PrioritySubsetImpl(*this, predicate, locality_weight_aware_));
+        new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
     return;
   }
 
@@ -278,8 +279,8 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
                      // Initialize new entry with hosts and update stats. (An uninitialized entry
                      // with only removed hosts is a degenerate case and we leave the entry
                      // uninitialized.)
-                     entry->priority_subset_.reset(
-                         new PrioritySubsetImpl(*this, predicate, locality_weight_aware_));
+                     entry->priority_subset_.reset(new PrioritySubsetImpl(
+                         *this, predicate, locality_weight_aware_, scale_locality_weight_));
                      stats_.lb_subsets_active_.inc();
                      stats_.lb_subsets_created_.inc();
                    }
@@ -419,9 +420,11 @@ void SubsetLoadBalancer::forEachSubset(LbSubsetMap& subsets,
 // with the given predicate.
 SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalancer& subset_lb,
                                                            HostPredicate predicate,
-                                                           bool locality_weight_aware)
+                                                           bool locality_weight_aware,
+                                                           bool scale_locality_weight)
     : PrioritySetImpl(), original_priority_set_(subset_lb.original_priority_set_),
-      predicate_(predicate), locality_weight_aware_(locality_weight_aware) {
+      predicate_(predicate), locality_weight_aware_(locality_weight_aware),
+      scale_locality_weight_(scale_locality_weight) {
 
   for (size_t i = 0; i < original_priority_set_.hostSetsPerPriority().size(); ++i) {
     empty_ &= getOrCreateHostSet(i).hosts().empty();
@@ -537,14 +540,38 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
       hosts_per_locality->filter([](const Host& host) { return host.healthy(); });
 
+  HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
+                           determineLocalityWeights(*hosts_per_locality), filtered_added,
+                           filtered_removed);
+}
+
+LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocalityWeights(
+    const HostsPerLocality& hosts_per_locality) const {
   if (locality_weight_aware_) {
-    HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
-                             original_host_set_.localityWeights(), filtered_added,
-                             filtered_removed);
-  } else {
-    HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
-                             {}, filtered_added, filtered_removed);
+    if (scale_locality_weight_) {
+      const auto& original_hosts_per_locality = original_host_set_.hostsPerLocality().get();
+      const auto& original_weights = *original_host_set_.localityWeights();
+
+      auto scaled_locality_weights = std::make_shared<LocalityWeights>(original_weights.size());
+      for (uint32_t i = 0; i < original_weights.size(); ++i) {
+        // If the original locality has zero hosts, skip it. This leaves the weight at zero.
+        if (original_hosts_per_locality[i].empty()) {
+          continue;
+        }
+
+        // Otherwise, scale it proportionally to the number of hosts removed by the subset
+        // predicate.
+        (*scaled_locality_weights)[i] =
+            std::round(float((original_weights[i] * hosts_per_locality.get()[i].size())) /
+                       original_hosts_per_locality[i].size());
+      }
+
+      return scaled_locality_weights;
+    } else {
+      return original_host_set_.localityWeights();
+    }
   }
+  return {};
 }
 
 HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
@@ -556,7 +583,8 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
 
   ASSERT(!overprovisioning_factor.has_value() ||
          overprovisioning_factor.value() == host_set->overprovisioning_factor());
-  return HostSetImplPtr{new HostSubsetImpl(*host_set, locality_weight_aware_)};
+  return HostSetImplPtr{
+      new HostSubsetImpl(*host_set, locality_weight_aware_, scale_locality_weight_)};
 }
 
 void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
