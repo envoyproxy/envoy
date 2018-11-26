@@ -27,4 +27,21 @@ message RBAC {
 
   // The prefix to use when emitting statistics.
   string stat_prefix = 3 [(validate.rules).string.min_bytes = 1];
+
+  enum EnforcementType {
+    // Apply RBAC policies during connection establishment to upstream.
+    ON_CONNECT = 0;
+
+    // Continuously apply RBAC policies as data arrives. Use this mode when
+    // using RBAC with message oriented protocols such as Mongo, MySQL, Kafka,
+    // etc. when the protocol decoders emit dynamic metadata such as the
+    // resources being accessed and the operations on the resources.
+    CONTINUOUS = 1;
+  };
+
+  // RBAC enforcement strategy. By default RBAC will be enforced during connection
+  // establishment to upstream. When used in conjunction with filters that emit
+  // dynamic metadata after decoding a payload (e.g., Mongo, MySQL, Kafka) set the
+  // enforcement type to CONTINUOUS.
+  EnforcementType enforcement_type = 4;
 }
