@@ -7,7 +7,6 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
@@ -62,16 +61,21 @@ TcpListenSocket::TcpListenSocket(int fd, const Address::InstanceConstSharedPtr& 
 }
 
 UdpListenSocket::UdpListenSocket(const Address::InstanceConstSharedPtr& address,
-                                 const Network::Socket::OptionsSharedPtr& options)
+                                 const Network::Socket::OptionsSharedPtr& options,
+                                 bool bind_to_port)
     : ListenSocketImpl(address->socket(Address::SocketType::Datagram), address) {
   RELEASE_ASSERT(fd_ != -1, "");
 
-  int on = 1;
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  Api::SysCallIntResult status = os_syscalls.setsockopt(fd_, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on));
-  RELEASE_ASSERT(status.rc_ != -1, fmt::format("failed to set UDP SO_REUSEPORT socket option"));
+  // TcpListenSocket sets SO_REUSEADDR to allow binding to an address/port still
+  // in TIME_WAIT. That consideration does not apply to UDP. SO_REUSEPORT could
+  // be used to allow multiple UDP sockets on the same address/port, but that
+  // can be set via SocketOptionImpl, if desired.
 
   setListenSocketOptions(options);
+
+  if (bind_to_port) {
+    doBind();
+  }
 }
 
 UdpListenSocket::UdpListenSocket(int fd, const Address::InstanceConstSharedPtr& address,
