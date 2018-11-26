@@ -56,9 +56,7 @@ void NetworkListenSocket<
 
 template <>
 void NetworkListenSocket<
-    NetworkSocketTrait<Address::SocketType::Datagram>>::setProtocolSpecificSocketOptions() {
-  // TODO (Jojy): Do we need any UDP specific socket options?
-}
+    NetworkSocketTrait<Address::SocketType::Datagram>>::setProtocolSpecificSocketOptions() {}
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
     : ListenSocketImpl(address->socket(Address::SocketType::Stream), address) {
