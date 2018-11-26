@@ -158,7 +158,7 @@ TEST_F(CorsFilterTest, OptionsRequestWithOriginCorsEnabled) {
 }
 
 TEST_F(CorsFilterTest, OptionsRequestWithoutRequestMethod) {
-  Http::TestHeaderMapImpl request_headers{{":method", "OPTIONS"}, {"origin", "localhost"}};
+  Http::TestHeaderMapImpl request_headers{{"origin", "localhost"}};
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
