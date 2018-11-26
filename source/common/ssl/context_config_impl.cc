@@ -32,8 +32,6 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
     }
     return providers;
   }
-  // TODO(htuch): Support multiple SDS secret configs; could we mix them with
-  // static?
   if (!config.tls_certificate_sds_secret_configs().empty()) {
     const auto& sds_secret_config = config.tls_certificate_sds_secret_configs(0);
     if (sds_secret_config.has_sds_config()) {
@@ -185,6 +183,8 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
     // ContextConfigImpl::tls_certificate_config_ with new secret.
     tc_update_callback_handle_ =
         tls_certficate_providers_[0]->addUpdateCallback([this, callback]() {
+          // This breaks multiple certificate support, but today SDS is only single cert.
+          // TODO(htuch): Fix this when SDS goes multi-cert.
           tls_certificate_configs_.clear();
           tls_certificate_configs_.emplace_back(*tls_certficate_providers_[0]->secret());
           callback();
