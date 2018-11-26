@@ -4,7 +4,6 @@ Client TLS authentication
 =========================
 
 * Client TLS authentication filter :ref:`architecture overview <arch_overview_ssl_auth_filter>`
-* :ref:`v1 API reference <config_network_filters_client_ssl_auth_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.network.client_ssl_auth.v2.ClientSslAuth>`
 
 .. _config_network_filters_client_ssl_auth_stats:

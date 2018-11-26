@@ -159,6 +159,7 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
+        "//test/integration/filters:random_pause_filter_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -172,9 +173,11 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//include/envoy/http:header_map_interface",
+        "//source/common/stats:stats_matcher_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
+        "@envoy_api//envoy/config/metrics/v2:stats_cc",
     ],
 )
 
@@ -190,22 +193,6 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "add_trailers_filter_config_lib",
-    srcs = [
-        "add_trailers_filter.cc",
-        "add_trailers_filter.h",
-        "add_trailers_filter_config.cc",
-        "add_trailers_filter_config.h",
-    ],
-    deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
-    ],
-)
-
-envoy_cc_test_library(
     name = "http_integration_lib",
     srcs = [
         "http_integration.cc",
@@ -214,12 +201,17 @@ envoy_cc_test_library(
         "http_integration.h",
     ],
     deps = [
-        ":add_trailers_filter_config_lib",
         ":integration_lib",
         ":test_host_predicate_lib",
+        "//include/envoy/event:timer_interface",
+        "//source/common/common:thread_annotations",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/upstream:utility_lib",
+        "//test/integration/filters:add_trailers_filter_config_lib",
+        "//test/integration/filters:headers_only_filter_config_lib",
+        "//test/integration/filters:passthrough_filter_config_lib",
+        "//test/integration/filters:pause_filter_lib",
         "//test/test_common:registry_lib",
     ],
 )
@@ -241,7 +233,10 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "idle_timeout_integration_test",
     srcs = ["idle_timeout_integration_test.cc"],
-    deps = [":http_protocol_integration_lib"],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//test/test_common:test_time_lib",
+    ],
 )
 
 envoy_cc_test_library(
@@ -265,6 +260,7 @@ envoy_cc_test_library(
     data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
         ":server_stats_interface",
+        ":tcp_dump",
         "//include/envoy/api:api_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -277,12 +273,12 @@ envoy_cc_test_library(
         "//include/envoy/server:hot_restart_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
+        "//include/envoy/thread:thread_interface",
         "//source/common/api:api_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:thread_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
@@ -314,7 +310,9 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:printers_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
     ],
 )
@@ -450,7 +448,6 @@ envoy_cc_test(
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
-        "//source/common/ratelimit:ratelimit_proto_cc",
         "//source/extensions/filters/http/ratelimit:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
@@ -481,7 +478,6 @@ envoy_cc_test(
         "//source/common/ssl:context_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/transport_sockets/ssl:config",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
@@ -537,7 +533,6 @@ envoy_cc_test(
         "//source/common/ssl:context_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/transport_sockets/ssl:config",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
@@ -582,6 +577,16 @@ envoy_cc_test(
         "//test/server:utility_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "tcp_dump",
+    srcs = ["tcp_dump.cc"],
+    hdrs = ["tcp_dump.h"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:fmt_lib",
     ],
 )
 

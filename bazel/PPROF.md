@@ -83,7 +83,7 @@ instantiation of `MainCommonBase::MainCommonBase`:
 
 Once these changes have been made in your working directory, it might make sense to
 save the diff as a patch (`git diff > file`), which can then be quickly
-applied/unapplied for testing and commiting. (`git apply`, `git apply -R`)
+applied/unapplied for testing and committing. (`git apply`, `git apply -R`)
 
 Build the binary using bazel, and run the binary without any environment variables:
 

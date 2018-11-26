@@ -4,7 +4,6 @@ Redis proxy
 ===========
 
 * Redis :ref:`architecture overview <arch_overview_redis>`
-* :ref:`v1 API reference <config_network_filters_redis_proxy_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.network.redis_proxy.v2.RedisProxy>`
 
 .. _config_network_filters_redis_proxy_stats:

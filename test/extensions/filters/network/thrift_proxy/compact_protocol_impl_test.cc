@@ -618,7 +618,7 @@ TEST_F(CompactProtocolTest, ReadListBegin) {
     addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0x1F}); // -1
 
     EXPECT_THROW_WITH_MESSAGE(proto.readListBegin(buffer, elem_type, size), EnvoyException,
-                              "negative compact procotol list/set size -1");
+                              "negative compact protocol list/set size -1");
     EXPECT_EQ(elem_type, FieldType::String);
     EXPECT_EQ(size, 1);
     EXPECT_EQ(buffer.length(), 6);

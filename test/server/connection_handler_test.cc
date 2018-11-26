@@ -51,6 +51,7 @@ public:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
+    bool reverseWriteFilterOrder() const override { return true; }
 
     ConnectionHandlerTest& parent_;
     Network::MockListenSocket socket_;
@@ -114,6 +115,48 @@ TEST_F(ConnectionHandlerTest, RemoveListener) {
   // Test stop/remove of not existent listener.
   handler_->stopListeners(0);
   handler_->removeListeners(0);
+}
+
+TEST_F(ConnectionHandlerTest, DisableListener) {
+  InSequence s;
+
+  Network::MockListener* listener = new NiceMock<Network::MockListener>();
+  Network::ListenerCallbacks* listener_callbacks;
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks = &cb;
+            return listener;
+          }));
+  TestListener* test_listener = addListener(1, false, false, "test_listener");
+  EXPECT_CALL(test_listener->socket_, localAddress());
+  handler_->addListener(*test_listener);
+
+  EXPECT_CALL(*listener, disable());
+  EXPECT_CALL(*listener, onDestroy());
+
+  handler_->disableListeners();
+}
+
+TEST_F(ConnectionHandlerTest, AddDisabledListener) {
+  InSequence s;
+
+  Network::MockListener* listener = new NiceMock<Network::MockListener>();
+  Network::ListenerCallbacks* listener_callbacks;
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks = &cb;
+            return listener;
+          }));
+  TestListener* test_listener = addListener(1, false, false, "test_listener");
+
+  EXPECT_CALL(*listener, disable());
+  EXPECT_CALL(test_listener->socket_, localAddress());
+  EXPECT_CALL(*listener, onDestroy());
+
+  handler_->disableListeners();
+  handler_->addListener(*test_listener);
 }
 
 TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {

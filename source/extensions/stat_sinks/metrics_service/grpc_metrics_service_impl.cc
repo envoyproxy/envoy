@@ -17,47 +17,19 @@ namespace StatSinks {
 namespace MetricsService {
 
 GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
-                                                 ThreadLocal::SlotAllocator& tls,
                                                  const LocalInfo::LocalInfo& local_info)
-    : tls_slot_(tls.allocateSlot()) {
-  SharedStateSharedPtr shared_state = std::make_shared<SharedState>(std::move(factory), local_info);
-  tls_slot_->set([shared_state](Event::Dispatcher&) {
-    return ThreadLocal::ThreadLocalObjectSharedPtr{new ThreadLocalStreamer(shared_state)};
-  });
-}
+    : client_(factory->create()), local_info_(local_info) {}
 
-void GrpcMetricsStreamerImpl::ThreadLocalStream::onRemoteClose(Grpc::Status::GrpcStatus,
-                                                               const std::string&) {
-  // Only erase if we have a stream. Otherwise we had an inline failure and we will clear the
-  // stream data in send().
-  if (parent_.thread_local_stream_->stream_ != nullptr) {
-    parent_.thread_local_stream_ = nullptr;
-  }
-}
-
-GrpcMetricsStreamerImpl::ThreadLocalStreamer::ThreadLocalStreamer(
-    const SharedStateSharedPtr& shared_state)
-    : client_(shared_state->factory_->create()), shared_state_(shared_state) {}
-
-void GrpcMetricsStreamerImpl::ThreadLocalStreamer::send(
-    envoy::service::metrics::v2::StreamMetricsMessage& message) {
-  if (thread_local_stream_ == nullptr) {
-    thread_local_stream_ = std::make_shared<ThreadLocalStream>(*this);
-  }
-
-  if (thread_local_stream_->stream_ == nullptr) {
-    thread_local_stream_->stream_ =
-        client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                           "envoy.service.metrics.v2.MetricsService.StreamMetrics"),
-                       *thread_local_stream_);
+void GrpcMetricsStreamerImpl::send(envoy::service::metrics::v2::StreamMetricsMessage& message) {
+  if (stream_ == nullptr) {
+    stream_ = client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                                 "envoy.service.metrics.v2.MetricsService.StreamMetrics"),
+                             *this);
     auto* identifier = message.mutable_identifier();
-    *identifier->mutable_node() = shared_state_->local_info_.node();
+    *identifier->mutable_node() = local_info_.node();
   }
-
-  if (thread_local_stream_->stream_ != nullptr) {
-    thread_local_stream_->stream_->sendMessage(message, false);
-  } else {
-    thread_local_stream_ = nullptr;
+  if (stream_ != nullptr) {
+    stream_->sendMessage(message, false);
   }
 }
 

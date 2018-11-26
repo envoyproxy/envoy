@@ -98,13 +98,6 @@ def api_proto_library(
         has_services = 0,
         linkstatic = None,
         require_py = 1):
-    # This is now vestigial, since there are no direct consumers in
-    # the data plane API. However, we want to maintain native proto_library support
-    # in the proto graph to (1) support future C++ use of native rules with
-    # cc_proto_library (or some Bazel aspect that works on proto_library) when
-    # it can play well with the PGV plugin and (2) other language support that
-    # can make use of native proto_library.
-
     native.proto_library(
         name = name,
         srcs = srcs,
@@ -123,22 +116,15 @@ def api_proto_library(
         ],
         visibility = visibility,
     )
-
-    # Under the hood, this is just an extension of the Protobuf library's
-    # bespoke cc_proto_library. It doesn't consume proto_library as a proto
-    # provider. Hopefully one day we can move to a model where this target and
-    # the proto_library above are aligned.
     pgv_cc_proto_library(
         name = _Suffix(name, _CC_SUFFIX),
-        srcs = srcs,
         linkstatic = linkstatic,
-        deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps],
-        external_deps = external_cc_proto_deps + [
-            "@com_google_protobuf//:cc_wkt_protos",
+        cc_deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps] + external_cc_proto_deps + [
+            "@com_github_gogo_protobuf//:gogo_proto_cc",
             "@googleapis//:http_api_protos",
             "@googleapis//:rpc_status_protos",
-            "@com_github_gogo_protobuf//:gogo_proto_cc",
         ],
+        deps = [":" + name],
         visibility = ["//visibility:public"],
     )
     py_export_suffixes = []
@@ -147,7 +133,7 @@ def api_proto_library(
         py_export_suffixes = ["_py", "_py_genproto"]
 
     # Allow unlimited visibility for consumers
-    export_suffixes = ["", "_cc", "_cc_validate", "_cc_proto", "_cc_proto_genproto"] + py_export_suffixes
+    export_suffixes = ["", "_cc", "_cc_validate"] + py_export_suffixes
     for s in export_suffixes:
         native.alias(
             name = name + "_export" + s,

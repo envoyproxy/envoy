@@ -412,7 +412,8 @@ void DetectorImpl::processSuccessRateEjections() {
     }
   }
 
-  if (valid_success_rate_hosts.size() >= success_rate_minimum_hosts) {
+  if (!valid_success_rate_hosts.empty() &&
+      valid_success_rate_hosts.size() >= success_rate_minimum_hosts) {
     double success_rate_stdev_factor =
         runtime_.snapshot().getInteger("outlier_detection.success_rate_stdev_factor",
                                        config_.successRateStdevFactor()) /

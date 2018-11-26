@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <string>
 
+#include "envoy/api/api.h"
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
@@ -82,7 +83,7 @@ bool illegalPath(const std::string& path);
 class FileImpl : public File {
 public:
   FileImpl(const std::string& path, Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
-           Stats::Store& stats_store, std::chrono::milliseconds flush_interval_msec);
+           Stats::Store& stats_store, Api::Api& api, std::chrono::milliseconds flush_interval_msec);
   ~FileImpl();
 
   // Filesystem::File
@@ -120,7 +121,7 @@ private:
                                           // not get interleaved by multiple processes writing to
                                           // the same file during hot-restart.
   Thread::MutexBasicLockable flush_lock_; // This lock is used to prevent simulataneous flushes from
-                                          // the flush thread and a syncronous flush. This protects
+                                          // the flush thread and a synchronous flush. This protects
                                           // concurrent access to the about_to_write_buffer_, fd_,
                                           // and all other data used during flushing and file
                                           // re-opening.
@@ -146,6 +147,7 @@ private:
                                             // final write to disk.
   Event::TimerPtr flush_timer_;
   Api::OsSysCalls& os_sys_calls_;
+  Api::Api& api_;
   const std::chrono::milliseconds flush_interval_msec_; // Time interval buffer gets flushed no
                                                         // matter if it reached the MIN_FLUSH_SIZE
                                                         // or not.

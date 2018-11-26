@@ -85,6 +85,11 @@ standard Debian installations. Common paths for system CA bundles on Linux and B
 See the reference for :ref:`UpstreamTlsContexts <envoy_api_msg_auth.UpstreamTlsContext>` and
 :ref:`DownstreamTlsContexts <envoy_api_msg_auth.DownstreamTlsContext>` for other TLS options.
 
+Secret discovery service (SDS)
+------------------------------
+
+TLS certificates can be specified in the static resource or can be fetched remotely. Please see :ref:`SDS <config_secret_discovery_service>` for details.
+
 .. _arch_overview_ssl_auth_filter:
 
 Authentication filter

@@ -54,7 +54,6 @@ API.
 Configuration
 -------------
 
-* :ref:`v1 API reference <config_http_filters_lua_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.lua.v2.Lua>`
 
 Script examples
@@ -290,16 +289,16 @@ under the filter name i.e. *envoy.lua*. Below is an example of a *metadata* in a
 
 Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
 
-requestInfo()
+streamInfo()
 ^^^^^^^^^^^^^
 
 .. code-block:: lua
 
-  requestInfo = handle:requestInfo()
+  streamInfo = handle:streamInfo()
 
-Returns :repo:`information <include/request_info/request_info.h>` related to the current request.
+Returns :repo:`information <include/stream_info/stream_info.h>` related to the current request.
 
-Returns a :ref:`request info object <config_http_filters_lua_request_info_wrapper>`.
+Returns a :ref:`stream info object <config_http_filters_lua_stream_info_wrapper>`.
 
 connection()
 ^^^^^^^^^^^^
@@ -426,9 +425,9 @@ __pairs()
 Iterates through every *metadata* entry. *key* is a string that supplies a *metadata*
 key. *value* is *metadata* entry value.
 
-.. _config_http_filters_lua_request_info_wrapper:
+.. _config_http_filters_lua_stream_info_wrapper:
 
-Request info object API
+Stream info object API
 -----------------------
 
 protocol()
@@ -436,7 +435,7 @@ protocol()
 
 .. code-block:: lua
 
-  requestInfo:protocol()
+  streamInfo:protocol()
 
 Returns the string representation of :repo:`HTTP protocol <include/envoy/http/protocol.h>`
 used by the current request. The possible values are: *HTTP/1.0*, *HTTP/1.1*, and *HTTP/2*.
@@ -446,11 +445,11 @@ dynamicMetadata()
 
 .. code-block:: lua
 
-  requestInfo:dynamicMetadata()
+  streamInfo:dynamicMetadata()
 
-Returns a :ref:`dynamic metadata object <config_http_filters_lua_request_info_dynamic_metadata_wrapper>`.
+Returns a :ref:`dynamic metadata object <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>`.
 
-.. _config_http_filters_lua_request_info_dynamic_metadata_wrapper:
+.. _config_http_filters_lua_stream_info_dynamic_metadata_wrapper:
 
 Dynamic metadata object API
 ---------------------------

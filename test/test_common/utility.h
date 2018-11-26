@@ -7,11 +7,13 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
+#include "envoy/thread/thread.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/c_smart_ptr.h"
@@ -98,6 +100,7 @@ public:
 private:
   const int32_t seed_;
   std::ranlux48 generator_;
+  RealTimeSource real_time_source_;
 };
 
 class TestUtility {
@@ -127,6 +130,21 @@ public:
    */
   static void feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
                                              uint64_t seed = 0);
+
+  /**
+   * Finds a stat in a vector with the given name.
+   * @param name the stat name to look for.
+   * @param v the vector of stats.
+   * @return the stat
+   */
+  template <typename T> static T findByName(const std::vector<T>& v, const std::string& name) {
+    auto pos = std::find_if(v.begin(), v.end(),
+                            [&name](const T& stat) -> bool { return stat->name() == name; });
+    if (pos == v.end()) {
+      return nullptr;
+    }
+    return *pos;
+  }
 
   /**
    * Find a counter in a stats store.
@@ -286,6 +304,10 @@ public:
   }
 
   static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
+
+  static void renameFile(const std::string& old_name, const std::string& new_name);
+  static void createDirectory(const std::string& name);
+  static void createSymlink(const std::string& target, const std::string& link);
 };
 
 /**
@@ -376,6 +398,15 @@ public:
   bool has(const LowerCaseString& key);
 };
 
+// Helper method to create a header map from an initializer list. Useful due to make_unique's
+// inability to infer the initializer list type.
+inline HeaderMapPtr
+makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& values) {
+  return std::make_unique<TestHeaderMapImpl,
+                          const std::initializer_list<std::pair<std::string, std::string>>&>(
+      values);
+}
+
 } // namespace Http
 
 namespace Stats {
@@ -430,6 +461,14 @@ public:
 };
 
 } // namespace Stats
+
+namespace Thread {
+ThreadFactory& threadFactoryForTest();
+} // namespace Thread
+
+namespace Api {
+ApiPtr createApiForTest();
+} // namespace Api
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, rhs, "") {
   *result_listener << *rhs << " is not equal to " << *arg;

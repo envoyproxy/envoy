@@ -18,22 +18,18 @@ These are the requirements:
 
   Only essential parts are listed in the configuration below for the cluster manager.
 
-.. code-block:: json
+.. code-block:: yaml
 
-  {
-    "sds": "{...}",
-    "local_cluster_name": "cluster_a",
-    "clusters": [
-      {
-        "name": "cluster_a",
-        "type": "sds",
-      },
-      {
-        "name": "cluster_b",
-        "type": "sds"
-      }
-    ]
-  }
+  cluster_manager:
+    local_cluster_name: cluster_a
+  static_resources:
+    clusters:
+    - name: cluster_a
+      type: EDS
+      eds_cluster_config: ...
+    - name: cluster_b
+      type: EDS
+      eds_cluster_config: ...
 
 Envoy configuration on the destination service
 ----------------------------------------------
@@ -44,13 +40,10 @@ information must be available as part of that response.
 
 Only zone related data is listed in the response below.
 
-.. code-block:: json
+.. code-block:: yaml
 
-   {
-      "tags": {
-          "az": "us-east-1d"
-      }
-   }
+  locality:
+    zone: us-east-1d
 
 Infrastructure setup
 --------------------

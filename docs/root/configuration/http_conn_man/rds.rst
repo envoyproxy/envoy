@@ -9,7 +9,6 @@ HTTP header modifications, virtual hosts, and the individual route entries conta
 virtual host. Each :ref:`HTTP connection manager filter <config_http_conn_man>` can independently
 fetch its own route configuration via the API.
 
-* :ref:`v1 API reference <config_http_conn_man_rds_v1>`
 * :ref:`v2 API reference <v2_grpc_streaming_endpoints>`
 
 Statistics

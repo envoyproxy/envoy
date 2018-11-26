@@ -1,5 +1,8 @@
 #pragma once
 
+#include <algorithm>
+#include <functional>
+
 namespace Envoy {
 /**
  * See if a reference exists within a container of std::reference_wrappers.

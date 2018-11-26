@@ -1,5 +1,7 @@
 #include "extensions/stat_sinks/hystrix/config.h"
 
+#include <memory>
+
 #include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/config/metrics/v2/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -22,8 +24,7 @@ Stats::SinkPtr HystrixSinkFactory::createStatsSink(const Protobuf::Message& conf
 }
 
 ProtobufTypes::MessagePtr HystrixSinkFactory::createEmptyConfigProto() {
-  return std::unique_ptr<envoy::config::metrics::v2::HystrixSink>(
-      new envoy::config::metrics::v2::HystrixSink());
+  return std::make_unique<envoy::config::metrics::v2::HystrixSink>();
 }
 
 std::string HystrixSinkFactory::name() { return StatsSinkNames::get().Hystrix; }

@@ -193,5 +193,11 @@ public:
    * @param path.
    */
   static void removePath(const std::string& path);
+
+  /**
+   * Set environment variable. Same args as setenv(2).
+   */
+  static void setEnvVar(const std::string& name, const std::string& value, int overwrite);
 };
+
 } // namespace Envoy

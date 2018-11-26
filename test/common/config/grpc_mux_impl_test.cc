@@ -1,10 +1,14 @@
+#include <memory>
+
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
+#include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
@@ -13,6 +17,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -35,15 +40,23 @@ namespace {
 class GrpcMuxImplTest : public testing::Test {
 public:
   GrpcMuxImplTest() : async_client_(new Grpc::MockAsyncClient()) {
-    dispatcher_.setTimeSystem(mock_time_system_);
+    dispatcher_.setTimeSystem(time_system_);
   }
 
   void setup() {
-    grpc_mux_.reset(new GrpcMuxImpl(
+    grpc_mux_ = std::make_unique<GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_));
+        random_, stats_, rate_limit_settings_);
+  }
+
+  void setup(const RateLimitSettings& custom_rate_limit_settings) {
+    grpc_mux_ = std::make_unique<GrpcMuxImpl>(
+        local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
+        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
+        random_, stats_, custom_rate_limit_settings);
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -75,8 +88,10 @@ public:
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
   NiceMock<MockGrpcMuxCallbacks> callbacks_;
-  NiceMock<MockTimeSystem> mock_time_system_;
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Stats::IsolatedStoreImpl stats_;
+  Envoy::Config::RateLimitSettings rate_limit_settings_;
 };
 
 // Validate behavior when multiple type URL watches are maintained, watches are created/destroyed
@@ -90,6 +105,7 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
   grpc_mux_->start();
+  EXPECT_EQ(1, stats_.gauge("control_plane.connected_state").value());
   expectSendMessage("bar", {"z"}, "");
   auto bar_z_sub = grpc_mux_->subscribe("bar", {"z"}, callbacks_);
   expectSendMessage("bar", {"zz", "z"}, "");
@@ -101,6 +117,8 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
 
 // Validate behavior when multiple type URL watches are maintained and the stream is reset.
 TEST_F(GrpcMuxImplTest, ResetStream) {
+  InSequence s;
+
   Event::MockTimer* timer = nullptr;
   Event::TimerCb timer_cb;
   EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
@@ -109,8 +127,8 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
     timer = new Event::MockTimer();
     return timer;
   }));
+
   setup();
-  InSequence s;
   auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
   auto bar_sub = grpc_mux_->subscribe("bar", {}, callbacks_);
   auto baz_sub = grpc_mux_->subscribe("baz", {"z"}, callbacks_);
@@ -124,6 +142,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   ASSERT_TRUE(timer != nullptr); // initialized from dispatcher mock.
   EXPECT_CALL(*timer, enableTimer(_));
   grpc_mux_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
+  EXPECT_EQ(0, stats_.gauge("control_plane.connected_state").value());
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
@@ -180,11 +199,11 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
     invalid_response->mutable_resources()->Add()->set_type_url("bar");
     EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)).WillOnce(Invoke([](const EnvoyException* e) {
       EXPECT_TRUE(
-          IsSubstring("", "", "bar does not match foo type URL is DiscoveryResponse", e->what()));
+          IsSubstring("", "", "bar does not match foo type URL in DiscoveryResponse", e->what()));
     }));
 
     expectSendMessage("foo", {"x", "y"}, "", "", Grpc::Status::GrpcStatus::Internal,
-                      fmt::format("bar does not match foo type URL is DiscoveryResponse {}",
+                      fmt::format("bar does not match foo type URL in DiscoveryResponse {}",
                                   invalid_response->DebugString()));
     grpc_mux_->onReceiveMessage(std::move(invalid_response));
   }
@@ -246,7 +265,9 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
     envoy::api::v2::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
     response->add_resources()->PackFrom(load_assignment);
-    EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "1")).Times(0);
+    EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "1"))
+        .WillOnce(Invoke([](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                            const std::string&) { EXPECT_TRUE(resources.empty()); }));
     EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
         .WillOnce(
             Invoke([&load_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -304,61 +325,34 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   expectSendMessage(type_url, {}, "2");
 }
 
-// Validate behavior when we have multiple watchers that send empty updates.
-TEST_F(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
-  setup();
-  InSequence s;
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  NiceMock<MockGrpcMuxCallbacks> foo_callbacks;
-  auto foo_sub = grpc_mux_->subscribe(type_url, {"x", "y"}, foo_callbacks);
+// Exactly one test requires a mock time system to provoke behavior that cannot
+// easily be achieved with a SimulatedTimeSystem.
+class GrpcMuxImplTestWithMockTimeSystem : public GrpcMuxImplTest {
+protected:
+  GrpcMuxImplTestWithMockTimeSystem() { dispatcher_.setTimeSystem(mock_time_system_); }
 
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage(type_url, {"x", "y"}, "");
-  grpc_mux_->start();
+  MockTimeSystem mock_time_system_;
+};
 
-  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-      new envoy::api::v2::DiscoveryResponse());
-  response->set_type_url(type_url);
-  response->set_version_info("1");
+//  Verifies that rate limiting is not enforced with defaults.
+TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
+  // Validate that only connection retry timer is enabled.
+  Event::MockTimer* timer = nullptr;
+  Event::TimerCb timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
+    timer_cb = cb;
+    EXPECT_EQ(nullptr, timer);
+    timer = new Event::MockTimer();
+    return timer;
+  }));
 
-  EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1")).Times(0);
-  expectSendMessage(type_url, {"x", "y"}, "1");
-  grpc_mux_->onReceiveMessage(std::move(response));
+  // Validate that rate limiter is not created.
+  EXPECT_CALL(mock_time_system_, monotonicTime()).Times(0);
 
-  expectSendMessage(type_url, {}, "1");
-}
-
-// Validate behavior when we have Single Watcher that sends Empty updates.
-TEST_F(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
-  setup();
-  const std::string& type_url = Config::TypeUrl::get().Cluster;
-  NiceMock<MockGrpcMuxCallbacks> foo_callbacks;
-  auto foo_sub = grpc_mux_->subscribe(type_url, {}, foo_callbacks);
-
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage(type_url, {}, "");
-  grpc_mux_->start();
-
-  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-      new envoy::api::v2::DiscoveryResponse());
-  response->set_type_url(type_url);
-  response->set_version_info("1");
-  // Validate that onConfigUpdate is called with empty resources.
-  EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
-      .WillOnce(Invoke([](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                          const std::string&) { EXPECT_TRUE(resources.empty()); }));
-  expectSendMessage(type_url, {}, "1");
-  grpc_mux_->onReceiveMessage(std::move(response));
-}
-
-//  Verifies that warning messages get logged when Envoy detects too many requests.
-TEST_F(GrpcMuxImplTest, TooManyRequests) {
   setup();
 
-  EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(100));
+  EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(99));
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-  EXPECT_CALL(mock_time_system_, monotonicTime())
-      .WillRepeatedly(Return(std::chrono::steady_clock::time_point{}));
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
@@ -378,25 +372,123 @@ TEST_F(GrpcMuxImplTest, TooManyRequests) {
   // Exhausts the limit.
   onReceiveMessage(99);
 
-  // API calls go over the limit for the first time.
-  EXPECT_LOG_CONTAINS("warning", "Too many sendDiscoveryRequest calls for foo",
-                      onReceiveMessage(1));
+  // API calls go over the limit but we do not see the stat incremented.
+  onReceiveMessage(1);
+  EXPECT_EQ(0, stats_.counter("control_plane.rate_limit_enforced").value());
+}
 
-  // Logging limiter waits for 5s, so a second warning message is expected.
+//  Verifies that default rate limiting is enforced with empty RateLimitSettings.
+TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSettings) {
+  // Validate that request drain timer is created.
+  Event::MockTimer* timer = nullptr;
+  Event::MockTimer* drain_request_timer = nullptr;
+
+  Event::TimerCb timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
+        timer_cb = cb;
+        EXPECT_EQ(nullptr, timer);
+        timer = new Event::MockTimer();
+        return timer;
+      }))
+      .WillOnce(Invoke([&drain_request_timer, &timer_cb](Event::TimerCb cb) {
+        timer_cb = cb;
+        EXPECT_EQ(nullptr, drain_request_timer);
+        drain_request_timer = new Event::MockTimer();
+        return drain_request_timer;
+      }));
   EXPECT_CALL(mock_time_system_, monotonicTime())
-      .Times(4)
-      .WillOnce(Return(std::chrono::steady_clock::time_point{}))
-      .WillOnce(Return(std::chrono::steady_clock::time_point{std::chrono::seconds(5)}))
-      .WillOnce(Return(std::chrono::steady_clock::time_point{std::chrono::seconds(6)}))
-      .WillOnce(Return(std::chrono::steady_clock::time_point{std::chrono::seconds(7)}));
+      .WillRepeatedly(Return(std::chrono::steady_clock::time_point{}));
 
-  // API calls go over the limit for the second time.
-  EXPECT_LOG_CONTAINS("warning", "Too many sendDiscoveryRequest calls for foo",
-                      onReceiveMessage(1));
+  RateLimitSettings custom_rate_limit_settings;
+  custom_rate_limit_settings.enabled_ = true;
+  setup(custom_rate_limit_settings);
 
-  // Without waiting full 5s, no rate limit log is expected.
-  EXPECT_LOG_NOT_CONTAINS("warning", "Too many sendDiscoveryRequest calls for foo",
-                          onReceiveMessage(1));
+  EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(99));
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+
+  const auto onReceiveMessage = [&](uint64_t burst) {
+    for (uint64_t i = 0; i < burst; i++) {
+      std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+          new envoy::api::v2::DiscoveryResponse());
+      response->set_version_info("baz");
+      response->set_nonce("bar");
+      response->set_type_url("foo");
+      grpc_mux_->onReceiveMessage(std::move(response));
+    }
+  };
+
+  auto foo_sub = grpc_mux_->subscribe("foo", {"x"}, callbacks_);
+  expectSendMessage("foo", {"x"}, "");
+  grpc_mux_->start();
+
+  // Validate that drain_request_timer is enabled when there are no tokens.
+  EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(100)));
+  onReceiveMessage(99);
+  EXPECT_EQ(1, stats_.counter("control_plane.rate_limit_enforced").value());
+  EXPECT_EQ(1, stats_.gauge("control_plane.pending_requests").value());
+}
+
+//  Verifies that rate limiting is enforced with custom RateLimitSettings.
+TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
+  // Validate that request drain timer is created.
+  Event::MockTimer* timer = nullptr;
+  Event::MockTimer* drain_request_timer = nullptr;
+
+  Event::TimerCb timer_cb;
+  Event::TimerCb drain_timer_cb;
+
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
+        timer_cb = cb;
+        EXPECT_EQ(nullptr, timer);
+        timer = new Event::MockTimer();
+        return timer;
+      }))
+      .WillOnce(Invoke([&drain_request_timer, &drain_timer_cb](Event::TimerCb cb) {
+        drain_timer_cb = cb;
+        EXPECT_EQ(nullptr, drain_request_timer);
+        drain_request_timer = new Event::MockTimer();
+        return drain_request_timer;
+      }));
+
+  RateLimitSettings custom_rate_limit_settings;
+  custom_rate_limit_settings.enabled_ = true;
+  custom_rate_limit_settings.max_tokens_ = 250;
+  custom_rate_limit_settings.fill_rate_ = 2;
+  setup(custom_rate_limit_settings);
+
+  EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(260));
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+
+  const auto onReceiveMessage = [&](uint64_t burst) {
+    for (uint64_t i = 0; i < burst; i++) {
+      std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+          new envoy::api::v2::DiscoveryResponse());
+      response->set_version_info("baz");
+      response->set_nonce("bar");
+      response->set_type_url("foo");
+      grpc_mux_->onReceiveMessage(std::move(response));
+    }
+  };
+
+  auto foo_sub = grpc_mux_->subscribe("foo", {"x"}, callbacks_);
+  expectSendMessage("foo", {"x"}, "");
+  grpc_mux_->start();
+
+  // Validate that rate limit is not enforced for 100 requests.
+  onReceiveMessage(100);
+  EXPECT_EQ(0, stats_.counter("control_plane.rate_limit_enforced").value());
+
+  // Validate that drain_request_timer is enabled when there are no tokens.
+  EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(500))).Times(AtLeast(1));
+  onReceiveMessage(160);
+  EXPECT_EQ(12, stats_.counter("control_plane.rate_limit_enforced").value());
+  EXPECT_EQ(12, stats_.counter("control_plane.pending_requests").value());
+
+  // Validate that drain requests call when there are multiple requests in queue.
+  time_system_.setMonotonicTime(std::chrono::seconds(10));
+  drain_timer_cb();
 }
 
 //  Verifies that a messsage with no resources is accepted.
@@ -472,7 +564,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_),
+          random_, stats_, rate_limit_settings_),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
@@ -485,7 +577,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_),
+          random_, stats_, rate_limit_settings_),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");

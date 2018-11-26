@@ -41,6 +41,7 @@ envoy_cc_library(
         ":codec_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:stack_array",
         "//source/common/common:utility_lib",
     ],
 )

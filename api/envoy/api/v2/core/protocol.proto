@@ -77,18 +77,7 @@ message Http2ProtocolOptions {
   google.protobuf.UInt32Value initial_connection_window_size = 4
       [(validate.rules).uint32 = {gte: 65535, lte: 2147483647}];
 
-  // [#not-implemented-hide:] Hiding until nghttp2 has native support.
-  //
   // Allows proxying Websocket and other upgrades over H2 connect.
-  //
-  // THIS IS NOT SAFE TO USE IN PRODUCTION
-  //
-  // This currently works via disabling all HTTP sanity checks for H2 traffic
-  // which is a much larger hammer than we'd like to use. Eventually when
-  // https://github.com/nghttp2/nghttp2/issues/1181 is resolved, this will work
-  // with simply enabling CONNECT for H2. This may require some tweaks to the
-  // headers making pre-CONNECT-support proxying not backwards compatible with
-  // post-CONNECT-support proxying.
   bool allow_connect = 5;
 }
 

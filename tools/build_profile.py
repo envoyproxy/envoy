@@ -6,6 +6,7 @@
 import re
 import sys
 
+
 def PrintProfile(f):
   prev_cmd = None
   prev_timestamp = None
@@ -16,6 +17,7 @@ def PrintProfile(f):
       if prev_cmd:
         print '%.2f %s' % (float(timestamp) - float(prev_timestamp), prev_cmd)
       prev_timestamp, prev_cmd = timestamp, cmd
+
 
 if __name__ == '__main__':
   PrintProfile(sys.stdin)

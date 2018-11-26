@@ -47,6 +47,7 @@ correspondence between an xDS API and a resource type. That is:
 * [RDS: `envoy.api.v2.RouteConfiguration`](envoy/api/v2/rds.proto)
 * [CDS: `envoy.api.v2.Cluster`](envoy/api/v2/cds.proto)
 * [EDS: `envoy.api.v2.ClusterLoadAssignment`](envoy/api/v2/eds.proto)
+* [SDS: `envoy.api.v2.Auth.Secret`](envoy/api/v2/auth/cert.proto)
 
 The concept of [_type
 URLs_](https://developers.google.com/protocol-buffers/docs/proto3#any) appears

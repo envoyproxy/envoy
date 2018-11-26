@@ -25,6 +25,6 @@ headers_to_add {
     value: "%START_TIME%"
   }
 }
-request_info {
+stream_info {
   start_time: 1522796769123
 }

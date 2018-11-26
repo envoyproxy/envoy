@@ -1,19 +1,18 @@
 #pragma once
 
-#include <dirent.h>
-
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
-#include "envoy/api/os_sys_calls.h"
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/type/percent.pb.validate.h"
 
+#include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
@@ -59,7 +58,9 @@ struct RuntimeStats {
 /**
  * Implementation of Snapshot whose source is the vector of layers passed to the constructor.
  */
-class SnapshotImpl : public Snapshot, public ThreadLocal::ThreadLocalObject {
+class SnapshotImpl : public Snapshot,
+                     public ThreadLocal::ThreadLocalObject,
+                     Logger::Loggable<Logger::Id::runtime> {
 public:
   SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
                std::vector<OverrideLayerConstPtr>&& layers);
@@ -70,6 +71,10 @@ public:
   bool featureEnabled(const std::string& key, uint64_t default_value) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value,
                       uint64_t random_value) const override;
+  bool featureEnabled(const std::string& key,
+                      const envoy::type::FractionalPercent& default_value) const override;
+  bool featureEnabled(const std::string& key, const envoy::type::FractionalPercent& default_value,
+                      uint64_t random_value) const override;
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string& key, uint64_t default_value) const override;
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
@@ -77,8 +82,18 @@ public:
   static Entry createEntry(const std::string& value);
 
 private:
+  static void resolveEntryType(Entry& entry) {
+    if (parseEntryUintValue(entry)) {
+      return;
+    }
+    parseEntryFractionalPercentValue(entry);
+  }
+
+  static bool parseEntryUintValue(Entry& entry);
+  static void parseEntryFractionalPercentValue(Entry& entry);
+
   const std::vector<OverrideLayerConstPtr> layers_;
-  std::unordered_map<std::string, const Snapshot::Entry> values_;
+  EntryMap values_;
   RandomGenerator& generator_;
 };
 
@@ -88,13 +103,11 @@ private:
 class OverrideLayerImpl : public Snapshot::OverrideLayer {
 public:
   explicit OverrideLayerImpl(const std::string& name) : name_{name} {}
-  const std::unordered_map<std::string, Snapshot::Entry>& values() const override {
-    return values_;
-  }
+  const Snapshot::EntryMap& values() const override { return values_; }
   const std::string& name() const override { return name_; }
 
 protected:
-  std::unordered_map<std::string, Snapshot::Entry> values_;
+  Snapshot::EntryMap values_;
   const std::string name_;
 };
 
@@ -128,26 +141,12 @@ private:
  */
 class DiskLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
-  DiskLayer(const std::string& name, const std::string& path, Api::OsSysCalls& os_sys_calls);
+  DiskLayer(const std::string& name, const std::string& path);
 
 private:
-  struct Directory {
-    Directory(const std::string& path) {
-      dir_ = opendir(path.c_str());
-      if (!dir_) {
-        throw EnvoyException(fmt::format("unable to open directory: {}", path));
-      }
-    }
-
-    ~Directory() { closedir(dir_); }
-
-    DIR* dir_;
-  };
-
   void walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth);
 
   const std::string path_;
-  Api::OsSysCalls& os_sys_calls_;
   // Maximum recursion depth for walkDirectory().
   const uint32_t MaxWalkDepth = 16;
 };
@@ -198,7 +197,7 @@ public:
   DiskBackedLoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
                        const std::string& root_symlink_path, const std::string& subdir,
                        const std::string& override_dir, Stats::Store& store,
-                       RandomGenerator& generator, Api::OsSysCallsPtr os_sys_calls);
+                       RandomGenerator& generator);
 
 private:
   std::unique_ptr<SnapshotImpl> createNewSnapshot() override;
@@ -206,7 +205,6 @@ private:
   const Filesystem::WatcherPtr watcher_;
   const std::string root_path_;
   const std::string override_path_;
-  const Api::OsSysCallsPtr os_sys_calls_;
 };
 
 } // namespace Runtime

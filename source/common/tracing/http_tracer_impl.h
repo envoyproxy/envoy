@@ -76,7 +76,7 @@ public:
    *
    * @return decision if request is traceable or not and Reason why.
    **/
-  static Decision isTracing(const RequestInfo::RequestInfo& request_info,
+  static Decision isTracing(const StreamInfo::StreamInfo& stream_info,
                             const Http::HeaderMap& request_headers);
 
   /**
@@ -84,8 +84,7 @@ public:
    * 2) Finish active span.
    */
   static void finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
-                           const RequestInfo::RequestInfo& request_info,
-                           const Config& tracing_config);
+                           const StreamInfo::StreamInfo& stream_info, const Config& tracing_config);
 
   static const std::string INGRESS_OPERATION;
   static const std::string EGRESS_OPERATION;
@@ -126,7 +125,7 @@ public:
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
-  SpanPtr startSpan(const Config&, Http::HeaderMap&, const RequestInfo::RequestInfo&,
+  SpanPtr startSpan(const Config&, Http::HeaderMap&, const StreamInfo::StreamInfo&,
                     const Tracing::Decision) override {
     return SpanPtr{new NullSpan()};
   }
@@ -138,7 +137,7 @@ public:
 
   // Tracing::HttpTracer
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
-                    const RequestInfo::RequestInfo& request_info,
+                    const StreamInfo::StreamInfo& stream_info,
                     const Tracing::Decision tracing_decision) override;
 
 private:

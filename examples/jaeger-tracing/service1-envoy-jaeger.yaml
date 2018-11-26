@@ -88,6 +88,7 @@ tracing:
     config:
       collector_cluster: jaeger
       collector_endpoint: "/api/v1/spans"
+      shared_span_context: false
 admin:
   access_log_path: "/dev/null"
   address:

@@ -104,10 +104,8 @@ typedef std::shared_ptr<AccessLog> AccessLogSharedPtr;
 class FaultConfig {
 public:
   FaultConfig(const envoy::config::filter::fault::v2::FaultDelay& fault_config)
-      : duration_ms_(PROTOBUF_GET_MS_REQUIRED(fault_config, fixed_delay)) {
-    PROTOBUF_SET_FRACTIONAL_PERCENT_OR_DEFAULT(delay_percentage_, fault_config, percentage,
-                                               percent);
-  }
+      : delay_percentage_(fault_config.percentage()),
+        duration_ms_(PROTOBUF_GET_MS_REQUIRED(fault_config, fixed_delay)) {}
   envoy::type::FractionalPercent delayPercentage() const { return delay_percentage_; }
   uint64_t delayDuration() const { return duration_ms_; }
 
@@ -130,7 +128,7 @@ public:
   ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
               AccessLogSharedPtr access_log, const FaultConfigSharedPtr& fault_config,
               const Network::DrainDecision& drain_decision, Runtime::RandomGenerator& generator,
-              Event::TimeSystem& time_system);
+              Event::TimeSystem& time_system, bool emit_dynamic_metadata);
   ~ProxyFilter();
 
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
@@ -159,6 +157,8 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
+
+  void setDynamicMetadata(std::string operation, std::string resource);
 
 private:
   struct ActiveQuery {
@@ -209,6 +209,7 @@ private:
   Event::TimerPtr delay_timer_;
   Event::TimerPtr drain_close_timer_;
   Event::TimeSystem& time_system_;
+  const bool emit_dynamic_metadata_;
 };
 
 class ProdProxyFilter : public ProxyFilter {

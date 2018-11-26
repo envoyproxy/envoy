@@ -47,7 +47,7 @@ const size_t TRAILERS_SIZE = sizeof(TRAILERS) - 1;
 
 class GrpcWebFilterTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
-  GrpcWebFilterTest() : filter_(cm_) {
+  GrpcWebFilterTest() : filter_() {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -103,7 +103,6 @@ public:
   }
 
   GrpcWebFilter filter_;
-  NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
@@ -181,7 +180,8 @@ TEST_F(GrpcWebFilterTest, Base64NoPadding) {
 TEST_P(GrpcWebFilterTest, StatsNoCluster) {
   Http::TestHeaderMapImpl request_headers{{"content-type", request_content_type()},
                                           {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
-  EXPECT_CALL(cm_, get(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
+
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_FALSE(doStatTracking());
 }
@@ -201,10 +201,12 @@ TEST_P(GrpcWebFilterTest, StatsNormalResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
   Http::TestHeaderMapImpl response_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
                      .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.success")
                      .value());
-  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
                      .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
 }
@@ -219,10 +221,12 @@ TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
   Http::TestHeaderMapImpl response_trailers{{"grpc-status", "1"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
                      .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.failure")
                      .value());
-  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
                      .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
 }

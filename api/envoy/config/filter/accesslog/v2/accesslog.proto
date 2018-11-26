@@ -7,6 +7,7 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/route/route.proto";
 import "envoy/type/percent.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
@@ -24,14 +25,19 @@ message AccessLog {
   // Filter which is used to determine if the access log needs to be written.
   AccessLogFilter filter = 2;
 
-  // Custom configuration that depends on the access log being instantiated. Built-in configurations
-  // include:
+  // Custom configuration that depends on the access log being instantiated. Built-in
+  // configurations include:
   //
   // #. "envoy.file_access_log": :ref:`FileAccessLog
   //    <envoy_api_msg_config.accesslog.v2.FileAccessLog>`
   // #. "envoy.http_grpc_access_log": :ref:`HttpGrpcAccessLogConfig
   //    <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`
-  google.protobuf.Struct config = 3;
+  oneof config_type {
+    google.protobuf.Struct config = 3;
+
+    // [#not-implemented-hide:]
+    google.protobuf.Any typed_config = 4;
+  }
 }
 
 message AccessLogFilter {

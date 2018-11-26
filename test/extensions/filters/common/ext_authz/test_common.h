@@ -79,6 +79,10 @@ MATCHER_P(AuthzOkResponse, response, "") {
   return true;
 }
 
+MATCHER_P(ContainsPairAsHeader, pair, "") {
+  return arg->headers().get(pair.first)->value().getStringView() == pair.second;
+}
+
 struct KeyValueOption {
   std::string key;
   std::string value;

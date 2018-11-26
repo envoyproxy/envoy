@@ -11,6 +11,7 @@
 
 #include "common/common/logger.h"
 #include "common/ssl/context_impl.h"
+#include "common/ssl/utility.h"
 
 #include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
@@ -38,7 +39,8 @@ class SslSocket : public Network::TransportSocket,
                   public Connection,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
-  SslSocket(ContextSharedPtr ctx, InitialState state);
+  SslSocket(ContextSharedPtr ctx, InitialState state,
+            Network::TransportSocketOptionsSharedPtr transport_socket_options);
 
   // Ssl::Connection
   bool peerCertificatePresented() const override;
@@ -69,11 +71,6 @@ private:
   void drainErrorQueue();
   void shutdownSsl();
 
-  // TODO: Move helper functions to the `Ssl::Utility` namespace.
-  std::string getUriSanFromCertificate(X509* cert) const;
-  std::string getSubjectFromCertificate(X509* cert) const;
-  std::vector<std::string> getDnsSansFromCertificate(X509* cert) const;
-
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
   bssl::UniquePtr<SSL> ssl_;
@@ -91,7 +88,8 @@ public:
   ClientSslSocketFactory(ClientContextConfigPtr config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope);
 
-  Network::TransportSocketPtr createTransportSocket() const override;
+  Network::TransportSocketPtr
+  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
 
   // Secret::SecretCallbacks
@@ -113,7 +111,8 @@ public:
   ServerSslSocketFactory(ServerContextConfigPtr config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope, const std::vector<std::string>& server_names);
 
-  Network::TransportSocketPtr createTransportSocket() const override;
+  Network::TransportSocketPtr
+  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
 
   // Secret::SecretCallbacks

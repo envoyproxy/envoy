@@ -24,9 +24,9 @@ public:
   class JwksReceiver {
   public:
     enum class Failure {
-      /* A network error occured causing JWKS retrieval failure. */
+      /* A network error occurred causing JWKS retrieval failure. */
       Network,
-      /* A failure occured when trying to parse the retrieved JWKS data. */
+      /* A failure occurred when trying to parse the retrieved JWKS data. */
       InvalidJwks,
     };
 

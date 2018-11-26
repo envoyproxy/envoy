@@ -70,7 +70,7 @@ config, and then change the first `HttpConnectionManager` to be different from t
 An example of modifying the bootstrap proto to overwrite runtime defaults:
 
 ```c++
-TestEnvironment::writeStringToFileForTest("runtime/ssl.alt_alpn", "100");
+TestEnvironment::writeStringToFileForTest("runtime/ratelimit.tcp_filter_enabled", "100");
 config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
   bootstrap.mutable_runtime()->set_symlink_root(TestEnvironment::temporaryPath("runtime");
 });
@@ -149,7 +149,7 @@ The full command might look something like
 ```
 bazel test //test/integration:http2_upstream_integration_test \
 --test_arg=--gtest_filter="IpVersions/Http2UpstreamIntegrationTest.RouterRequestAndResponseWithBodyNoBuffer/IPv6" \
---jobs 60 --local_resources 100000000000,100000000000,10000000 --test_arg="-l trace"
+--jobs 60 --local_resources 100000000000,100000000000,10000000 --runs_per_test=1000 --test_arg="-l trace"
 ```
 
 ## Debugging test flakes

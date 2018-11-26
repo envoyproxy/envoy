@@ -82,6 +82,9 @@ public:
   Router::Config& routerConfig() override { return *this; }
 
 private:
+  void processFilter(
+      const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftFilter& proto_config);
+
   Server::Configuration::FactoryContext& context_;
   const std::string stats_prefix_;
   ThriftFilterStats stats_;

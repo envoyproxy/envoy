@@ -47,3 +47,8 @@ message StringMatcher {
     string regex = 4 [(validate.rules).string.max_bytes = 1024];
   }
 }
+
+// Specifies a list of ways to match a string.
+message ListStringMatcher {
+  repeated StringMatcher patterns = 1 [(validate.rules).repeated .min_items = 1];
+}

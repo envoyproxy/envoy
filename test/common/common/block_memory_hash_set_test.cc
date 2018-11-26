@@ -51,7 +51,7 @@ protected:
     hash_set_options_.num_slots = 5;
     const uint32_t mem_size =
         BlockMemoryHashSet<TestValueClass>::numBytes(hash_set_options_, stats_options_);
-    memory_.reset(new uint8_t[mem_size]);
+    memory_ = std::make_unique<uint8_t[]>(mem_size);
     memset(memory_.get(), 0, mem_size);
   }
 

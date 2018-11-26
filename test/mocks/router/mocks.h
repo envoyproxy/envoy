@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
@@ -33,7 +34,7 @@ public:
 
   // DirectResponseEntry
   MOCK_CONST_METHOD2(finalizeResponseHeaders,
-                     void(Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info));
+                     void(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info));
   MOCK_CONST_METHOD1(newPath, std::string(const Http::HeaderMap& headers));
   MOCK_CONST_METHOD2(rewritePathHeader,
                      void(Http::HeaderMap& headers, bool insert_envoy_original_path));
@@ -70,12 +71,17 @@ public:
   uint32_t numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
   MOCK_CONST_METHOD0(retryHostPredicates, std::vector<Upstream::RetryHostPredicateSharedPtr>());
+  MOCK_CONST_METHOD0(retryPriority, Upstream::RetryPrioritySharedPtr());
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
+  const std::vector<uint32_t>& retriableStatusCodes() const override {
+    return retriable_status_codes_;
+  }
 
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
   uint32_t host_selection_max_attempts_;
+  std::vector<uint32_t> retriable_status_codes_;
 };
 
 class MockRetryState : public RetryState {
@@ -91,6 +97,8 @@ public:
                                         DoRetryCallback callback));
   MOCK_METHOD1(onHostAttempted, void(Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Upstream::Host& host));
+  MOCK_METHOD2(priorityLoadForRetry, Upstream::PriorityLoad&(const Upstream::PrioritySet&,
+                                                             const Upstream::PriorityLoad&));
   MOCK_CONST_METHOD0(hostSelectionMaxAttempts, uint32_t());
 
   DoRetryCallback callback_;
@@ -172,6 +180,7 @@ public:
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
   MOCK_CONST_METHOD0(routeConfig, const Config&());
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
+  MOCK_CONST_METHOD0(includeAttemptCount, bool());
   MOCK_METHOD0(retryPriority, Upstream::RetryPrioritySharedPtr());
   MOCK_METHOD0(retryHostPredicate, Upstream::RetryHostPredicateSharedPtr());
 
@@ -225,10 +234,10 @@ public:
   MOCK_CONST_METHOD0(clusterName, const std::string&());
   MOCK_CONST_METHOD0(clusterNotFoundResponseCode, Http::Code());
   MOCK_CONST_METHOD3(finalizeRequestHeaders,
-                     void(Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info,
+                     void(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                           bool insert_envoy_original_path));
   MOCK_CONST_METHOD2(finalizeResponseHeaders,
-                     void(Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info));
+                     void(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info));
   MOCK_CONST_METHOD0(hashPolicy, const HashPolicy*());
   MOCK_CONST_METHOD0(metadataMatchCriteria, const Router::MetadataMatchCriteria*());
   MOCK_CONST_METHOD0(priority, Upstream::ResourcePriority());
@@ -242,19 +251,14 @@ public:
   MOCK_CONST_METHOD0(virtualHostName, const std::string&());
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
   MOCK_CONST_METHOD0(autoHostRewrite, bool());
-  MOCK_CONST_METHOD0(useOldStyleWebSocket, bool());
-  MOCK_CONST_METHOD5(createWebSocketProxy,
-                     Http::WebSocketProxyPtr(Http::HeaderMap& request_headers,
-                                             RequestInfo::RequestInfo& request_info,
-                                             Http::WebSocketProxyCallbacks& callbacks,
-                                             Upstream::ClusterManager& cluster_manager,
-                                             Network::ReadFilterCallbacks* read_callbacks));
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
+  MOCK_CONST_METHOD0(typedMetadata, const Envoy::Config::TypedMetadata&());
   MOCK_CONST_METHOD0(pathMatchCriterion, const PathMatchCriterion&());
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
+  MOCK_CONST_METHOD0(includeAttemptCount, bool());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;

@@ -18,6 +18,7 @@ envoy_cc_library(
         "//source/common/common:hash_lib",
         "//source/common/common:thread_annotations",
         "//source/common/common:thread_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 
@@ -126,6 +127,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/stats:symbol_table_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
     ],
 )
@@ -163,12 +165,25 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "stats_matcher_lib",
+    srcs = ["stats_matcher_impl.cc"],
+    hdrs = ["stats_matcher_impl.h"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+        "//source/common/common:matchers_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/config/metrics/v2:stats_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "thread_local_store_lib",
     srcs = ["thread_local_store.cc"],
     hdrs = ["thread_local_store.h"],
     deps = [
         ":heap_stat_data_lib",
         ":stats_lib",
+        ":stats_matcher_lib",
         ":tag_producer_lib",
         "//include/envoy/thread_local:thread_local_interface",
     ],

@@ -59,7 +59,7 @@ public:
    * from the buffer.
    * @param buffer the buffer to read from
    * @param metadata MessageMetadata to be updated with name, message type, and sequence id.
-   * @return true if a message header was sucessfully read, false if more data is required
+   * @return true if a message header was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid message header
    */
   virtual bool readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) PURE;
@@ -68,7 +68,7 @@ public:
    * Reads the end of a Thrift protocol message from the buffer. If successful, the message footer
    * is removed from the buffer.
    * @param buffer the buffer to read from
-   * @return true if a message footer was sucessfully read, false if more data is required
+   * @return true if a message footer was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid message footer
    */
   virtual bool readMessageEnd(Buffer::Instance& buffer) PURE;
@@ -78,7 +78,7 @@ public:
    * value from the struct header. If successful, the struct header is removed from the buffer.
    * @param buffer the buffer to read from
    * @param name updated with the struct name on success only
-   * @return true if a struct header was sucessfully read, false if more data is required
+   * @return true if a struct header was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid struct header
    */
   virtual bool readStructBegin(Buffer::Instance& buffer, std::string& name) PURE;
@@ -87,7 +87,7 @@ public:
    * Reads the end of a Thrift struct from the buffer. If successful, the struct footer is removed
    * from the buffer.
    * @param buffer the buffer to read from
-   * @return true if a struct footer was sucessfully read, false if more data is required
+   * @return true if a struct footer was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid struct footer
    */
   virtual bool readStructEnd(Buffer::Instance& buffer) PURE;
@@ -100,7 +100,7 @@ public:
    * @param name updated with the field name on success only
    * @param field_type updated with the FieldType on success only
    * @param field_id updated with the field ID on success only
-   * @return true if a field header was sucessfully read, false if more data is required
+   * @return true if a field header was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid field header
    */
   virtual bool readFieldBegin(Buffer::Instance& buffer, std::string& name, FieldType& field_type,
@@ -110,7 +110,7 @@ public:
    * Reads the end of a Thrift struct field from the buffer. If successful, the field footer is
    * removed from the buffer.
    * @param buffer the buffer to read from
-   * @return true if a field footer was sucessfully read, false if more data is required
+   * @return true if a field footer was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid field footer
    */
   virtual bool readFieldEnd(Buffer::Instance& buffer) PURE;
@@ -123,7 +123,7 @@ public:
    * @param key_type updated with map key FieldType on success only
    * @param value_type updated with map value FieldType on success only
    * @param size updated with the number of key-value pairs in the map on success only
-   * @return true if a map header was sucessfully read, false if more data is required
+   * @return true if a map header was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid map header
    */
   virtual bool readMapBegin(Buffer::Instance& buffer, FieldType& key_type, FieldType& value_type,
@@ -133,7 +133,7 @@ public:
    * Reads the end of a Thrift map from the buffer. If successful, the map footer is removed from
    * the buffer.
    * @param buffer the buffer to read from
-   * @return true if a map footer was sucessfully read, false if more data is required
+   * @return true if a map footer was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid map footer
    */
   virtual bool readMapEnd(Buffer::Instance& buffer) PURE;
@@ -145,7 +145,7 @@ public:
    * @param buffer the buffer to read from
    * @param elem_type updated with list element FieldType on success only
    * @param size updated with the number of list members on success only
-   * @return true if a list header was sucessfully read, false if more data is required
+   * @return true if a list header was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid list header
    */
   virtual bool readListBegin(Buffer::Instance& buffer, FieldType& elem_type, uint32_t& size) PURE;
@@ -154,7 +154,7 @@ public:
    * Reads the end of a Thrift list from the buffer. If successful, the list footer is removed from
    * the buffer.
    * @param buffer the buffer to read from
-   * @return true if a list footer was sucessfully read, false if more data is required
+   * @return true if a list footer was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid list footer
    */
   virtual bool readListEnd(Buffer::Instance& buffer) PURE;
@@ -166,7 +166,7 @@ public:
    * @param buffer the buffer to read from
    * @param elem_type updated with set element FieldType on success only
    * @param size updated with the number of set members on success only
-   * @return true if a set header was sucessfully read, false if more data is required
+   * @return true if a set header was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid set header
    */
   virtual bool readSetBegin(Buffer::Instance& buffer, FieldType& elem_type, uint32_t& size) PURE;
@@ -175,7 +175,7 @@ public:
    * Reads the end of a Thrift set from the buffer. If successful, the set footer is removed from
    * the buffer.
    * @param buffer the buffer to read from
-   * @return true if a set footer was sucessfully read, false if more data is required
+   * @return true if a set footer was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid set footer
    */
   virtual bool readSetEnd(Buffer::Instance& buffer) PURE;

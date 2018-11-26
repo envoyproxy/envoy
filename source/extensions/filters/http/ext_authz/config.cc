@@ -34,7 +34,8 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
                Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Filters::Common::ExtAuthz::RawHttpClientImpl>(
           cluster_name, filter_config->cm(), std::chrono::milliseconds(timeout_ms), path_prefix,
-          filter_config->allowedAuthorizationHeaders(), filter_config->allowedRequestHeaders());
+          filter_config->allowedAuthorizationHeaders(), filter_config->allowedRequestHeaders(),
+          filter_config->authorizationHeadersToAdd());
       callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{
           std::make_shared<Filter>(filter_config, std::move(client))});
     };
@@ -54,6 +55,13 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
         std::make_shared<Filter>(filter_config, std::move(client))});
   };
 };
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute& proto_config,
+    Server::Configuration::FactoryContext&) {
+  return std::make_shared<FilterConfigPerRoute>(proto_config);
+}
 
 /**
  * Static registration for the external authorization filter. @see RegisterFactory.

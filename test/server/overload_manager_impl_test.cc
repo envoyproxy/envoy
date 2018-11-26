@@ -77,9 +77,10 @@ protected:
         register_factory2_(factory2_) {}
 
   void setDispatcherExpectation() {
+    timer_ = new NiceMock<Event::MockTimer>();
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&](Event::TimerCb cb) {
       timer_cb_ = cb;
-      return new NiceMock<Event::MockTimer>();
+      return timer_;
     }));
   }
 
@@ -129,6 +130,7 @@ protected:
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Event::MockTimer>* timer_; // not owned
   Stats::IsolatedStoreImpl stats_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
   Event::TimerCb timer_cb_;
@@ -198,6 +200,8 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   EXPECT_EQ(2, cb_count);
   EXPECT_EQ(0, active_gauge.value());
   EXPECT_EQ(40, pressure_gauge2.value());
+
+  manager->stop();
 }
 
 TEST_F(OverloadManagerImplTest, FailedUpdates) {
@@ -212,6 +216,8 @@ TEST_F(OverloadManagerImplTest, FailedUpdates) {
   EXPECT_EQ(1, failed_updates.value());
   timer_cb_();
   EXPECT_EQ(2, failed_updates.value());
+
+  manager->stop();
 }
 
 TEST_F(OverloadManagerImplTest, SkippedUpdates) {
@@ -235,6 +241,8 @@ TEST_F(OverloadManagerImplTest, SkippedUpdates) {
   post_cb();
   timer_cb_();
   EXPECT_EQ(2, skipped_updates.value());
+
+  manager->stop();
 }
 
 TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
@@ -306,6 +314,17 @@ TEST_F(OverloadManagerImplTest, DuplicateTrigger) {
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException, "Duplicate trigger .*");
 }
+
+TEST_F(OverloadManagerImplTest, Shutdown) {
+  setDispatcherExpectation();
+
+  auto manager(createOverloadManager(getConfig()));
+  manager->start();
+
+  EXPECT_CALL(*timer_, disableTimer());
+  manager->stop();
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

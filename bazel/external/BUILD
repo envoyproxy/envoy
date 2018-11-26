@@ -6,6 +6,7 @@ cc_library(
     deps = [
         "@com_google_googletest//:gtest",
         "@com_lightstep_tracer_cpp//:lightstep_tracer",
+        "@com_github_datadog_dd_opentracing_cpp//:dd_opentracing_cpp",
         "@io_opentracing_cpp//:opentracing",
     ],
 )

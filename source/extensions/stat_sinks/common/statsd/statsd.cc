@@ -233,7 +233,7 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
 
   if (!connection_) {
     Upstream::Host::CreateConnectionData info =
-        parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_info_->name(), nullptr);
+        parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_info_->name(), nullptr, nullptr);
     if (!info.connection_) {
       return;
     }
@@ -244,7 +244,7 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
                                      parent_.cluster_info_->stats().upstream_cx_rx_bytes_buffered_,
                                      parent_.cluster_info_->stats().upstream_cx_tx_bytes_total_,
                                      parent_.cluster_info_->stats().upstream_cx_tx_bytes_buffered_,
-                                     &parent_.cluster_info_->stats().bind_errors_});
+                                     &parent_.cluster_info_->stats().bind_errors_, nullptr});
     connection_->connect();
   }
 

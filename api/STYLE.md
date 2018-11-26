@@ -112,6 +112,10 @@ In addition, the following conventions should be followed:
   // [#comment:next free field: 28]
   ```
 
+* The [Breaking Change
+  Policy](https://github.com/envoyproxy/envoy/blob/master//CONTRIBUTING.md#breaking-change-policy) describes
+  API versioning, deprecation and compatibility.
+
 ## Package organization
 
 API definitions are layered hierarchically in packages from top-to-bottom:

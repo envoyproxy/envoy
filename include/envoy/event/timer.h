@@ -7,12 +7,11 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
+#include "common/common/thread.h"
 #include "common/event/libevent.h"
 
 namespace Envoy {
 namespace Event {
-
-class TimerCB;
 
 /**
  * Callback invoked when a timer event fires.
@@ -58,6 +57,8 @@ typedef std::unique_ptr<Scheduler> SchedulerPtr;
 class TimeSystem : public TimeSource {
 public:
   virtual ~TimeSystem() {}
+
+  using Duration = MonotonicTime::duration;
 
   /**
    * Creates a timer factory. This indirection enables thread-local timer-queue management,

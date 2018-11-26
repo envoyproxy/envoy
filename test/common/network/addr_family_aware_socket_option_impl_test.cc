@@ -61,7 +61,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6EmptyOptionNames) {
 }
 
 // If a platform suppports IPv4 and IPv6 socket option variants for an IPv4 address, we apply the
-// IPv4 varient
+// IPv4 variant
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V4IgnoreV6) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
   const int fd = address.socket(Address::SocketType::Stream);

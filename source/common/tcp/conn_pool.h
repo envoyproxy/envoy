@@ -22,7 +22,8 @@ class ConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
-               const Network::ConnectionSocket::OptionsSharedPtr& options);
+               const Network::ConnectionSocket::OptionsSharedPtr& options,
+               Network::TransportSocketOptionsSharedPtr transport_socket_options);
 
   ~ConnPoolImpl();
 
@@ -124,7 +125,9 @@ protected:
     ~PendingRequest();
 
     // ConnectionPool::Cancellable
-    void cancel() override { parent_.onPendingRequestCancel(*this); }
+    void cancel(ConnectionPool::CancelPolicy cancel_policy) override {
+      parent_.onPendingRequestCancel(*this, cancel_policy);
+    }
 
     ConnPoolImpl& parent_;
     ConnectionPool::Callbacks& callbacks_;
@@ -135,20 +138,22 @@ protected:
   void assignConnection(ActiveConn& conn, ConnectionPool::Callbacks& callbacks);
   void createNewConnection();
   void onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent event);
-  void onPendingRequestCancel(PendingRequest& request);
+  void onPendingRequestCancel(PendingRequest& request, ConnectionPool::CancelPolicy cancel_policy);
   virtual void onConnReleased(ActiveConn& conn);
   virtual void onConnDestroyed(ActiveConn& conn);
   void onUpstreamReady();
-  void processIdleConnection(ActiveConn& conn, bool delay);
+  void processIdleConnection(ActiveConn& conn, bool new_connection, bool delay);
   void checkForDrained();
 
   Event::Dispatcher& dispatcher_;
   Upstream::HostConstSharedPtr host_;
   Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
+  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 
-  std::list<ActiveConnPtr> ready_conns_;
-  std::list<ActiveConnPtr> busy_conns_;
+  std::list<ActiveConnPtr> pending_conns_; // conns awaiting connected event
+  std::list<ActiveConnPtr> ready_conns_;   // conns ready for assignment
+  std::list<ActiveConnPtr> busy_conns_;    // conns assigned
   std::list<PendingRequestPtr> pending_requests_;
   std::list<DrainedCb> drained_callbacks_;
   Stats::TimespanPtr conn_connect_ms_;

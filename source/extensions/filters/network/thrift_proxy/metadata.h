@@ -127,6 +127,7 @@ class HeaderValues {
 public:
   const Http::LowerCaseString ClientId{":client-id"};
   const Http::LowerCaseString Dest{":dest"};
+  const Http::LowerCaseString MethodName{":method-name"};
 };
 typedef ConstSingleton<HeaderValues> Headers;
 

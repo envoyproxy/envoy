@@ -4,7 +4,6 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -74,25 +73,16 @@ public:
   void setup() {
     EXPECT_CALL(dispatcher, createFilesystemWatcher_())
         .WillOnce(ReturnNew<NiceMock<Filesystem::MockWatcher>>());
-
-    os_sys_calls_ = new NiceMock<Api::MockOsSysCalls>;
-    ON_CALL(*os_sys_calls_, stat(_, _))
-        .WillByDefault(Invoke([](const char* filename, struct stat* stat) {
-          const int rc = ::stat(filename, stat);
-          return Api::SysCallIntResult{rc, errno};
-        }));
   }
 
   void run(const std::string& primary_dir, const std::string& override_dir) {
-    Api::OsSysCallsPtr os_sys_calls(os_sys_calls_);
-    loader.reset(new DiskBackedLoaderImpl(dispatcher, tls,
-                                          TestEnvironment::temporaryPath(primary_dir), "envoy",
-                                          override_dir, store, generator, std::move(os_sys_calls)));
+    loader = std::make_unique<DiskBackedLoaderImpl>(dispatcher, tls,
+                                                    TestEnvironment::temporaryPath(primary_dir),
+                                                    "envoy", override_dir, store, generator);
   }
 
   Event::MockDispatcher dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
-  NiceMock<Api::MockOsSysCalls>* os_sys_calls_{};
 
   Stats::IsolatedStoreImpl store;
   MockRandomGenerator generator;
@@ -125,6 +115,37 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   EXPECT_CALL(generator, random()).WillOnce(Return(2));
   EXPECT_FALSE(loader->snapshot().featureEnabled("file3", 1));
 
+  // Fractional percent feature enablement
+  envoy::type::FractionalPercent fractional_percent;
+  fractional_percent.set_numerator(5);
+  fractional_percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(50));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file8", fractional_percent)); // valid data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(60));
+  EXPECT_FALSE(loader->snapshot().featureEnabled("file8", fractional_percent)); // valid data
+
+  // We currently expect that runtime values represented as fractional percents that are provided as
+  // integers are parsed simply as percents (denominator of 100).
+  EXPECT_CALL(generator, random()).WillOnce(Return(53));
+  EXPECT_FALSE(loader->snapshot().featureEnabled("file10", fractional_percent)); // valid int data
+  EXPECT_CALL(generator, random()).WillOnce(Return(51));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file10", fractional_percent)); // valid int data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(4));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(6));
+  EXPECT_FALSE(
+      loader->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(4));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file1", fractional_percent)); // invalid data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(6));
+  EXPECT_FALSE(loader->snapshot().featureEnabled("file1", fractional_percent)); // invalid data
+
   // Check stable value
   EXPECT_TRUE(loader->snapshot().featureEnabled("file3", 1, 1));
   EXPECT_FALSE(loader->snapshot().featureEnabled("file3", 1, 3));
@@ -142,8 +163,8 @@ TEST_F(DiskBackedLoaderImplTest, GetLayers) {
   run("test/common/runtime/test_data/current", "envoy_override");
   const auto& layers = loader->snapshot().getLayers();
   EXPECT_EQ(3, layers.size());
-  EXPECT_EQ("hello", layers[0]->values().find("file1")->second.string_value_);
-  EXPECT_EQ("hello override", layers[1]->values().find("file1")->second.string_value_);
+  EXPECT_EQ("hello", layers[0]->values().find("file1")->second.raw_string_value_);
+  EXPECT_EQ("hello override", layers[1]->values().find("file1")->second.raw_string_value_);
   // Admin should be last
   EXPECT_NE(nullptr, dynamic_cast<const AdminLayer*>(layers.back().get()));
   EXPECT_TRUE(layers[2]->values().empty());
@@ -151,23 +172,12 @@ TEST_F(DiskBackedLoaderImplTest, GetLayers) {
   loader->mergeValues({{"foo", "bar"}});
   // The old snapshot and its layers should have been invalidated. Refetch.
   const auto& new_layers = loader->snapshot().getLayers();
-  EXPECT_EQ("bar", new_layers[2]->values().find("foo")->second.string_value_);
+  EXPECT_EQ("bar", new_layers[2]->values().find("foo")->second.raw_string_value_);
 }
 
 TEST_F(DiskBackedLoaderImplTest, BadDirectory) {
   setup();
   run("/baddir", "/baddir");
-}
-
-TEST_F(DiskBackedLoaderImplTest, BadStat) {
-  setup();
-  EXPECT_CALL(*os_sys_calls_, stat(_, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
-  run("test/common/runtime/test_data/current", "envoy_override");
-  EXPECT_EQ(store.counter("runtime.load_error").value(), 1);
-  // We should still have the admin layer
-  const auto& layers = loader->snapshot().getLayers();
-  EXPECT_EQ(1, layers.size());
-  EXPECT_NE(nullptr, dynamic_cast<const AdminLayer*>(layers.back().get()));
 }
 
 TEST_F(DiskBackedLoaderImplTest, OverrideFolderDoesNotExist) {
@@ -248,18 +258,18 @@ TEST(LoaderImplTest, All) {
 }
 
 TEST(DiskLayer, IllegalPath) {
-  Api::MockOsSysCalls mock_os_syscalls;
-  EXPECT_THROW_WITH_MESSAGE(DiskLayer("test", "/dev", mock_os_syscalls), EnvoyException,
-                            "Invalid path: /dev");
+#if defined(WIN32)
+  // no illegal paths on Windows at the moment
+  return;
+#endif
+  EXPECT_THROW_WITH_MESSAGE(DiskLayer("test", "/dev"), EnvoyException, "Invalid path: /dev");
 }
 
 // Validate that we catch recursion that goes too deep in the runtime filesystem
 // walk.
 TEST(DiskLayer, Loop) {
-  Api::OsSysCallsImpl os_syscalls;
   EXPECT_THROW_WITH_MESSAGE(
-      DiskLayer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop"),
-                os_syscalls),
+      DiskLayer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop")),
       EnvoyException, "Walk recursion depth exceded 16");
 }
 

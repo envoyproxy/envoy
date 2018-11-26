@@ -7,7 +7,7 @@
 
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/request_info/request_info_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "test/test_common/printers.h"
 
@@ -154,10 +154,10 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11,
-                                                   factory_context_->dispatcher().timeSystem());
+  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
+                                                factory_context_->dispatcher().timeSystem());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                              true);
     actual = tool_config.headers_->get_(Http::Headers::get().Path);
   }
@@ -166,10 +166,10 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11,
-                                                   factory_context_->dispatcher().timeSystem());
+  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
+                                                factory_context_->dispatcher().timeSystem());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                              true);
     actual = tool_config.headers_->get_(Http::Headers::get().Host);
   }
@@ -194,11 +194,11 @@ bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config, const std::str
 bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
                                                const std::string& expected) {
   std::string actual = "";
-  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11,
-                                                   factory_context_->dispatcher().timeSystem());
-  request_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
+  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
+                                                factory_context_->dispatcher().timeSystem());
+  stream_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                              true);
     actual = tool_config.headers_->get_(field);
   }

@@ -4,7 +4,6 @@ Health check
 ============
 
 * Health check filter :ref:`architecture overview <arch_overview_health_checking_filter>`
-* :ref:`v1 API reference <config_http_filters_health_check_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.health_check.v2.HealthCheck>`
 
 .. note::

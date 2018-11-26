@@ -128,15 +128,17 @@ ConfigImpl::ConfigImpl(
       transport_(lookupTransport(config.transport())), proto_(lookupProtocol(config.protocol())),
       route_matcher_(new Router::RouteMatcher(config.route_config())) {
 
-  // Construct the only Thrift DecoderFilter: the Router
-  auto& factory =
-      Envoy::Config::Utility::getAndCheckFactory<ThriftFilters::NamedThriftFilterConfigFactory>(
-          ThriftFilters::ThriftFilterNames::get().ROUTER);
-  ThriftFilters::FilterFactoryCb callback;
+  if (config.thrift_filters().empty()) {
+    ENVOY_LOG(debug, "using default router filter");
 
-  auto empty_config = factory.createEmptyConfigProto();
-  callback = factory.createFilterFactoryFromProto(*empty_config, stats_prefix_, context_);
-  filter_factories_.push_back(callback);
+    envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftFilter router;
+    router.set_name(ThriftFilters::ThriftFilterNames::get().ROUTER);
+    processFilter(router);
+  } else {
+    for (const auto& filter : config.thrift_filters()) {
+      processFilter(filter);
+    }
+  }
 }
 
 void ConfigImpl::createFilterChain(ThriftFilters::FilterChainFactoryCallbacks& callbacks) {
@@ -151,6 +153,29 @@ TransportPtr ConfigImpl::createTransport() {
 
 ProtocolPtr ConfigImpl::createProtocol() {
   return NamedProtocolConfigFactory::getFactory(proto_).createProtocol();
+}
+
+void ConfigImpl::processFilter(
+    const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftFilter& proto_config) {
+  const ProtobufTypes::String& string_name = proto_config.name();
+
+  ENVOY_LOG(debug, "    thrift filter #{}", filter_factories_.size());
+  ENVOY_LOG(debug, "      name: {}", string_name);
+
+  const Json::ObjectSharedPtr filter_config =
+      MessageUtil::getJsonObjectFromMessage(proto_config.config());
+  ENVOY_LOG(debug, "      config: {}", filter_config->asJsonString());
+
+  auto& factory =
+      Envoy::Config::Utility::getAndCheckFactory<ThriftFilters::NamedThriftFilterConfigFactory>(
+          string_name);
+
+  ProtobufTypes::MessagePtr message =
+      Envoy::Config::Utility::translateToFactoryConfig(proto_config, factory);
+  ThriftFilters::FilterFactoryCb callback =
+      factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
+
+  filter_factories_.push_back(callback);
 }
 
 } // namespace ThriftProxy

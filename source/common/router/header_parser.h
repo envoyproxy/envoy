@@ -19,7 +19,7 @@ typedef std::unique_ptr<HeaderParser> HeaderParserPtr;
 /**
  * HeaderParser manipulates Http::HeaderMap instances. Headers to be added are pre-parsed to select
  * between a constant value implementation and a dynamic value implementation based on
- * RequestInfo::RequestInfo fields.
+ * StreamInfo::StreamInfo fields.
  */
 class HeaderParser {
 public:
@@ -39,8 +39,7 @@ public:
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add,
       const Protobuf::RepeatedPtrField<ProtobufTypes::String>& headers_to_remove);
 
-  void evaluateHeaders(Http::HeaderMap& headers,
-                       const RequestInfo::RequestInfo& request_info) const;
+  void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const;
 
 protected:
   HeaderParser() {}

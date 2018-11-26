@@ -42,5 +42,6 @@ envoy_cc_mock(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )

@@ -16,7 +16,7 @@ listeners:
             host_rewrite: www.google.com
             cluster: service_google
       filters:
-      - { type: decoder, name: router, config: {} }
+      - { name: router, config: {} }
 
 admin:
   access_log_path: /tmp/admin_access.log

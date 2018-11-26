@@ -15,8 +15,7 @@ envoy_cc_test_library(
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/common:token_bucket_interface",
-        "//include/envoy/event:timer_interface",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/event:real_time_system_lib",
+        "//test/test_common:test_time_lib",
     ],
 )

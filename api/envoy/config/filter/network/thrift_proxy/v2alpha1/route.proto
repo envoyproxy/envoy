@@ -70,7 +70,7 @@ message RouteMatch {
   repeated envoy.api.v2.route.HeaderMatcher headers = 4;
 }
 
-// [#comment:next free field: 3]
+// [#comment:next free field: 5]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -92,6 +92,11 @@ message RouteAction {
   // with values there taking precedence. Keys and values should be provided under the "envoy.lb"
   // metadata key.
   envoy.api.v2.core.Metadata metadata_match = 3;
+
+  // Specifies a set of rate limit configurations that could be applied to the route.
+  // N.B. Thrift service or method name matching can be achieved by specifying a RequestHeaders
+  // action with the header name ":method-name".
+  repeated envoy.api.v2.route.RateLimit rate_limits = 4;
 }
 
 // Allows for specification of multiple upstream clusters along with weights that indicate the

@@ -27,20 +27,21 @@ public:
   FilterStatus messageEnd() override { return FilterStatus::Continue; }
   FilterStatus structBegin(absl::string_view name) override;
   FilterStatus structEnd() override;
-  FilterStatus fieldBegin(absl::string_view name, FieldType field_type, int16_t field_id) override;
+  FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
+                          int16_t& field_id) override;
   FilterStatus fieldEnd() override;
-  FilterStatus boolValue(bool value) override;
-  FilterStatus byteValue(uint8_t value) override;
-  FilterStatus int16Value(int16_t value) override;
-  FilterStatus int32Value(int32_t value) override;
-  FilterStatus int64Value(int64_t value) override;
-  FilterStatus doubleValue(double value) override;
+  FilterStatus boolValue(bool& value) override;
+  FilterStatus byteValue(uint8_t& value) override;
+  FilterStatus int16Value(int16_t& value) override;
+  FilterStatus int32Value(int32_t& value) override;
+  FilterStatus int64Value(int64_t& value) override;
+  FilterStatus doubleValue(double& value) override;
   FilterStatus stringValue(absl::string_view value) override;
-  FilterStatus mapBegin(FieldType key_type, FieldType value_type, uint32_t size) override;
+  FilterStatus mapBegin(FieldType& key_type, FieldType& value_type, uint32_t& size) override;
   FilterStatus mapEnd() override;
-  FilterStatus listBegin(FieldType elem_type, uint32_t size) override;
+  FilterStatus listBegin(FieldType& elem_type, uint32_t& size) override;
   FilterStatus listEnd() override;
-  FilterStatus setBegin(FieldType elem_type, uint32_t size) override;
+  FilterStatus setBegin(FieldType& elem_type, uint32_t& size) override;
   FilterStatus setEnd() override;
 
   // Invoked when the current delegate is complete. Completion implies that the delegate is fully
@@ -105,7 +106,8 @@ public:
   // DecoderEventHandler
   FilterStatus structBegin(absl::string_view name) override;
   FilterStatus structEnd() override;
-  FilterStatus fieldBegin(absl::string_view name, FieldType field_type, int16_t field_id) override;
+  FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
+                          int16_t& field_id) override;
 
   // ThriftStructValue
   const ThriftFieldPtrList& fields() const override { return fields_; }
@@ -125,7 +127,7 @@ public:
   ThriftListValueImpl(ThriftBase* parent) : ThriftValueBase(parent, FieldType::List) {}
 
   // DecoderEventHandler
-  FilterStatus listBegin(FieldType elem_type, uint32_t size) override;
+  FilterStatus listBegin(FieldType& elem_type, uint32_t& size) override;
   FilterStatus listEnd() override;
 
   // ThriftListValue
@@ -151,7 +153,7 @@ public:
   ThriftSetValueImpl(ThriftBase* parent) : ThriftValueBase(parent, FieldType::Set) {}
 
   // DecoderEventHandler
-  FilterStatus setBegin(FieldType elem_type, uint32_t size) override;
+  FilterStatus setBegin(FieldType& elem_type, uint32_t& size) override;
   FilterStatus setEnd() override;
 
   // ThriftSetValue
@@ -177,7 +179,7 @@ public:
   ThriftMapValueImpl(ThriftBase* parent) : ThriftValueBase(parent, FieldType::Map) {}
 
   // DecoderEventHandler
-  FilterStatus mapBegin(FieldType key_type, FieldType elem_type, uint32_t size) override;
+  FilterStatus mapBegin(FieldType& key_type, FieldType& elem_type, uint32_t& size) override;
   FilterStatus mapEnd() override;
 
   // ThriftMapValue
@@ -205,12 +207,12 @@ public:
   ThriftValueImpl(ThriftBase* parent, FieldType value_type) : ThriftValueBase(parent, value_type) {}
 
   // DecoderEventHandler
-  FilterStatus boolValue(bool value) override;
-  FilterStatus byteValue(uint8_t value) override;
-  FilterStatus int16Value(int16_t value) override;
-  FilterStatus int32Value(int32_t value) override;
-  FilterStatus int64Value(int64_t value) override;
-  FilterStatus doubleValue(double value) override;
+  FilterStatus boolValue(bool& value) override;
+  FilterStatus byteValue(uint8_t& value) override;
+  FilterStatus int16Value(int16_t& value) override;
+  FilterStatus int32Value(int32_t& value) override;
+  FilterStatus int64Value(int64_t& value) override;
+  FilterStatus doubleValue(double& value) override;
   FilterStatus stringValue(absl::string_view value) override;
 
 protected:

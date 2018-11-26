@@ -45,7 +45,7 @@ public:
     MessageUtil::loadFromYaml(yaml, proto_config);
     config_.reset(new Config(proto_config, stats_store_, runtime_));
     client_ = new RateLimit::MockClient();
-    filter_.reset(new Filter(config_, RateLimit::ClientPtr{client_}));
+    filter_ = std::make_unique<Filter>(config_, RateLimit::ClientPtr{client_});
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
     // NOP currently.

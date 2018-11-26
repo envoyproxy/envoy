@@ -12,7 +12,7 @@ message Headers {
   repeated envoy.api.v2.core.HeaderValue headers = 1;
 }
 
-message RequestInfo {
+message StreamInfo {
   envoy.api.v2.core.Metadata dynamic_metadata = 1;
   uint64 start_time = 2;
   google.protobuf.UInt32Value response_code = 3;

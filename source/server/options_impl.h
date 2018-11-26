@@ -33,6 +33,10 @@ public:
   OptionsImpl(int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
               spdlog::level::level_enum default_log_level);
 
+  // Test constructor; creates "reasonable" defaults, but desired values should be set explicitly.
+  OptionsImpl(const std::string& service_cluster, const std::string& service_node,
+              const std::string& service_zone, spdlog::level::level_enum log_level);
+
   // Setters for option fields. These are not part of the Options interface.
   void setBaseId(uint64_t base_id) { base_id_ = base_id; };
   void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
@@ -67,6 +71,9 @@ public:
   void setHotRestartDisabled(bool hot_restart_disabled) {
     hot_restart_disabled_ = hot_restart_disabled;
   }
+  void setSignalHandling(bool signal_handling_enabled) {
+    signal_handling_enabled_ = signal_handling_enabled;
+  }
 
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
@@ -80,6 +87,10 @@ public:
   }
   std::chrono::seconds drainTime() const override { return drain_time_; }
   spdlog::level::level_enum logLevel() const override { return log_level_; }
+  const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
+  componentLogLevels() const override {
+    return component_log_levels_;
+  }
   const std::string& logFormat() const override { return log_format_; }
   const std::string& logPath() const override { return log_path_; }
   std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
@@ -94,16 +105,26 @@ public:
   uint64_t maxStats() const override { return max_stats_; }
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
+  bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
+  bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
+  virtual Server::CommandLineOptionsPtr toCommandLineOptions() const override;
+  void parseComponentLogLevels(const std::string& component_log_levels);
+  uint32_t count() const;
 
 private:
+  void logError(const std::string& error) const;
+
   uint64_t base_id_;
   uint32_t concurrency_;
   std::string config_path_;
   std::string config_yaml_;
+  bool allow_unknown_fields_{false};
   bool v2_config_only_;
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;
+  std::vector<std::pair<std::string, spdlog::level::level_enum>> component_log_levels_;
+  std::string component_log_level_str_;
   std::string log_format_;
   std::string log_path_;
   uint64_t restart_epoch_;
@@ -117,6 +138,9 @@ private:
   uint64_t max_stats_;
   Stats::StatsOptionsImpl stats_options_;
   bool hot_restart_disabled_;
+  bool signal_handling_enabled_;
+  bool mutex_tracing_enabled_;
+  uint32_t count_;
 };
 
 /**

@@ -139,7 +139,7 @@ void Filter::onRead() {
   // even if previous data has not been read, which is always the case due to MSG_PEEK. When
   // the TlsInspector completes and passes the socket along, a new FileEvent is created for the
   // socket, so that new event is immediately signalled as readable because it is new and the socket
-  // is readable, even though no new events have ocurred.
+  // is readable, even though no new events have occurred.
   //
   // TODO(ggreenway): write an integration test to ensure the events work as expected on all
   // platforms.

@@ -53,8 +53,8 @@ public:
   ~MockClientContext();
 
   MOCK_CONST_METHOD0(daysUntilFirstCertExpires, size_t());
-  MOCK_CONST_METHOD0(getCaCertInformation, std::string());
-  MOCK_CONST_METHOD0(getCertChainInformation, std::string());
+  MOCK_CONST_METHOD0(getCaCertInformation, CertificateDetailsPtr());
+  MOCK_CONST_METHOD0(getCertChainInformation, CertificateDetailsPtr());
 };
 
 } // namespace Ssl

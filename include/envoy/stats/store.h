@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag_producer.h"
 
 namespace Envoy {
@@ -65,6 +66,13 @@ public:
    * Set the given tag producer to control tags.
    */
   virtual void setTagProducer(TagProducerPtr&& tag_producer) PURE;
+
+  /**
+   * Attach a StatsMatcher to this StoreRoot to prevent the initialization of stats according to
+   * some ruleset.
+   * @param stats_matcher a StatsMatcher to attach to this StoreRoot.
+   */
+  virtual void setStatsMatcher(StatsMatcherPtr&& stats_matcher) PURE;
 
   /**
    * Initialize the store for threading. This will be called once after all worker threads have

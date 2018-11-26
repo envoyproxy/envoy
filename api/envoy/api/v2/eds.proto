@@ -17,6 +17,7 @@ import "google/protobuf/wrappers.proto";
 option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: EDS]
+// Endpoint discovery :ref:`architecture overview <arch_overview_service_discovery_types_eds>`
 
 service EndpointDiscoveryService {
   // The resource_names field in DiscoveryRequest specifies a list of clusters

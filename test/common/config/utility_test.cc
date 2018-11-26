@@ -214,6 +214,35 @@ TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
   Utility::checkFilesystemSubscriptionBackingPath(test_path);
 }
 
+TEST(UtilityTest, ParseDefaultRateLimitSettings) {
+  envoy::api::v2::core::ApiConfigSource api_config_source;
+  const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_EQ(false, rate_limit_settings.enabled_);
+  EXPECT_EQ(100, rate_limit_settings.max_tokens_);
+  EXPECT_EQ(10, rate_limit_settings.fill_rate_);
+}
+
+TEST(UtilityTest, ParseEmptyRateLimitSettings) {
+  envoy::api::v2::core::ApiConfigSource api_config_source;
+  api_config_source.mutable_rate_limit_settings();
+  const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_EQ(true, rate_limit_settings.enabled_);
+  EXPECT_EQ(100, rate_limit_settings.max_tokens_);
+  EXPECT_EQ(10, rate_limit_settings.fill_rate_);
+}
+
+TEST(UtilityTest, ParseRateLimitSettings) {
+  envoy::api::v2::core::ApiConfigSource api_config_source;
+  ::envoy::api::v2::core::RateLimitSettings* rate_limits =
+      api_config_source.mutable_rate_limit_settings();
+  rate_limits->mutable_max_tokens()->set_value(500);
+  rate_limits->mutable_fill_rate()->set_value(4);
+  const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_EQ(true, rate_limit_settings.enabled_);
+  EXPECT_EQ(500, rate_limit_settings.max_tokens_);
+  EXPECT_EQ(4, rate_limit_settings.fill_rate_);
+}
+
 // TEST(UtilityTest, FactoryForGrpcApiConfigSource) should catch misconfigured
 // API configs along the dimension of ApiConfigSource type.
 TEST(UtilityTest, FactoryForGrpcApiConfigSource) {

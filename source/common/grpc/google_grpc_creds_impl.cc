@@ -16,9 +16,9 @@ std::shared_ptr<grpc::ChannelCredentials> CredsUtility::getChannelCredentials(
     case envoy::api::v2::core::GrpcService::GoogleGrpc::ChannelCredentials::kSslCredentials: {
       const auto& ssl_credentials = google_grpc.channel_credentials().ssl_credentials();
       const grpc::SslCredentialsOptions ssl_credentials_options = {
-          .pem_root_certs = Config::DataSource::read(ssl_credentials.root_certs(), true),
-          .pem_private_key = Config::DataSource::read(ssl_credentials.private_key(), true),
-          .pem_cert_chain = Config::DataSource::read(ssl_credentials.cert_chain(), true),
+          Config::DataSource::read(ssl_credentials.root_certs(), true),
+          Config::DataSource::read(ssl_credentials.private_key(), true),
+          Config::DataSource::read(ssl_credentials.cert_chain(), true),
       };
       return grpc::SslCredentials(ssl_credentials_options);
     }

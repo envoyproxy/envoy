@@ -9,11 +9,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcWeb {
 
-Http::FilterFactoryCb
-GrpcWebFilterConfig::createFilter(const std::string&,
-                                  Server::Configuration::FactoryContext& context) {
-  return [&context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<GrpcWebFilter>(context.clusterManager()));
+Http::FilterFactoryCb GrpcWebFilterConfig::createFilter(const std::string&,
+                                                        Server::Configuration::FactoryContext&) {
+  return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<GrpcWebFilter>());
   };
 }
 

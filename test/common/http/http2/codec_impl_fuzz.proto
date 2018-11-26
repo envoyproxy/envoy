@@ -36,7 +36,7 @@ message StreamAction {
 message MutateAction {
   // Buffer index.
   uint32 buffer = 1;
-  // Offset withing buffer.
+  // Offset within buffer.
   uint32 offset = 2;
   // Value to set (only lower byte is significant).
   uint32 value = 3;

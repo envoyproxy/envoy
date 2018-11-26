@@ -7,6 +7,7 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -35,16 +36,14 @@ TEST_F(WatcherImplTest, All) {
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
 
-  mkdir(TestEnvironment::temporaryPath("envoy_test").c_str(), S_IRWXU);
+  TestUtility::createDirectory(TestEnvironment::temporaryPath("envoy_test"));
   { std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target")); }
-  int rc = symlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str(),
-                   TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
-  EXPECT_EQ(0, rc);
+  TestUtility::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                             TestEnvironment::temporaryPath("envoy_test/watcher_link"));
 
   { std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_new_target")); }
-  rc = symlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str(),
-               TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
-  EXPECT_EQ(0, rc);
+  TestUtility::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"),
+                             TestEnvironment::temporaryPath("envoy_test/watcher_new_link"));
 
   WatchCallback callback;
   EXPECT_CALL(callback, called(Watcher::Events::MovedTo)).Times(2);
@@ -53,16 +52,14 @@ TEST_F(WatcherImplTest, All) {
                       callback.called(events);
                       dispatcher_.exit();
                     });
-
-  rename(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str(),
-         TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  TestUtility::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
+                          TestEnvironment::temporaryPath("envoy_test/watcher_link"));
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 
-  rc = symlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str(),
-               TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
-  EXPECT_EQ(0, rc);
-  rename(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str(),
-         TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  TestUtility::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"),
+                             TestEnvironment::temporaryPath("envoy_test/watcher_new_link"));
+  TestUtility::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
+                          TestEnvironment::temporaryPath("envoy_test/watcher_link"));
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
@@ -74,7 +71,7 @@ TEST_F(WatcherImplTest, Create) {
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
   unlink(TestEnvironment::temporaryPath("envoy_test/other_file").c_str());
 
-  mkdir(TestEnvironment::temporaryPath("envoy_test").c_str(), S_IRWXU);
+  TestUtility::createDirectory(TestEnvironment::temporaryPath("envoy_test"));
   { std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target")); }
 
   WatchCallback callback;
@@ -88,14 +85,10 @@ TEST_F(WatcherImplTest, Create) {
   { std::ofstream file(TestEnvironment::temporaryPath("envoy_test/other_file")); }
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
-  int rc = symlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str(),
-                   TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
-  EXPECT_EQ(0, rc);
-
-  rc = rename(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str(),
-              TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
-  EXPECT_EQ(0, rc);
-
+  TestUtility::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                             TestEnvironment::temporaryPath("envoy_test/watcher_new_link"));
+  TestUtility::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
+                          TestEnvironment::temporaryPath("envoy_test/watcher_link"));
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
@@ -114,7 +107,7 @@ TEST_F(WatcherImplTest, BadPath) {
 TEST_F(WatcherImplTest, ParentDirectoryRemoved) {
   Filesystem::WatcherPtr watcher = dispatcher_.createFilesystemWatcher();
 
-  mkdir(TestEnvironment::temporaryPath("envoy_test_empty").c_str(), S_IRWXU);
+  TestUtility::createDirectory(TestEnvironment::temporaryPath("envoy_test_empty"));
 
   WatchCallback callback;
   EXPECT_CALL(callback, called(testing::_)).Times(0);

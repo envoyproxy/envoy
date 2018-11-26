@@ -79,7 +79,7 @@ public:
   uint64_t id() { return connection_->id(); }
 
   /**
-   * @return size_t the number of oustanding requests that have not completed or been reset.
+   * @return size_t the number of outstanding requests that have not completed or been reset.
    */
   size_t numActiveRequests() { return active_requests_.size(); }
 

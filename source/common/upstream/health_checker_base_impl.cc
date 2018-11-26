@@ -3,6 +3,7 @@
 #include "envoy/data/core/v2alpha/health_check_event.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "common/network/utility.h"
 #include "common/router/router.h"
 
 namespace Envoy {
@@ -14,7 +15,8 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger)
-    : cluster_(cluster), dispatcher_(dispatcher),
+    : always_log_health_check_failures_(config.always_log_health_check_failures()),
+      cluster_(cluster), dispatcher_(dispatcher),
       timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
       healthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, healthy_threshold)),
@@ -87,20 +89,22 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
     base_time_ms = no_traffic_interval_.count();
   }
 
-  if (interval_jitter_percent_ > 0) {
-    base_time_ms += random_.random() % (interval_jitter_percent_ * base_time_ms / 100);
+  const uint64_t jitter_percent_mod = interval_jitter_percent_ * base_time_ms / 100;
+  if (jitter_percent_mod > 0) {
+    base_time_ms += random_.random() % jitter_percent_mod;
   }
 
   if (interval_jitter_.count() > 0) {
     base_time_ms += (random_.random() % interval_jitter_.count());
   }
 
-  uint64_t min_interval = runtime_.snapshot().getInteger("health_check.min_interval", 0);
-  uint64_t max_interval = runtime_.snapshot().getInteger("health_check.max_interval",
-                                                         std::numeric_limits<uint64_t>::max());
+  const uint64_t min_interval = runtime_.snapshot().getInteger("health_check.min_interval", 0);
+  const uint64_t max_interval = runtime_.snapshot().getInteger(
+      "health_check.max_interval", std::numeric_limits<uint64_t>::max());
 
   uint64_t final_ms = std::min(base_time_ms, max_interval);
-  final_ms = std::max(final_ms, min_interval);
+  // We force a non-zero final MS, to prevent live lock.
+  final_ms = std::max(uint64_t(1), std::max(final_ms, min_interval));
   return std::chrono::milliseconds(final_ms);
 }
 
@@ -246,6 +250,10 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
     }
   }
 
+  if ((first_check_ || parent_.always_log_health_check_failures_) && parent_.event_logger_) {
+    parent_.event_logger_->logUnhealthy(parent_.healthCheckerType(), host_, type, first_check_);
+  }
+
   parent_.stats_.failure_.inc();
   if (type == envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK) {
     parent_.stats_.network_failure_.inc();
@@ -287,6 +295,25 @@ void HealthCheckEventLoggerImpl::logEjectUnhealthy(
   *event.mutable_host() = std::move(address);
   event.set_cluster_name(host->cluster().name());
   event.mutable_eject_unhealthy_event()->set_failure_type(failure_type);
+  TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
+  // Make sure the type enums make it into the JSON
+  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
+                                                          /* always_print_primitive_fields */ true);
+  file_->write(fmt::format("{}\n", json));
+}
+
+void HealthCheckEventLoggerImpl::logUnhealthy(
+    envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+    const HostDescriptionConstSharedPtr& host,
+    envoy::data::core::v2alpha::HealthCheckFailureType failure_type, bool first_check) {
+  envoy::data::core::v2alpha::HealthCheckEvent event;
+  event.set_health_checker_type(health_checker_type);
+  envoy::api::v2::core::Address address;
+  Network::Utility::addressToProtobufAddress(*host->address(), address);
+  *event.mutable_host() = std::move(address);
+  event.set_cluster_name(host->cluster().name());
+  event.mutable_health_check_failure_event()->set_failure_type(failure_type);
+  event.mutable_health_check_failure_event()->set_first_check(first_check);
   TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
   // Make sure the type enums make it into the JSON
   const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,

@@ -193,7 +193,7 @@ void DnsResolverImpl::onAresSocketStateChange(int fd, int read, int write) {
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
                                          DnsLookupFamily dns_lookup_family, ResolveCb callback) {
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
-  // failed intial call to getHostbyName followed by a synchronous IPv4
+  // failed initial call to getHostbyName followed by a synchronous IPv4
   // resolution.
   std::unique_ptr<PendingResolution> pending_resolution(
       new PendingResolution(callback, dispatcher_, channel_, dns_name));

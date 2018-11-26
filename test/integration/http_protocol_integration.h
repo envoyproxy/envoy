@@ -49,7 +49,7 @@ public:
   protocolTestParamsToString(const testing::TestParamInfo<HttpProtocolTestParams>& p);
 
   HttpProtocolIntegrationTest()
-      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version) {}
+      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, realTime()) {}
 
   void SetUp() override {
     setDownstreamProtocol(GetParam().downstream_protocol);

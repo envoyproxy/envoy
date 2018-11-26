@@ -24,7 +24,7 @@ class GrpcJsonTranscoderIntegrationTest
       public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   GrpcJsonTranscoderIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
   /**
    * Global initializer for all integration tests.
    */
@@ -72,8 +72,8 @@ protected:
     }
 
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
     if (!grpc_request_messages.empty()) {
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
       ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
       Grpc::Decoder grpc_decoder;
@@ -115,8 +115,6 @@ protected:
         upstream_request_->encodeTrailers(response_trailers);
       }
       EXPECT_TRUE(upstream_request_->complete());
-    } else {
-      ASSERT_TRUE(upstream_request_->waitForReset());
     }
 
     response->waitForEndStream();
@@ -277,18 +275,11 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingPost) {
         { "theme" : "Documentary" },
         { "theme" : "Mystery" },
       ])",
-      {R"(shelf { theme: "Classics" })",
-       R"(shelf { theme: "Satire" })",
-       R"(shelf { theme: "Russian" })",
-       R"(shelf { theme: "Children" })",
-       R"(shelf { theme: "Documentary" })",
-       R"(shelf { theme: "Mystery" })"},
-      {R"(id: 3 theme: "Classics")",
-       R"(id: 4 theme: "Satire")",
-       R"(id: 5 theme: "Russian")",
-       R"(id: 6 theme: "Children")",
-       R"(id: 7 theme: "Documentary")",
-       R"(id: 8 theme: "Mystery")"},
+      {R"(shelf { theme: "Classics" })", R"(shelf { theme: "Satire" })",
+       R"(shelf { theme: "Russian" })", R"(shelf { theme: "Children" })",
+       R"(shelf { theme: "Documentary" })", R"(shelf { theme: "Mystery" })"},
+      {R"(id: 3 theme: "Classics")", R"(id: 4 theme: "Satire")", R"(id: 5 theme: "Russian")",
+       R"(id: 6 theme: "Children")", R"(id: 7 theme: "Documentary")", R"(id: 8 theme: "Mystery")"},
       Status(),
       Http::TestHeaderMapImpl{{":status", "200"},
                               {"content-type", "application/json"},

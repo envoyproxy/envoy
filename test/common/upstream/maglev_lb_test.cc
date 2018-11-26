@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/upstream/maglev_lb.h"
 
 #include "test/common/upstream/utility.h"
@@ -23,8 +25,8 @@ public:
   MaglevLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 
   void init(uint32_t table_size) {
-    lb_.reset(new MaglevLoadBalancer(priority_set_, stats_, runtime_, random_, common_config_,
-                                     table_size));
+    lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, runtime_, random_,
+                                               common_config_, table_size);
     lb_->initialize();
   }
 

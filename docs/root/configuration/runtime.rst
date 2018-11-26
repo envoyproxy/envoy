@@ -17,7 +17,6 @@ built into the code, except for any values added via `/runtime_modify`.
   secured <operations_admin_interface_security>`.
 
 
-* :ref:`v1 API reference <config_runtime_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.bootstrap.v2.Runtime>`
 
 File system layout

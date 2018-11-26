@@ -12,7 +12,6 @@ clusters depending on what is required.
   Any clusters that are statically defined within the Envoy configuration cannot be modified or
   removed via the CDS API.
 
-* :ref:`v1 CDS API <config_cluster_manager_cds_v1>`
 * :ref:`v2 CDS API <v2_grpc_streaming_endpoints>`
 
 Statistics
@@ -30,3 +29,4 @@ CDS has a statistics tree rooted at *cluster_manager.cds.* with the following st
   update_failure, Counter, Total API fetches that failed because of network errors
   update_rejected, Counter, Total API fetches that failed because of schema/validation errors
   version, Gauge, Hash of the contents from the last successful API fetch
+  control_plane.connected_state, Gauge, A boolan (1 for connected and 0 for disconnected) that indicates the current connection state with management server

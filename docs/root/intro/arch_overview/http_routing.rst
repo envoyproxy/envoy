@@ -30,14 +30,13 @@ request. The router filter supports the following features:
 * :ref:`Automatic host rewriting <envoy_api_field_route.RouteAction.auto_host_rewrite>` based on
   the DNS name of the selected upstream host.
 * :ref:`Prefix rewriting <envoy_api_field_route.RedirectAction.prefix_rewrite>`.
-* :ref:`Websocket upgrades <envoy_api_field_route.RouteAction.use_websocket>` at route level.
 * :ref:`Request retries <arch_overview_http_routing_retry>` specified either via HTTP header or via
   route configuration.
 * Request timeout specified either via :ref:`HTTP
   header <config_http_filters_router_headers_consumed>` or via :ref:`route configuration
   <envoy_api_field_route.RouteAction.timeout>`.
 * Traffic shifting from one upstream cluster to another via :ref:`runtime values
-  <envoy_api_field_route.RouteMatch.runtime>` (see :ref:`traffic shifting/splitting
+  <envoy_api_field_route.RouteMatch.runtime_fraction>` (see :ref:`traffic shifting/splitting
   <config_http_conn_man_route_table_traffic_splitting>`).
 * Traffic splitting across multiple upstream clusters using :ref:`weight/percentage-based routing
   <envoy_api_field_route.RouteAction.weighted_clusters>` (see :ref:`traffic shifting/splitting
@@ -77,6 +76,13 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
 * **Retry conditions**: Envoy can retry on different types of conditions depending on application
   requirements. For example, network failure, all 5xx response codes, idempotent 4xx response codes,
   etc.
+* **Host selection retry plugins**: Envoy can be configured to apply additional logic to the host
+  selection logic when selecting hosts for retries. Specifying a
+  :ref:`retry host predicate <envoy_api_field_route.RouteAction.RetryPolicy.retry_host_predicate>`
+  allows for reattempting host selection when certain hosts are selected (e.g. when an already
+  attempted host is selected), while a
+  :ref:`retry prioririty <envoy_api_field_route.RouteAction.RetryPolicy.retry_priority>` can be
+  configured to adjust the priority load used when selecting a priority for retries.
 
 Note that retries may be disabled depending on the contents of the :ref:`x-envoy-overloaded
 <config_http_filters_router_x-envoy-overloaded_consumed>`.

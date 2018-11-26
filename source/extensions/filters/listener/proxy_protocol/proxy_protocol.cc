@@ -10,6 +10,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
@@ -136,12 +137,12 @@ void Filter::parseV2Header(char* buf) {
     if (((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_STREAM) ||
         ((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_DGRAM)) {
       if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET) {
-        typedef struct {
+        PACKED_STRUCT(struct pp_ipv4_addr {
           uint32_t src_addr;
           uint32_t dst_addr;
           uint16_t src_port;
           uint16_t dst_port;
-        } __attribute__((packed)) pp_ipv4_addr;
+        });
         pp_ipv4_addr* v4;
         v4 = reinterpret_cast<pp_ipv4_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
         sockaddr_in ra4, la4;
@@ -160,12 +161,12 @@ void Filter::parseV2Header(char* buf) {
                        std::make_shared<Network::Address::Ipv4Instance>(&la4)});
         return;
       } else if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET6) {
-        typedef struct {
+        PACKED_STRUCT(struct pp_ipv6_addr {
           uint8_t src_addr[16];
           uint8_t dst_addr[16];
           uint16_t src_port;
           uint16_t dst_port;
-        } __attribute__((packed)) pp_ipv6_addr;
+        });
         pp_ipv6_addr* v6;
         v6 = reinterpret_cast<pp_ipv6_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
         sockaddr_in6 ra6, la6;

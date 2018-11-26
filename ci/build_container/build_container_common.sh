@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
-VERSION=0.15.0
-SHA256=0dea01a7a511797878f486e6ed8e549980c0710a0a116c8ee953d4e26de41515
+VERSION=0.17.2
+SHA256=1cf35c463944003ceb3c3716d7fc489d3d70625e34a8127dfd8b272afad7e0fd
 
 # buildifier
 curl --location --output /usr/local/bin/buildifier https://github.com/bazelbuild/buildtools/releases/download/"$VERSION"/buildifier \

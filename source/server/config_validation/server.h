@@ -34,7 +34,7 @@ namespace Server {
  * the config is valid, false if invalid.
  */
 bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                    ComponentFactory& component_factory);
+                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory);
 
 /**
  * ValidationInstance does the bulk of the work for config-validation runs of Envoy. It implements
@@ -56,7 +56,7 @@ public:
   ValidationInstance(Options& options, Event::TimeSystem& time_system,
                      Network::Address::InstanceConstSharedPtr local_address,
                      Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
-                     ComponentFactory& component_factory);
+                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory);
 
   // Server::Instance
   Admin& admin() override { return admin_; }
@@ -74,7 +74,7 @@ public:
   void getParentStats(HotRestart::GetParentStatsInfo&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   HotRestart& hotRestart() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Init::Manager& initManager() override { return init_manager_; }
-  ListenerManager& listenerManager() override { return listener_manager_; }
+  ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
   RateLimit::ClientPtr
@@ -83,9 +83,10 @@ public:
   }
   Runtime::Loader& runtime() override { return *runtime_loader_; }
   void shutdown() override;
+  bool isShutdown() override { return false; }
   void shutdownAdmin() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
-  OverloadManager& overloadManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  OverloadManager& overloadManager() override { return *overload_manager_; }
   bool healthCheckFailed() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -95,6 +96,7 @@ public:
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   Event::TimeSystem& timeSystem() override { return time_system_; }
+  Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_->statsFlushInterval();
@@ -128,7 +130,7 @@ public:
   uint64_t nextListenerTag() override { return 0; }
 
   // Server::WorkerFactory
-  WorkerPtr createWorker() override {
+  WorkerPtr createWorker(OverloadManager&) override {
     // Returned workers are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
@@ -154,8 +156,10 @@ private:
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   InitManagerImpl init_manager_;
-  ListenerManagerImpl listener_manager_;
+  std::unique_ptr<ListenerManagerImpl> listener_manager_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
+  std::unique_ptr<OverloadManager> overload_manager_;
+  Envoy::MutexTracer* mutex_tracer_;
 };
 
 } // namespace Server

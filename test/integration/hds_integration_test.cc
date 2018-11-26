@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
@@ -24,10 +26,12 @@ namespace {
 class HdsIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  HdsIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
     hds_upstream_ = fake_upstreams_.back().get();
     hds_upstream_->set_allow_unexpected_disconnects(true);
     HttpIntegrationTest::createUpstreams();
@@ -52,8 +56,10 @@ public:
     HttpIntegrationTest::initialize();
 
     // Endpoint connections
-    host_upstream_.reset(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
-    host2_upstream_.reset(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
+    host_upstream_ =
+        std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem());
+    host2_upstream_ =
+        std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem());
   }
 
   // Sets up a connection between Envoy and the management server.

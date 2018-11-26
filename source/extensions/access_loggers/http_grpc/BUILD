@@ -22,6 +22,7 @@ envoy_cc_library(
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/upstream:upstream_interface",
         "//source/common/grpc:async_client_lib",
         "//source/common/network:utility_lib",
         "@envoy_api//envoy/config/accesslog/v2:als_cc",

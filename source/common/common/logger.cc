@@ -48,8 +48,23 @@ void StderrSinkDelegate::flush() {
   std::cerr << std::flush;
 }
 
+void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatter) {
+  absl::MutexLock lock(&format_mutex_);
+  formatter_ = std::move(formatter);
+}
+
 void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
-  sink_->log(msg.formatted.str());
+  absl::ReleasableMutexLock lock(&format_mutex_);
+  if (!formatter_) {
+    lock.Release();
+    sink_->log(absl::string_view(msg.raw.data(), msg.raw.size()));
+    return;
+  }
+
+  fmt::memory_buffer formatted;
+  formatter_->format(msg, formatted);
+  lock.Release();
+  sink_->log(absl::string_view(formatted.data(), formatted.size()));
 }
 
 DelegatingLogSinkPtr DelegatingLogSink::init() {
@@ -100,6 +115,17 @@ void Registry::setLogFormat(const std::string& log_format) {
   for (Logger& logger : allLoggers()) {
     logger.logger_->set_pattern(log_format);
   }
+}
+
+Logger* Registry::logger(const std::string& log_name) {
+  Logger* logger_to_return = nullptr;
+  for (Logger& logger : loggers()) {
+    if (logger.name() == log_name) {
+      logger_to_return = &logger;
+      break;
+    }
+  }
+  return logger_to_return;
 }
 
 } // namespace Logger

@@ -10,14 +10,16 @@ import os
 import shutil
 import logging
 import subprocess
+import sys
 
 os.putenv("BUILDIFIER_BIN", "/usr/local/bin/buildifier")
 
 tools = os.path.dirname(os.path.realpath(__file__))
 tmp = os.path.join(os.getenv('TEST_TMPDIR', "/tmp"), "check_format_test")
 src = os.path.join(tools, 'testdata', 'check_format')
-check_format = os.path.join(tools, 'check_format.py')
+check_format = sys.executable + " " + os.path.join(tools, 'check_format.py')
 errors = 0
+
 
 # Echoes and runs an OS command, returning exit status and the captured
 # stdout+stderr as a string array.
@@ -35,6 +37,7 @@ def runCommand(command):
   logging.info("%s" % command)
   return status, stdout
 
+
 # Runs the 'check_format' operation, on the specified file, printing
 # the comamnd run and the status code as well as the stdout, and returning
 # all of that to the caller.
@@ -43,10 +46,12 @@ def runCheckFormat(operation, filename):
   status, stdout = runCommand(command)
   return (command, status, stdout)
 
+
 def getInputFile(filename):
   infile = os.path.join(src, filename)
   shutil.copyfile(infile, filename)
   return filename
+
 
 # Attempts to fix file, returning a 4-tuple: the command, input file name,
 # output filename, captured stdout as an array of lines, and the error status
@@ -56,6 +61,7 @@ def fixFileHelper(filename):
   shutil.copyfile(infile, filename)
   command, status, stdout = runCheckFormat("fix", getInputFile(filename))
   return (command, infile, filename, status, stdout)
+
 
 # Attempts to fix a file, returning the status code and the generated output.
 # If the fix was successful, the diff is returned as a string-array. If the file
@@ -73,17 +79,21 @@ def fixFileExpectingSuccess(file):
     return 1
   return 0
 
+
 def fixFileExpectingNoChange(file):
   command, infile, outfile, status, stdout = fixFileHelper(file)
   if status != 0:
     return 1
   status, stdout = runCommand('diff ' + outfile + ' ' + infile)
   if status != 0:
+    logging.error(file + ': expected file to remain unchanged')
     return 1
   return 0
 
+
 def emitStdoutAsError(stdout):
   logging.error("\n".join(stdout))
+
 
 def expectError(status, stdout, expected_substring):
   if status == 0:
@@ -96,20 +106,46 @@ def expectError(status, stdout, expected_substring):
   emitStdoutAsError(stdout)
   return 1
 
+
 def fixFileExpectingFailure(filename, expected_substring):
   command, infile, outfile, status, stdout = fixFileHelper(filename)
   return expectError(status, stdout, expected_substring)
+
 
 def checkFileExpectingError(filename, expected_substring):
   command, status, stdout = runCheckFormat("check", getInputFile(filename))
   return expectError(status, stdout, expected_substring)
 
+
+def checkAndFixError(filename, expected_substring):
+  errors = checkFileExpectingError(filename, expected_substring)
+  errors += fixFileExpectingSuccess(filename)
+  return errors
+
+
+def checkToolNotFoundError():
+  # Temporarily change PATH to test the error about lack of external tools.
+  oldPath = os.environ["PATH"]
+  os.environ["PATH"] = "/sbin:/usr/sbin"
+  clang_format = os.getenv("CLANG_FORMAT", "clang-format-7")
+  errors = checkFileExpectingError("no_namespace_envoy.cc", "Command %s not found." % clang_format)
+  os.environ["PATH"] = oldPath
+  return errors
+
+
+def checkUnfixableError(filename, expected_substring):
+  errors = checkFileExpectingError(filename, expected_substring)
+  errors += fixFileExpectingFailure(filename, expected_substring)
+  return errors
+
+
 def checkFileExpectingOK(filename):
   command, status, stdout = runCheckFormat("check", getInputFile(filename))
   if status != 0:
-    logging.error("status=%d, output:\n" % status)
+    logging.error("Expected %s to have no errors; status=%d, output:\n" % (filename, status))
     emitStdoutAsError(stdout)
-  return 0
+  return status + fixFileExpectingNoChange(filename)
+
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='tester for check_format.py.')
@@ -124,69 +160,55 @@ if __name__ == "__main__":
   shutil.rmtree(tmp, True)
   os.makedirs(tmp)
   os.chdir(tmp)
-  # TODO(akonradi): reorder these by error instead of grouping the fixes
-  # together and checks together
-  errors += fixFileExpectingSuccess("over_enthusiastic_spaces.cc")
-  errors += fixFileExpectingSuccess("extra_enthusiastic_spaces.cc")
-  errors += fixFileExpectingSuccess("angle_bracket_include.cc")
-  errors += fixFileExpectingFailure("proto_deps.cc",
-                                    "unexpected direct dependency on google.protobuf")
-  errors += fixFileExpectingSuccess("proto_style.cc")
-  errors += fixFileExpectingSuccess("long_line.cc")
-  errors += fixFileExpectingSuccess("header_order.cc")
-  errors += fixFileExpectingSuccess("license.BUILD")
-  errors += fixFileExpectingSuccess("bad_envoy_build_sys_ref.BUILD")
-  errors += fixFileExpectingSuccess("proto_format.proto")
-  errors += fixFileExpectingFailure("no_namespace_envoy.cc",
-                                    "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
-  errors += fixFileExpectingFailure("mutex.cc",
-                                    "Don't use <mutex> or <condition_variable*>")
-  errors += fixFileExpectingFailure("condition_variable.cc",
-                                    "Don't use <mutex> or <condition_variable*>")
-  errors += fixFileExpectingFailure("condition_variable_any.cc",
-                                    "Don't use <mutex> or <condition_variable*>")
-  errors += checkFileExpectingError("shared_mutex.cc", "shared_mutex")
-  errors += fixFileExpectingFailure("shared_mutex.cc", "shared_mutex")
 
+  # The following error is the error about unavailability of external tools.
+  errors += checkToolNotFoundError()
+
+  # The following errors can be detected but not fixed automatically.
+  errors += checkUnfixableError("no_namespace_envoy.cc",
+                                "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
+  errors += checkUnfixableError("mutex.cc", "Don't use <mutex> or <condition_variable*>")
+  errors += checkUnfixableError("condition_variable.cc",
+                                "Don't use <mutex> or <condition_variable*>")
+  errors += checkUnfixableError("condition_variable_any.cc",
+                                "Don't use <mutex> or <condition_variable*>")
+  errors += checkUnfixableError("shared_mutex.cc", "shared_mutex")
+  errors += checkUnfixableError("shared_mutex.cc", "shared_mutex")
   real_time_inject_error = (
       "Don't reference real-world time sources from production code; use injection")
-  errors += fixFileExpectingFailure("real_time_source.cc", real_time_inject_error)
-  errors += fixFileExpectingFailure("real_time_system.cc", real_time_inject_error)
-  errors += fixFileExpectingFailure("system_clock.cc", real_time_inject_error)
-  errors += fixFileExpectingFailure("steady_clock.cc", real_time_inject_error)
+  errors += checkUnfixableError("real_time_source.cc", real_time_inject_error)
+  errors += checkUnfixableError("real_time_system.cc", real_time_inject_error)
+  errors += checkUnfixableError("system_clock.cc", real_time_inject_error)
+  errors += checkUnfixableError("steady_clock.cc", real_time_inject_error)
+  errors += checkUnfixableError("condvar_wait_for.cc", real_time_inject_error)
+  errors += checkUnfixableError("sleep.cc", real_time_inject_error)
+  errors += checkUnfixableError("std_atomic_free_functions.cc", "std::atomic_*")
+  errors += checkUnfixableError("no_namespace_envoy.cc",
+                                "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
+  errors += checkUnfixableError("proto.BUILD", "unexpected direct external dependency on protobuf")
+  errors += checkUnfixableError("proto_deps.cc", "unexpected direct dependency on google.protobuf")
+  errors += checkUnfixableError("attribute_packed.cc", "Don't use __attribute__((packed))")
+  errors += checkUnfixableError("designated_initializers.cc", "Don't use designated initializers")
+  errors += checkUnfixableError("elvis_operator.cc", "Don't use the '?:' operator")
+  errors += checkUnfixableError("testing_test.cc",
+                                "Don't use 'using testing::Test;, elaborate the type instead")
 
-  errors += fixFileExpectingNoChange("ok_file.cc")
+  # The following files have errors that can be automatically fixed.
+  errors += checkAndFixError("over_enthusiastic_spaces.cc",
+                             "./over_enthusiastic_spaces.cc:3: over-enthusiastic spaces")
+  errors += checkAndFixError("extra_enthusiastic_spaces.cc",
+                             "./extra_enthusiastic_spaces.cc:3: over-enthusiastic spaces")
+  errors += checkAndFixError("angle_bracket_include.cc",
+                             "envoy includes should not have angle brackets")
+  errors += checkAndFixError("proto_style.cc", "incorrect protobuf type reference")
+  errors += checkAndFixError("long_line.cc", "clang-format check failed")
+  errors += checkAndFixError("header_order.cc", "header_order.py check failed")
+  errors += checkAndFixError("license.BUILD", "envoy_build_fixer check failed")
+  errors += checkAndFixError("bad_envoy_build_sys_ref.BUILD", "Superfluous '@envoy//' prefix")
+  errors += checkAndFixError("proto_format.proto", "clang-format check failed")
 
-  errors += checkFileExpectingError("over_enthusiastic_spaces.cc",
-                                    "./over_enthusiastic_spaces.cc:3: over-enthusiastic spaces")
-  errors += checkFileExpectingError("extra_enthusiastic_spaces.cc",
-                                    "./extra_enthusiastic_spaces.cc:3: over-enthusiastic spaces")
-  errors += checkFileExpectingError("angle_bracket_include.cc",
-                                    "envoy includes should not have angle brackets")
-  errors += checkFileExpectingError("no_namespace_envoy.cc",
-                                    "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
-  errors += checkFileExpectingError("proto_deps.cc",
-                                    "unexpected direct dependency on google.protobuf")
-  errors += checkFileExpectingError("proto_style.cc", "incorrect protobuf type reference")
-  errors += checkFileExpectingError("long_line.cc", "clang-format check failed")
-  errors += checkFileExpectingError("header_order.cc", "header_order.py check failed")
-  errors += checkFileExpectingError("license.BUILD", "envoy_build_fixer check failed")
-  errors += checkFileExpectingError("bad_envoy_build_sys_ref.BUILD",
-                                    "Superfluous '@envoy//' prefix")
-  errors += checkFileExpectingError("proto_format.proto", "clang-format check failed")
-  errors += checkFileExpectingError("real_time_source.cc", real_time_inject_error)
-  errors += checkFileExpectingError("real_time_system.cc", real_time_inject_error)
-  errors += checkFileExpectingError("system_clock.cc", real_time_inject_error)
-  errors += checkFileExpectingError("steady_clock.cc", real_time_inject_error)
-  errors += checkFileExpectingError("std_atomic_free_functions.cc", "std::atomic_*")
-  errors += fixFileExpectingFailure("std_atomic_free_functions.cc", "std::atomic_*")
-
-  errors += checkFileExpectingOK("ok_file.cc")
-
-  errors += fixFileExpectingFailure("proto.BUILD",
-                                    "unexpected direct external dependency on protobuf")
-  errors += checkFileExpectingError("proto.BUILD",
-                                    "unexpected direct external dependency on protobuf")
+  errors += checkFileExpectingOK("real_time_source_override.cc")
+  errors += checkFileExpectingOK("time_system_wait_for.cc")
 
   if errors != 0:
     logging.error("%d FAILURES" % errors)

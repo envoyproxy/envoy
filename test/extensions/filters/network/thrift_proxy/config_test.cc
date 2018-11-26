@@ -1,8 +1,11 @@
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.validate.h"
 
 #include "extensions/filters/network/thrift_proxy/config.h"
+#include "extensions/filters/network/thrift_proxy/filters/factory_base.h"
 
+#include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -38,6 +41,13 @@ getProtocolTypes() {
     protocol++;
   }
   return v;
+}
+
+envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy
+parseThriftProxyFromV2Yaml(const std::string& yaml) {
+  envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy thrift_proxy;
+  MessageUtil::loadFromYaml(yaml, thrift_proxy);
+  return thrift_proxy;
 }
 
 } // namespace
@@ -109,6 +119,64 @@ TEST_F(ThriftFilterConfigTest, ThriftProxyWithEmptyProto) {
   config.set_stat_prefix("my_stat_prefix");
 
   testConfig(config);
+}
+
+// Test config with an explicitly defined router filter.
+TEST_F(ThriftFilterConfigTest, ThriftProxyWithExplicitRouterConfig) {
+  const std::string yaml = R"EOF(
+stat_prefix: thrift
+route_config:
+  name: local_route
+thrift_filters:
+  - name: envoy.filters.thrift.router
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy config =
+      parseThriftProxyFromV2Yaml(yaml);
+  testConfig(config);
+}
+
+// Test config with an unknown filter.
+TEST_F(ThriftFilterConfigTest, ThriftProxyWithUnknownFilter) {
+  const std::string yaml = R"EOF(
+stat_prefix: thrift
+route_config:
+  name: local_route
+thrift_filters:
+  - name: no_such_filter
+  - name: envoy.filters.thrift.router
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy config =
+      parseThriftProxyFromV2Yaml(yaml);
+
+  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
+                          "no_such_filter");
+}
+
+// Test config with multiple filters.
+TEST_F(ThriftFilterConfigTest, ThriftProxyWithMultipleFilters) {
+  const std::string yaml = R"EOF(
+stat_prefix: ingress
+route_config:
+  name: local_route
+thrift_filters:
+  - name: envoy.filters.thrift.mock_filter
+    config:
+      key: value
+  - name: envoy.filters.thrift.router
+)EOF";
+
+  ThriftFilters::MockFilterConfigFactory factory;
+  Registry::InjectFactory<ThriftFilters::NamedThriftFilterConfigFactory> registry(factory);
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy config =
+      parseThriftProxyFromV2Yaml(yaml);
+  testConfig(config);
+
+  EXPECT_EQ(1, factory.config_struct_.fields_size());
+  EXPECT_EQ("value", factory.config_struct_.fields().at("key").string_value());
+  EXPECT_EQ("thrift.ingress.", factory.config_stat_prefix_);
 }
 
 } // namespace ThriftProxy

@@ -25,7 +25,7 @@ public:
       : tls_(tls), api_(api), hooks_(hooks), time_system_(time_system) {}
 
   // Server::WorkerFactory
-  WorkerPtr createWorker() override;
+  WorkerPtr createWorker(OverloadManager& overload_manager) override;
 
 private:
   ThreadLocal::Instance& tls_;
@@ -40,7 +40,8 @@ private:
 class WorkerImpl : public Worker, Logger::Loggable<Logger::Id::main> {
 public:
   WorkerImpl(ThreadLocal::Instance& tls, TestHooks& hooks, Event::DispatcherPtr&& dispatcher,
-             Network::ConnectionHandlerPtr handler);
+             Network::ConnectionHandlerPtr handler, OverloadManager& overload_manager,
+             Api::Api& api);
 
   // Server::Worker
   void addListener(Network::ListenerConfig& listener, AddListenerCompletion completion) override;
@@ -53,11 +54,13 @@ public:
 
 private:
   void threadRoutine(GuardDog& guard_dog);
+  void stopAcceptingConnectionsCb(OverloadActionState state);
 
   ThreadLocal::Instance& tls_;
   TestHooks& hooks_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
+  Api::Api& api_;
   Thread::ThreadPtr thread_;
 };
 

@@ -42,8 +42,8 @@ FilterStatus ThriftBase::structEnd() {
   return delegate_->structEnd();
 }
 
-FilterStatus ThriftBase::fieldBegin(absl::string_view name, FieldType field_type,
-                                    int16_t field_id) {
+FilterStatus ThriftBase::fieldBegin(absl::string_view name, FieldType& field_type,
+                                    int16_t& field_id) {
   ASSERT(delegate_ != nullptr);
   return delegate_->fieldBegin(name, field_type, field_id);
 }
@@ -53,32 +53,32 @@ FilterStatus ThriftBase::fieldEnd() {
   return delegate_->fieldEnd();
 }
 
-FilterStatus ThriftBase::boolValue(bool value) {
+FilterStatus ThriftBase::boolValue(bool& value) {
   ASSERT(delegate_ != nullptr);
   return delegate_->boolValue(value);
 }
 
-FilterStatus ThriftBase::byteValue(uint8_t value) {
+FilterStatus ThriftBase::byteValue(uint8_t& value) {
   ASSERT(delegate_ != nullptr);
   return delegate_->byteValue(value);
 }
 
-FilterStatus ThriftBase::int16Value(int16_t value) {
+FilterStatus ThriftBase::int16Value(int16_t& value) {
   ASSERT(delegate_ != nullptr);
   return delegate_->int16Value(value);
 }
 
-FilterStatus ThriftBase::int32Value(int32_t value) {
+FilterStatus ThriftBase::int32Value(int32_t& value) {
   ASSERT(delegate_ != nullptr);
   return delegate_->int32Value(value);
 }
 
-FilterStatus ThriftBase::int64Value(int64_t value) {
+FilterStatus ThriftBase::int64Value(int64_t& value) {
   ASSERT(delegate_ != nullptr);
   return delegate_->int64Value(value);
 }
 
-FilterStatus ThriftBase::doubleValue(double value) {
+FilterStatus ThriftBase::doubleValue(double& value) {
   ASSERT(delegate_ != nullptr);
   return delegate_->doubleValue(value);
 }
@@ -88,7 +88,7 @@ FilterStatus ThriftBase::stringValue(absl::string_view value) {
   return delegate_->stringValue(value);
 }
 
-FilterStatus ThriftBase::mapBegin(FieldType key_type, FieldType value_type, uint32_t size) {
+FilterStatus ThriftBase::mapBegin(FieldType& key_type, FieldType& value_type, uint32_t& size) {
   ASSERT(delegate_ != nullptr);
   return delegate_->mapBegin(key_type, value_type, size);
 }
@@ -98,7 +98,7 @@ FilterStatus ThriftBase::mapEnd() {
   return delegate_->mapEnd();
 }
 
-FilterStatus ThriftBase::listBegin(FieldType elem_type, uint32_t size) {
+FilterStatus ThriftBase::listBegin(FieldType& elem_type, uint32_t& size) {
   ASSERT(delegate_ != nullptr);
   return delegate_->listBegin(elem_type, size);
 }
@@ -108,7 +108,7 @@ FilterStatus ThriftBase::listEnd() {
   return delegate_->listEnd();
 }
 
-FilterStatus ThriftBase::setBegin(FieldType elem_type, uint32_t size) {
+FilterStatus ThriftBase::setBegin(FieldType& elem_type, uint32_t& size) {
   ASSERT(delegate_ != nullptr);
   return delegate_->setBegin(elem_type, size);
 }
@@ -140,7 +140,7 @@ FilterStatus ThriftFieldImpl::fieldEnd() {
   return FilterStatus::Continue;
 }
 
-FilterStatus ThriftListValueImpl::listBegin(FieldType elem_type, uint32_t size) {
+FilterStatus ThriftListValueImpl::listBegin(FieldType& elem_type, uint32_t& size) {
   if (delegate_) {
     return delegate_->listBegin(elem_type, size);
   }
@@ -176,7 +176,7 @@ void ThriftListValueImpl::delegateComplete() {
   remaining_--;
 }
 
-FilterStatus ThriftSetValueImpl::setBegin(FieldType elem_type, uint32_t size) {
+FilterStatus ThriftSetValueImpl::setBegin(FieldType& elem_type, uint32_t& size) {
   if (delegate_) {
     return delegate_->setBegin(elem_type, size);
   }
@@ -212,7 +212,8 @@ void ThriftSetValueImpl::delegateComplete() {
   remaining_--;
 }
 
-FilterStatus ThriftMapValueImpl::mapBegin(FieldType key_type, FieldType elem_type, uint32_t size) {
+FilterStatus ThriftMapValueImpl::mapBegin(FieldType& key_type, FieldType& elem_type,
+                                          uint32_t& size) {
   if (delegate_) {
     return delegate_->mapBegin(key_type, elem_type, size);
   }
@@ -268,42 +269,42 @@ void ThriftMapValueImpl::delegateComplete() {
   elements_.emplace_back(std::move(key), nullptr);
 }
 
-FilterStatus ThriftValueImpl::boolValue(bool value) {
+FilterStatus ThriftValueImpl::boolValue(bool& value) {
   ASSERT(value_type_ == FieldType::Bool);
   bool_value_ = value;
   parent_->delegateComplete();
   return FilterStatus::Continue;
 }
 
-FilterStatus ThriftValueImpl::byteValue(uint8_t value) {
+FilterStatus ThriftValueImpl::byteValue(uint8_t& value) {
   ASSERT(value_type_ == FieldType::Byte);
   byte_value_ = value;
   parent_->delegateComplete();
   return FilterStatus::Continue;
 }
 
-FilterStatus ThriftValueImpl::int16Value(int16_t value) {
+FilterStatus ThriftValueImpl::int16Value(int16_t& value) {
   ASSERT(value_type_ == FieldType::I16);
   int16_value_ = value;
   parent_->delegateComplete();
   return FilterStatus::Continue;
 }
 
-FilterStatus ThriftValueImpl::int32Value(int32_t value) {
+FilterStatus ThriftValueImpl::int32Value(int32_t& value) {
   ASSERT(value_type_ == FieldType::I32);
   int32_value_ = value;
   parent_->delegateComplete();
   return FilterStatus::Continue;
 }
 
-FilterStatus ThriftValueImpl::int64Value(int64_t value) {
+FilterStatus ThriftValueImpl::int64Value(int64_t& value) {
   ASSERT(value_type_ == FieldType::I64);
   int64_value_ = value;
   parent_->delegateComplete();
   return FilterStatus::Continue;
 }
 
-FilterStatus ThriftValueImpl::doubleValue(double value) {
+FilterStatus ThriftValueImpl::doubleValue(double& value) {
   ASSERT(value_type_ == FieldType::Double);
   double_value_ = value;
   parent_->delegateComplete();
@@ -358,8 +359,8 @@ FilterStatus ThriftStructValueImpl::structEnd() {
   return FilterStatus::Continue;
 }
 
-FilterStatus ThriftStructValueImpl::fieldBegin(absl::string_view name, FieldType field_type,
-                                               int16_t field_id) {
+FilterStatus ThriftStructValueImpl::fieldBegin(absl::string_view name, FieldType& field_type,
+                                               int16_t& field_id) {
   if (delegate_) {
     return delegate_->fieldBegin(name, field_type, field_id);
   }

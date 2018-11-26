@@ -21,19 +21,34 @@ message TcpProxy {
   // <config_network_filters_tcp_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
 
-  // The upstream cluster to connect to.
-  //
-  // .. note::
-  //
-  //  Once full filter chain matching is implemented in listeners, this field will become the only
-  //  way to configure the target cluster. All other matching will be done via :ref:`filter chain
-  //  matching rules <envoy_api_msg_listener.FilterChainMatch>`. For very simple configurations,
-  //  this field can still be used to select the cluster when no other matching rules are required.
-  //  Otherwise, a :ref:`deprecated_v1
-  //  <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.deprecated_v1>` configuration is
-  //  required to use more complex routing in the interim.
-  //
-  string cluster = 2;
+  oneof cluster_specifier {
+    option (validate.required) = true;
+
+    // The upstream cluster to connect to.
+    //
+    // .. note::
+    //
+    //  Once full filter chain matching is implemented in listeners, this field will become the only
+    //  way to configure the target cluster. All other matching will be done via :ref:`filter chain
+    //  matching rules <envoy_api_msg_listener.FilterChainMatch>`. For very simple configurations,
+    //  this field can still be used to select the cluster when no other matching rules are
+    //  required. Otherwise, a :ref:`deprecated_v1
+    //  <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.deprecated_v1>` configuration
+    //  is required to use more complex routing in the interim.
+    //
+    string cluster = 2;
+
+    // Multiple upstream clusters can be specified for a given route. The
+    // request is routed to one of the upstream clusters based on weights
+    // assigned to each cluster.
+    //
+    // .. note::
+    //
+    //  This field is ignored if the :ref:`deprecated_v1
+    //  <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.deprecated_v1>`
+    //  configuration is set.
+    WeightedCluster weighted_clusters = 10;
+  }
 
   // Optional endpoint metadata match criteria. Only endpoints in the upstream
   // cluster with metadata matching that set in metadata_match will be
@@ -131,4 +146,22 @@ message TcpProxy {
   // The maximum number of unsuccessful connection attempts that will be made before
   // giving up. If the parameter is not specified, 1 connection attempt will be made.
   google.protobuf.UInt32Value max_connect_attempts = 7 [(validate.rules).uint32.gte = 1];
+
+  // Allows for specification of multiple upstream clusters along with weights
+  // that indicate the percentage of traffic to be forwarded to each cluster.
+  // The router selects an upstream cluster based on these weights.
+  message WeightedCluster {
+    message ClusterWeight {
+      // Name of the upstream cluster.
+      string name = 1 [(validate.rules).string.min_bytes = 1];
+
+      // When a request matches the route, the choice of an upstream cluster is
+      // determined by its weight. The sum of weights across all entries in the
+      // clusters array determines the total weight.
+      uint32 weight = 2 [(validate.rules).uint32.gte = 1];
+    }
+
+    // Specifies one or more upstream clusters associated with the route.
+    repeated ClusterWeight clusters = 1 [(validate.rules).repeated .min_items = 1];
+  }
 }

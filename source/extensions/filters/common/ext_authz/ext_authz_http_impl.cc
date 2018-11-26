@@ -43,10 +43,13 @@ RawHttpClientImpl::RawHttpClientImpl(
     const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
     const absl::optional<std::chrono::milliseconds>& timeout, const std::string& path_prefix,
     const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers,
-    const Http::LowerCaseStrUnorderedSet& allowed_request_headers)
+    const Http::LowerCaseStrUnorderedSet& allowed_request_headers,
+    const HeaderKeyValueVector& authorization_headers_to_add)
     : cluster_name_(cluster_name), path_prefix_(path_prefix),
       allowed_authorization_headers_(allowed_authorization_headers),
-      allowed_request_headers_(allowed_request_headers), timeout_(timeout), cm_(cluster_manager) {}
+      allowed_request_headers_(allowed_request_headers),
+      authorization_headers_to_add_(authorization_headers_to_add), timeout_(timeout),
+      cm_(cluster_manager) {}
 
 RawHttpClientImpl::~RawHttpClientImpl() { ASSERT(!callbacks_); }
 
@@ -77,9 +80,13 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     }
   }
 
+  for (const auto& kv : authorization_headers_to_add_) {
+    headers->setReference(kv.first, kv.second);
+  }
+
   request_ = cm_.httpAsyncClientForCluster(cluster_name_)
                  .send(std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers)), *this,
-                       timeout_);
+                       Http::AsyncClient::RequestOptions().setTimeout(timeout_));
 }
 
 ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {

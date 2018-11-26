@@ -108,7 +108,7 @@ private:
    *                 request headers depending on whether this is called from the encode state or
    *                 decode state.
    *  @param rules the header-to-metadata mapping set in configuration.
-   *  @param callbacks the callback used to fetch the RequestInfo (which is then used to get
+   *  @param callbacks the callback used to fetch the StreamInfo (which is then used to get
    *                   metadata). Callable with both encoder_callbacks_ and decoder_callbacks_.
    */
   void writeHeaderToMetadata(Http::HeaderMap& headers, const HeaderToMetadataRules& rules,

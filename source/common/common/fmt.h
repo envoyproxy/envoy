@@ -2,20 +2,21 @@
 
 #include "absl/strings/string_view.h"
 #include "fmt/format.h"
+#include "fmt/ostream.h"
 
 // NOLINT(namespace-envoy)
 
 namespace fmt {
 
-// Provide an implementation of format_arg for fmt::format that allows absl::string_view to be
+// Provide an implementation of formatter for fmt::format that allows absl::string_view to be
 // formatted with the same format specifiers available to std::string.
 // TODO(zuercher): Once absl::string_view is replaced with std::string_view, this can be removed
 // as fmtlib handles std::string_view natively.
-template <typename ArgFormatter>
-void format_arg(BasicFormatter<char, ArgFormatter>& f, const char*& format_str,
-                const absl::string_view sv) {
-  BasicStringRef<char> str(sv.data(), sv.size());
-  format_str = f.format(format_str, internal::MakeArg<BasicFormatter<char>>(str));
-}
+template <> struct formatter<absl::string_view> : formatter<string_view> {
+  auto format(absl::string_view absl_string_view, fmt::format_context& ctx) -> decltype(ctx.out()) {
+    string_view fmt_string_view(absl_string_view.data(), absl_string_view.size());
+    return formatter<string_view>::format(fmt_string_view, ctx);
+  }
+};
 
 } // namespace fmt

@@ -17,6 +17,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::Return;
 
 namespace Envoy {
 namespace Http {
@@ -77,7 +78,7 @@ TEST(HttpUtility, isUpgrade) {
 // Start with H1 style websocket request headers. Transform to H2 and back.
 TEST(HttpUtility, H1H2H1Request) {
   TestHeaderMapImpl converted_headers = {
-      {":method", "GET"}, {"content-length", "0"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+      {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
   const TestHeaderMapImpl original_headers(converted_headers);
 
   ASSERT_TRUE(Utility::isUpgrade(converted_headers));
@@ -95,8 +96,7 @@ TEST(HttpUtility, H1H2H1Request) {
 
 // Start with H2 style websocket request headers. Transform to H1 and back.
 TEST(HttpUtility, H2H1H2Request) {
-  TestHeaderMapImpl converted_headers = {
-      {":method", "CONNECT"}, {"content-length", "0"}, {":protocol", "websocket"}};
+  TestHeaderMapImpl converted_headers = {{":method", "CONNECT"}, {":protocol", "websocket"}};
   const TestHeaderMapImpl original_headers(converted_headers);
 
   ASSERT_FALSE(Utility::isUpgrade(converted_headers));
@@ -109,15 +109,14 @@ TEST(HttpUtility, H2H1H2Request) {
 
   ASSERT_FALSE(Utility::isUpgrade(converted_headers));
   ASSERT_TRUE(Utility::isH2UpgradeRequest(converted_headers));
+  converted_headers.removeContentLength();
   ASSERT_EQ(converted_headers, original_headers);
 }
 
 // Start with H1 style websocket response headers. Transform to H2 and back.
 TEST(HttpUtility, H1H2H1Response) {
-  TestHeaderMapImpl converted_headers = {{":status", "101"},
-                                         {"content-length", "0"},
-                                         {"upgrade", "websocket"},
-                                         {"connection", "upgrade"}};
+  TestHeaderMapImpl converted_headers = {
+      {":status", "101"}, {"upgrade", "websocket"}, {"connection", "upgrade"}};
   const TestHeaderMapImpl original_headers(converted_headers);
 
   ASSERT_TRUE(Utility::isUpgrade(converted_headers));
@@ -135,10 +134,10 @@ TEST(HttpUtility, H1H2H1Response) {
 // header order may not be preserved.
 TEST(HttpUtility, OrderNotPreserved) {
   TestHeaderMapImpl expected_headers = {
-      {":method", "GET"}, {"content-length", "0"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+      {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
 
   TestHeaderMapImpl converted_headers = {
-      {":method", "GET"}, {"content-length", "0"}, {"Connection", "upgrade"}, {"Upgrade", "foo"}};
+      {":method", "GET"}, {"Connection", "upgrade"}, {"Upgrade", "foo"}};
 
   Utility::transformUpgradeRequestFromH1toH2(converted_headers);
   Utility::transformUpgradeRequestFromH2toH1(converted_headers);
@@ -151,14 +150,52 @@ TEST(HttpUtility, OrderNotPreserved) {
 // a custom x-envoy-original-method header if it is ever needed.
 TEST(HttpUtility, MethodNotPreserved) {
   TestHeaderMapImpl expected_headers = {
-      {":method", "GET"}, {"content-length", "0"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+      {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
 
   TestHeaderMapImpl converted_headers = {
-      {":method", "POST"}, {"content-length", "0"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+      {":method", "POST"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
 
   Utility::transformUpgradeRequestFromH1toH2(converted_headers);
   Utility::transformUpgradeRequestFromH2toH1(converted_headers);
   EXPECT_EQ(converted_headers, expected_headers);
+}
+
+TEST(HttpUtility, ContentLengthMangling) {
+  // Content-Length of 0 is removed on the request path.
+  {
+    TestHeaderMapImpl request_headers = {
+        {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}, {"content-length", "0"}};
+    Utility::transformUpgradeRequestFromH1toH2(request_headers);
+    EXPECT_TRUE(request_headers.ContentLength() == nullptr);
+  }
+
+  // Non-zero Content-Length is not removed on the request path.
+  {
+    TestHeaderMapImpl request_headers = {
+        {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}, {"content-length", "1"}};
+    Utility::transformUpgradeRequestFromH1toH2(request_headers);
+    EXPECT_FALSE(request_headers.ContentLength() == nullptr);
+  }
+
+  // Content-Length of 0 is removed on the response path.
+  {
+    TestHeaderMapImpl response_headers = {{":status", "101"},
+                                          {"upgrade", "websocket"},
+                                          {"connection", "upgrade"},
+                                          {"content-length", "0"}};
+    Utility::transformUpgradeResponseFromH1toH2(response_headers);
+    EXPECT_TRUE(response_headers.ContentLength() == nullptr);
+  }
+
+  // Non-zero Content-Length is not removed on the response path.
+  {
+    TestHeaderMapImpl response_headers = {{":status", "101"},
+                                          {"upgrade", "websocket"},
+                                          {"connection", "upgrade"},
+                                          {"content-length", "1"}};
+    Utility::transformUpgradeResponseFromH1toH2(response_headers);
+    EXPECT_FALSE(response_headers.ContentLength() == nullptr);
+  }
 }
 
 TEST(HttpUtility, appendXff) {
@@ -173,7 +210,7 @@ TEST(HttpUtility, appendXff) {
     TestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"}};
     Network::Address::Ipv4Instance address("127.0.0.1");
     Utility::appendXff(headers, address);
-    EXPECT_EQ("10.0.0.1, 127.0.0.1", headers.get_("x-forwarded-for"));
+    EXPECT_EQ("10.0.0.1,127.0.0.1", headers.get_("x-forwarded-for"));
   }
 
   {
@@ -420,7 +457,8 @@ TEST(HttpUtility, SendLocalReply) {
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks, encodeData(_, true));
-  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large", false);
+  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
+                          absl::nullopt, false);
 }
 
 TEST(HttpUtility, SendLocalGrpcReply) {
@@ -431,11 +469,37 @@ TEST(HttpUtility, SendLocalGrpcReply) {
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
         EXPECT_STREQ(headers.Status()->value().c_str(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_STREQ(headers.GrpcStatus()->value().c_str(), "2"); // Unknown gRPC error.
+        EXPECT_EQ(headers.GrpcStatus()->value().c_str(),
+                  std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unknown)));
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_STREQ(headers.GrpcMessage()->value().c_str(), "large");
       }));
-  Utility::sendLocalReply(true, callbacks, is_reset, Http::Code::PayloadTooLarge, "large", false);
+  Utility::sendLocalReply(true, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
+                          absl::nullopt, false);
+}
+
+TEST(HttpUtility, RateLimitedGrpcStatus) {
+  MockStreamDecoderFilterCallbacks callbacks;
+
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+        EXPECT_NE(headers.GrpcStatus(), nullptr);
+        EXPECT_EQ(headers.GrpcStatus()->value().c_str(),
+                  std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unavailable)));
+      }));
+  Utility::sendLocalReply(true, callbacks, false, Http::Code::TooManyRequests, "", absl::nullopt,
+                          false);
+
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+        EXPECT_NE(headers.GrpcStatus(), nullptr);
+        EXPECT_EQ(headers.GrpcStatus()->value().c_str(),
+                  std::to_string(enumToInt(Grpc::Status::GrpcStatus::ResourceExhausted)));
+      }));
+  Utility::sendLocalReply(
+      true, callbacks, false, Http::Code::TooManyRequests, "",
+      absl::make_optional<Grpc::Status::GrpcStatus>(Grpc::Status::GrpcStatus::ResourceExhausted),
+      false);
 }
 
 TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
@@ -446,7 +510,8 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
     is_reset = true;
   }));
   EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
-  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large", false);
+  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
+                          absl::nullopt, false);
 }
 
 TEST(HttpUtility, SendLocalReplyHeadRequest) {
@@ -457,7 +522,8 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
         EXPECT_STREQ(headers.ContentLength()->value().c_str(),
                      fmt::format("{}", strlen("large")).c_str());
       }));
-  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large", true);
+  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
+                          absl::nullopt, true);
 }
 
 TEST(HttpUtility, TestExtractHostPathFromUri) {
@@ -512,6 +578,152 @@ TEST(HttpUtility, QueryParamsToString) {
   EXPECT_EQ("?a=1", Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}})));
   EXPECT_EQ("?a=1&b=2",
             Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}, {"b", "2"}})));
+}
+
+// Verify that it resolveMostSpecificPerFilterConfigGeneric works with nil routes.
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
+  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric("envoy.filter", nullptr));
+}
+
+class TestConfig : public Router::RouteSpecificFilterConfig {
+public:
+  int state_;
+  void merge(const TestConfig& other) { state_ += other.state_; }
+};
+
+// Verify that resolveMostSpecificPerFilterConfig works and we get back the original type.
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
+  TestConfig testConfig;
+
+  const std::string filter_name = "envoy.filter";
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+
+  // make the file callbacks return our test config
+  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
+      .WillByDefault(Return(&testConfig));
+
+  // test the we get the same object back (as this goes through the dynamic_cast)
+  auto resolved_filter_config = Utility::resolveMostSpecificPerFilterConfig<TestConfig>(
+      filter_name, filter_callbacks.route());
+  EXPECT_EQ(&testConfig, resolved_filter_config);
+}
+
+// Verify that resolveMostSpecificPerFilterConfigGeneric indeed returns the most specific per filter
+// config.
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
+  const std::string filter_name = "envoy.filter";
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+
+  const Router::RouteSpecificFilterConfig* nullconfig = nullptr;
+  const Router::RouteSpecificFilterConfig* one = nullconfig + 1;
+  const Router::RouteSpecificFilterConfig* two = nullconfig + 2;
+  const Router::RouteSpecificFilterConfig* three = nullconfig + 3;
+
+  // Test when there's nothing on the route
+  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                        filter_callbacks.route()));
+
+  // Testing in reverse order, so that the method always returns the last object.
+  ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
+      .WillByDefault(Return(one));
+  EXPECT_EQ(one, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                    filter_callbacks.route()));
+
+  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name)).WillByDefault(Return(two));
+  EXPECT_EQ(two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                    filter_callbacks.route()));
+
+  ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
+      .WillByDefault(Return(three));
+  EXPECT_EQ(three, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                      filter_callbacks.route()));
+
+  // Cover the case of no route entry
+  ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
+  EXPECT_EQ(two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                    filter_callbacks.route()));
+}
+
+// Verify that traversePerFilterConfigGeneric traverses in the order of specificity.
+TEST(HttpUtility, TraversePerFilterConfigIteratesInOrder) {
+  const std::string filter_name = "envoy.filter";
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+
+  // Create configs to test; to ease of testing instead of using real objects
+  // we will use pointers that are actually indexes.
+  const Router::RouteSpecificFilterConfig* nullconfig = nullptr;
+  size_t num_configs = 1;
+  ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
+      .WillByDefault(Return(nullconfig + num_configs));
+  num_configs++;
+  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
+      .WillByDefault(Return(nullconfig + num_configs));
+  num_configs++;
+  ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
+      .WillByDefault(Return(nullconfig + num_configs));
+
+  // a vector to save which configs are visited by the traversePerFilterConfigGeneric
+  std::vector<size_t> visited_configs(num_configs, 0);
+
+  // Iterate; save the retrieved config index in the iteration index in visited_configs.
+  size_t index = 0;
+  Utility::traversePerFilterConfigGeneric(filter_name, filter_callbacks.route(),
+                                          [&](const Router::RouteSpecificFilterConfig& cfg) {
+                                            int cfg_index = &cfg - nullconfig;
+                                            visited_configs[index] = cfg_index - 1;
+                                            index++;
+                                          });
+
+  // Make sure all methods were called, and in order.
+  for (size_t i = 0; i < visited_configs.size(); i++) {
+    EXPECT_EQ(i, visited_configs[i]);
+  }
+}
+
+// Verify that traversePerFilterConfig works and we get back the original type.
+TEST(HttpUtility, TraversePerFilterConfigTyped) {
+  TestConfig testConfig;
+
+  const std::string filter_name = "envoy.filter";
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+
+  // make the file callbacks return our test config
+  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
+      .WillByDefault(Return(&testConfig));
+
+  // iterate the configs
+  size_t index = 0;
+  Utility::traversePerFilterConfig<TestConfig>(filter_name, filter_callbacks.route(),
+                                               [&](const TestConfig&) { index++; });
+
+  // make sure that the callback was called (which means that the dynamic_cast worked.)
+  EXPECT_EQ(1, index);
+}
+
+// Verify that merging works as expected and we get back the merged result.
+TEST(HttpUtility, GetMergedPerFilterConfig) {
+  TestConfig baseTestConfig, routeTestConfig;
+
+  baseTestConfig.state_ = 1;
+  routeTestConfig.state_ = 1;
+
+  const std::string filter_name = "envoy.filter";
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+
+  // make the file callbacks return our test config
+  ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
+      .WillByDefault(Return(&baseTestConfig));
+  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
+      .WillByDefault(Return(&routeTestConfig));
+
+  // merge the configs
+  auto merged_cfg = Utility::getMergedPerFilterConfig<TestConfig>(
+      filter_name, filter_callbacks.route(),
+      [&](TestConfig& base_cfg, const TestConfig& route_cfg) { base_cfg.merge(route_cfg); });
+
+  // make sure that the callback was called (which means that the dynamic_cast worked.)
+  ASSERT_TRUE(merged_cfg.has_value());
+  EXPECT_EQ(2, merged_cfg.value().state_);
 }
 
 } // namespace Http

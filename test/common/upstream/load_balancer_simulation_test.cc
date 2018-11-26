@@ -29,7 +29,7 @@ static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
   return HostSharedPtr{
       new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
                    envoy::api::v2::core::Metadata::default_instance(), weight, locality,
-                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance())};
+                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0)};
 }
 
 // Simulate weighted LR load balancer.
@@ -61,8 +61,10 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   stats.max_host_weight_.set(weight);
   NiceMock<Runtime::MockLoader> runtime;
   Runtime::RandomGeneratorImpl random;
+  envoy::api::v2::Cluster::LeastRequestLbConfig least_request_lb_config;
   envoy::api::v2::Cluster::CommonLbConfig common_config;
-  LeastRequestLoadBalancer lb_{priority_set, nullptr, stats, runtime, random, common_config};
+  LeastRequestLoadBalancer lb_{
+      priority_set, nullptr, stats, runtime, random, common_config, least_request_lb_config};
 
   std::unordered_map<HostConstSharedPtr, uint64_t> host_hits;
   const uint64_t total_requests = 100;

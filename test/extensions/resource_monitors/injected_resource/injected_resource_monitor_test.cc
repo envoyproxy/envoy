@@ -73,10 +73,10 @@ protected:
 };
 
 TEST_F(InjectedResourceMonitorTest, ReportsCorrectPressure) {
-  EXPECT_CALL(cb_, onSuccess(Server::ResourceUsage{.resource_pressure_ = 0.6}));
+  EXPECT_CALL(cb_, onSuccess(Server::ResourceUsage{0.6}));
   updateResource(0.6);
 
-  EXPECT_CALL(cb_, onSuccess(Server::ResourceUsage{.resource_pressure_ = 0.7}));
+  EXPECT_CALL(cb_, onSuccess(Server::ResourceUsage{0.7}));
   updateResource(0.7);
 }
 

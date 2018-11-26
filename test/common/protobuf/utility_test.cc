@@ -33,6 +33,7 @@ TEST(UtilityTest, RepeatedPtrUtilDebugString) {
 
 TEST(UtilityTest, DowncastAndValidate) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.mutable_runtime();
   EXPECT_THROW(MessageUtil::validate(bootstrap), ProtoValidationException);
   EXPECT_THROW(
       MessageUtil::downcastAndValidate<const envoy::config::bootstrap::v2::Bootstrap&>(bootstrap),

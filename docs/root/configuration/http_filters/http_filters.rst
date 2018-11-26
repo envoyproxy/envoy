@@ -18,6 +18,7 @@ HTTP filters
   health_check_filter
   header_to_metadata_filter
   ip_tagging_filter
+  jwt_authn_filter
   lua_filter
   rate_limit_filter
   rbac_filter

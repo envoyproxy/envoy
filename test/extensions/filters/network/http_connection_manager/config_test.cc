@@ -46,7 +46,7 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  Http::SlowDateProviderImpl date_provider_;
+  Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSystem()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
 };
 
@@ -131,6 +131,27 @@ TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  internal_address_config:
+    unix_sockets: true
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  Network::Address::PipeInstance unixAddress{"/foo"};
+  Network::Address::Ipv4Instance internalIpAddress{"127.0.0.1", 0};
+  Network::Address::Ipv4Instance externalIpAddress{"12.0.0.1", 0};
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(unixAddress));
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(internalIpAddress));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
+}
+
 // Validated that an explicit zero stream idle timeout disables.
 TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   const std::string yaml_string = R"EOF(
@@ -145,6 +166,50 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_);
   EXPECT_EQ(0, config.streamIdleTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ConfiguredRequestTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  request_timeout: 53s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(53 * 1000, config.requestTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DisabledRequestTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  request_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(0, config.requestTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(0, config.requestTimeout().count());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
@@ -385,6 +450,20 @@ TEST_F(HttpConnectionManagerConfigTest, BadAccessLogNestedTypes) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   EXPECT_THROW(factory.createFilterFactory(*json_config, context_), Json::Exception);
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ReversedEncodeOrderConfig) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_TRUE(config.reverseEncodeOrder());
 }
 
 class FilterChainTest : public HttpConnectionManagerConfigTest {

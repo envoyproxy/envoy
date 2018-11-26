@@ -76,7 +76,7 @@ public:
   virtual void shutdown() PURE;
 
   /**
-   * Return the hot restart compatability version so that operations code can decide whether to
+   * Return the hot restart compatibility version so that operations code can decide whether to
    * perform a full or hot restart.
    */
   virtual std::string version() PURE;

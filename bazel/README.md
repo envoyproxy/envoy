@@ -28,15 +28,16 @@ for how to update or override dependencies.
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
 2. Install external dependencies libtool, cmake, ninja, realpath and curl libraries separately.
-On Ubuntu, run the following commands:
+On Ubuntu, run the following command:
 ```
- apt-get install libtool
- apt-get install cmake
- apt-get install realpath
- apt-get install clang-format-6.0
- apt-get install automake
- apt-get install ninja-build
- apt-get install curl
+sudo apt-get install \
+   libtool \
+   cmake \
+   realpath \
+   clang-format-7 \
+   automake \
+   ninja-build \
+   curl
 ```
 
 On Fedora (maybe also other red hat distros), run the following:
@@ -44,17 +45,11 @@ On Fedora (maybe also other red hat distros), run the following:
 dnf install cmake libtool libstdc++
 ```
 
-On OS X, you'll need to install several dependencies. This can be accomplished via Homebrew:
+On OS X, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
 ```
-brew install coreutils # for realpath
-brew install wget
-brew install cmake
-brew install libtool
-brew install go
-brew install bazel
-brew install automake
-brew install ninja
+brew install coreutils wget cmake libtool go bazel automake ninja
 ```
+_note_: `coreutils` is used for realpath
 
 Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
 Apple LLVM version 9.1.0 (clang-902.0.30).
@@ -92,7 +87,7 @@ known to work.
 
 By default Clang drops some debug symbols that are required for pretty printing to work correctly.
 More information can be found [here](https://bugs.llvm.org/show_bug.cgi?id=24202). The easy solution
-is to set ```--copt=-fno-limit-debug-info``` on the CLI or in your bazel.rc file.
+is to set ```--copt=-fno-limit-debug-info``` on the CLI or in your .bazelrc file.
 
 # Testing Envoy with Bazel
 
@@ -144,6 +139,9 @@ bazel test //test/... --test_env=HEAPCHECK=
 # Changes the heap checker to "minimal" mode
 bazel test //test/... --test_env=HEAPCHECK=minimal
 ```
+
+If you see a leak detected, by default the reported offsets will require `addr2line` interpretation.
+You can run under `--config=clang-asan` to have this automatically applied.
 
 Bazel will by default cache successful test results. To force it to rerun tests:
 
@@ -229,7 +227,9 @@ To build and run tests with the gcc compiler's [address sanitizer
 bazel test -c dbg --config=asan //test/...
 ```
 
-The ASAN failure stack traces include line numbers as a result of running ASAN with a `dbg` build above.
+The ASAN failure stack traces include line numbers as a result of running ASAN with a `dbg` build above. If the
+stack trace is not symbolized, try setting the ASAN_SYMBOLIZER_PATH environment variable to point to the
+llvm-symbolizer binary (or make sure the llvm-symbolizer is in your $PATH).
 
 If you have clang-5.0 or newer, additional checks are provided with:
 
@@ -412,3 +412,77 @@ bazel build --explain=file.txt --verbose_explanations //source/...
 
 Sometimes it's useful to see real system paths in bazel error message output (vs. symbolic links).
 `tools/path_fix.sh` is provided to help with this. See the comments in that file.
+
+# Compilation database
+
+Run `tools/gen_compilation_database.py` to generate
+a [JSON Compilation Database](https://clang.llvm.org/docs/JSONCompilationDatabase.html). This could be used
+with any tools (e.g. clang-tidy) compatible with the format.
+
+The compilation database could also be used to setup editors with cross reference, code completion.
+For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
+[cquery](https://github.com/cquery-project/cquery) with supported editors.
+
+# Advanced caching setup
+
+Setting up an HTTP cache for Bazel output helps optimize Bazel performance and resource usage when
+using multiple compilation modes or multiple trees.
+
+## Setup common `envoy_deps`
+
+This step sets up the common `envoy_deps` allowing HTTP or disk cache (described below) to work
+across working trees in different paths. Also it allows new working trees to skip dependency
+compilation. The drawback is that the cached dependencies won't be updated automatically, so make
+sure all your working trees have same (or compatible) dependencies, and run this step periodically
+to update them.
+
+Make sure you don't have `--override_repository` in your `.bazelrc` when you run this step.
+
+```
+bazel fetch //test/...
+cp -LR $(bazel info output_base)/external/envoy_deps ${HOME}/envoy_deps_cache
+```
+
+Adding the following parameter to Bazel everytime or persist them in `.bazelrc`, note you will need to expand
+the environment variables for `.bazelrc`.
+
+```
+--override_repository=envoy_deps=${HOME}/envoy_deps_cache
+```
+
+## Setup local cache
+
+You may use any [Remote Caching](https://docs.bazel.build/versions/master/remote-caching.html) backend
+as an alternative to this.
+
+This requires Go 1.11+, follow the [instructions](https://golang.org/doc/install#install) to install
+if you don't have one.
+
+```
+go run github.com/buchgr/bazel-remote --dir ${HOME}/bazel_cache --host 127.0.0.1 --port 28080 --max_size 64
+```
+
+See [Bazel remote cache](github.com/buchgr/bazel-remote) for more information on the parameters.
+The command above will setup a maximum 64 GiB cache at `~/bazel_cache` on port 28080. You might
+want to setup a larger cache if you run ASAN builds.
+
+NOTE: Using docker to run remote cache server described in remote cache docs will likely have
+slower cache performance on macOS due to slow disk performance for Docker on Mac.
+
+Adding the following parameter to Bazel everytime or persist them in `.bazelrc`.
+
+```
+--remote_http_cache=http://127.0.0.1:28080/
+```
+
+## Restrict environment variables
+
+You might need the following parameters for Bazel or persist in `.bazelrc` as well to make cache
+more efficient. This will let Bazel use an environment with a static value for _PATH_ and does
+not inherit _LD_LIBRARY_PATH_ or _TMPDIR_. See
+[Bazel Command-Line References](https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_strict_action_env)
+for more information.
+
+```
+--experimental_strict_action_env
+```

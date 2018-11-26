@@ -7,7 +7,6 @@ The buffer filter is used to stop filter iteration and wait for a fully buffered
 This is useful in different situations including protecting some applications from having to deal
 with partial requests and high network latency.
 
-* :ref:`v1 API reference <config_http_filters_buffer_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.buffer.v2.Buffer>`
 
 Per-Route Configuration

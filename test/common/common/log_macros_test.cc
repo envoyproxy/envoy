@@ -67,9 +67,9 @@ TEST(Logger, logAsStatement) {
 
   // Make sure that if statement inside of LOGGER macro does not catch trailing
   // else ....
-  if (true)
+  if (true) // NOLINT(readability-braces-around-statements)
     ENVOY_LOG_MISC(warn, "test message 1 '{}'", i++);
-  else
+  else // NOLINT(readability-braces-around-statements)
     ENVOY_LOG_MISC(critical, "test message 2 '{}'", j++);
 
   EXPECT_THAT(i, testing::Eq(1));
@@ -109,6 +109,11 @@ TEST(Logger, checkLoggerLevel) {
 
   testObj.setLevel(spdlog::level::info);
   EXPECT_THAT(testObj.executeAtTraceLevel(), testing::Eq(2));
+}
+
+TEST(RegistryTest, LoggerWithName) {
+  EXPECT_EQ(nullptr, Logger::Registry::logger("blah"));
+  EXPECT_EQ("upstream", Logger::Registry::logger("upstream")->name());
 }
 
 } // namespace Envoy

@@ -200,7 +200,7 @@ TEST_F(TwitterProtocolTest, Type) {
   EXPECT_EQ(proto.type(), ProtocolType::Twitter);
 }
 
-// Tests readMessageBegin with insufficent data.
+// Tests readMessageBegin with insufficient data.
 TEST_F(TwitterProtocolTest, ReadMessageBeginInsufficientData) {
   TwitterProtocolImpl proto;
   Buffer::OwnedImpl buffer;

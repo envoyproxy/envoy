@@ -4,7 +4,6 @@ gRPC-JSON transcoder
 ====================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
-* :ref:`v1 API reference <config_http_filters_grpc_json_transcoder_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.transcoder.v2.GrpcJsonTranscoder>`
 
 This is a filter which allows a RESTful JSON API client to send requests to Envoy over HTTP
@@ -74,7 +73,7 @@ Sending arbitrary content
 -------------------------
 
 By default, when transcoding occurs, gRPC-JSON encodes the message output of a gRPC service method into
-JSON and sets the HTTP response `Content-Type` header to `application/json`. To send abritrary content,
+JSON and sets the HTTP response `Content-Type` header to `application/json`. To send arbitrary content,
 a gRPC service method can use
 `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_
 as its output message type. The implementation needs to set

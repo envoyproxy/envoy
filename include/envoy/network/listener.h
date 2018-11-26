@@ -7,8 +7,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
-#include "envoy/network/transport_socket.h"
-#include "envoy/ssl/context.h"
 #include "envoy/stats/scope.h"
 
 namespace Envoy {
@@ -74,6 +72,14 @@ public:
    * @return const std::string& the listener's name.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return bool indicates whether write filters should be in the reversed order of the filter
+   *         chain config.
+   */
+  // TODO(qiannawang): this method is deprecated and to be moved soon. See
+  // https://github.com/envoyproxy/envoy/pull/4889 for more details.
+  virtual bool reverseWriteFilterOrder() const PURE;
 };
 
 /**
@@ -106,6 +112,16 @@ public:
 class Listener {
 public:
   virtual ~Listener() {}
+
+  /**
+   * Temporarily disable accepting new connections.
+   */
+  virtual void disable() PURE;
+
+  /**
+   * Enable accepting new connections.
+   */
+  virtual void enable() PURE;
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;

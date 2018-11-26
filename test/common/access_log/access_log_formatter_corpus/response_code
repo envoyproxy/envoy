@@ -1,5 +1,5 @@
 format: "%RESPONSE_CODE%"
-request_info {
+stream_info {
   response_code {
     value: 404
   }

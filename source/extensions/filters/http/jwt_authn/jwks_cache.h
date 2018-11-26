@@ -41,12 +41,12 @@ public:
   public:
     virtual ~JwksData() {}
 
+    // Check if a list of audiences are allowed.
+    virtual bool areAudiencesAllowed(const std::vector<std::string>& audiences) const PURE;
+
     // Get the cached config: JWT rule.
     virtual const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider&
     getJwtProvider() const PURE;
-
-    // Check if a list of audiences are allowed.
-    virtual bool areAudiencesAllowed(const std::vector<std::string>& audiences) const PURE;
 
     // Get the Jwks object.
     virtual const ::google::jwt_verify::Jwks* getJwksObj() const PURE;
@@ -60,7 +60,9 @@ public:
   };
 
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.
-  virtual JwksData* findByIssuer(const std::string& name) PURE;
+  virtual JwksData* findByIssuer(const std::string& issuer) PURE;
+
+  virtual JwksData* findByProvider(const std::string& provider) PURE;
 
   // Factory function to create an instance.
   static JwksCachePtr

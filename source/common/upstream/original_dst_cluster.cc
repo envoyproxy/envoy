@@ -81,7 +81,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
             info_, info_->name() + dst_addr.asString(), std::move(host_ip_port),
             envoy::api::v2::core::Metadata::default_instance(), 1,
             envoy::api::v2::core::Locality().default_instance(),
-            envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
+            envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0));
 
         ENVOY_LOG(debug, "Created host {}.", host->address()->asString());
         // Add the new host to the map. We just failed to find it in

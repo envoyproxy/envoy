@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdint>
 #include <queue>
 
@@ -88,7 +90,7 @@ private:
   };
 
   // Current time in EDF scheduler.
-  // TOOD(htuch): Is it worth the small extra complexity to use integer time for performance
+  // TODO(htuch): Is it worth the small extra complexity to use integer time for performance
   // reasons?
   double current_time_{};
   // Offset used during addition to break ties when entries have the same weight but should reflect
