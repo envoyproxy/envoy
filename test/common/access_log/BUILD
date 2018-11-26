@@ -12,17 +12,6 @@ load(
 
 envoy_package()
 
-envoy_cc_test_library(
-    name = "test_util",
-    hdrs = ["test_util.h"],
-    deps = [
-        "//include/envoy/stream_info:stream_info_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/stream_info:filter_state_lib",
-        "//test/test_common:test_time_lib",
-    ],
-)
-
 envoy_proto_library(
     name = "access_log_formatter_fuzz_proto",
     srcs = ["access_log_formatter_fuzz.proto"],
@@ -58,10 +47,10 @@ envoy_cc_test(
     name = "access_log_impl_test",
     srcs = ["access_log_impl_test.cc"],
     deps = [
-        ":test_util",
         "//source/common/access_log:access_log_lib",
         "//source/common/config:filter_json_lib",
         "//source/extensions/access_loggers/file:config",
+        "//test/common/stream_info:test_util",
         "//test/common/upstream:utility_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
@@ -95,10 +84,10 @@ envoy_cc_binary(
         "benchmark",
     ],
     deps = [
-        ":test_util",
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/http:header_map_lib",
         "//source/common/network:address_lib",
+        "//test/common/stream_info:test_util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",

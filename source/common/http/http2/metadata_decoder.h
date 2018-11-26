@@ -53,6 +53,7 @@ public:
 
 private:
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
+  friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderMultipleMetadataReachSizeLimit_Test;
   /**
    * Decodes METADATA payload using nghttp2.
    * @param end_metadata indicates is END_METADATA is true.
@@ -69,8 +70,10 @@ private:
   // Payload received.
   Buffer::OwnedImpl payload_;
 
-  // Payload size limit. If the payload received exceeds the limit, fails the connection.
+  // Payload size limit. If the total payload received exceeds the limit, fails the connection.
   const uint64_t max_payload_size_bound_ = 1024 * 1024;
+
+  uint64_t total_payload_size_ = 0;
 
   // TODO(soya3129): consider sharing the inflater with all streams in a connection. Caveat:
   // inflater failure on one stream can impact other streams.

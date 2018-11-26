@@ -255,7 +255,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
 
   EXPECT_EQ(manager.initializeReadFilters(), true);
 
-  EXPECT_CALL(factory_context.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(factory_context.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
       .WillOnce(Return(&conn_pool));
 
   request_callbacks->complete(RateLimit::LimitStatus::OK, nullptr);

@@ -376,6 +376,12 @@ message Cluster {
     // host selected but Y having 100, then a lot more load is being dumped on the single host in X
     // than originally anticipated in the load balancing assignment delivered via EDS.
     bool locality_weight_aware = 4;
+
+    // When used with locality_weight_aware, scales the weight of each locality by the ratio
+    // of hosts in the subset vs hosts in the original subset. This aims to even out the load
+    // going to an individual locality if said locality is disproportionally affected by the
+    // subset predicate.
+    bool scale_locality_weight = 5;
   }
 
   // Configuration for load balancing subsetting.
