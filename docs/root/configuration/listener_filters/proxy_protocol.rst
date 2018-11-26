@@ -24,3 +24,4 @@ If there is a protocol error or an unsupported address family
 (e.g. AF_UNIX) the connection will be closed and an error thrown.
 
 * :ref:`v2 API reference <envoy_api_field_listener.Filter.name>`
+* This filter should be configured with the name *envoy.listener.tls_inspector*.
