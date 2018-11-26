@@ -21,7 +21,7 @@
 #include "envoy/stats/stats_options.h"
 #include "envoy/thread/thread.h"
 
-#include "common/http/codes.h"
+#include "common/http/context_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
@@ -244,7 +244,6 @@ public:
   MOCK_METHOD1(startWorkers, void(GuardDog& guard_dog));
   MOCK_METHOD0(stopListeners, void());
   MOCK_METHOD0(stopWorkers, void());
-  MOCK_METHOD0(codeStats, Http::CodeStats&());
 };
 
 class MockWorkerFactory : public WorkerFactory {
@@ -344,7 +343,7 @@ public:
   MOCK_METHOD0(startTimeCurrentEpoch, time_t());
   MOCK_METHOD0(startTimeFirstEpoch, time_t());
   MOCK_METHOD0(stats, Stats::Store&());
-  MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
+  MOCK_METHOD0(httpContext, Http::Context&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
@@ -354,7 +353,7 @@ public:
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
-  testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
+  //testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
   std::shared_ptr<testing::NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new testing::NiceMock<Network::MockDnsResolver>()};
   testing::NiceMock<Api::MockApi> api_;
@@ -375,6 +374,7 @@ public:
   testing::NiceMock<MockListenerManager> listener_manager_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Singleton::ManagerPtr singleton_manager_;
+  Http::ContextImpl http_context_;
 };
 
 namespace Configuration {
@@ -386,7 +386,7 @@ public:
   ~MockMain();
 
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager*());
-  MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
+  MOCK_METHOD0(httpContext, Http::Context&());
   MOCK_METHOD0(rateLimitClientFactory, RateLimit::ClientFactory&());
   MOCK_METHOD0(statsSinks, std::list<Stats::SinkPtr>&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
@@ -431,7 +431,7 @@ public:
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
-  Http::CodeStats& codeStats() override { return code_stats_; }
+  Http::Context& httpContext() override { return http_context_; }
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -449,7 +449,8 @@ public:
   Stats::IsolatedStoreImpl listener_scope_;
   Event::SimulatedTimeSystem time_system_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
-  Http::CodeStatsImpl code_stats_;
+  Tracing::HttpNullTracer null_tracer_;
+  Http::ContextImpl http_context_;
 };
 
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {

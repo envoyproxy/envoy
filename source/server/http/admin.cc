@@ -1022,10 +1022,9 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
                                          const std::vector<Network::FilterFactoryCb>&) {
   // Don't pass in the overload manager so that the admin interface is accessible even when
   // the envoy is overloaded.
-  Http::CodeStats& code_stats = server_.listenerManager().codeStats();
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-      *this, server_.drainManager(), server_.random(), server_.httpTracer(), server_.runtime(),
-      server_.localInfo(), server_.clusterManager(), nullptr, server_.timeSystem(), code_stats)});
+      *this, server_.drainManager(), server_.random(), server_.httpContext(), server_.runtime(),
+      server_.localInfo(), server_.clusterManager(), nullptr, server_.timeSystem())});
   return true;
 }
 

@@ -90,11 +90,13 @@ public:
    * @param cluster_manager_factory supplies the cluster manager creation factory.
    */
   void initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstrap, Instance& server,
-                  Upstream::ClusterManagerFactory& cluster_manager_factory);
+                  Upstream::ClusterManagerFactory& cluster_manager_factory,
+                  Http::ContextPtr http_context);
 
   // Server::Configuration::Main
   Upstream::ClusterManager* clusterManager() override { return cluster_manager_.get(); }
-  Tracing::HttpTracer& httpTracer() override { return *http_tracer_; }
+  //Tracing::HttpTracer& httpTracer() override { return http_context_->tracer(); }
+  Http::Context& httpContext() override { return *http_context_; }
   RateLimit::ClientFactory& rateLimitClientFactory() override { return *ratelimit_client_factory_; }
   std::list<Stats::SinkPtr>& statsSinks() override { return stats_sinks_; }
   std::chrono::milliseconds statsFlushInterval() const override { return stats_flush_interval_; }
@@ -107,17 +109,20 @@ public:
     return watchdog_multikill_timeout_;
   }
 
-private:
   /**
    * Initialize tracers and corresponding sinks.
    */
-  void initializeTracers(const envoy::config::trace::v2::Tracing& configuration, Instance& server);
+  static Tracing::HttpTracerPtr makeHttpTracer(
+      const envoy::config::trace::v2::Tracing& configuration,
+      Instance& server);
 
+private:
   void initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                             Instance& server);
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
-  Tracing::HttpTracerPtr http_tracer_;
+  //Tracing::HttpTracerPtr http_tracer_;
+  Http::ContextPtr http_context_;
   std::list<Stats::SinkPtr> stats_sinks_;
   RateLimit::ClientFactoryPtr ratelimit_client_factory_;
   std::chrono::milliseconds stats_flush_interval_;

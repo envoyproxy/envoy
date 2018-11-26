@@ -5,6 +5,7 @@
 #include "common/api/api_impl.h"
 #include "common/config/bootstrap_json.h"
 #include "common/config/well_known_names.h"
+#include "common/http/context_impl.h"
 #include "common/json/json_loader.h"
 #include "common/upstream/cluster_manager_impl.h"
 
@@ -54,21 +55,23 @@ class ConfigurationImplTest : public testing::Test {
 protected:
   ConfigurationImplTest()
       : api_(Api::createApiForTest()),
+        http_context_(new Http::ContextImpl),
         cluster_manager_factory_(server_.runtime(), server_.stats(), server_.threadLocal(),
                                  server_.random(), server_.dnsResolver(),
                                  server_.sslContextManager(), server_.dispatcher(),
-                                 server_.localInfo(), server_.secretManager(), *api_) {}
+                                 server_.localInfo(), server_.secretManager(), *api_, *http_context_) {}
 
   Api::ApiPtr api_;
+  Tracing::HttpNullTracer null_tracer_;
+  std::unique_ptr<Http::ContextImpl> http_context_;
   NiceMock<Server::MockInstance> server_;
   Upstream::ProdClusterManagerFactory cluster_manager_factory_;
+  MainImpl config_;
 };
-
 TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
 
-  MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  config_.initialize(bootstrap, server_, cluster_manager_factory_, http_context_.release());
 
   EXPECT_EQ(std::chrono::milliseconds(5000), config.statsFlushInterval());
 }
@@ -90,8 +93,7 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
 
   envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
-  MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  config_.initialize(bootstrap, server_, cluster_manager_factory_, http_context_);
 
   EXPECT_EQ(std::chrono::milliseconds(500), config.statsFlushInterval());
 }
@@ -120,8 +122,7 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
 
   envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
-  MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  config_.initialize(bootstrap, server_, cluster_manager_factory_, http_context_);
 
   ASSERT_EQ(1U, config.clusterManager()->clusters().count("test_cluster"));
   EXPECT_EQ(8192U, config.clusterManager()
@@ -152,8 +153,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   server_.local_info_.node_.set_cluster("");
-  MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  config_.initialize(bootstrap, server_, cluster_manager_factory_, http_context_);
 
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
 }
@@ -188,8 +188,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
   envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   server_.local_info_.node_.set_cluster("");
-  MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  config_.initialize(bootstrap, server_, cluster_manager_factory_, http_context_);
 
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
 }
@@ -223,8 +222,8 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
 
   envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
   bootstrap.mutable_tracing()->mutable_http()->set_name("invalid");
-  MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_,
+                                              http_context_),
                             EnvoyException,
                             "Didn't find a registered implementation for name: 'invalid'");
 }
@@ -249,8 +248,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   auto& field_map = *sink.mutable_config()->mutable_fields();
   field_map["tcp_cluster_name"].set_string_value("fake_cluster");
 
-  MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  config_.initialize(bootstrap, server_, cluster_manager_factory_, http_context_);
 
   EXPECT_EQ(1, config.statsSinks().size());
 }
@@ -275,8 +273,8 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
   auto& field_map = *sink.mutable_config()->mutable_fields();
   field_map["tcp_cluster_name"].set_string_value("fake_cluster");
 
-  MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
+  EXPECT_THROW_WITH_MESSAGE(config_.initialize(bootstrap, server_, cluster_manager_factory_,
+                                               http_context_),
                             EnvoyException,
                             "Didn't find a registered implementation for name: 'envoy.invalid'");
 }
@@ -300,8 +298,8 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
   auto& field_map = *sink.mutable_config()->mutable_fields();
   field_map["tcp_cluster_name"].set_string_value("fake_cluster");
 
-  MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_,
+                                              http_context_),
                             EnvoyException,
                             "Provided name for static registration lookup was empty.");
 }

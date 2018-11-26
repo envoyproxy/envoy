@@ -81,7 +81,9 @@ public:
             }));
 
     try {
-      main_config.initialize(bootstrap, server_, *cluster_manager_factory_);
+      auto tracer = Server::Configuration::MainImpl::makeHttpTracer(bootstrap.tracing(), server_);
+      Http::Context http_context(tracer);
+      main_config.initialize(bootstrap, server_, *cluster_manager_factory_, http_context);
     } catch (const EnvoyException& ex) {
       ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", options_.configPath(),
                                    ex.what());

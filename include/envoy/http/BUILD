@@ -46,6 +46,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "context_interface",
+    hdrs = ["context.h"],
+    deps = [
+        ":codes_interface",
+        "//include/envoy/tracing:http_tracer_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
     external_deps = ["abseil_optional"],

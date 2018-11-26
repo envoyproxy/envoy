@@ -118,7 +118,7 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                            ListenerManagerImpl& parent, const std::string& name, bool modifiable,
-                           bool workers_started, uint64_t hash, Http::CodeStats& code_stats)
+                           bool workers_started, uint64_t hash/*, Http::CodeStats& code_stats*/)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
@@ -133,7 +133,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, bugfix_reverse_write_filter_order, true)),
       modifiable_(modifiable), workers_started_(workers_started), hash_(hash),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
-      config_(config), version_info_(version_info), code_stats_(code_stats) {
+      config_(config), version_info_(version_info)/*, code_stats_(code_stats)*/ {
   if (config.has_transparent()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
@@ -653,7 +653,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   }
 
   auto new_listener = std::make_unique<ListenerImpl>(config, version_info, *this, name, modifiable,
-                                                     workers_started_, hash, code_stats_);
+                                                     workers_started_, hash);
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This

@@ -96,7 +96,7 @@ public:
                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                           AccessLog::AccessLogManager& log_manager, Server::Admin& admin) override {
     return ClusterManagerPtr{clusterManagerFromProto_(bootstrap, stats, tls, runtime, random,
-                                                      local_info, log_manager, admin, code_stats_)};
+                                                      local_info, log_manager, admin/*, code_stats_*/)};
   }
 
   Secret::SecretManager& secretManager() override { return secret_manager_; }
@@ -106,8 +106,8 @@ public:
                                Stats::Store& stats, ThreadLocal::Instance& tls,
                                Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                const LocalInfo::LocalInfo& local_info,
-                               AccessLog::AccessLogManager& log_manager, Server::Admin& admin,
-                               Http::CodeStats& code_stats));
+                               AccessLog::AccessLogManager& log_manager, Server::Admin& admin/*,
+                               Http::CodeStats& code_stats*/));
   MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(HostConstSharedPtr host));
   MOCK_METHOD1(allocateTcpConnPool_, Tcp::ConnectionPool::Instance*(HostConstSharedPtr host));
   MOCK_METHOD5(clusterFromProto_,
@@ -126,7 +126,7 @@ public:
   Ssl::ContextManagerImpl ssl_context_manager_{dispatcher_.timeSystem()};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Secret::MockSecretManager> secret_manager_;
-  Http::CodeStatsImpl code_stats_;
+  //Http::CodeStatsImpl code_stats_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.
@@ -146,10 +146,10 @@ public:
                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                          AccessLog::AccessLogManager& log_manager,
                          Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                         Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
-                         Http::CodeStats& code_stats)
+                         Api::Api& api, MockLocalClusterUpdate& local_cluster_update/*,
+                                                                                      Http::CodeStats& code_stats*/)
       : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
-                           main_thread_dispatcher, admin, api, code_stats),
+                           main_thread_dispatcher, admin, api/*, code_stats*/),
         local_cluster_update_(local_cluster_update) {}
 
 protected:
@@ -176,7 +176,7 @@ public:
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<ClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_, code_stats_);
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_/*, code_stats_*/);
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -211,7 +211,7 @@ public:
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_,
-        local_cluster_update_, code_stats_);
+        local_cluster_update_/*, code_stats_*/);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -252,7 +252,7 @@ public:
   NiceMock<Server::MockAdmin> admin_;
   Event::SimulatedTimeSystem time_system_;
   MockLocalClusterUpdate local_cluster_update_;
-  Http::CodeStatsImpl code_stats_;
+  //Http::CodeStatsImpl code_stats_;
 };
 
 envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {

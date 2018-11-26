@@ -89,13 +89,18 @@ void ValidationInstance::initialize(Options& options,
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>();
   ssl_context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(time_system_);
-  cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-      runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo(), *secret_manager_, api());
 
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
-  main_config->initialize(bootstrap, *this, *cluster_manager_factory_);
+
+  auto http_context = std::make_unique<Http::ContextImpl>(Configuration::MainImpl::makeHttpTracer(
+      bootstrap.tracing(), *this));
+
+  cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
+      runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
+      localInfo(), *secret_manager_, api(), *http_context);
+
+  main_config->initialize(bootstrap, *this, *cluster_manager_factory_, std::move(http_context));
 
   clusterManager().setInitializedCb(
       [this]() -> void { init_manager_.initialize([]() -> void {}); });

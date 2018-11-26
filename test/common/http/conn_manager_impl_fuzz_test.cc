@@ -13,7 +13,7 @@
 // * HTTP 1.0 special cases
 // * Fuzz config settings
 #include "common/common/empty_string.h"
-#include "common/http/codes.h"
+#include "common/http/context_impl.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
@@ -383,13 +383,12 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   FuzzConfig config;
   NiceMock<Network::MockDrainDecision> drain_close;
   NiceMock<Runtime::MockRandomGenerator> random;
-  NiceMock<Tracing::MockHttpTracer> tracer;
+  Http::ContextImpl http_context;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   std::unique_ptr<Ssl::MockConnection> ssl_connection;
-  CodeStatsImpl code_stats;
   bool connection_alive = true;
 
   ON_CALL(filter_callbacks.connection_, ssl()).WillByDefault(Return(ssl_connection.get()));
@@ -401,8 +400,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   filter_callbacks.connection_.remote_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
 
-  ConnectionManagerImpl conn_manager(config, drain_close, random, tracer, runtime, local_info,
-                                     cluster_manager, nullptr, config.time_system_, code_stats);
+  ConnectionManagerImpl conn_manager(config, drain_close, random, http_context, runtime, local_info,
+                                     cluster_manager, nullptr, config.time_system_);
   conn_manager.initializeReadFilterCallbacks(filter_callbacks);
 
   std::vector<FuzzStreamPtr> streams;

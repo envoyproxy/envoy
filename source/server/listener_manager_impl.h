@@ -120,7 +120,7 @@ public:
   void startWorkers(GuardDog& guard_dog) override;
   void stopListeners() override;
   void stopWorkers() override;
-  Http::CodeStats& codeStats() override { return code_stats_; }
+  Http::Context& httpContext() { return server_.httpContext(); }
 
   Instance& server_;
   TimeSource& time_source_;
@@ -180,7 +180,6 @@ private:
   ListenerManagerStats stats_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   LdsApiPtr lds_api_;
-  Http::CodeStatsImpl code_stats_;
 };
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
@@ -209,7 +208,7 @@ public:
    */
   ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool modifiable,
-               bool workers_started, uint64_t hash, Http::CodeStats& code_stats);
+               bool workers_started, uint64_t hash/*, Http::CodeStats& code_stats*/);
   ~ListenerImpl();
 
   /**
@@ -261,7 +260,9 @@ public:
   Event::Dispatcher& dispatcher() override { return parent_.server_.dispatcher(); }
   Network::DrainDecision& drainDecision() override { return *this; }
   bool healthCheckFailed() override { return parent_.server_.healthCheckFailed(); }
-  Tracing::HttpTracer& httpTracer() override { return parent_.server_.httpTracer(); }
+  Tracing::HttpTracer& httpTracer() override { return httpContext().tracer(); }
+  Http::Context& httpContext() override { return parent_.server_.httpContext(); }
+  //Http::CodeStats& codeStats() override { return parent_.codeStats(); }
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override { return parent_.server_.localInfo(); }
   Envoy::Runtime::RandomGenerator& random() override { return parent_.server_.random(); }
@@ -293,7 +294,7 @@ public:
     ensureSocketOptions();
     Network::Socket::appendOptions(listen_socket_options_, options);
   }
-  Http::CodeStats& codeStats() override { return code_stats_; }
+  //Http::CodeStats& codeStats() override { return code_stats_; }
 
   // Network::DrainDecision
   bool drainClose() const override;
@@ -394,7 +395,7 @@ private:
   const envoy::api::v2::Listener config_;
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
-  Http::CodeStats& code_stats_;
+  //Http::CodeStats& code_stats_;
 };
 
 class FilterChainImpl : public Network::FilterChain {

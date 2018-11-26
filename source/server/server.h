@@ -20,7 +20,7 @@
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/common/logger_delegates.h"
 #include "common/grpc/async_client_manager_impl.h"
-#include "common/http/codes.h"
+#include "common/http/context_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
@@ -178,7 +178,8 @@ public:
   time_t startTimeCurrentEpoch() override { return start_time_; }
   time_t startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
-  Tracing::HttpTracer& httpTracer() override;
+  //Tracing::HttpTracer& httpTracer() override;
+  Http::Context& httpContext() override { return config_->httpContext(); }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   Event::TimeSystem& timeSystem() override { return time_system_; }

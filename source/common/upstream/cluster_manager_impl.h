@@ -40,11 +40,12 @@ public:
                             Ssl::ContextManager& ssl_context_manager,
                             Event::Dispatcher& main_thread_dispatcher,
                             const LocalInfo::LocalInfo& local_info,
-                            Secret::SecretManager& secret_manager, Api::Api& api)
-      : main_thread_dispatcher_(main_thread_dispatcher), api_(api), runtime_(runtime),
-        stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
-        ssl_context_manager_(ssl_context_manager), local_info_(local_info),
-        secret_manager_(secret_manager) {}
+                            Secret::SecretManager& secret_manager, Api::Api& api,
+                            Http::Context& http_context)
+  : main_thread_dispatcher_(main_thread_dispatcher), api_(api), http_context_(http_context),
+    runtime_(runtime), stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
+    ssl_context_manager_(ssl_context_manager), local_info_(local_info),
+    secret_manager_(secret_manager) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
@@ -72,7 +73,7 @@ public:
 protected:
   Event::Dispatcher& main_thread_dispatcher_;
   Api::Api& api_;
-  Http::CodeStatsImpl code_stats_;
+  Http::Context& http_context_;
 
 private:
   Runtime::Loader& runtime_;
@@ -170,7 +171,7 @@ public:
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin, Api::Api& api,
-                     Http::CodeStats& code_stats);
+                     Http::Context& http_context);
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
@@ -433,7 +434,6 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
-  Http::CodeStats& code_stats_;
   ClusterManagerInitHelper init_helper_;
   Config::GrpcMuxPtr ads_mux_;
   LoadStatsReporterPtr load_stats_reporter_;
@@ -444,6 +444,7 @@ private:
   TimeSource& time_source_;
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
+  Http::Context& http_context_;
 };
 
 } // namespace Upstream
