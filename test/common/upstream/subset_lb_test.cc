@@ -1439,6 +1439,84 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(&context));
 }
 
+TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
+  std::vector<std::set<std::string>> subset_keys = {{"version"}};
+  EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
+  EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
+  EXPECT_CALL(subset_info_, localityWeightAware()).WillRepeatedly(Return(true));
+  EXPECT_CALL(subset_info_, scaleLocalityWeight()).WillRepeatedly(Return(true));
+
+  // We configure a weighted host set is weighted equally between each locality.
+  configureWeightedHostSet(
+      {
+          {"tcp://127.0.0.1:80", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:81", {{"version", "1.1"}}},
+      },
+      {
+          {"tcp://127.0.0.1:82", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:83", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:84", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:85", {{"version", "1.1"}}},
+      },
+      host_set_, {50, 50});
+
+  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
+                                   subset_info_, ring_hash_lb_config_, least_request_lb_config_,
+                                   common_config_));
+  TestLoadBalancerContext context({{"version", "1.1"}});
+
+  // Since we scale the locality weights by number of hosts removed, we expect to see the second
+  // locality to be selected less because we've excluded more hosts in that locality than in the
+  // first.
+  // The localities are split 50/50, but because of the scaling we expect to see 66/33 instead.
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+}
+
+TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
+  std::vector<std::set<std::string>> subset_keys = {{"version"}};
+  EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
+  EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
+  EXPECT_CALL(subset_info_, localityWeightAware()).WillRepeatedly(Return(true));
+  EXPECT_CALL(subset_info_, scaleLocalityWeight()).WillRepeatedly(Return(true));
+
+  // We configure a weighted host set where the locality weights are very low to test
+  // that we are rounding computation instead of flooring it.
+  configureWeightedHostSet(
+      {
+          {"tcp://127.0.0.1:80", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:81", {{"version", "1.1"}}},
+      },
+      {
+          {"tcp://127.0.0.1:82", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:83", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:84", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:85", {{"version", "1.1"}}},
+      },
+      host_set_, {2, 2});
+
+  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
+                                   subset_info_, ring_hash_lb_config_, least_request_lb_config_,
+                                   common_config_));
+  TestLoadBalancerContext context({{"version", "1.0"}});
+
+  // We expect to see a 33/66 split because 2 * 1 / 2 = 1 and 2 * 3 / 4 = 1.5 -> 2
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][2], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+}
+
 TEST_P(SubsetLoadBalancerTest, GaugesUpdatedOnDestroy) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));

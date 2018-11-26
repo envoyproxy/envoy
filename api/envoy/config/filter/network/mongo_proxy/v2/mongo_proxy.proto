@@ -25,4 +25,8 @@ message MongoProxy {
   // and KillCursors. Once an active delay is in progress, all incoming
   // data up until the timer event fires will be a part of the delay.
   envoy.config.filter.fault.v2.FaultDelay delay = 3;
+
+  // Flag to specify whether :ref:`dynamic metadata
+  // <config_network_filters_mongo_proxy_dynamic_metadata>` should be emitted. Defaults to false.
+  bool emit_dynamic_metadata = 4;
 }
