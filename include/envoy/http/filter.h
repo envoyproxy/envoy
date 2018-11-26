@@ -269,6 +269,13 @@ public:
   virtual void encodeTrailers(HeaderMapPtr&& trailers) PURE;
 
   /**
+   * Called with metadata to be encoded.
+   *
+   * @param metadata_map supplies the unique_ptr of the metadata to be encoded.
+   */
+  virtual void encodeMetadata(MetadataMapPtr&& metadata_map) PURE;
+
+  /**
    * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
    * their high watermark.
    *
