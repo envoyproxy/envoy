@@ -45,6 +45,7 @@ Version history
 * router: added ability to set attempt count in upstream requests, see :ref:`virtual host's include request
   attempt count flag <envoy_api_field_route.VirtualHost.include_request_attempt_count>`.
 * router: added internal :ref:`grpc-retry-on <config_http_filters_router_x-envoy-retry-grpc-on>` policy.
+* router: added per-route configuration of :ref:`internal redirects <envoy_api_field_route.RouteAction.internal_redirect_action>`.
 * router: added :ref:`scheme_redirect <envoy_api_field_route.RedirectAction.scheme_redirect>` and
   :ref:`port_redirect <envoy_api_field_route.RedirectAction.port_redirect>` to define the respective
   scheme and port rewriting RedirectAction

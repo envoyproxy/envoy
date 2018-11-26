@@ -204,7 +204,7 @@ public:
 enum class RetryStatus { No, NoOverflow, Yes };
 
 /**
- * InternalRedirectAction from the RetryPolicy
+ * InternalRedirectAction from the route configuration.
  */
 enum class InternalRedirectAction { Reject, PassThrough, Handle };
 

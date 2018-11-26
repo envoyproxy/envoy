@@ -36,6 +36,7 @@
 namespace Envoy {
 namespace Router {
 namespace {
+
 InternalRedirectAction convertRedirectAction(const envoy::api::v2::route::RouteAction& route) {
   switch (route.internal_redirect_action()) {
   case envoy::api::v2::route::RouteAction::REJECT:

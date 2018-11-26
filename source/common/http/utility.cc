@@ -31,9 +31,10 @@ static const char kDefaultPath[] = "/";
 
 bool Utility::Url::initialize(absl::string_view absolute_url) {
   struct http_parser_url u;
-  bool is_connect = false;
+  const bool is_connect = false;
   http_parser_url_init(&u);
-  int result = http_parser_parse_url(absolute_url.data(), absolute_url.length(), is_connect, &u);
+  const int result =
+      http_parser_parse_url(absolute_url.data(), absolute_url.length(), is_connect, &u);
 
   if (result != 0) {
     return false;

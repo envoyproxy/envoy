@@ -10,19 +10,19 @@ public:
     // Add route with custom retry policy
     config_helper_.addRoute("reject.redirect", "/", "cluster_0", false,
                             envoy::api::v2::route::RouteAction::NOT_FOUND,
-                            envoy::api::v2::route::VirtualHost::NONE, retry_policy, false,
+                            envoy::api::v2::route::VirtualHost::NONE, retry_policy, false, "",
                             envoy::api::v2::route::RouteAction::REJECT);
 
     // Add route with custom retry policy
     config_helper_.addRoute("pass.through.redirect", "/", "cluster_0", false,
                             envoy::api::v2::route::RouteAction::NOT_FOUND,
-                            envoy::api::v2::route::VirtualHost::NONE, retry_policy, false,
+                            envoy::api::v2::route::VirtualHost::NONE, retry_policy, false, "",
                             envoy::api::v2::route::RouteAction::PASS_THROUGH);
 
     // Add route with custom retry policy
     config_helper_.addRoute("handle.redirect", "/", "cluster_0", false,
                             envoy::api::v2::route::RouteAction::NOT_FOUND,
-                            envoy::api::v2::route::VirtualHost::NONE, retry_policy, false,
+                            envoy::api::v2::route::VirtualHost::NONE, retry_policy, false, "",
                             envoy::api::v2::route::RouteAction::HANDLE);
 
     HttpProtocolIntegrationTest::initialize();
@@ -49,7 +49,7 @@ TEST_P(RedirectIntegrationTest, RedirectNotConfigured) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_redirect_response_, true);
 
-  // The redirect will be transformed into a server error becasue redirects are
+  // The redirect will be transformed into a server error because redirects are
   // not configured on.
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
@@ -70,7 +70,7 @@ TEST_P(RedirectIntegrationTest, RedirectExplicitlyDisabled) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_redirect_response_, true);
 
-  // The redirect will be transformed into a server error becasue redirects are
+  // The redirect will be transformed into a server error because redirects are
   // not configured on.
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
@@ -92,7 +92,7 @@ TEST_P(RedirectIntegrationTest, RedirectPassedThrough) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_redirect_response_, true);
 
-  // The redirect will be transformed into a server error becasue redirects are
+  // The redirect will be transformed into a server error because redirects are
   // not configured on.
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
@@ -150,7 +150,7 @@ TEST_P(RedirectIntegrationTest, InvalidRedirect) {
   default_redirect_response_.insertEnvoyInternalRedirect().value("invalid_url", 11);
   upstream_request_->encodeHeaders(default_redirect_response_, true);
 
-  // The redirect will be transformed into a server error becasue the url was
+  // The redirect will be transformed into a server error because the url was
   // invalid.
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
