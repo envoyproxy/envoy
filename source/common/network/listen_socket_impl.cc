@@ -47,7 +47,7 @@ void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& opti
 
 template <>
 void NetworkListenSocket<
-    NetworkSocketTrait<Address::SocketType::Stream>>::setProtocolSpecificSocketOptions() {
+    NetworkSocketTrait<Address::SocketType::Stream>>::setPrebindSocketOptions() {
   // TODO(htuch): This might benefit from moving to SocketOptionImpl.
   int on = 1;
   int rc = setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
@@ -56,7 +56,7 @@ void NetworkListenSocket<
 
 template <>
 void NetworkListenSocket<
-    NetworkSocketTrait<Address::SocketType::Datagram>>::setProtocolSpecificSocketOptions() {}
+    NetworkSocketTrait<Address::SocketType::Datagram>>::setPrebindSocketOptions() {}
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
     : ListenSocketImpl(address->socket(Address::SocketType::Stream), address) {

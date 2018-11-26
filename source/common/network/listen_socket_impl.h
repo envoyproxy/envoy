@@ -81,7 +81,7 @@ public:
       : ListenSocketImpl(address->socket(T::type), address) {
     RELEASE_ASSERT(fd_ != -1, "");
 
-    setProtocolSpecificSocketOptions();
+    setPrebindSocketOptions();
 
     setupSocket(options, bind_to_port);
   }
@@ -93,7 +93,7 @@ public:
   }
 
 protected:
-  void setProtocolSpecificSocketOptions();
+  void setPrebindSocketOptions();
 };
 
 using TcpListenSocket = NetworkListenSocket<NetworkSocketTrait<Address::SocketType::Stream>>;
