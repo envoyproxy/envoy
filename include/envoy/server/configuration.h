@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/ratelimit/ratelimit.h"
 #include "envoy/stats/sink.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -59,11 +58,6 @@ public:
    * @return Tracing::HttpTracer& singleton for use by the entire server.
    */
   virtual Tracing::HttpTracer& httpTracer() PURE;
-
-  /**
-   * @return RateLimit::RateLimitServiceConfigPtr for use by extensions.
-   */
-  virtual RateLimit::RateLimitServiceConfigPtr rateLimitServiceConfig() const PURE;
 
   /**
    * @return std::list<Stats::SinkPtr>& the list of stats sinks initialized from the configuration.

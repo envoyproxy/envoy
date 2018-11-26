@@ -77,6 +77,22 @@ public:
 };
 
 /**
+ * RateLimitServiceConfig that wraps the proto structure so that it can be registered as a
+ * singleton.
+ */
+class RateLimitServiceConfig : public Singleton::Instance {
+
+public:
+  RateLimitServiceConfig(
+      const envoy::config::ratelimit::v2::RateLimitServiceConfig& ratelimit_config)
+      : config_(ratelimit_config) {}
+
+  const envoy::config::ratelimit::v2::RateLimitServiceConfig& config_;
+};
+
+typedef std::shared_ptr<RateLimitServiceConfig> RateLimitServiceConfigPtr;
+
+/**
  * Implementation of Server::Configuration::Main that reads a configuration from a JSON file.
  */
 class MainImpl : Logger::Loggable<Logger::Id::config>, public Main {
@@ -97,9 +113,6 @@ public:
   Tracing::HttpTracer& httpTracer() override { return *http_tracer_; }
   std::list<Stats::SinkPtr>& statsSinks() override { return stats_sinks_; }
   std::chrono::milliseconds statsFlushInterval() const override { return stats_flush_interval_; }
-  RateLimit::RateLimitServiceConfigPtr rateLimitServiceConfig() const override {
-    return ratelimit_service_config_;
-  }
   std::chrono::milliseconds wdMissTimeout() const override { return watchdog_miss_timeout_; }
   std::chrono::milliseconds wdMegaMissTimeout() const override {
     return watchdog_megamiss_timeout_;
@@ -126,7 +139,7 @@ private:
   std::chrono::milliseconds watchdog_megamiss_timeout_;
   std::chrono::milliseconds watchdog_kill_timeout_;
   std::chrono::milliseconds watchdog_multikill_timeout_;
-  RateLimit::RateLimitServiceConfigPtr ratelimit_service_config_;
+  RateLimitServiceConfigPtr ratelimit_service_config_;
 };
 
 /**

@@ -16,8 +16,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RateLimitFilter {
 
-SINGLETON_MANAGER_REGISTRATION(ratelimit_config); // just of tests.
-
 TEST(RateLimitFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(RateLimitConfigFactory().createFilterFactoryFromProto(

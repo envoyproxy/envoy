@@ -11,12 +11,4 @@ envoy_package()
 envoy_cc_library(
     name = "ratelimit_interface",
     hdrs = ["ratelimit.h"],
-    external_deps = ["abseil_optional"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/singleton:instance_interface",
-        "//include/envoy/tracing:http_tracer_interface",
-        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
-        "@envoy_api//envoy/config/ratelimit/v2:rls_cc",
-    ],
 )

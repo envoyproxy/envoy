@@ -6,7 +6,6 @@
 #include <string>
 
 #include "envoy/common/mutex_tracer.h"
-#include "envoy/ratelimit/ratelimit.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
@@ -342,7 +341,6 @@ public:
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   // MOCK_METHOD0(timeSystem, Event::TestTimeSystem&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
-  MOCK_CONST_METHOD0(rateLimitServiceConfig, RateLimit::RateLimitServiceConfigPtr());
 
   Event::TestTimeSystem& timeSystem() override { return test_time_.timeSystem(); }
 
@@ -384,7 +382,6 @@ public:
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(statsSinks, std::list<Stats::SinkPtr>&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
-  MOCK_CONST_METHOD0(rateLimitServiceConfig, RateLimit::RateLimitServiceConfigPtr());
   MOCK_CONST_METHOD0(wdMissTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMegaMissTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdKillTimeout, std::chrono::milliseconds());
@@ -418,7 +415,6 @@ public:
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
-  MOCK_CONST_METHOD0(rateLimitServiceConfig, RateLimit::RateLimitServiceConfigPtr());
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 

@@ -265,10 +265,6 @@ public:
   Envoy::Runtime::Loader& runtime() override { return parent_.server_.runtime(); }
   Stats::Scope& scope() override { return *global_scope_; }
   Singleton::Manager& singletonManager() override { return parent_.server_.singletonManager(); }
-  RateLimit::RateLimitServiceConfigPtr rateLimitServiceConfig() const override {
-    return parent_.server_.rateLimitServiceConfig();
-  }
-
   OverloadManager& overloadManager() override { return parent_.server_.overloadManager(); }
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
   Admin& admin() override { return parent_.server_.admin(); }
