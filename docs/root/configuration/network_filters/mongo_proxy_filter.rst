@@ -191,4 +191,4 @@ a list of operations performed on the collection.
   :widths: 1, 1, 2
 
   key, string, The resource name in *db.collection* format.
-  value, array, A list of strings representing the operations executed on the resource. Operation is either insert,update,query,delete.
+  value, array, A list of strings representing the operations executed on the resource (insert/update/query/delete).
