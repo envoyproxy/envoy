@@ -102,10 +102,7 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
   client_connection->connect();
 
   size_t connect_count = 0;
-  auto connect_second_time = [&connect_count, &dispatcher, &server_connection, &client_connection,
-                              expected_digest, expected_uri, expected_local_uri,
-                              expected_serial_number, expected_subject, expected_local_subject,
-                              expected_peer_cert]() {
+  auto connect_second_time = [&]() {
     if (++connect_count == 2) {
       if (!expected_digest.empty()) {
         // Assert twice to ensure a cached value is returned and still valid.
@@ -243,10 +240,7 @@ const std::string testUtilV2(
   client_connection->connect();
 
   size_t connect_count = 0;
-  auto connect_second_time = [&connect_count, &dispatcher, &server_connection, &client_connection,
-                              &new_session, expected_server_cert_digest, expected_alpn_protocol,
-                              expected_client_cert_uri, expected_protocol_version,
-                              expected_requested_server_name]() {
+  auto connect_second_time = [&]() {
     if (++connect_count == 2) {
       if (!expected_server_cert_digest.empty()) {
         EXPECT_EQ(expected_server_cert_digest,
