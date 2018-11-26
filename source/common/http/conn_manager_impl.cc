@@ -1404,8 +1404,12 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
   auto upgrade = request_headers_ ? request_headers_->Upgrade() : nullptr;
   state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
+    const Router::RouteEntry::UpgradeMap* upgrade_map = nullptr;
+    if (cached_route_.value() && cached_route_.value()->routeEntry()) {
+      upgrade_map = &cached_route_.value()->routeEntry()->upgradeMap();
+    }
     if (connection_manager_.config_.filterFactory().createUpgradeFilterChain(
-            upgrade->value().c_str(), *this)) {
+            upgrade->value().c_str(), upgrade_map, *this)) {
       state_.successful_upgrade_ = true;
       connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
       connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();

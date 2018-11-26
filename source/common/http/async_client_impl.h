@@ -231,6 +231,7 @@ private:
     }
 
     bool includeAttemptCount() const override { return false; }
+    const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
@@ -242,6 +243,7 @@ private:
     static const Config::TypedMetadataImpl<Config::TypedMetadataFactory> typed_metadata_;
     static const NullPathMatchCriterion path_match_criterion_;
 
+    Router::RouteEntry::UpgradeMap upgrade_map_;
     const std::string& cluster_name_;
     absl::optional<std::chrono::milliseconds> timeout_;
   };
