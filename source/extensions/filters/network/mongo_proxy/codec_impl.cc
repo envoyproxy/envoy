@@ -426,8 +426,8 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
 }
 
 void DecoderImpl::onData(Buffer::Instance& data) {
-  while (data.length() > 0 && decode(data))
-    ;
+  while (data.length() > 0 && decode(data)) {
+  }
 }
 
 void EncoderImpl::encodeCommonHeader(int32_t total_size, const Message& message,

@@ -51,15 +51,15 @@ if [[ "$1" == "bazel.release" ]]; then
     echo 'Ignoring build for git tag event'
     exit 0
   fi
-  
+
   setup_gcc_toolchain
   echo "bazel release build with tests..."
   bazel_release_binary_build
-  
+
   if [[ $# > 1 ]]; then
     shift
     echo "Testing $* ..."
-    # Run only specified tests. Argument can be a single test 
+    # Run only specified tests. Argument can be a single test
     # (e.g. '//test/common/common:assert_test') or a test group (e.g. '//test/common/...')
     bazel test ${BAZEL_TEST_OPTIONS} -c opt $*
   else
@@ -219,6 +219,7 @@ elif [[ "$1" == "check_format" ]]; then
   ./tools/check_format_test_helper.py --log=WARN
   echo "check_format..."
   ./tools/check_format.py check
+  ./tools/format_python_tools.sh check
   exit 0
 elif [[ "$1" == "check_repositories" ]]; then
   cd "${ENVOY_SRCDIR}"

@@ -20,6 +20,8 @@
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/utility.h"
+#include "common/http/http2/metadata_decoder.h"
+#include "common/http/http2/metadata_encoder.h"
 
 #include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
@@ -154,6 +156,7 @@ protected:
     virtual void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                nghttp2_data_provider* provider) PURE;
     void submitTrailers(const HeaderMap& trailers);
+    void submitMetadata();
 
     // Http::StreamEncoder
     void encode100ContinueHeaders(const HeaderMap& headers) override;
@@ -161,6 +164,7 @@ protected:
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(const HeaderMap& trailers) override;
     Stream& getStream() override { return *this; }
+    void encodeMetadata(const MetadataMap& metadata_map) override;
 
     // Http::Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
@@ -192,6 +196,13 @@ protected:
     // to the decoder_.
     void decodeHeaders();
 
+    // Get MetadataEncoder for this stream.
+    MetadataEncoder& getMetadataEncoder();
+    // Get MetadataDecoder for this stream.
+    MetadataDecoder& getMetadataDecoder();
+    // Callback function for MetadataDecoder.
+    void onMetadataDecoded(std::unique_ptr<MetadataMap> metadata_map);
+
     virtual void transformUpgradeFromH1toH2(HeaderMap& headers) PURE;
     virtual void maybeTransformUpgradeFromH2ToH1() PURE;
 
@@ -210,6 +221,8 @@ protected:
         [this]() -> void { this->pendingSendBufferLowWatermark(); },
         [this]() -> void { this->pendingSendBufferHighWatermark(); }};
     HeaderMapPtr pending_trailers_;
+    std::unique_ptr<MetadataDecoder> metadata_decoder_;
+    std::unique_ptr<MetadataEncoder> metadata_encoder_;
     absl::optional<StreamResetReason> deferred_reset_;
     HeaderString cookies_;
     bool local_end_stream_sent_ : 1;
@@ -281,6 +294,7 @@ protected:
   CodecStats stats_;
   Network::Connection& connection_;
   uint32_t per_stream_buffer_limit_;
+  bool allow_metadata_;
 
 private:
   virtual ConnectionCallbacks& callbacks() PURE;
@@ -292,6 +306,9 @@ private:
   int onInvalidFrame(int32_t stream_id, int error_code);
   ssize_t onSend(const uint8_t* data, size_t length);
   int onStreamClose(int32_t stream_id, uint32_t error_code);
+  int onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len);
+  int onMetadataFrameComplete(int32_t stream_id, bool end_metadata);
+  ssize_t packMetadata(int32_t stream_id, uint8_t* buf, size_t len);
 
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;

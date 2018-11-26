@@ -22,7 +22,7 @@ public:
                                   Ssl::ContextManager& ssl_context_manager,
                                   Event::Dispatcher& main_thread_dispatcher,
                                   const LocalInfo::LocalInfo& local_info,
-                                  Secret::SecretManager& secret_manager);
+                                  Secret::SecretManager& secret_manager, Api::Api& api);
 
   ClusterManagerPtr
   clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
@@ -47,12 +47,13 @@ public:
                            ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                            AccessLog::AccessLogManager& log_manager, Event::Dispatcher& dispatcher,
-                           Server::Admin& admin);
+                           Server::Admin& admin, Api::Api& api);
 
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string&, ResourcePriority,
                                                          Http::Protocol,
                                                          LoadBalancerContext*) override;
-  Host::CreateConnectionData tcpConnForCluster(const std::string&, LoadBalancerContext*) override;
+  Host::CreateConnectionData tcpConnForCluster(const std::string&, LoadBalancerContext*,
+                                               Network::TransportSocketOptionsSharedPtr) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string&) override;
 
 private:

@@ -35,6 +35,7 @@ public:
   MOCK_CONST_METHOD0(defaultSubset, const ProtobufWkt::Struct&());
   MOCK_CONST_METHOD0(subsetKeys, const std::vector<std::set<std::string>>&());
   MOCK_CONST_METHOD0(localityWeightAware, bool());
+  MOCK_CONST_METHOD0(scaleLocalityWeight, bool());
 
   std::vector<std::set<std::string>> subset_keys_;
 };
@@ -45,8 +46,8 @@ public:
   ~MockClusterInfo();
 
   void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry) {
-    resource_manager_.reset(new ResourceManagerImpl(runtime_, name_, cx, rq_pending, rq, rq_retry,
-                                                    circuit_breakers_stats_));
+    resource_manager_ = std::make_unique<ResourceManagerImpl>(runtime_, name_, cx, rq_pending, rq,
+                                                              rq_retry, circuit_breakers_stats_);
   }
 
   // Upstream::ClusterInfo
@@ -63,6 +64,8 @@ public:
   MOCK_CONST_METHOD0(type, envoy::api::v2::Cluster::DiscoveryType());
   MOCK_CONST_METHOD0(lbRingHashConfig,
                      const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&());
+  MOCK_CONST_METHOD0(lbLeastRequestConfig,
+                     const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>&());
   MOCK_CONST_METHOD0(lbOriginalDstConfig,
                      const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>&());
   MOCK_CONST_METHOD0(maintenanceMode, bool());

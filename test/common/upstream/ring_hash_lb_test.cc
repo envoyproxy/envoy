@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -37,8 +38,8 @@ public:
   RingHashLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 
   void init() {
-    lb_.reset(new RingHashLoadBalancer(priority_set_, stats_, runtime_, random_, config_,
-                                       common_config_));
+    lb_ = std::make_unique<RingHashLoadBalancer>(priority_set_, stats_, runtime_, random_, config_,
+                                                 common_config_);
     lb_->initialize();
   }
 

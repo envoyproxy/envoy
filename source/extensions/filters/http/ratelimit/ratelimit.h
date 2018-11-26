@@ -38,15 +38,21 @@ public:
         request_type_(config.request_type().empty() ? stringToType("both")
                                                     : stringToType(config.request_type())),
         local_info_(local_info), scope_(scope), runtime_(runtime),
-        failure_mode_deny_(config.failure_mode_deny()) {}
+        failure_mode_deny_(config.failure_mode_deny()),
+        rate_limited_grpc_status_(
+            config.rate_limited_as_resource_exhausted()
+                ? absl::make_optional(Grpc::Status::GrpcStatus::ResourceExhausted)
+                : absl::nullopt) {}
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
   Runtime::Loader& runtime() { return runtime_; }
   Stats::Scope& scope() { return scope_; }
   FilterRequestType requestType() const { return request_type_; }
-
   bool failureModeAllow() const { return !failure_mode_deny_; }
+  const absl::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
+    return rate_limited_grpc_status_;
+  }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -67,6 +73,7 @@ private:
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
+  const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;

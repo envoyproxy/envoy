@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/http/header_map_impl.h"
@@ -43,7 +45,7 @@ ip_tags:
     envoy::config::filter::http::ip_tagging::v2::IPTagging config;
     MessageUtil::loadFromYaml(yaml, config);
     config_.reset(new IpTaggingFilterConfig(config, "prefix.", stats_, runtime_));
-    filter_.reset(new IpTaggingFilter(config_));
+    filter_ = std::make_unique<IpTaggingFilter>(config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 

@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/service/discovery/v2/hds.pb.h"
 
 #include "common/ssl/context_manager_impl.h"
@@ -58,9 +60,9 @@ public:
           server_response_timer_cb_ = timer_cb;
           return server_response_timer_;
         }));
-    hds_delegate_.reset(new HdsDelegate(node_, stats_store_, Grpc::AsyncClientPtr(async_client_),
-                                        dispatcher_, runtime_, stats_store_, ssl_context_manager_,
-                                        random_, test_factory_, log_manager_, cm_, local_info_));
+    hds_delegate_ = std::make_unique<HdsDelegate>(
+        node_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_, runtime_,
+        stats_store_, ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_);
   }
 
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
@@ -127,7 +129,7 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   // Create Message
   // - Cluster "anna0" with 3 endpoints
   // - Cluster "anna1" with 3 endpoints
-  message.reset(new envoy::service::discovery::v2::HealthCheckSpecifier);
+  message = std::make_unique<envoy::service::discovery::v2::HealthCheckSpecifier>();
   message->mutable_interval()->set_seconds(1);
 
   for (int i = 0; i < 2; i++) {
@@ -165,7 +167,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   // Create Message
   // - Cluster "minkowski0" with 2 health_checks
   // - Cluster "minkowski1" with 3 health_checks
-  message.reset(new envoy::service::discovery::v2::HealthCheckSpecifier);
+  message = std::make_unique<envoy::service::discovery::v2::HealthCheckSpecifier>();
   message->mutable_interval()->set_seconds(1);
 
   for (int i = 0; i < 2; i++) {
@@ -201,7 +203,7 @@ TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
   createHdsDelegate();
 
   // Create Message
-  message.reset(new envoy::service::discovery::v2::HealthCheckSpecifier);
+  message = std::make_unique<envoy::service::discovery::v2::HealthCheckSpecifier>();
   message->mutable_interval()->set_seconds(1);
 
   // Process message
@@ -217,7 +219,7 @@ TEST_F(HdsTest, TestMinimalSendResponse) {
   createHdsDelegate();
 
   // Create Message
-  message.reset(new envoy::service::discovery::v2::HealthCheckSpecifier);
+  message = std::make_unique<envoy::service::discovery::v2::HealthCheckSpecifier>();
   message->mutable_interval()->set_seconds(1);
 
   // Process message and send 2 responses

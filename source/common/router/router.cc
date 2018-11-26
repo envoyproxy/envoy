@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/event/dispatcher.h"
@@ -259,7 +260,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
                      headers.Path()->value().c_str());
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr);
+    callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, absl::nullopt);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -277,7 +278,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
             response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
           }
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
-        });
+        },
+        absl::nullopt);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -289,7 +291,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    callbacks_->sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "", nullptr);
+    callbacks_->sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "", nullptr,
+                               absl::nullopt);
     return Http::FilterHeadersStatus::StopIteration;
   }
   cluster_ = cluster->info();
@@ -309,12 +312,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (cluster_->maintenanceMode()) {
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
-    callbacks_->sendLocalReply(
-        Http::Code::ServiceUnavailable, "maintenance mode", [this](Http::HeaderMap& headers) {
-          if (!config_.suppress_envoy_headers_) {
-            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
-          }
-        });
+    callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "maintenance mode",
+                               [this](Http::HeaderMap& headers) {
+                                 if (!config_.suppress_envoy_headers_) {
+                                   headers.insertEnvoyOverloaded().value(
+                                       Http::Headers::get().EnvoyOverloadedValues.True);
+                                 }
+                               },
+                               absl::nullopt);
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -355,7 +360,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
-  upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));
+  upstream_request_ = std::make_unique<UpstreamRequest>(*this, *conn_pool);
   upstream_request_->encodeHeaders(end_stream);
   if (end_stream) {
     onRequestComplete();
@@ -383,7 +388,8 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
 void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, false);
-  callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", nullptr);
+  callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", nullptr,
+                             absl::nullopt);
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -453,7 +459,7 @@ void Filter::maybeDoShadowing() {
   Http::MessagePtr request(new Http::RequestMessageImpl(
       Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_headers_)}));
   if (callbacks_->decodingBuffer()) {
-    request->body().reset(new Buffer::OwnedImpl(*callbacks_->decodingBuffer()));
+    request->body() = std::make_unique<Buffer::OwnedImpl>(*callbacks_->decodingBuffer());
   }
   if (downstream_trailers_) {
     request->trailers(Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_trailers_)});
@@ -474,7 +480,6 @@ void Filter::onRequestComplete() {
     // seems unnecessary right now.
     maybeDoShadowing();
 
-    upstream_request_->setupPerTryTimeout();
     if (timeout_.global_timeout_.count() > 0) {
       response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
       response_timeout_->enableTimer(timeout_.global_timeout_);
@@ -486,7 +491,6 @@ void Filter::onDestroy() {
   if (upstream_request_) {
     upstream_request_->resetStream();
   }
-  stream_destroyed_ = true;
   cleanup();
 }
 
@@ -526,7 +530,9 @@ void Filter::onUpstreamReset(UpstreamResetType type,
   // We don't retry on a global timeout or if we already started the response.
   if (type != UpstreamResetType::GlobalTimeout && !downstream_response_started_ && retry_state_) {
     // Notify retry modifiers about the attempted host.
-    retry_state_->onHostAttempted(upstream_host);
+    if (upstream_host != nullptr) {
+      retry_state_->onHostAttempted(upstream_host);
+    }
 
     RetryStatus retry_status =
         retry_state_->shouldRetry(nullptr, reset_reason, [this]() -> void { doRetry(); });
@@ -576,11 +582,14 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
-    callbacks_->sendLocalReply(code, body, [dropped, this](Http::HeaderMap& headers) {
-      if (dropped && !config_.suppress_envoy_headers_) {
-        headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
-      }
-    });
+    callbacks_->sendLocalReply(code, body,
+                               [dropped, this](Http::HeaderMap& headers) {
+                                 if (dropped && !config_.suppress_envoy_headers_) {
+                                   headers.insertEnvoyOverloaded().value(
+                                       Http::Headers::get().EnvoyOverloadedValues.True);
+                                 }
+                               },
+                               absl::nullopt);
   }
 }
 
@@ -678,14 +687,14 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
       cleanup(!end_stream);
       cluster_->stats().upstream_internal_redirect_rejected_total_.inc();
       headers->removeEnvoyInternalRedirect(); // Just to be paranoid.
-      callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr);
+      callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt);
       return;
     case InternalRedirectAction::Handle:
       cleanup(!end_stream);
       if (!setupInternalRedirect(headers, end_stream)) {
         cluster_->stats().upstream_internal_redirect_failed_total_.inc();
         headers->removeEnvoyInternalRedirect();
-        callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr);
+        callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt);
         ENVOY_STREAM_LOG(debug, "failing redirect", *callbacks_);
       }
       // Either we've set up an internal redirect, or sent a failure reply.
@@ -758,6 +767,10 @@ void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers) {
   }
   onUpstreamComplete();
   callbacks_->encodeTrailers(std::move(trailers));
+}
+
+void Filter::onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map) {
+  callbacks_->encodeMetadata(std::move(metadata_map));
 }
 
 void Filter::onUpstreamComplete() {
@@ -866,7 +879,7 @@ void Filter::doRetry() {
 
   ASSERT(response_timeout_ || timeout_.global_timeout_.count() == 0);
   ASSERT(!upstream_request_);
-  upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));
+  upstream_request_ = std::make_unique<UpstreamRequest>(*this, *conn_pool);
   upstream_request_->encodeHeaders(!callbacks_->decodingBuffer() && !downstream_trailers_);
   // It's possible we got immediately reset.
   if (upstream_request_) {
@@ -879,8 +892,6 @@ void Filter::doRetry() {
     if (downstream_trailers_) {
       upstream_request_->encodeTrailers(*downstream_trailers_);
     }
-
-    upstream_request_->setupPerTryTimeout();
   }
 }
 
@@ -947,6 +958,10 @@ void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   parent_.onUpstreamTrailers(std::move(trailers));
 }
 
+void Filter::UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
+  parent_.onUpstreamMetadata(std::move(metadata_map));
+}
+
 void Filter::UpstreamRequest::maybeEndDecode(bool end_stream) {
   if (end_stream) {
     stream_info_.onLastUpstreamRxByteReceived();
@@ -974,9 +989,9 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
   if (!request_encoder_) {
     ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks_, data.length());
     if (!buffered_request_body_) {
-      buffered_request_body_.reset(
-          new Buffer::WatermarkBuffer([this]() -> void { this->enableDataFromDownstream(); },
-                                      [this]() -> void { this->disableDataFromDownstream(); }));
+      buffered_request_body_ = std::make_unique<Buffer::WatermarkBuffer>(
+          [this]() -> void { this->enableDataFromDownstream(); },
+          [this]() -> void { this->disableDataFromDownstream(); });
       buffered_request_body_->setWatermarks(parent_.buffer_limit_);
     }
 
@@ -1087,6 +1102,8 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
+
+  setupPerTryTimeout();
 
   conn_pool_stream_handle_ = nullptr;
   setRequestEncoder(request_encoder);

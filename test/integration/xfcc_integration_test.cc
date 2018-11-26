@@ -1,5 +1,6 @@
 #include "xfcc_integration_test.h"
 
+#include <memory>
 #include <regex>
 #include <unordered_map>
 
@@ -94,7 +95,7 @@ Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
       Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
                                    ":" + std::to_string(lookupPort("http")));
   return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                             client_mtls_ssl_ctx_->createTransportSocket(),
+                                             client_mtls_ssl_ctx_->createTransportSocket(nullptr),
                                              nullptr);
 }
 
@@ -123,7 +124,7 @@ void XfccIntegrationTest::initialize() {
     config_helper_.addSslConfig();
   }
 
-  context_manager_.reset(new Ssl::ContextManagerImpl(timeSystem()));
+  context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(timeSystem());
   client_tls_ssl_ctx_ = createClientSslContext(false);
   client_mtls_ssl_ctx_ = createClientSslContext(true);
   HttpIntegrationTest::initialize();

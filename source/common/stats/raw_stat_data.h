@@ -40,44 +40,47 @@ struct RawStatData {
   ~RawStatData() = delete;
 
   /**
-   * Returns the size of this struct, accounting for the length of name_
-   * and padding for alignment.
+   * @return uint64_t the size of this struct, accounting for the length of
+   *     name_ and padding for alignment.
    */
   static uint64_t structSize(uint64_t name_size);
 
   /**
-   * Wrapper for structSize, taking a StatsOptions struct.
-   * Required by BlockMemoryHashSet, which has the context to supply StatsOptions.
+   * Wrapper for structSize, taking a StatsOptions struct. Required by
+   * BlockMemoryHashSet, which has the context to supply StatsOptions.
    */
   static uint64_t structSizeWithOptions(const StatsOptions& stats_options);
 
   /**
-   * Initializes this object to have the specified key,
-   * a refcount of 1, and all other values zero. Required for the HeapRawStatDataAllocator, which
-   * does not expect stat name truncation. We pass in the number of bytes allocated in order to
-   * assert the copy is safe inline.
+   * Initializes this object to have the specified key, a refcount of 1, and all
+   * other values zero. Required for the HeapRawStatDataAllocator, which does
+   * not expect stat name truncation. We pass in the number of bytes allocated
+   * in order to assert the copy is safe inline.
+   *
+   * @param key the key
+   * @param stats_options the stats options
    */
   void initialize(absl::string_view key, const StatsOptions& stats_options);
 
   /**
-   * Returns a hash of the key. This is required by BlockMemoryHashSet.
+   * @return uint64_t a hash of the key. This is required by BlockMemoryHashSet.
    */
   static uint64_t hash(absl::string_view key) { return HashUtil::xxHash64(key); }
 
   /**
-   * Returns true if object is in use.
+   * @return true if object is in use.
    */
   bool initialized() { return name_[0] != '\0'; }
 
   /**
-   * Returns the name as a string_view with no truncation.
+   * @return absl::string_view the name as a string_view.
    */
   absl::string_view key() const { return absl::string_view(name_); }
 
   /**
-   * Returns the name as a std::string.
+   * @return const char* the name.
    */
-  std::string name() const { return std::string(name_); }
+  const char* name() const { return name_; }
 
   std::atomic<uint64_t> value_;
   std::atomic<uint64_t> pending_increment_;

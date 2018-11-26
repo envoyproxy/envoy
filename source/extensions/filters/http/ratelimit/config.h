@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.h"
+#include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.validate.h"
 
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"

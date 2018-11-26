@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
@@ -54,10 +56,10 @@ public:
     HttpIntegrationTest::initialize();
 
     // Endpoint connections
-    host_upstream_.reset(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
-    host2_upstream_.reset(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+    host_upstream_ =
+        std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem());
+    host2_upstream_ =
+        std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem());
   }
 
   // Sets up a connection between Envoy and the management server.

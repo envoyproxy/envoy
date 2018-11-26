@@ -93,7 +93,7 @@ const std::string Annotation::toJson() {
 
   if (endpoint_) {
     Util::mergeJsons(json_string, static_cast<Endpoint>(endpoint_.value()).toJson(),
-                     ZipkinJsonFieldNames::get().ANNOTATION_ENDPOINT.c_str());
+                     ZipkinJsonFieldNames::get().ANNOTATION_ENDPOINT);
   }
 
   return json_string;
@@ -133,7 +133,7 @@ const std::string BinaryAnnotation::toJson() {
 
   if (endpoint_) {
     Util::mergeJsons(json_string, static_cast<Endpoint>(endpoint_.value()).toJson(),
-                     ZipkinJsonFieldNames::get().BINARY_ANNOTATION_ENDPOINT.c_str());
+                     ZipkinJsonFieldNames::get().BINARY_ANNOTATION_ENDPOINT);
   }
 
   return json_string;
@@ -207,14 +207,14 @@ const std::string Span::toJson() {
     annotation_json_vector.push_back(it->toJson());
   }
   Util::addArrayToJson(json_string, annotation_json_vector,
-                       ZipkinJsonFieldNames::get().SPAN_ANNOTATIONS.c_str());
+                       ZipkinJsonFieldNames::get().SPAN_ANNOTATIONS);
 
   std::vector<std::string> binary_annotation_json_vector;
   for (auto it = binary_annotations_.begin(); it != binary_annotations_.end(); it++) {
     binary_annotation_json_vector.push_back(it->toJson());
   }
   Util::addArrayToJson(json_string, binary_annotation_json_vector,
-                       ZipkinJsonFieldNames::get().SPAN_BINARY_ANNOTATIONS.c_str());
+                       ZipkinJsonFieldNames::get().SPAN_BINARY_ANNOTATIONS);
 
   return json_string;
 }

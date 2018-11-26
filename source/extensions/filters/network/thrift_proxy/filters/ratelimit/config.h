@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit.pb.h"
+#include "envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit.pb.validate.h"
 
 #include "extensions/filters/network/thrift_proxy/filters/factory_base.h"
 #include "extensions/filters/network/thrift_proxy/filters/well_known_names.h"

@@ -9,6 +9,7 @@ configured :ref:`route table <envoy_api_msg_RouteConfiguration>`. In addition to
 redirection, the filter also handles retry, statistics, etc.
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.router.v2.Router>`
+* This filter should be configured with the name *envoy.router*.
 
 .. _config_http_filters_router_headers_consumed:
 
@@ -225,6 +226,15 @@ x-envoy-overloaded
 
 If this header is set by upstream, Envoy will not retry. Currently the value of the header is not
 looked at, only its presence.
+
+.. _config_http_filters_router_x-envoy-ratelimited:
+
+x-envoy-ratelimited
+^^^^^^^^^^^^^^^^^^^
+
+If this header is set by upstream, Envoy will not retry. Currently the value of the header is not
+looked at, only its presence. This header is set by :ref:`rate limit filter<config_http_filters_rate_limit>`
+when the request is rate limited. 
 
 .. _config_http_filters_router_x-envoy-decorator-operation:
 

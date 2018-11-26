@@ -109,6 +109,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "thread_local_cluster_interface",
     hdrs = ["thread_local_cluster.h"],
+    deps = [
+        ":load_balancer_interface",
+        ":upstream_interface",
+    ],
 )
 
 envoy_cc_library(

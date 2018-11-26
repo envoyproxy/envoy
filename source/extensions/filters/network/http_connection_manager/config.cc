@@ -135,7 +135,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager)
     : context_(context), reverse_encode_order_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-                             config, bugfix_reverse_encode_order, false)),
+                             config, bugfix_reverse_encode_order, true)),
       stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
@@ -150,6 +150,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout)),
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
+      request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       date_provider_(date_provider),
@@ -233,9 +234,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     uint64_t overall_sampling{
         PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing_config, overall_sampling, 100, 100)};
 
-    tracing_config_.reset(new Http::TracingConnectionManagerConfig(
-        {tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
-         overall_sampling}));
+    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(
+        Http::TracingConnectionManagerConfig{tracing_operation_name, request_headers_for_tags,
+                                             client_sampling, random_sampling, overall_sampling});
   }
 
   for (const auto& access_log : config.access_log()) {

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "extensions/filters/http/common/jwks_fetcher.h"
 
 #include "test/mocks/server/mocks.h"

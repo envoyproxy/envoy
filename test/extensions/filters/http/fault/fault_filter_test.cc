@@ -130,7 +130,7 @@ public:
 
   void SetUpTest(const envoy::config::filter::http::fault::v2::HTTPFault fault) {
     config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_, generator_));
-    filter_.reset(new FaultFilter(config_));
+    filter_ = std::make_unique<FaultFilter>(config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 

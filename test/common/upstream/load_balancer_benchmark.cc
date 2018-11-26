@@ -1,5 +1,7 @@
 // Usage: bazel run //test/common/upstream:load_balancer_benchmark
 
+#include <memory>
+
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/ring_hash_lb.h"
@@ -43,8 +45,8 @@ public:
   RingHashTester(uint64_t num_hosts, uint64_t min_ring_size) : BaseTester(num_hosts) {
     config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
     config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
-    ring_hash_lb_.reset(new RingHashLoadBalancer{priority_set_, stats_, runtime_, random_, config_,
-                                                 common_config_});
+    ring_hash_lb_ = std::make_unique<RingHashLoadBalancer>(priority_set_, stats_, runtime_, random_,
+                                                           config_, common_config_);
   }
 
   Stats::IsolatedStoreImpl stats_store_;

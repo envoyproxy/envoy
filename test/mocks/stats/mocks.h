@@ -29,7 +29,8 @@ public:
 
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
-  const std::string name() const override { return name_; };
+  std::string name() const override { return name_; };
+  const char* nameCStr() const override { return name_.c_str(); };
 
   MOCK_METHOD1(add, void(uint64_t amount));
   MOCK_METHOD0(inc, void());
@@ -54,7 +55,8 @@ public:
 
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
-  const std::string name() const override { return name_; };
+  std::string name() const override { return name_; };
+  const char* nameCStr() const override { return name_.c_str(); };
 
   MOCK_METHOD1(add, void(uint64_t amount));
   MOCK_METHOD0(dec, void());
@@ -79,7 +81,8 @@ public:
 
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
-  const std::string name() const override { return name_; };
+  std::string name() const override { return name_; };
+  const char* nameCStr() const override { return name_.c_str(); };
 
   MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
   MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
@@ -98,7 +101,8 @@ public:
 
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
-  const std::string name() const override { return name_; };
+  std::string name() const override { return name_; };
+  const char* nameCStr() const override { return name_.c_str(); };
   void merge() override {}
   const std::string summary() const override { return ""; };
 

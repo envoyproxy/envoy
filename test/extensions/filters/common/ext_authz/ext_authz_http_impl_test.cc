@@ -112,9 +112,9 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
   (*mutable_headers)[std::string{"foo"}] = std::string{"bar"};
 
   EXPECT_CALL(async_client_, send_(_, _, _))
-      .WillOnce(Invoke(
-          [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks&,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+      .WillOnce(
+          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks&,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             const auto* length_header_entry = message->headers().get(Http::Headers::get().Path);
             EXPECT_EQ(length_header_entry->value().getStringView(), "/bar/foo");
             return nullptr;
@@ -139,9 +139,9 @@ TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZero) {
   (*mutable_headers)[Http::Headers::get().Method.get()] = std::string{"POST"};
 
   EXPECT_CALL(async_client_, send_(_, _, _))
-      .WillOnce(Invoke(
-          [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks&,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+      .WillOnce(
+          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks&,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             const auto* length_header_entry =
                 message->headers().get(Http::Headers::get().ContentLength);
             EXPECT_EQ(length_header_entry->value().getStringView(), "0");

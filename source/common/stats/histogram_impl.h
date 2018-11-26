@@ -49,7 +49,8 @@ public:
       : MetricImpl(std::move(tag_extracted_name), std::move(tags)), parent_(parent), name_(name) {}
 
   // Stats:;Metric
-  const std::string name() const override { return name_; }
+  std::string name() const override { return name_; }
+  const char* nameCStr() const override { return name_.c_str(); }
 
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
@@ -71,7 +72,8 @@ class NullHistogramImpl : public Histogram {
 public:
   NullHistogramImpl() {}
   ~NullHistogramImpl() {}
-  const std::string name() const override { return ""; }
+  std::string name() const override { return ""; }
+  const char* nameCStr() const override { return ""; }
   const std::string& tagExtractedName() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
   const std::vector<Tag>& tags() const override { CONSTRUCT_ON_FIRST_USE(std::vector<Tag>, {}); }
   void recordValue(uint64_t) override {}

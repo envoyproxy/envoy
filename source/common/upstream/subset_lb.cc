@@ -1,5 +1,6 @@
 #include "common/upstream/subset_lb.h"
 
+#include <memory>
 #include <unordered_set>
 
 #include "envoy/api/v2/cds.pb.h"
@@ -21,14 +22,17 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LoadBalancerSubsetInfo& subsets,
     const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
+    const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>& least_request_config,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
-    : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config), common_config_(common_config),
-      stats_(stats), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
+    : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
+      least_request_config_(least_request_config), common_config_(common_config), stats_(stats),
+      runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),
                                subsets.defaultSubset().fields().end()),
       subset_keys_(subsets.subsetKeys()), original_priority_set_(priority_set),
       original_local_priority_set_(local_priority_set),
-      locality_weight_aware_(subsets.localityWeightAware()) {
+      locality_weight_aware_(subsets.localityWeightAware()),
+      scale_locality_weight_(subsets.scaleLocalityWeight()) {
   ASSERT(subsets.isEnabled());
 
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
@@ -183,7 +187,7 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVecto
 
     fallback_subset_.reset(new LbSubsetEntry());
     fallback_subset_->priority_subset_.reset(
-        new PrioritySubsetImpl(*this, predicate, locality_weight_aware_));
+        new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
     return;
   }
 
@@ -275,8 +279,8 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
                      // Initialize new entry with hosts and update stats. (An uninitialized entry
                      // with only removed hosts is a degenerate case and we leave the entry
                      // uninitialized.)
-                     entry->priority_subset_.reset(
-                         new PrioritySubsetImpl(*this, predicate, locality_weight_aware_));
+                     entry->priority_subset_.reset(new PrioritySubsetImpl(
+                         *this, predicate, locality_weight_aware_, scale_locality_weight_));
                      stats_.lb_subsets_active_.inc();
                      stats_.lb_subsets_created_.inc();
                    }
@@ -416,9 +420,11 @@ void SubsetLoadBalancer::forEachSubset(LbSubsetMap& subsets,
 // with the given predicate.
 SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalancer& subset_lb,
                                                            HostPredicate predicate,
-                                                           bool locality_weight_aware)
+                                                           bool locality_weight_aware,
+                                                           bool scale_locality_weight)
     : PrioritySetImpl(), original_priority_set_(subset_lb.original_priority_set_),
-      predicate_(predicate), locality_weight_aware_(locality_weight_aware) {
+      predicate_(predicate), locality_weight_aware_(locality_weight_aware),
+      scale_locality_weight_(scale_locality_weight) {
 
   for (size_t i = 0; i < original_priority_set_.hostSetsPerPriority().size(); ++i) {
     empty_ &= getOrCreateHostSet(i).hosts().empty();
@@ -430,30 +436,30 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
 
   switch (subset_lb.lb_type_) {
   case LoadBalancerType::LeastRequest:
-    lb_.reset(new LeastRequestLoadBalancer(*this, subset_lb.original_local_priority_set_,
-                                           subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
-                                           subset_lb.common_config_));
+    lb_ = std::make_unique<LeastRequestLoadBalancer>(
+        *this, subset_lb.original_local_priority_set_, subset_lb.stats_, subset_lb.runtime_,
+        subset_lb.random_, subset_lb.common_config_, subset_lb.least_request_config_);
     break;
 
   case LoadBalancerType::Random:
-    lb_.reset(new RandomLoadBalancer(*this, subset_lb.original_local_priority_set_,
-                                     subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
-                                     subset_lb.common_config_));
+    lb_ = std::make_unique<RandomLoadBalancer>(*this, subset_lb.original_local_priority_set_,
+                                               subset_lb.stats_, subset_lb.runtime_,
+                                               subset_lb.random_, subset_lb.common_config_);
     break;
 
   case LoadBalancerType::RoundRobin:
-    lb_.reset(new RoundRobinLoadBalancer(*this, subset_lb.original_local_priority_set_,
-                                         subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
-                                         subset_lb.common_config_));
+    lb_ = std::make_unique<RoundRobinLoadBalancer>(*this, subset_lb.original_local_priority_set_,
+                                                   subset_lb.stats_, subset_lb.runtime_,
+                                                   subset_lb.random_, subset_lb.common_config_);
     break;
 
   case LoadBalancerType::RingHash:
     // TODO(mattklein123): The ring hash LB is thread aware, but currently the subset LB is not.
     // We should make the subset LB thread aware since the calculations are costly, and then we
     // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
-    thread_aware_lb_.reset(
-        new RingHashLoadBalancer(*this, subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
-                                 subset_lb.lb_ring_hash_config_, subset_lb.common_config_));
+    thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
+        *this, subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
+        subset_lb.lb_ring_hash_config_, subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
     break;
@@ -462,8 +468,8 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     // TODO(mattklein123): The Maglev LB is thread aware, but currently the subset LB is not.
     // We should make the subset LB thread aware since the calculations are costly, and then we
     // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
-    thread_aware_lb_.reset(new MaglevLoadBalancer(*this, subset_lb.stats_, subset_lb.runtime_,
-                                                  subset_lb.random_, subset_lb.common_config_));
+    thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
+        *this, subset_lb.stats_, subset_lb.runtime_, subset_lb.random_, subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
     break;
@@ -534,14 +540,38 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
       hosts_per_locality->filter([](const Host& host) { return host.healthy(); });
 
+  HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
+                           determineLocalityWeights(*hosts_per_locality), filtered_added,
+                           filtered_removed);
+}
+
+LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocalityWeights(
+    const HostsPerLocality& hosts_per_locality) const {
   if (locality_weight_aware_) {
-    HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
-                             original_host_set_.localityWeights(), filtered_added,
-                             filtered_removed);
-  } else {
-    HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
-                             {}, filtered_added, filtered_removed);
+    if (scale_locality_weight_) {
+      const auto& original_hosts_per_locality = original_host_set_.hostsPerLocality().get();
+      const auto& original_weights = *original_host_set_.localityWeights();
+
+      auto scaled_locality_weights = std::make_shared<LocalityWeights>(original_weights.size());
+      for (uint32_t i = 0; i < original_weights.size(); ++i) {
+        // If the original locality has zero hosts, skip it. This leaves the weight at zero.
+        if (original_hosts_per_locality[i].empty()) {
+          continue;
+        }
+
+        // Otherwise, scale it proportionally to the number of hosts removed by the subset
+        // predicate.
+        (*scaled_locality_weights)[i] =
+            std::round(float((original_weights[i] * hosts_per_locality.get()[i].size())) /
+                       original_hosts_per_locality[i].size());
+      }
+
+      return scaled_locality_weights;
+    } else {
+      return original_host_set_.localityWeights();
+    }
   }
+  return {};
 }
 
 HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
@@ -553,7 +583,8 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
 
   ASSERT(!overprovisioning_factor.has_value() ||
          overprovisioning_factor.value() == host_set->overprovisioning_factor());
-  return HostSetImplPtr{new HostSubsetImpl(*host_set, locality_weight_aware_)};
+  return HostSetImplPtr{
+      new HostSubsetImpl(*host_set, locality_weight_aware_, scale_locality_weight_)};
 }
 
 void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,

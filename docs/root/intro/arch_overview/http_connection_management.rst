@@ -121,8 +121,8 @@ synthesizing a new request, sending it to the upstream specified by the new rout
 returning the redirected response as the response of the original request.
 
 Internal redirects are configured via the :ref:`internal redirect action
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.internal_redirect_action>`
-in the HTTP Connection Manager Config.
+<envoy_api_field_route.RouteAction.internal_redirect_action>`
+in the route configuration.
 
 Redirect handling is triggered by an upstream server sending a 302 response with an
 x-envoy-internal-redirect header containing the fully qualified URL (http://host/path) to redirect

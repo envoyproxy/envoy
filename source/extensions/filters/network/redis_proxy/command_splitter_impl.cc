@@ -112,7 +112,7 @@ SplitRequestPtr MGETRequest::create(ConnPool::Instance& conn_pool,
   request_ptr->num_pending_responses_ = incoming_request.asArray().size() - 1;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
 
-  request_ptr->pending_response_.reset(new RespValue());
+  request_ptr->pending_response_ = std::make_unique<RespValue>();
   request_ptr->pending_response_->type(RespType::Array);
   std::vector<RespValue> responses(request_ptr->num_pending_responses_);
   request_ptr->pending_response_->asArray().swap(responses);
@@ -185,7 +185,7 @@ SplitRequestPtr MSETRequest::create(ConnPool::Instance& conn_pool,
   request_ptr->num_pending_responses_ = (incoming_request.asArray().size() - 1) / 2;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
 
-  request_ptr->pending_response_.reset(new RespValue());
+  request_ptr->pending_response_ = std::make_unique<RespValue>();
   request_ptr->pending_response_->type(RespType::SimpleString);
 
   std::vector<RespValue> values(3);
@@ -252,7 +252,7 @@ SplitRequestPtr SplitKeysSumResultRequest::create(ConnPool::Instance& conn_pool,
   request_ptr->num_pending_responses_ = incoming_request.asArray().size() - 1;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
 
-  request_ptr->pending_response_.reset(new RespValue());
+  request_ptr->pending_response_ = std::make_unique<RespValue>();
   request_ptr->pending_response_->type(RespType::Integer);
 
   std::vector<RespValue> values(2);

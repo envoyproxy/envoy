@@ -8,6 +8,7 @@
 #include "common/common/c_smart_ptr.h"
 #include "common/memory/stats.h"
 #include "common/stats/stats_matcher_impl.h"
+#include "common/stats/tag_producer_impl.h"
 #include "common/stats/thread_local_store.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -650,6 +651,10 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
     return;
   }
 
+  // Use a tag producer that will produce tags.
+  envoy::config::metrics::v2::StatsConfig stats_config;
+  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+
   const size_t million = 1000 * 1000;
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
   if (start_mem == 0) {
@@ -660,13 +665,17 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 32 * million); // actual value: 31492864 as of Oct 15, 2018
+  EXPECT_LT(end_mem - start_mem, 28 * million); // actual value: 27203216 as of Oct 29, 2018
 }
 
 TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
   if (!TestUtil::hasDeterministicMallocStats()) {
     return;
   }
+
+  // Use a tag producer that will produce tags.
+  envoy::config::metrics::v2::StatsConfig stats_config;
+  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
 
   const size_t million = 1000 * 1000;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -679,7 +688,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 41 * million); // actual value: 40411536 as of Oct 15, 2018
+  EXPECT_LT(end_mem - start_mem, 31 * million); // actual value: 30482576 as of Oct 29, 2018
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
@@ -875,6 +884,63 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   for (const ParentHistogramSharedPtr& histogram : store_->histograms()) {
     EXPECT_TRUE(histogram->used());
   }
+}
+
+class TruncatingAllocTest : public HeapStatsThreadLocalStoreTest {
+  class TruncatingHeapAlloc : public HeapStatDataAllocator {
+  public:
+    bool requiresBoundedStatNameSize() const override { return true; }
+  };
+
+protected:
+  TruncatingAllocTest() : long_name_(options_.maxNameLength() + 1, 'A') {}
+
+  void SetUp() override {
+    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, truncating_heap_alloc_);
+    // Do not call superclass SetUp.
+  }
+
+  TruncatingHeapAlloc truncating_heap_alloc_;
+  std::string long_name_;
+};
+
+TEST_F(TruncatingAllocTest, CounterNotTruncated) {
+  EXPECT_NO_LOGS({
+    Counter& counter = store_->counter("simple");
+    EXPECT_EQ(&counter, &store_->counter("simple"));
+  });
+}
+
+TEST_F(TruncatingAllocTest, GaugeNotTruncated) {
+  EXPECT_NO_LOGS({
+    Gauge& gauge = store_->gauge("simple");
+    EXPECT_EQ(&gauge, &store_->gauge("simple"));
+  });
+}
+
+TEST_F(TruncatingAllocTest, CounterTruncated) {
+  Counter* counter = nullptr;
+  EXPECT_LOG_CONTAINS("warning", "is too long with", {
+    Counter& c = store_->counter(long_name_);
+    counter = &c;
+  });
+  EXPECT_NO_LOGS(EXPECT_EQ(counter, &store_->counter(long_name_)));
+}
+
+TEST_F(TruncatingAllocTest, GaugeTruncated) {
+  Gauge* gauge = nullptr;
+  EXPECT_LOG_CONTAINS("warning", "is too long with", {
+    Gauge& g = store_->gauge(long_name_);
+    gauge = &g;
+  });
+  EXPECT_NO_LOGS(EXPECT_EQ(gauge, &store_->gauge(long_name_)));
+}
+
+TEST_F(TruncatingAllocTest, HistogramWithLongNameNotTruncated) {
+  EXPECT_NO_LOGS({
+    Histogram& histogram = store_->histogram(long_name_);
+    EXPECT_EQ(&histogram, &store_->histogram(long_name_));
+  });
 }
 
 } // namespace Stats

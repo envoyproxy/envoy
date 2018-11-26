@@ -11,6 +11,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/http/codec_client.h"
+#include "common/http/conn_pool_base.h"
 
 namespace Envoy {
 namespace Http {
@@ -21,7 +22,7 @@ namespace Http2 {
  * shifting to a new connection if we reach max streams on the primary. This is a base class
  * used for both the prod implementation as well as the testing one.
  */
-class ConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::Instance {
+class ConnPoolImpl : public ConnectionPool::Instance, public ConnPoolImplBase {
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
@@ -66,13 +67,16 @@ protected:
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
     uint64_t total_streams_{};
     Event::TimerPtr connect_timer_;
+    bool upstream_ready_{};
     Stats::TimespanPtr conn_length_;
     bool closed_with_active_rq_{};
   };
 
   typedef std::unique_ptr<ActiveClient> ActiveClientPtr;
 
-  void checkForDrained();
+  // Http::ConnPoolImplBase
+  void checkForDrained() override;
+
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   virtual uint32_t maxTotalStreams() PURE;
   void movePrimaryClientToDraining();
@@ -81,14 +85,14 @@ protected:
   void onGoAway(ActiveClient& client);
   void onStreamDestroy(ActiveClient& client);
   void onStreamReset(ActiveClient& client, Http::StreamResetReason reason);
+  void newClientStream(Http::StreamDecoder& response_decoder, ConnectionPool::Callbacks& callbacks);
+  void onUpstreamReady();
 
   Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
-  Upstream::HostConstSharedPtr host_;
   ActiveClientPtr primary_client_;
   ActiveClientPtr draining_client_;
   std::list<DrainedCb> drained_callbacks_;
-  Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
 };
 

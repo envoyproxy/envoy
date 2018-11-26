@@ -56,6 +56,13 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
   };
 };
 
+Router::RouteSpecificFilterConfigConstSharedPtr
+ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute& proto_config,
+    Server::Configuration::FactoryContext&) {
+  return std::make_shared<FilterConfigPerRoute>(proto_config);
+}
+
 /**
  * Static registration for the external authorization filter. @see RegisterFactory.
  */

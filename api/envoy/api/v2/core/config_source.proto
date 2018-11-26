@@ -5,6 +5,7 @@ package envoy.api.v2.core;
 import "envoy/api/v2/core/grpc_service.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
@@ -48,12 +49,27 @@ message ApiConfigSource {
   // For REST APIs, the request timeout. If not set, a default value of 1s will be used.
   google.protobuf.Duration request_timeout = 5
       [(validate.rules).duration.gt.seconds = 0, (gogoproto.stdduration) = true];
+
+  // For GRPC APIs, the rate limit settings. If present, discovery requests made by Envoy will be
+  // rate limited.
+  RateLimitSettings rate_limit_settings = 6;
 }
 
 // Aggregated Discovery Service (ADS) options. This is currently empty, but when
 // set in :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` can be used to
 // specify that ADS is to be used.
 message AggregatedConfigSource {
+}
+
+// Rate Limit settings to be applied for discovery requests made by Envoy.
+message RateLimitSettings {
+  // Maximum number of tokens to be used for rate limting discovery request calls. If not set, a
+  // default value of 100 will be used.
+  google.protobuf.UInt32Value max_tokens = 1;
+
+  // Rate at which tokens will be filled per second. If not set, a default fill rate of 10 tokens
+  // per second will be used.
+  google.protobuf.DoubleValue fill_rate = 2 [(validate.rules).double.gt = 0.0];
 }
 
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters

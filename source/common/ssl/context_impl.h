@@ -9,9 +9,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/ssl/context_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
+#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -42,7 +42,7 @@ struct SslStats {
 
 class ContextImpl : public virtual Context {
 public:
-  virtual bssl::UniquePtr<SSL> newSsl() const;
+  virtual bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name) const;
 
   /**
    * Logs successful TLS handshake and updates stats.
@@ -143,7 +143,7 @@ public:
   ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config,
                     TimeSource& time_source);
 
-  bssl::UniquePtr<SSL> newSsl() const override;
+  bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name) const override;
 
 private:
   const std::string server_name_indication_;

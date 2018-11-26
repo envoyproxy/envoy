@@ -52,7 +52,7 @@ public:
   Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
     return [&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       absl::WriterMutexLock m(&rand_lock_);
-      if (rng_.get() == nullptr) {
+      if (rng_ == nullptr) {
         // Lazily create to ensure the test seed is set.
         rng_ = std::make_unique<TestRandomGenerator>();
       }

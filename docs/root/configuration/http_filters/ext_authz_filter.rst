@@ -4,6 +4,7 @@ External Authorization
 ======================
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
 * :ref:`HTTP filter v2 API reference <envoy_api_msg_config.filter.http.ext_authz.v2alpha.ExtAuthz>`
+* This filter should be configured with the name *envoy.ext_authz*.
 
 The external authorization HTTP filter calls an external gRPC or HTTP service to check if the incoming
 HTTP request is authorized or not.
@@ -73,6 +74,33 @@ A sample filter configuration for a raw HTTP authorization server:
       lb_policy: round_robin
       hosts:
         - socket_address: { address: 127.0.0.1, port_value: 10003 }
+
+Per-Route Configuration
+-----------------------
+
+A sample virtual host and route filter configuration.
+In this example we add additional context on the virtual host, and disabled the filter for `/static` prefixed routes.
+
+.. code-block:: yaml
+
+  route_config:
+    name: local_route
+    virtual_hosts:
+    - name: local_service
+      domains: ["*"]
+      per_filter_config:
+        envoy.ext_authz:
+          check_settings:
+            context_extensions:
+              virtual_host: local_service
+      routes:
+      - match: { prefix: "/static" }
+        route: { cluster: some_service }
+        per_filter_config:
+          envoy.ext_authz:
+            disabled: true
+      - match: { prefix: "/" }
+        route: { cluster: some_service }
 
 Statistics
 ----------

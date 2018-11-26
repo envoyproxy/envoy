@@ -1,12 +1,13 @@
 #include "common/http/http2/metadata_decoder.h"
 
 #include "common/common/assert.h"
+#include "common/common/stack_array.h"
 
 namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-MetadataDecoder::MetadataDecoder(uint64_t stream_id, MetadataCallback cb) : stream_id_(stream_id) {
+MetadataDecoder::MetadataDecoder(MetadataCallback cb) : metadata_map_(new MetadataMap()) {
   nghttp2_hd_inflater* inflater;
   int rv = nghttp2_hd_inflate_new(&inflater);
   ASSERT(rv == 0);
@@ -20,7 +21,8 @@ bool MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len) {
   ASSERT(data != nullptr && len != 0);
   payload_.add(data, len);
 
-  return payload_.length() <= max_payload_size_bound_;
+  total_payload_size_ += payload_.length();
+  return total_payload_size_ <= max_payload_size_bound_;
 }
 
 bool MetadataDecoder::onMetadataFrameComplete(bool end_metadata) {
@@ -30,8 +32,8 @@ bool MetadataDecoder::onMetadataFrameComplete(bool end_metadata) {
   }
 
   if (end_metadata) {
-    callback_(metadata_map_);
-    metadata_map_.clear();
+    callback_(std::move(metadata_map_));
+    metadata_map_ = std::make_unique<MetadataMap>();
   }
   return true;
 }
@@ -39,8 +41,8 @@ bool MetadataDecoder::onMetadataFrameComplete(bool end_metadata) {
 bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
   // Computes how many slices are needed to get all the data out.
   const int num_slices = payload_.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
-  payload_.getRawSlices(slices, num_slices);
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  payload_.getRawSlices(slices.begin(), num_slices);
 
   // Data consumed by nghttp2 so far.
   ssize_t payload_size_consumed = 0;
@@ -71,8 +73,8 @@ bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
 
       if (inflate_flags & NGHTTP2_HD_INFLATE_EMIT) {
         // One header key value pair has been successfully decoded.
-        metadata_map_.emplace(std::string(reinterpret_cast<char*>(nv.name), nv.namelen),
-                              std::string(reinterpret_cast<char*>(nv.value), nv.valuelen));
+        metadata_map_->emplace(std::string(reinterpret_cast<char*>(nv.name), nv.namelen),
+                               std::string(reinterpret_cast<char*>(nv.value), nv.valuelen));
       }
     }
 

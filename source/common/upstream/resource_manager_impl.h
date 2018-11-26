@@ -7,6 +7,7 @@
 
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/resource_manager.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
 

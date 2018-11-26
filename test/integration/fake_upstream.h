@@ -58,6 +58,7 @@ public:
   void encodeData(absl::string_view data, bool end_stream);
   void encodeTrailers(const Http::HeaderMapImpl& trailers);
   void encodeResetStream();
+  void encodeMetadata(const Http::MetadataMap& metadata_map);
   const Http::HeaderMap& headers() { return *headers_; }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
@@ -149,6 +150,7 @@ public:
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
+  void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason) override;
@@ -578,6 +580,7 @@ private:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    bool reverseWriteFilterOrder() const override { return true; }
 
     FakeUpstream& parent_;
     std::string name_;

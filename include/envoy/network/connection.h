@@ -261,6 +261,22 @@ public:
    * @return std::chrono::milliseconds The delayed close timeout value.
    */
   virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
+
+  /**
+   * Set the order of the write filters, indicating whether it is reversed to the filter chain
+   * config.
+   */
+  // TODO(qiannawang): this method is deprecated and to be moved soon. See
+  // https://github.com/envoyproxy/envoy/pull/4889 for more details.
+  virtual void setWriteFilterOrder(bool reversed) PURE;
+
+  /**
+   * @return bool indicates whether write filters should be in the reversed order of the filter
+   *         chain config.
+   */
+  // TODO(qiannawang): this method is deprecated and to be moved soon. See
+  // https://github.com/envoyproxy/envoy/pull/4889 for more details.
+  virtual bool reverseWriteFilterOrder() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

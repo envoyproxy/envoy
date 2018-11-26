@@ -280,6 +280,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_google_libprotobuf_mutator()
     _io_opentracing_cpp()
     _com_lightstep_tracer_cpp()
+    _com_github_datadog_dd_opentracing_cpp()
     _com_github_grpc_grpc()
     _com_github_google_jwt_verify()
     _com_github_nanopb_nanopb()
@@ -401,6 +402,17 @@ def _com_lightstep_tracer_cpp():
         actual = "@com_lightstep_tracer_cpp//:lightstep_tracer",
     )
 
+def _com_github_datadog_dd_opentracing_cpp():
+    _repository_impl("com_github_datadog_dd_opentracing_cpp")
+    _repository_impl(
+        name = "com_github_msgpack_msgpack_c",
+        build_file = "@com_github_datadog_dd_opentracing_cpp//:bazel/external/msgpack.BUILD",
+    )
+    native.bind(
+        name = "dd_opentracing_cpp",
+        actual = "@com_github_datadog_dd_opentracing_cpp//:dd_opentracing_cpp",
+    )
+
 def _com_github_tencent_rapidjson():
     _repository_impl(
         name = "com_github_tencent_rapidjson",
@@ -441,6 +453,14 @@ def _com_google_absl():
     native.bind(
         name = "abseil_base",
         actual = "@com_google_absl//absl/base:base",
+    )
+    native.bind(
+        name = "abseil_flat_hash_map",
+        actual = "@com_google_absl//absl/container:flat_hash_map",
+    )
+    native.bind(
+        name = "abseil_flat_hash_set",
+        actual = "@com_google_absl//absl/container:flat_hash_set",
     )
     native.bind(
         name = "abseil_strings",

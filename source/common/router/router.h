@@ -289,6 +289,7 @@ private:
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
+    void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;
@@ -372,6 +373,7 @@ private:
   void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamTrailers(Http::HeaderMapPtr&& trailers);
+  void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map);
   void onUpstreamComplete();
   void onUpstreamReset(UpstreamResetType type,
                        const absl::optional<Http::StreamResetReason>& reset_reason);
@@ -400,7 +402,6 @@ private:
   Http::HeaderMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;
   uint32_t buffer_limit_{0};
-  bool stream_destroyed_{};
   MetadataMatchCriteriaConstPtr metadata_match_;
 
   // list of cookies to add to upstream headers

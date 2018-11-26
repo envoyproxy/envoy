@@ -12,6 +12,7 @@ cscope.*
 /docs/landing_source/.bundle
 /generated
 *.pyc
+**/pyformat
 SOURCE_VERSION
 *.sw*
 tags

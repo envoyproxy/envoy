@@ -1,3 +1,5 @@
+#pragma once
+
 #include "common/network/address_impl.h"
 #include "common/network/socket_option_impl.h"
 

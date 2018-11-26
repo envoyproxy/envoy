@@ -7,12 +7,15 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -27,7 +30,10 @@ enum class FilterHeadersStatus {
   // Do not iterate to any of the remaining filters in the chain. Returning
   // FilterDataStatus::Continue from decodeData()/encodeData() or calling
   // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
-  StopIteration
+  StopIteration,
+  // Continue iteration to remaining filters, but ignore any subsequent data or trailers. This
+  // results in creating a header only request/response.
+  ContinueAndEndStream
 };
 
 /**
@@ -221,9 +227,11 @@ public:
    *                  type, or encoded in the grpc-message header.
    * @param modify_headers supplies an optional callback function that can modify the
    *                       response headers.
+   * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
    */
   virtual void sendLocalReply(Code response_code, const std::string& body_text,
-                              std::function<void(HeaderMap& headers)> modify_headers) PURE;
+                              std::function<void(HeaderMap& headers)> modify_headers,
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status) PURE;
 
   /**
    * Called with 100-Continue headers to be encoded.
@@ -259,6 +267,13 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(HeaderMapPtr&& trailers) PURE;
+
+  /**
+   * Called with metadata to be encoded.
+   *
+   * @param metadata_map supplies the unique_ptr of the metadata to be encoded.
+   */
+  virtual void encodeMetadata(MetadataMapPtr&& metadata_map) PURE;
 
   /**
    * Called when the buffer for a decoder filter or any buffers the filter sends data to go over

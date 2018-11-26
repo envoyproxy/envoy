@@ -8,10 +8,20 @@
 namespace Envoy {
 namespace Ssl {
 
+const ASN1_TIME& epochASN1_Time() {
+  static ASN1_TIME* e = []() -> ASN1_TIME* {
+    ASN1_TIME* epoch = ASN1_TIME_new();
+    const time_t epoch_time = 0;
+    RELEASE_ASSERT(ASN1_TIME_set(epoch, epoch_time) != NULL, "");
+    return epoch;
+  }();
+  return *e;
+}
+
 inline bssl::UniquePtr<ASN1_TIME> currentASN1_Time(TimeSource& time_source) {
   bssl::UniquePtr<ASN1_TIME> current_asn_time(ASN1_TIME_new());
-  time_t current_time = std::chrono::system_clock::to_time_t(time_source.systemTime());
-  ASN1_TIME_set(current_asn_time.get(), current_time);
+  const time_t current_time = std::chrono::system_clock::to_time_t(time_source.systemTime());
+  RELEASE_ASSERT(ASN1_TIME_set(current_asn_time.get(), current_time) != NULL, "");
   return current_asn_time;
 }
 
@@ -65,16 +75,30 @@ std::string Utility::getSubjectFromCertificate(X509& cert) {
   return std::string(reinterpret_cast<const char*>(data), data_len);
 }
 
-int32_t Utility::getDaysUntilExpiration(X509* cert, TimeSource& time_source) {
+int32_t Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_source) {
   if (cert == nullptr) {
     return std::numeric_limits<int>::max();
   }
   int days, seconds;
   if (ASN1_TIME_diff(&days, &seconds, currentASN1_Time(time_source).get(),
-                     X509_get_notAfter(cert))) {
+                     X509_get0_notAfter(cert))) {
     return days;
   }
   return 0;
+}
+
+SystemTime Utility::getValidFrom(const X509& cert) {
+  int days, seconds;
+  int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1_Time(), X509_get0_notBefore(&cert));
+  ASSERT(rc == 1);
+  return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
+}
+
+SystemTime Utility::getExpirationTime(const X509& cert) {
+  int days, seconds;
+  int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1_Time(), X509_get0_notAfter(&cert));
+  ASSERT(rc == 1);
+  return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
 }
 
 } // namespace Ssl

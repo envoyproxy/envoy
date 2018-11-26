@@ -15,6 +15,7 @@ envoy_cc_library(
     deps = [
         ":engine_lib",
         "//include/envoy/stats:stats_macros",
+        "//source/common/singleton:const_singleton",
         "@envoy_api//envoy/config/filter/http/rbac/v2:rbac_cc",
         "@envoy_api//envoy/config/filter/network/rbac/v2:rbac_cc",
     ],

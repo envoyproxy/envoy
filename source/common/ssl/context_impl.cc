@@ -275,7 +275,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   return out;
 }
 
-bssl::UniquePtr<SSL> ContextImpl::newSsl() const {
+bssl::UniquePtr<SSL> ContextImpl::newSsl(absl::optional<std::string>) const {
   return bssl::UniquePtr<SSL>(SSL_new(ctx_.get()));
 }
 
@@ -468,6 +468,10 @@ CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::str
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
   certificate_details->set_days_until_expiration(
       Utility::getDaysUntilExpiration(cert, time_source_));
+  ProtobufWkt::Timestamp* valid_from = certificate_details->mutable_valid_from();
+  TimestampUtil::systemClockToTimestamp(Utility::getValidFrom(*cert), *valid_from);
+  ProtobufWkt::Timestamp* expiration_time = certificate_details->mutable_expiration_time();
+  TimestampUtil::systemClockToTimestamp(Utility::getExpirationTime(*cert), *expiration_time);
 
   for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
     envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
@@ -494,11 +498,15 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
   }
 }
 
-bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
-  bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl());
+bssl::UniquePtr<SSL>
+ClientContextImpl::newSsl(absl::optional<std::string> override_server_name) const {
+  bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(absl::nullopt));
 
-  if (!server_name_indication_.empty()) {
-    int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication_.c_str());
+  std::string server_name_indication =
+      override_server_name.has_value() ? override_server_name.value() : server_name_indication_;
+
+  if (!server_name_indication.empty()) {
+    int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication.c_str());
     RELEASE_ASSERT(rc, "");
   }
 

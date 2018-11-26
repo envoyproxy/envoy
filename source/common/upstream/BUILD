@@ -59,6 +59,7 @@ envoy_cc_library(
         ":load_stats_reporter_lib",
         ":ring_hash_lb_lib",
         ":subset_lb_lib",
+        "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -143,6 +144,7 @@ envoy_cc_library(
         "//include/envoy/upstream:load_balancer_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:stack_array",
         "//source/common/protobuf:utility_lib",
     ],
 )
@@ -240,6 +242,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/upstream:resource_manager_interface",
+        "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
     ],
 )

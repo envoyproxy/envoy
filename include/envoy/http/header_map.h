@@ -259,6 +259,7 @@ private:
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
   HEADER_FUNC(EnvoyOriginalUrl)                                                                    \
   HEADER_FUNC(EnvoyOverloaded)                                                                     \
+  HEADER_FUNC(EnvoyRateLimited)                                                                    \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
   HEADER_FUNC(EnvoyRetriableStatusCodes)                                                           \
