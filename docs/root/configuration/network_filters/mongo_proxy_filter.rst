@@ -190,5 +190,5 @@ a list of operations performed on the collection.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  <db.collection>, string, The resource name in *db.collection* format.
-  [], list, A list of strings, representing the operations executed on the resource. Operation is either insert,update,query,delete.
+  key, string, The resource name in *db.collection* format.
+  value, array, A list of strings representing the operations executed on the resource. Operation is either insert,update,query,delete.
