@@ -48,7 +48,7 @@ SslIntegrationTest::makeSslClientConnection(const ClientSslTransportOptions& opt
       createClientSslTransportSocketFactory(options, *context_manager_);
   return dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
-      client_transport_socket_factory_ptr->createTransportSocket(), nullptr);
+      client_transport_socket_factory_ptr->createTransportSocket({}), nullptr);
 }
 
 void SslIntegrationTest::checkStats() {

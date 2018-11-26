@@ -5004,6 +5004,53 @@ virtual_hosts:
   EXPECT_EQ(expected_codes, retry_policy.retriableStatusCodes());
 }
 
+TEST(RouteConfigurationV2, UpgradeConfigs) {
+  const std::string UpgradeYaml = R"EOF(
+name: RetriableStatusCodes
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          upgrade_configs:
+            - upgrade_type: Websocket
+            - upgrade_type: disabled
+              enabled: false
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(UpgradeYaml), factory_context, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry::UpgradeMap& upgrade_map = config.route(headers, 0)->routeEntry()->upgradeMap();
+  EXPECT_TRUE(upgrade_map.find("websocket")->second);
+  EXPECT_TRUE(upgrade_map.find("foo") == upgrade_map.end());
+  EXPECT_FALSE(upgrade_map.find("disabled")->second);
+}
+
+TEST(RouteConfigurationV2, DuplicateUpgradeConfigs) {
+  const std::string yaml = R"EOF(
+name: RetriableStatusCodes
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          upgrade_configs:
+            - upgrade_type: Websocket
+            - upgrade_type: WebSocket
+              enabled: false
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true),
+      EnvoyException, "Duplicate upgrade WebSocket");
+}
+
 // Verifies that we're creating a new instance of the retry plugins on each call instead of always
 // returning the same one.
 TEST(RouteConfigurationV2, RetryPluginsAreNotReused) {

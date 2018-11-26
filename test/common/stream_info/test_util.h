@@ -153,6 +153,7 @@ public:
     return duration(end_time_);
   }
 
+  envoy::api::v2::core::Metadata& dynamicMetadata() override { return metadata_; };
   const envoy::api::v2::core::Metadata& dynamicMetadata() const override { return metadata_; };
 
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {

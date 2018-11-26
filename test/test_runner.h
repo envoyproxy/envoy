@@ -7,6 +7,7 @@
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/global.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -41,7 +42,16 @@ public:
       file_logger = std::make_unique<Logger::FileSinkDelegate>(
           TestEnvironment::getOptions().logPath(), access_log_manager, Logger::Registry::getSink());
     }
-    return RUN_ALL_TESTS();
+    int exit_status = RUN_ALL_TESTS();
+
+    // Check that all singletons have been destroyed.
+    std::string active_singletons = Test::Globals::describeActiveSingletons();
+    if (!active_singletons.empty()) {
+      std::cerr << "\n\nFAIL: Active singletons exist:\n" << active_singletons << std::endl;
+      exit_status = EXIT_FAILURE;
+    }
+
+    return exit_status;
   }
 };
 } // namespace Envoy
