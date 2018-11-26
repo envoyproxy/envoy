@@ -48,10 +48,10 @@ private:
   const std::string& cluster_name_;
   const std::string& path_prefix_;
   const absl::optional<std::chrono::milliseconds>& timeout_;
-  const std::vector<Matchers::StringMatcher> allowed_request_headers_;
-  const std::vector<Matchers::StringMatcher> allowed_client_headers_;
-  const std::vector<Matchers::StringMatcher> allowed_upstream_headers_;
-  const Http::LowerCaseStrPairVector authorization_headers_to_add_;
+  const std::vector<Matchers::StringMatcher>& allowed_request_headers_;
+  const std::vector<Matchers::StringMatcher>& allowed_client_headers_;
+  const std::vector<Matchers::StringMatcher>& allowed_upstream_headers_;
+  const Http::LowerCaseStrPairVector& authorization_headers_to_add_;
 
   Http::AsyncClient::Request* request_{};
   RequestCallbacks* callbacks_{};
