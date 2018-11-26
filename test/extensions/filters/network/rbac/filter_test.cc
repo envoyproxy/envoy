@@ -104,7 +104,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithOneTimeEnforcement) {
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithContinuousEnforcement) {
   config_ = setupConfig(true, true /* continuous enforcement */);
-  filter_.reset(new RoleBasedAccessControlFilter(config_));
+  filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
   filter_->initializeReadFilterCallbacks(callbacks_);
   setDestinationPort(123);
 
