@@ -283,7 +283,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   for (auto upgrade_config : config.upgrade_configs()) {
     const std::string& name = upgrade_config.upgrade_type();
-    bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
+    const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
     if (findUpgradeCaseInsensitive(upgrade_filter_factories_, name) !=
         upgrade_filter_factories_.end()) {
       throw EnvoyException(
@@ -364,12 +364,13 @@ void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCall
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
-    absl::string_view upgrade_type, const Http::FilterChainFactory::UpgradeMap* upgrade_map,
+    absl::string_view upgrade_type,
+    const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
     Http::FilterChainFactoryCallbacks& callbacks) {
   bool route_enabled = false;
-  if (upgrade_map) {
-    auto route_it = findUpgradeBoolCaseInsensitive(*upgrade_map, upgrade_type);
-    if (route_it != upgrade_map->end()) {
+  if (per_route_upgrade_map) {
+    auto route_it = findUpgradeBoolCaseInsensitive(*per_route_upgrade_map, upgrade_type);
+    if (route_it != per_route_upgrade_map->end()) {
       // Upgrades explicitly not allowed on this route.
       if (route_it->second == false) {
         return false;

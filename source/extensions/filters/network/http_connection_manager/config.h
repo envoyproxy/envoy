@@ -102,7 +102,7 @@ public:
     bool allow_upgrade;
   };
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
-                                const Http::FilterChainFactory::UpgradeMap* upgrade_map,
+                                const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
                                 Http::FilterChainFactoryCallbacks& callbacks) override;
 
   // Http::ConnectionManagerConfig
