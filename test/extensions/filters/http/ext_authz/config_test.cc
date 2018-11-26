@@ -52,26 +52,23 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
       cluster: "ext_authz"
       timeout: 0.25s
    
-    authorization_request:
-      path_prefix: /test
-      allowed_headers:
-        - key-foo
-        - key-bar  
-      allowed_headers_prefix:
-        - key-foo
-        - key-bar
-      headers_to_add:
-        - { key: key-foo, value: value-foo }
-        - { key: key-bar, value: value-bar }
+    authorization_request: 
+      allowed_headers: 
+        patterns: 
+        - exact: baz
+        - prefix: "x-"
+    authorization_response: 
+      allowed_upstream_headers: 
+        patterns: 
+        - exact: baz
+        - prefix: "x-success"
+      allowed_client_headers: 
+        patterns: 
+        - exact: baz
+        - prefix: "x-fail"
 
-    authorization_response:
-      allowed_upstream_headers:
-        - key-foo
-        - key-bar
-      allowed_client_headers:
-        - key-foo
-        - key-bar
-        
+    path_prefix: "/extauth"
+    
   failure_mode_allow: true
   )EOF";
 

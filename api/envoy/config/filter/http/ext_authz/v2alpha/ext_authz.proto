@@ -7,6 +7,8 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/grpc_service.proto";
 import "envoy/api/v2/core/http_uri.proto";
 
+import "envoy/type/matcher/string.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: External Authorization ]
@@ -77,7 +79,9 @@ message HttpService {
   // Sets the HTTP server URI which the authorization requests must be sent to.
   envoy.api.v2.core.HttpUri server_uri = 1;
 
-  reserved 2;
+  // Sets an optional prefix to the value of authorization request header *Path*.
+  string path_prefix = 2;
+
   reserved 3;
   reserved 4;
   reserved 5;
@@ -92,24 +96,16 @@ message HttpService {
 }
 
 message AuthorizationRequest {
-  // Sets an optional prefix to the value of authorization request header *Path*.
-  string path_prefix = 1;
-
   // Sets a list of keys that are used to determine which client request headers should
   // be forwarded *from the filter* to the authorization server. Note that *Content-Length*,
   // *Authority*, *Method*, *Path* and *Authorization* are always dispatched to the authorization
   // server by default. The message will not contain body data and the *Content-Length* will be set
-  // to zero.
-  repeated string allowed_headers = 2;
-
-  // Sets a list of prefixes that are used to determine which client request headers should
-  // be forwarded *from the filter* to the authorization server. Note that headers matched in
-  // *allowed_headers* list will not be matched again in this list.
-  repeated string allowed_headers_prefix = 3;
+  // to zero. Keys ending with wildcard * will be matched by prefix.
+  envoy.type.matcher.ListStringMatcher allowed_headers = 2;
 
   // Sets a list of headers and their values that will be added to the request to external
   // authorization server. Note that these will override the headers coming from the downstream.
-  repeated envoy.api.v2.core.HeaderValue headers_to_add = 4;
+  repeated envoy.api.v2.core.HeaderValue headers_to_add = 3;
 }
 
 message AuthorizationResponse {
@@ -117,14 +113,14 @@ message AuthorizationResponse {
   // be forwarded *from the filter* to the upstream service only when the HTTP status is a 200 OK.
   // Note that these headers will override that the original request headers when respectively
   // matched.
-  repeated string allowed_upstream_headers = 1;
+  envoy.type.matcher.ListStringMatcher allowed_upstream_headers = 1;
 
   // Sets a list of keys that are used to determine which authorization response headers should
   // be forwarded *from the filter* to the client when the HTTP status is *NOT* a 200 OK. Note that
   // when this list is empty, all the authorization response headers will be sent to the client
   // (default). When a header is included in this list, *Path*, *Status*, *Content-Length*, *Host*,
   // *WWWAuthenticate* and *Location* are automatically added.
-  repeated string allowed_client_headers = 2;
+  envoy.type.matcher.ListStringMatcher allowed_client_headers = 2;
 }
 
 // Extra settings on a per virtualhost/route/weighter-cluster level.

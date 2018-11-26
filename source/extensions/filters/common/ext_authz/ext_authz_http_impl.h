@@ -3,6 +3,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
+#include "common/common/matchers.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 
@@ -24,14 +25,12 @@ class RawHttpClientImpl : public Client,
                           Logger::Loggable<Logger::Id::config> {
 public:
   explicit RawHttpClientImpl(Upstream::ClusterManager& cluster_manager,
-                             const std::string& cluster_name,
+                             const std::string& cluster_name, const std::string& path_prefix,
                              const absl::optional<std::chrono::milliseconds>& timeout,
-                             const std::string& path_prefix,
-                             const Http::LowerCaseStrUnorderedSet& allowed_request_headers,
-                             const Http::LowerCaseStrUnorderedSet& allowed_request_headers_prefix,
-                             const Http::LowerCaseStrPairVector& authorization_headers_to_add,
-                             const Http::LowerCaseStrUnorderedSet& allowed_upstream_headers,
-                             const Http::LowerCaseStrUnorderedSet& allowed_client_headers);
+                             const std::vector<Matchers::StringMatcher>& allowed_request_headers,
+                             const std::vector<Matchers::StringMatcher>& allowed_client_headers,
+                             const std::vector<Matchers::StringMatcher>& allowed_upstream_headers,
+                             const Http::LowerCaseStrPairVector& authorization_headers_to_add);
   ~RawHttpClientImpl();
 
   // ExtAuthz::Client
@@ -45,15 +44,15 @@ public:
 
 private:
   ResponsePtr messageToResponse(Http::MessagePtr message);
-  const std::string cluster_name_;
-  const std::string path_prefix_;
-  const Http::LowerCaseStrUnorderedSet& allowed_request_headers_;
-  const Http::LowerCaseStrUnorderedSet& allowed_request_headers_prefix_;
-  const Http::LowerCaseStrPairVector& authorization_headers_to_add_;
-  const Http::LowerCaseStrUnorderedSet& allowed_upstream_headers_;
-  const Http::LowerCaseStrUnorderedSet& allowed_client_headers_;
-  absl::optional<std::chrono::milliseconds> timeout_;
   Upstream::ClusterManager& cm_;
+  const std::string& cluster_name_;
+  const std::string& path_prefix_;
+  const absl::optional<std::chrono::milliseconds>& timeout_;
+  const std::vector<Matchers::StringMatcher> allowed_request_headers_;
+  const std::vector<Matchers::StringMatcher> allowed_client_headers_;
+  const std::vector<Matchers::StringMatcher> allowed_upstream_headers_;
+  const Http::LowerCaseStrPairVector authorization_headers_to_add_;
+
   Http::AsyncClient::Request* request_{};
   RequestCallbacks* callbacks_{};
 };

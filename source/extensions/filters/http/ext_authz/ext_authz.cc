@@ -17,68 +17,74 @@ FilterConfig::FilterConfig(const envoy::config::filter::http::ext_authz::v2alpha
                            Stats::Scope& scope, Upstream::ClusterManager& cm)
     : allowed_request_headers_(
           toRequestHeader(config.http_service().authorization_request().allowed_headers())),
-      allowed_request_headers_prefix_(
-          toHeaderPrefix(config.http_service().authorization_request().allowed_headers_prefix())),
-      authorization_headers_to_add_(toAuthorizationHeaderToAdd(
-          config.http_service().authorization_request().headers_to_add())),
       allowed_client_headers_(
           toClientHeader(config.http_service().authorization_response().allowed_client_headers())),
       allowed_upstream_headers_(toUpstreamHeader(
           config.http_service().authorization_response().allowed_upstream_headers())),
+      authorization_headers_to_add_(toAuthorizationHeaderToAdd(
+          config.http_service().authorization_request().headers_to_add())),
       local_info_(local_info), runtime_(runtime),
       cluster_name_(config.grpc_service().envoy_grpc().cluster_name()), scope_(scope), cm_(cm),
       failure_mode_allow_(config.failure_mode_allow()) {}
 
-Http::LowerCaseStrUnorderedSet FilterConfig::toUpstreamHeader(
-    const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys) {
-  Http::LowerCaseStrUnorderedSet key_set;
-  key_set.reserve(keys.size());
-  for (const auto& key : keys) {
-    key_set.emplace(key);
+std::vector<Matchers::StringMatcher>
+FilterConfig::toRequestHeader(const envoy::type::matcher::ListStringMatcher& matchers) {
+  std::vector<Http::LowerCaseString> default_keys{
+      Http::Headers::get().Authorization, Http::Headers::get().Method, Http::Headers::get().Path,
+      Http::Headers::get().Host};
+  std::vector<Matchers::StringMatcher> list_matcher;
+  list_matcher.reserve(matchers.patterns().size() + default_keys.size());
+  for (const auto& key : default_keys) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_exact(key.get());
+    list_matcher.push_back(matcher);
   }
-  return key_set;
+  for (const auto& matcher : matchers.patterns()) {
+    list_matcher.push_back(Matchers::StringMatcher(matcher));
+  }
+  return list_matcher;
 }
 
-Http::LowerCaseStrUnorderedSet
-FilterConfig::toClientHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys) {
-  Http::LowerCaseStrUnorderedSet key_set;
-  if (!keys.empty()) {
-    key_set.reserve(keys.size() + 6);
-    key_set.emplace(Http::Headers::get().Status);
-    key_set.emplace(Http::Headers::get().ContentLength);
-    key_set.emplace(Http::Headers::get().Path);
-    key_set.emplace(Http::Headers::get().Host);
-    key_set.emplace(Http::Headers::get().WWWAuthenticate);
-    key_set.emplace(Http::Headers::get().Location);
-    for (const auto& key : keys) {
-      key_set.emplace(key);
+std::vector<Matchers::StringMatcher>
+FilterConfig::toClientHeader(const envoy::type::matcher::ListStringMatcher& matchers) {
+  std::vector<Matchers::StringMatcher> list_matcher;
+
+  // If the list is empty, all authorization response headers, except Host, should be included to
+  // the client response. If not empty, user input matchers and a default list of exact matches will
+  // be used.
+  if (matchers.patterns().empty()) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_regex("^((?!(:authority)).)*$");
+    list_matcher.push_back(matcher);
+  } else {
+    std::vector<Http::LowerCaseString> default_keys{Http::Headers::get().Status,
+                                                    Http::Headers::get().ContentLength,
+                                                    Http::Headers::get().Path,
+                                                    Http::Headers::get().Host,
+                                                    Http::Headers::get().WWWAuthenticate,
+                                                    Http::Headers::get().Location};
+    list_matcher.reserve(matchers.patterns().size() + default_keys.size());
+    for (const auto& key : default_keys) {
+      envoy::type::matcher::StringMatcher matcher;
+      matcher.set_exact(key.get());
+      list_matcher.push_back(matcher);
+    }
+    for (const auto& matcher : matchers.patterns()) {
+      list_matcher.push_back(Matchers::StringMatcher(matcher));
     }
   }
-  return key_set;
+
+  return list_matcher;
 }
 
-Http::LowerCaseStrUnorderedSet FilterConfig::toRequestHeader(
-    const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys) {
-  Http::LowerCaseStrUnorderedSet key_set;
-  key_set.reserve(keys.size() + 4);
-  key_set.emplace(Http::Headers::get().Path);
-  key_set.emplace(Http::Headers::get().Method);
-  key_set.emplace(Http::Headers::get().Host);
-  key_set.emplace(Http::Headers::get().Authorization);
-  for (const auto& key : keys) {
-    key_set.emplace(key);
+std::vector<Matchers::StringMatcher>
+FilterConfig::toUpstreamHeader(const envoy::type::matcher::ListStringMatcher& matchers) {
+  std::vector<Matchers::StringMatcher> list_matcher;
+  list_matcher.reserve(matchers.patterns().size());
+  for (const auto& matcher : matchers.patterns()) {
+    list_matcher.push_back(Matchers::StringMatcher(matcher));
   }
-  return key_set;
-}
-
-Http::LowerCaseStrUnorderedSet
-FilterConfig::toHeaderPrefix(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys) {
-  Http::LowerCaseStrUnorderedSet key_set;
-  key_set.reserve(keys.size());
-  for (const auto& prefix : keys) {
-    key_set.emplace(prefix);
-  }
-  return key_set;
+  return list_matcher;
 }
 
 Http::LowerCaseStrPairVector FilterConfig::toAuthorizationHeaderToAdd(
@@ -97,20 +103,16 @@ const Runtime::Loader& FilterConfig::runtime() { return runtime_; }
 
 const std::string& FilterConfig::cluster() { return cluster_name_; }
 
-const Http::LowerCaseStrUnorderedSet& FilterConfig::allowedUpstreamHeaders() {
-  return allowed_upstream_headers_;
-}
-
-const Http::LowerCaseStrUnorderedSet& FilterConfig::allowedClientHeaders() {
-  return allowed_client_headers_;
-}
-
-const Http::LowerCaseStrUnorderedSet& FilterConfig::allowedRequestHeaders() {
+const std::vector<Matchers::StringMatcher>& FilterConfig::allowedRequestHeaders() {
   return allowed_request_headers_;
 }
 
-const Http::LowerCaseStrUnorderedSet& FilterConfig::allowedRequestHeaderPrefixes() {
-  return allowed_request_headers_prefix_;
+const std::vector<Matchers::StringMatcher>& FilterConfig::allowedClientHeaders() {
+  return allowed_client_headers_;
+}
+
+const std::vector<Matchers::StringMatcher>& FilterConfig::allowedUpstreamHeaders() {
+  return allowed_upstream_headers_;
 }
 
 const Http::LowerCaseStrPairVector& FilterConfig::authorizationHeadersToAdd() {

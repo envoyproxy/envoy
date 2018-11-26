@@ -77,6 +77,12 @@ public:
     EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
     EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
   }
+
+  bool findMatcher(const std::vector<Matchers::StringMatcher>& list,
+                   const Http::LowerCaseString& key) {
+    return std::any_of(list.begin(), list.end(),
+                       [&key](auto matcher) { return matcher.match(key.get()); });
+  }
 };
 
 class HttpFilterTest : public HttpFilterTestBase<testing::Test> {};
@@ -268,42 +274,48 @@ TEST_F(HttpFilterTest, TestAllowedHeaders) {
       cluster: "ext_authz"
       timeout: 0.25s
     authorization_request:
-      path_prefix: /test
       allowed_headers:
-        - key
-      allowed_headers_prefix:
-        - key
+        patterns: 
+          - exact: key
       headers_to_add:
         - { key: foo, value: bar }
     authorization_response:
       allowed_upstream_headers:
-        - key
+        patterns: 
+          - exact: key
       allowed_client_headers:
-        - key
+        patterns: 
+          - exact: key
+    path_prefix: /test
   failure_mode_allow: true
   )EOF");
 
+  const auto key = Http::LowerCaseString{"key"};
+
   // Check allowed request headers.
-  EXPECT_EQ(config_->allowedRequestHeaders().size(), 5);
-  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Path), 1);
-  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Method), 1);
-  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Host), 1);
-  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Authorization), 1);
-  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::LowerCaseString{"key"}), 1);
+  EXPECT_EQ(5, config_->allowedRequestHeaders().size());
+  EXPECT_EQ(true, findMatcher(config_->allowedRequestHeaders(), Http::Headers::get().Method));
+  EXPECT_EQ(true, findMatcher(config_->allowedRequestHeaders(), Http::Headers::get().Host));
+  EXPECT_EQ(true,
+            findMatcher(config_->allowedRequestHeaders(), Http::Headers::get().Authorization));
+  EXPECT_EQ(false,
+            findMatcher(config_->allowedRequestHeaders(), Http::Headers::get().ContentLength));
+  EXPECT_EQ(true, findMatcher(config_->allowedRequestHeaders(), key));
 
   // Check allowed client headers.
-  EXPECT_EQ(config_->allowedClientHeaders().size(), 7);
-  EXPECT_EQ(config_->allowedClientHeaders().count(Http::Headers::get().Path), 1);
-  EXPECT_EQ(config_->allowedClientHeaders().count(Http::Headers::get().Status), 1);
-  EXPECT_EQ(config_->allowedClientHeaders().count(Http::Headers::get().ContentLength), 1);
-  EXPECT_EQ(config_->allowedClientHeaders().count(Http::Headers::get().Host), 1);
-  EXPECT_EQ(config_->allowedClientHeaders().count(Http::Headers::get().WWWAuthenticate), 1);
-  EXPECT_EQ(config_->allowedClientHeaders().count(Http::Headers::get().Location), 1);
-  EXPECT_EQ(config_->allowedClientHeaders().count(Http::LowerCaseString{"key"}), 1);
+  EXPECT_EQ(7, config_->allowedClientHeaders().size());
+  EXPECT_EQ(true, findMatcher(config_->allowedClientHeaders(), Http::Headers::get().Path));
+  EXPECT_EQ(true, findMatcher(config_->allowedClientHeaders(), Http::Headers::get().Status));
+  EXPECT_EQ(true, findMatcher(config_->allowedClientHeaders(), Http::Headers::get().ContentLength));
+  EXPECT_EQ(true, findMatcher(config_->allowedClientHeaders(), Http::Headers::get().Host));
+  EXPECT_EQ(true,
+            findMatcher(config_->allowedClientHeaders(), Http::Headers::get().WWWAuthenticate));
+  EXPECT_EQ(false, findMatcher(config_->allowedClientHeaders(), Http::Headers::get().Origin));
+  EXPECT_EQ(true, findMatcher(config_->allowedClientHeaders(), key));
 
   // Check allowed upstream headers.
   EXPECT_EQ(config_->allowedUpstreamHeaders().size(), 1);
-  EXPECT_EQ(config_->allowedUpstreamHeaders().count(Http::LowerCaseString{"key"}), 1);
+  EXPECT_EQ(true, findMatcher(config_->allowedUpstreamHeaders(), key));
 }
 
 // Test default allowed headers in the HTTP client.
@@ -319,16 +331,22 @@ TEST_F(HttpFilterTest, TestDefaultAllowedHeaders) {
 
   // Check allowed request headers.
   EXPECT_EQ(config_->allowedRequestHeaders().size(), 4);
-  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Path), 1);
-  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Method), 1);
-  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Host), 1);
-  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Authorization), 1);
+  EXPECT_EQ(true, findMatcher(config_->allowedRequestHeaders(), Http::Headers::get().Method));
+  EXPECT_EQ(true, findMatcher(config_->allowedRequestHeaders(), Http::Headers::get().Host));
+  EXPECT_EQ(true,
+            findMatcher(config_->allowedRequestHeaders(), Http::Headers::get().Authorization));
+  EXPECT_EQ(false,
+            findMatcher(config_->allowedRequestHeaders(), Http::Headers::get().ContentLength));
 
   // Check allowed client headers.
-  EXPECT_EQ(config_->allowedClientHeaders().size(), 0);
+  EXPECT_EQ(config_->allowedClientHeaders().size(), 1);
+  EXPECT_EQ(true, findMatcher(config_->allowedClientHeaders(), Http::Headers::get().ContentLength));
+  EXPECT_EQ(false, findMatcher(config_->allowedClientHeaders(), Http::Headers::get().Host));
 
   // Check allowed upstream headers.
   EXPECT_EQ(config_->allowedUpstreamHeaders().size(), 0);
+  EXPECT_EQ(false,
+            findMatcher(config_->allowedUpstreamHeaders(), Http::Headers::get().ContentLength));
 }
 
 // -------------------

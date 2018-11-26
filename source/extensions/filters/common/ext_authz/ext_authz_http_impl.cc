@@ -37,22 +37,25 @@ const Response& getOkResponse() {
       CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{}, std::string{}, Http::Code::OK};
   return *response;
 }
+
+struct ResponseContext {
+  ResponsePtr response_;
+  const std::vector<Matchers::StringMatcher>* matchers_;
+};
 } // namespace
 
 RawHttpClientImpl::RawHttpClientImpl(
     Upstream::ClusterManager& cluster_manager, const std::string& cluster_name,
-    const absl::optional<std::chrono::milliseconds>& timeout, const std::string& path_prefix,
-    const Http::LowerCaseStrUnorderedSet& allowed_request_headers,
-    const Http::LowerCaseStrUnorderedSet& allowed_request_headers_prefix,
-    const Http::LowerCaseStrPairVector& authorization_headers_to_add,
-    const Http::LowerCaseStrUnorderedSet& allowed_upstream_headers,
-    const Http::LowerCaseStrUnorderedSet& allowed_client_headers)
-    : cluster_name_(cluster_name), path_prefix_(path_prefix),
-      allowed_request_headers_(allowed_request_headers),
-      allowed_request_headers_prefix_(allowed_request_headers_prefix),
-      authorization_headers_to_add_(authorization_headers_to_add),
+    const std::string& path_prefix, const absl::optional<std::chrono::milliseconds>& timeout,
+    const std::vector<Matchers::StringMatcher>& allowed_request_headers,
+    const std::vector<Matchers::StringMatcher>& allowed_client_headers,
+    const std::vector<Matchers::StringMatcher>& allowed_upstream_headers,
+    const Http::LowerCaseStrPairVector& authorization_headers_to_add)
+    : cm_(cluster_manager), cluster_name_(cluster_name), path_prefix_(path_prefix),
+      timeout_(timeout), allowed_request_headers_(allowed_request_headers),
+      allowed_client_headers_(allowed_client_headers),
       allowed_upstream_headers_(allowed_upstream_headers),
-      allowed_client_headers_(allowed_client_headers), timeout_(timeout), cm_(cluster_manager) {}
+      authorization_headers_to_add_(authorization_headers_to_add) {}
 
 RawHttpClientImpl::~RawHttpClientImpl() { ASSERT(!callbacks_); }
 
@@ -71,7 +74,8 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(getZeroContentLengthHeader());
   for (const auto& header : request.attributes().request().http().headers()) {
     const Http::LowerCaseString key{header.first};
-    if (allowed_request_headers_.find(key) != allowed_request_headers_.cend()) {
+    if (std::any_of(allowed_request_headers_.begin(), allowed_request_headers_.end(),
+                    [&key](auto matcher) { return matcher.match(key.get()); })) {
       if (key == Http::Headers::get().Path && !path_prefix_.empty()) {
         std::string value;
         absl::StrAppend(&value, path_prefix_, header.second);
@@ -79,16 +83,8 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
       } else {
         headers->addCopy(key, header.second);
       }
-    } else {
-      // Performance should be ok here, since the prefix list will be small or empty in most cases.
-      for (const auto& prefix : allowed_request_headers_prefix_) {
-        if (StringUtil::startsWith(key.get().c_str(), prefix.get(), true)) {
-          headers->addCopy(key, header.second);
-        }
-      }
     }
   }
-
   for (const auto& header_to_add : authorization_headers_to_add_) {
     headers->setReference(header_to_add.first, header_to_add.second);
   }
@@ -114,42 +110,34 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
     return std::make_unique<Response>(getErrorResponse());
   }
 
+  // If the authorization server returned HTTP status 200 OK, set an authorized reponse object,
+  // otherwise set a rejected response.
+  ResponseContext ctx;
   if (status_code == enumToInt(Http::Code::OK)) {
-    ResponsePtr ok_response = std::make_unique<Response>(getOkResponse());
-    // Copy all headers that should be forwarded to the upstream.
-    for (const auto& header : allowed_upstream_headers_) {
-      const auto* entry = message->headers().get(header);
-      if (entry) {
-        ok_response->headers_to_add.emplace_back(Http::LowerCaseString{entry->key().c_str()},
-                                                 entry->value().c_str());
-      }
-    }
-    return ok_response;
+    ctx.matchers_ = &allowed_upstream_headers_;
+    ctx.response_ = std::make_unique<Response>(getOkResponse());
+  } else {
+    ctx.matchers_ = &allowed_client_headers_;
+    ctx.response_ = std::make_unique<Response>(getDeniedResponse());
+    ctx.response_->status_code = static_cast<Http::Code>(status_code);
+    ctx.response_->body = message->bodyAsString();
   }
 
-  ResponsePtr denied_response = std::make_unique<Response>(getDeniedResponse());
-  denied_response->status_code = static_cast<Http::Code>(status_code);
-  denied_response->body = message->bodyAsString();
-  if (allowed_client_headers_.empty()) {
-    // Copy all headers to the client's response.
-    message->headers().iterate(
-        [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-          static_cast<Http::HeaderVector*>(context)->emplace_back(
-              Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        &(denied_response->headers_to_add));
-  } else {
-    // Copy only the allowed headers to the client's response.
-    for (const auto& header : allowed_client_headers_) {
-      const auto* entry = message->headers().get(header);
-      if (entry) {
-        denied_response->headers_to_add.emplace_back(Http::LowerCaseString{entry->key().c_str()},
-                                                     entry->value().c_str());
-      }
-    }
-  }
-  return denied_response;
+  message->headers().iterate(
+      [](const Http::HeaderEntry& header, void* ctx) -> Http::HeaderMap::Iterate {
+        auto* context = static_cast<ResponseContext*>(ctx);
+        for (const auto& matcher : *(context->matchers_)) {
+          if (matcher.match(header.key().c_str())) {
+            context->response_->headers_to_add.emplace_back(
+                Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
+            return Http::HeaderMap::Iterate::Continue;
+          }
+        }
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      &ctx);
+
+  return std::move(ctx.response_);
 }
 
 void RawHttpClientImpl::onSuccess(Http::MessagePtr&& message) {

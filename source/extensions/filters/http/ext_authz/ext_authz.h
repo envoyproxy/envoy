@@ -14,6 +14,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/common/matchers.h"
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
@@ -35,44 +36,38 @@ enum class FilterRequestType { Internal, External, Both };
  */
 class FilterConfig {
 public:
-  FilterConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
-               const LocalInfo::LocalInfo& local_info, const Runtime::Loader& runtime,
-               Stats::Scope& scope, Upstream::ClusterManager& cm);
+  FilterConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz&,
+               const LocalInfo::LocalInfo&, const Runtime::Loader&, Stats::Scope& scope,
+               Upstream::ClusterManager&);
 
   const LocalInfo::LocalInfo& localInfo();
   const Runtime::Loader& runtime();
   const std::string& cluster();
-  const Http::LowerCaseStrUnorderedSet& allowedRequestHeaders();
-  const Http::LowerCaseStrUnorderedSet& allowedRequestHeaderPrefixes();
+  const std::vector<Matchers::StringMatcher>& allowedRequestHeaders();
+  const std::vector<Matchers::StringMatcher>& allowedClientHeaders();
+  const std::vector<Matchers::StringMatcher>& allowedUpstreamHeaders();
   const Http::LowerCaseStrPairVector& authorizationHeadersToAdd();
-  const Http::LowerCaseStrUnorderedSet& allowedUpstreamHeaders();
-  const Http::LowerCaseStrUnorderedSet& allowedClientHeaders();
   Stats::Scope& scope() const;
   Upstream::ClusterManager& cm() const;
   bool failureModeAllow() const;
 
 private:
-  static Http::LowerCaseStrUnorderedSet
-  toRequestHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys);
-  static Http::LowerCaseStrUnorderedSet
-  toHeaderPrefix(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys);
-  static Http::LowerCaseStrPairVector toAuthorizationHeaderToAdd(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& headers);
-  static Http::LowerCaseStrUnorderedSet
-  toClientHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys);
-  static Http::LowerCaseStrUnorderedSet
-  toUpstreamHeader(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& keys);
+  static std::vector<Matchers::StringMatcher>
+  toRequestHeader(const envoy::type::matcher::ListStringMatcher&);
+  static std::vector<Matchers::StringMatcher>
+  toClientHeader(const envoy::type::matcher::ListStringMatcher&);
+  static std::vector<Matchers::StringMatcher>
+  toUpstreamHeader(const envoy::type::matcher::ListStringMatcher&);
+  static Http::LowerCaseStrPairVector
+  toAuthorizationHeaderToAdd(const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>&);
 
-  const Http::LowerCaseStrUnorderedSet allowed_request_headers_;
-  const Http::LowerCaseStrUnorderedSet allowed_request_headers_prefix_;
+  const std::vector<Matchers::StringMatcher> allowed_request_headers_;
+  const std::vector<Matchers::StringMatcher> allowed_client_headers_;
+  const std::vector<Matchers::StringMatcher> allowed_upstream_headers_;
   const Http::LowerCaseStrPairVector authorization_headers_to_add_;
-  const Http::LowerCaseStrUnorderedSet allowed_client_headers_;
-  const Http::LowerCaseStrUnorderedSet allowed_upstream_headers_;
-
   const LocalInfo::LocalInfo& local_info_;
   const Runtime::Loader& runtime_;
   const std::string cluster_name_;
-
   Stats::Scope& scope_;
   Upstream::ClusterManager& cm_;
   bool failure_mode_allow_{};
