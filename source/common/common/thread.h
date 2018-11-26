@@ -18,21 +18,13 @@ typedef int32_t ThreadId;
 ThreadId currentThreadId();
 
 /**
- * Wrapper for a pthread thread. We don't use std::thread because it eats exceptions and leads to
- * unusable stack traces.
+ * Implementation of ThreadFactory
  */
-class ThreadImpl : public Thread {
+class ThreadFactoryImpl : public ThreadFactory {
 public:
-  ThreadImpl(std::function<void()> thread_routine);
+  ThreadFactoryImpl() {}
 
-  /**
-   * Join on thread exit.
-   */
-  void join() override;
-
-private:
-  std::function<void()> thread_routine_;
-  pthread_t thread_id_;
+  ThreadPtr createThread(std::function<void()> thread_routine) override;
 };
 
 /**

@@ -96,7 +96,13 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
+  typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
+  struct FilterConfig {
+    std::unique_ptr<FilterFactoriesList> filter_factories;
+    bool allow_upgrade;
+  };
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
+                                const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
                                 Http::FilterChainFactoryCallbacks& callbacks) override;
 
   // Http::ConnectionManagerConfig
@@ -138,7 +144,6 @@ public:
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
 
 private:
-  typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
   enum class CodecType { HTTP1, HTTP2, AUTO };
   void processFilter(
       const envoy::config::filter::network::http_connection_manager::v2::HttpFilter& proto_config,
@@ -146,7 +151,7 @@ private:
 
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
-  std::map<std::string, std::unique_ptr<FilterFactoriesList>> upgrade_filter_factories_;
+  std::map<std::string, FilterConfig> upgrade_filter_factories_;
   const bool reverse_encode_order_{};
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string stats_prefix_;

@@ -275,7 +275,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   return out;
 }
 
-bssl::UniquePtr<SSL> ContextImpl::newSsl() const {
+bssl::UniquePtr<SSL> ContextImpl::newSsl(absl::optional<std::string>) const {
   return bssl::UniquePtr<SSL>(SSL_new(ctx_.get()));
 }
 
@@ -498,11 +498,15 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
   }
 }
 
-bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
-  bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl());
+bssl::UniquePtr<SSL>
+ClientContextImpl::newSsl(absl::optional<std::string> override_server_name) const {
+  bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(absl::nullopt));
 
-  if (!server_name_indication_.empty()) {
-    int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication_.c_str());
+  std::string server_name_indication =
+      override_server_name.has_value() ? override_server_name.value() : server_name_indication_;
+
+  if (!server_name_indication.empty()) {
+    int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication.c_str());
     RELEASE_ASSERT(rc, "");
   }
 

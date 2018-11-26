@@ -37,6 +37,7 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:socket_option_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
         "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",

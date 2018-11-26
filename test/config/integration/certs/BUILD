@@ -11,3 +11,8 @@ filegroup(
     name = "certs",
     srcs = glob(["*.pem"]),
 )
+
+cc_library(
+    name = "hashes",
+    hdrs = glob(["*hash.h"]),
+)

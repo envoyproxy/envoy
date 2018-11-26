@@ -128,7 +128,7 @@ public:
   ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
               AccessLogSharedPtr access_log, const FaultConfigSharedPtr& fault_config,
               const Network::DrainDecision& drain_decision, Runtime::RandomGenerator& generator,
-              Event::TimeSystem& time_system);
+              Event::TimeSystem& time_system, bool emit_dynamic_metadata);
   ~ProxyFilter();
 
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
@@ -157,6 +157,8 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
+
+  void setDynamicMetadata(std::string operation, std::string resource);
 
 private:
   struct ActiveQuery {
@@ -207,6 +209,7 @@ private:
   Event::TimerPtr delay_timer_;
   Event::TimerPtr drain_close_timer_;
   Event::TimeSystem& time_system_;
+  const bool emit_dynamic_metadata_;
 };
 
 class ProdProxyFilter : public ProxyFilter {

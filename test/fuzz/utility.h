@@ -2,7 +2,7 @@
 
 #include "common/network/utility.h"
 
-#include "test/common/access_log/test_util.h"
+#include "test/common/stream_info/test_util.h"
 #include "test/fuzz/common.pb.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"

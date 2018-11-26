@@ -29,7 +29,6 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
-using testing::Test;
 
 namespace Envoy {
 namespace Tracing {
@@ -324,7 +323,7 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
 }
 
-class HttpTracerImplTest : public Test {
+class HttpTracerImplTest : public testing::Test {
 public:
   HttpTracerImplTest() {
     driver_ = new MockDriver();

@@ -32,6 +32,13 @@ from the result Envoy assumes it no longer exists and will drain traffic from an
 connection pools. Note that Envoy never synchronously resolves DNS in the forwarding path. At the
 expense of eventual consistency, there is never a worry of blocking on a long running DNS query.
 
+If a single DNS name resolves to the same IP multiple times, these IPs will be de-duplicated.
+
+If multiple DNS names resolve to the same IP, health checking will *not* be shared.
+This means that care should be taken if active health checking is used with DNS names that resolve
+to the same IPs: if an IP is repeated many times between DNS names it might cause undue load on the
+upstream host.
+
 .. _arch_overview_service_discovery_types_logical_dns:
 
 Logical DNS
