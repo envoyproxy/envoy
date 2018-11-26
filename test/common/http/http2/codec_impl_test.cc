@@ -7,6 +7,7 @@
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
@@ -32,6 +33,10 @@ namespace Http2 {
 
 using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
 using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple>;
+
+namespace {
+uint8_t buf_tmp[METADATA_MAX_PAYLOAD_SIZE] = {0};
+} // namespace
 
 class TestServerConnectionImpl : public ServerConnectionImpl {
 public:
@@ -102,12 +107,19 @@ public:
         }));
   }
 
+  // Using error level logging so the settings values can be logged.
   void Http2SettingsFromTuple(Http2Settings& setting, const Http2SettingsTuple& tp) {
     setting.hpack_table_size_ = ::testing::get<0>(tp);
+    ENVOY_LOG_MISC(error, "hpack_table_size: {}", setting.hpack_table_size_);
     setting.max_concurrent_streams_ = ::testing::get<1>(tp);
+    ENVOY_LOG_MISC(error, "max_concurrent_streams: {}", setting.max_concurrent_streams_);
     setting.initial_stream_window_size_ = ::testing::get<2>(tp);
+    ENVOY_LOG_MISC(error, "initial_stream_window_size: {}", setting.initial_stream_window_size_);
     setting.initial_connection_window_size_ = ::testing::get<3>(tp);
+    ENVOY_LOG_MISC(error, "initial_connection_window_size: {}",
+                   setting.initial_connection_window_size_);
     setting.allow_metadata_ = allow_metadata_;
+    ENVOY_LOG_MISC(error, "allow_metadata: {}", setting.allow_metadata_);
   }
 
   // corruptFramePayload assumes data contains at least 10 bytes of the beginning of a frame.
@@ -118,12 +130,11 @@ public:
       ENVOY_LOG_MISC(error, "data size too big or too small");
       return;
     }
-    uint8_t buf[METADATA_MAX_PAYLOAD_SIZE] = {0};
-    data.copyOut(0, length, static_cast<void*>(buf));
+    data.copyOut(0, length, static_cast<void*>(buf_tmp));
     data.drain(length);
     // Keeps the frame header (9 bytes) valid, and corrupts the payload.
-    buf[10] |= 0xff;
-    data.add(buf, length);
+    buf_tmp[10] |= 0xff;
+    data.add(buf_tmp, length);
   }
 
   bool allow_metadata_ = false;
@@ -758,7 +769,9 @@ class Http2CodecImplStreamLimitTest : public Http2CodecImplTest {};
 // TODO(PiotrSikora): add tests that exercise both scenarios: before and after receiving
 // the HTTP/2 SETTINGS frame.
 TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
+  ENVOY_LOG_MISC(error, "Client http2 settings: ");
   Http2SettingsFromTuple(client_http2settings_, ::testing::get<0>(GetParam()));
+  ENVOY_LOG_MISC(error, "Server http2 settings: ");
   Http2SettingsFromTuple(server_http2settings_, ::testing::get<1>(GetParam()));
   client_ = std::make_unique<TestClientConnectionImpl>(client_connection_, client_callbacks_,
                                                        stats_store_, client_http2settings_);
@@ -815,15 +828,24 @@ INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
                                            HTTP2SETTINGS_DEFAULT_COMBINE));
 
+namespace {
+// Randomly picks a testing value to reduce the number of tests to run.
+uint32_t randomPick(const uint32_t first, const uint32_t second) {
+  Runtime::RandomGeneratorImpl random;
+  return random.random() % 2 == 0 ? first : second;
+}
+} // namespace
+
 #define HTTP2SETTINGS_EDGE_COMBINE                                                                 \
   ::testing::Combine(                                                                              \
-      ::testing::Values(Http2Settings::MIN_HPACK_TABLE_SIZE, Http2Settings::MAX_HPACK_TABLE_SIZE), \
-      ::testing::Values(Http2Settings::MIN_MAX_CONCURRENT_STREAMS,                                 \
-                        Http2Settings::MAX_MAX_CONCURRENT_STREAMS),                                \
-      ::testing::Values(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE,                             \
-                        Http2Settings::MAX_INITIAL_STREAM_WINDOW_SIZE),                            \
-      ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE,                         \
-                        Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
+      ::testing::Values(                                                                           \
+          randomPick(Http2Settings::MIN_HPACK_TABLE_SIZE, Http2Settings::MAX_HPACK_TABLE_SIZE)),   \
+      ::testing::Values(randomPick(Http2Settings::MIN_MAX_CONCURRENT_STREAMS,                      \
+                                   Http2Settings::MAX_MAX_CONCURRENT_STREAMS)),                    \
+      ::testing::Values(randomPick(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE,                  \
+                                   Http2Settings::MAX_INITIAL_STREAM_WINDOW_SIZE)),                \
+      ::testing::Values(randomPick(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE,              \
+                                   Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE)))
 
 INSTANTIATE_TEST_CASE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTest,
                         ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE, HTTP2SETTINGS_EDGE_COMBINE));
