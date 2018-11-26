@@ -12,6 +12,7 @@ and shadow mode, shadow mode won't effect real users, it is used to test that a 
 work before rolling out to production.
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.rbac.v2.RBAC>`
+* This filter should be configured with the name *envoy.filters.http.rbac*.
 
 Per-Route Configuration
 -----------------------

@@ -14,5 +14,6 @@ from the client. This can be used to select a
 :ref:`application_protocols <envoy_api_field_listener.FilterChainMatch.application_protocols>`
 of a :ref:`FilterChainMatch <envoy_api_msg_listener.FilterChainMatch>`.
 
+* This filter should be configured with the name *envoy.listener.proxy_protocol*.
 * :ref:`SNI <faq_how_to_setup_sni>`
 * :ref:`v2 API reference <envoy_api_field_listener.ListenerFilter.name>`
