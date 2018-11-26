@@ -54,6 +54,10 @@ private:
     CreateConnectionData createConnection(
         Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
         Network::TransportSocketOptionsSharedPtr transport_socket_options) const override;
+    CreateConnectionData createFixedSrcConnection(
+        Event::Dispatcher& dispatcher, Network::Address::InstanceConstSharedPtr src_address,
+        const Network::ConnectionSocket::OptionsSharedPtr& options,
+        Network::TransportSocketOptionsSharedPtr transport_socket_options) const override;
 
     // Upstream::HostDescription
     // Override setting health check address, since for logical DNS the registered host has 0.0.0.0

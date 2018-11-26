@@ -149,19 +149,30 @@ parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
-  return {createConnection(dispatcher, *cluster_, address_, options, transport_socket_options),
+  return {
+      createConnection(dispatcher, *cluster_, nullptr, address_, options, transport_socket_options),
+      shared_from_this()};
+}
+
+Host::CreateConnectionData HostImpl::createFixedSrcConnection(
+    Event::Dispatcher& dispatcher, Network::Address::InstanceConstSharedPtr src_address,
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
+  return {createConnection(dispatcher, *cluster_, src_address, address_, options,
+                           transport_socket_options),
           shared_from_this()};
 }
 
 Host::CreateConnectionData
 HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), nullptr, nullptr),
+  return {createConnection(dispatcher, *cluster_, nullptr, healthCheckAddress(), nullptr, nullptr),
           shared_from_this()};
 }
 
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
-                           Network::Address::InstanceConstSharedPtr address,
+                           Network::Address::InstanceConstSharedPtr src_address,
+                           Network::Address::InstanceConstSharedPtr dst_address,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
@@ -177,9 +188,14 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     connection_options = options;
   }
-
+  // By default, use the source chosen by the cluster. However, if we've overriden the
+  // per-connection source, use that instead.
+  Network::Address::InstanceConstSharedPtr src_to_use = cluster.sourceAddress();
+  if (src_address) {
+    src_to_use = src_address;
+  }
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(),
+      dst_address, src_to_use,
       cluster.transportSocketFactory().createTransportSocket(transport_socket_options),
       connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());

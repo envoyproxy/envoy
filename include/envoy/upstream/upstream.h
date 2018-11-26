@@ -77,6 +77,22 @@ public:
                    Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
 
   /**
+   * Create a connection for this host with the provided source address.
+   * @param dispatcher supplies the owning dispatcher.
+   * @param address the source address to use for the connection.
+   * @param options supplies the socket options that will be set on the new connection.
+   * @return the connection data which includes the raw network connection as well as the *real*
+   *         host that backs it. The reason why a 2nd host is returned is that some hosts are
+   *         logical and wrap multiple real network destinations. In this case, a different host
+   *         will be returned along with the connection vs. the host the method was called on.
+   *         If it matters, callers should not assume that the returned host will be the same.
+   */
+  virtual CreateConnectionData createFixedSrcConnection(
+      Event::Dispatcher& dispatcher, Network::Address::InstanceConstSharedPtr src_address,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
+
+  /**
    * Create a health check connection for this host.
    * @param dispatcher supplies the owning dispatcher.
    * @return the connection data.

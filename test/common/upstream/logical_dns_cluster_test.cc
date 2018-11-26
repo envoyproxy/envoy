@@ -413,5 +413,34 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   testBasicSetup(basic_yaml_load_assignment, "foo.bar.com", 8000);
 }
 
+TEST_F(LogicalDnsClusterTest, LogicalHostFixedSrcConnectionUsesCorrectDst) {
+  const std::string basic_yaml_hosts = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_refresh_rate: 4s
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+  dns_lookup_family: V4_ONLY
+  hosts:
+  - socket_address:
+      address: www.foo.com
+      port_value: 443
+  )EOF";
+  expectResolve(Network::DnsLookupFamily::V4Only, "www.foo.com");
+  setupFromV2Yaml(basic_yaml_hosts);
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000)));
+  dns_callback_(TestUtility::makeDnsResponse({"10.1.2.3"}));
+  HostSharedPtr logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  auto src_address = Network::Utility::resolveUrl("tcp://192.168.3.4:1234");
+  EXPECT_CALL(dispatcher_, createClientConnection_(
+                               PointeesEq(Network::Utility::resolveUrl("tcp://10.1.2.3:443")),
+                               PointeesEq(src_address), _, _))
+      .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
+
+  logical_host->createFixedSrcConnection(dispatcher_, src_address, nullptr, nullptr);
+}
+
 } // namespace Upstream
 } // namespace Envoy

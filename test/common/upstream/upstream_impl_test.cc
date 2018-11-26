@@ -35,6 +35,7 @@ using testing::_;
 using testing::ContainerEq;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -789,7 +790,18 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   EXPECT_CALL(resolver3.active_dns_query_, cancel());
 }
 
-TEST(HostImplTest, HostCluster) {
+class HostImplTest : public testing::Test {
+public:
+  HostSharedPtr makeDefaultHost(const std::string& host_address) {
+    return makeTestHost(cluster_info_, host_address);
+  }
+
+  std::shared_ptr<NiceMock<MockClusterInfo>> cluster_info_{
+      std::make_shared<NiceMock<MockClusterInfo>>()};
+  Event::MockDispatcher dispatcher_;
+};
+
+TEST_F(HostImplTest, HostCluster) {
   MockCluster cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
   EXPECT_EQ(cluster.info_.get(), &host->cluster());
@@ -798,7 +810,7 @@ TEST(HostImplTest, HostCluster) {
   EXPECT_EQ("", host->locality().zone());
 }
 
-TEST(HostImplTest, Weight) {
+TEST_F(HostImplTest, Weight) {
   MockCluster cluster;
 
   EXPECT_EQ(1U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 0)->weight());
@@ -815,7 +827,7 @@ TEST(HostImplTest, Weight) {
   EXPECT_EQ(128U, host->weight());
 }
 
-TEST(HostImplTest, HostnameCanaryAndLocality) {
+TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   MockCluster cluster;
   envoy::api::v2::core::Metadata metadata;
   Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
@@ -835,6 +847,36 @@ TEST(HostImplTest, HostnameCanaryAndLocality) {
   EXPECT_EQ("hello", host.locality().zone());
   EXPECT_EQ("world", host.locality().sub_zone());
   EXPECT_EQ(1, host.priority());
+}
+
+TEST_F(HostImplTest, createFixedSrcConnectionNoSrcUsesClusterSrc) {
+  auto host = makeDefaultHost("tcp://127.0.0.1:80");
+  auto source_address = Network::Utility::resolveUrl("tcp://192.168.0.1:12345");
+  cluster_info_->source_address_ = source_address;
+  NiceMock<Network::MockClientConnection>* connection =
+      new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, PointeesEq(source_address), _, _))
+      .WillOnce(Return(connection));
+
+  auto conn_data = host->createFixedSrcConnection(dispatcher_, nullptr, nullptr, nullptr);
+
+  EXPECT_EQ(conn_data.connection_.get(), connection);
+}
+
+TEST_F(HostImplTest, createFixedSrcConnectionUsesProvidedSrc) {
+  auto host = makeDefaultHost("tcp://127.0.0.1:80");
+  auto cluster_source_address = Network::Utility::resolveUrl("tcp://192.168.0.1:12345");
+  auto provided_source_address = Network::Utility::resolveUrl("tcp://10.0.0.1:125");
+  cluster_info_->source_address_ = cluster_source_address;
+  NiceMock<Network::MockClientConnection>* connection =
+      new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, PointeesEq(provided_source_address), _, _))
+      .WillOnce(Return(connection));
+
+  auto conn_data =
+      host->createFixedSrcConnection(dispatcher_, provided_source_address, nullptr, nullptr);
+
+  EXPECT_EQ(conn_data.connection_.get(), connection);
 }
 
 TEST(StaticClusterImplTest, InitialHosts) {

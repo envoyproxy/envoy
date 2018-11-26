@@ -115,6 +115,15 @@ public:
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
 
+  CreateConnectionData
+  createFixedSrcConnection(Event::Dispatcher& dispatcher,
+                           Network::Address::InstanceConstSharedPtr src_address,
+                           const Network::ConnectionSocket::OptionsSharedPtr& options,
+                           Network::TransportSocketOptionsSharedPtr) const override {
+    MockCreateConnectionData data = createFixedSrcConnection_(dispatcher, src_address, options);
+    return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
+  }
+
   CreateConnectionData createHealthCheckConnection(Event::Dispatcher& dispatcher) const override {
     MockCreateConnectionData data = createConnection_(dispatcher, nullptr);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
@@ -140,6 +149,11 @@ public:
   MOCK_CONST_METHOD2(
       createConnection_,
       MockCreateConnectionData(Event::Dispatcher& dispatcher,
+                               const Network::ConnectionSocket::OptionsSharedPtr& options));
+  MOCK_CONST_METHOD3(
+      createFixedSrcConnection_,
+      MockCreateConnectionData(Event::Dispatcher& dispatcher,
+                               Network::Address::InstanceConstSharedPtr src_address,
                                const Network::ConnectionSocket::OptionsSharedPtr& options));
   MOCK_CONST_METHOD0(gauges, std::vector<Stats::GaugeSharedPtr>());
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
