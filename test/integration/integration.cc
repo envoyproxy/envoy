@@ -116,6 +116,13 @@ void IntegrationStreamDecoder::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   }
 }
 
+void IntegrationStreamDecoder::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
+  // Combines newly received metadata with the existing metadata.
+  for (const auto metadata : *metadata_map) {
+    metadata_map_->insert(metadata);
+  }
+}
+
 void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason) {
   saw_reset_ = true;
   reset_reason_ = reason;

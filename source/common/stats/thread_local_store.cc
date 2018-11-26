@@ -69,10 +69,6 @@ bool ThreadLocalStoreImpl::rejects(const std::string& name) const {
   // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the
   // hot path) could become prohibitively expensive. Revisit this usage in the
   // future.
-  //
-  // Also note that the elaboration of the stat-name into a string is expensive,
-  // so I think it might be better to move the matcher test until after caching,
-  // unless its acceptsAll/rejectsAll.
   return stats_matcher_->rejects(name);
 }
 
@@ -299,9 +295,6 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // strategy costs an extra hash lookup for each miss, but saves time
   // re-copying the string and significant memory overhead.
   std::string final_name = prefix_ + name;
-
-  // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the hot path) could
-  // become prohibitively expensive. Revisit this usage in the future.
   if (parent_.rejects(final_name)) {
     return null_counter_;
   }
@@ -348,8 +341,6 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   // do a find() first, using tha if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
   std::string final_name = prefix_ + name;
-
-  // See warning/comments in counter().
   if (parent_.rejects(final_name)) {
     return null_gauge_;
   }
@@ -378,8 +369,6 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // do a find() first, using tha if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
   std::string final_name = prefix_ + name;
-
-  // See warning/comments in counter().
   if (parent_.rejects(final_name)) {
     return null_histogram_;
   }

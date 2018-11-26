@@ -114,6 +114,13 @@ void FakeStream::encodeResetStream() {
       [this]() -> void { encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset); });
 }
 
+void FakeStream::encodeMetadata(const Http::MetadataMap& metadata_map) {
+  std::shared_ptr<Http::MetadataMap> metadata_map_copy(
+      new Http::MetadataMap(static_cast<const Http::MetadataMap&>(metadata_map)));
+  parent_.connection().dispatcher().post(
+      [this, metadata_map_copy]() -> void { encoder_.encodeMetadata(*metadata_map_copy); });
+}
+
 void FakeStream::onResetStream(Http::StreamResetReason) {
   Thread::LockGuard lock(lock_);
   saw_reset_ = true;
@@ -210,6 +217,7 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
   } else {
     auto settings = Http::Http2Settings();
     settings.allow_connect_ = true;
+    settings.allow_metadata_ = true;
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(shared_connection_.connection(),
                                                                  *this, store, settings);
     ASSERT(type == Type::HTTP2);

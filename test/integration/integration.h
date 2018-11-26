@@ -34,6 +34,7 @@ public:
   const Http::HeaderMap* continue_headers() { return continue_headers_.get(); }
   const Http::HeaderMap& headers() { return *headers_; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
+  const Http::MetadataMap& metadata_map() { return *metadata_map_; }
   void waitForContinueHeaders();
   void waitForHeaders();
   void waitForBodyData(uint64_t size);
@@ -45,7 +46,7 @@ public:
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
-  void decodeMetadata(Http::MetadataMapPtr&&) override {}
+  void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason) override;
@@ -57,6 +58,7 @@ private:
   Http::HeaderMapPtr continue_headers_;
   Http::HeaderMapPtr headers_;
   Http::HeaderMapPtr trailers_;
+  Http::MetadataMapPtr metadata_map_{new Http::MetadataMap()};
   bool waiting_for_end_stream_{};
   bool saw_end_stream_{};
   std::string body_;
