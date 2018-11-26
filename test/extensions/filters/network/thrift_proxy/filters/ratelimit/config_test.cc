@@ -15,6 +15,8 @@ namespace Extensions {
 namespace ThriftFilters {
 namespace RateLimitFilter {
 
+SINGLETON_MANAGER_REGISTRATION(ratelimit_config); // just of tests.
+
 namespace {
 envoy::config::filter::thrift::rate_limit::v2alpha1::RateLimit
 parseRateLimitFromV2Yaml(const std::string& yaml) {
