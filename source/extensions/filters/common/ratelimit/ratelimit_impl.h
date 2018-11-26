@@ -91,6 +91,7 @@ private:
  * Manager so that all filters can reuse it.
  */
 class GrpcClientImpl : public Client,
+                       public RateLimitAsyncCallbacks,
                        public Singleton::Instance,
                        public Logger::Loggable<Logger::Id::config> {
 public:
@@ -102,6 +103,17 @@ public:
   static void createRequest(envoy::service::ratelimit::v2::RateLimitRequest& request,
                             const std::string& domain,
                             const std::vector<Envoy::RateLimit::Descriptor>& descriptors);
+
+  // Grpc::AsyncRequestCallbacks
+  void onCreateInitialMetadata(Http::HeaderMap&) override {}
+  void onSuccess(std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse>&& response,
+                 Tracing::Span& span) override {
+    tls_slot_->getTyped<GrpcTlsClientImpl>().onSuccess(std::move(response), span);
+  }
+  void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
+                 Tracing::Span& span) override {
+    tls_slot_->getTyped<GrpcTlsClientImpl>().onFailure(status, message, span);
+  }
 
   // Filters::Common::RateLimit::Client
   void cancel() override { tls_slot_->getTyped<GrpcTlsClientImpl>().cancel(); }

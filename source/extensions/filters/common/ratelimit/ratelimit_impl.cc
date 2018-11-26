@@ -25,10 +25,14 @@ SINGLETON_MANAGER_REGISTRATION(ratelimit_client);
 
 ClientFactoryPtr
 ClientFactory ::rateLimitClientFactory(Server::Configuration::FactoryContext& context) {
-  if (context.rateLimitServiceConfig()) {
+  // TODO(ramaraochavali): figure out a way to get the singleton name here.
+  Envoy::RateLimit::RateLimitServiceConfigPtr ratelimit_config =
+      context.singletonManager().getTyped<Envoy::RateLimit::RateLimitServiceConfig>(
+          "ratelimit_config_singleton", [] { return nullptr; });
+  if (ratelimit_config) {
     return std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::GrpcFactoryImpl>(
-        context.rateLimitServiceConfig()->config_,
-        context.clusterManager().grpcAsyncClientManager(), context.threadLocal(), context.scope());
+        ratelimit_config->config_, context.clusterManager().grpcAsyncClientManager(),
+        context.threadLocal(), context.scope());
   }
   return std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::NullFactoryImpl>();
 }
