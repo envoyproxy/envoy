@@ -105,6 +105,17 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2VerifySA
   checkStats();
 }
 
+// Server with an RSA certificate and a client with RSA/ECDSA cipher suites
+// works.
+TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferServerRsa) {
+  server_ecdsa_cert_ = false;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  checkStats();
+}
+
 // Server with an ECDSA certificate and a client with RSA/ECDSA cipher suites
 // works.
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferServerEcdsa) {
@@ -119,6 +130,7 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferServerEcdsa) 
 // Server with an RSA certificate and a client with only RSA cipher suites
 // works.
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferClientRsaOnly) {
+  server_ecdsa_cert_ = false;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(
         ClientSslTransportOptions().setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}));
@@ -135,6 +147,20 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferServerEcdsaCl
   EXPECT_FALSE(
       makeRawHttpConnection(makeSslClientConnection(ClientSslTransportOptions().setCipherSuites(
                                 {"ECDHE-RSA-AES128-GCM-SHA256"})))
+          ->connected());
+  Stats::CounterSharedPtr counter =
+      test_server_->counter(listenerStatPrefix("ssl.connection_error"));
+  EXPECT_EQ(1U, counter->value());
+  counter->reset();
+}
+
+// Server has only an RSA certificate, client is only ECDSA capable, leads to connection fail.
+TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferServerEcdsaClientEcdsaOnly) {
+  server_ecdsa_cert_ = false;
+  initialize();
+  EXPECT_FALSE(
+      makeRawHttpConnection(makeSslClientConnection(ClientSslTransportOptions().setCipherSuites(
+                                {"ECDHE-ECDSA-AES128-GCM-SHA256"})))
           ->connected());
   Stats::CounterSharedPtr counter =
       test_server_->counter(listenerStatPrefix("ssl.connection_error"));

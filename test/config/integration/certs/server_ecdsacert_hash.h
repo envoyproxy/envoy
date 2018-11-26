@@ -1,4 +1,2 @@
 // NOLINT(namespace-envoy)
-#define TEST_SERVER_ECDSA_CERT_HASH                                                                \
-  "53:D3:FF:A9:53:FC:0D:33:46:2D:63:A3:98:B1:CF:7A:B2:11:BC:D1:6F:DF:77:FE:F2:C7:F9:5C:4C:B7:5E:"  \
-  "E3"
+#define TEST_SERVER_ECDSA_CERT_HASH "F7:97:78:71:62:1F:48:EA:F1:76:A3:AA:11:71:6E:30:99:E7:0A:0F:A2:51:DB:B5:80:42:89:13:78:3A:80:35"

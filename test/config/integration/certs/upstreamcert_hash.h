@@ -1,4 +1,2 @@
 // NOLINT(namespace-envoy)
-#define TEST_UPSTREAM_CERT_HASH                                                                    \
-  "9F:30:EF:F6:F5:52:55:86:3F:FE:1A:95:26:51:95:A0:66:48:6F:D3:C3:B0:14:90:69:16:BB:D7:EB:66:B3:"  \
-  "55"
+#define TEST_UPSTREAM_CERT_HASH "7C:00:F7:49:33:9C:D6:54:D8:8E:38:E6:8D:5A:C0:77:42:C7:B2:E8:CE:1D:BA:20:78:92:3D:29:62:A3:84:F9"
