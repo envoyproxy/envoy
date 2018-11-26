@@ -43,9 +43,6 @@ bool FilterChainUtility::buildFilterChain(
   return true;
 }
 
-// Singleton registration via macro defined in envoy/singleton/manager.h
-SINGLETON_MANAGER_REGISTRATION(ratelimit_config);
-
 void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
@@ -56,12 +53,12 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
     server.secretManager().addStaticSecret(secrets[i]);
   }
 
-  if (bootstrap.has_rate_limit_service()) {
-    ratelimit_service_config_ = server.singletonManager().getTyped<RateLimitServiceConfig>(
-        SINGLETON_MANAGER_REGISTERED_NAME(ratelimit_config), [&bootstrap] {
-          return std::make_shared<RateLimitServiceConfig>(bootstrap.rate_limit_service());
-        });
-  }
+  // TODO(ramaraochavali): remove this dependency on extension when rate limit service config is
+  // deprecated and removed from bootstrap. For now, just call in to extensions to register the rate
+  // limit service config, so that extensions can build rate limit client.
+  ratelimit_service_config_ =
+      Envoy::Extensions::Filters::Common::RateLimit::registerRateLimitServiceConfig(server,
+                                                                                    bootstrap);
 
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(

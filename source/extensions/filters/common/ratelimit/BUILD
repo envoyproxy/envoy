@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["ratelimit_impl.h"],
     deps = [
         ":ratelimit_client_interface",
+        ":ratelimit_registration_lib",
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/grpc:async_client_manager_interface",
         "//include/envoy/ratelimit:ratelimit_interface",
@@ -30,6 +31,19 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2/ratelimit:ratelimit_cc",
         "@envoy_api//envoy/config/ratelimit/v2:rls_cc",
         "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "ratelimit_registration_lib",
+    srcs = ["ratelimit_registration.cc"],
+    hdrs = ["ratelimit_registration.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/server:instance_interface",
+        "//include/envoy/singleton:manager_interface",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
 
