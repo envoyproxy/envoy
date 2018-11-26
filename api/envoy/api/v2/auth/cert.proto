@@ -293,6 +293,12 @@ message UpstreamTlsContext {
   //
   //   TLS renegotiation is considered insecure and shouldn't be used unless absolutely necessary.
   bool allow_renegotiation = 3;
+
+  // Maximum number of session keys (Pre-Shared Keys for TLSv1.3+, Session IDs and Session Tickets
+  // for TLSv1.2 and older) to store for the purpose of session resumption.
+  //
+  // Defaults to 1, setting this to 0 disables session resumption.
+  google.protobuf.UInt32Value max_session_keys = 4;
 }
 
 message DownstreamTlsContext {
