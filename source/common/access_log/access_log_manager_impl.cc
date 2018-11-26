@@ -16,7 +16,7 @@ Filesystem::FileSharedPtr AccessLogManagerImpl::createAccessLog(const std::strin
     return access_logs_[file_name];
   }
 
-  access_logs_[file_name] = api_.createFile(file_name, dispatcher_, lock_, stats_store_);
+  access_logs_[file_name] = api_.createFile(file_name, dispatcher_, lock_);
   return access_logs_[file_name];
 }
 
