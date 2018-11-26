@@ -53,7 +53,7 @@ protected:
         .WillOnce(Return(true));
     options->emplace_back(std::move(option));
     auto socket1 = createListenSocketPtr(addr, options, true);
-    // TODO (Jojy): This is unfortunate. We should be able to templatize this
+    // TODO (conqerAtapple): This is unfortunate. We should be able to templatize this
     // instead of if block.
     if (NetworkSocketTrait<S>::type == Address::SocketType::Stream) {
       EXPECT_EQ(0, listen(socket1->fd(), 0));
