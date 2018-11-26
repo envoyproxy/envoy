@@ -73,6 +73,7 @@ envoy_cc_test(
     srcs = ["dispatcher_test.cc"],
     deps = [
         "//source/common/event:libevent_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/server/config_validation:api_lib",
         "//source/server/config_validation:dns_lib",
         "//test/test_common:environment_lib",
@@ -86,6 +87,7 @@ envoy_cc_fuzz_test(
     srcs = ["config_fuzz_test.cc"],
     corpus = "//test/server:server_fuzz_test_corpus",
     deps = [
+        "//source/common/common:thread_lib",
         "//source/server/config_validation:server_lib",
         "//source/server:proto_descriptors_lib",
         "//test/integration:integration_lib",

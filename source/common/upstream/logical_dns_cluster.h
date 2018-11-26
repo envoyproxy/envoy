@@ -51,9 +51,9 @@ private:
           parent_(parent) {}
 
     // Upstream::Host
-    CreateConnectionData
-    createConnection(Event::Dispatcher& dispatcher,
-                     const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
+    CreateConnectionData createConnection(
+        Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+        Network::TransportSocketOptionsSharedPtr transport_socket_options) const override;
 
     // Upstream::HostDescription
     // Override setting health check address, since for logical DNS the registered host has 0.0.0.0

@@ -21,7 +21,8 @@ bool MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len) {
   ASSERT(data != nullptr && len != 0);
   payload_.add(data, len);
 
-  return payload_.length() <= max_payload_size_bound_;
+  total_payload_size_ += payload_.length();
+  return total_payload_size_ <= max_payload_size_bound_;
 }
 
 bool MetadataDecoder::onMetadataFrameComplete(bool end_metadata) {
