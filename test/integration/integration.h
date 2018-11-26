@@ -177,6 +177,7 @@ public:
 
   Event::TestTimeSystem& timeSystem() { return *time_system_; }
 
+  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
 private:
