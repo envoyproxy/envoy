@@ -26,6 +26,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
+#include "common/common/cleanup.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/protobuf.h"
@@ -206,6 +207,49 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
     }
   }
   return ret;
+}
+
+bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
+  const auto& remote_address = socket.remoteAddress();
+  // Before calling getifaddrs, verify the obvious checks.
+  // Note that there are corner cases, where remote and local address will be the same
+  // while the client is not actually local. Example could be an iptables intercepted
+  // connection. However, this is a rare exception and such assumption results in big
+  // performance optimization.
+  if (remote_address->type() == Envoy::Network::Address::Type::Pipe ||
+      remote_address == socket.localAddress() || isLoopbackAddress(*remote_address)) {
+    return true;
+  }
+
+  struct ifaddrs* ifaddr;
+  const int rc = getifaddrs(&ifaddr);
+  Cleanup ifaddr_cleanup([ifaddr] {
+    if (ifaddr) {
+      freeifaddrs(ifaddr);
+    }
+  });
+  RELEASE_ASSERT(rc == 0, "");
+
+  auto af_look_up =
+      (remote_address->ip()->version() == Address::IpVersion::v4) ? AF_INET : AF_INET6;
+
+  for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == nullptr) {
+      continue;
+    }
+
+    if (ifa->ifa_addr->sa_family == af_look_up) {
+      const auto* addr = reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
+      auto local_address = Address::addressFromSockAddr(
+          *addr, (af_look_up == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
+
+      if (remote_address == local_address) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 bool Utility::isInternalAddress(const Address::Instance& address) {
