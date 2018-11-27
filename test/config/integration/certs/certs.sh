@@ -25,7 +25,7 @@ generate_x509_cert() {
   openssl req -new -key $1key.pem -out $1cert.csr -config $1cert.cfg -batch -sha256
   openssl x509 -req -days 730 -in $1cert.csr -sha256 -CA $2cert.pem -CAkey \
     $2key.pem -CAcreateserial -out $1cert.pem -extensions v3_ca -extfile $1cert.cfg
-  echo -e "// NOLINT(namespace-envoy)\n#define TEST_$(echo $1 | tr a-z A-Z)_CERT_HASH \"$(openssl x509 -in $1cert.pem -noout -fingerprint -sha256 | cut -d"=" -f2)\"" > $1cert_hash.h
+  echo -e "// NOLINT(namespace-envoy)\nconstexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_HASH[] = \"$(openssl x509 -in $1cert.pem -noout -fingerprint -sha256 | cut -d"=" -f2)\";" > $1cert_hash.h
 }
 
 # Generate cert for the CA.
