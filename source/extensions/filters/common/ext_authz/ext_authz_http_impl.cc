@@ -121,7 +121,7 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
     return std::make_unique<Response>(getErrorResponse());
   }
 
-  // If the authorization server returned HTTP status 200 OK, set an authorized reponse object,
+  // If the authorization server returned HTTP status 200 OK, set an authorized response object,
   // otherwise set a rejected response.
   ResponseContext ctx;
   if (status_code == enumToInt(Http::Code::OK)) {
