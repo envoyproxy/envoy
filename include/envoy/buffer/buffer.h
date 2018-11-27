@@ -74,7 +74,7 @@ public:
    * Copy a string into the buffer.
    * @param data supplies the string to copy.
    */
-  virtual void add(const std::string& data) PURE;
+  virtual void add(absl::string_view data) PURE;
 
   /**
    * Copy another buffer into this buffer.

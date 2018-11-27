@@ -142,7 +142,7 @@ Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOption
  * @param is_head_request tells if this is a response to a HEAD request
  */
 void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
-                    Code response_code, const std::string& body_text,
+                    Code response_code, absl::string_view body_text,
                     const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                     bool is_head_request);
 
@@ -162,7 +162,7 @@ void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const
 void sendLocalReply(bool is_grpc,
                     std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
                     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
-                    const bool& is_reset, Code response_code, const std::string& body_text,
+                    const bool& is_reset, Code response_code, absl::string_view body_text,
                     const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                     bool is_head_request = false);
 
