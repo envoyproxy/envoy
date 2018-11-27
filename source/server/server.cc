@@ -307,9 +307,8 @@ void InstanceImpl::initialize(Options& options,
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(time_system_);
 
-  auto http_context = std::make_unique<Http::ContextImpl>(Configuration::MainImpl::makeHttpTracer(
-      bootstrap_.tracing(), *this));
-
+  auto tracer = Configuration::MainImpl::makeHttpTracer(bootstrap_.tracing(), *this);
+  auto http_context = std::make_unique<Http::ContextImpl>(std::move(tracer));
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
       localInfo(), secretManager(), api(), *http_context);
