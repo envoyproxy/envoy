@@ -5,7 +5,6 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/async_client_impl.h"
-#include "common/http/codes.h"
 #include "common/http/context_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"

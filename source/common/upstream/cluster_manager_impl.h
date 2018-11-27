@@ -42,10 +42,10 @@ public:
                             const LocalInfo::LocalInfo& local_info,
                             Secret::SecretManager& secret_manager, Api::Api& api,
                             Http::Context& http_context)
-  : main_thread_dispatcher_(main_thread_dispatcher), api_(api), http_context_(http_context),
-    runtime_(runtime), stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
-    ssl_context_manager_(ssl_context_manager), local_info_(local_info),
-    secret_manager_(secret_manager) {}
+      : main_thread_dispatcher_(main_thread_dispatcher), api_(api), http_context_(http_context),
+        runtime_(runtime), stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
+        ssl_context_manager_(ssl_context_manager), local_info_(local_info),
+        secret_manager_(secret_manager) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr

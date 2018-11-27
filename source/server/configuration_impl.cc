@@ -46,10 +46,7 @@ bool FilterChainUtility::buildFilterChain(
 
 void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Instance& server,
-                          Upstream::ClusterManagerFactory& cluster_manager_factory,
-                          Http::ContextPtr http_context) {
-  http_context_ = std::move(http_context);
-
+                          Upstream::ClusterManagerFactory& cluster_manager_factory) {
   const auto& secrets = bootstrap.static_resources().secrets();
   ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());
   for (ssize_t i = 0; i < secrets.size(); i++) {
@@ -81,6 +78,8 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
   watchdog_multikill_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
 
+  initializeTracers(bootstrap.tracing(), server);
+
   if (bootstrap.has_rate_limit_service()) {
     ratelimit_client_factory_ = std::make_unique<RateLimit::GrpcFactoryImpl>(
         bootstrap.rate_limit_service(), cluster_manager_->grpcAsyncClientManager(), server.stats());
@@ -91,12 +90,13 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
   initializeStatsSinks(bootstrap, server);
 }
 
-Tracing::HttpTracerPtr MainImpl::makeHttpTracer(
-    const envoy::config::trace::v2::Tracing& configuration, Instance& server) {
+void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& configuration,
+                                 Instance& server) {
   ENVOY_LOG(info, "loading tracing configuration");
 
   if (!configuration.has_http()) {
-    return std::make_unique<Tracing::HttpNullTracer>();
+    http_tracer_ = std::make_unique<Tracing::HttpNullTracer>();
+    return;
   }
 
   // Initialize tracing driver.
@@ -107,7 +107,7 @@ Tracing::HttpTracerPtr MainImpl::makeHttpTracer(
   auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(type);
   ProtobufTypes::MessagePtr message =
       Config::Utility::translateToFactoryConfig(configuration.http(), factory);
-  return factory.createHttpTracer(*message, server);
+  http_tracer_ = factory.createHttpTracer(*message, server);
 }
 
 void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,

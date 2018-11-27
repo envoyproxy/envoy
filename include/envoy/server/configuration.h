@@ -9,7 +9,7 @@
 
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/stats/sink.h"
-#include "envoy/http/context.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "absl/types/optional.h"
@@ -56,9 +56,9 @@ public:
   virtual Upstream::ClusterManager* clusterManager() PURE;
 
   /**
-   * @return HttpContext& singleton for use by the entire server.
+   * @return Tracing::HttpTracer& singleton for use by the entire server.
    */
-  virtual Http::Context& httpContext() PURE;
+  virtual Tracing::HttpTracer& httpTracer() PURE;
 
   /**
    * @return RateLimit::ClientFactory& the global rate limit service client factory.

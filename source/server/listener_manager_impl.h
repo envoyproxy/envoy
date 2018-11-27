@@ -12,7 +12,6 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
-#include "common/http/codes.h"
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
 
@@ -208,7 +207,7 @@ public:
    */
   ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool modifiable,
-               bool workers_started, uint64_t hash/*, Http::CodeStats& code_stats*/);
+               bool workers_started, uint64_t hash);
   ~ListenerImpl();
 
   /**
@@ -262,7 +261,6 @@ public:
   bool healthCheckFailed() override { return parent_.server_.healthCheckFailed(); }
   Tracing::HttpTracer& httpTracer() override { return httpContext().tracer(); }
   Http::Context& httpContext() override { return parent_.server_.httpContext(); }
-  //Http::CodeStats& codeStats() override { return parent_.codeStats(); }
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override { return parent_.server_.localInfo(); }
   Envoy::Runtime::RandomGenerator& random() override { return parent_.server_.random(); }
@@ -294,7 +292,6 @@ public:
     ensureSocketOptions();
     Network::Socket::appendOptions(listen_socket_options_, options);
   }
-  //Http::CodeStats& codeStats() override { return code_stats_; }
 
   // Network::DrainDecision
   bool drainClose() const override;
@@ -406,7 +403,6 @@ private:
   const envoy::api::v2::Listener config_;
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
-  //Http::CodeStats& code_stats_;
 };
 
 class FilterChainImpl : public Network::FilterChain {

@@ -51,7 +51,8 @@ public:
     envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
     MessageUtil::loadFromYaml(yaml, proto_config);
 
-    config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, http_context_));
+    config_.reset(
+        new FilterConfig(proto_config, local_info_, stats_store_, runtime_, http_context_));
 
     client_ = new RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, RateLimit::ClientPtr{client_});

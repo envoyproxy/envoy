@@ -55,12 +55,14 @@ public:
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
-    /*
+    cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
+        server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
+        server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
+        server_.secretManager(), *api_, server_.httpContext());
+
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
     }));
-    */
-
     ON_CALL(server_, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
     ON_CALL(component_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(
@@ -80,13 +82,7 @@ public:
             }));
 
     try {
-      auto tracer = Server::Configuration::MainImpl::makeHttpTracer(bootstrap.tracing(), server_);
-      auto http_context = std::make_unique<Http::ContextImpl>(std::move(tracer));
-      cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-          server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
-          server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
-          server_.secretManager(), *api_, *http_context);
-      main_config.initialize(bootstrap, server_, *cluster_manager_factory_, std::move(http_context));
+      main_config.initialize(bootstrap, server_, *cluster_manager_factory_);
     } catch (const EnvoyException& ex) {
       ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", options_.configPath(),
                                    ex.what());

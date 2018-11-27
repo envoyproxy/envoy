@@ -12,7 +12,7 @@ namespace Http {
  * Captures http-related structures with cardinality of one per server.
  */
 class Context {
- public:
+public:
   virtual ~Context() {}
   virtual Tracing::HttpTracer& tracer() PURE;
   virtual CodeStats& codeStats() PURE;

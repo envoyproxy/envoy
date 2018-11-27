@@ -118,8 +118,6 @@ InstanceImpl::~InstanceImpl() {
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_->clusterManager(); }
 
-//Tracing::HttpTracer& InstanceImpl::httpTracer() { return config_->httpTracer(); }
-
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
   listener_manager_->stopListeners();
@@ -307,17 +305,16 @@ void InstanceImpl::initialize(Options& options,
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(time_system_);
 
-  auto tracer = Configuration::MainImpl::makeHttpTracer(bootstrap_.tracing(), *this);
-  auto http_context = std::make_unique<Http::ContextImpl>(std::move(tracer));
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo(), secretManager(), api(), *http_context);
+      localInfo(), secretManager(), api(), http_context_);
 
   // Now the configuration gets parsed. The configuration may start setting thread local data
   // per above. See MainImpl::initialize() for why we do this pointer dance.
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
-  main_config->initialize(bootstrap_, *this, *cluster_manager_factory_, std::move(http_context));
+  main_config->initialize(bootstrap_, *this, *cluster_manager_factory_);
+  http_context_.setTracer(main_config->httpTracer());
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
