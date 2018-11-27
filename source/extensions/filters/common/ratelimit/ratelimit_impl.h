@@ -143,6 +143,8 @@ private:
   ThreadLocal::SlotAllocator& tls_;
 };
 
+// TODO(ramaraochavali): NullClientImpl and NullFactoryImpl should be removed when we remove rate
+// limit config from bootstrap.
 class NullClientImpl : public Client {
 public:
   // Filters::Common::RateLimit::Client

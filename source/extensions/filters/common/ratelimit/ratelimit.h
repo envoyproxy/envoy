@@ -10,6 +10,8 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/tracing/http_tracer.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -93,7 +95,8 @@ public:
    * FactoryContext.
    */
   static std::unique_ptr<ClientFactory>
-  rateLimitClientFactory(Server::Configuration::FactoryContext& context);
+  rateLimitClientFactory(Server::Configuration::FactoryContext& context,
+                         RateLimitServiceConfigPtr ratelimit_config);
 };
 
 typedef std::unique_ptr<ClientFactory> ClientFactoryPtr;

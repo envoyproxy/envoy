@@ -26,8 +26,8 @@ namespace RateLimit {
 SINGLETON_MANAGER_REGISTRATION(ratelimit_client);
 
 ClientFactoryPtr
-ClientFactory ::rateLimitClientFactory(Server::Configuration::FactoryContext& context) {
-  RateLimitServiceConfigPtr ratelimit_config = rateLimitConfig(context);
+ClientFactory ::rateLimitClientFactory(Server::Configuration::FactoryContext& context,
+                                       RateLimitServiceConfigPtr ratelimit_config) {
   if (ratelimit_config) {
     return std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::GrpcFactoryImpl>(
         ratelimit_config->config_, context.clusterManager().grpcAsyncClientManager(),

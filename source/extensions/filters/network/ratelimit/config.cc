@@ -27,9 +27,12 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
 
   ConfigSharedPtr filter_config(new Config(proto_config, context.scope(), context.runtime()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
+  // When we introduce rate limit service config in filters, we should validate here that it matches
+  // with bootstrap.
   Filters::Common::RateLimit::ClientPtr ratelimit_client =
-      Filters::Common::RateLimit::ClientFactory::rateLimitClientFactory(context)->create(
-          std::chrono::milliseconds(timeout_ms), context);
+      Filters::Common::RateLimit::ClientFactory::rateLimitClientFactory(
+          context, Filters::Common::RateLimit::rateLimitConfig(context))
+          ->create(std::chrono::milliseconds(timeout_ms), context);
   std::shared_ptr<Filter> filter =
       std::make_shared<Filter>(filter_config, std::move(ratelimit_client));
   // This lambda captures the shared_ptrs created above, thus preserving the

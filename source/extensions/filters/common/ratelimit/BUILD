@@ -43,6 +43,7 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/singleton:manager_interface",
+        "//source/common/common:assert_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
@@ -52,6 +53,7 @@ envoy_cc_library(
     hdrs = ["ratelimit.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":ratelimit_registration_lib",
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/tracing:http_tracer_interface",
