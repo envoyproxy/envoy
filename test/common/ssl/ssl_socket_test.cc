@@ -3193,7 +3193,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context);
-  EXPECT_EQ(nullptr, server_cfg->tlsCertificate());
+  EXPECT_TRUE(server_cfg->tlsCertificates().empty());
   EXPECT_FALSE(server_cfg->isReady());
 
   Event::SimulatedTimeSystem time_system;
@@ -3234,7 +3234,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context);
-  EXPECT_EQ(nullptr, client_cfg->tlsCertificate());
+  EXPECT_TRUE(client_cfg->tlsCertificates().empty());
   EXPECT_FALSE(client_cfg->isReady());
 
   ContextManagerImpl manager(time_system);
