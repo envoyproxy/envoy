@@ -148,16 +148,15 @@ public:
   int BufUint16Drain(Buffer::Instance& buffer, uint16_t& val);
   int BufUint32Drain(Buffer::Instance& buffer, uint32_t& val);
   int BufUint64Drain(Buffer::Instance& buffer, uint64_t& val);
-  int BufReadBySizeDrain(Buffer::Instance& buffer, int len, int& val);
+  int BufReadBySizeDrain(Buffer::Instance& buffer, size_t len, int& val);
   int ReadLengthEncodedIntegerDrain(Buffer::Instance& buffer, int& val);
-  int DrainBytes(Buffer::Instance& buffer, int skip_bytes);
+  int DrainBytes(Buffer::Instance& buffer, size_t skip_bytes);
   int BufStringDrain(Buffer::Instance& buffer, std::string& str);
-  int BufStringDrainBySize(Buffer::Instance& buffer, std::string& str, int len);
+  int BufStringDrainBySize(Buffer::Instance& buffer, std::string& str, size_t len);
   int HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq);
   void SetSeq(int seq);
 
 private:
-  uint64_t offset_;
   int seq_;
 };
 

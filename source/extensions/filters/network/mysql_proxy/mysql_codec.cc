@@ -8,55 +8,55 @@ namespace NetworkFilters {
 namespace MySQLProxy {
 
 int MySQLCodec::BufUint8Drain(Buffer::Instance& buffer, uint8_t& val) {
-  if (buffer.length() < (offset_ + sizeof(uint8_t))) {
+  if (buffer.length() < sizeof(uint8_t)) {
     return MYSQL_FAILURE;
   }
-  buffer.copyOut(offset_, sizeof(uint8_t), &val);
-  offset_ += sizeof(uint8_t);
+  buffer.copyOut(0, sizeof(uint8_t), &val);
+  buffer.drain(sizeof(uint8_t));
   return MYSQL_SUCCESS;
 }
 
 int MySQLCodec::BufUint16Drain(Buffer::Instance& buffer, uint16_t& val) {
-  if (buffer.length() < (offset_ + sizeof(uint16_t))) {
+  if (buffer.length() < sizeof(uint16_t)) {
     return MYSQL_FAILURE;
   }
-  buffer.copyOut(offset_, sizeof(uint16_t), &val);
-  offset_ += sizeof(uint16_t);
+  buffer.copyOut(0, sizeof(uint16_t), &val);
+  buffer.drain(sizeof(uint16_t));
   return MYSQL_SUCCESS;
 }
 
 int MySQLCodec::BufUint32Drain(Buffer::Instance& buffer, uint32_t& val) {
-  if (buffer.length() < (offset_ + sizeof(uint32_t))) {
+  if (buffer.length() < sizeof(uint32_t)) {
     return MYSQL_FAILURE;
   }
-  buffer.copyOut(offset_, sizeof(uint32_t), &val);
-  offset_ += sizeof(uint32_t);
+  buffer.copyOut(0, sizeof(uint32_t), &val);
+  buffer.drain(sizeof(uint32_t));
   return MYSQL_SUCCESS;
 }
 
 int MySQLCodec::BufUint64Drain(Buffer::Instance& buffer, uint64_t& val) {
-  if (buffer.length() < (offset_ + sizeof(uint64_t))) {
+  if (buffer.length() < sizeof(uint64_t)) {
     return MYSQL_FAILURE;
   }
-  buffer.copyOut(offset_, sizeof(uint64_t), &val);
-  offset_ += sizeof(uint64_t);
+  buffer.copyOut(0, sizeof(uint64_t), &val);
+  buffer.drain(sizeof(uint64_t));
   return MYSQL_SUCCESS;
 }
 
-int MySQLCodec::BufReadBySizeDrain(Buffer::Instance& buffer, int len, int& val) {
-  if (buffer.length() < (offset_ + len)) {
+int MySQLCodec::BufReadBySizeDrain(Buffer::Instance& buffer, size_t len, int& val) {
+  if (buffer.length() < len) {
     return MYSQL_FAILURE;
   }
-  buffer.copyOut(offset_, len, &val);
-  offset_ += len;
+  buffer.copyOut(0, len, &val);
+  buffer.drain(len);
   return MYSQL_SUCCESS;
 }
 
-int MySQLCodec::DrainBytes(Buffer::Instance& buffer, int skip_bytes) {
-  if (buffer.length() < (offset_ + skip_bytes)) {
+int MySQLCodec::DrainBytes(Buffer::Instance& buffer, size_t skip_bytes) {
+  if (buffer.length() < skip_bytes) {
     return MYSQL_FAILURE;
   }
-  offset_ += skip_bytes;
+  buffer.drain(skip_bytes);
   return MYSQL_SUCCESS;
 }
 
@@ -90,7 +90,7 @@ int MySQLCodec::ReadLengthEncodedIntegerDrain(Buffer::Instance& buffer, int& val
 
 int MySQLCodec::BufStringDrain(Buffer::Instance& buffer, std::string& str) {
   char end = MYSQL_STR_END;
-  ssize_t index = buffer.search(&end, sizeof(end), offset_);
+  ssize_t index = buffer.search(&end, sizeof(end), 0);
   if (index == -1) {
     return MYSQL_FAILURE;
   }
@@ -98,18 +98,18 @@ int MySQLCodec::BufStringDrain(Buffer::Instance& buffer, std::string& str) {
     return MYSQL_FAILURE;
   }
   str.assign(std::string(static_cast<char*>(buffer.linearize(index)), index));
-  str = str.substr(offset_);
-  offset_ = index + 1;
+  str = str.substr(0);
+  buffer.drain(index + 1);
   return MYSQL_SUCCESS;
 }
 
-int MySQLCodec::BufStringDrainBySize(Buffer::Instance& buffer, std::string& str, int len) {
-  if (buffer.length() < (offset_ + len)) {
+int MySQLCodec::BufStringDrainBySize(Buffer::Instance& buffer, std::string& str, size_t len) {
+  if (buffer.length() < len) {
     return MYSQL_FAILURE;
   }
-  str.assign(std::string(static_cast<char*>(buffer.linearize(len + offset_)), len + offset_));
-  str = str.substr(offset_);
-  offset_ += len;
+  str.assign(std::string(static_cast<char*>(buffer.linearize(len)), len));
+  str = str.substr(0);
+  buffer.drain(len);
   return MYSQL_SUCCESS;
 }
 
@@ -152,7 +152,7 @@ int MySQLCodec::HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq) {
   return MYSQL_SUCCESS;
 }
 
-bool MySQLCodec::EndOfBuffer(Buffer::Instance& buffer) { return (buffer.length() == offset_); }
+bool MySQLCodec::EndOfBuffer(Buffer::Instance& buffer) { return buffer.length() == 0; }
 
 bool DecoderImpl::decode(Buffer::Instance& data) {
   callbacks_.decode(data);
