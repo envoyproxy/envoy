@@ -28,6 +28,7 @@ Version history
   value to override the default HTTP to gRPC status mapping.
 * http: no longer close the TCP connection when a HTTP/1 request is retried due
   to a response with empty body.
+* listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using :ref:`source_type <envoy_api_field_listener.FilterChainMatch.source_type>`.
 * load balancer: added a `configuration <envoy_api_msg_Cluster.LeastRequestLbConfig>` option to specify the number of choices made in P2C.
 * logging: added missing [ in log prefix.
 * mongo_proxy: added :ref:`dynamic metadata <config_network_filters_mongo_proxy_dynamic_metadata>`.
@@ -54,11 +55,13 @@ Version history
   been fully decoded by Envoy.
 * router: added support for not retrying :ref:`rate limited requests<config_http_filters_router_x-envoy-ratelimited>`. Rate limit filter now sets the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>`
   header so the rate limited requests that may have been retried earlier will not be retried with this change.
+* router: added support for enabling upgrades on a :ref:`per-route <envoy_api_field_route.RouteAction.upgrade_configs>` basis.
 * stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
 * stream: renamed `perRequestState` to `filterState` in `StreamInfo`.
 * thrift_proxy: introduced thrift rate limiter filter
+* tls: add support for :ref:`client-side session resumption <envoy_api_field_auth.UpstreamTlsContext.max_session_keys>`.
 * tls: add support for CRLs in :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
 * tracing: added support to the Zipkin tracer for the :ref:`b3 <config_http_conn_man_headers_b3>` single header format.
 * tracing: added support for :ref:`Datadog <arch_overview_tracing>` tracer.

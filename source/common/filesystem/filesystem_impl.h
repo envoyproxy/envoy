@@ -33,6 +33,44 @@ struct FileSystemStats {
 namespace Filesystem {
 
 /**
+ * Captures state, properties, and stats of a file-system.
+ */
+class Instance {
+public:
+  Instance(std::chrono::milliseconds file_flush_interval_msec,
+           Thread::ThreadFactory& thread_factory, Stats::Store& store);
+
+  /**
+   * Creates a file, overriding the flush-interval set in the class.
+   *
+   * @param path The path of the file to open.
+   * @param dispatcher The dispatcher used for set up timers to run flush().
+   * @param lock The lock.
+   * @param file_flush_interval_msec Number of milliseconds to delay before flushing.
+   */
+  FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
+                           Thread::BasicLockable& lock,
+                           std::chrono::milliseconds file_flush_interval_msec);
+
+  /**
+   * Creates a file, using the default flush-interval for the class.
+   *
+   * @param path The path of the file to open.
+   * @param dispatcher The dispatcher used for set up timers to run flush().
+   * @param lock The lock.
+   */
+  FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
+                           Thread::BasicLockable& lock) {
+    return createFile(path, dispatcher, lock, file_flush_interval_msec_);
+  }
+
+private:
+  const std::chrono::milliseconds file_flush_interval_msec_;
+  FileSystemStats file_stats_;
+  Thread::ThreadFactory& thread_factory_;
+};
+
+/**
  * @return bool whether a file exists on disk and can be opened for read.
  */
 bool fileExists(const std::string& path);
@@ -83,7 +121,8 @@ bool illegalPath(const std::string& path);
 class FileImpl : public File {
 public:
   FileImpl(const std::string& path, Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
-           Stats::Store& stats_store, Api::Api& api, std::chrono::milliseconds flush_interval_msec);
+           FileSystemStats& stats_, std::chrono::milliseconds flush_interval_msec,
+           Thread::ThreadFactory& thread_factory);
   ~FileImpl();
 
   // Filesystem::File
@@ -147,11 +186,11 @@ private:
                                             // final write to disk.
   Event::TimerPtr flush_timer_;
   Api::OsSysCalls& os_sys_calls_;
-  Api::Api& api_;
+  Thread::ThreadFactory& thread_factory_;
   const std::chrono::milliseconds flush_interval_msec_; // Time interval buffer gets flushed no
                                                         // matter if it reached the MIN_FLUSH_SIZE
                                                         // or not.
-  FileSystemStats stats_;
+  FileSystemStats& stats_;
 };
 
 } // namespace Filesystem

@@ -353,6 +353,11 @@ message HttpConnectionManager {
     // this type of upgrade. If no filters are present, the filter chain for
     // HTTP connections will be used for this upgrade type.
     repeated HttpFilter filters = 2;
+    // Determines if upgrades are enabled or disabled by default. Defaults to true.
+    // This can be overriden on a per-route basis with :ref:`cluster
+    // <envoy_api_field_route.RouteAction.upgrade_configs>` as documented in the
+    // :ref:`upgrade documentation <arch_overview_websocket>`.
+    google.protobuf.BoolValue enabled = 3;
   };
   repeated UpgradeConfig upgrade_configs = 23;
 

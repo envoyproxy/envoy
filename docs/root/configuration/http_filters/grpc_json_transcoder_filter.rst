@@ -5,6 +5,7 @@ gRPC-JSON transcoder
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.transcoder.v2.GrpcJsonTranscoder>`
+* This filter should be configured with the name *envoy.grpc_json_transcoder*.
 
 This is a filter which allows a RESTful JSON API client to send requests to Envoy over HTTP
 and get proxied to a gRPC service. The HTTP mapping for the gRPC service has to be defined by

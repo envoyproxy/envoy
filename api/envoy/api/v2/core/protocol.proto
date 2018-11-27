@@ -79,6 +79,14 @@ message Http2ProtocolOptions {
 
   // Allows proxying Websocket and other upgrades over H2 connect.
   bool allow_connect = 5;
+
+  // [#not-implemented-hide:] Hiding until envoy has full metadata support.
+  // Still under implementation. DO NOT USE.
+  //
+  // Allows metadata. See [metadata
+  // docs](https://github.com/envoyproxy/envoy/blob/master/source/docs/h2_metadata.md) for more
+  // information.
+  bool allow_metadata = 6;
 }
 
 // [#not-implemented-hide:]

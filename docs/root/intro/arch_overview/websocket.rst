@@ -7,7 +7,7 @@ Envoy Upgrade support is intended mainly for WebSocket but may be used for non-W
 upgrades as well. Upgrades pass both the HTTP headers and the upgrade payload
 through an HTTP filter chain. One may configure the
 :ref:`upgrade_configs <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`
-in one of two ways. If only the
+with or without custom filter chains. If only the
 :ref:`upgrade_type <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.UpgradeConfig.upgrade_type>`
 is specified, both the upgrade headers, any request and response body, and WebSocket payload will
 pass through the default HTTP filter chain. To avoid the use of HTTP-only filters for upgrade payload,
@@ -15,6 +15,22 @@ one can set up custom
 :ref:`filters <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.UpgradeConfig.filters>`
 for the given upgrade type, up to and including only using the router filter to send the WebSocket
 data upstream.
+
+Upgrades can be enabled or disabled on a :ref:`per-route <envoy_api_field_route.RouteAction.upgrade_configs>` basis.
+Any per-route enabling/disabling automatically overrides HttpConnectionManager configuration as
+laid out below, but custom filter chains can only be configured on a per-HttpConnectionManager basis.
+
++-----------------------+-------------------------+-------------------+
+| *HCM Upgrade Enabled* | *Route Upgrade Enabled* | *Upgrade Enabled* |
++=======================+=========================+===================+
+| T (Default)           | T (Default)             | T                 |
++-----------------------+-------------------------+-------------------+
+| T (Default)           | F                       | F                 |
++-----------------------+-------------------------+-------------------+
+| F                     | T (Default)             | T                 |
++-----------------------+-------------------------+-------------------+
+| F                     | F                       | F                 |
++-----------------------+-------------------------+-------------------+
 
 Note that the statistics for upgrades are all bundled together so websocket
 :ref:`statistics <config_http_conn_man_stats>` are tracked by stats such as
