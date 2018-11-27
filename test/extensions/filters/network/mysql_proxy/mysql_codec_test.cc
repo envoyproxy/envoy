@@ -29,7 +29,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeV9EncDec) {
   std::string salt(MySQLTestUtils::GetSalt());
   mysql_greet_encode.SetSalt(salt);
   std::string data = mysql_greet_encode.Encode();
-  std::string mysql_msg = mysql_greet_encode.EncodeHdr(data, 0);
+  std::string mysql_msg = BufferHelper::EncodeHdr(data, 0);
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
   ServerGreeting mysql_greet_decode{};
@@ -62,7 +62,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeV10EncDec) {
   mysql_greet_encode.SetServerStatus(MYSQL_SERVER_STATUS);
   mysql_greet_encode.SetExtServerCap(MYSQL_SERVER_EXT_CAPAB);
   std::string data = mysql_greet_encode.Encode();
-  std::string mysql_msg = mysql_greet_encode.EncodeHdr(data, 0);
+  std::string mysql_msg = BufferHelper::EncodeHdr(data, 0);
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
   ServerGreeting mysql_greet_decode{};
@@ -98,7 +98,7 @@ TEST_F(MySQLCodecTest, MySQLClLoginV41PluginAuthEncDec) {
   std::string db = "mysql_db";
   mysql_clogin_encode.SetDB(db);
   std::string data = mysql_clogin_encode.Encode();
-  std::string mysql_msg = mysql_clogin_encode.EncodeHdr(data, 1);
+  std::string mysql_msg = BufferHelper::EncodeHdr(data, 1);
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
   ClientLogin mysql_clogin_decode{};
@@ -134,7 +134,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin41SecureConnEncDec) {
   std::string db = "mysql_db";
   mysql_clogin_encode.SetDB(db);
   std::string data = mysql_clogin_encode.Encode();
-  std::string mysql_msg = mysql_clogin_encode.EncodeHdr(data, 1);
+  std::string mysql_msg = BufferHelper::EncodeHdr(data, 1);
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
   ClientLogin mysql_clogin_decode{};
@@ -165,7 +165,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin41EncDec) {
   std::string passwd = MySQLTestUtils::GetAuthResp();
   mysql_clogin_encode.SetAuthResp(passwd);
   std::string data = mysql_clogin_encode.Encode();
-  std::string mysql_msg = mysql_clogin_encode.EncodeHdr(data, 1);
+  std::string mysql_msg = BufferHelper::EncodeHdr(data, 1);
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
   ClientLogin mysql_clogin_decode{};
@@ -195,7 +195,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320EncDec) {
   std::string passwd = MySQLTestUtils::GetAuthResp();
   mysql_clogin_encode.SetAuthResp(passwd);
   std::string data = mysql_clogin_encode.Encode();
-  std::string mysql_msg = mysql_clogin_encode.EncodeHdr(data, 1);
+  std::string mysql_msg = BufferHelper::EncodeHdr(data, 1);
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
   ClientLogin mysql_clogin_decode{};
@@ -225,7 +225,7 @@ TEST_F(MySQLCodecTest, MySQLClientLoginSSLEncDec) {
   std::string passwd = MySQLTestUtils::GetAuthResp();
   mysql_clogin_encode.SetAuthResp(passwd);
   std::string data = mysql_clogin_encode.Encode();
-  std::string mysql_msg = mysql_clogin_encode.EncodeHdr(data, 1);
+  std::string mysql_msg = BufferHelper::EncodeHdr(data, 1);
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
   ClientLogin mysql_clogin_decode{};
@@ -249,7 +249,7 @@ TEST_F(MySQLCodecTest, MySQLLoginOkEncDec) {
   mysql_loginok_encode.SetServerStatus(MYSQL_UT_SERVER_OK);
   mysql_loginok_encode.SetWarnings(MYSQL_UT_SERVER_WARNINGS);
   std::string data = mysql_loginok_encode.Encode();
-  std::string mysql_msg = mysql_loginok_encode.EncodeHdr(data, 2);
+  std::string mysql_msg = BufferHelper::EncodeHdr(data, 2);
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
   ClientLoginResponse mysql_loginok_decode{};

@@ -14,16 +14,17 @@ public:
   int Decode(Buffer::Instance&) override;
   std::string Encode() override;
 
-  MySQLCodec::Cmd GetCmd() const { return cmd_; }
+  Cmd ParseCmd(Buffer::Instance& data);
+  Cmd GetCmd() const { return cmd_; }
   const std::string& GetData() const { return data_; }
   std::string& GetDb() { return db_; }
-  void SetCmd(MySQLCodec::Cmd cmd);
+  void SetCmd(Cmd cmd);
   void SetData(std::string& data);
   void SetDb(std::string db);
   bool RunQueryParser() { return run_query_parser_; }
 
 private:
-  MySQLCodec::Cmd cmd_;
+  Cmd cmd_;
   std::string data_;
   std::string db_;
   bool run_query_parser_;

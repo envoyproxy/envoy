@@ -7,7 +7,44 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-int MySQLCodec::BufUint8Drain(Buffer::Instance& buffer, uint8_t& val) {
+void BufferHelper::BufUint8Add(Buffer::Instance& buffer, uint8_t val) {
+  buffer.add(&val, sizeof(uint8_t));
+}
+
+void BufferHelper::BufUint16Add(Buffer::Instance& buffer, uint16_t val) {
+  buffer.add(&val, sizeof(uint16_t));
+}
+
+void BufferHelper::BufUint32Add(Buffer::Instance& buffer, uint32_t val) {
+  buffer.add(&val, sizeof(uint32_t));
+}
+
+void BufferHelper::BufStringAdd(Buffer::Instance& buffer, const std::string& str) {
+  buffer.add(str);
+}
+
+std::string BufferHelper::BufToString(Buffer::Instance& buffer) {
+  char* data = static_cast<char*>(buffer.linearize(buffer.length()));
+  std::string s = std::string(data, buffer.length());
+  return s;
+}
+
+std::string BufferHelper::EncodeHdr(const std::string& cmd_str, int seq) {
+  MySQLHeader mysqlhdr;
+  mysqlhdr.fields.length = cmd_str.length();
+  mysqlhdr.fields.seq = seq;
+
+  Buffer::OwnedImpl buffer;
+  BufUint32Add(buffer, mysqlhdr.bits);
+
+  std::string e_string = BufToString(buffer);
+  e_string.append(cmd_str);
+  return e_string;
+}
+
+bool BufferHelper::EndOfBuffer(Buffer::Instance& buffer) { return buffer.length() == 0; }
+
+int BufferHelper::BufUint8Drain(Buffer::Instance& buffer, uint8_t& val) {
   if (buffer.length() < sizeof(uint8_t)) {
     return MYSQL_FAILURE;
   }
@@ -16,7 +53,7 @@ int MySQLCodec::BufUint8Drain(Buffer::Instance& buffer, uint8_t& val) {
   return MYSQL_SUCCESS;
 }
 
-int MySQLCodec::BufUint16Drain(Buffer::Instance& buffer, uint16_t& val) {
+int BufferHelper::BufUint16Drain(Buffer::Instance& buffer, uint16_t& val) {
   if (buffer.length() < sizeof(uint16_t)) {
     return MYSQL_FAILURE;
   }
@@ -25,7 +62,7 @@ int MySQLCodec::BufUint16Drain(Buffer::Instance& buffer, uint16_t& val) {
   return MYSQL_SUCCESS;
 }
 
-int MySQLCodec::BufUint32Drain(Buffer::Instance& buffer, uint32_t& val) {
+int BufferHelper::BufUint32Drain(Buffer::Instance& buffer, uint32_t& val) {
   if (buffer.length() < sizeof(uint32_t)) {
     return MYSQL_FAILURE;
   }
@@ -34,7 +71,7 @@ int MySQLCodec::BufUint32Drain(Buffer::Instance& buffer, uint32_t& val) {
   return MYSQL_SUCCESS;
 }
 
-int MySQLCodec::BufUint64Drain(Buffer::Instance& buffer, uint64_t& val) {
+int BufferHelper::BufUint64Drain(Buffer::Instance& buffer, uint64_t& val) {
   if (buffer.length() < sizeof(uint64_t)) {
     return MYSQL_FAILURE;
   }
@@ -43,7 +80,7 @@ int MySQLCodec::BufUint64Drain(Buffer::Instance& buffer, uint64_t& val) {
   return MYSQL_SUCCESS;
 }
 
-int MySQLCodec::BufReadBySizeDrain(Buffer::Instance& buffer, size_t len, int& val) {
+int BufferHelper::BufReadBySizeDrain(Buffer::Instance& buffer, size_t len, int& val) {
   if (buffer.length() < len) {
     return MYSQL_FAILURE;
   }
@@ -52,17 +89,9 @@ int MySQLCodec::BufReadBySizeDrain(Buffer::Instance& buffer, size_t len, int& va
   return MYSQL_SUCCESS;
 }
 
-int MySQLCodec::DrainBytes(Buffer::Instance& buffer, size_t skip_bytes) {
-  if (buffer.length() < skip_bytes) {
-    return MYSQL_FAILURE;
-  }
-  buffer.drain(skip_bytes);
-  return MYSQL_SUCCESS;
-}
-
 // Implementation of MySQL lenenc encoder based on
 // https://dev.mysql.com/doc/internals/en/integer.html#packet-Protocol::LengthEncodedInteger
-int MySQLCodec::ReadLengthEncodedIntegerDrain(Buffer::Instance& buffer, int& val) {
+int BufferHelper::ReadLengthEncodedIntegerDrain(Buffer::Instance& buffer, int& val) {
   int size = 0;
   uint8_t byte_val = 0;
   if (BufUint8Drain(buffer, byte_val) == MYSQL_FAILURE) {
@@ -88,7 +117,15 @@ int MySQLCodec::ReadLengthEncodedIntegerDrain(Buffer::Instance& buffer, int& val
   return MYSQL_SUCCESS;
 }
 
-int MySQLCodec::BufStringDrain(Buffer::Instance& buffer, std::string& str) {
+int BufferHelper::DrainBytes(Buffer::Instance& buffer, size_t skip_bytes) {
+  if (buffer.length() < skip_bytes) {
+    return MYSQL_FAILURE;
+  }
+  buffer.drain(skip_bytes);
+  return MYSQL_SUCCESS;
+}
+
+int BufferHelper::BufStringDrain(Buffer::Instance& buffer, std::string& str) {
   char end = MYSQL_STR_END;
   ssize_t index = buffer.search(&end, sizeof(end), 0);
   if (index == -1) {
@@ -103,7 +140,7 @@ int MySQLCodec::BufStringDrain(Buffer::Instance& buffer, std::string& str) {
   return MYSQL_SUCCESS;
 }
 
-int MySQLCodec::BufStringDrainBySize(Buffer::Instance& buffer, std::string& str, size_t len) {
+int BufferHelper::BufStringDrainBySize(Buffer::Instance& buffer, std::string& str, size_t len) {
   if (buffer.length() < len) {
     return MYSQL_FAILURE;
   }
@@ -113,35 +150,7 @@ int MySQLCodec::BufStringDrainBySize(Buffer::Instance& buffer, std::string& str,
   return MYSQL_SUCCESS;
 }
 
-std::string MySQLCodec::BufToString(Buffer::Instance& buffer) {
-  char* data = static_cast<char*>(buffer.linearize(buffer.length()));
-  std::string s = std::string(data, buffer.length());
-  return s;
-}
-
-MySQLCodec::Cmd MySQLCodec::ParseCmd(Buffer::Instance& data) {
-  uint8_t cmd;
-  if (BufUint8Drain(data, cmd) != MYSQL_SUCCESS) {
-    return MySQLCodec::Cmd::COM_NULL;
-  }
-  return static_cast<MySQLCodec::Cmd>(cmd);
-}
-
-void MySQLCodec::SetSeq(int seq) { seq_ = seq; }
-
-std::string MySQLCodec::EncodeHdr(const std::string& cmd_str, int seq) {
-  MySQLCodec::MySQLHeader mysqlhdr;
-  Buffer::OwnedImpl buffer;
-
-  mysqlhdr.fields.length = cmd_str.length();
-  mysqlhdr.fields.seq = seq;
-  BufUint32Add(buffer, mysqlhdr.bits);
-  std::string e_string = BufToString(buffer);
-  e_string.append(cmd_str);
-  return e_string;
-}
-
-int MySQLCodec::HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq) {
+int BufferHelper::HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq) {
   uint32_t val = 0;
   if (BufUint32Drain(buffer, val) != MYSQL_SUCCESS) {
     return MYSQL_FAILURE;
@@ -151,8 +160,6 @@ int MySQLCodec::HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq) {
   ENVOY_LOG(trace, "MYSQL-hdrseq {}, len {}", seq, len);
   return MYSQL_SUCCESS;
 }
-
-bool MySQLCodec::EndOfBuffer(Buffer::Instance& buffer) { return buffer.length() == 0; }
 
 bool DecoderImpl::decode(Buffer::Instance& data) {
   callbacks_.decode(data);

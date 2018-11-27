@@ -89,75 +89,81 @@ constexpr int MYSQL_SUCCESS = 0;
 constexpr int MYSQL_FAILURE = -1;
 constexpr char MYSQL_STR_END = '\0';
 
+enum class PktType {
+  MYSQL_REQUEST = 0,
+  MYSQL_RESPONSE = 1,
+};
+
+enum class Cmd {
+  COM_NULL = -1,
+  COM_SLEEP = 0,
+  COM_QUIT = 1,
+  COM_INIT_DB = 2,
+  COM_QUERY = 3,
+  COM_FIELD_LIST = 4,
+  COM_CREATE_DB = 5,
+  COM_DROP_DB = 6,
+  COM_REFRESH = 7,
+  COM_SHUTDOWN = 8,
+  COM_STATISTICS = 9,
+  COM_PROCESS_INFO = 10,
+  COM_CONNECT = 11,
+  COM_PROCESS_KILL = 12,
+  COM_DEBUG = 13,
+  COM_PING = 14,
+  COM_TIME = 15,
+  COM_DELAYED_INSERT = 16,
+  COM_CHANGE_USER = 17,
+  COM_DAEMON = 29,
+  COM_RESET_CONNECTION = 31,
+};
+
+PACKED_STRUCT(struct header_fields {
+  uint32_t length : 24;
+  uint32_t seq : 8;
+});
+
+union MySQLHeader {
+  header_fields fields;
+  uint32_t bits;
+};
+
 class MySQLCodec : public Logger::Loggable<Logger::Id::filter> {
 public:
-  enum class PktType {
-    MYSQL_REQUEST = 0,
-    MYSQL_RESPONSE = 1,
-  };
-
-  enum class Cmd {
-    COM_NULL = -1,
-    COM_SLEEP = 0,
-    COM_QUIT = 1,
-    COM_INIT_DB = 2,
-    COM_QUERY = 3,
-    COM_FIELD_LIST = 4,
-    COM_CREATE_DB = 5,
-    COM_DROP_DB = 6,
-    COM_REFRESH = 7,
-    COM_SHUTDOWN = 8,
-    COM_STATISTICS = 9,
-    COM_PROCESS_INFO = 10,
-    COM_CONNECT = 11,
-    COM_PROCESS_KILL = 12,
-    COM_DEBUG = 13,
-    COM_PING = 14,
-    COM_TIME = 15,
-    COM_DELAYED_INSERT = 16,
-    COM_CHANGE_USER = 17,
-    COM_DAEMON = 29,
-    COM_RESET_CONNECTION = 31,
-  };
-
-  PACKED_STRUCT(struct header_fields {
-    uint32_t length : 24;
-    uint32_t seq : 8;
-  });
-
-  union MySQLHeader {
-    header_fields fields;
-    uint32_t bits;
-  };
+  virtual ~MySQLCodec(){};
 
   virtual int Decode(Buffer::Instance& data) PURE;
   virtual std::string Encode() PURE;
-  virtual ~MySQLCodec(){};
 
-  Cmd ParseCmd(Buffer::Instance& data);
-  void BufUint8Add(Buffer::Instance& buffer, uint8_t val) { buffer.add(&val, sizeof(uint8_t)); }
-  void BufUint16Add(Buffer::Instance& buffer, uint16_t val) { buffer.add(&val, sizeof(uint16_t)); }
-  void BufUint32Add(Buffer::Instance& buffer, uint32_t val) { buffer.add(&val, sizeof(uint32_t)); }
-  void BufStringAdd(Buffer::Instance& buffer, const std::string& str) { buffer.add(str); }
-  std::string BufToString(Buffer::Instance& buffer);
-  std::string EncodeHdr(const std::string& cmd_str, int seq);
   int GetSeq() { return seq_; }
-  bool EndOfBuffer(Buffer::Instance& buffer);
-
-  int BufUint8Drain(Buffer::Instance& buffer, uint8_t& val);
-  int BufUint16Drain(Buffer::Instance& buffer, uint16_t& val);
-  int BufUint32Drain(Buffer::Instance& buffer, uint32_t& val);
-  int BufUint64Drain(Buffer::Instance& buffer, uint64_t& val);
-  int BufReadBySizeDrain(Buffer::Instance& buffer, size_t len, int& val);
-  int ReadLengthEncodedIntegerDrain(Buffer::Instance& buffer, int& val);
-  int DrainBytes(Buffer::Instance& buffer, size_t skip_bytes);
-  int BufStringDrain(Buffer::Instance& buffer, std::string& str);
-  int BufStringDrainBySize(Buffer::Instance& buffer, std::string& str, size_t len);
-  int HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq);
-  void SetSeq(int seq);
+  void SetSeq(int seq) { seq_ = seq; }
 
 private:
   int seq_;
+};
+
+/**
+ * IO helpers for reading/writing MySQL data from/to a buffer.
+ */
+class BufferHelper : public Logger::Loggable<Logger::Id::filter> {
+public:
+  static void BufUint8Add(Buffer::Instance& buffer, uint8_t val);
+  static void BufUint16Add(Buffer::Instance& buffer, uint16_t val);
+  static void BufUint32Add(Buffer::Instance& buffer, uint32_t val);
+  static void BufStringAdd(Buffer::Instance& buffer, const std::string& str);
+  static std::string BufToString(Buffer::Instance& buffer);
+  static std::string EncodeHdr(const std::string& cmd_str, int seq);
+  static bool EndOfBuffer(Buffer::Instance& buffer);
+  static int BufUint8Drain(Buffer::Instance& buffer, uint8_t& val);
+  static int BufUint16Drain(Buffer::Instance& buffer, uint16_t& val);
+  static int BufUint32Drain(Buffer::Instance& buffer, uint32_t& val);
+  static int BufUint64Drain(Buffer::Instance& buffer, uint64_t& val);
+  static int BufReadBySizeDrain(Buffer::Instance& buffer, size_t len, int& val);
+  static int ReadLengthEncodedIntegerDrain(Buffer::Instance& buffer, int& val);
+  static int DrainBytes(Buffer::Instance& buffer, size_t skip_bytes);
+  static int BufStringDrain(Buffer::Instance& buffer, std::string& str);
+  static int BufStringDrainBySize(Buffer::Instance& buffer, std::string& str, size_t len);
+  static int HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq);
 };
 
 /**
