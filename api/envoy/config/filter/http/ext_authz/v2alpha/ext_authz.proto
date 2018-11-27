@@ -36,8 +36,7 @@ message ExtAuthz {
   //     includes any of the HTTP 5xx errors, or a communication failure between the filter and the
   //     authorization server.
   //  2. When *failure_mode_allow* is false, the filter will *always* return a *Forbidden response*
-  //  to
-  //     the client. It will *not allow* traffic to the upstream in the presence of an error. This
+  //  to the client. It will *not allow* traffic to the upstream in the presence of an error. This
   //     includes any of the HTTP 5xx errors, or a communication failure between the filter and the
   //     authorization server.
   //
@@ -51,8 +50,9 @@ message ExtAuthz {
 // whether the request should be authorized or not.
 //
 // A successful check allows the authorization service adding or overriding headers from the
-// original request before dispatching it to the upstream. This is done by configuring which headers
-// in the authorization response should be sent to the upstream. See :ref:`allowed_upstream_headers
+// original request before dispatching them to the upstream. This is done by configuring whic
+// headers in the authorization response should be sent to the upstream. See
+// :ref:`allowed_upstream_headers
 // <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_upstream_headers>`
 // for more details.
 //
@@ -64,11 +64,10 @@ message ExtAuthz {
 // <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_client_headers>`
 // for more details.
 //
-// .. note::
+//  .. note::
 //
-//   Unlike the gRPC client that request and response headers are passed in the message,
-//   headers forwarded by via the raw HTTP client will affect the request or the response.
-//
+//    Unlike the gRPC client that request and response headers are passed in the message,
+//    headers forwarded by via the raw HTTP client will affect the request or the response.
 message HttpService {
   // Sets the HTTP server URI which the authorization requests must be sent to.
   envoy.api.v2.core.HttpUri server_uri = 1;

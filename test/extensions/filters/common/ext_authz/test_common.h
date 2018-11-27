@@ -14,12 +14,36 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-namespace {
-static bool CompareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs) {
-  return std::set<std::pair<Http::LowerCaseString, std::string>>(lhs.begin(), lhs.end()) ==
-         std::set<std::pair<Http::LowerCaseString, std::string>>(rhs.begin(), rhs.end());
-}
-} // namespace
+struct KeyValueOption {
+  std::string key;
+  std::string value;
+  bool append;
+};
+
+typedef std::vector<KeyValueOption> KeyValueOptionVector;
+typedef std::vector<envoy::api::v2::core::HeaderValueOption> HeaderValueOptionVector;
+typedef std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse> CheckResponsePtr;
+
+class TestCommon {
+public:
+  static Http::MessagePtr makeMessageResponse(const HeaderValueOptionVector& headers,
+                                              const std::string& body = std::string{});
+
+  static CheckResponsePtr
+  makeCheckResponse(Grpc::Status::GrpcStatus response_status = Grpc::Status::GrpcStatus::Ok,
+                    envoy::type::StatusCode http_status_code = envoy::type::StatusCode::OK,
+                    const std::string& body = std::string{},
+                    const HeaderValueOptionVector& headers = HeaderValueOptionVector{});
+
+  static Response
+  makeAuthzResponse(CheckStatus status, Http::Code status_code = Http::Code::OK,
+                    const std::string& body = std::string{},
+                    const HeaderValueOptionVector& headers = HeaderValueOptionVector{});
+
+  static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
+
+  static bool CompareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs);
+};
 
 MATCHER_P(AuthzErrorResponse, status, "") {
   // These fields should be always empty when the status is an error.
@@ -51,7 +75,7 @@ MATCHER_P(AuthzDeniedResponse, response, "") {
     return false;
   }
   // Compare headers_to_add.
-  return CompareHeaderVector(response.headers_to_add, arg->headers_to_add);
+  return TestCommon::CompareHeaderVector(response.headers_to_add, arg->headers_to_add);
 }
 
 MATCHER_P(AuthzOkResponse, response, "") {
@@ -59,47 +83,18 @@ MATCHER_P(AuthzOkResponse, response, "") {
     return false;
   }
   // Compare headers_to_apppend.
-  if (!CompareHeaderVector(response.headers_to_append, arg->headers_to_append)) {
+  if (!TestCommon::CompareHeaderVector(response.headers_to_append, arg->headers_to_append)) {
     return false;
   }
 
   // Compare headers_to_add.
-  return CompareHeaderVector(response.headers_to_add, arg->headers_to_add);
+  return TestCommon::CompareHeaderVector(response.headers_to_add, arg->headers_to_add);
   ;
 }
 
 MATCHER_P(ContainsPairAsHeader, pair, "") {
   return arg->headers().get(pair.first)->value().getStringView() == pair.second;
 }
-
-struct KeyValueOption {
-  std::string key;
-  std::string value;
-  bool append;
-};
-
-typedef std::vector<KeyValueOption> KeyValueOptionVector;
-typedef std::vector<envoy::api::v2::core::HeaderValueOption> HeaderValueOptionVector;
-typedef std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse> CheckResponsePtr;
-
-class TestCommon {
-public:
-  static Http::MessagePtr makeMessageResponse(const HeaderValueOptionVector& headers,
-                                              const std::string& body = std::string{});
-
-  static CheckResponsePtr
-  makeCheckResponse(Grpc::Status::GrpcStatus response_status = Grpc::Status::GrpcStatus::Ok,
-                    envoy::type::StatusCode http_status_code = envoy::type::StatusCode::OK,
-                    const std::string& body = std::string{},
-                    const HeaderValueOptionVector& headers = HeaderValueOptionVector{});
-
-  static Response
-  makeAuthzResponse(CheckStatus status, Http::Code status_code = Http::Code::OK,
-                    const std::string& body = std::string{},
-                    const HeaderValueOptionVector& headers = HeaderValueOptionVector{});
-
-  static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
-};
 
 } // namespace ExtAuthz
 } // namespace Common
