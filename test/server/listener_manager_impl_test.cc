@@ -278,7 +278,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterConfig) {
     "address": "tcp://127.0.0.1:1234",
     "filters": [
       {
-        "type" : "type",
+        "foo" : "type",
         "name" : "name",
         "config" : {}
       }
@@ -296,7 +296,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
     "address": "tcp://127.0.0.1:1234",
     "filters": [
       {
-        "type" : "write",
         "name" : "invalid",
         "config" : {}
       }
@@ -330,7 +329,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
     "bind_to_port": false,
     "filters": [
       {
-        "type" : "read",
         "name" : "stats_test",
         "config" : {}
       }
@@ -525,7 +523,7 @@ dynamic_draining_listeners:
     "name": "foo",
     "address": "tcp://127.0.0.1:1234",
     "filters": [
-      { "type" : "read", "name" : "fake", "config" : {} }
+      { "name" : "fake", "config" : {} }
     ]
   }
   )EOF";
@@ -791,7 +789,7 @@ dynamic_draining_listeners:
     "name": "baz",
     "address": "tcp://127.0.0.1:1236",
     "filters": [
-      { "type" : "read", "name" : "fake", "config" : {} }
+      { "name" : "fake", "config" : {} }
     ]
   }
   )EOF";
@@ -987,7 +985,7 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
     "name": "foo",
     "address": "tcp://127.0.0.1:1234",
     "filters": [
-      { "type" : "read", "name" : "fake", "config" : {} }
+      { "name" : "fake", "config" : {} }
     ]
   }
   )EOF";

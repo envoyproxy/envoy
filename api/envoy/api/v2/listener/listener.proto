@@ -42,13 +42,6 @@ message Filter {
     // [#not-implemented-hide:]
     google.protobuf.Any typed_config = 4;
   }
-  // [#not-implemented-hide:]
-  message DeprecatedV1 {
-    string type = 1;
-  }
-
-  // [#not-implemented-hide:]
-  DeprecatedV1 deprecated_v1 = 3 [deprecated = true];
 }
 
 // Specifies the match criteria for selecting a specific filter chain for a
