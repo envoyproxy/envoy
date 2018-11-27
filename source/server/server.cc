@@ -54,7 +54,8 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
                            ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory)
     : shutdown_(false), options_(options), time_system_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
-      thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec(), thread_factory)),
+      thread_local_(tls),
+      api_(new Api::Impl(options.fileFlushIntervalMsec(), thread_factory, store)),
       secret_manager_(std::make_unique<Secret::SecretManagerImpl>()),
       dispatcher_(api_->allocateDispatcher(time_system)),
       singleton_manager_(new Singleton::ManagerImpl()),
@@ -62,7 +63,7 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks, time_system),
       dns_resolver_(dispatcher_->createDnsResolver({})),
-      access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false),
+      access_log_manager_(*api_, *dispatcher_, access_log_lock), terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr) {
 
@@ -116,8 +117,6 @@ InstanceImpl::~InstanceImpl() {
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_->clusterManager(); }
-
-Tracing::HttpTracer& InstanceImpl::httpTracer() { return config_->httpTracer(); }
 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
@@ -308,13 +307,14 @@ void InstanceImpl::initialize(Options& options,
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo(), secretManager(), api());
+      localInfo(), secretManager(), api(), http_context_);
 
   // Now the configuration gets parsed. The configuration may start setting thread local data
   // per above. See MainImpl::initialize() for why we do this pointer dance.
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
   main_config->initialize(bootstrap_, *this, *cluster_manager_factory_);
+  http_context_.setTracer(main_config->httpTracer());
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.

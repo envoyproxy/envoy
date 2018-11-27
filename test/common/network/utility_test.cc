@@ -8,6 +8,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -131,6 +132,46 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
 }
 
 TEST(NetworkUtility, GetOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
+
+TEST(NetworkUtility, LocalConnection) {
+  Network::Address::InstanceConstSharedPtr local_addr;
+  Network::Address::InstanceConstSharedPtr remote_addr;
+
+  testing::NiceMock<Network::MockConnectionSocket> socket;
+
+  EXPECT_CALL(socket, remoteAddress()).WillRepeatedly(testing::ReturnRef(local_addr));
+  EXPECT_CALL(socket, remoteAddress()).WillRepeatedly(testing::ReturnRef(remote_addr));
+
+  local_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
+  remote_addr.reset(new Network::Address::PipeInstance("/pipe/path"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::PipeInstance("/pipe/path"));
+  remote_addr.reset(new Network::Address::PipeInstance("/pipe/path"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
+  remote_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv4Instance("127.0.0.2"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4"));
+  remote_addr.reset(new Network::Address::Ipv4Instance("8.8.8.8"));
+  EXPECT_FALSE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv6Instance("::1"));
+  remote_addr.reset(new Network::Address::Ipv6Instance("::1"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv6Instance("::2"));
+  remote_addr.reset(new Network::Address::Ipv6Instance("::1"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  remote_addr.reset(new Network::Address::Ipv6Instance("fd00::"));
+  EXPECT_FALSE(Utility::isLocalConnection(socket));
+}
 
 TEST(NetworkUtility, InternalAddress) {
   EXPECT_TRUE(Utility::isInternalAddress(Address::Ipv4Instance("127.0.0.1")));

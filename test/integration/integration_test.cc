@@ -387,6 +387,7 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
 // response path.
 TEST_P(IntegrationTest, ViaAppendWith100Continue) {
   config_helper_.addConfigModifier(setVia("foo"));
+  testEnvoyHandling100Continue(false, "foo");
 }
 
 // Test delayed close semantics for downstream HTTP/1.1 connections. When an early response is

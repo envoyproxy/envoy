@@ -23,7 +23,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
 
   const auto filter_config = std::make_shared<FilterConfig>(
       proto_config, context.localInfo(), context.scope(), context.runtime(),
-      context.clusterManager(), context.codeStats());
+      context.clusterManager(), context.httpContext());
 
   if (proto_config.has_http_service()) {
     const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.http_service().server_uri(),

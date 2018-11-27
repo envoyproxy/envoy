@@ -136,7 +136,7 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
                                            EMPTY_STRING,
                                            EMPTY_STRING,
                                            false};
-    codeStats().chargeResponseStat(info);
+    httpContext().codeStats().chargeResponseStat(info);
     headers_to_add_->insertEnvoyRateLimited().value(
         Http::Headers::get().EnvoyRateLimitedValues.True);
     break;
