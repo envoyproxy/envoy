@@ -26,8 +26,6 @@ routing PRs, questions, etc. to the right place.
   * Outlier detection, HTTP routing, xDS, configuration/operational questions.
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
   * Base server (watchdog, workers, startup, stack trace handling, etc.).
-* Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
-  * Redis, Python, configuration/operational questions.
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan@tetrate.io)
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions).
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@tetrate.io)
@@ -52,3 +50,5 @@ matter expert reviews. Feel free to loop them in as needed.
   * Bazel/build.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * abseil and performance work.
+* Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
+  * Redis, Python, configuration/operational questions.
