@@ -16,7 +16,7 @@ using testing::Return;
 namespace Envoy {
 namespace Network {
 
-template <Network::Address::SocketType S>
+template <Network::Address::SocketType Type>
 class ListenSocketImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
   ListenSocketImplTest() : version_(GetParam()) {}
@@ -24,7 +24,7 @@ protected:
 
   template <typename... Args>
   std::unique_ptr<ListenSocketImpl> createListenSocketPtr(Args&&... args) {
-    using NetworkSocketTraitType = NetworkSocketTrait<S>;
+    using NetworkSocketTraitType = NetworkSocketTrait<Type>;
 
     return std::make_unique<NetworkListenSocket<NetworkSocketTraitType>>(
         std::forward<Args>(args)...);
@@ -55,7 +55,7 @@ protected:
     auto socket1 = createListenSocketPtr(addr, options, true);
     // TODO (conqerAtapple): This is unfortunate. We should be able to templatize this
     // instead of if block.
-    if (NetworkSocketTrait<S>::type == Address::SocketType::Stream) {
+    if (NetworkSocketTrait<Type>::type == Address::SocketType::Stream) {
       EXPECT_EQ(0, listen(socket1->fd(), 0));
     }
 
