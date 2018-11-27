@@ -29,8 +29,8 @@ message RBAC {
   string stat_prefix = 3 [(validate.rules).string.min_bytes = 1];
 
   enum EnforcementType {
-    // Apply RBAC policies during connection establishment to upstream.
-    ON_CONNECT = 0;
+    // Apply RBAC policies when the first byte of data arrives on the connection.
+    ONE_TIME_ON_FIRST_BYTE = 0;
 
     // Continuously apply RBAC policies as data arrives. Use this mode when
     // using RBAC with message oriented protocols such as Mongo, MySQL, Kafka,
@@ -39,9 +39,10 @@ message RBAC {
     CONTINUOUS = 1;
   };
 
-  // RBAC enforcement strategy. By default RBAC will be enforced during connection
-  // establishment to upstream. When used in conjunction with filters that emit
-  // dynamic metadata after decoding a payload (e.g., Mongo, MySQL, Kafka) set the
-  // enforcement type to CONTINUOUS.
+  // RBAC enforcement strategy. By default RBAC will be enforced only once
+  // when the first byte of data arrives from the downstream. When used in
+  // conjunction with filters that emit dynamic metadata after decoding
+  // every payload (e.g., Mongo, MySQL, Kafka) set the enforcement type to
+  // CONTINUOUS to enforce RBAC policies on every message boundary.
   EnforcementType enforcement_type = 4;
 }
