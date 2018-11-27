@@ -1,5 +1,5 @@
-// DO NOT EDIT - THIS FILE WAS GENERATED
-// clang-format off
+// FIXME(adam.kotwasinski) this file can be generated, as it's repeating the same code for 0..9
+// delegates
 #pragma once
 
 #include <algorithm>
@@ -26,6 +26,7 @@ namespace Kafka {
  * This header contains only composite deserializers
  * The basic design is composite deserializer creating delegates DeserializerType1..N
  * Result of type ResponseType is constructed by getting results of each of delegates
+ * These deserializers can throw, if any of the delegate deserializers can
  */
 
 /**
@@ -38,26 +39,16 @@ namespace Kafka {
  *
  * @param ResponseType type of deserialized data
  */
-template <
-  typename ResponseType
->
+template <typename ResponseType>
 class CompositeDeserializerWith0Delegates : public Deserializer<ResponseType> {
 public:
-
   CompositeDeserializerWith0Delegates(){};
 
-  size_t feed(const char*&, uint64_t&) {
-    return 0;
-  }
+  size_t feed(const char*&, uint64_t&) { return 0; }
 
-  bool ready() const {
-    return true;
-  }
+  bool ready() const { return true; }
 
-  ResponseType get() const {
-    return {
-    };
-  }
+  ResponseType get() const { return {}; }
 
 protected:
 };
@@ -73,13 +64,9 @@ protected:
  * @param ResponseType type of deserialized data
  * @param DeserializerType1 deserializer 1 (result used as argument 1 of ResponseType's ctor)
  */
-template <
-  typename ResponseType,
-  typename DeserializerType1
->
+template <typename ResponseType, typename DeserializerType1>
 class CompositeDeserializerWith1Delegates : public Deserializer<ResponseType> {
 public:
-
   CompositeDeserializerWith1Delegates(){};
 
   size_t feed(const char*& buffer, uint64_t& remaining) {
@@ -88,15 +75,9 @@ public:
     return consumed;
   }
 
-  bool ready() const {
-    return delegate1_.ready();
-  }
+  bool ready() const { return delegate1_.ready(); }
 
-  ResponseType get() const {
-    return {
-      delegate1_.get()
-    };
-  }
+  ResponseType get() const { return {delegate1_.get()}; }
 
 protected:
   DeserializerType1 delegate1_;
@@ -114,14 +95,9 @@ protected:
  * @param DeserializerType1 deserializer 1 (result used as argument 1 of ResponseType's ctor)
  * @param DeserializerType2 deserializer 2 (result used as argument 2 of ResponseType's ctor)
  */
-template <
-  typename ResponseType,
-  typename DeserializerType1,
-  typename DeserializerType2
->
+template <typename ResponseType, typename DeserializerType1, typename DeserializerType2>
 class CompositeDeserializerWith2Delegates : public Deserializer<ResponseType> {
 public:
-
   CompositeDeserializerWith2Delegates(){};
 
   size_t feed(const char*& buffer, uint64_t& remaining) {
@@ -131,16 +107,9 @@ public:
     return consumed;
   }
 
-  bool ready() const {
-    return delegate2_.ready();
-  }
+  bool ready() const { return delegate2_.ready(); }
 
-  ResponseType get() const {
-    return {
-      delegate1_.get(),
-      delegate2_.get()
-    };
-  }
+  ResponseType get() const { return {delegate1_.get(), delegate2_.get()}; }
 
 protected:
   DeserializerType1 delegate1_;
@@ -160,15 +129,10 @@ protected:
  * @param DeserializerType2 deserializer 2 (result used as argument 2 of ResponseType's ctor)
  * @param DeserializerType3 deserializer 3 (result used as argument 3 of ResponseType's ctor)
  */
-template <
-  typename ResponseType,
-  typename DeserializerType1,
-  typename DeserializerType2,
-  typename DeserializerType3
->
+template <typename ResponseType, typename DeserializerType1, typename DeserializerType2,
+          typename DeserializerType3>
 class CompositeDeserializerWith3Delegates : public Deserializer<ResponseType> {
 public:
-
   CompositeDeserializerWith3Delegates(){};
 
   size_t feed(const char*& buffer, uint64_t& remaining) {
@@ -179,17 +143,9 @@ public:
     return consumed;
   }
 
-  bool ready() const {
-    return delegate3_.ready();
-  }
+  bool ready() const { return delegate3_.ready(); }
 
-  ResponseType get() const {
-    return {
-      delegate1_.get(),
-      delegate2_.get(),
-      delegate3_.get()
-    };
-  }
+  ResponseType get() const { return {delegate1_.get(), delegate2_.get(), delegate3_.get()}; }
 
 protected:
   DeserializerType1 delegate1_;
@@ -211,16 +167,10 @@ protected:
  * @param DeserializerType3 deserializer 3 (result used as argument 3 of ResponseType's ctor)
  * @param DeserializerType4 deserializer 4 (result used as argument 4 of ResponseType's ctor)
  */
-template <
-  typename ResponseType,
-  typename DeserializerType1,
-  typename DeserializerType2,
-  typename DeserializerType3,
-  typename DeserializerType4
->
+template <typename ResponseType, typename DeserializerType1, typename DeserializerType2,
+          typename DeserializerType3, typename DeserializerType4>
 class CompositeDeserializerWith4Delegates : public Deserializer<ResponseType> {
 public:
-
   CompositeDeserializerWith4Delegates(){};
 
   size_t feed(const char*& buffer, uint64_t& remaining) {
@@ -232,17 +182,10 @@ public:
     return consumed;
   }
 
-  bool ready() const {
-    return delegate4_.ready();
-  }
+  bool ready() const { return delegate4_.ready(); }
 
   ResponseType get() const {
-    return {
-      delegate1_.get(),
-      delegate2_.get(),
-      delegate3_.get(),
-      delegate4_.get()
-    };
+    return {delegate1_.get(), delegate2_.get(), delegate3_.get(), delegate4_.get()};
   }
 
 protected:
@@ -267,17 +210,10 @@ protected:
  * @param DeserializerType4 deserializer 4 (result used as argument 4 of ResponseType's ctor)
  * @param DeserializerType5 deserializer 5 (result used as argument 5 of ResponseType's ctor)
  */
-template <
-  typename ResponseType,
-  typename DeserializerType1,
-  typename DeserializerType2,
-  typename DeserializerType3,
-  typename DeserializerType4,
-  typename DeserializerType5
->
+template <typename ResponseType, typename DeserializerType1, typename DeserializerType2,
+          typename DeserializerType3, typename DeserializerType4, typename DeserializerType5>
 class CompositeDeserializerWith5Delegates : public Deserializer<ResponseType> {
 public:
-
   CompositeDeserializerWith5Delegates(){};
 
   size_t feed(const char*& buffer, uint64_t& remaining) {
@@ -290,18 +226,11 @@ public:
     return consumed;
   }
 
-  bool ready() const {
-    return delegate5_.ready();
-  }
+  bool ready() const { return delegate5_.ready(); }
 
   ResponseType get() const {
-    return {
-      delegate1_.get(),
-      delegate2_.get(),
-      delegate3_.get(),
-      delegate4_.get(),
-      delegate5_.get()
-    };
+    return {delegate1_.get(), delegate2_.get(), delegate3_.get(), delegate4_.get(),
+            delegate5_.get()};
   }
 
 protected:
@@ -328,18 +257,11 @@ protected:
  * @param DeserializerType5 deserializer 5 (result used as argument 5 of ResponseType's ctor)
  * @param DeserializerType6 deserializer 6 (result used as argument 6 of ResponseType's ctor)
  */
-template <
-  typename ResponseType,
-  typename DeserializerType1,
-  typename DeserializerType2,
-  typename DeserializerType3,
-  typename DeserializerType4,
-  typename DeserializerType5,
-  typename DeserializerType6
->
+template <typename ResponseType, typename DeserializerType1, typename DeserializerType2,
+          typename DeserializerType3, typename DeserializerType4, typename DeserializerType5,
+          typename DeserializerType6>
 class CompositeDeserializerWith6Delegates : public Deserializer<ResponseType> {
 public:
-
   CompositeDeserializerWith6Delegates(){};
 
   size_t feed(const char*& buffer, uint64_t& remaining) {
@@ -353,19 +275,11 @@ public:
     return consumed;
   }
 
-  bool ready() const {
-    return delegate6_.ready();
-  }
+  bool ready() const { return delegate6_.ready(); }
 
   ResponseType get() const {
-    return {
-      delegate1_.get(),
-      delegate2_.get(),
-      delegate3_.get(),
-      delegate4_.get(),
-      delegate5_.get(),
-      delegate6_.get()
-    };
+    return {delegate1_.get(), delegate2_.get(), delegate3_.get(),
+            delegate4_.get(), delegate5_.get(), delegate6_.get()};
   }
 
 protected:
@@ -394,19 +308,11 @@ protected:
  * @param DeserializerType6 deserializer 6 (result used as argument 6 of ResponseType's ctor)
  * @param DeserializerType7 deserializer 7 (result used as argument 7 of ResponseType's ctor)
  */
-template <
-  typename ResponseType,
-  typename DeserializerType1,
-  typename DeserializerType2,
-  typename DeserializerType3,
-  typename DeserializerType4,
-  typename DeserializerType5,
-  typename DeserializerType6,
-  typename DeserializerType7
->
+template <typename ResponseType, typename DeserializerType1, typename DeserializerType2,
+          typename DeserializerType3, typename DeserializerType4, typename DeserializerType5,
+          typename DeserializerType6, typename DeserializerType7>
 class CompositeDeserializerWith7Delegates : public Deserializer<ResponseType> {
 public:
-
   CompositeDeserializerWith7Delegates(){};
 
   size_t feed(const char*& buffer, uint64_t& remaining) {
@@ -421,20 +327,11 @@ public:
     return consumed;
   }
 
-  bool ready() const {
-    return delegate7_.ready();
-  }
+  bool ready() const { return delegate7_.ready(); }
 
   ResponseType get() const {
-    return {
-      delegate1_.get(),
-      delegate2_.get(),
-      delegate3_.get(),
-      delegate4_.get(),
-      delegate5_.get(),
-      delegate6_.get(),
-      delegate7_.get()
-    };
+    return {delegate1_.get(), delegate2_.get(), delegate3_.get(), delegate4_.get(),
+            delegate5_.get(), delegate6_.get(), delegate7_.get()};
   }
 
 protected:
@@ -465,20 +362,11 @@ protected:
  * @param DeserializerType7 deserializer 7 (result used as argument 7 of ResponseType's ctor)
  * @param DeserializerType8 deserializer 8 (result used as argument 8 of ResponseType's ctor)
  */
-template <
-  typename ResponseType,
-  typename DeserializerType1,
-  typename DeserializerType2,
-  typename DeserializerType3,
-  typename DeserializerType4,
-  typename DeserializerType5,
-  typename DeserializerType6,
-  typename DeserializerType7,
-  typename DeserializerType8
->
+template <typename ResponseType, typename DeserializerType1, typename DeserializerType2,
+          typename DeserializerType3, typename DeserializerType4, typename DeserializerType5,
+          typename DeserializerType6, typename DeserializerType7, typename DeserializerType8>
 class CompositeDeserializerWith8Delegates : public Deserializer<ResponseType> {
 public:
-
   CompositeDeserializerWith8Delegates(){};
 
   size_t feed(const char*& buffer, uint64_t& remaining) {
@@ -494,21 +382,11 @@ public:
     return consumed;
   }
 
-  bool ready() const {
-    return delegate8_.ready();
-  }
+  bool ready() const { return delegate8_.ready(); }
 
   ResponseType get() const {
-    return {
-      delegate1_.get(),
-      delegate2_.get(),
-      delegate3_.get(),
-      delegate4_.get(),
-      delegate5_.get(),
-      delegate6_.get(),
-      delegate7_.get(),
-      delegate8_.get()
-    };
+    return {delegate1_.get(), delegate2_.get(), delegate3_.get(), delegate4_.get(),
+            delegate5_.get(), delegate6_.get(), delegate7_.get(), delegate8_.get()};
   }
 
 protected:
@@ -541,21 +419,12 @@ protected:
  * @param DeserializerType8 deserializer 8 (result used as argument 8 of ResponseType's ctor)
  * @param DeserializerType9 deserializer 9 (result used as argument 9 of ResponseType's ctor)
  */
-template <
-  typename ResponseType,
-  typename DeserializerType1,
-  typename DeserializerType2,
-  typename DeserializerType3,
-  typename DeserializerType4,
-  typename DeserializerType5,
-  typename DeserializerType6,
-  typename DeserializerType7,
-  typename DeserializerType8,
-  typename DeserializerType9
->
+template <typename ResponseType, typename DeserializerType1, typename DeserializerType2,
+          typename DeserializerType3, typename DeserializerType4, typename DeserializerType5,
+          typename DeserializerType6, typename DeserializerType7, typename DeserializerType8,
+          typename DeserializerType9>
 class CompositeDeserializerWith9Delegates : public Deserializer<ResponseType> {
 public:
-
   CompositeDeserializerWith9Delegates(){};
 
   size_t feed(const char*& buffer, uint64_t& remaining) {
@@ -572,22 +441,12 @@ public:
     return consumed;
   }
 
-  bool ready() const {
-    return delegate9_.ready();
-  }
+  bool ready() const { return delegate9_.ready(); }
 
   ResponseType get() const {
-    return {
-      delegate1_.get(),
-      delegate2_.get(),
-      delegate3_.get(),
-      delegate4_.get(),
-      delegate5_.get(),
-      delegate6_.get(),
-      delegate7_.get(),
-      delegate8_.get(),
-      delegate9_.get()
-    };
+    return {delegate1_.get(), delegate2_.get(), delegate3_.get(),
+            delegate4_.get(), delegate5_.get(), delegate6_.get(),
+            delegate7_.get(), delegate8_.get(), delegate9_.get()};
   }
 
 protected:
@@ -606,4 +465,3 @@ protected:
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
-// clang-format on

@@ -16,6 +16,7 @@ PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf391
 OPENCENSUS_GIT_SHA = "ab82e5fdec8267dc2a726544b10af97675970847"  # May 23, 2018
 OPENCENSUS_SHA = "1950f844d9f338ba731897a9bb526f9074c0487b3f274ce2ec3b4feaf0bef7e2"
 
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 def api_dependencies():
@@ -30,6 +31,16 @@ def api_dependencies():
         sha256 = PGV_SHA256,
         strip_prefix = "protoc-gen-validate-" + PGV_RELEASE,
         url = "https://github.com/lyft/protoc-gen-validate/archive/v" + PGV_RELEASE + ".tar.gz",
+    )
+    http_file(
+        name = "kafka_produce_request_spec",
+        sha256 = "e035f70a136ef5a5ef2ff17b52dc10f2eae4ac596639689f5584054909d5816f",
+        urls = ["https://raw.githubusercontent.com/apache/kafka/2.2/clients/src/main/resources/common/message/ProduceRequest.json"],
+    )
+    http_file(
+        name = "kafka_fetch_request_spec",
+        sha256 = "9209b68fe0295818071c2f644363cf71e6443eb61f8e9d2636412876c5e2bae8",
+        urls = ["https://raw.githubusercontent.com/apache/kafka/2.2/clients/src/main/resources/common/message/FetchRequest.json"],
     )
     http_archive(
         name = "googleapis",

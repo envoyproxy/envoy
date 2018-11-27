@@ -1,7 +1,7 @@
 #include "common/common/stack_array.h"
 
-#include "extensions/filters/network/kafka/generated/serialization_composite.h"
 #include "extensions/filters/network/kafka/serialization.h"
+#include "extensions/filters/network/kafka/serialization_composite.h"
 
 #include "test/mocks/server/mocks.h"
 
@@ -44,7 +44,14 @@ TEST(ArrayDeserializer, EmptyBufferShouldNotBeReady) {
   ASSERT_EQ(testee.ready(), false);
 }
 
-EncodingContext encoder;
+TEST(NullableArrayDeserializer, EmptyBufferShouldNotBeReady) {
+  // given
+  const NullableArrayDeserializer<int8_t, Int8Deserializer> testee{};
+  // when, then
+  ASSERT_EQ(testee.ready(), false);
+}
+
+EncodingContext encoder{-1}; // api_version does not matter for primitive types
 
 // helper function
 const char* getRawData(const Buffer::OwnedImpl& buffer) {
@@ -272,7 +279,7 @@ TEST(NullableBytesDeserializer, ShouldThrowOnInvalidLength) {
 }
 
 TEST(ArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
-  const NullableArray<std::string> value{{"aaa", "bbbbb", "cc", "d", "e", "ffffffff"}};
+  const std::vector<std::string> value{{"aaa", "bbbbb", "cc", "d", "e", "ffffffff"}};
   serializeThenDeserializeAndCheckEquality<ArrayDeserializer<std::string, StringDeserializer>>(
       value);
 }
@@ -280,6 +287,28 @@ TEST(ArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
 TEST(ArrayDeserializer, ShouldThrowOnInvalidLength) {
   // given
   ArrayDeserializer<std::string, StringDeserializer> testee;
+  Buffer::OwnedImpl buffer;
+
+  const int32_t len = -1; // ARRAY accepts only >= 0
+  encoder.encode(len, buffer);
+
+  uint64_t remaining = 1024;
+  const char* data = getRawData(buffer);
+
+  // when
+  // then
+  EXPECT_THROW(testee.feed(data, remaining), EnvoyException);
+}
+
+TEST(NullableArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
+  const NullableArray<std::string> value{{"aaa", "bbbbb", "cc", "d", "e", "ffffffff"}};
+  serializeThenDeserializeAndCheckEquality<
+      NullableArrayDeserializer<std::string, StringDeserializer>>(value);
+}
+
+TEST(NullableArrayDeserializer, ShouldThrowOnInvalidLength) {
+  // given
+  NullableArrayDeserializer<std::string, StringDeserializer> testee;
   Buffer::OwnedImpl buffer;
 
   const int32_t len = -2; // -1 is OK for ARRAY

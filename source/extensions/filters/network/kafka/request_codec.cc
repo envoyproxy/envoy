@@ -53,15 +53,15 @@ void RequestDecoder::doParse(ParserSharedPtr& parser, const Buffer::RawSlice& sl
   }
 }
 
-void RequestEncoder::encode(const Request& message) {
-  EncodingContext encoder;
+void MessageEncoderImpl::encode(const Message& message) {
   Buffer::OwnedImpl data_buffer;
   // TODO (adam.kotwasinski) precompute the size instead of using temporary
   // also, when we have 'computeSize' method, then we can push encoding request's size into
   // Request::encode
-  int32_t data_len = encoder.encode(message, data_buffer); // encode data computing data length
-  encoder.encode(data_len, output_);                       // encode data length into result
-  output_.add(data_buffer);                                // copy data into result
+  int32_t data_len = message.encode(data_buffer); // encode data computing data length
+  EncodingContext encoder{-1};
+  encoder.encode(data_len, output_); // encode data length into result
+  output_.add(data_buffer);          // copy data into result
 }
 
 } // namespace Kafka

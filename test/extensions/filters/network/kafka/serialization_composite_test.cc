@@ -1,9 +1,9 @@
-// DO NOT EDIT - THIS FILE WAS GENERATED
-// clang-format off
+// FIXME(adam.kotwasinski) this file can be generated, as it's repeating the same code for 0..9
+// delegates
 #include "common/common/stack_array.h"
 
-#include "extensions/filters/network/kafka/generated/serialization_composite.h"
 #include "extensions/filters/network/kafka/serialization.h"
+#include "extensions/filters/network/kafka/serialization_composite.h"
 
 #include "test/mocks/server/mocks.h"
 
@@ -41,7 +41,7 @@ void serializeThenDeserializeAndCheckEqualityInOneGo(AT expected) {
   BT testee{};
 
   Buffer::OwnedImpl buffer;
-  EncodingContext encoder;
+  EncodingContext encoder{-1};
   const size_t written = encoder.encode(expected, buffer);
 
   uint64_t remaining =
@@ -79,7 +79,7 @@ void serializeThenDeserializeAndCheckEqualityWithChunks(AT expected) {
   BT testee{};
 
   Buffer::OwnedImpl buffer;
-  EncodingContext encoder;
+  EncodingContext encoder{-1};
   const size_t written = encoder.encode(expected, buffer);
 
   const char* data = getRawData(buffer);
@@ -119,17 +119,12 @@ template <typename BT, typename AT> void serializeThenDeserializeAndCheckEqualit
 
 struct CompositeResultWith0Fields {
 
-  size_t encode(Buffer::Instance&, EncodingContext&) const {
-    return 0;
-  }
+  size_t encode(Buffer::Instance&, EncodingContext&) const { return 0; }
 
-  bool operator==(const CompositeResultWith0Fields&) const {
-    return true;
-  }
+  bool operator==(const CompositeResultWith0Fields&) const { return true; }
 };
 
-typedef CompositeDeserializerWith0Delegates<CompositeResultWith0Fields>
-    TestCompositeDeserializer0;
+typedef CompositeDeserializerWith0Delegates<CompositeResultWith0Fields> TestCompositeDeserializer0;
 
 // composite with 0 delegates is special case: it's always ready
 TEST(CompositeDeserializerWith0Delegates, EmptyBufferShouldBeReady) {
@@ -153,9 +148,7 @@ struct CompositeResultWith1Fields {
     return written;
   }
 
-  bool operator==(const CompositeResultWith1Fields& rhs) const {
-    return field1_ == rhs.field1_;
-  }
+  bool operator==(const CompositeResultWith1Fields& rhs) const { return field1_ == rhs.field1_; }
 };
 
 typedef CompositeDeserializerWith1Delegates<CompositeResultWith1Fields, StringDeserializer>
@@ -189,7 +182,8 @@ struct CompositeResultWith2Fields {
   }
 };
 
-typedef CompositeDeserializerWith2Delegates<CompositeResultWith2Fields, StringDeserializer,StringDeserializer>
+typedef CompositeDeserializerWith2Delegates<CompositeResultWith2Fields, StringDeserializer,
+                                            StringDeserializer>
     TestCompositeDeserializer2;
 
 TEST(CompositeDeserializerWith2Delegates, EmptyBufferShouldNotBeReady) {
@@ -222,7 +216,8 @@ struct CompositeResultWith3Fields {
   }
 };
 
-typedef CompositeDeserializerWith3Delegates<CompositeResultWith3Fields, StringDeserializer,StringDeserializer,StringDeserializer>
+typedef CompositeDeserializerWith3Delegates<CompositeResultWith3Fields, StringDeserializer,
+                                            StringDeserializer, StringDeserializer>
     TestCompositeDeserializer3;
 
 TEST(CompositeDeserializerWith3Delegates, EmptyBufferShouldNotBeReady) {
@@ -253,11 +248,14 @@ struct CompositeResultWith4Fields {
   }
 
   bool operator==(const CompositeResultWith4Fields& rhs) const {
-    return field1_ == rhs.field1_ && field2_ == rhs.field2_ && field3_ == rhs.field3_ && field4_ == rhs.field4_;
+    return field1_ == rhs.field1_ && field2_ == rhs.field2_ && field3_ == rhs.field3_ &&
+           field4_ == rhs.field4_;
   }
 };
 
-typedef CompositeDeserializerWith4Delegates<CompositeResultWith4Fields, StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer>
+typedef CompositeDeserializerWith4Delegates<CompositeResultWith4Fields, StringDeserializer,
+                                            StringDeserializer, StringDeserializer,
+                                            StringDeserializer>
     TestCompositeDeserializer4;
 
 TEST(CompositeDeserializerWith4Delegates, EmptyBufferShouldNotBeReady) {
@@ -290,11 +288,14 @@ struct CompositeResultWith5Fields {
   }
 
   bool operator==(const CompositeResultWith5Fields& rhs) const {
-    return field1_ == rhs.field1_ && field2_ == rhs.field2_ && field3_ == rhs.field3_ && field4_ == rhs.field4_ && field5_ == rhs.field5_;
+    return field1_ == rhs.field1_ && field2_ == rhs.field2_ && field3_ == rhs.field3_ &&
+           field4_ == rhs.field4_ && field5_ == rhs.field5_;
   }
 };
 
-typedef CompositeDeserializerWith5Delegates<CompositeResultWith5Fields, StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer>
+typedef CompositeDeserializerWith5Delegates<CompositeResultWith5Fields, StringDeserializer,
+                                            StringDeserializer, StringDeserializer,
+                                            StringDeserializer, StringDeserializer>
     TestCompositeDeserializer5;
 
 TEST(CompositeDeserializerWith5Delegates, EmptyBufferShouldNotBeReady) {
@@ -329,11 +330,14 @@ struct CompositeResultWith6Fields {
   }
 
   bool operator==(const CompositeResultWith6Fields& rhs) const {
-    return field1_ == rhs.field1_ && field2_ == rhs.field2_ && field3_ == rhs.field3_ && field4_ == rhs.field4_ && field5_ == rhs.field5_ && field6_ == rhs.field6_;
+    return field1_ == rhs.field1_ && field2_ == rhs.field2_ && field3_ == rhs.field3_ &&
+           field4_ == rhs.field4_ && field5_ == rhs.field5_ && field6_ == rhs.field6_;
   }
 };
 
-typedef CompositeDeserializerWith6Delegates<CompositeResultWith6Fields, StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer>
+typedef CompositeDeserializerWith6Delegates<
+    CompositeResultWith6Fields, StringDeserializer, StringDeserializer, StringDeserializer,
+    StringDeserializer, StringDeserializer, StringDeserializer>
     TestCompositeDeserializer6;
 
 TEST(CompositeDeserializerWith6Delegates, EmptyBufferShouldNotBeReady) {
@@ -370,11 +374,15 @@ struct CompositeResultWith7Fields {
   }
 
   bool operator==(const CompositeResultWith7Fields& rhs) const {
-    return field1_ == rhs.field1_ && field2_ == rhs.field2_ && field3_ == rhs.field3_ && field4_ == rhs.field4_ && field5_ == rhs.field5_ && field6_ == rhs.field6_ && field7_ == rhs.field7_;
+    return field1_ == rhs.field1_ && field2_ == rhs.field2_ && field3_ == rhs.field3_ &&
+           field4_ == rhs.field4_ && field5_ == rhs.field5_ && field6_ == rhs.field6_ &&
+           field7_ == rhs.field7_;
   }
 };
 
-typedef CompositeDeserializerWith7Delegates<CompositeResultWith7Fields, StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer>
+typedef CompositeDeserializerWith7Delegates<
+    CompositeResultWith7Fields, StringDeserializer, StringDeserializer, StringDeserializer,
+    StringDeserializer, StringDeserializer, StringDeserializer, StringDeserializer>
     TestCompositeDeserializer7;
 
 TEST(CompositeDeserializerWith7Delegates, EmptyBufferShouldNotBeReady) {
@@ -413,11 +421,16 @@ struct CompositeResultWith8Fields {
   }
 
   bool operator==(const CompositeResultWith8Fields& rhs) const {
-    return field1_ == rhs.field1_ && field2_ == rhs.field2_ && field3_ == rhs.field3_ && field4_ == rhs.field4_ && field5_ == rhs.field5_ && field6_ == rhs.field6_ && field7_ == rhs.field7_ && field8_ == rhs.field8_;
+    return field1_ == rhs.field1_ && field2_ == rhs.field2_ && field3_ == rhs.field3_ &&
+           field4_ == rhs.field4_ && field5_ == rhs.field5_ && field6_ == rhs.field6_ &&
+           field7_ == rhs.field7_ && field8_ == rhs.field8_;
   }
 };
 
-typedef CompositeDeserializerWith8Delegates<CompositeResultWith8Fields, StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer>
+typedef CompositeDeserializerWith8Delegates<
+    CompositeResultWith8Fields, StringDeserializer, StringDeserializer, StringDeserializer,
+    StringDeserializer, StringDeserializer, StringDeserializer, StringDeserializer,
+    StringDeserializer>
     TestCompositeDeserializer8;
 
 TEST(CompositeDeserializerWith8Delegates, EmptyBufferShouldNotBeReady) {
@@ -458,11 +471,16 @@ struct CompositeResultWith9Fields {
   }
 
   bool operator==(const CompositeResultWith9Fields& rhs) const {
-    return field1_ == rhs.field1_ && field2_ == rhs.field2_ && field3_ == rhs.field3_ && field4_ == rhs.field4_ && field5_ == rhs.field5_ && field6_ == rhs.field6_ && field7_ == rhs.field7_ && field8_ == rhs.field8_ && field9_ == rhs.field9_;
+    return field1_ == rhs.field1_ && field2_ == rhs.field2_ && field3_ == rhs.field3_ &&
+           field4_ == rhs.field4_ && field5_ == rhs.field5_ && field6_ == rhs.field6_ &&
+           field7_ == rhs.field7_ && field8_ == rhs.field8_ && field9_ == rhs.field9_;
   }
 };
 
-typedef CompositeDeserializerWith9Delegates<CompositeResultWith9Fields, StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer,StringDeserializer>
+typedef CompositeDeserializerWith9Delegates<
+    CompositeResultWith9Fields, StringDeserializer, StringDeserializer, StringDeserializer,
+    StringDeserializer, StringDeserializer, StringDeserializer, StringDeserializer,
+    StringDeserializer, StringDeserializer>
     TestCompositeDeserializer9;
 
 TEST(CompositeDeserializerWith9Delegates, EmptyBufferShouldNotBeReady) {
@@ -481,4 +499,3 @@ TEST(CompositeDeserializerWith9Delegates, ShouldDeserialize) {
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
-// clang-format on

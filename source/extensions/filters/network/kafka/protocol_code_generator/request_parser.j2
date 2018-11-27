@@ -1,0 +1,6 @@
+{% for version in complex_type.versions %}class {{ complex_type.name }}V{{ version }}Parser: public RequestParser<{{ complex_type.name }}, {{ complex_type.name }}V{{ version }}Deserializer> {
+public:
+	{{ complex_type.name }}V{{ version }}Parser(RequestContextSharedPtr ctx) : RequestParser{ctx} {};
+};
+
+{% endfor %}

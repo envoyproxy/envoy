@@ -178,6 +178,9 @@ private:
  */
 class StringDeserializer : public Deserializer<std::string> {
 public:
+  /**
+   * Can throw EnvoyException if given string length is not valid
+   */
   size_t feed(const char*& buffer, uint64_t& remaining) {
     const size_t length_consumed = length_buf_.feed(buffer, remaining);
     if (!length_buf_.ready()) {
@@ -190,7 +193,7 @@ public:
       if (required_ >= 0) {
         data_buf_ = std::vector<char>(required_);
       } else {
-        throw EnvoyException(fmt::format("invalid std::string length: {}", required_));
+        throw EnvoyException(fmt::format("invalid STRING length: {}", required_));
       }
       length_consumed_ = true;
     }
@@ -237,6 +240,9 @@ private:
  */
 class NullableStringDeserializer : public Deserializer<NullableString> {
 public:
+  /**
+   * Can throw EnvoyException if given string length is not valid
+   */
   size_t feed(const char*& buffer, uint64_t& remaining) {
     const size_t length_consumed = length_buf_.feed(buffer, remaining);
     if (!length_buf_.ready()) {
@@ -307,6 +313,9 @@ private:
  */
 class BytesDeserializer : public Deserializer<Bytes> {
 public:
+  /**
+   * Can throw EnvoyException if given bytes length is not valid
+   */
   size_t feed(const char*& buffer, uint64_t& remaining) {
     const size_t length_consumed = length_buf_.feed(buffer, remaining);
     if (!length_buf_.ready()) {
@@ -364,6 +373,9 @@ private:
  */
 class NullableBytesDeserializer : public Deserializer<NullableBytes> {
 public:
+  /**
+   * Can throw EnvoyException if given bytes length is not valid
+   */
   size_t feed(const char*& buffer, uint64_t& remaining) {
     const size_t length_consumed = length_buf_.feed(buffer, remaining);
     if (!length_buf_.ready()) {
@@ -442,8 +454,88 @@ private:
  * follow. A null array is represented with a length of -1.
  */
 template <typename ResponseType, typename DeserializerType>
-class ArrayDeserializer : public Deserializer<NullableArray<ResponseType>> {
+class ArrayDeserializer : public Deserializer<std::vector<ResponseType>> {
 public:
+  /**
+   * Can throw EnvoyException if array length is invalid or if DeserializerType can throw
+   */
+  size_t feed(const char*& buffer, uint64_t& remaining) {
+
+    const size_t length_consumed = length_buf_.feed(buffer, remaining);
+    if (!length_buf_.ready()) {
+      // break early: we still need to fill in length buffer
+      return length_consumed;
+    }
+
+    if (!length_consumed_) {
+      required_ = length_buf_.get();
+      if (required_ >= 0) {
+        children_ = std::vector<DeserializerType>(required_);
+      } else {
+        throw EnvoyException(fmt::format("invalid ARRAY length: {}", required_));
+      }
+      length_consumed_ = true;
+    }
+
+    if (ready_) {
+      return length_consumed;
+    }
+
+    size_t child_consumed{0};
+    for (DeserializerType& child : children_) {
+      child_consumed += child.feed(buffer, remaining);
+    }
+
+    bool children_ready_ = true;
+    for (DeserializerType& child : children_) {
+      children_ready_ &= child.ready();
+    }
+    ready_ = children_ready_;
+
+    return length_consumed + child_consumed;
+  }
+
+  bool ready() const { return ready_; }
+
+  std::vector<ResponseType> get() const {
+    std::vector<ResponseType> result{};
+    result.reserve(children_.size());
+    for (const DeserializerType& child : children_) {
+      const ResponseType child_result = child.get();
+      result.push_back(child_result);
+    }
+    return result;
+  }
+
+private:
+  Int32Deserializer length_buf_;
+  bool length_consumed_{false};
+  int32_t required_;
+  std::vector<DeserializerType> children_;
+  bool children_setup_{false};
+  bool ready_{false};
+};
+
+/**
+ * Deserializer for nullable array of objects of the same type
+ *
+ * First reads the length of the array, then initializes N underlying deserializers of type
+ * DeserializerType After the last of N deserializers is ready, the results of each of them are
+ * gathered and put in a vector
+ * @param ResponseType result type returned by deserializer of type DeserializerType
+ * @param DeserializerType underlying deserializer type
+ *
+ * From documentation:
+ * Represents a sequence of objects of a given type T. Type T can be either a primitive type (e.g.
+ * STRING) or a structure. First, the length N is given as an int32_t. Then N instances of type T
+ * follow. A null array is represented with a length of -1.
+ */
+template <typename ResponseType, typename DeserializerType>
+class NullableArrayDeserializer : public Deserializer<NullableArray<ResponseType>> {
+public:
+  /**
+   * Can throw EnvoyException if array length is invalid or if DeserializerType can throw
+   */
   size_t feed(const char*& buffer, uint64_t& remaining) {
 
     const size_t length_consumed = length_buf_.feed(buffer, remaining);
@@ -462,7 +554,7 @@ public:
         ready_ = true;
       }
       if (required_ < NULL_ARRAY_LENGTH) {
-        throw EnvoyException(fmt::format("invalid array length: {}", required_));
+        throw EnvoyException(fmt::format("invalid NULLABLE_ARRAY length: {}", required_));
       }
 
       length_consumed_ = true;
@@ -496,7 +588,7 @@ public:
         const ResponseType child_result = child.get();
         result.push_back(child_result);
       }
-      return {result};
+      return result;
     } else {
       return absl::nullopt;
     }
@@ -517,9 +609,17 @@ private:
  * Encodes provided argument in Kafka format
  * In case of primitive types, this is done explicitly as per spec
  * In case of composite types, this is done by calling 'encode' on provided argument
+ *
+ * This object also carries extra information that is used while traversing the request
+ * structure-tree during encryping (currently api_version, as different request versions serialize
+ * differently)
  */
+// XXX (adam.kotwasinski) that class might be split into Request/ResponseEncodingContext in future,
+// but leaving it as it is now
 class EncodingContext {
 public:
+  EncodingContext(int16_t api_version) : api_version_{api_version} {};
+
   /**
    * Encode given reference in a buffer
    * @return bytes written
@@ -530,7 +630,18 @@ public:
    * Encode given array in a buffer
    * @return bytes written
    */
+  template <typename T> size_t encode(const std::vector<T>& arg, Buffer::Instance& dst);
+
+  /**
+   * Encode given nullable array in a buffer
+   * @return bytes written
+   */
   template <typename T> size_t encode(const NullableArray<T>& arg, Buffer::Instance& dst);
+
+  int16_t apiVersion() const { return api_version_; }
+
+private:
+  const int16_t api_version_;
 };
 
 /**
@@ -556,7 +667,7 @@ template <> inline size_t EncodingContext::encode(const int8_t& arg, Buffer::Ins
  */
 #define ENCODE_NUMERIC_TYPE(TYPE, CONVERTER)                                                       \
   template <> inline size_t EncodingContext::encode(const TYPE& arg, Buffer::Instance& dst) {      \
-    TYPE val = CONVERTER(arg);                                                                     \
+    const TYPE val = CONVERTER(arg);                                                               \
     dst.add(&val, sizeof(TYPE));                                                                   \
     return sizeof(TYPE);                                                                           \
   }
@@ -596,7 +707,7 @@ inline size_t EncodingContext::encode(const NullableString& arg, Buffer::Instanc
   if (arg.has_value()) {
     return encode(*arg, dst);
   } else {
-    int16_t len = -1;
+    const int16_t len = -1;
     return encode(len, dst);
   }
 }
@@ -606,8 +717,8 @@ inline size_t EncodingContext::encode(const NullableString& arg, Buffer::Instanc
  * Encode byte array as INT32 length + N bytes
  */
 template <> inline size_t EncodingContext::encode(const Bytes& arg, Buffer::Instance& dst) {
-  int32_t data_length = arg.size();
-  size_t header_length = encode(data_length, dst);
+  const int32_t data_length = arg.size();
+  const size_t header_length = encode(data_length, dst);
   dst.add(arg.data(), arg.size());
   return header_length + data_length;
 }
@@ -620,9 +731,19 @@ template <> inline size_t EncodingContext::encode(const NullableBytes& arg, Buff
   if (arg.has_value()) {
     return encode(*arg, dst);
   } else {
-    int32_t len = -1;
+    const int32_t len = -1;
     return encode(len, dst);
   }
+}
+
+/**
+ * Encode nullable object array to T as INT32 length + N elements
+ * Each element of type T then serializes itself on its own
+ */
+template <typename T>
+size_t EncodingContext::encode(const std::vector<T>& arg, Buffer::Instance& dst) {
+  const NullableArray<T> wrapped = {arg};
+  return encode(wrapped, dst);
 }
 
 /**
@@ -632,8 +753,8 @@ template <> inline size_t EncodingContext::encode(const NullableBytes& arg, Buff
 template <typename T>
 size_t EncodingContext::encode(const NullableArray<T>& arg, Buffer::Instance& dst) {
   if (arg.has_value()) {
-    int32_t len = arg->size();
-    size_t header_length = encode(len, dst);
+    const int32_t len = arg->size();
+    const size_t header_length = encode(len, dst);
     size_t written{0};
     for (const T& el : *arg) {
       // for each of array elements, resolve the correct method again
@@ -642,7 +763,7 @@ size_t EncodingContext::encode(const NullableArray<T>& arg, Buffer::Instance& ds
     }
     return header_length + written;
   } else {
-    int32_t len = -1;
+    const int32_t len = -1;
     return encode(len, dst);
   }
 }

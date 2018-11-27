@@ -1,7 +1,4 @@
-#include "extensions/filters/network/kafka/kafka_request.h"
-
-#include "extensions/filters/network/kafka/generated/requests.h"
-#include "extensions/filters/network/kafka/parser.h"
+#include "extensions/filters/network/kafka/kafka_request_parser.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,10 +17,20 @@ ParseResponse RequestStartParser::parse(const char*& buffer, uint64_t& remaining
 }
 
 ParseResponse RequestHeaderParser::parse(const char*& buffer, uint64_t& remaining) {
-  context_->remaining_request_size_ -= deserializer_.feed(buffer, remaining);
+  try {
+    context_->remaining_request_size_ -= deserializer_->feed(buffer, remaining);
+  } catch (const EnvoyException& e) {
+    buffer += context_->remaining_request_size_;
+    remaining -= context_->remaining_request_size_;
+    context_->remaining_request_size_ = 0;
 
-  if (deserializer_.ready()) {
-    RequestHeader request_header = deserializer_.get();
+    const RequestHeader header{-1, -1, -1, absl::nullopt};
+    return ParseResponse::parsedMessage(
+        std::make_shared<UnknownRequest>(context_->request_header_));
+  }
+
+  if (deserializer_->ready()) {
+    RequestHeader request_header = deserializer_->get();
     context_->request_header_ = request_header;
     ParserSharedPtr next_parser = parser_resolver_.createParser(
         request_header.api_key_, request_header.api_version_, context_);

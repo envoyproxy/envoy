@@ -1,6 +1,6 @@
 // DO NOT EDIT - THIS FILE WAS GENERATED
 // clang-format off
-#include "extensions/filters/network/kafka/generated/requests.h"
+#include "extensions/filters/network/kafka/requests.h"
 #include "extensions/filters/network/kafka/request_codec.h"
 
 #include "test/mocks/server/mocks.h"
@@ -26,7 +26,7 @@ public:
 };
 
 template <typename T> std::shared_ptr<T> RequestDecoderTest::serializeAndDeserialize(T request) {
-  RequestEncoder serializer{buffer_};
+  MessageEncoderImpl serializer{buffer_};
   serializer.encode(request);
 
   std::shared_ptr<MockMessageListener> mock_listener = std::make_shared<MockMessageListener>();
@@ -39,10 +39,11 @@ template <typename T> std::shared_ptr<T> RequestDecoderTest::serializeAndDeseria
 
   return std::dynamic_pointer_cast<T>(receivedMessage);
 };
-
-TEST_F(RequestDecoderTest, shouldParseOffsetCommitRequestV0) {
+{% for request_type in request_types %}{% for field_list in request_type.compute_field_lists() %}
+TEST_F(RequestDecoderTest, shouldParse{{ request_type.name }}V{{ field_list.version }}) {
   // given
-  OffsetCommitRequestV0 request = {"string", {{ {"string", {{ {32, 64, {"nullable"}, } }}, } }}, };
+  {{ request_type.name }} data = { {{ field_list.example_value() }} };
+  ConcreteRequest<{{ request_type.name }}> request = { { {{ request_type.get_extra('api_key') }}, {{ field_list.version }}, 0, absl::nullopt }, data };
 
   // when
   auto received = serializeAndDeserialize(request);
@@ -51,42 +52,7 @@ TEST_F(RequestDecoderTest, shouldParseOffsetCommitRequestV0) {
   ASSERT_NE(received, nullptr);
   ASSERT_EQ(*received, request);
 }
-
-TEST_F(RequestDecoderTest, shouldParseOffsetCommitRequestV1) {
-  // given
-  OffsetCommitRequestV1 request = {"string", 32, "string", {{ {"string", {{ {32, 64, 64, {"nullable"}, } }}, } }}, };
-
-  // when
-  auto received = serializeAndDeserialize(request);
-
-  // then
-  ASSERT_NE(received, nullptr);
-  ASSERT_EQ(*received, request);
-}
-
-TEST_F(RequestDecoderTest, shouldParseOffsetCommitRequestV2) {
-  // given
-  OffsetCommitRequestV2 request = {"string", 32, "string", 64, {{ {"string", {{ {32, 64, {"nullable"}, } }}, } }}, };
-
-  // when
-  auto received = serializeAndDeserialize(request);
-
-  // then
-  ASSERT_NE(received, nullptr);
-  ASSERT_EQ(*received, request);
-}
-
-TEST_F(RequestDecoderTest, shouldParseOffsetCommitRequestV3) {
-  // given
-  OffsetCommitRequestV3 request = {"string", 32, "string", 64, {{ {"string", {{ {32, 64, {"nullable"}, } }}, } }}, };
-
-  // when
-  auto received = serializeAndDeserialize(request);
-
-  // then
-  ASSERT_NE(received, nullptr);
-  ASSERT_EQ(*received, request);
-}
+{% endfor %}{% endfor %}
 
 } // namespace Kafka
 } // namespace NetworkFilters

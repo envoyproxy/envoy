@@ -3,6 +3,8 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 
+#include "extensions/filters/network/kafka/message.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -10,14 +12,13 @@ namespace Kafka {
 
 /**
  * Kafka message decoder
- * @tparam MessageType message type (Kafka request or Kafka response)
  */
-template <typename MessageType> class MessageDecoder {
+class MessageDecoder {
 public:
   virtual ~MessageDecoder() = default;
 
   /**
-   * Processes given buffer attempting to decode messages of type MessageType container within
+   * Processes given buffer attempting to decode messages contained within
    * @param data buffer instance
    */
   virtual void onData(Buffer::Instance& data) PURE;
@@ -27,7 +28,7 @@ public:
  * Kafka message decoder
  * @tparam MessageType message type (Kafka request or Kafka response)
  */
-template <typename MessageType> class MessageEncoder {
+class MessageEncoder {
 public:
   virtual ~MessageEncoder() = default;
 
@@ -35,7 +36,7 @@ public:
    * Encodes given message
    * @param message message to be encoded
    */
-  virtual void encode(const MessageType& message) PURE;
+  virtual void encode(const Message& message) PURE;
 };
 
 } // namespace Kafka

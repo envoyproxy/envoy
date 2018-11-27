@@ -1,4 +1,3 @@
-#include "extensions/filters/network/kafka/generated/requests.h"
 #include "extensions/filters/network/kafka/request_codec.h"
 
 #include "test/mocks/server/mocks.h"
@@ -32,7 +31,7 @@ public:
 };
 
 template <typename T> std::shared_ptr<T> RequestDecoderTest::serializeAndDeserialize(T request) {
-  RequestEncoder serializer{buffer_};
+  MessageEncoderImpl serializer{buffer_};
   serializer.encode(request);
 
   std::shared_ptr<MockMessageListener> mock_listener = std::make_shared<MockMessageListener>();
@@ -51,12 +50,28 @@ ParserSharedPtr createSentinelParser(testing::Unused, testing::Unused,
   return std::make_shared<SentinelParser>(context);
 }
 
+struct MockRequest {
+  const int32_t field1_ = 1;
+  const int64_t field2_ = 2;
+
+  size_t encode(Buffer::Instance& buffer, EncodingContext& encoder) const {
+    size_t written{0};
+    written += encoder.encode(field1_, buffer);
+    written += encoder.encode(field2_, buffer);
+    return written;
+  }
+
+  friend std::ostream& operator<<(std::ostream& os, const MockRequest&) {
+    return os << "{MockRequest}";
+  };
+};
+
 TEST_F(RequestDecoderTest, shouldProduceAbortedMessageOnUnknownData) {
   // given
-  RequestEncoder serializer{buffer_};
-  NullableArray<OffsetCommitRequestV0Topic> topics{{{"topic1", {{{{0, 10, "m1"}}}}}}};
-  OffsetCommitRequestV0 request{"group_id", topics};
-  request.setMetadata(42, "client-id");
+  MessageEncoderImpl serializer{buffer_};
+  MockRequest data{};
+  // api key & version values do not matter, as resolver recognizes nothing
+  ConcreteRequest<MockRequest> request = {{1000, 2000, 3000, "correlation-id"}, data};
 
   serializer.encode(request);
 

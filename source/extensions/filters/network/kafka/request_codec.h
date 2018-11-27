@@ -5,8 +5,8 @@
 
 #include "extensions/filters/network/kafka/codec.h"
 #include "extensions/filters/network/kafka/kafka_request.h"
+#include "extensions/filters/network/kafka/kafka_request_parser.h"
 #include "extensions/filters/network/kafka/parser.h"
-#include "extensions/filters/network/kafka/serialization.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -38,7 +38,7 @@ typedef std::shared_ptr<RequestCallback> RequestCallbackSharedPtr;
  * Stores parse state (have `onData` invoked multiple times for messages that are larger than single
  * buffer)
  */
-class RequestDecoder : public MessageDecoder<Request>, public Logger::Loggable<Logger::Id::kafka> {
+class RequestDecoder : public MessageDecoder {
 public:
   /**
    * Creates a decoder that can decode requests specified by RequestParserResolver, notifying
@@ -69,19 +69,19 @@ private:
 };
 
 /**
- * Encodes provided requests into underlying buffer
+ * Encodes provided messages into underlying buffer
  */
-class RequestEncoder : public MessageEncoder<Request> {
+class MessageEncoderImpl : public MessageEncoder {
 public:
   /**
    * Wraps buffer with encoder
    */
-  RequestEncoder(Buffer::Instance& output) : output_(output) {}
+  MessageEncoderImpl(Buffer::Instance& output) : output_(output) {}
 
   /**
    * Encodes request into wrapped buffer
    */
-  void encode(const Request& message) override;
+  void encode(const Message& message) override;
 
 private:
   Buffer::Instance& output_;
