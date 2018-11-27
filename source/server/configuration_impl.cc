@@ -48,6 +48,8 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
                           Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory,
                           Http::ContextPtr http_context) {
+  http_context_ = std::move(http_context);
+
   const auto& secrets = bootstrap.static_resources().secrets();
   ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());
   for (ssize_t i = 0; i < secrets.size(); i++) {
@@ -78,8 +80,6 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, kill_timeout, 0));
   watchdog_multikill_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
-
-  http_context_ = std::move(http_context);
 
   if (bootstrap.has_rate_limit_service()) {
     ratelimit_client_factory_ = std::make_unique<RateLimit::GrpcFactoryImpl>(

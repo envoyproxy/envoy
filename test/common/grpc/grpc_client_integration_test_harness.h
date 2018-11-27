@@ -275,7 +275,7 @@ public:
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
         cluster_info_ptr_, *stats_store_, dispatcher_, local_info_, cm_, runtime_, random_,
-        std::move(shadow_writer_ptr_), code_stats_);
+        std::move(shadow_writer_ptr_), http_context_);
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
     EXPECT_CALL(cm_, get(fake_cluster_name_)).WillRepeatedly(Return(&thread_local_cluster_));
@@ -428,7 +428,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
-  Http::CodeStatsImpl code_stats_;
+  Http::ContextImpl http_context_;
   envoy::api::v2::core::Locality host_locality_;
   Upstream::MockHost* mock_host_ = new NiceMock<Upstream::MockHost>();
   Upstream::MockHostDescription* mock_host_description_ =

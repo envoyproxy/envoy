@@ -54,7 +54,7 @@ TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
 class ConfigurationImplTest : public testing::Test {
 protected:
   ConfigurationImplTest()
-      : api_(Api::createApiForTest()),
+      : api_(Api::createApiForTest(stats_store_)),
         http_context_(new Http::ContextImpl),
         cluster_manager_factory_(server_.runtime(), server_.stats(), server_.threadLocal(),
                                  server_.random(), server_.dnsResolver(),
@@ -73,9 +73,9 @@ protected:
 TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
 
-  config_.initialize(bootstrap, server_, cluster_manager_factory_, http_context_.release());
+  config_.initialize(bootstrap, server_, cluster_manager_factory_, std::move(http_context_));
 
-  EXPECT_EQ(std::chrono::milliseconds(5000), config.statsFlushInterval());
+  EXPECT_EQ(std::chrono::milliseconds(5000), config_.statsFlushInterval());
 }
 
 TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
@@ -95,9 +95,9 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
 
   envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
-  config_.initialize(bootstrap, server_, cluster_manager_factory_, http_context_);
+  config_.initialize(bootstrap, server_, cluster_manager_factory_, std::move(http_context_));
 
-  EXPECT_EQ(std::chrono::milliseconds(500), config.statsFlushInterval());
+  EXPECT_EQ(std::chrono::milliseconds(500), config_.statsFlushInterval());
 }
 
 TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
@@ -124,10 +124,10 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
 
   envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
-  config_.initialize(bootstrap, server_, cluster_manager_factory_, http_context_);
+  config_.initialize(bootstrap, server_, cluster_manager_factory_, std::move(http_context_));
 
-  ASSERT_EQ(1U, config.clusterManager()->clusters().count("test_cluster"));
-  EXPECT_EQ(8192U, config.clusterManager()
+  ASSERT_EQ(1U, config_.clusterManager()->clusters().count("test_cluster"));
+  EXPECT_EQ(8192U, config_.clusterManager()
                        ->clusters()
                        .find("test_cluster")
                        ->second.get()
@@ -155,9 +155,9 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   server_.local_info_.node_.set_cluster("");
-  config_.initialize(bootstrap, server_, cluster_manager_factory_, http_context_);
+  config_.initialize(bootstrap, server_, cluster_manager_factory_, std::move(http_context_));
 
-  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
+  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config_.httpContext().tracer()));
 }
 
 TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfiguration) {
@@ -190,9 +190,9 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
   envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   server_.local_info_.node_.set_cluster("");
-  config_.initialize(bootstrap, server_, cluster_manager_factory_, http_context_);
+  config_.initialize(bootstrap, server_, cluster_manager_factory_, std::move(http_context_));
 
-  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
+  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config_.httpContext().tracer()));
 }
 
 TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
@@ -224,8 +224,7 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
 
   envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
   bootstrap.mutable_tracing()->mutable_http()->set_name("invalid");
-  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_,
-                                              http_context_),
+  EXPECT_THROW_WITH_MESSAGE(MainImpl::makeHttpTracer(bootstrap.tracing(), server_),
                             EnvoyException,
                             "Didn't find a registered implementation for name: 'invalid'");
 }
@@ -250,9 +249,9 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   auto& field_map = *sink.mutable_config()->mutable_fields();
   field_map["tcp_cluster_name"].set_string_value("fake_cluster");
 
-  config_.initialize(bootstrap, server_, cluster_manager_factory_, http_context_);
+  config_.initialize(bootstrap, server_, cluster_manager_factory_, std::move(http_context_));
 
-  EXPECT_EQ(1, config.statsSinks().size());
+  EXPECT_EQ(1, config_.statsSinks().size());
 }
 
 TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
@@ -276,7 +275,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
   field_map["tcp_cluster_name"].set_string_value("fake_cluster");
 
   EXPECT_THROW_WITH_MESSAGE(config_.initialize(bootstrap, server_, cluster_manager_factory_,
-                                               http_context_),
+                                               std::move(http_context_)),
                             EnvoyException,
                             "Didn't find a registered implementation for name: 'envoy.invalid'");
 }
@@ -300,8 +299,8 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
   auto& field_map = *sink.mutable_config()->mutable_fields();
   field_map["tcp_cluster_name"].set_string_value("fake_cluster");
 
-  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_,
-                                              http_context_),
+  EXPECT_THROW_WITH_MESSAGE(config_.initialize(bootstrap, server_, cluster_manager_factory_,
+                                               std::move(http_context_)),
                             EnvoyException,
                             "Provided name for static registration lookup was empty.");
 }

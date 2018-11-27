@@ -83,8 +83,9 @@ public:
 
     try {
       auto tracer = Server::Configuration::MainImpl::makeHttpTracer(bootstrap.tracing(), server_);
-      Http::Context http_context(tracer);
-      main_config.initialize(bootstrap, server_, *cluster_manager_factory_, http_context);
+      Http::ContextPtr http_context = std::make_unique<Http::ContextImpl>(std::move(tracer));
+      main_config.initialize(bootstrap, server_, *cluster_manager_factory_,
+                             std::move(http_context));
     } catch (const EnvoyException& ex) {
       ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", options_.configPath(),
                                    ex.what());
