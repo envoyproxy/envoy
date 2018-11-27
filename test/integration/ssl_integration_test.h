@@ -29,6 +29,11 @@ public:
   Network::ClientConnectionPtr makeSslClientConnection(bool alpn, bool san);
   void checkStats();
 
+protected:
+  // Set this true to debug SSL handshake issues with openssl s_client. The
+  // verbose trace will be in the logs, openssl must be installed separately.
+  bool debug_with_s_client_{false};
+
 private:
   std::unique_ptr<ContextManager> context_manager_;
 
