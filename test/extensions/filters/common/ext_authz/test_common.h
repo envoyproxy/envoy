@@ -14,6 +14,13 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
+namespace {
+static bool CompareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs) {
+  return std::set<std::pair<Http::LowerCaseString, std::string>>(lhs.begin(), lhs.end()) ==
+         std::set<std::pair<Http::LowerCaseString, std::string>>(rhs.begin(), rhs.end());
+}
+} // namespace
+
 MATCHER_P(AuthzErrorResponse, status, "") {
   // These fields should be always empty when the status is an error.
   if (!arg->headers_to_add.empty() || !arg->headers_to_append.empty() || !arg->body.empty()) {
@@ -44,15 +51,7 @@ MATCHER_P(AuthzDeniedResponse, response, "") {
     return false;
   }
   // Compare headers_to_add.
-  if (!arg->headers_to_add.empty() && response.headers_to_add.empty()) {
-    return false;
-  }
-  if (!std::equal(arg->headers_to_add.begin(), arg->headers_to_add.end(),
-                  response.headers_to_add.begin())) {
-    return false;
-  }
-
-  return true;
+  return CompareHeaderVector(response.headers_to_add, arg->headers_to_add);
 }
 
 MATCHER_P(AuthzOkResponse, response, "") {
@@ -60,23 +59,13 @@ MATCHER_P(AuthzOkResponse, response, "") {
     return false;
   }
   // Compare headers_to_apppend.
-  if (!arg->headers_to_append.empty() && response.headers_to_append.empty()) {
-    return false;
-  }
-  if (!std::equal(arg->headers_to_append.begin(), arg->headers_to_append.end(),
-                  response.headers_to_append.begin())) {
-    return false;
-  }
-  // Compare headers_to_add.
-  if (!arg->headers_to_add.empty() && response.headers_to_add.empty()) {
-    return false;
-  }
-  if (!std::equal(arg->headers_to_add.begin(), arg->headers_to_add.end(),
-                  response.headers_to_add.begin())) {
+  if (!CompareHeaderVector(response.headers_to_append, arg->headers_to_append)) {
     return false;
   }
 
-  return true;
+  // Compare headers_to_add.
+  return CompareHeaderVector(response.headers_to_add, arg->headers_to_add);
+  ;
 }
 
 MATCHER_P(ContainsPairAsHeader, pair, "") {

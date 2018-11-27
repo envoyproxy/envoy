@@ -57,12 +57,9 @@ FilterConfig::toClientHeader(const envoy::type::matcher::ListStringMatcher& matc
     matcher.set_regex("^((?!(:authority)).)*$");
     list_matcher.push_back(matcher);
   } else {
-    std::vector<Http::LowerCaseString> default_keys{Http::Headers::get().Status,
-                                                    Http::Headers::get().ContentLength,
-                                                    Http::Headers::get().Path,
-                                                    Http::Headers::get().Host,
-                                                    Http::Headers::get().WWWAuthenticate,
-                                                    Http::Headers::get().Location};
+    std::vector<Http::LowerCaseString> default_keys{
+        Http::Headers::get().Status, Http::Headers::get().ContentLength,
+        Http::Headers::get().WWWAuthenticate, Http::Headers::get().Location};
     list_matcher.reserve(matchers.patterns().size() + default_keys.size());
     for (const auto& key : default_keys) {
       envoy::type::matcher::StringMatcher matcher;

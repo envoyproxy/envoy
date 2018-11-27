@@ -94,6 +94,17 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        Http::AsyncClient::RequestOptions().setTimeout(timeout_));
 }
 
+void RawHttpClientImpl::onSuccess(Http::MessagePtr&& message) {
+  callbacks_->onComplete(messageToResponse(std::move(message)));
+  callbacks_ = nullptr;
+}
+
+void RawHttpClientImpl::onFailure(Http::AsyncClient::FailureReason reason) {
+  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
+  callbacks_->onComplete(std::make_unique<Response>(getErrorResponse()));
+  callbacks_ = nullptr;
+}
+
 ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
   // Set an error status if parsing status code fails. A Forbidden response is sent to the client
   // if the filter has not been configured with failure_mode_allow.
@@ -138,17 +149,6 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
       &ctx);
 
   return std::move(ctx.response_);
-}
-
-void RawHttpClientImpl::onSuccess(Http::MessagePtr&& message) {
-  callbacks_->onComplete(messageToResponse(std::move(message)));
-  callbacks_ = nullptr;
-}
-
-void RawHttpClientImpl::onFailure(Http::AsyncClient::FailureReason reason) {
-  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
-  callbacks_->onComplete(std::make_unique<Response>(getErrorResponse()));
-  callbacks_ = nullptr;
 }
 
 } // namespace ExtAuthz

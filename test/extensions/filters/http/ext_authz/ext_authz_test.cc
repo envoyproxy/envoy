@@ -303,11 +303,11 @@ TEST_F(HttpFilterTest, TestAllowedHeaders) {
   EXPECT_EQ(true, findMatcher(config_->allowedRequestHeaders(), key));
 
   // Check allowed client headers.
-  EXPECT_EQ(7, config_->allowedClientHeaders().size());
-  EXPECT_EQ(true, findMatcher(config_->allowedClientHeaders(), Http::Headers::get().Path));
+  EXPECT_EQ(5, config_->allowedClientHeaders().size());
   EXPECT_EQ(true, findMatcher(config_->allowedClientHeaders(), Http::Headers::get().Status));
   EXPECT_EQ(true, findMatcher(config_->allowedClientHeaders(), Http::Headers::get().ContentLength));
-  EXPECT_EQ(true, findMatcher(config_->allowedClientHeaders(), Http::Headers::get().Host));
+  EXPECT_EQ(false, findMatcher(config_->allowedClientHeaders(), Http::Headers::get().Path));
+  EXPECT_EQ(false, findMatcher(config_->allowedClientHeaders(), Http::Headers::get().Host));
   EXPECT_EQ(true,
             findMatcher(config_->allowedClientHeaders(), Http::Headers::get().WWWAuthenticate));
   EXPECT_EQ(false, findMatcher(config_->allowedClientHeaders(), Http::Headers::get().Origin));

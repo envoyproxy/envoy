@@ -41,8 +41,9 @@ public:
                                   TestUtility::createPrefixMatcher("x-")}},
         allowed_client_headers_{{TestUtility::createExactMatcher("foo"),
                                  TestUtility::createExactMatcher(":status"),
-                                 TestUtility::createPrefixMatcher("y-")}},
-        allowed_upstream_headers_{{TestUtility::createExactMatcher("bar")}},
+                                 TestUtility::createPrefixMatcher("x-")}},
+        allowed_upstream_headers_{{TestUtility::createExactMatcher("bar")},
+                                  {TestUtility::createPrefixMatcher("x-")}},
         authorization_headers_to_add_{
             {std::make_pair(Http::LowerCaseString("x-authz-header1"), "value"),
              std::make_pair(Http::LowerCaseString("x-authz-header2"), "value")}},
@@ -96,7 +97,8 @@ public:
   MockRequestCallbacks request_callbacks_;
 };
 
-// Test the client when a request contains path to be re-written and ok response is received.
+// Verify client response when the authorization server returns a 200 OK and path_prefix is
+// configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
   Http::MessagePtr message_ptr = sendRequest({{":path", "/foo"}, {"foo", "bar"}});
 
@@ -120,7 +122,7 @@ TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZero) {
   EXPECT_EQ(method->value().getStringView(), "POST");
 }
 
-// Test the client when a request contains headers in the prefix whitelist.
+// Test the client when a request contains headers in the prefix matchers.
 TEST_F(ExtAuthzHttpClientTest, AllowedRequestHeadersPrefix) {
   Http::MessagePtr message_ptr =
       sendRequest({{Http::Headers::get().XContentTypeOptions.get(), "foobar"},
@@ -137,7 +139,7 @@ TEST_F(ExtAuthzHttpClientTest, AllowedRequestHeadersPrefix) {
   EXPECT_EQ(x_content_type->value().getStringView(), "foobar");
 }
 
-// Test the client when an ok response is received.
+// Verify client response when authorization server returns a 200 OK.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
@@ -151,7 +153,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   client_.onSuccess(std::move(check_response));
 }
 
-// Test the client when authorization headers to add are specified.
+// Verify client response headers when authorization_headers_to_add is configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
@@ -173,10 +175,11 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   client_.onSuccess(std::move(check_response));
 }
 
-// Test that the client allows only header in the whitelist to be sent to the upstream.
+// Verify client response headers when allow_upstream_headers is configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
   const std::string empty_body{};
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{"bar", "foo", false}});
+  const auto expected_headers =
+      TestCommon::makeHeaderValueOption({{"x-baz", "foo", false}, {"bar", "foo", false}});
   const auto authz_response =
       TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers);
 
@@ -191,6 +194,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
                                          {":method", "post", false},
                                          {"content-length", "post", false},
                                          {"bar", "foo", false},
+                                         {"x-baz", "foo", false},
                                          {"foobar", "foo", false}});
   auto message_response = TestCommon::makeMessageResponse(check_response_headers);
   client_.onSuccess(std::move(message_response));
@@ -211,12 +215,11 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   client_.onSuccess(TestCommon::makeMessageResponse(expected_headers));
 }
 
-// Test the client when a denied response is received and it contains additional HTTP attributes.
+// Verify client response headers and body when the authorization server denies the request.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
-  allowed_client_headers_.clear();
   const auto expected_body = std::string{"test"};
   const auto expected_headers = TestCommon::makeHeaderValueOption(
-      {{":status", "401", false}, {"foo", "bar", false}, {"foobar", "bar", false}});
+      {{":status", "401", false}, {"foo", "bar", false}, {"x-foobar", "bar", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::Denied, Http::Code::Unauthorized, expected_body, expected_headers);
 
@@ -228,22 +231,24 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
   client_.onSuccess(TestCommon::makeMessageResponse(expected_headers, expected_body));
 }
 
-// Test the client when a denied response is received and allowed client headers is not empty.
+// Verify client response headers whe the authorization server denies the request and
+// allowed_client_headers is configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
-  allowed_client_headers_.clear();
   const auto expected_body = std::string{"test"};
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::Denied, Http::Code::Unauthorized, expected_body,
       TestCommon::makeHeaderValueOption(
-          {{":authority", "bar", false}, {":status", "401", false}, {"foo", "bar", false}}));
+          {{"x-foo", "bar", false}, {":status", "401", false}, {"foo", "bar", false}}));
 
   envoy::service::auth::v2alpha::CheckRequest request;
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
 
-  const auto check_response_headers = TestCommon::makeHeaderValueOption(
-      {{"foo", "bar", false}, {"foobar", "bar", false}, {":status", "401", false}});
+  const auto check_response_headers = TestCommon::makeHeaderValueOption({{":method", "post", false},
+                                                                         {"x-foo", "bar", false},
+                                                                         {":status", "401", false},
+                                                                         {"foo", "bar", false}});
   client_.onSuccess(TestCommon::makeMessageResponse(check_response_headers, expected_body));
 }
 
@@ -270,7 +275,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
   client_.onSuccess(std::move(check_response));
 }
 
-// Test the client when a call to authorization server returns a status code that cannot be
+// Test the client when a call to authorization server returns a status code that cannot be parsed.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestErrorParsingStatusCode) {
   Http::MessagePtr check_response(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "foo"}}}));

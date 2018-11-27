@@ -15,14 +15,8 @@ import "validate/validate.proto";
 // The external authorization service configuration
 // :ref:`configuration overview <config_http_filters_ext_authz>`.
 
-// External Authorization filter calls out to an external service over either:
-//
-//  1. gRPC Authorization API defined by :ref:`CheckRequest
-//     <envoy_api_msg_service.auth.v2alpha.CheckRequest>`.
-//  2. Raw HTTP Authorization server by passing the request headers to the service.
-//
-// A failed check will cause this filter to close the HTTP request normally with 403 (Forbidden),
-// unless a different status code has been indicated in the authorization response.
+// External Authorization filter calls out to an external service over either
+// gRPC or raw HTTP clients.
 message ExtAuthz {
 
   oneof services {
@@ -35,16 +29,26 @@ message ExtAuthz {
     HttpService http_service = 3;
   }
 
-  // The filter's behaviour in case the external authorization service does
-  // not respond back. When set to true, Envoy will also allow traffic in cases when
-  // an error occurs during the authorization process.
-  // Defaults to false.
+  // Allows bypassing the filter on errors during the authorization process.
+  //
+  //  1. When *failure_mode_allow* is true, traffic will be allowed in the presence of an error.
+  //  This
+  //     includes any of the HTTP 5xx errors, or a communication failure between the filter and the
+  //     authorization server.
+  //  2. When *failure_mode_allow* is false, the filter will *always* return a *Forbidden response*
+  //  to
+  //     the client. It will *not allow* traffic to the upstream in the presence of an error. This
+  //     includes any of the HTTP 5xx errors, or a communication failure between the filter and the
+  //     authorization server.
+  //
+  // Note that filter will produce stats on error. See *Statistics* at :ref:`configuration overview
+  // <config_http_filters_ext_authz>`.
   bool failure_mode_allow = 2;
 }
 
-// External Authorization filter calls out to an upstream authorization server by passing the raw
+// External Authorization filter calls an authorization server by passing the raw
 // HTTP request headers to the server. This allows the authorization service to take a decision
-// whether the request is authorized or not.
+// whether the request should be authorized or not.
 //
 // A successful check allows the authorization service adding or overriding headers from the
 // original request before dispatching it to the upstream. This is done by configuring which headers
@@ -54,27 +58,17 @@ message ExtAuthz {
 //
 // A failed check will cause this filter to close the HTTP request with 403 (Forbidden),
 // unless a different status code has been indicated by the authorization server via response
-// headers. In addition to the the status code, the filter will send all headers from the
-// authorization server back to the client by default. See :ref:`allowed_client_headers
+// headers. In addition to the the status code and with exception of the *Authority*, the filter
+// will send all headers from the authorization server back to the client by default. See
+// :ref:`allowed_client_headers
 // <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_client_headers>`
 // for more details.
 //
-// IMPORTANT: Unlike the gRPC client that request and response headers are passed in the message,
-// headers forwarded by via the raw HTTP client will affect the request.
+// .. note::
 //
-// If an error happens during the checking process, two situations may occur depending on the
-// filter's configuration:
+//   Unlike the gRPC client that request and response headers are passed in the message,
+//   headers forwarded by via the raw HTTP client will affect the request or the response.
 //
-//  1. When *failure_mode_allow* is true, traffic will be allowed in the presence of an error. This
-//     includes any of the HTTP 5xx errors, or a communication failure between the filter and the
-//     authorization server.
-//  2. When *failure_mode_allow* is false, the filter will *always* return a *Forbidden response* to
-//     the client. It will *not allow* traffic to the upstream in the presence of an error. This
-//     includes any of the HTTP 5xx errors, or a communication failure between the filter and the
-//     authorization server.
-//
-// Note that filter will produce stats on error. See *Statistics* at :ref:`configuration overview
-// <config_http_filters_ext_authz>`.
 message HttpService {
   // Sets the HTTP server URI which the authorization requests must be sent to.
   envoy.api.v2.core.HttpUri server_uri = 1;
@@ -96,11 +90,11 @@ message HttpService {
 }
 
 message AuthorizationRequest {
-  // Sets a list of keys that are used to determine which client request headers should
+  // Sets a list of matchers that are used to determine which client request headers should
   // be forwarded *from the filter* to the authorization server. Note that *Content-Length*,
   // *Authority*, *Method*, *Path* and *Authorization* are always dispatched to the authorization
   // server by default. The message will not contain body data and the *Content-Length* will be set
-  // to zero. Keys ending with wildcard * will be matched by prefix.
+  // to zero.
   envoy.type.matcher.ListStringMatcher allowed_headers = 2;
 
   // Sets a list of headers and their values that will be added to the request to external
@@ -109,7 +103,7 @@ message AuthorizationRequest {
 }
 
 message AuthorizationResponse {
-  // Sets a list of keys that are used to determine which authorization response headers should
+  // Sets a list of matchers that are used to determine which authorization response headers should
   // be forwarded *from the filter* to the upstream service only when the HTTP status is a 200 OK.
   // Note that these headers will override that the original request headers when respectively
   // matched.
@@ -117,9 +111,9 @@ message AuthorizationResponse {
 
   // Sets a list of keys that are used to determine which authorization response headers should
   // be forwarded *from the filter* to the client when the HTTP status is *NOT* a 200 OK. Note that
-  // when this list is empty, all the authorization response headers will be sent to the client
-  // (default). When a header is included in this list, *Path*, *Status*, *Content-Length*, *Host*,
-  // *WWWAuthenticate* and *Location* are automatically added.
+  // when this list is empty, all the authorization response headers, except *Authority* will be
+  // sent to the client (default). When a header is included in this list, *Path*, *Status*,
+  // *Content-Length*, *WWWAuthenticate* and *Location* are automatically added.
   envoy.type.matcher.ListStringMatcher allowed_client_headers = 2;
 }
 
