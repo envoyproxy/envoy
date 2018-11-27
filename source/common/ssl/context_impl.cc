@@ -182,9 +182,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     SSL_CTX_set_cert_verify_callback(ctx_.get(), ContextImpl::verifyCallback, this);
   }
 
-  if (config.tlsCertificate() != nullptr) {
+  const auto tls_certificates = config.tlsCertificates();
+  if (!tls_certificates.empty()) {
     // Load certificate chain.
-    const auto& tls_certificate = *config.tlsCertificate();
+    const auto& tls_certificate = tls_certificates[0].get();
     cert_chain_file_path_ = tls_certificate.certificateChainPath();
     bssl::UniquePtr<BIO> bio(
         BIO_new_mem_buf(const_cast<char*>(tls_certificate.certificateChain().data()),
@@ -574,7 +575,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
                                      const std::vector<std::string>& server_names,
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()) {
-  if (config.tlsCertificate() == nullptr) {
+  if (config.tlsCertificates().empty()) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
   if (config.certificateValidationContext() != nullptr &&
