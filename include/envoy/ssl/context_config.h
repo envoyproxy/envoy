@@ -81,6 +81,11 @@ public:
    * @return true if server-initiated TLS renegotiation will be allowed.
    */
   virtual bool allowRenegotiation() const PURE;
+
+  /**
+   * @return The maximum number of session keys to store.
+   */
+  virtual size_t maxSessionKeys() const PURE;
 };
 
 typedef std::unique_ptr<ClientContextConfig> ClientContextConfigPtr;

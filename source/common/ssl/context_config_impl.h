@@ -95,10 +95,12 @@ public:
   // Ssl::ClientContextConfig
   const std::string& serverNameIndication() const override { return server_name_indication_; }
   bool allowRenegotiation() const override { return allow_renegotiation_; }
+  size_t maxSessionKeys() const override { return max_session_keys_; }
 
 private:
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
+  const size_t max_session_keys_;
 };
 
 class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextConfig {

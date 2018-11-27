@@ -44,6 +44,19 @@ void SslIntegrationTest::TearDown() {
 Network::ClientConnectionPtr
 SslIntegrationTest::makeSslClientConnection(const ClientSslTransportOptions& options) {
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
+  if (debug_with_s_client_) {
+    const std::string s_client_cmd = TestEnvironment::substitute(
+        "openssl s_client -connect " + address->asString() +
+            " -showcerts -debug -msg -CAfile "
+            "{{ test_rundir }}/test/config/integration/certs/cacert.pem "
+            "-servername lyft.com -cert "
+            "{{ test_rundir }}/test/config/integration/certs/clientcert.pem "
+            "-key "
+            "{{ test_rundir }}/test/config/integration/certs/clientkey.pem ",
+        version_);
+    ENVOY_LOG_MISC(debug, "Executing {}", s_client_cmd);
+    RELEASE_ASSERT(::system(s_client_cmd.c_str()) == 0, "");
+  }
   auto client_transport_socket_factory_ptr =
       createClientSslTransportSocketFactory(options, *context_manager_);
   return dispatcher_->createClientConnection(
@@ -52,8 +65,9 @@ SslIntegrationTest::makeSslClientConnection(const ClientSslTransportOptions& opt
 }
 
 void SslIntegrationTest::checkStats() {
+  const uint32_t expected_handshakes = debug_with_s_client_ ? 2 : 1;
   Stats::CounterSharedPtr counter = test_server_->counter(listenerStatPrefix("ssl.handshake"));
-  EXPECT_EQ(1U, counter->value());
+  EXPECT_EQ(expected_handshakes, counter->value());
   counter->reset();
 }
 
@@ -242,6 +256,8 @@ public:
       // Rest of TLS initialization.
     });
     SslIntegrationTest::initialize();
+    // This confuses our socket counting.
+    debug_with_s_client_ = false;
   }
 
   std::string path_prefix_ = TestEnvironment::temporaryPath("ssl_trace");
