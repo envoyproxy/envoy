@@ -137,15 +137,18 @@ the modified request through a new filter chain to a new upstream as selected by
 associated with the new URL.
 
 For a redirect to be successful it must pass the following checks
+
 1. Be a 302 response
-1. Have an x-envoy-internal-redirect with a valid, fully qualified URL matching the scheme of the original request.
-1. The request must have been fully processed by Envoy.
-1. The request must not have a body
-1. The request must have not been previously redirected, as determined by the presence of an x-envoy-original-url header
+2. Have an x-envoy-internal-redirect with a valid, fully qualified URL matching the scheme of the original request.
+3. The request must have been fully processed by Envoy.
+4. The request must not have a body
+5. The request must have not been previously redirected, as determined by the presence of an x-envoy-original-url header
+
 Any failure will result in a 500 being sent downstream.
 
 Once the redirect has passed these checks, the request headers which were shipped to the original
 upstream will be modified by
+
 1. Putting the fully qualified original request URL in the x-envoy-original-url header
 2. Replacing the Authority/Host, Scheme, and Path headers with the values from x-envoy-internal-redirect header
 
@@ -155,6 +158,17 @@ HTTP connection manager sanitization such as clearing untrusted headers will onl
 per-route header modifications will be applied on both the original route and the second route, even
 if they are the same, so be mindful configuring header modification rules to avoid duplicating
 undesired header values.
+
+A sample redirect flow might look like this:
+
+1. Client sends a GET request for *\http://foo.com/bar*
+2. Upstream 1 (not necessarily Envoy based) sends a 302 with *"x-envoy-internal-redirect: \http://baz.com/eep"*
+3. Envoy is configured to allow redirects on the original route, and sends a new GET request to
+   Upstream 2, to fetch *\http://baz.com/eep* with the additional request header
+   *"x-envoy-original-url: \http://foo.com/bar"*
+4. Envoy proxies the response data for *\http://baz.com/eep* to the client as the response to the original
+   request.
+
 
 Timeouts
 --------
