@@ -134,19 +134,21 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
     ctx.response_->body = message->bodyAsString();
   }
 
-  message->headers().iterate(
-      [](const Http::HeaderEntry& header, void* ctx) -> Http::HeaderMap::Iterate {
-        auto* context = static_cast<ResponseContext*>(ctx);
-        for (const auto& matcher : *(context->matchers_)) {
-          if (matcher.match(header.key().c_str())) {
-            context->response_->headers_to_add.emplace_back(
-                Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
-            return Http::HeaderMap::Iterate::Continue;
+  if (ctx.matchers_ != nullptr) {
+    message->headers().iterate(
+        [](const Http::HeaderEntry& header, void* ctx) -> Http::HeaderMap::Iterate {
+          auto* context = static_cast<ResponseContext*>(ctx);
+          for (const auto& matcher : *(context->matchers_)) {
+            if (matcher.match(header.key().getStringView())) {
+              context->response_->headers_to_add.emplace_back(
+                  Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
+              return Http::HeaderMap::Iterate::Continue;
+            }
           }
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &ctx);
+          return Http::HeaderMap::Iterate::Continue;
+        },
+        &ctx);
+  }
 
   return std::move(ctx.response_);
 }

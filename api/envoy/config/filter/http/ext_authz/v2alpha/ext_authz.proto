@@ -32,13 +32,12 @@ message ExtAuthz {
   // Allows bypassing the filter on errors during the authorization process.
   //
   //  1. When *failure_mode_allow* is true, traffic will be allowed in the presence of an error.
-  //  This
-  //     includes any of the HTTP 5xx errors, or a communication failure between the filter and the
-  //     authorization server.
+  //  This includes any of the HTTP 5xx errors, or a communication failure between the filter and
+  //  the authorization server.
   //  2. When *failure_mode_allow* is false, the filter will *always* return a *Forbidden response*
   //  to the client. It will *not allow* traffic to the upstream in the presence of an error. This
-  //     includes any of the HTTP 5xx errors, or a communication failure between the filter and the
-  //     authorization server.
+  //  includes any of the HTTP 5xx errors, or a communication failure between the filter and the
+  //  authorization server.
   //
   // Note that filter will produce stats on error. See *Statistics* at :ref:`configuration overview
   // <config_http_filters_ext_authz>`.
