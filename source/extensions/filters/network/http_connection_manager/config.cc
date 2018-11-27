@@ -30,7 +30,18 @@ namespace HttpConnectionManager {
 namespace {
 
 typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
-typedef std::map<std::string, std::unique_ptr<FilterFactoriesList>> FilterFactoryMap;
+typedef std::map<std::string, HttpConnectionManagerConfig::FilterConfig> FilterFactoryMap;
+
+HttpConnectionManagerConfig::UpgradeMap::const_iterator
+findUpgradeBoolCaseInsensitive(const HttpConnectionManagerConfig::UpgradeMap& upgrade_map,
+                               absl::string_view upgrade_type) {
+  for (auto it = upgrade_map.begin(); it != upgrade_map.end(); ++it) {
+    if (StringUtil::CaseInsensitiveCompare()(it->first, upgrade_type)) {
+      return it;
+    }
+  }
+  return upgrade_map.end();
+}
 
 FilterFactoryMap::const_iterator findUpgradeCaseInsensitive(const FilterFactoryMap& upgrade_map,
                                                             absl::string_view upgrade_type) {
@@ -272,6 +283,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   for (auto upgrade_config : config.upgrade_configs()) {
     const std::string& name = upgrade_config.upgrade_type();
+    const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
     if (findUpgradeCaseInsensitive(upgrade_filter_factories_, name) !=
         upgrade_filter_factories_.end()) {
       throw EnvoyException(
@@ -282,10 +294,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       for (int32_t i = 0; i < upgrade_config.filters().size(); i++) {
         processFilter(upgrade_config.filters(i), i, name, *factories);
       }
-      upgrade_filter_factories_.emplace(std::make_pair(name, std::move(factories)));
+      upgrade_filter_factories_.emplace(
+          std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     } else {
       std::unique_ptr<FilterFactoriesList> factories(nullptr);
-      upgrade_filter_factories_.emplace(std::make_pair(name, std::move(factories)));
+      upgrade_filter_factories_.emplace(
+          std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     }
   }
 }
@@ -350,21 +364,37 @@ void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCall
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
-    absl::string_view upgrade_type, Http::FilterChainFactoryCallbacks& callbacks) {
-  auto it = findUpgradeCaseInsensitive(upgrade_filter_factories_, upgrade_type);
-  if (it != upgrade_filter_factories_.end()) {
-    FilterFactoriesList* filters_to_use = nullptr;
-    if (it->second != nullptr) {
-      filters_to_use = it->second.get();
-    } else {
-      filters_to_use = &filter_factories_;
+    absl::string_view upgrade_type,
+    const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
+    Http::FilterChainFactoryCallbacks& callbacks) {
+  bool route_enabled = false;
+  if (per_route_upgrade_map) {
+    auto route_it = findUpgradeBoolCaseInsensitive(*per_route_upgrade_map, upgrade_type);
+    if (route_it != per_route_upgrade_map->end()) {
+      // Upgrades explicitly not allowed on this route.
+      if (route_it->second == false) {
+        return false;
+      }
+      // Upgrades explicitly enabled on this route.
+      route_enabled = true;
     }
-    for (const Http::FilterFactoryCb& factory : *filters_to_use) {
-      factory(callbacks);
-    }
-    return true;
   }
-  return false;
+
+  auto it = findUpgradeCaseInsensitive(upgrade_filter_factories_, upgrade_type);
+  if ((it == upgrade_filter_factories_.end() || !it->second.allow_upgrade) && !route_enabled) {
+    // Either the HCM disables upgrades and the route-config does not override,
+    // or neither is configured for this upgrade.
+    return false;
+  }
+  FilterFactoriesList* filters_to_use = &filter_factories_;
+  if (it != upgrade_filter_factories_.end() && it->second.filter_factories != nullptr) {
+    filters_to_use = it->second.filter_factories.get();
+  }
+
+  for (const Http::FilterFactoryCb& factory : *filters_to_use) {
+    factory(callbacks);
+  }
+  return true;
 }
 
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {

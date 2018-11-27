@@ -36,9 +36,11 @@ public:
   virtual const std::string& ecdhCurves() const PURE;
 
   /**
-   * @return TlsCertificateConfig the certificate config used to identify the local side.
+   * @return std::vector<std::reference_wrapper<const TlsCertificateConfig>> TLS
+   * certificate configs.
    */
-  virtual const TlsCertificateConfig* tlsCertificate() const PURE;
+  virtual std::vector<std::reference_wrapper<const TlsCertificateConfig>>
+  tlsCertificates() const PURE;
 
   /**
    * @return CertificateValidationContextConfig the certificate validation context config.
@@ -81,6 +83,11 @@ public:
    * @return true if server-initiated TLS renegotiation will be allowed.
    */
   virtual bool allowRenegotiation() const PURE;
+
+  /**
+   * @return The maximum number of session keys to store.
+   */
+  virtual size_t maxSessionKeys() const PURE;
 };
 
 typedef std::unique_ptr<ClientContextConfig> ClientContextConfigPtr;

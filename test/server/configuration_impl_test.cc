@@ -59,8 +59,10 @@ protected:
         cluster_manager_factory_(server_.runtime(), server_.stats(), server_.threadLocal(),
                                  server_.random(), server_.dnsResolver(),
                                  server_.sslContextManager(), server_.dispatcher(),
-                                 server_.localInfo(), server_.secretManager(), *api_, *http_context_) {}
+                                 server_.localInfo(), server_.secretManager(), *api_,
+                                 *http_context_) {}
 
+  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Tracing::HttpNullTracer null_tracer_;
   std::unique_ptr<Http::ContextImpl> http_context_;

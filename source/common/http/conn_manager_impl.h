@@ -99,7 +99,7 @@ private:
           stopped_(false), dual_filter_(dual_filter) {}
 
     bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
-    bool commonHandleAfterHeadersCallback(FilterHeadersStatus status);
+    bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& headers_only);
     void commonHandleBufferData(Buffer::Instance& provided_data);
     bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
                                        bool& buffer_was_streaming);
@@ -184,6 +184,7 @@ private:
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(HeaderMapPtr&& trailers) override;
+    void encodeMetadata(MetadataMapPtr&& metadata_map) override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void
@@ -293,6 +294,7 @@ private:
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
+    void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map);
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
 
@@ -419,7 +421,12 @@ private:
     // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
     bool has_continue_headers_{};
-    bool is_head_request_{false};
+    bool is_head_request_{};
+    // Whether a filter has indicated that the request should be treated as a headers only request.
+    bool decoding_headers_only_{};
+    // Whether a filter has indicated that the response should be treated as a headers only
+    // response.
+    bool encoding_headers_only_{};
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

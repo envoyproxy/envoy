@@ -10,6 +10,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/message.h"
+#include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
 
 #include "common/json/json_loader.h"

@@ -233,6 +233,7 @@ private:
     }
 
     bool includeAttemptCount() const override { return false; }
+    const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
@@ -244,6 +245,7 @@ private:
     static const Config::TypedMetadataImpl<Config::TypedMetadataFactory> typed_metadata_;
     static const NullPathMatchCriterion path_match_criterion_;
 
+    Router::RouteEntry::UpgradeMap upgrade_map_;
     const std::string& cluster_name_;
     absl::optional<std::chrono::milliseconds> timeout_;
   };
@@ -304,6 +306,7 @@ private:
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(HeaderMapPtr&& trailers) override;
+  void encodeMetadata(MetadataMapPtr&&) override {}
   void onDecoderFilterAboveWriteBufferHighWatermark() override {}
   void onDecoderFilterBelowWriteBufferLowWatermark() override {}
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
