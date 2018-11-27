@@ -379,7 +379,7 @@ private:
                        const absl::optional<Http::StreamResetReason>& reset_reason);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry(bool end_stream);
-  bool setupInternalRedirect(const Http::HeaderMapPtr& headers, bool end_stream);
+  bool setupInternalRedirect(const Http::HeaderMapPtr& headers);
   void doRetry();
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.

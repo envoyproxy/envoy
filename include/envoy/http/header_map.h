@@ -282,6 +282,7 @@ private:
   HEADER_FUNC(Host)                                                                                \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(LastModified)                                                                        \
+  HEADER_FUNC(Location)                                                                            \
   HEADER_FUNC(Method)                                                                              \
   HEADER_FUNC(NoChunks)                                                                            \
   HEADER_FUNC(Origin)                                                                              \

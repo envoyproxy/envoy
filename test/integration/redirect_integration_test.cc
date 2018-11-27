@@ -29,8 +29,9 @@ public:
   }
 
 protected:
-  Http::TestHeaderMapImpl default_redirect_response_{
-      {":status", "302"}, {"x-envoy-internal-redirect", "http://authority2/new/url"}};
+  Http::TestHeaderMapImpl default_redirect_response_{{":status", "302"},
+                                                     {"x-envoy-internal-redirect", "yes"},
+                                                     {"location", "http://authority2/new/url"}};
 };
 
 // By default if internal redirects are not configured, redirects are translated
@@ -122,7 +123,6 @@ TEST_P(RedirectIntegrationTest, BasicRedirect) {
   upstream_request_->encodeHeaders(default_redirect_response_, true);
 
   waitForNextUpstreamRequest();
-  std::cerr << upstream_request_->headers();
   ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
   EXPECT_STREQ("http://handle.redirect/test/long/url",
                upstream_request_->headers().EnvoyOriginalUrl()->value().c_str());
@@ -147,7 +147,7 @@ TEST_P(RedirectIntegrationTest, InvalidRedirect) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   waitForNextUpstreamRequest();
-  default_redirect_response_.insertEnvoyInternalRedirect().value("invalid_url", 11);
+  default_redirect_response_.insertLocation().value("invalid_url", 11);
   upstream_request_->encodeHeaders(default_redirect_response_, true);
 
   // The redirect will be transformed into a server error because the url was

@@ -1911,7 +1911,7 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
-TEST_F(RouterTest, InternalRedirect) {
+TEST_F(RouterTest, InternalRedirectFailure) {
   sendRequest();
 
   Http::HeaderMapPtr response_headers(

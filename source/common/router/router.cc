@@ -686,14 +686,12 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
       // configured on.
       cleanup(!end_stream);
       cluster_->stats().upstream_internal_redirect_rejected_total_.inc();
-      headers->removeEnvoyInternalRedirect(); // Just to be paranoid.
       callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt);
       return;
     case InternalRedirectAction::Handle:
       cleanup(!end_stream);
-      if (!setupInternalRedirect(headers, end_stream)) {
+      if (!setupInternalRedirect(headers)) {
         cluster_->stats().upstream_internal_redirect_failed_total_.inc();
-        headers->removeEnvoyInternalRedirect();
         callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt);
         ENVOY_STREAM_LOG(debug, "failing redirect", *callbacks_);
       }
@@ -846,17 +844,18 @@ bool Filter::setupRetry(bool end_stream) {
   return true;
 }
 
-bool Filter::setupInternalRedirect(const Http::HeaderMapPtr& headers, bool end_stream) {
-  const Http::HeaderEntry* internal_redirect = headers->EnvoyInternalRedirect();
-  ASSERT(internal_redirect);
+bool Filter::setupInternalRedirect(const Http::HeaderMapPtr& headers) {
+  ENVOY_STREAM_LOG(debug, "attempting internal redirect", *callbacks_);
+  const Http::HeaderEntry* location = headers->Location();
+  ASSERT(headers->EnvoyInternalRedirect());
   // As with setupRetry, redirects are not supported for streaming requests yet.
   if (!downstream_end_stream_ ||
       callbacks_->decodingBuffer() || // Redirects woth body not yet supported.
-      !convertRequestHeadersForInternalRedirect(*downstream_headers_, *internal_redirect)) {
+      location == nullptr ||
+      !convertRequestHeadersForInternalRedirect(*downstream_headers_, *location)) {
     return false;
   }
 
-  setupRetry(end_stream);
   // At this point barring an bug with recreateStream, the redirect will occur.
   cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
   ENVOY_STREAM_LOG(debug, "performing redirect", *callbacks_);
