@@ -96,6 +96,14 @@ TEST_P(ListenSocketImplTest, BindSpecificPortUdp) {
   EXPECT_EQ(addr->ip()->port(), socket1.localAddress()->ip()->port());
   EXPECT_EQ(addr->ip()->addressAsString(), socket1.localAddress()->ip()->addressAsString());
 
+  auto option2 = std::make_unique<MockSocketOption>();
+  auto options2 = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
+  EXPECT_CALL(*option2, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
+      .WillOnce(Return(true));
+  options2->emplace_back(std::move(option2));
+  // The address and port are bound already, should throw exception.
+  EXPECT_THROW(Network::UdpListenSocket socket2(addr, options2, true), EnvoyException);
+
   // Test the case of a socket with fd and given address and port.
   UdpListenSocket socket3(dup(socket1.fd()), addr, nullptr);
   EXPECT_EQ(addr->asString(), socket3.localAddress()->asString());
