@@ -134,6 +134,11 @@ public:
    * @return bool Whether CORS is enabled for the route or virtual host.
    */
   virtual bool enabled() const PURE;
+
+  /**
+   * @return std::string The runtime key for flags related to this cors policy.
+   */
+  virtual const std::string& runtimeKey() const PURE;
 };
 
 /**

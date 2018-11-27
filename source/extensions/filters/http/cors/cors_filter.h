@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/filter.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -32,8 +33,9 @@ struct CorsStats {
  */
 class CorsFilterConfig {
 public:
-  CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope);
+  CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
   CorsStats& stats() { return stats_; }
+  Runtime::Loader& runtime() { return runtime_; }
 
 private:
   static CorsStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -41,6 +43,7 @@ private:
   }
 
   CorsStats stats_;
+  Runtime::Loader& runtime_;
 };
 typedef std::shared_ptr<CorsFilterConfig> CorsFilterConfigSharedPtr;
 
@@ -86,6 +89,8 @@ private:
   const std::string& exposeHeaders();
   const std::string& maxAge();
   bool allowCredentials();
+  std::string runtimeKey(const Envoy::Router::CorsPolicy* policy, const std::string& key);
+  bool shadowEnabled();
   bool enabled();
   bool isOriginAllowed(const Http::HeaderString& origin);
   bool isOriginAllowedString(const Http::HeaderString& origin);

@@ -10,6 +10,22 @@ For the meaning of the headers please refer to the pages below.
 - https://www.w3.org/TR/cors/
 - :ref:`v2 API reference <envoy_api_msg_route.CorsPolicy>`
 
+.. _cors-runtime:
+
+Runtime
+-------
+
+The CORS filter supports the following runtime settings:
+
+cors.{runtime_key}.filter_enabled
+  The % of requests for which the filter is enabled. Default is 0.
+  If present, this will override the `enabled` field of the configuration.
+
+cors.{runtime_key}.shadow_enabled
+  The % of requests for which the filter is enabled in shadow only mode. Default is 0.
+  If present, this will evaluate a requests Origin to determine if it's valid
+  but will not enforce any policies.
+
 .. _cors-statistics:
 
 Statistics

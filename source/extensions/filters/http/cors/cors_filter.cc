@@ -13,8 +13,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cors {
 
-CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope)
-    : stats_(generateStats(stats_prefix + "cors.", scope)) {}
+CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope,
+                                   Runtime::Loader& runtime)
+    : stats_(generateStats(stats_prefix + "cors.", scope)), runtime_(runtime) {}
 
 CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config)
     : policies_({{nullptr, nullptr}}), config_(std::move(config)) {}
@@ -32,14 +33,12 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
       decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy(),
   }};
 
-  if (!enabled()) {
+  if (!enabled() && !shadowEnabled())
     return Http::FilterHeadersStatus::Continue;
-  }
 
   origin_ = headers.Origin();
-  if (origin_ == nullptr || origin_->value().empty()) {
+  if (origin_ == nullptr || origin_->value().empty())
     return Http::FilterHeadersStatus::Continue;
-  }
 
   if (!isOriginAllowed(origin_->value())) {
     config_->stats().origin_invalid_.inc();
@@ -48,38 +47,34 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
 
   is_cors_request_ = true;
   config_->stats().origin_valid_.inc();
+  if (shadowEnabled() && !enabled())
+    return Http::FilterHeadersStatus::Continue;
 
   const auto method = headers.Method();
-  if (method == nullptr || method->value().c_str() != Http::Headers::get().MethodValues.Options) {
+  if (method == nullptr || method->value().c_str() != Http::Headers::get().MethodValues.Options)
     return Http::FilterHeadersStatus::Continue;
-  }
 
   const auto requestMethod = headers.AccessControlRequestMethod();
-  if (requestMethod == nullptr || requestMethod->value().empty()) {
+  if (requestMethod == nullptr || requestMethod->value().empty())
     return Http::FilterHeadersStatus::Continue;
-  }
 
   Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
       {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))}}};
 
   response_headers->insertAccessControlAllowOrigin().value(*origin_);
 
-  if (allowCredentials()) {
+  if (allowCredentials())
     response_headers->insertAccessControlAllowCredentials().value(
         Http::Headers::get().CORSValues.True);
-  }
 
-  if (!allowMethods().empty()) {
+  if (!allowMethods().empty())
     response_headers->insertAccessControlAllowMethods().value(allowMethods());
-  }
 
-  if (!allowHeaders().empty()) {
+  if (!allowHeaders().empty())
     response_headers->insertAccessControlAllowHeaders().value(allowHeaders());
-  }
 
-  if (!maxAge().empty()) {
+  if (!maxAge().empty())
     response_headers->insertAccessControlMaxAge().value(maxAge());
-  }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
 
@@ -114,97 +109,109 @@ bool CorsFilter::isOriginAllowed(const Http::HeaderString& origin) {
 }
 
 bool CorsFilter::isOriginAllowedString(const Http::HeaderString& origin) {
-  if (allowOrigins() == nullptr) {
+  if (allowOrigins() == nullptr)
     return false;
-  }
   for (const auto& o : *allowOrigins()) {
-    if (o == "*" || origin == o.c_str()) {
+    if (o == "*" || origin == o.c_str())
       return true;
-    }
   }
   return false;
 }
 
 bool CorsFilter::isOriginAllowedRegex(const Http::HeaderString& origin) {
-  if (allowOriginRegexes() == nullptr) {
+  if (allowOriginRegexes() == nullptr)
     return false;
-  }
   for (const auto& regex : *allowOriginRegexes()) {
-    if (std::regex_match(origin.c_str(), regex)) {
+    if (std::regex_match(origin.c_str(), regex))
       return true;
-    }
   }
   return false;
 }
 
 const std::list<std::string>* CorsFilter::allowOrigins() {
   for (const auto policy : policies_) {
-    if (policy && !policy->allowOrigins().empty()) {
+    if (policy && !policy->allowOrigins().empty())
       return &policy->allowOrigins();
-    }
   }
   return nullptr;
 }
 
 const std::list<std::regex>* CorsFilter::allowOriginRegexes() {
   for (const auto policy : policies_) {
-    if (policy && !policy->allowOriginRegexes().empty()) {
+    if (policy && !policy->allowOriginRegexes().empty())
       return &policy->allowOriginRegexes();
-    }
   }
   return nullptr;
 }
 
 const std::string& CorsFilter::allowMethods() {
   for (const auto policy : policies_) {
-    if (policy && !policy->allowMethods().empty()) {
+    if (policy && !policy->allowMethods().empty())
       return policy->allowMethods();
-    }
   }
   return EMPTY_STRING;
 }
 
 const std::string& CorsFilter::allowHeaders() {
   for (const auto policy : policies_) {
-    if (policy && !policy->allowHeaders().empty()) {
+    if (policy && !policy->allowHeaders().empty())
       return policy->allowHeaders();
-    }
   }
   return EMPTY_STRING;
 }
 
 const std::string& CorsFilter::exposeHeaders() {
   for (const auto policy : policies_) {
-    if (policy && !policy->exposeHeaders().empty()) {
+    if (policy && !policy->exposeHeaders().empty())
       return policy->exposeHeaders();
-    }
   }
   return EMPTY_STRING;
 }
 
 const std::string& CorsFilter::maxAge() {
   for (const auto policy : policies_) {
-    if (policy && !policy->maxAge().empty()) {
+    if (policy && !policy->maxAge().empty())
       return policy->maxAge();
-    }
   }
   return EMPTY_STRING;
 }
 
 bool CorsFilter::allowCredentials() {
   for (const auto policy : policies_) {
-    if (policy && policy->allowCredentials()) {
+    if (policy && policy->allowCredentials())
       return policy->allowCredentials().value();
-    }
+  }
+  return false;
+}
+
+std::string CorsFilter::runtimeKey(const Envoy::Router::CorsPolicy* policy,
+                                   const std::string& key) {
+  if (policy->runtimeKey().empty())
+    return EMPTY_STRING;
+  return "cors." + policy->runtimeKey() + "." + key;
+}
+
+bool CorsFilter::shadowEnabled() {
+  for (const auto policy : policies_) {
+    if (!policy)
+      continue;
+    const auto shadowMode = runtimeKey(policy, "shadow_enabled");
+    if (shadowMode == EMPTY_STRING)
+      break;
+    return config_->runtime().snapshot().featureEnabled(shadowMode, 0);
   }
   return false;
 }
 
 bool CorsFilter::enabled() {
   for (const auto policy : policies_) {
-    if (policy) {
-      return policy->enabled();
-    }
+    if (!policy)
+      continue;
+    const auto filterEnabled = runtimeKey(policy, "filter_enabled");
+    bool policyEnabled = policy->enabled();
+    if (filterEnabled == EMPTY_STRING)
+      return policyEnabled;
+    return config_->runtime().snapshot().featureEnabled(filterEnabled, int(policyEnabled) * 100);
   }
   return false;
 }
