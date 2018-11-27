@@ -92,11 +92,7 @@ namespace Envoy {
                         }
                     }
 
-                    if (span_name != "-" && !span_name.empty()) {
-                        writer.String(span_name.c_str());
-                    } else {
-                        writer.String(name_.c_str());
-                    }
+                    writer.String(name_.c_str());
 
                     if (http_request_annotation_json_vector.size() != 0 || http_response_annotation_json_vector.size() != 0) {
                         writer.Key(XRayJsonFieldNames::get().SPAN_HTTP_ANNOTATIONS.c_str());
@@ -219,6 +215,7 @@ namespace Envoy {
                     }
 
                     if (span_name != "-" && !span_name.empty()) {
+                        std::replace(span_name.begin(), span_name.end(), '|', '.');
                         writer.String(span_name.c_str());
                     } else {
                         writer.String(name_.c_str());
