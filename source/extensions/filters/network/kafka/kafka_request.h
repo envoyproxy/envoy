@@ -6,7 +6,6 @@
 
 #include "common/common/assert.h"
 
-#include "extensions/filters/network/kafka/debug_helpers.h"
 #include "extensions/filters/network/kafka/kafka_protocol.h"
 #include "extensions/filters/network/kafka/parser.h"
 #include "extensions/filters/network/kafka/serialization.h"
@@ -31,12 +30,6 @@ struct RequestHeader {
     return api_key_ == rhs.api_key_ && api_version_ == rhs.api_version_ &&
            correlation_id_ == rhs.correlation_id_ && client_id_ == rhs.client_id_;
   };
-
-  friend std::ostream& operator<<(std::ostream& os, const RequestHeader& arg) {
-    return os << "{api_key=" << arg.api_key_ << ", api_version=" << arg.api_version_
-              << ", correlation_id=" << arg.correlation_id_ << ", client_id=" << arg.client_id_
-              << "}";
-  };
 };
 
 /**
@@ -45,11 +38,6 @@ struct RequestHeader {
 struct RequestContext {
   int32_t remaining_request_size_{0};
   RequestHeader request_header_{};
-
-  friend std::ostream& operator<<(std::ostream& os, const RequestContext& arg) {
-    return os << "{header=" << arg.request_header_ << ", remaining=" << arg.remaining_request_size_
-              << "}";
-  }
 };
 
 typedef std::shared_ptr<RequestContext> RequestContextSharedPtr;
@@ -132,7 +120,7 @@ public:
    * Consumes INT32 bytes as request length and updates the context with that value
    * @return RequestHeaderParser instance to process request header
    */
-  ParseResponse parse(const char*& buffer, uint64_t& remaining);
+  ParseResponse parse(const char*& buffer, uint64_t& remaining) override;
 
   const RequestContextSharedPtr contextForTest() const { return context_; }
 
@@ -142,14 +130,14 @@ private:
   Int32Deserializer request_length_;
 };
 
-// clang-format off
 /**
- * Deserializer that extracts request header
+ * Deserializer that extracts request header (4 fields)
  * @see http://kafka.apache.org/protocol.html#protocol_messages
  */
 class RequestHeaderDeserializer
-    : public CompositeDeserializerWith4Delegates<RequestHeader, Int16Deserializer, Int16Deserializer, Int32Deserializer, NullableStringDeserializer> {};
-// clang-format on
+    : public CompositeDeserializerWith4Delegates<RequestHeader, Int16Deserializer,
+                                                 Int16Deserializer, Int32Deserializer,
+                                                 NullableStringDeserializer> {};
 
 /**
  * Parser responsible for computing request header and updating the context with data resolved
@@ -165,7 +153,7 @@ public:
    * Uses data provided to compute request header
    * @return Parser instance responsible for processing rest of the message
    */
-  ParseResponse parse(const char*& buffer, uint64_t& remaining);
+  ParseResponse parse(const char*& buffer, uint64_t& remaining) override;
 
   const RequestContextSharedPtr contextForTest() const { return context_; }
 
@@ -183,7 +171,7 @@ private:
  * @param BT deserializer type corresponding to request class (should be subclass of
  * Deserializer<RT>)
  */
-template <typename RT, typename BT> class RequestParser : public Parser {
+template <typename RequestType, typename DeserializerType> class RequestParser : public Parser {
 public:
   /**
    * Create a parser with given context
@@ -195,15 +183,14 @@ public:
    * Consume enough data to fill in deserializer and receive the parsed request
    * Fill in request's header with data stored in context
    */
-  ParseResponse parse(const char*& buffer, uint64_t& remaining) {
+  ParseResponse parse(const char*& buffer, uint64_t& remaining) override {
     context_->remaining_request_size_ -= deserializer.feed(buffer, remaining);
     if (deserializer.ready()) {
       // after a successful parse, there should be nothing left - we have consumed all the bytes
       ASSERT(0 == context_->remaining_request_size_);
-      RT request = deserializer.get();
+      RequestType request = deserializer.get();
       request.header() = context_->request_header_;
-      ENVOY_LOG(trace, "parsed request {}: {}", *context_, request);
-      MessageSharedPtr msg = std::make_shared<RT>(request);
+      MessageSharedPtr msg = std::make_shared<RequestType>(request);
       return ParseResponse::parsedMessage(msg);
     } else {
       return ParseResponse::stillWaiting();
@@ -212,7 +199,7 @@ public:
 
 protected:
   RequestContextSharedPtr context_;
-  BT deserializer; // underlying request-specific deserializer
+  DeserializerType deserializer; // underlying request-specific deserializer
 };
 
 /**
@@ -266,26 +253,11 @@ public:
     return written;
   }
 
-  /**
-   * Pretty-prints given request into a stream
-   */
-  std::ostream& print(std::ostream& os) const override final {
-    // write header
-    os << request_header_ << " "; // not very pretty
-    // write request-specific data
-    return printDetails(os);
-  }
-
 protected:
   /**
    * Encodes request-specific data into a buffer
    */
   virtual size_t encodeDetails(Buffer::Instance&, EncodingContext&) const PURE;
-
-  /**
-   * Prints request-specific data into a stream
-   */
-  virtual std::ostream& printDetails(std::ostream&) const PURE;
 
   RequestHeader request_header_;
 };
@@ -304,10 +276,6 @@ protected:
   //   this would add ability to forward unknown types of requests in cluster-proxy
   size_t encodeDetails(Buffer::Instance&, EncodingContext&) const override {
     throw EnvoyException("cannot serialize unknown request");
-  }
-
-  std::ostream& printDetails(std::ostream& out) const override {
-    return out << "{unknown request}";
   }
 };
 

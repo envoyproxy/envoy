@@ -1,11 +1,5 @@
 #pragma once
 
-#include <vector>
-
-#include "common/common/macros.h"
-
-#include "extensions/filters/network/kafka/kafka_types.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

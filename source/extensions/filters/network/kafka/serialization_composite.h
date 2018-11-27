@@ -22,8 +22,8 @@ namespace Kafka {
 
 /**
  * This header contains only composite deserializers
- * The basic design is composite deserializer creating delegates T1..Tn
- * Result of type RT is constructed by getting results of each of delegates
+ * The basic design is composite deserializer creating delegates DeserializerType1..Tn
+ * Result of type ResponseType is constructed by getting results of each of delegates
  */
 
 /**
@@ -32,14 +32,14 @@ namespace Kafka {
  * (deserializers that are already ready do not consume data, so it's safe).
  * The composite deserializer is ready when the last deserializer is ready
  * (which means all deserializers before it are ready too)
- * Constructs the result of type RT using { delegate1_.get(), delegate2_.get() ... }
+ * Constructs the result of type ResponseType using { delegate1_.get(), delegate2_.get() ... }
  *
- * @param RT type of deserialized data
- * @param T1 1st deserializer (result used as 1st argument of RT's ctor)
- * @param T2 2nd deserializer (result used as 2nd argument of RT's ctor)
+ * @param ResponseType type of deserialized data
+ * @param DeserializerType1 1st deserializer (result used as 1st argument of ResponseType's ctor)
+ * @param DeserializerType2 2nd deserializer (result used as 2nd argument of ResponseType's ctor)
  */
-template <typename RT, typename T1, typename T2>
-class CompositeDeserializerWith2Delegates : public Deserializer<RT> {
+template <typename ResponseType, typename DeserializerType1, typename DeserializerType2>
+class CompositeDeserializerWith2Delegates : public Deserializer<ResponseType> {
 public:
   CompositeDeserializerWith2Delegates(){};
   size_t feed(const char*& buffer, uint64_t& remaining) {
@@ -49,11 +49,11 @@ public:
     return consumed;
   }
   bool ready() const { return delegate2_.ready(); }
-  RT get() const { return {delegate1_.get(), delegate2_.get()}; }
+  ResponseType get() const { return {delegate1_.get(), delegate2_.get()}; }
 
 protected:
-  T1 delegate1_;
-  T2 delegate2_;
+  DeserializerType1 delegate1_;
+  DeserializerType2 delegate2_;
 };
 
 /**
@@ -62,15 +62,16 @@ protected:
  * (deserializers that are already ready do not consume data, so it's safe).
  * The composite deserializer is ready when the last deserializer is ready
  * (which means all deserializers before it are ready too)
- * Constructs the result of type RT using { delegate1_.get(), delegate2_.get() ... }
+ * Constructs the result of type ResponseType using { delegate1_.get(), delegate2_.get() ... }
  *
- * @param RT type of deserialized data
- * @param T1 1st deserializer (result used as 1st argument of RT's ctor)
- * @param T2 2nd deserializer (result used as 2nd argument of RT's ctor)
- * @param T3 3rd deserializer (result used as 3rd argument of RT's ctor)
+ * @param ResponseType type of deserialized data
+ * @param DeserializerType1 1st deserializer (result used as 1st argument of ResponseType's ctor)
+ * @param DeserializerType2 2nd deserializer (result used as 2nd argument of ResponseType's ctor)
+ * @param DeserializerType3 3rd deserializer (result used as 3rd argument of ResponseType's ctor)
  */
-template <typename RT, typename T1, typename T2, typename T3>
-class CompositeDeserializerWith3Delegates : public Deserializer<RT> {
+template <typename ResponseType, typename DeserializerType1, typename DeserializerType2,
+          typename DeserializerType3>
+class CompositeDeserializerWith3Delegates : public Deserializer<ResponseType> {
 public:
   CompositeDeserializerWith3Delegates(){};
   size_t feed(const char*& buffer, uint64_t& remaining) {
@@ -81,12 +82,12 @@ public:
     return consumed;
   }
   bool ready() const { return delegate3_.ready(); }
-  RT get() const { return {delegate1_.get(), delegate2_.get(), delegate3_.get()}; }
+  ResponseType get() const { return {delegate1_.get(), delegate2_.get(), delegate3_.get()}; }
 
 protected:
-  T1 delegate1_;
-  T2 delegate2_;
-  T3 delegate3_;
+  DeserializerType1 delegate1_;
+  DeserializerType2 delegate2_;
+  DeserializerType3 delegate3_;
 };
 
 /**
@@ -95,16 +96,17 @@ protected:
  * (deserializers that are already ready do not consume data, so it's safe).
  * The composite deserializer is ready when the last deserializer is ready
  * (which means all deserializers before it are ready too)
- * Constructs the result of type RT using { delegate1_.get(), delegate2_.get() ... }
+ * Constructs the result of type ResponseType using { delegate1_.get(), delegate2_.get() ... }
  *
- * @param RT type of deserialized data
- * @param T1 1st deserializer (result used as 1st argument of RT's ctor)
- * @param T2 2nd deserializer (result used as 2nd argument of RT's ctor)
- * @param T3 3rd deserializer (result used as 3rd argument of RT's ctor)
- * @param T4 4th deserializer (result used as 4th argument of RT's ctor)
+ * @param ResponseType type of deserialized data
+ * @param DeserializerType1 1st deserializer (result used as 1st argument of ResponseType's ctor)
+ * @param DeserializerType2 2nd deserializer (result used as 2nd argument of ResponseType's ctor)
+ * @param DeserializerType3 3rd deserializer (result used as 3rd argument of ResponseType's ctor)
+ * @param DeserializerType4 4th deserializer (result used as 4th argument of ResponseType's ctor)
  */
-template <typename RT, typename T1, typename T2, typename T3, typename T4>
-class CompositeDeserializerWith4Delegates : public Deserializer<RT> {
+template <typename ResponseType, typename DeserializerType1, typename DeserializerType2,
+          typename DeserializerType3, typename DeserializerType4>
+class CompositeDeserializerWith4Delegates : public Deserializer<ResponseType> {
 public:
   CompositeDeserializerWith4Delegates(){};
   size_t feed(const char*& buffer, uint64_t& remaining) {
@@ -116,15 +118,15 @@ public:
     return consumed;
   }
   bool ready() const { return delegate4_.ready(); }
-  RT get() const {
+  ResponseType get() const {
     return {delegate1_.get(), delegate2_.get(), delegate3_.get(), delegate4_.get()};
   }
 
 protected:
-  T1 delegate1_;
-  T2 delegate2_;
-  T3 delegate3_;
-  T4 delegate4_;
+  DeserializerType1 delegate1_;
+  DeserializerType2 delegate2_;
+  DeserializerType3 delegate3_;
+  DeserializerType4 delegate4_;
 };
 
 } // namespace Kafka

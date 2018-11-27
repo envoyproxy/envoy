@@ -153,9 +153,9 @@ public:
  * Values 0 and 1 are used to represent false and true respectively.
  * When reading a boolean value, any non-zero value is considered true.
  */
-class BoolBuffer : public Deserializer<bool> {
+class BooleanDeserializer : public Deserializer<bool> {
 public:
-  BoolBuffer(){};
+  BooleanDeserializer(){};
 
   size_t feed(const char*& buffer, uint64_t& remaining) { return buffer_.feed(buffer, remaining); }
 
@@ -172,7 +172,7 @@ private:
  * First reads length (INT16) and then allocates the buffer of given length
  *
  * From documentation:
- * First the length N is given as an int16_t.
+ * First the length N is given as an INT16.
  * Then N bytes follow which are the UTF-8 encoding of the character sequence.
  * Length must not be negative.
  */
@@ -231,7 +231,7 @@ private:
  * null value)
  *
  * From documentation:
- * For non-null strings, first the length N is given as an int16_t.
+ * For non-null strings, first the length N is given as an INT16.
  * Then N bytes follow which are the UTF-8 encoding of the character sequence.
  * A null value is encoded with length of -1 and there are no following bytes.
  */
@@ -299,21 +299,150 @@ private:
 };
 
 /**
+ * Deserializer of bytes value
+ * First reads length (INT32) and then allocates the buffer of given length
+ *
+ * From documentation:
+ * First the length N is given as an INT32. Then N bytes follow.
+ */
+class BytesDeserializer : public Deserializer<Bytes> {
+public:
+  size_t feed(const char*& buffer, uint64_t& remaining) {
+    const size_t length_consumed = length_buf_.feed(buffer, remaining);
+    if (!length_buf_.ready()) {
+      // break early: we still need to fill in length buffer
+      return length_consumed;
+    }
+
+    if (!length_consumed_) {
+      required_ = length_buf_.get();
+      if (required_ >= 0) {
+        data_buf_ = std::vector<unsigned char>(required_);
+      } else {
+        throw EnvoyException(fmt::format("invalid BYTES length: {}", required_));
+      }
+      length_consumed_ = true;
+    }
+
+    const size_t data_consumed = std::min<size_t>(required_, remaining);
+    const size_t written = data_buf_.size() - required_;
+    memcpy(data_buf_.data() + written, buffer, data_consumed);
+    required_ -= data_consumed;
+
+    buffer += data_consumed;
+    remaining -= data_consumed;
+
+    if (required_ == 0) {
+      ready_ = true;
+    }
+
+    return length_consumed + data_consumed;
+  }
+
+  bool ready() const { return ready_; }
+
+  Bytes get() const { return data_buf_; }
+
+private:
+  Int32Deserializer length_buf_;
+  bool length_consumed_{false};
+  int32_t required_;
+
+  std::vector<unsigned char> data_buf_;
+  bool ready_{false};
+};
+
+/**
+ * Deserializer of nullable bytes value
+ * First reads length (INT32) and then allocates the buffer of given length
+ * If length was -1, buffer allocation is omitted and deserializer is immediately ready (returning
+ * null value)
+ *
+ * From documentation:
+ * For non-null values, first the length N is given as an INT32. Then N bytes follow.
+ * A null value is encoded with length of -1 and there are no following bytes.
+ */
+class NullableBytesDeserializer : public Deserializer<NullableBytes> {
+public:
+  size_t feed(const char*& buffer, uint64_t& remaining) {
+    const size_t length_consumed = length_buf_.feed(buffer, remaining);
+    if (!length_buf_.ready()) {
+      // break early: we still need to fill in length buffer
+      return length_consumed;
+    }
+
+    if (!length_consumed_) {
+      required_ = length_buf_.get();
+
+      if (required_ >= 0) {
+        data_buf_ = std::vector<unsigned char>(required_);
+      }
+      if (required_ == NULL_BYTES_LENGTH) {
+        ready_ = true;
+      }
+      if (required_ < NULL_BYTES_LENGTH) {
+        throw EnvoyException(fmt::format("invalid NULLABLE_BYTES length: {}", required_));
+      }
+
+      length_consumed_ = true;
+    }
+
+    if (ready_) {
+      return length_consumed;
+    }
+
+    const size_t data_consumed = std::min<size_t>(required_, remaining);
+    const size_t written = data_buf_.size() - required_;
+    memcpy(data_buf_.data() + written, buffer, data_consumed);
+    required_ -= data_consumed;
+
+    buffer += data_consumed;
+    remaining -= data_consumed;
+
+    if (required_ == 0) {
+      ready_ = true;
+    }
+
+    return length_consumed + data_consumed;
+  }
+
+  bool ready() const { return ready_; }
+
+  NullableBytes get() const {
+    if (NULL_BYTES_LENGTH == required_) {
+      return absl::nullopt;
+    } else {
+      return {data_buf_};
+    }
+  }
+
+private:
+  constexpr static int32_t NULL_BYTES_LENGTH{-1};
+
+  Int32Deserializer length_buf_;
+  bool length_consumed_{false};
+  int32_t required_;
+
+  std::vector<unsigned char> data_buf_;
+  bool ready_{false};
+};
+
+/**
  * Deserializer for array of objects of the same type
  *
- * First reads the length of the array, then initializes N underlying deserializers of type CT
- * After the last of N deserializers is ready, the results of each of them are gathered and put in a
- * vector
- * @param RT result type returned by deserializer CT
- * @param CT underlying deserializer type
+ * First reads the length of the array, then initializes N underlying deserializers of type
+ * DeserializerType After the last of N deserializers is ready, the results of each of them are
+ * gathered and put in a vector
+ * @param ResponseType result type returned by deserializer of type DeserializerType
+ * @param DeserializerType underlying deserializer type
  *
  * From documentation:
  * Represents a sequence of objects of a given type T. Type T can be either a primitive type (e.g.
  * STRING) or a structure. First, the length N is given as an int32_t. Then N instances of type T
  * follow. A null array is represented with a length of -1.
  */
-template <typename RT, typename CT>
-class ArrayDeserializer : public Deserializer<NullableArray<RT>> {
+template <typename ResponseType, typename DeserializerType>
+class ArrayDeserializer : public Deserializer<NullableArray<ResponseType>> {
 public:
   size_t feed(const char*& buffer, uint64_t& remaining) {
 
@@ -327,7 +456,7 @@ public:
       required_ = length_buf_.get();
 
       if (required_ >= 0) {
-        children_ = std::vector<CT>(required_);
+        children_ = std::vector<DeserializerType>(required_);
       }
       if (required_ == NULL_ARRAY_LENGTH) {
         ready_ = true;
@@ -344,12 +473,12 @@ public:
     }
 
     size_t child_consumed{0};
-    for (CT& child : children_) {
+    for (DeserializerType& child : children_) {
       child_consumed += child.feed(buffer, remaining);
     }
 
     bool children_ready_ = true;
-    for (CT& child : children_) {
+    for (DeserializerType& child : children_) {
       children_ready_ &= child.ready();
     }
     ready_ = children_ready_;
@@ -359,12 +488,12 @@ public:
 
   bool ready() const { return ready_; }
 
-  NullableArray<RT> get() const {
+  NullableArray<ResponseType> get() const {
     if (NULL_ARRAY_LENGTH != required_) {
-      std::vector<RT> result{};
+      std::vector<ResponseType> result{};
       result.reserve(children_.size());
-      for (const CT& child : children_) {
-        const RT child_result = child.get();
+      for (const DeserializerType& child : children_) {
+        const ResponseType child_result = child.get();
         result.push_back(child_result);
       }
       return {result};
@@ -379,22 +508,9 @@ private:
   Int32Deserializer length_buf_;
   bool length_consumed_{false};
   int32_t required_;
-  std::vector<CT> children_;
+  std::vector<DeserializerType> children_;
   bool children_setup_{false};
   bool ready_{false};
-};
-
-/**
- * Trivial deserializer that is always ready, and consumes no bytes
- * Used in situations when value is always present and returns a constant
- */
-template <typename RT> class NullDeserializer : public Deserializer<RT> {
-public:
-  size_t feed(const char*&, uint64_t&) { return 0; }
-
-  bool ready() const { return true; }
-
-  RT get() const { return {}; }
 };
 
 /**

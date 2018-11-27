@@ -8,26 +8,34 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-// abstract codecs for requests and responses
-
 /**
  * Kafka message decoder
- * @tparam MT message type (Kafka request or Kafka response)
+ * @tparam MessageType message type (Kafka request or Kafka response)
  */
-template <typename MT> class MessageDecoder {
+template <typename MessageType> class MessageDecoder {
 public:
   virtual ~MessageDecoder() = default;
+
+  /**
+   * Processes given buffer attempting to decode messages of type MessageType container within
+   * @param data buffer instance
+   */
   virtual void onData(Buffer::Instance& data) PURE;
 };
 
 /**
  * Kafka message decoder
- * @tparam MT message type (Kafka request or Kafka response)
+ * @tparam MessageType message type (Kafka request or Kafka response)
  */
-template <typename MT> class MessageEncoder {
+template <typename MessageType> class MessageEncoder {
 public:
   virtual ~MessageEncoder() = default;
-  virtual void encode(const MT& message) PURE;
+
+  /**
+   * Encodes given message
+   * @param message message to be encoded
+   */
+  virtual void encode(const MessageType& message) PURE;
 };
 
 } // namespace Kafka

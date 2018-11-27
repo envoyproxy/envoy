@@ -44,11 +44,6 @@ struct OffsetCommitPartition {
     return partition_ == rhs.partition_ && offset_ == rhs.offset_ && timestamp_ == rhs.timestamp_ &&
            metadata_ == rhs.metadata_;
   };
-
-  friend std::ostream& operator<<(std::ostream& os, const OffsetCommitPartition& arg) {
-    return os << "{partition=" << arg.partition_ << ", offset=" << arg.offset_
-              << ", timestamp=" << arg.timestamp_ << ", metadata=" << arg.metadata_ << "}";
-  }
 };
 
 /**
@@ -68,10 +63,6 @@ struct OffsetCommitTopic {
   bool operator==(const OffsetCommitTopic& rhs) const {
     return topic_ == rhs.topic_ && partitions_ == rhs.partitions_;
   };
-
-  friend std::ostream& operator<<(std::ostream& os, const OffsetCommitTopic& arg) {
-    return os << "{topic=" << arg.topic_ << ", partitions_=" << arg.partitions_ << "}";
-  }
 };
 
 /**
@@ -116,12 +107,6 @@ protected:
     return written;
   }
 
-  std::ostream& printDetails(std::ostream& os) const override {
-    return os << "{group_id=" << group_id_ << ", group_generation_id=" << group_generation_id_
-              << ", member_id=" << member_id_ << ", retention_time=" << retention_time_
-              << ", topics=" << topics_ << "}";
-  }
-
 private:
   const std::string group_id_;
   const int32_t group_generation_id_; // since v1
@@ -130,45 +115,51 @@ private:
   const NullableArray<OffsetCommitTopic> topics_;
 };
 
-// clang-format off
-
 // api version 0
 
 // Deserializes bytes into OffsetCommitPartition (api version 0): partition, offset, metadata
 class OffsetCommitPartitionV0Buffer
-    : public CompositeDeserializerWith3Delegates<OffsetCommitPartition, Int32Deserializer, Int64Deserializer, NullableStringDeserializer> {};
+    : public CompositeDeserializerWith3Delegates<OffsetCommitPartition, Int32Deserializer,
+                                                 Int64Deserializer, NullableStringDeserializer> {};
 // Deserializes array of OffsetCommitPartition-s v0
 class OffsetCommitPartitionV0ArrayBuffer
     : public ArrayDeserializer<OffsetCommitPartition, OffsetCommitPartitionV0Buffer> {};
 // Deserializes bytes into OffsetCommitTopic (api version 0): topic name, partitions (v0)
 class OffsetCommitTopicV0Buffer
-    : public CompositeDeserializerWith2Delegates<OffsetCommitTopic, StringDeserializer, OffsetCommitPartitionV0ArrayBuffer> {};
+    : public CompositeDeserializerWith2Delegates<OffsetCommitTopic, StringDeserializer,
+                                                 OffsetCommitPartitionV0ArrayBuffer> {};
 // Deserializes array of OffsetCommitTopic-s v0
 class OffsetCommitTopicV0ArrayBuffer
     : public ArrayDeserializer<OffsetCommitTopic, OffsetCommitTopicV0Buffer> {};
 // Deserializes bytes into OffsetCommitRequest (api version 0): group_id, topics (v0)
 class OffsetCommitRequestV0Deserializer
-    : public CompositeDeserializerWith2Delegates<OffsetCommitRequest, StringDeserializer, OffsetCommitTopicV0ArrayBuffer> {};
+    : public CompositeDeserializerWith2Delegates<OffsetCommitRequest, StringDeserializer,
+                                                 OffsetCommitTopicV0ArrayBuffer> {};
 
 // api version 1
 
-// Deserializes bytes into OffsetCommitPartition (api version 1): partition, offset, timestamp, metadata
+// Deserializes bytes into OffsetCommitPartition (api version 1): partition, offset, timestamp,
+// metadata
 class OffsetCommitPartitionV1Buffer
-    : public CompositeDeserializerWith4Delegates<OffsetCommitPartition, Int32Deserializer, Int64Deserializer, Int64Deserializer, NullableStringDeserializer> {};
+    : public CompositeDeserializerWith4Delegates<OffsetCommitPartition, Int32Deserializer,
+                                                 Int64Deserializer, Int64Deserializer,
+                                                 NullableStringDeserializer> {};
 // Deserializes array of OffsetCommitPartition-s v1
 class OffsetCommitPartitionV1ArrayBuffer
     : public ArrayDeserializer<OffsetCommitPartition, OffsetCommitPartitionV1Buffer> {};
 // Deserializes bytes into OffsetCommitTopic (api version 1): topic name, partitions (v1)
 class OffsetCommitTopicV1Buffer
-    : public CompositeDeserializerWith2Delegates<OffsetCommitTopic, StringDeserializer, OffsetCommitPartitionV1ArrayBuffer> {};
+    : public CompositeDeserializerWith2Delegates<OffsetCommitTopic, StringDeserializer,
+                                                 OffsetCommitPartitionV1ArrayBuffer> {};
 // Deserializes array of OffsetCommitTopic-s v1
 class OffsetCommitTopicV1ArrayBuffer
     : public ArrayDeserializer<OffsetCommitTopic, OffsetCommitTopicV1Buffer> {};
-// Deserializes bytes into OffsetCommitRequest (api version 1): group_id, generation_id, member_id, topics (v1)
+// Deserializes bytes into OffsetCommitRequest (api version 1): group_id, generation_id, member_id,
+// topics (v1)
 class OffsetCommitRequestV1Deserializer
-    : public CompositeDeserializerWith4Delegates<OffsetCommitRequest, StringDeserializer, Int32Deserializer, StringDeserializer, OffsetCommitTopicV1ArrayBuffer> {};
-
-// clang-format on
+    : public CompositeDeserializerWith4Delegates<OffsetCommitRequest, StringDeserializer,
+                                                 Int32Deserializer, StringDeserializer,
+                                                 OffsetCommitTopicV1ArrayBuffer> {};
 
 /**
  * Define Parsers that wrap the corresponding deserializers

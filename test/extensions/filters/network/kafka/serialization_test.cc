@@ -32,9 +32,13 @@ TEST_EmptyDeserializerShouldNotBeReady(Int16Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(Int32Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(UInt32Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(Int64Deserializer);
-TEST_EmptyDeserializerShouldNotBeReady(BoolBuffer);
+TEST_EmptyDeserializerShouldNotBeReady(BooleanDeserializer);
+
 TEST_EmptyDeserializerShouldNotBeReady(StringDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(NullableStringDeserializer);
+TEST_EmptyDeserializerShouldNotBeReady(BytesDeserializer);
+TEST_EmptyDeserializerShouldNotBeReady(NullableBytesDeserializer);
+
 TEST(CompositeDeserializerWith2Delegates, EmptyBufferShouldNotBeReady) {
   // given
   struct CompositeResult {
@@ -72,15 +76,6 @@ TEST(ArrayDeserializer, EmptyBufferShouldNotBeReady) {
   const ArrayDeserializer<int8_t, Int8Deserializer> testee{};
   // when, then
   ASSERT_EQ(testee.ready(), false);
-}
-
-// Null deserializer is a special case, it's always ready and can provide results via 0-arg ctor
-TEST(NullDeserializer, EmptyBufferShouldBeReady) {
-  // given
-  const NullDeserializer<int8_t> testee{};
-  // when, then
-  ASSERT_EQ(testee.ready(), true);
-  ASSERT_EQ(testee.get(), 0);
 }
 
 EncodingContext encoder{-1}; // context is not used when serializing primitive types
@@ -191,7 +186,7 @@ TEST_DeserializerShouldDeserialize(Int16Deserializer, int16_t, 42);
 TEST_DeserializerShouldDeserialize(Int32Deserializer, int32_t, 42);
 TEST_DeserializerShouldDeserialize(UInt32Deserializer, uint32_t, 42);
 TEST_DeserializerShouldDeserialize(Int64Deserializer, int64_t, 42);
-TEST_DeserializerShouldDeserialize(BoolBuffer, bool, true);
+TEST_DeserializerShouldDeserialize(BooleanDeserializer, bool, true);
 
 TEST(StringDeserializer, ShouldDeserialize) {
   const std::string value = "sometext";
@@ -244,6 +239,63 @@ TEST(NullableStringDeserializer, ShouldThrowOnInvalidLength) {
 
   int16_t len = -2; // -1 is OK for NULLABLE_STRING
   encoder.encode(len, buffer);
+
+  uint64_t remaining = 1024;
+  const char* data = getRawData(buffer);
+
+  // when
+  // then
+  EXPECT_THROW(testee.feed(data, remaining), EnvoyException);
+}
+
+TEST(BytesDeserializer, ShouldDeserialize) {
+  const Bytes value{'a', 'b', 'c', 'd'};
+  serializeThenDeserializeAndCheckEquality<BytesDeserializer>(value);
+}
+
+TEST(BytesDeserializer, ShouldDeserializeEmptyBytes) {
+  const Bytes value{};
+  serializeThenDeserializeAndCheckEquality<BytesDeserializer>(value);
+}
+
+TEST(BytesDeserializer, ShouldThrowOnInvalidLength) {
+  // given
+  BytesDeserializer testee;
+  Buffer::OwnedImpl buffer;
+
+  const int32_t bytes_length = -1; // BYTES accepts only >= 0
+  encoder.encode(bytes_length, buffer);
+
+  uint64_t remaining = 1024;
+  const char* data = getRawData(buffer);
+
+  // when
+  // then
+  EXPECT_THROW(testee.feed(data, remaining), EnvoyException);
+}
+
+TEST(NullableBytesDeserializer, ShouldDeserialize) {
+  const NullableBytes value{{'a', 'b', 'c', 'd'}};
+  serializeThenDeserializeAndCheckEquality<NullableBytesDeserializer>(value);
+}
+
+TEST(NullableBytesDeserializer, ShouldDeserializeEmptyBytes) {
+  const NullableBytes value{{}};
+  serializeThenDeserializeAndCheckEquality<NullableBytesDeserializer>(value);
+}
+
+TEST(NullableBytesDeserializer, ShouldDeserializeNullBytes) {
+  const NullableBytes value = absl::nullopt;
+  serializeThenDeserializeAndCheckEquality<NullableBytesDeserializer>(value);
+}
+
+TEST(NullableBytesDeserializer, ShouldThrowOnInvalidLength) {
+  // given
+  NullableBytesDeserializer testee;
+  Buffer::OwnedImpl buffer;
+
+  const int32_t bytes_length = -2; // -1 is OK for NULLABLE_BYTES
+  encoder.encode(bytes_length, buffer);
 
   uint64_t remaining = 1024;
   const char* data = getRawData(buffer);

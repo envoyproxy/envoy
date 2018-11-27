@@ -14,13 +14,17 @@ namespace NetworkFilters {
 namespace Kafka {
 
 /**
- * Invoked when request is successfully decoded
+ * Callback invoked when request is successfully decoded
  */
 class RequestCallback {
 public:
   virtual ~RequestCallback() = default;
 
-  virtual void onMessage(MessageSharedPtr) PURE;
+  /**
+   * Callback method invoked when request is successfully decoded
+   * @param request request that has been decoded
+   */
+  virtual void onMessage(MessageSharedPtr request) PURE;
 };
 
 typedef std::shared_ptr<RequestCallback> RequestCallbackSharedPtr;
@@ -53,7 +57,7 @@ public:
    * Updates decoder state
    * impl note: similar to redis codec, which also keeps state
    */
-  void onData(Buffer::Instance& data);
+  void onData(Buffer::Instance& data) override;
 
 private:
   void doParse(ParserSharedPtr& parser, const Buffer::RawSlice& slice);

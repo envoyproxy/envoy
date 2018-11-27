@@ -28,7 +28,6 @@ envoy_cc_library(
     name = "kafka_request_lib",
     srcs = ["kafka_request.cc"],
     hdrs = [
-        "debug_helpers.h",
         "kafka_request.h",
         "messages/offset_commit.h",
     ],

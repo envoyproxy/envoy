@@ -41,7 +41,6 @@ void RequestDecoder::doParse(ParserSharedPtr& parser, const Buffer::RawSlice& sl
 
         // next parser is not present, so we have finished parsing a message
         MessageSharedPtr message = result.message_;
-        ENVOY_LOG(trace, "parsed message: {}", *message);
         for (auto& callback : callbacks_) {
           callback->onMessage(result.message_);
         }
