@@ -40,51 +40,33 @@ inline std::string defaultStaticClusterJson(const std::string& name) {
                       name);
 }
 
-inline std::string staticClusterWithAttrJson(const std::string& attr) {
-  std::string json_string = R"EOF(
-  {
-    "name": "test_cluster",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+inline std::string staticClusterWithAttrYaml(const std::string& attr) {
+  std::string yaml_string = R"EOF(
+    name: test_cluster
+    connect_timeout_ms: 250
+    lb_type: round_robin
+    hosts:
+      - url: tcp://127.0.0.1:11001
     %s
-  }
   )EOF";
 
-  std::string input_str;
-  if (!attr.empty()) {
-    input_str = "," + attr;
-  }
-
-  return fmt::sprintf(json_string, input_str);
+  return fmt::sprintf(yaml_string, attr);
 }
 
-inline std::string strictDnsClusterWithAttrJson(const std::string& attr) {
-  std::string json_string = R"EOF(
-  {
-    "name": "test_cluster",
-    "type": "STRICT_DNS",
-    "connect_timeout": "0.250s",
-    "lb_policy": "ROUND_ROBIN",
-    "hosts": [
-      {
-        "socket_address":
-        {
-          "address": "foo.bar.com",
-          "port_value": 1234
-        }
-      }
-    ]%s
-  }
+inline std::string strictDnsClusterWithAttrYaml(const std::string& attr) {
+  std::string yaml_string = R"EOF(
+    name: test_cluster
+    type: STRICT_DNS
+    connect_timeout: 0.250s
+    lb_policy: ROUND_ROBIN
+    hosts:
+      - socket_address:
+          address: foo.bar.com
+          port_value: 1234
+    %s
   )EOF";
 
-  std::string input_str;
-  if (!attr.empty()) {
-    input_str = "," + attr;
-  }
-
-  return fmt::sprintf(json_string, input_str);
+  return fmt::sprintf(yaml_string, attr);
 }
 
 inline std::string clustersJson(const std::vector<std::string>& clusters) {
@@ -112,7 +94,7 @@ inline envoy::api::v2::Cluster defaultStaticCluster(const std::string& name) {
 }
 
 inline envoy::api::v2::Cluster makeClusterWithAttribute(const std::string& attr_to_add) {
-  return Envoy::Upstream::parseClusterFromJson(staticClusterWithAttrJson(attr_to_add));
+  return Envoy::Upstream::parseClusterFromV2Yaml(staticClusterWithAttrYaml(attr_to_add));
 }
 
 inline envoy::api::v2::Cluster

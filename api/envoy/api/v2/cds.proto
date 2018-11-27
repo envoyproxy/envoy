@@ -550,11 +550,11 @@ message Cluster {
 
   // If true, the source address of the origin is spoofed on the connection to the upstream.
   // [#not-implemented-hide:] Hide from docs.
-  google.protobuf.BoolValue src_transparent = 38;
+  bool src_transparent = 38;
 
   // if non-zero, set the MARK field. Allows matching on e.g. 'ip rule' or 'iptables'.
   // [#proto-status: draft] Still working on this.
-  google.protobuf.UInt32Value mark = 39;
+  uint32 mark = 39;
 }
 
 // An extensible structure containing the address Envoy should bind to when
