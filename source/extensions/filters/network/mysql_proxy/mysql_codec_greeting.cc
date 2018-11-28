@@ -23,17 +23,11 @@ void ServerGreeting::SetServerStatus(int server_status) { server_status_ = serve
 
 void ServerGreeting::SetExtServerCap(int ext_server_cap) { ext_server_cap_ = ext_server_cap; }
 
-int ServerGreeting::Decode(Buffer::Instance& buffer) {
-  int len = 0;
-  int seq = 0;
-  if (BufferHelper::HdrReadDrain(buffer, len, seq) != MYSQL_SUCCESS) {
-    ENVOY_LOG(info, "error parsing mysql HDR in mysql Greeting msg");
-    return MYSQL_FAILURE;
-  }
-  SetSeq(seq);
+int ServerGreeting::Decode(Buffer::Instance& buffer, int seq, int) {
   if (seq != GREETING_SEQ_NUM) {
     return MYSQL_FAILURE;
   }
+  SetSeq(seq);
   uint8_t protocol = 0;
   if (BufferHelper::BufUint8Drain(buffer, protocol) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing protocol in mysql Greeting msg");

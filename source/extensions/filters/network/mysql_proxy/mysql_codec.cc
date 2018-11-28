@@ -157,18 +157,54 @@ int BufferHelper::HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq) {
   }
   seq = htonl(val) & MYSQL_HDR_SEQ_MASK;
   len = val & MYSQL_HDR_PKT_SIZE_MASK;
-  ENVOY_LOG(trace, "MYSQL-hdrseq {}, len {}", seq, len);
+  ENVOY_LOG(trace, "mysql_proxy: MYSQL-hdrseq {}, len {}", seq, len);
   return MYSQL_SUCCESS;
 }
 
 bool DecoderImpl::decode(Buffer::Instance& data) {
-  callbacks_.decode(data);
-  data.drain(data.length());
-  ENVOY_LOG(trace, "{} bytes remaining after decoding", data.length());
-  return false;
+  ENVOY_LOG(trace, "mysql_proxy: decoding {} bytes", data.length());
+
+  int len = 0;
+  int seq = 0;
+  if (BufferHelper::HdrReadDrain(data, len, seq) != MYSQL_SUCCESS) {
+    throw EnvoyException("error parsing mysql packet header");
+  }
+
+  // Fire the login attempt callback.
+  if (session_.GetState() == MySQLSession::State::MYSQL_CHALLENGE_REQ) {
+    callbacks_.onLoginAttempt();
+  }
+
+  /*
+  // The sequence ID is reset on a new command.
+  if (seq == MYSQL_PKT_0) {
+    session_.SetExpectedSeq(MYSQL_PKT_0);
+    ENVOY_LOG(trace, "mysql_proxy: received packet with sequence ID = 0");
+  }
+  */
+
+  // Ignore duplicate and out-of-sync packets.
+  if (seq != session_.GetExpectedSeq()) {
+    callbacks_.onProtocolError();
+    data.drain(len);
+    ENVOY_LOG(info, "mysql_proxy: ignoring out-of-sync packet");
+    return true;
+  }
+  session_.SetExpectedSeq(session_.GetExpectedSeq() + 1);
+
+  // Ensure that the whole packet was consumed or drain it.
+  const int data_len = data.length();
+  callbacks_.decode(data, seq, len);
+  const int consumed_len = data_len - data.length();
+  data.drain(len - consumed_len);
+
+  ENVOY_LOG(trace, "mysql_proxy: {} bytes remaining after decoding", data.length());
+  return true;
 }
 
 void DecoderImpl::onData(Buffer::Instance& data) {
+  // TODO(venilnoronha): handle messages over 16 mb. See
+  // https://dev.mysql.com/doc/dev/mysql-server/8.0.2/page_protocol_basic_packets.html#sect_protocol_basic_packets_sending_mt_16mb.
   while (data.length() > 0 && decode(data)) {
   }
 }

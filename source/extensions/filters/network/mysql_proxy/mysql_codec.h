@@ -6,6 +6,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
+#include "extensions/filters/network/mysql_proxy/mysql_session.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -132,7 +134,7 @@ class MySQLCodec : public Logger::Loggable<Logger::Id::filter> {
 public:
   virtual ~MySQLCodec(){};
 
-  virtual int Decode(Buffer::Instance& data) PURE;
+  virtual int Decode(Buffer::Instance& data, int seq, int len) PURE;
   virtual std::string Encode() PURE;
 
   int GetSeq() { return seq_; }
@@ -173,7 +175,9 @@ class DecoderCallbacks {
 public:
   virtual ~DecoderCallbacks() {}
 
-  virtual void decode(Buffer::Instance& message) PURE;
+  virtual void decode(Buffer::Instance& message, int seq, int len) PURE;
+  virtual void onProtocolError() PURE;
+  virtual void onLoginAttempt() PURE;
 };
 
 /**
@@ -190,7 +194,8 @@ typedef std::unique_ptr<Decoder> DecoderPtr;
 
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
 public:
-  DecoderImpl(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
+  DecoderImpl(DecoderCallbacks& callbacks, MySQLSession& session)
+      : callbacks_(callbacks), session_(session) {}
 
   // MySQLProxy::Decoder
   void onData(Buffer::Instance& data) override;
@@ -199,6 +204,7 @@ private:
   bool decode(Buffer::Instance& data);
 
   DecoderCallbacks& callbacks_;
+  MySQLSession& session_;
 };
 
 } // namespace MySQLProxy

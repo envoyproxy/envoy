@@ -29,11 +29,10 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeV9EncDec) {
   std::string salt(MySQLTestUtils::GetSalt());
   mysql_greet_encode.SetSalt(salt);
   std::string data = mysql_greet_encode.Encode();
-  std::string mysql_msg = BufferHelper::EncodeHdr(data, 0);
 
-  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
+  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.Decode(*decode_data);
+  mysql_greet_decode.Decode(*decode_data, GREETING_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_greet_decode.GetSalt(), mysql_greet_encode.GetSalt());
   EXPECT_EQ(mysql_greet_decode.GetVersion(), mysql_greet_encode.GetVersion());
   EXPECT_EQ(mysql_greet_decode.GetProtocol(), mysql_greet_encode.GetProtocol());
@@ -62,11 +61,10 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeV10EncDec) {
   mysql_greet_encode.SetServerStatus(MYSQL_SERVER_STATUS);
   mysql_greet_encode.SetExtServerCap(MYSQL_SERVER_EXT_CAPAB);
   std::string data = mysql_greet_encode.Encode();
-  std::string mysql_msg = BufferHelper::EncodeHdr(data, 0);
 
-  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
+  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.Decode(*decode_data);
+  mysql_greet_decode.Decode(*decode_data, GREETING_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_greet_decode.GetSalt(), mysql_greet_encode.GetSalt());
   EXPECT_EQ(mysql_greet_decode.GetVersion(), mysql_greet_encode.GetVersion());
   EXPECT_EQ(mysql_greet_decode.GetProtocol(), mysql_greet_encode.GetProtocol());
@@ -98,11 +96,10 @@ TEST_F(MySQLCodecTest, MySQLClLoginV41PluginAuthEncDec) {
   std::string db = "mysql_db";
   mysql_clogin_encode.SetDB(db);
   std::string data = mysql_clogin_encode.Encode();
-  std::string mysql_msg = BufferHelper::EncodeHdr(data, 1);
 
-  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
+  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data);
+  mysql_clogin_decode.Decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.IsResponse41(), true);
   EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
   EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
@@ -134,11 +131,10 @@ TEST_F(MySQLCodecTest, MySQLClientLogin41SecureConnEncDec) {
   std::string db = "mysql_db";
   mysql_clogin_encode.SetDB(db);
   std::string data = mysql_clogin_encode.Encode();
-  std::string mysql_msg = BufferHelper::EncodeHdr(data, 1);
 
-  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
+  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data);
+  mysql_clogin_decode.Decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.IsResponse41(), true);
   EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
   EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
@@ -165,11 +161,10 @@ TEST_F(MySQLCodecTest, MySQLClientLogin41EncDec) {
   std::string passwd = MySQLTestUtils::GetAuthResp();
   mysql_clogin_encode.SetAuthResp(passwd);
   std::string data = mysql_clogin_encode.Encode();
-  std::string mysql_msg = BufferHelper::EncodeHdr(data, 1);
 
-  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
+  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data);
+  mysql_clogin_decode.Decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.IsResponse41(), true);
   EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
   EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
@@ -195,11 +190,10 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320EncDec) {
   std::string passwd = MySQLTestUtils::GetAuthResp();
   mysql_clogin_encode.SetAuthResp(passwd);
   std::string data = mysql_clogin_encode.Encode();
-  std::string mysql_msg = BufferHelper::EncodeHdr(data, 1);
 
-  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
+  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data);
+  mysql_clogin_decode.Decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.IsResponse320(), true);
   EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
   EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
@@ -225,11 +219,10 @@ TEST_F(MySQLCodecTest, MySQLClientLoginSSLEncDec) {
   std::string passwd = MySQLTestUtils::GetAuthResp();
   mysql_clogin_encode.SetAuthResp(passwd);
   std::string data = mysql_clogin_encode.Encode();
-  std::string mysql_msg = BufferHelper::EncodeHdr(data, 1);
 
-  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
+  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data);
+  mysql_clogin_decode.Decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.IsSSLRequest(), true);
   EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
   EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
@@ -249,11 +242,10 @@ TEST_F(MySQLCodecTest, MySQLLoginOkEncDec) {
   mysql_loginok_encode.SetServerStatus(MYSQL_UT_SERVER_OK);
   mysql_loginok_encode.SetWarnings(MYSQL_UT_SERVER_WARNINGS);
   std::string data = mysql_loginok_encode.Encode();
-  std::string mysql_msg = BufferHelper::EncodeHdr(data, 2);
 
-  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
+  Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLoginResponse mysql_loginok_decode{};
-  mysql_loginok_decode.Decode(*decode_data);
+  mysql_loginok_decode.Decode(*decode_data, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_loginok_decode.GetRespCode(), mysql_loginok_encode.GetRespCode());
   EXPECT_EQ(mysql_loginok_decode.GetAffectedRows(), mysql_loginok_encode.GetAffectedRows());
   EXPECT_EQ(mysql_loginok_decode.GetLastInsertId(), mysql_loginok_encode.GetLastInsertId());

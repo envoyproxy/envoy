@@ -82,14 +82,16 @@ public:
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
 
   // MySQLProxy::DecoderCallback
-  void decode(Buffer::Instance& message) override;
+  void decode(Buffer::Instance& message, int seq, int len) override;
+  void onProtocolError() override;
+  void onLoginAttempt() override;
 
   MySQLSession& getSession() { return session_; }
   void doDecode(Buffer::Instance& buffer);
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);
 
 private:
-  Network::FilterStatus Process(Buffer::Instance& data);
+  Network::FilterStatus Process(Buffer::Instance& data, int seq, int len);
   Network::ReadFilterCallbacks* read_callbacks_{};
   MySQLFilterConfigSharedPtr config_;
   MySQLSession session_;

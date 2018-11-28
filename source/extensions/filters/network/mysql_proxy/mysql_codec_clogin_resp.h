@@ -13,7 +13,7 @@ namespace MySQLProxy {
 class ClientLoginResponse : public MySQLCodec {
 public:
   // MySQLCodec
-  int Decode(Buffer::Instance& buffer) override;
+  int Decode(Buffer::Instance& buffer, int seq, int len) override;
   std::string Encode() override;
 
   uint8_t GetRespCode() const { return resp_code_; }

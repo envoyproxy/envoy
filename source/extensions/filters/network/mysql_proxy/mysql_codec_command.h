@@ -11,7 +11,7 @@ namespace MySQLProxy {
 class Command : public MySQLCodec {
 public:
   // MySQLCodec
-  int Decode(Buffer::Instance&) override;
+  int Decode(Buffer::Instance&, int seq, int len) override;
   std::string Encode() override;
 
   Cmd ParseCmd(Buffer::Instance& data);
@@ -33,7 +33,7 @@ private:
 class CommandResp : public MySQLCodec {
 public:
   // MySQLCodec
-  int Decode(Buffer::Instance&) override { return 0; }
+  int Decode(Buffer::Instance&, int, int) override { return 0; }
   std::string Encode() override { return ""; }
 
   uint16_t GetServerStatus() const { return server_status_; }

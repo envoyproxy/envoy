@@ -56,24 +56,27 @@ void MySQLFilter::doDecode(Buffer::Instance& buffer) {
   try {
     decoder_->onData(buffer);
   } catch (EnvoyException& e) {
-    ENVOY_LOG(info, "mysql decoding error: {}", e.what());
+    ENVOY_LOG(info, "mysql_proxy: decoding error: {}", e.what());
     config_->stats_.decoder_errors_.inc();
     sniffing_ = false;
   }
 }
 
 DecoderPtr MySQLFilter::createDecoder(DecoderCallbacks& callbacks) {
-  return DecoderPtr{new DecoderImpl(callbacks)};
+  return DecoderPtr{new DecoderImpl(callbacks, session_)};
 }
 
-void MySQLFilter::decode(Buffer::Instance& message) { Process(message); }
+void MySQLFilter::decode(Buffer::Instance& message, int seq, int len) {
+  Process(message, seq, len);
+}
 
-Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data) {
-  ENVOY_CONN_LOG(trace, "onData, len {}", read_callbacks_->connection(), data.length());
-  if (!data.length()) {
-    ENVOY_CONN_LOG(trace, "no data, return ", read_callbacks_->connection());
-    return Network::FilterStatus::Continue;
-  }
+void MySQLFilter::onProtocolError() { config_->stats_.protocol_errors_.inc(); }
+
+void MySQLFilter::onLoginAttempt() { config_->stats_.login_attempts_.inc(); }
+
+Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, int seq, int len) {
+  ENVOY_CONN_LOG(trace, "mysql_proxy: onData, len {}", read_callbacks_->connection(),
+                 data.length());
 
   // Run the mysql state machine
   switch (session_.GetState()) {
@@ -81,24 +84,15 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data) {
   // expect Server Challenge packet
   case MySQLSession::State::MYSQL_INIT: {
     ServerGreeting greeting{};
-    greeting.Decode(data);
-    if (greeting.GetSeq() != GREETING_SEQ_NUM) {
-      config_->stats_.protocol_errors_.inc();
-      break;
-    }
+    greeting.Decode(data, seq, len);
     session_.SetState(MySQLSession::State::MYSQL_CHALLENGE_REQ);
     break;
   }
 
   // Process Client Handshake Response
   case MySQLSession::State::MYSQL_CHALLENGE_REQ: {
-    config_->stats_.login_attempts_.inc();
     ClientLogin client_login{};
-    client_login.Decode(data);
-    if (client_login.GetSeq() != CHALLENGE_SEQ_NUM) {
-      config_->stats_.protocol_errors_.inc();
-      break;
-    }
+    client_login.Decode(data, seq, len);
     if (client_login.IsSSLRequest()) {
       session_.SetState(MySQLSession::State::MYSQL_SSL_PT);
       config_->stats_.upgraded_to_ssl_.inc();
@@ -116,17 +110,12 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data) {
   case MySQLSession::State::MYSQL_CHALLENGE_RESP_41:
   case MySQLSession::State::MYSQL_CHALLENGE_RESP_320: {
     ClientLoginResponse client_login_resp{};
-    client_login_resp.Decode(data);
-    if (client_login_resp.GetSeq() != CHALLENGE_RESP_SEQ_NUM) {
-      config_->stats_.protocol_errors_.inc();
-      break;
-    }
+    client_login_resp.Decode(data, seq, len);
     if (client_login_resp.GetRespCode() == MYSQL_RESP_OK) {
       session_.SetState(MySQLSession::State::MYSQL_REQ);
     } else if (client_login_resp.GetRespCode() == MYSQL_RESP_AUTH_SWITCH) {
       config_->stats_.auth_switch_request_.inc();
       session_.SetState(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP);
-      session_.SetExpectedSeq(client_login_resp.GetSeq() + 1);
     } else if (client_login_resp.GetRespCode() == MYSQL_RESP_ERR) {
       config_->stats_.login_failures_.inc();
       session_.SetState(MySQLSession::State::MYSQL_ERROR);
@@ -138,28 +127,18 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data) {
 
   case MySQLSession::State::MYSQL_AUTH_SWITCH_RESP: {
     ClientSwitchResponse client_switch_resp{};
-    client_switch_resp.Decode(data);
-    if ((client_switch_resp.GetSeq() != session_.GetExpectedSeq())) {
-      config_->stats_.protocol_errors_.inc();
-      break;
-    }
+    client_switch_resp.Decode(data, seq, len);
     session_.SetState(MySQLSession::State::MYSQL_AUTH_SWITCH_MORE);
-    session_.SetExpectedSeq(client_switch_resp.GetSeq() + 1);
     break;
   }
 
   case MySQLSession::State::MYSQL_AUTH_SWITCH_MORE: {
     ClientLoginResponse client_login_resp{};
-    client_login_resp.Decode(data);
-    if (client_login_resp.GetSeq() != session_.GetExpectedSeq()) {
-      config_->stats_.protocol_errors_.inc();
-      break;
-    }
+    client_login_resp.Decode(data, seq, len);
     if (client_login_resp.GetRespCode() == MYSQL_RESP_OK) {
       session_.SetState(MySQLSession::State::MYSQL_REQ);
     } else if (client_login_resp.GetRespCode() == MYSQL_RESP_MORE) {
       session_.SetState(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP);
-      session_.SetExpectedSeq(client_login_resp.GetSeq() + 1);
     } else if (client_login_resp.GetRespCode() == MYSQL_RESP_ERR) {
       config_->stats_.login_failures_.inc();
       session_.SetState(MySQLSession::State::MYSQL_ERROR);
@@ -172,7 +151,7 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data) {
   // Process Command
   case MySQLSession::State::MYSQL_REQ: {
     Command command{};
-    command.Decode(data);
+    command.Decode(data, seq, len);
     session_.SetState(MySQLSession::State::MYSQL_REQ_RESP);
     if (!command.RunQueryParser()) {
       // some mysql commands don't have a string to parse
@@ -182,7 +161,7 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data) {
     hsql::SQLParserResult result;
     hsql::SQLParser::parse(command.GetData(), &result);
 
-    ENVOY_CONN_LOG(trace, "mysql msg processed {}", read_callbacks_->connection(),
+    ENVOY_CONN_LOG(trace, "mysql_proxy: msg processed {}", read_callbacks_->connection(),
                    command.GetData());
 
     // check whether the parsing was successful
@@ -218,7 +197,7 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data) {
   // Process Command Response
   case MySQLSession::State::MYSQL_REQ_RESP: {
     CommandResp command_resp{};
-    command_resp.Decode(data);
+    command_resp.Decode(data, seq, len);
     session_.SetState(MySQLSession::State::MYSQL_REQ);
     break;
   }
@@ -229,8 +208,8 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data) {
     break;
   }
 
-  ENVOY_CONN_LOG(trace, "mysql msg processed, session in state {}", read_callbacks_->connection(),
-                 static_cast<int>(session_.GetState()));
+  ENVOY_CONN_LOG(trace, "mysql_proxy: msg processed, session in state {}",
+                 read_callbacks_->connection(), static_cast<int>(session_.GetState()));
 
   return Network::FilterStatus::Continue;
 }

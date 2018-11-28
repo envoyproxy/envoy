@@ -19,14 +19,7 @@ void Command::SetCmd(Cmd cmd) { cmd_ = cmd; }
 
 void Command::SetDb(std::string db) { db_ = db; }
 
-int Command::Decode(Buffer::Instance& buffer) {
-  int len = 0;
-  int seq = 0;
-
-  if (BufferHelper::HdrReadDrain(buffer, len, seq) != MYSQL_SUCCESS) {
-    ENVOY_LOG(error, "error parsing mysql HDR in mysql Command msg");
-    return MYSQL_FAILURE;
-  }
+int Command::Decode(Buffer::Instance& buffer, int seq, int len) {
   SetSeq(seq);
 
   Cmd cmd = ParseCmd(buffer);

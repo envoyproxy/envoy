@@ -19,17 +19,11 @@ void ClientLoginResponse::SetServerStatus(uint16_t status) { server_status_ = st
 
 void ClientLoginResponse::SetWarnings(uint16_t warnings) { warnings_ = warnings; }
 
-int ClientLoginResponse::Decode(Buffer::Instance& buffer) {
-  int len = 0;
-  int seq = 0;
-  if (BufferHelper::HdrReadDrain(buffer, len, seq) != MYSQL_SUCCESS) {
-    ENVOY_LOG(info, "error parsing mysql HDR in mysql ClientLogin msg");
-    return MYSQL_FAILURE;
-  }
-  SetSeq(seq);
+int ClientLoginResponse::Decode(Buffer::Instance& buffer, int seq, int) {
   if (seq != CHALLENGE_RESP_SEQ_NUM) {
     return MYSQL_FAILURE;
   }
+  SetSeq(seq);
   uint8_t resp_code = 0;
   if (BufferHelper::BufUint8Drain(buffer, resp_code) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing response code in mysql Login Ok msg");

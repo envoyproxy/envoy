@@ -43,13 +43,7 @@ bool ClientLogin::IsClientSecureConnection() const {
   return extended_client_cap_ & MYSQL_EXT_CL_SECURE_CONNECTION;
 }
 
-int ClientLogin::Decode(Buffer::Instance& buffer) {
-  int len = 0;
-  int seq = 0;
-  if (BufferHelper::HdrReadDrain(buffer, len, seq) != MYSQL_SUCCESS) {
-    ENVOY_LOG(info, "error parsing mysql HDR in mysql ClientLogin msg");
-    return MYSQL_FAILURE;
-  }
+int ClientLogin::Decode(Buffer::Instance& buffer, int seq, int) {
   if (seq != CHALLENGE_SEQ_NUM) {
     return MYSQL_FAILURE;
   }

@@ -13,13 +13,7 @@ void ClientSwitchResponse::SetAuthPluginResp(std::string& auth_plugin_resp_) {
   auth_plugin_resp_.assign(auth_plugin_resp_);
 }
 
-int ClientSwitchResponse::Decode(Buffer::Instance& buffer) {
-  int len = 0;
-  int seq = 0;
-  if (BufferHelper::HdrReadDrain(buffer, len, seq) != MYSQL_SUCCESS) {
-    ENVOY_LOG(info, "error parsing mysql HDR in mysql ClientLogin msg");
-    return MYSQL_FAILURE;
-  }
+int ClientSwitchResponse::Decode(Buffer::Instance&, int seq, int) {
   SetSeq(seq);
   return MYSQL_SUCCESS;
 }

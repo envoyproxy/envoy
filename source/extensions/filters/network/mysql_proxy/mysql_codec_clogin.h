@@ -12,7 +12,7 @@ constexpr int UNSET_BYTES = 23;
 class ClientLogin : public MySQLCodec {
 public:
   // MySQLCodec
-  int Decode(Buffer::Instance& buffer) override;
+  int Decode(Buffer::Instance& buffer, int seq, int len) override;
   std::string Encode() override;
 
   int GetClientCap() const { return client_cap_; }
