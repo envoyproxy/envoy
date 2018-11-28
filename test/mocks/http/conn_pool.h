@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "envoy/http/conn_pool.h"
+#include "envoy/network/address.h"
 
 #include "gmock/gmock.h"
 
@@ -37,6 +38,7 @@ public:
   MOCK_METHOD3(newStream, Cancellable*(Http::StreamDecoder& response_decoder,
                                        Http::ConnectionPool::Callbacks& callbacks,
                                        const Upstream::LoadBalancerContext& context));
+  MOCK_METHOD1(setUpstreamSourceInformation, void(const UpstreamSourceInformation& info));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_;
 };

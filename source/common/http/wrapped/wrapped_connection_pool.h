@@ -29,6 +29,15 @@ public:
                                          ConnectionPool::Callbacks& callbacks,
                                          const Upstream::LoadBalancerContext& context) override;
 
+  void setUpstreamSourceInformation(
+      const ConnectionPool::UpstreamSourceInformation& /* unused */) override {
+
+    // Unimplemented for now. We may want to look at using this as a way of doing a "union" of the
+    // source information when multiple dimensions are involved -- i.e. chain multiple wrapped pools
+    // together.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
   // ConnPoolImplBase
   void checkForDrained() override;
 

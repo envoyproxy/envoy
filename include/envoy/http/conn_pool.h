@@ -10,6 +10,11 @@
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
+namespace Network {
+namespace Address {
+class Instance;
+} // namespace Address
+} // namespace Network
 namespace Http {
 namespace ConnectionPool {
 
@@ -61,6 +66,13 @@ public:
    */
   virtual void onPoolReady(Http::StreamEncoder& encoder,
                            Upstream::HostDescriptionConstSharedPtr host) PURE;
+};
+
+/**
+ * Provides information to a connection pool about how it should connect to the upstreams.
+ */
+struct UpstreamSourceInformation {
+  std::shared_ptr<const Network::Address::Instance> source_address_; /**< nullptr if not used */
 };
 
 /**
@@ -128,6 +140,15 @@ public:
    */
   virtual Cancellable* newStream(Http::StreamDecoder& response_decoder, Callbacks& callbacks,
                                  const Upstream::LoadBalancerContext& context) PURE;
+
+  /**
+   * Set the upstream source information to be used for new connections. This information allows
+   * the connection pool to modify how it connects to the upstream for all connections. Note that if
+   * the connectino pool has any existing connections, changing the upstream source information
+   * results in undefined behaviour.
+   * @param information The information to use.
+   */
+  virtual void setUpstreamSourceInformation(const UpstreamSourceInformation& information) PURE;
 };
 
 typedef std::unique_ptr<Instance> InstancePtr;

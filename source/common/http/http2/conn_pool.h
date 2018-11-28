@@ -39,6 +39,8 @@ public:
   ConnectionPool::Cancellable* newStream(StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks,
                                          const Upstream::LoadBalancerContext& context) override;
+  void setUpstreamSourceInformation(
+      const ConnectionPool::UpstreamSourceInformation& information) override;
 
 protected:
   struct ActiveClient : public Network::ConnectionCallbacks,
@@ -49,6 +51,7 @@ protected:
     ~ActiveClient();
 
     void onConnectTimeout() { parent_.onConnectTimeout(*this); }
+    Upstream::Host::CreateConnectionData createUpstreamConnection() const;
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
@@ -98,6 +101,7 @@ protected:
   ActiveClientPtr draining_client_;
   std::list<DrainedCb> drained_callbacks_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
+  ConnectionPool::UpstreamSourceInformation upstream_source_info_;
 };
 
 /**

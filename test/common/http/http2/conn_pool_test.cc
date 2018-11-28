@@ -74,9 +74,7 @@ public:
     }
   }
 
-  // Creates a new test client, expecting a new connection to be created and associated
-  // with the new client.
-  void expectClientCreate(absl::optional<uint32_t> buffer_limits = {}) {
+  void setupTestClient() {
     test_clients_.emplace_back();
     TestCodecClient& test_client = test_clients_.back();
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
@@ -84,23 +82,41 @@ public:
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     test_client.client_dispatcher_ =
         std::make_unique<Event::DispatcherImpl>(test_time_.timeSystem());
-    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-        .WillOnce(Return(test_client.connection_));
+
     auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     Network::ClientConnectionPtr connection{test_client.connection_};
     test_client.codec_client_ = new CodecClientForTest(
         std::move(connection), test_client.codec_,
         [this](CodecClient*) -> void { onClientDestroy(); },
         Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
+  }
+
+  void setupCodecClient(TestConnPoolImpl& pool) {
+    EXPECT_CALL(pool, createCodecClient_(_))
+        .WillOnce(Invoke([this](Upstream::Host::CreateConnectionData&) -> CodecClient* {
+          return test_clients_.back().codec_client_;
+        }));
+    EXPECT_CALL(*test_clients_.back().connect_timer_, enableTimer(_));
+  }
+
+  // Creates a new test client, expecting a new connection to be created and associated
+  // with the new client.
+  void expectClientCreate(absl::optional<uint32_t> buffer_limits = {}) {
+    setupTestClient();
+    TestCodecClient& test_client = test_clients_.back();
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+        .WillOnce(Return(test_client.connection_));
     if (buffer_limits) {
       EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes()).WillOnce(Return(*buffer_limits));
       EXPECT_CALL(*test_clients_.back().connection_, setBufferLimits(*buffer_limits));
     }
-    EXPECT_CALL(pool_, createCodecClient_(_))
-        .WillOnce(Invoke([this](Upstream::Host::CreateConnectionData&) -> CodecClient* {
-          return test_clients_.back().codec_client_;
-        }));
-    EXPECT_CALL(*test_client.connect_timer_, enableTimer(_));
+
+    setupCodecClient(pool_);
+  }
+
+  void setupClientAndCodec(TestConnPoolImpl& pool) {
+    setupTestClient();
+    setupCodecClient(pool);
   }
 
   // Connects a pending connection for client with the given index, asserting
@@ -653,6 +669,71 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
   dispatcher_.clearDeferredDeleteList();
 
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_close_notify_.value());
+}
+
+/**
+ * Targets the upstream connection logic in Instance.
+ */
+class Http2ConnPoolImplConnectionTest : public Http2ConnPoolImplTest {
+public:
+  std::unique_ptr<TestConnPoolImpl> makeDefaultPool() {
+    return std::make_unique<TestConnPoolImpl>(dispatcher_, mock_host_,
+                                              Upstream::ResourcePriority::Default, nullptr);
+  }
+
+  ConnectionPool::UpstreamSourceInformation
+  makeSourceInfoWithAddress(Network::Address::InstanceConstSharedPtr address) {
+    ConnectionPool::UpstreamSourceInformation info;
+    info.source_address_ = std::move(address);
+    return info;
+  }
+
+  std::shared_ptr<NiceMock<Upstream::MockHost>> mock_host_{new NiceMock<Upstream::MockHost>()};
+  NiceMock<Http::MockStreamDecoder> decoder_;
+  ConnPoolCallbacks callbacks_;
+};
+
+TEST_F(Http2ConnPoolImplConnectionTest, NoUpstreamSourceInfoMeansNoFixedSrc) {
+  auto pool = makeDefaultPool();
+  setupClientAndCodec(*pool);
+
+  EXPECT_CALL(*mock_host_, createConnection_(_, _));
+  pool->newStream(decoder_, callbacks_);
+
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  EXPECT_CALL(*this, onClientDestroy());
+}
+
+TEST_F(Http2ConnPoolImplConnectionTest, FixedSrcCalledWhenSourceAddressProvided) {
+  auto pool = makeDefaultPool();
+  setupClientAndCodec(*pool);
+  auto address = Network::Utility::resolveUrl("tcp://10.1.3.5:9876");
+  auto info = makeSourceInfoWithAddress(address);
+  pool->setUpstreamSourceInformation(info);
+  EXPECT_CALL(*mock_host_, createFixedSrcConnection_(Ref(dispatcher_), PointeesEq(address), _));
+
+  pool->newStream(decoder_, callbacks_);
+
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  EXPECT_CALL(*this, onClientDestroy());
+}
+
+TEST_F(Http2ConnPoolImplConnectionTest, CanUpdateUpstreamSourceTwice) {
+  auto pool = makeDefaultPool();
+  setupClientAndCodec(*pool);
+  auto address1 = Network::Utility::resolveUrl("tcp://10.1.3.5:9876");
+  auto address2 = Network::Utility::resolveUrl("tcp://10.1.3.5:9876");
+  auto info = makeSourceInfoWithAddress(address1);
+  pool->setUpstreamSourceInformation(info);
+  info.source_address_ = address2;
+  pool->setUpstreamSourceInformation(info);
+
+  EXPECT_CALL(*mock_host_, createFixedSrcConnection_(Ref(dispatcher_), PointeesEq(address2), _));
+
+  pool->newStream(decoder_, callbacks_);
+
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  EXPECT_CALL(*this, onClientDestroy());
 }
 
 } // namespace Http2

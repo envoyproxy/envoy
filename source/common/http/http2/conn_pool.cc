@@ -136,6 +136,11 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
   return newStream(response_decoder, callbacks);
 }
 
+void ConnPoolImpl::setUpstreamSourceInformation(
+    const ConnectionPool::UpstreamSourceInformation& info) {
+  upstream_source_info_ = info;
+}
+
 void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
@@ -216,6 +221,15 @@ void ConnPoolImpl::onConnectTimeout(ActiveClient& client) {
   client.client_->close();
 }
 
+Upstream::Host::CreateConnectionData ConnPoolImpl::ActiveClient::createUpstreamConnection() const {
+  if (parent_.upstream_source_info_.source_address_) {
+    return parent_.host_->createFixedSrcConnection(parent_.dispatcher_,
+                                                   parent_.upstream_source_info_.source_address_,
+                                                   parent_.socket_options_, nullptr);
+  }
+  return parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_, nullptr);
+}
+
 void ConnPoolImpl::onGoAway(ActiveClient& client) {
   ENVOY_CONN_LOG(debug, "remote goaway", *client.client_);
   host_->cluster().stats().upstream_cx_close_notify_.inc();
@@ -268,8 +282,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })) {
   parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan>(
       parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem());
-  Upstream::Host::CreateConnectionData data =
-      parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_, nullptr);
+  Upstream::Host::CreateConnectionData data = createUpstreamConnection();
   real_host_description_ = data.host_description_;
   client_ = parent_.createCodecClient(data);
   client_->addConnectionCallbacks(*this);

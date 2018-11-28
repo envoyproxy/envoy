@@ -29,6 +29,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Property;
+using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -45,8 +46,13 @@ public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
                       Upstream::ClusterInfoConstSharedPtr cluster,
                       NiceMock<Event::MockTimer>* upstream_ready_timer)
-      : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
-                     Upstream::ResourcePriority::Default, nullptr),
+      : ConnPoolImplForTest(dispatcher, upstream_ready_timer,
+                            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000")) {}
+
+  ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
+                      NiceMock<Event::MockTimer>* upstream_ready_timer,
+                      Upstream::HostSharedPtr host)
+      : ConnPoolImpl(dispatcher, std::move(host), Upstream::ResourcePriority::Default, nullptr),
         mock_dispatcher_(dispatcher), mock_upstream_ready_timer_(upstream_ready_timer) {}
 
   ~ConnPoolImplForTest() {
@@ -73,7 +79,7 @@ public:
   MOCK_METHOD0(createCodecClient_, CodecClient*());
   MOCK_METHOD0(onClientDestroy, void());
 
-  void expectClientCreate() {
+  void setupTestClient() {
     test_clients_.emplace_back();
     TestCodecClient& test_client = test_clients_.back();
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
@@ -95,10 +101,20 @@ public:
           }
         },
         Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
+  }
+
+  void expectClientCreate() {
+    setupTestClient();
+    TestCodecClient& test_client = test_clients_.back();
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
     EXPECT_CALL(*this, createCodecClient_()).WillOnce(Return(test_client.codec_client_));
     EXPECT_CALL(*test_client.connect_timer_, enableTimer(_));
+  }
+
+  void expectClientCreateWithoutConnCreate() {
+    setupTestClient();
+    EXPECT_CALL(*this, createCodecClient_()).WillOnce(Return(test_clients_.back().codec_client_));
   }
 
   void expectEnableUpstreamReady() {
@@ -119,7 +135,7 @@ public:
 };
 
 /**
- * Test fixture for all connection pool tests.
+ * Test fixture for most connection pool tests.
  */
 class Http1ConnPoolImplTest : public testing::Test {
 public:
@@ -747,6 +763,81 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+/**
+ * Test fixture for connection pool tests focusing on how connections to the upstream are
+ * established.
+ */
+class Http1ConnPoolImplConnectionTest : public testing::Test {
+public:
+  Http1ConnPoolImplConnectionTest()
+      : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
+        conn_pool_(dispatcher_, upstream_ready_timer_, host_) {}
+
+  ~Http1ConnPoolImplConnectionTest() {
+    // Make sure all gauges are 0.
+    for (const Stats::GaugeSharedPtr& gauge : host_->cluster_.stats_store_.gauges()) {
+      EXPECT_EQ(0U, gauge->value());
+    }
+  }
+
+  ConnectionPool::UpstreamSourceInformation
+  makeSourceInfoWithAddress(Network::Address::InstanceConstSharedPtr address) {
+    ConnectionPool::UpstreamSourceInformation info;
+    info.source_address_ = std::move(address);
+    return info;
+  }
+  //! Call this after invoking newStream -- we have a bunch of stuff that validates stats on destoy
+  //! so we need to make sure those stats are good.
+  void cleanupStreams() {
+    EXPECT_CALL(conn_pool_, onClientDestroy());
+    EXPECT_CALL(callbacks_.pool_failure_, ready());
+    conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+    dispatcher_.clearDeferredDeleteList();
+  }
+
+  ConnPoolCallbacks callbacks_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Event::MockTimer>* upstream_ready_timer_;
+  std::shared_ptr<NiceMock<Upstream::MockHost>> host_{new NiceMock<Upstream::MockHost>()};
+  ConnPoolImplForTest conn_pool_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Http::MockStreamDecoder> outer_decoder_;
+};
+
+TEST_F(Http1ConnPoolImplConnectionTest, NoUpstreamSourceInfoMeansNoFixedSrc) {
+  conn_pool_.expectClientCreateWithoutConnCreate();
+  EXPECT_CALL(*host_, createConnection_(_, _));
+
+  conn_pool_.newStream(outer_decoder_, callbacks_);
+
+  cleanupStreams();
+}
+
+TEST_F(Http1ConnPoolImplConnectionTest, SourceAddressIsInvokesFixedSrc) {
+  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  conn_pool_.expectClientCreateWithoutConnCreate();
+  auto source = Network::Utility::resolveUrl("tcp://10.1.3.5:9876");
+  auto info = makeSourceInfoWithAddress(source);
+  conn_pool_.setUpstreamSourceInformation(info);
+  EXPECT_CALL(*host_, createFixedSrcConnection_(Ref(dispatcher_), PointeesEq(source), _));
+
+  conn_pool_.newStream(outer_decoder_, callbacks_);
+
+  cleanupStreams();
+}
+
+TEST_F(Http1ConnPoolImplConnectionTest, SourceAddressIsInvokesFixedSrcDifferentAdd) {
+  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  conn_pool_.expectClientCreateWithoutConnCreate();
+  auto source = Network::Utility::resolveUrl("tcp://11.2.4.75:12");
+  auto info = makeSourceInfoWithAddress(source);
+  conn_pool_.setUpstreamSourceInformation(info);
+  EXPECT_CALL(*host_, createFixedSrcConnection_(Ref(dispatcher_), PointeesEq(source), _));
+
+  conn_pool_.newStream(outer_decoder_, callbacks_);
+
+  cleanupStreams();
+}
 } // namespace Http1
 } // namespace Http
 } // namespace Envoy

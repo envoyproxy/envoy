@@ -7,6 +7,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/conn_pool.h"
+#include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/upstream.h"
@@ -46,6 +47,9 @@ public:
   ConnectionPool::Cancellable* newStream(StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks,
                                          const Upstream::LoadBalancerContext& context) override;
+  void setUpstreamSourceInformation(
+      const ConnectionPool::UpstreamSourceInformation& information) override;
+
   // ConnPoolImplBase
   void checkForDrained() override;
 
@@ -86,6 +90,7 @@ protected:
     ~ActiveClient();
 
     void onConnectTimeout();
+    Upstream::Host::CreateConnectionData createUpstreamConnection() const;
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
@@ -123,6 +128,7 @@ protected:
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   Event::TimerPtr upstream_ready_timer_;
   bool upstream_ready_enabled_{false};
+  ConnectionPool::UpstreamSourceInformation upstream_source_info_;
 };
 
 /**

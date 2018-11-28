@@ -15,6 +15,7 @@ envoy_cc_mock(
     hdrs = ["conn_pool.h"],
     deps = [
         "//include/envoy/http:conn_pool_interface",
+        "//include/envoy/network:address_interface",
         "//test/mocks/upstream:host_mocks",
     ],
 )

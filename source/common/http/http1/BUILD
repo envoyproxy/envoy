@@ -43,6 +43,7 @@ envoy_cc_library(
         "//include/envoy/event:timer_interface",
         "//include/envoy/http:conn_pool_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/network:address_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:timespan",
