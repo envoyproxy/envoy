@@ -32,8 +32,8 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
           : "none",
       callbacks_->connection().streamInfo().dynamicMetadata().DebugString());
 
-  // When the enforcement type is continuous always do the RBAC checks. If its connect time check
-  // only, run the check once and skip for subsequent onData calls.
+  // When the enforcement type is continuous always do the RBAC checks. If it is a one time check,
+  // run the check once and skip it for subsequent onData calls.
   if (config_->enforcementType() == envoy::config::filter::network::rbac::v2::RBAC::CONTINUOUS) {
     shadow_engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow);
     engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
