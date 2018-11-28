@@ -5,6 +5,9 @@
 #include "envoy/server/instance.h"
 #include "envoy/singleton/manager.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit.h"
+#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -39,6 +42,13 @@ registerRateLimitServiceConfig(Server::Instance& server,
  * Returns the registered configuration from singleton manager.
  */
 RateLimitServiceConfigPtr rateLimitConfig(Server::Configuration::FactoryContext& context);
+
+/**
+ * Returns the rate limit client. This method builds rate limit client and registers with singleton
+ * manager.
+ */
+ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
+                          const uint32_t timeout_ms);
 
 } // namespace RateLimit
 } // namespace Common

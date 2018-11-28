@@ -12,7 +12,6 @@
 #include "extensions/filters/common/ratelimit/ratelimit_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
@@ -153,9 +152,8 @@ TEST(RateLimitGrpcFactoryTest, Create) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   NiceMock<ThreadLocal::MockInstance> tls;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   GrpcFactoryImpl factory(config, async_client_manager, tls, scope);
-  factory.create(absl::optional<std::chrono::milliseconds>(), factory_context);
+  factory.create(absl::optional<std::chrono::milliseconds>());
 }
 
 // TODO(htuch): cluster_name is deprecated, remove after 1.6.0.
@@ -172,15 +170,13 @@ TEST(RateLimitGrpcFactoryTest, CreateLegacy) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   NiceMock<ThreadLocal::MockInstance> tls;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   GrpcFactoryImpl factory(config, async_client_manager, tls, scope);
-  factory.create(absl::optional<std::chrono::milliseconds>(), factory_context);
+  factory.create(absl::optional<std::chrono::milliseconds>());
 }
 
 TEST(RateLimitNullFactoryTest, Basic) {
   NullFactoryImpl factory;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ClientPtr client = factory.create(absl::optional<std::chrono::milliseconds>(), factory_context);
+  ClientPtr client = factory.create(absl::optional<std::chrono::milliseconds>());
   MockRequestCallbacks request_callbacks;
   EXPECT_CALL(request_callbacks, complete_(LimitStatus::OK, _));
   client->limit(request_callbacks, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance());

@@ -9,6 +9,7 @@
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/ratelimit/ratelimit.h"
+#include "envoy/server/instance.h"
 #include "envoy/service/ratelimit/v2/rls.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/tracing/http_tracer.h"
@@ -92,7 +93,6 @@ private:
  */
 class GrpcClientImpl : public Client,
                        public RateLimitAsyncCallbacks,
-                       public Singleton::Instance,
                        public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcClientImpl(Grpc::AsyncClientFactoryPtr&& factory,
@@ -135,8 +135,7 @@ public:
                   ThreadLocal::SlotAllocator& tls_slot, Stats::Scope& scope);
 
   // Filters::Common::RateLimit::ClientFactory
-  ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout,
-                   Server::Configuration::FactoryContext& context) override;
+  ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout) override;
 
 private:
   Grpc::AsyncClientFactoryPtr async_client_factory_;
@@ -158,8 +157,7 @@ public:
 class NullFactoryImpl : public ClientFactory {
 public:
   // Filters::Common::RateLimit::ClientFactory
-  ClientPtr create(const absl::optional<std::chrono::milliseconds>&,
-                   Server::Configuration::FactoryContext&) override {
+  ClientPtr create(const absl::optional<std::chrono::milliseconds>&) override {
     return ClientPtr{new NullClientImpl()};
   }
 };

@@ -14,27 +14,11 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 
-#include "server/configuration_impl.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace RateLimit {
-
-// Singleton registration via macro defined in envoy/singleton/manager.h
-SINGLETON_MANAGER_REGISTRATION(ratelimit_client);
-
-ClientFactoryPtr
-ClientFactory ::rateLimitClientFactory(Server::Configuration::FactoryContext& context,
-                                       RateLimitServiceConfigPtr ratelimit_config) {
-  if (ratelimit_config) {
-    return std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::GrpcFactoryImpl>(
-        ratelimit_config->config_, context.clusterManager().grpcAsyncClientManager(),
-        context.threadLocal(), context.scope());
-  }
-  return std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::NullFactoryImpl>();
-}
 
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientFactoryPtr&& factory,
                                const absl::optional<std::chrono::milliseconds>& timeout,
@@ -130,12 +114,8 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitSe
   async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }
 
-ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout,
-                                  Server::Configuration::FactoryContext& context) {
-  return context.singletonManager().getTyped<GrpcClientImpl>(
-      SINGLETON_MANAGER_REGISTERED_NAME(ratelimit_client), [timeout, this] {
-        return std::make_shared<GrpcClientImpl>(std::move(async_client_factory_), timeout, tls_);
-      });
+ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout) {
+  return std::make_shared<GrpcClientImpl>(std::move(async_client_factory_), timeout, tls_);
 }
 
 } // namespace RateLimit

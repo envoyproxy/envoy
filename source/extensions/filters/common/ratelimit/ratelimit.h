@@ -7,10 +7,8 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/ratelimit/ratelimit.h"
-#include "envoy/server/filter_config.h"
+#include "envoy/singleton/instance.h"
 #include "envoy/tracing/http_tracer.h"
-
-#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
 
 #include "absl/types/optional.h"
 
@@ -49,7 +47,7 @@ public:
 /**
  * A client used to query a centralized rate limit service.
  */
-class Client {
+class Client : public Singleton::Instance {
 public:
   virtual ~Client() {}
 
@@ -87,16 +85,7 @@ public:
   /**
    * Returns rate limit client from singleton manager.
    */
-  virtual ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout,
-                           Server::Configuration::FactoryContext& context) PURE;
-
-  /**
-   * Returns ClientFactory constructed from the RateLimitServiceConfig available in passed in
-   * FactoryContext.
-   */
-  static std::unique_ptr<ClientFactory>
-  rateLimitClientFactory(Server::Configuration::FactoryContext& context,
-                         RateLimitServiceConfigPtr ratelimit_config);
+  virtual ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout) PURE;
 };
 
 typedef std::unique_ptr<ClientFactory> ClientFactoryPtr;
