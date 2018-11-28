@@ -75,6 +75,7 @@ public:
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
+  // TODO(alyssawilk) this does not scale. Refactor.
   // Add an additional route to the configuration.
   void addRoute(const std::string& host, const std::string& route, const std::string& cluster,
                 bool validate_clusters,
@@ -83,8 +84,10 @@ public:
                     envoy::api::v2::route::VirtualHost::NONE,
                 envoy::api::v2::route::RouteAction::RetryPolicy retry_policy = {},
                 bool include_attempt_count_header = false, const absl::string_view upgrade = "",
-                const envoy::api::v2::route::RouteAction::InternalRedirectAction action =
-                    envoy::api::v2::route::RouteAction::REJECT);
+                const envoy::api::v2::route::RouteAction::InternalRedirectAction internal_action =
+                    envoy::api::v2::route::RouteAction::REJECT_INTERNAL_REDIRECT,
+                const envoy::api::v2::route::RouteAction::RedirectAction action =
+                    envoy::api::v2::route::RouteAction::PASS_THROUGH_REDIRECT);
 
   // Add an HTTP filter prior to existing filters.
   void addFilter(const std::string& filter_yaml);

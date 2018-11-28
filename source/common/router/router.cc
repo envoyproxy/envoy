@@ -646,6 +646,49 @@ void Filter::onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers) {
   callbacks_->encode100ContinueHeaders(std::move(headers));
 }
 
+bool Filter::handledRedirect(const uint64_t response_code, Http::HeaderMap& headers,
+                             bool end_stream) {
+  std::cerr << "HERE\n";
+  if (response_code == 302 && !headers.EnvoyInternalRedirect()) {
+    std::cerr << "HERE1\n";
+    if (route_entry_->redirectAction() == RedirectAction::Handle) {
+      std::cerr << "HERE2\n";
+      if (setupRedirect(headers)) {
+        std::cerr << "HERE3\n";
+        return true;
+      }
+      // If the redirect could not be handled, fail open and let it pass to the
+      // next downstream.
+    }
+    return false;
+  }
+
+  if (headers.EnvoyInternalRedirect()) {
+    switch (route_entry_->internalRedirectAction()) {
+    case RedirectAction::Reject:
+      // Upstream asked for an internal redirect when internal redirects are not
+      // configured on.
+      cleanup(!end_stream);
+      cluster_->stats().upstream_internal_redirect_rejected_total_.inc();
+      callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt);
+      return true;
+    case RedirectAction::Handle:
+      cleanup(!end_stream);
+      if (!setupRedirect(headers)) {
+        cluster_->stats().upstream_internal_redirect_failed_total_.inc();
+        callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt);
+        ENVOY_STREAM_LOG(debug, "failing redirect", *callbacks_);
+      }
+      // Either we've set up an internal redirect, or sent a failure reply.
+      return true;
+    case RedirectAction::PassThrough:
+      // Pass the redirect through to frontline Envoy instances.
+      return false;
+    }
+  }
+  return false;
+}
+
 void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&& headers,
                                bool end_stream) {
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
@@ -679,28 +722,8 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
     retry_state_.reset();
   }
 
-  if (headers->EnvoyInternalRedirect()) {
-    switch (route_entry_->internalRedirectAction()) {
-    case InternalRedirectAction::Reject:
-      // Upstream asked for an internal redirect when internal redirects are not
-      // configured on.
-      cleanup(!end_stream);
-      cluster_->stats().upstream_internal_redirect_rejected_total_.inc();
-      callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt);
-      return;
-    case InternalRedirectAction::Handle:
-      cleanup(!end_stream);
-      if (!setupInternalRedirect(headers)) {
-        cluster_->stats().upstream_internal_redirect_failed_total_.inc();
-        callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt);
-        ENVOY_STREAM_LOG(debug, "failing redirect", *callbacks_);
-      }
-      // Either we've set up an internal redirect, or sent a failure reply.
-      return;
-    case InternalRedirectAction::PassThrough:
-      // Pass the redirect through to frontline Envoy instances.
-      break;
-    }
+  if (handledRedirect(response_code, *headers, end_stream)) {
+    return;
   }
 
   // Only send upstream service time if we received the complete request and this is not a
@@ -844,10 +867,9 @@ bool Filter::setupRetry(bool end_stream) {
   return true;
 }
 
-bool Filter::setupInternalRedirect(const Http::HeaderMapPtr& headers) {
+bool Filter::setupRedirect(const Http::HeaderMap& headers) {
   ENVOY_STREAM_LOG(debug, "attempting internal redirect", *callbacks_);
-  const Http::HeaderEntry* location = headers->Location();
-  ASSERT(headers->EnvoyInternalRedirect());
+  const Http::HeaderEntry* location = headers.Location();
   // As with setupRetry, redirects are not supported for streaming requests yet.
   if (!downstream_end_stream_ ||
       callbacks_->decodingBuffer() || // Redirects woth body not yet supported.

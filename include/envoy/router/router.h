@@ -204,9 +204,9 @@ public:
 enum class RetryStatus { No, NoOverflow, Yes };
 
 /**
- * InternalRedirectAction from the route configuration.
+ * RedirectAction from the route configuration.
  */
-enum class InternalRedirectAction { Reject, PassThrough, Handle };
+enum class RedirectAction { Reject, PassThrough, Handle };
 
 /**
  * Wraps retry state for an active routed request.
@@ -637,9 +637,14 @@ public:
   virtual const UpgradeMap& upgradeMap() const PURE;
 
   /**
+   * @returns the redirect action which should be taken on this route.
+   */
+  virtual RedirectAction redirectAction() const PURE;
+
+  /**
    * @returns the internal redirect action which should be taken on this route.
    */
-  virtual InternalRedirectAction internalRedirectAction() const PURE;
+  virtual RedirectAction internalRedirectAction() const PURE;
 };
 
 /**

@@ -347,9 +347,8 @@ public:
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
   bool includeAttemptCount() const override { return vhost_.includeAttemptCount(); }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
-  InternalRedirectAction internalRedirectAction() const override {
-    return internal_redirect_action_;
-  }
+  RedirectAction internalRedirectAction() const override { return internal_redirect_action_; }
+  RedirectAction redirectAction() const override { return redirect_action_; }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -450,9 +449,10 @@ private:
 
     bool includeAttemptCount() const override { return parent_->includeAttemptCount(); }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
-    InternalRedirectAction internalRedirectAction() const override {
+    RedirectAction internalRedirectAction() const override {
       return parent_->internalRedirectAction();
     }
+    RedirectAction redirectAction() const override { return parent_->redirectAction(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -575,7 +575,8 @@ private:
   std::string direct_response_body_;
   PerFilterConfigs per_filter_configs_;
   Event::TimeSystem& time_system_;
-  InternalRedirectAction internal_redirect_action_;
+  RedirectAction internal_redirect_action_;
+  RedirectAction redirect_action_;
 };
 
 /**

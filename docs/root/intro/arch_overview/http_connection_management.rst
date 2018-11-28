@@ -116,40 +116,45 @@ Envoy can be extended with custom retry plugins similar to how custom filters ca
 Internal redirects
 --------------------------
 
-Envoy supports "internal redirects", that is capturing 302-redirect responses internally,
+Envoy supports handling 302 redirects internally, that is capturing a 302 redirect response,
 synthesizing a new request, sending it to the upstream specified by the new route match, and
 returning the redirected response as the response of the original request.
 
-Internal redirects are configured via the :ref:`internal redirect action
+There are two modes of redirect handling, "Internal redirects", for internal or private URLs,
+general redirects, which capture all 302s. They are configured separately via the
+:ref:`internal redirect action
 <envoy_api_field_route.RouteAction.internal_redirect_action>`
-in the route configuration.
+and :ref:`redirect action
+<envoy_api_field_route.RouteAction.redirect_action>` fields in 
+route configuration respectively.
 
-Redirect handling is triggered by an upstream server sending a 302 response with an
-x-envoy-internal-redirect header. If the Envoy receiving this response is not configured for
-internal redirects, or is explicitly configured to REJECT, the 302 will be converted into a 500
-to prevent leaking potentially private URLs to untrusted clients. If the Envoy receiving the
-response is configured to PASS_THROUGH it will ignore the header and pass the response through, so
-that users with multi-level Envoy deployments can configure which layers of Envoy capture and handle
-the internal redirect. If the Envoy is configured to HANDLE, it will validate the redirect and
-modify the request headers as described below, and send the modified request through a new filter
-chain to a new upstream as selected by the route associated with the new URL.
+Internal redirect handling is triggered via the x-envoy-internal-redirect header. Any response
+with this header will be treated as an internal redirect, and if the route is not configured for
+redirects, or the redirect is invalid, it will be translated to a 500 downstream. Internal redirects
+basically fail closed: it is assumed that the Location header may contain PII, or have passed auth
+checks, and should never be returned to untrusted clients. For multi-level deployments, a upstream
+Envoy can be configured to PASS_THROUGH internal redirects to the downstream Envoy, so that via
+configuration the redirects can be fielded at either level of infrastructure.
+
+Conversely, where basic redirect handling is configured on, Envoy will do best-effort handling for
+all 302 responses which do not contain an x-envoy-internal-redirect. This handling is fail-open:
+if the preconditions are not met, the 302 will be forwarded downstream.
 
 For a redirect to be successful it must pass the following checks
 
 1. Be a 302 response
-2. Have *x-envoy-internal-redirect* present in the response headers
-3. Have a *location* header with a valid, fully qualified URL matching the scheme of the original request.
-4. The request must have been fully processed by Envoy.
-5. The request must not have a body
-6. The request must have not been previously redirected, as determined by the presence of an x-envoy-original-url header
+2. Have a *location* header with a valid, fully qualified URL matching the scheme of the original request.
+3. The request must have been fully processed by Envoy.
+4. The request must not have a body
+5. The request must have not been previously redirected, as determined by the presence of an x-envoy-original-url header
 
-Any failure will result in a 500 being sent downstream.
+Any failure will result in redirect processing not taking place (500 for internal redirects, pass through for redirects)
 
 Once the redirect has passed these checks, the request headers which were shipped to the original
 upstream will be modified by
 
 1. Putting the fully qualified original request URL in the x-envoy-original-url header
-2. Replacing the Authority/Host, Scheme, and Path headers with the values from the location header
+2. Replacing the Authority/Host, Scheme, and Path headers with the values from the Location header
 
 The altered request headers will then have a new route selected, be sent through a new filter chain,
 and then shipped upstream with all of the normal Envoy request sanitization taking place. Note that

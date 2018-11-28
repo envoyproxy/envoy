@@ -379,12 +379,15 @@ private:
                        const absl::optional<Http::StreamResetReason>& reset_reason);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry(bool end_stream);
-  bool setupInternalRedirect(const Http::HeaderMapPtr& headers);
+  bool setupRedirect(const Http::HeaderMap& headers);
   void doRetry();
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream);
   TimeSource& timeSource() { return config_.timeSource(); }
+
+  // FIXME comment.
+  bool handledRedirect(const uint64_t response_code, Http::HeaderMap& headers, bool end_stream);
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
