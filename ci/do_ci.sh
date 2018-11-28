@@ -149,7 +149,8 @@ elif [[ "$1" == "bazel.ipv6_tests" ]]; then
   setup_clang_toolchain
   echo "Testing..."
   cd "${ENVOY_CI_DIR}"
-  bazel test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/integration/... //test/common/network/...
+  bazel test ${BAZEL_TEST_OPTIONS} --test_env=ENVOY_IP_TEST_VERSIONS=v6only -c fastbuild \
+    //test/integration/... //test/common/network/...
   exit 0
 elif [[ "$1" == "bazel.api" ]]; then
   setup_clang_toolchain
