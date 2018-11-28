@@ -15,7 +15,6 @@
   "listeners": [{
     "address": "unix://{{ socket_dir }}/unix-sockets.listener_0",
     "filters": [{
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "auto",
