@@ -93,11 +93,11 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
     Network::Socket::appendOptions(cluster_options,
                                    Network::SocketOptionFactory::buildIpFreebindOptions());
   }
-  if (config.src_transparent()) {
+  if (config.upstream_connection_options().src_transparent()) {
     Network::Socket::appendOptions(cluster_options,
                                    Network::SocketOptionFactory::buildIpTransparentOptions());
   }
-  const uint32_t mark = config.mark();
+  const uint32_t mark = config.upstream_connection_options().mark();
   if (mark != 0) {
     Network::Socket::appendOptions(cluster_options,
                                    Network::SocketOptionFactory::buildSocketMarkOptions(mark));

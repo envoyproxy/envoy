@@ -1867,7 +1867,10 @@ TEST_F(ClusterInfoImplTest, TestNoSocketOptionsDefault) {
 }
 
 TEST_F(ClusterInfoImplTest, TestMarkSocketOptions) {
-  auto cluster = makeCluster(strictDnsClusterWithAttrYaml("mark: 145"));
+  auto cluster = makeCluster(strictDnsClusterWithAttrYaml(R"EOF(
+    upstream_connection_options:
+      mark: 145
+  )EOF"));
   auto options = cluster->info()->clusterSocketOptions();
 
   const auto expected_option = ENVOY_SOCKET_SO_MARK;
@@ -1889,7 +1892,10 @@ TEST_F(ClusterInfoImplTest, TestMarkSocketOptions) {
 }
 
 TEST_F(ClusterInfoImplTest, TestTransparentSocketOptions) {
-  auto cluster = makeCluster(strictDnsClusterWithAttrYaml("src_transparent: true"));
+  auto cluster = makeCluster(strictDnsClusterWithAttrYaml(R"EOF(
+    upstream_connection_options:
+      src_transparent: true
+  )EOF"));
   auto options = cluster->info()->clusterSocketOptions();
 
   const auto expected_option = ENVOY_SOCKET_IP_TRANSPARENT;
