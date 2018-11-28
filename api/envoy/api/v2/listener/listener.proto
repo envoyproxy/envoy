@@ -42,6 +42,8 @@ message Filter {
     // [#not-implemented-hide:]
     google.protobuf.Any typed_config = 4;
   }
+
+  reserved 3;
 }
 
 // Specifies the match criteria for selecting a specific filter chain for a
