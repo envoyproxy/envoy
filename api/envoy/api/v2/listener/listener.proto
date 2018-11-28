@@ -65,6 +65,7 @@ message Filter {
 // 3. Server name (e.g. SNI for TLS protocol),
 // 4. Transport protocol.
 // 5. Application protocols (e.g. ALPN for TLS protocol).
+// 6. Source type (e.g. any, local or external network).
 //
 // For criteria that allow ranges or wildcards, the most specific value in any
 // of the configured filter chains that matches the incoming connection is going
@@ -92,6 +93,18 @@ message FilterChainMatch {
 
   // [#not-implemented-hide:]
   google.protobuf.UInt32Value suffix_len = 5;
+
+  enum ConnectionSourceType {
+    // Any connection source matches.
+    ANY = 0;
+    // Match a connection originating from the same host.
+    LOCAL = 1;
+    // Match a connection originating from a different host.
+    EXTERNAL = 2;
+  }
+
+  // Specifies the connection source IP match type. Can be any, local or external network.
+  ConnectionSourceType source_type = 12 [(validate.rules).enum.defined_only = true];
 
   // The criteria is satisfied if the source IP address of the downstream
   // connection is contained in at least one of the specified subnets. If the
