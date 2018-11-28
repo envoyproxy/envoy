@@ -95,18 +95,20 @@ ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConst
   if (address->type() == Network::Address::Type::Pipe) {
     const std::string addr = fmt::format("unix://{}", address->asString());
     const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
-    if (fd != -1) {
+    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(fd);
+    if (io_handle->fd() != -1) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-      return std::make_shared<Network::UdsListenSocket>(fd, address);
+      return std::make_shared<Network::UdsListenSocket>(io_handle, address);
     }
     return std::make_shared<Network::UdsListenSocket>(address);
   }
 
   const std::string addr = fmt::format("tcp://{}", address->asString());
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
-  if (fd != -1) {
+  Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(fd);
+  if (io_handle->fd() != -1) {
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-    return std::make_shared<Network::TcpListenSocket>(fd, address, options);
+    return std::make_shared<Network::TcpListenSocket>(io_handle, address, options);
   }
   return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
 }
