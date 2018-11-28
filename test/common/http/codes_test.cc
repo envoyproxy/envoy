@@ -235,5 +235,31 @@ TEST(CodeUtilityResponseTimingTest, All) {
   code_stats.chargeResponseTiming(info);
 }
 
+class CodeStatsTest : public testing::Test {
+protected:
+  absl::string_view stripTrailingDot(absl::string_view prefix) {
+    return CodeStatsImpl::stripTrailingDot(prefix);
+  }
+
+  std::string join(const std::vector<absl::string_view>& v) { return CodeStatsImpl::join(v); }
+
+  CodeStatsImpl code_stats_;
+};
+
+TEST_F(CodeStatsTest, StripTrailingDot) {
+  EXPECT_EQ("", stripTrailingDot(""));
+  EXPECT_EQ("foo", stripTrailingDot("foo."));
+  EXPECT_EQ(".foo", stripTrailingDot(".foo"));  // no change
+  EXPECT_EQ("foo.", stripTrailingDot("foo..")); // only one dot gets stripped.
+}
+
+TEST_F(CodeStatsTest, Join) {
+  EXPECT_EQ("hello.world", join({"hello", "world"}));
+  EXPECT_EQ("hello.world", join({"", "hello", "world"})); // leading empty token ignored.
+  EXPECT_EQ("hello.", join({"hello", ""}));               // trailign empty token not ignored.
+  EXPECT_EQ("hello", join({"hello"}));
+  EXPECT_EQ("", join({""}));
+}
+
 } // namespace Http
 } // namespace Envoy

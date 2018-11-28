@@ -18,14 +18,29 @@ public:
 
   // CodeStats
   void chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
-                               Code response_code) override;
-  void chargeResponseStat(const ResponseStatInfo& info) override;
-  void chargeResponseTiming(const ResponseTimingInfo& info) override;
+                               Code response_code) const override;
+  void chargeResponseStat(const ResponseStatInfo& info) const override;
+  void chargeResponseTiming(const ResponseTimingInfo& info) const override;
 
 private:
+  friend class CodeStatsTest;
+
+  /**
+   * Strips any trailing "." from a prefix. This is handy as most prefixes
+   * are specified as a literal like "http.", or an empty-string "". We
+   * are going to be passing these, as well as other tokens, to join() below,
+   * which will add "." between each token.
+   */
   static absl::string_view stripTrailingDot(absl::string_view prefix);
+
+  /**
+   * Joins a string-view vector with "." between each token. If there's an
+   * initial blank token it is skipped. Leading blank tokens occur due to empty
+   * prefixes, which are fairly common.
+   */
   static std::string join(const std::vector<absl::string_view>& v);
 
+  // Predeclared tokens used for combining with join().
   const absl::string_view canary_upstream_rq_completed_{"canary.upstream_rq_completed"};
   const absl::string_view canary_upstream_rq_time_{"canary.upstream_rq_time"};
   const absl::string_view canary_upstream_rq_{"canary.upstream_rq_"};

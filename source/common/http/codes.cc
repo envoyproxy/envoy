@@ -23,7 +23,7 @@ CodeStatsImpl::CodeStatsImpl() {}
 CodeStatsImpl::~CodeStatsImpl() {}
 
 void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
-                                            Code response_code) {
+                                            Code response_code) const {
   // Build a dynamic stat for the response code and increment it.
   scope.counter(absl::StrCat(prefix, upstream_rq_completed_)).inc();
   scope
@@ -33,7 +33,7 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, const std::stri
   scope.counter(absl::StrCat(prefix, upstream_rq_, enumToInt(response_code))).inc();
 }
 
-void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) {
+void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
   const uint64_t response_code = info.response_status_code_;
   chargeBasicResponseStat(info.cluster_scope_, info.prefix_, static_cast<Code>(response_code));
 
@@ -98,7 +98,7 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) {
   }
 }
 
-void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) {
+void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
   info.cluster_scope_.histogram(absl::StrCat(info.prefix_, upstream_rq_time_))
       .recordValue(info.response_time_.count());
   if (info.upstream_canary_) {
@@ -138,7 +138,9 @@ absl::string_view CodeStatsImpl::stripTrailingDot(absl::string_view str) {
 }
 
 std::string CodeStatsImpl::join(const std::vector<absl::string_view>& v) {
-  ASSERT(!v.empty());
+  if (v.empty()) {
+    return "";
+  }
   auto iter = v.begin();
   if (iter->empty()) {
     ++iter; // Skip any initial empty prefix.
