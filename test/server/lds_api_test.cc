@@ -356,7 +356,6 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
                      ]
                   }}
                }},
-               "type" : "read",
                "name" : "tcp_proxy"
             }}
          ]
