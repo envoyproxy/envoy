@@ -65,7 +65,7 @@ namespace Envoy {
                     writer.Key(XRayJsonFieldNames::get().SPAN_START_TIME.c_str());
                     writer.Double(start_time_);
                     writer.Key(XRayJsonFieldNames::get().SPAN_END_TIME.c_str());
-                    const double stop_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                    const double stop_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()/static_cast<double>(1000);
                     writer.Double(stop_time);
                     writer.Key(XRayJsonFieldNames::get().SPAN_NAMESPACE.c_str());
                     writer.String(XRayJsonFieldNames::get().SPAN_REMOTE.c_str());
@@ -181,7 +181,7 @@ namespace Envoy {
                     writer.Double(start_time_);
 
                     writer.Key(XRayJsonFieldNames::get().SPAN_END_TIME.c_str());
-		            const double stop_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+		            const double stop_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()/static_cast<double>(1000);
                     writer.Double(stop_time);
 
                     writer.Key(XRayJsonFieldNames::get().SPAN_ORIGIN.c_str());

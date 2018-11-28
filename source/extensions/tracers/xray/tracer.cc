@@ -48,14 +48,14 @@ namespace Envoy {
                     uint64_t span_id = random_generator_.random();
                     span_ptr->setId(span_id);
 
-                    double start_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                    double start_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()/static_cast<double>(1000);
                     span_ptr->setStartTime(start_time);
 
                     ChildSpan childSpan;
                     childSpan.setName(span_name);
                     uint64_t child_span_id = random_generator_.random();
                     childSpan.setId(child_span_id);
-                    double child_start_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                    double child_start_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()/static_cast<double>(1000);
                     childSpan.setStartTime(child_start_time);
                     
                     span_ptr->addChildSpan(std::move(childSpan));
@@ -98,14 +98,14 @@ namespace Envoy {
                     // Keep the same sampled flag
                     span_ptr->setSampled(previous_context.sampled());
 
-                    double start_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                    double start_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()/static_cast<double>(1000);
                     span_ptr->setStartTime(start_time);
 
                     ChildSpan childSpan;
                     childSpan.setName(span_name);
                     uint64_t child_span_id = random_generator_.random();
                     childSpan.setId(child_span_id);
-                    double child_start_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                    double child_start_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()/static_cast<double>(1000);
                     childSpan.setStartTime(child_start_time);
                     span_ptr->addChildSpan(std::move(childSpan));
 
