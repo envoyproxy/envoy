@@ -1615,7 +1615,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
           }
         },
         "additionalProperties" : false
-      }
+     }
     },
     "required" : ["name", "type", "connect_timeout_ms", "lb_type"],
     "additionalProperties" : false
