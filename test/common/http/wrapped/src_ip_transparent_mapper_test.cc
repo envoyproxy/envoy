@@ -13,6 +13,8 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AnyNumber;
+using testing::Field;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -48,7 +50,7 @@ public:
         .WillOnce(SaveArg<0>(&drained_callbacks_.back()));
 
     auto retval = std::move(next_pool_to_assign_);
-    next_pool_to_assign_ = std::make_unique<ConnectionPool::MockInstance>();
+    next_pool_to_assign_ = std::make_unique<NiceMock<ConnectionPool::MockInstance>>();
     return retval;
   }
 
@@ -62,16 +64,17 @@ public:
     // The connection mock returns a reference to remote_address_ by default as its implementation
     // of remoteAddress(). So, we simply change the value.
     connection_mock_.remote_address_ = Network::Utility::resolveUrl("tcp://" + address);
+    source_info_.source_address_ = connection_mock_.remote_address_;
   }
 
   static constexpr size_t DefaultMaxNumPools = 10;
   NiceMock<Upstream::MockLoadBalancerContext> lb_context_mock_;
   NiceMock<Network::MockConnection> connection_mock_;
-  std::unique_ptr<ConnectionPool::MockInstance> next_pool_to_assign_{
-      new ConnectionPool::MockInstance()};
+  std::unique_ptr<NiceMock<ConnectionPool::MockInstance>> next_pool_to_assign_{
+      new NiceMock<ConnectionPool::MockInstance>()};
   uint32_t unique_address = 1;
-
   std::vector<ConnectionPool::Instance::DrainedCb> drained_callbacks_;
+  ConnectionPool::UpstreamSourceInformation source_info_;
 };
 
 constexpr size_t SrcIpTransparentMapperTest::DefaultMaxNumPools;
@@ -439,6 +442,57 @@ TEST_F(SrcIpTransparentMapperTest, noLingeringStateAfterIdlev6) {
   auto should_be_same = mapper->assignPool(lb_context_mock_);
 
   EXPECT_EQ(new_pool_old_addr, should_be_same);
+}
+
+// Show that we tell the pool to use the remote address when establishing its connections.
+TEST_F(SrcIpTransparentMapperTest, remoteAddressSentToPool) {
+  auto mapper = makeDefaultMapper();
+
+  setRemoteAddressToUse("1.0.0.2:0");
+  EXPECT_CALL(*next_pool_to_assign_,
+              setUpstreamSourceInformation(
+                  Field(&ConnectionPool::UpstreamSourceInformation::source_address_,
+                        PointeesEq(source_info_.source_address_))));
+  mapper->assignPool(lb_context_mock_);
+}
+
+// Show that even if the pool was previously assigned, it'll be updated with the latest address.
+TEST_F(SrcIpTransparentMapperTest, remoteAddressUpdated) {
+  auto mapper = makeDefaultMapper();
+
+  const auto pool = next_pool_to_assign_.get();
+  setRemoteAddressToUse("1.0.0.2:0");
+  mapper->assignPool(lb_context_mock_);
+  drainPool(0);
+  setRemoteAddressToUse("2.9.71.5:0");
+  EXPECT_CALL(*pool, setUpstreamSourceInformation(
+                         Field(&ConnectionPool::UpstreamSourceInformation::source_address_,
+                               PointeesEq(source_info_.source_address_))));
+  mapper->assignPool(lb_context_mock_);
+}
+
+// Show that the port is masked off, since we're only setting the IP.
+TEST_F(SrcIpTransparentMapperTest, portIgnored) {
+  auto mapper = makeDefaultMapper();
+
+  const auto pool = next_pool_to_assign_.get();
+  setRemoteAddressToUse("9.0.0.1:123");
+  EXPECT_CALL(*pool, setUpstreamSourceInformation(
+                         Field(&ConnectionPool::UpstreamSourceInformation::source_address_,
+                               PointeesEq(Network::Utility::parseInternetAddress("9.0.0.1")))));
+  mapper->assignPool(lb_context_mock_);
+}
+
+// Make sure IPv6 is set properly
+TEST_F(SrcIpTransparentMapperTest, remoteAddressIpv6) {
+  auto mapper = makeDefaultMapper();
+
+  const auto pool = next_pool_to_assign_.get();
+  setRemoteAddressToUse("[1::2]:123");
+  EXPECT_CALL(*pool, setUpstreamSourceInformation(
+                         Field(&ConnectionPool::UpstreamSourceInformation::source_address_,
+                               PointeesEq(Network::Utility::parseInternetAddress("1::2")))));
+  mapper->assignPool(lb_context_mock_);
 }
 } // namespace Http
 } // namespace Envoy

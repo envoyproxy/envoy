@@ -27,6 +27,7 @@ envoy_cc_library(
         "//include/envoy/http:conn_pool_interface",
         "//include/envoy/http:connection_mapper_interface",
         "//include/envoy/network:address_interface",
+        "//source/common/network:utility_lib",
     ],
 )
 

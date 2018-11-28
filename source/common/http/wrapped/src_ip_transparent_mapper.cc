@@ -4,6 +4,8 @@
 
 #include "envoy/network/address.h"
 
+#include "common/network/utility.h"
+
 using Envoy::Network::Address::Ip;
 
 namespace Envoy {
@@ -96,6 +98,12 @@ ConnectionPool::Instance* SrcIpTransparentMapper::assignPool(const Ip& address) 
     next_up.v6_address_ = raw;
   }
 
+  ConnectionPool::UpstreamSourceInformation info;
+  // build up an Address::Instance object with the port set to 0 so we don't actually set the port
+  // when establishing the connetion.
+  info.source_address_ = Network::Utility::getAddressWithPort(
+      *Network::Utility::copyInternetAddressAndPort(address), 0);
+  to_return->setUpstreamSourceInformation(info);
   active_pools_.emplace(to_return, std::move(next_up));
   return to_return;
 }
