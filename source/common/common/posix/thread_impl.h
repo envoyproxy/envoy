@@ -19,7 +19,6 @@ public:
    * Join on thread exit.
    */
   void join() override;
-  ThreadHandle handle() const override { return thread_handle_; }
 
 private:
   std::function<void()> thread_routine_;

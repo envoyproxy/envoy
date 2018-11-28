@@ -7,11 +7,7 @@
 
 #include "common/common/thread_annotations.h"
 
-#ifdef __linux__
-#include <sys/syscall.h>
-#elif defined(__APPLE__)
-#include <pthread.h>
-#elif defined(WIN32)
+#if defined(WIN32)
 #include <Windows.h>
 // <windows.h> defines some macros that interfere with our code, so undef them
 #undef DELETE
@@ -23,10 +19,8 @@ namespace Thread {
 
 #if !defined(WIN32)
 typedef int32_t ThreadId;
-typedef pthread_t ThreadHandle;
 #else
 typedef DWORD ThreadId;
-typedef HANDLE ThreadHandle;
 #endif
 
 class Thread {
@@ -37,8 +31,6 @@ public:
    * Join on thread exit.
    */
   virtual void join() PURE;
-
-  virtual ThreadHandle handle() const PURE;
 };
 
 typedef std::unique_ptr<Thread> ThreadPtr;
