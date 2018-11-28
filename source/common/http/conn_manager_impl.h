@@ -292,7 +292,7 @@ private:
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
-    void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMap& metadata_map);
+    void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map);
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
 
@@ -399,7 +399,6 @@ private:
     HeaderMapPtr request_headers_;
     Buffer::WatermarkBufferPtr buffered_request_data_;
     HeaderMapPtr request_trailers_;
-    MetadataMapPtr response_metadata_map_{new MetadataMap()};
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;

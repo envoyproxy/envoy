@@ -1051,7 +1051,8 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   std::string value = std::string(80 * 1024, '1');
   Http::MetadataMap metadata_map = {{key, value}};
   upstream_request_->encodeMetadata(metadata_map);
-  upstream_request_->encodeHeaders(default_response_headers_, true);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(12, true);
 
   // Verifies metadata is received by the client.
   response->waitForEndStream();
@@ -1130,54 +1131,15 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
 
   // Sends metadata before reset.
   value = std::string(10, '6');
-  upstream_request_->encodeMetadata(metadata_map);
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(10, false);
   metadata_map = {{key, value}};
+  upstream_request_->encodeMetadata(metadata_map);
   upstream_request_->encodeResetStream();
 
   // Verifies stream is reset.
   response->waitForReset();
   ASSERT_FALSE(response->complete());
-  // Verifies no metadata is received.
-  EXPECT_EQ(0, response->metadata_map().size());
-
-  // Sends the seventh request.
-  response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
-  waitForNextUpstreamRequest();
-
-  // Sends same metadata multiple times.
-  value = std::string(10, '5');
-  metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeMetadata(metadata_map);
-  upstream_request_->encodeData(10, false);
-  upstream_request_->encodeMetadata(metadata_map);
-  upstream_request_->encodeData(0, true);
-
-  // Verifies metadata is received by the client.
-  response->waitForEndStream();
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ(response->metadata_map().find(key)->second, value);
-
-  // Sends the eighth request.
-  response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
-  waitForNextUpstreamRequest();
-
-  // Sends trailers.
-  value = std::string(10, '5');
-  metadata_map = {{key, value}};
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeMetadata(metadata_map);
-  upstream_request_->encodeData(10, false);
-  Http::TestHeaderMapImpl response_trailers{{"response", "trailer"}};
-  upstream_request_->encodeTrailers(response_trailers);
-
-  // Verifies metadata is received by the client.
-  response->waitForEndStream();
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ(response->metadata_map().find(key)->second, value);
 }
 
 void HttpIntegrationTest::testEnvoyProxyMultipleMetadata() {
