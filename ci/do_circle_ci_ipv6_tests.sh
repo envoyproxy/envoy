@@ -10,8 +10,6 @@ export ENVOY_BUILD_DIR=/tmp/envoy-docker
 
 export TEST_TYPE="bazel.ipv6_tests"
 
-export BAZEL_EXTRA_TEST_OPTIONS="--test_env=ENVOY_IP_TEST_VERSIONS=v6only"
-
 function finish {
   echo "disk space at end of build:"
   df -h
