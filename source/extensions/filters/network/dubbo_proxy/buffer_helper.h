@@ -42,7 +42,7 @@ public:
   std::string toString() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void add(const void*, uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void addBufferFragment(Buffer::BufferFragment&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  void add(const std::string&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void add(absl::string_view) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void add(const Buffer::Instance&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void commit(Buffer::RawSlice*, uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void prepend(absl::string_view) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
