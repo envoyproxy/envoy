@@ -13,7 +13,7 @@ namespace Http {
  */
 class Context {
 public:
-  virtual ~Context() {}
+  virtual ~Context() = default;
   virtual Tracing::HttpTracer& tracer() PURE;
   virtual CodeStats& codeStats() PURE;
 };

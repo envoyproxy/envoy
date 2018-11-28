@@ -116,7 +116,7 @@ InstanceImpl::~InstanceImpl() {
   listener_manager_.reset();
 }
 
-Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_->clusterManager(); }
+Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clusterManager(); }
 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
@@ -154,10 +154,10 @@ void InstanceImpl::flushStats() {
     server_stats_->total_connections_.set(numConnections() + info.num_connections_);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
-    InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_.source());
+    InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_.source());
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
     if (stat_flush_timer_ != nullptr) {
-      stat_flush_timer_->enableTimer(config_->statsFlushInterval());
+      stat_flush_timer_->enableTimer(config_.statsFlushInterval());
     }
   });
 }
@@ -311,10 +311,8 @@ void InstanceImpl::initialize(Options& options,
 
   // Now the configuration gets parsed. The configuration may start setting thread local data
   // per above. See MainImpl::initialize() for why we do this pointer dance.
-  Configuration::MainImpl* main_config = new Configuration::MainImpl();
-  config_.reset(main_config);
-  main_config->initialize(bootstrap_, *this, *cluster_manager_factory_);
-  http_context_.setTracer(main_config->httpTracer());
+  config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
+  http_context_.setTracer(config_.httpTracer());
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
@@ -334,18 +332,18 @@ void InstanceImpl::initialize(Options& options,
         access_log_manager_, clusterManager(), localInfo());
   }
 
-  for (Stats::SinkPtr& sink : main_config->statsSinks()) {
+  for (Stats::SinkPtr& sink : config_.statsSinks()) {
     stats_store_.addSink(*sink);
   }
 
   // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
   // Just setup the timer.
   stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
-  stat_flush_timer_->enableTimer(config_->statsFlushInterval());
+  stat_flush_timer_->enableTimer(config_.statsFlushInterval());
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, *config_, time_system_, api());
+  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, time_system_, api());
 }
 
 void InstanceImpl::startWorkers() {
@@ -493,8 +491,8 @@ void InstanceImpl::terminate() {
     flushStats();
   }
 
-  if (config_ != nullptr && config_->clusterManager() != nullptr) {
-    config_->clusterManager()->shutdown();
+  if (config_.clusterManager() != nullptr) {
+    config_.clusterManager()->shutdown();
   }
   handler_.reset();
   thread_local_.shutdownThread();

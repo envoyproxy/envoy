@@ -84,7 +84,7 @@ enum class Code {
  */
 class CodeStats {
 public:
-  virtual ~CodeStats() {}
+  virtual ~CodeStats() = default;
 
   struct ResponseStatInfo {
     Stats::Scope& global_scope_;
