@@ -158,7 +158,7 @@ public:
   // Server::WatchDog
   MOCK_METHOD1(startWatchdog, void(Event::Dispatcher& dispatcher));
   MOCK_METHOD0(touch, void());
-  MOCK_CONST_METHOD0(threadId, int32_t());
+  MOCK_CONST_METHOD0(threadId, Thread::ThreadId());
   MOCK_CONST_METHOD0(lastTouchTime, MonotonicTime());
 };
 
@@ -168,7 +168,7 @@ public:
   ~MockGuardDog();
 
   // Server::GuardDog
-  MOCK_METHOD1(createWatchDog, WatchDogSharedPtr(int32_t thread_id));
+  MOCK_METHOD1(createWatchDog, WatchDogSharedPtr(Thread::ThreadId thread_id));
   MOCK_METHOD1(stopWatching, void(WatchDogSharedPtr wd));
 
   std::shared_ptr<MockWatchDog> watch_dog_;

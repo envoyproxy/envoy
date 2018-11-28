@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/server/watchdog.h"
+#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Server {
@@ -28,7 +29,7 @@ public:
    *
    * @param thread_id A numeric thread ID, like from Thread::currentThreadId()
    */
-  virtual WatchDogSharedPtr createWatchDog(int32_t thread_id) PURE;
+  virtual WatchDogSharedPtr createWatchDog(Thread::ThreadId thread_id) PURE;
 
   /**
    * Tell the GuardDog to forget about this WatchDog.

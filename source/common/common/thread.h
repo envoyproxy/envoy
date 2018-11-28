@@ -10,8 +10,6 @@
 namespace Envoy {
 namespace Thread {
 
-typedef int32_t ThreadId;
-
 /**
  * Get current thread id.
  */

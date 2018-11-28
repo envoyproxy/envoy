@@ -64,6 +64,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/server:watchdog_interface",
         "//include/envoy/stats:stats_interface",
+        "//include/envoy/thread:thread_interface",
     ],
 )
 
@@ -134,6 +135,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:address_interface",
+        "//include/envoy/thread:thread_interface",
     ],
 )
 

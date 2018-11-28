@@ -82,7 +82,7 @@ void GuardDogImpl::threadRoutine() {
   } while (waitOrDetectStop());
 }
 
-WatchDogSharedPtr GuardDogImpl::createWatchDog(int32_t thread_id) {
+WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadId thread_id) {
   // Timer started by WatchDog will try to fire at 1/2 of the interval of the
   // minimum timeout specified. loop_interval_ is const so all shared state
   // accessed out of the locked section below is const (time_system_ has no
