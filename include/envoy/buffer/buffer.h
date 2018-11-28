@@ -57,7 +57,9 @@ public:
   virtual ~Instance() {}
 
   /**
-   * Copy data into the buffer.
+   * Copy data into the buffer (deprecated, use absl::string_view variant
+   * instead).
+   * TODO(htuch): Cleanup deprecated call sites.
    * @param data supplies the data address.
    * @param size supplies the data size.
    */
