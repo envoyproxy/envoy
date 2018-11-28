@@ -169,7 +169,7 @@ public:
 
               return &cm_.conn_pool_;
             }));
-    EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+    EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _)).WillOnce(Return(&cancellable_));
     expectResponseTimerCreate();
 
     Http::TestHeaderMapImpl headers;
@@ -239,9 +239,10 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
       .WillByDefault(Return(Upstream::ResourcePriority::High));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High, _, &router_));
 
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         callbacks.onPoolFailure(Http::ConnectionPool::PoolFailureReason::ConnectionFailure,
                                 cm_.conn_pool_.host_);
         return nullptr;
@@ -268,7 +269,7 @@ TEST_F(RouterTest, Http1Upstream) {
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features());
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _));
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers;
@@ -290,7 +291,7 @@ TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features());
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _));
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers;
@@ -310,7 +311,7 @@ TEST_F(RouterTest, Http2Upstream) {
       .WillOnce(Return(Upstream::ClusterInfo::Features::HTTP2));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _));
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers;
@@ -330,7 +331,7 @@ TEST_F(RouterTest, UseDownstreamProtocol1) {
   EXPECT_CALL(callbacks_.stream_info_, protocol()).WillOnce(ReturnPointee(&downstream_protocol));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _));
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers;
@@ -350,7 +351,7 @@ TEST_F(RouterTest, UseDownstreamProtocol2) {
   EXPECT_CALL(callbacks_.stream_info_, protocol()).WillOnce(ReturnPointee(&downstream_protocol));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _));
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers;
@@ -375,7 +376,7 @@ TEST_F(RouterTest, HashPolicy) {
             EXPECT_EQ(10UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
           }));
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers;
@@ -400,7 +401,7 @@ TEST_F(RouterTest, HashPolicyNoHash) {
             EXPECT_FALSE(context->computeHashKey());
             return &cm_.conn_pool_;
           }));
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers;
@@ -424,9 +425,10 @@ TEST_F(RouterTest, AddCookie) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
 
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
         return &cancellable_;
@@ -471,9 +473,10 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
 
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
         return &cancellable_;
@@ -518,9 +521,10 @@ TEST_F(RouterTest, AddMultipleCookies) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
 
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
         return &cancellable_;
@@ -583,7 +587,7 @@ TEST_F(RouterTest, MetadataMatchCriteria) {
                       &callbacks_.route_->route_entry_.metadata_matches_criteria_);
             return &cm_.conn_pool_;
           }));
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers;
@@ -612,7 +616,7 @@ TEST_F(RouterTest, NoMetadataMatchCriteria) {
             EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
             return &cm_.conn_pool_;
           }));
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers;
@@ -625,7 +629,7 @@ TEST_F(RouterTest, NoMetadataMatchCriteria) {
 }
 
 TEST_F(RouterTest, CancelBeforeBoundToPool) {
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers;
@@ -701,9 +705,10 @@ TEST_F(RouterTestSuppressEnvoyHeaders, MaintenanceMode) {
 TEST_F(RouterTest, EnvoyUpstreamServiceTime) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -733,9 +738,10 @@ TEST_F(RouterTest, EnvoyUpstreamServiceTime) {
 TEST_F(RouterTestSuppressEnvoyHeaders, EnvoyUpstreamServiceTime) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -761,9 +767,10 @@ TEST_F(RouterTestSuppressEnvoyHeaders, EnvoyUpstreamServiceTime) {
 TEST_F(RouterTest, NoRetriesOverflow) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -784,9 +791,10 @@ TEST_F(RouterTest, NoRetriesOverflow) {
   // We expect the 5xx response to kick off a new request.
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   NiceMock<Http::MockStreamEncoder> encoder2;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
@@ -807,9 +815,10 @@ TEST_F(RouterTest, NoRetriesOverflow) {
 TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
         return nullptr;
@@ -832,9 +841,10 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
 TEST_F(RouterTest, UpstreamTimeout) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
         return nullptr;
@@ -874,9 +884,10 @@ TEST_F(RouterTest, UpstreamTimeout) {
 TEST_F(RouterTest, GrpcOkTrailersOnly) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -898,9 +909,10 @@ TEST_F(RouterTest, GrpcOkTrailersOnly) {
 TEST_F(RouterTest, GrpcAlreadyExistsTrailersOnly) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -922,9 +934,10 @@ TEST_F(RouterTest, GrpcAlreadyExistsTrailersOnly) {
 TEST_F(RouterTest, GrpcInternalTrailersOnly) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -947,9 +960,10 @@ TEST_F(RouterTest, GrpcInternalTrailersOnly) {
 TEST_F(RouterTest, GrpcDataEndStream) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -974,9 +988,10 @@ TEST_F(RouterTest, GrpcDataEndStream) {
 TEST_F(RouterTest, GrpcReset) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1000,9 +1015,10 @@ TEST_F(RouterTest, GrpcReset) {
 TEST_F(RouterTest, GrpcOk) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1026,9 +1042,10 @@ TEST_F(RouterTest, GrpcOk) {
 TEST_F(RouterTest, GrpcInternal) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1051,9 +1068,10 @@ TEST_F(RouterTest, GrpcInternal) {
 TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
         return nullptr;
@@ -1091,9 +1109,10 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
 TEST_F(RouterTest, UpstreamPerTryTimeout) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
         return nullptr;
@@ -1137,9 +1156,10 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
   Http::StreamDecoder* response_decoder = nullptr;
   Http::ConnectionPool::Callbacks* pool_callbacks;
 
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         pool_callbacks = &callbacks;
         return nullptr;
@@ -1187,9 +1207,10 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
 TEST_F(RouterTest, RetryRequestNotComplete) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1214,9 +1235,10 @@ TEST_F(RouterTest, RetryRequestNotComplete) {
 TEST_F(RouterTest, RetryNoneHealthy) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1250,9 +1272,10 @@ TEST_F(RouterTest, RetryNoneHealthy) {
 TEST_F(RouterTest, RetryUpstreamReset) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1269,9 +1292,10 @@ TEST_F(RouterTest, RetryUpstreamReset) {
 
   // We expect this reset to kick off a new request.
   NiceMock<Http::MockStreamEncoder> encoder2;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
@@ -1293,9 +1317,10 @@ TEST_F(RouterTest, RetryUpstreamReset) {
 TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1317,9 +1342,10 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
 
   // We expect this reset to kick off a new request.
   NiceMock<Http::MockStreamEncoder> encoder2;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
@@ -1340,9 +1366,10 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
 // a way that no host is present.
 TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
   Http::ConnectionPool::Callbacks* conn_pool_callbacks;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         conn_pool_callbacks = &callbacks;
         return nullptr;
       }));
@@ -1362,9 +1389,10 @@ TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
   Http::StreamDecoder* response_decoder = nullptr;
   // We expect this reset to kick off a new request.
   NiceMock<Http::MockStreamEncoder> encoder2;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
@@ -1384,9 +1412,10 @@ TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
 TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1418,9 +1447,10 @@ TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
 TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1447,9 +1477,10 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
 TEST_F(RouterTest, RetryUpstreamReset100ContinueResponseStarted) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1473,9 +1504,10 @@ TEST_F(RouterTest, RetryUpstreamReset100ContinueResponseStarted) {
 TEST_F(RouterTest, RetryUpstream5xx) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1496,9 +1528,10 @@ TEST_F(RouterTest, RetryUpstream5xx) {
   // We expect the 5xx response to kick off a new request.
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   NiceMock<Http::MockStreamEncoder> encoder2;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
@@ -1517,9 +1550,10 @@ TEST_F(RouterTest, RetryUpstream5xx) {
 TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1553,9 +1587,10 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
 TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1574,12 +1609,13 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
   Http::ConnectionPool::MockCancellable cancellable;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder,
-                           Http::ConnectionPool::Callbacks&) -> Http::ConnectionPool::Cancellable* {
-        response_decoder = &decoder;
-        return &cancellable;
-      }));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks&,
+                     const Upstream::LoadBalancerContext&) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            return &cancellable;
+          }));
   router_.retry_state_->callback_();
 
   // Fire timeout.
@@ -1600,9 +1636,10 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
 TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHostAltResponseCode) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1623,12 +1660,13 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHostAltRespo
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
   Http::ConnectionPool::MockCancellable cancellable;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder,
-                           Http::ConnectionPool::Callbacks&) -> Http::ConnectionPool::Cancellable* {
-        response_decoder = &decoder;
-        return &cancellable;
-      }));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks&,
+                     const Upstream::LoadBalancerContext&) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            return &cancellable;
+          }));
   router_.retry_state_->callback_();
 
   // Fire timeout.
@@ -1646,9 +1684,10 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHostAltRespo
 TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1676,9 +1715,10 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
 
   // We expect the 5xx response to kick off a new request.
   NiceMock<Http::MockStreamEncoder> encoder2;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
@@ -1716,9 +1756,10 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
 TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1743,9 +1784,10 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
   // We expect the grpc-status to result in a retried request.
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   NiceMock<Http::MockStreamEncoder> encoder2;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
@@ -1768,9 +1810,10 @@ TEST_F(RouterTest, RetryRespsectsMaxHostSelectionCount) {
 
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1802,9 +1845,10 @@ TEST_F(RouterTest, RetryRespsectsMaxHostSelectionCount) {
 
   // We expect the 5xx response to kick off a new request.
   NiceMock<Http::MockStreamEncoder> encoder2;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
@@ -1834,9 +1878,10 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
 
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
@@ -1868,9 +1913,10 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
 
   // We expect the 5xx response to kick off a new request.
   NiceMock<Http::MockStreamEncoder> encoder2;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
@@ -1900,9 +1946,10 @@ TEST_F(RouterTest, Shadow) {
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
         return nullptr;
@@ -1943,9 +1990,10 @@ TEST_F(RouterTest, AltStatName) {
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
         return nullptr;
@@ -2354,9 +2402,10 @@ TEST_F(RouterTest, CanaryStatusTrue) {
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
         return nullptr;
@@ -2387,9 +2436,10 @@ TEST_F(RouterTest, CanaryStatusFalse) {
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
         return nullptr;
@@ -2428,9 +2478,10 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
 
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
         return nullptr;
       }));
@@ -2463,9 +2514,10 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
 
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
         return nullptr;
       }));
@@ -2496,10 +2548,10 @@ public:
       stream_callbacks_ = &callbacks;
     }));
     EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
-    EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-        .WillOnce(Invoke(
-            [&](Http::StreamDecoder& decoder,
-                Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+    EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+        .WillOnce(
+            Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                       const Upstream::LoadBalancerContext&) -> Http::ConnectionPool::Cancellable* {
               response_decoder_ = &decoder;
               pool_callbacks_ = &callbacks;
               if (pool_ready) {
@@ -2604,10 +2656,10 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
   router_.setDecoderFilterCallbacks(callbacks_);
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillRepeatedly(Invoke(
-          [&](Http::StreamDecoder& decoder,
-              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                     const Upstream::LoadBalancerContext&) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
             return nullptr;
@@ -2647,9 +2699,10 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         EXPECT_CALL(*child_span, injectContext(_));
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
@@ -2678,9 +2731,10 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                           const Upstream::LoadBalancerContext &
+                           /*unused*/) -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         EXPECT_CALL(*child_span, injectContext(_));
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
