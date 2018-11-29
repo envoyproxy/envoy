@@ -721,6 +721,10 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
     EVP_MD_CTX md;
     int rc = EVP_DigestInit(&md, EVP_sha256());
     RELEASE_ASSERT(rc == 1, "");
+
+    // Hash the CommonName/SANs of the server certificate. This makes sure that sessions can only be
+    // resumed to a certificate for the same name, but allows resuming to unique certs in the case
+    // that different Envoy instances each have their own certs.
     X509_NAME* cert_subject = X509_get_subject_name(cert);
     RELEASE_ASSERT(cert_subject != nullptr, "");
     int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
