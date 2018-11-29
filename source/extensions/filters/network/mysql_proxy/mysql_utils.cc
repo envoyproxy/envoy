@@ -1,4 +1,4 @@
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 #include <arpa/inet.h>
 
@@ -158,51 +158,6 @@ int BufferHelper::peekHdr(Buffer::Instance& buffer, uint64_t& offset, int& len, 
   len = val & MYSQL_HDR_PKT_SIZE_MASK;
   ENVOY_LOG(trace, "mysql_proxy: MYSQL-hdrseq {}, len {}", seq, len);
   return MYSQL_SUCCESS;
-}
-
-bool DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
-  ENVOY_LOG(trace, "mysql_proxy: decoding {} bytes", data.length());
-
-  int len = 0;
-  int seq = 0;
-  if (BufferHelper::peekHdr(data, offset, len, seq) != MYSQL_SUCCESS) {
-    throw EnvoyException("error parsing mysql packet header");
-  }
-
-  callbacks_.onNewMessage(session_.getState());
-
-  /*
-  // The sequence ID is reset on a new command.
-  if (seq == MYSQL_PKT_0) {
-    session_.setExpectedSeq(MYSQL_PKT_0);
-    ENVOY_LOG(trace, "mysql_proxy: received packet with sequence ID = 0");
-  }
-  */
-
-  // Ignore duplicate and out-of-sync packets.
-  if (seq != session_.getExpectedSeq()) {
-    callbacks_.onProtocolError();
-    offset += len;
-    ENVOY_LOG(info, "mysql_proxy: ignoring out-of-sync packet");
-    return true;
-  }
-  session_.setExpectedSeq(seq + 1);
-
-  // Ensure that the whole packet was consumed.
-  const uint64_t prev_offset = offset;
-  callbacks_.decode(data, offset, seq, len);
-  offset = prev_offset + len;
-
-  ENVOY_LOG(trace, "mysql_proxy: {} bytes remaining after decoding", data.length());
-  return true;
-}
-
-void DecoderImpl::onData(Buffer::Instance& data) {
-  // TODO(venilnoronha): handle messages over 16 mb. See
-  // https://dev.mysql.com/doc/dev/mysql-server/8.0.2/page_protocol_basic_packets.html#sect_protocol_basic_packets_sending_mt_16mb.
-  uint64_t offset = 0;
-  while (!BufferHelper::endOfBuffer(data, offset) && decode(data, offset)) {
-  }
 }
 
 } // namespace MySQLProxy

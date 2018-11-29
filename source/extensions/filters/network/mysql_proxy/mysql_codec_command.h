@@ -45,16 +45,16 @@ public:
   void setCmd(Cmd cmd);
   void setData(std::string& data);
   void setDb(std::string db);
-  bool RunQueryParser() { return run_query_parser_; }
+  bool isQuery() { return is_query_; }
 
 private:
   Cmd cmd_;
   std::string data_;
   std::string db_;
-  bool run_query_parser_;
+  bool is_query_;
 };
 
-class CommandResp : public MySQLCodec {
+class CommandResponse : public MySQLCodec {
 public:
   // MySQLCodec
   int decode(Buffer::Instance&, uint64_t&, int, int) override { return 0; }

@@ -15,6 +15,7 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
+#include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 #include "extensions/filters/network/mysql_proxy/mysql_session.h"
 
 namespace Envoy {
@@ -82,18 +83,20 @@ public:
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
 
   // MySQLProxy::DecoderCallback
-  void decode(Buffer::Instance& message, uint64_t& offset, int seq, int len) override;
   void onProtocolError() override;
   void onNewMessage(MySQLSession::State state) override;
+  void onClientLogin(ClientLogin& message) override;
+  void onClientLoginResponse(ClientLoginResponse& message) override;
+  void onMoreClientLoginResponse(ClientLoginResponse& message) override;
+  void onCommand(Command& message) override;
 
-  MySQLSession& getSession() { return session_; }
   void doDecode(Buffer::Instance& buffer);
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);
+  MySQLSession& getSession() { return decoder_->getSession(); }
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   MySQLFilterConfigSharedPtr config_;
-  MySQLSession session_;
   std::unique_ptr<Decoder> decoder_;
   bool sniffing_{true};
 };

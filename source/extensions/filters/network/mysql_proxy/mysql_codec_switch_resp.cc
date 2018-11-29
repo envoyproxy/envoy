@@ -1,6 +1,7 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 namespace Envoy {
 namespace Extensions {

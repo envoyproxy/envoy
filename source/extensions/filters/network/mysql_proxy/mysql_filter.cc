@@ -61,7 +61,7 @@ void MySQLFilter::doDecode(Buffer::Instance& buffer) {
 }
 
 DecoderPtr MySQLFilter::createDecoder(DecoderCallbacks& callbacks) {
-  return DecoderPtr{new DecoderImpl(callbacks, session_)};
+  return DecoderPtr{new DecoderImpl(callbacks)};
 }
 
 void MySQLFilter::onProtocolError() { config_->stats_.protocol_errors_.inc(); }
@@ -72,147 +72,66 @@ void MySQLFilter::onNewMessage(MySQLSession::State state) {
   }
 }
 
-void MySQLFilter::decode(Buffer::Instance& message, uint64_t& offset, int seq, int len) {
-  ENVOY_CONN_LOG(trace, "mysql_proxy: onData, len {}", read_callbacks_->connection(),
-                 message.length());
+void MySQLFilter::onClientLogin(ClientLogin& client_login) {
+  if (client_login.isSSLRequest()) {
+    config_->stats_.upgraded_to_ssl_.inc();
+  }
+}
 
-  // Run the mysql state machine
-  switch (session_.getState()) {
+void MySQLFilter::onClientLoginResponse(ClientLoginResponse& client_login_resp) {
+  if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
+    config_->stats_.auth_switch_request_.inc();
+  } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
+    config_->stats_.login_failures_.inc();
+  }
+}
 
-  // expect Server Challenge packet
-  case MySQLSession::State::MYSQL_INIT: {
-    ServerGreeting greeting{};
-    greeting.decode(message, offset, seq, len);
-    session_.setState(MySQLSession::State::MYSQL_CHALLENGE_REQ);
-    break;
+void MySQLFilter::onMoreClientLoginResponse(ClientLoginResponse& client_login_resp) {
+  if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
+    config_->stats_.login_failures_.inc();
+  }
+}
+
+void MySQLFilter::onCommand(Command& command) {
+  if (!command.isQuery()) {
+    return;
   }
 
-  // Process Client Handshake Response
-  case MySQLSession::State::MYSQL_CHALLENGE_REQ: {
-    ClientLogin client_login{};
-    client_login.decode(message, offset, seq, len);
-    if (client_login.isSSLRequest()) {
-      session_.setState(MySQLSession::State::MYSQL_SSL_PT);
-      config_->stats_.upgraded_to_ssl_.inc();
-    } else if (client_login.isResponse41()) {
-      session_.setState(MySQLSession::State::MYSQL_CHALLENGE_RESP_41);
-    } else {
-      session_.setState(MySQLSession::State::MYSQL_CHALLENGE_RESP_320);
-    }
-    break;
+  // Parse a given query
+  hsql::SQLParserResult result;
+  hsql::SQLParser::parse(command.getData(), &result);
+
+  ENVOY_CONN_LOG(trace, "mysql_proxy: query processed {}", read_callbacks_->connection(),
+                 command.getData());
+
+  if (!result.isValid()) {
+    return;
   }
 
-  case MySQLSession::State::MYSQL_SSL_PT:
-    break;
+  // Set dynamic metadata
+  auto& dynamic_metadata = const_cast<envoy::api::v2::core::Metadata&>(
+      read_callbacks_->connection().streamInfo().dynamicMetadata());
+  ProtobufWkt::Struct metadata(
+      (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy]);
+  auto& fields = *metadata.mutable_fields();
 
-  case MySQLSession::State::MYSQL_CHALLENGE_RESP_41:
-  case MySQLSession::State::MYSQL_CHALLENGE_RESP_320: {
-    ClientLoginResponse client_login_resp{};
-    client_login_resp.decode(message, offset, seq, len);
-    if (client_login_resp.getRespCode() == MYSQL_RESP_OK) {
-      session_.setState(MySQLSession::State::MYSQL_REQ);
-    } else if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
-      config_->stats_.auth_switch_request_.inc();
-      session_.setState(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP);
-    } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
-      config_->stats_.login_failures_.inc();
-      session_.setState(MySQLSession::State::MYSQL_ERROR);
-    } else {
-      session_.setState(MySQLSession::State::MYSQL_NOT_HANDLED);
-    }
-    break;
-  }
-
-  case MySQLSession::State::MYSQL_AUTH_SWITCH_RESP: {
-    ClientSwitchResponse client_switch_resp{};
-    client_switch_resp.decode(message, offset, seq, len);
-    session_.setState(MySQLSession::State::MYSQL_AUTH_SWITCH_MORE);
-    break;
-  }
-
-  case MySQLSession::State::MYSQL_AUTH_SWITCH_MORE: {
-    ClientLoginResponse client_login_resp{};
-    client_login_resp.decode(message, offset, seq, len);
-    if (client_login_resp.getRespCode() == MYSQL_RESP_OK) {
-      session_.setState(MySQLSession::State::MYSQL_REQ);
-    } else if (client_login_resp.getRespCode() == MYSQL_RESP_MORE) {
-      session_.setState(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP);
-    } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
-      config_->stats_.login_failures_.inc();
-      session_.setState(MySQLSession::State::MYSQL_ERROR);
-    } else {
-      session_.setState(MySQLSession::State::MYSQL_NOT_HANDLED);
-    }
-    break;
-  }
-
-  // Process Command
-  case MySQLSession::State::MYSQL_REQ: {
-    Command command{};
-    command.decode(message, offset, seq, len);
-    session_.setState(MySQLSession::State::MYSQL_REQ_RESP);
-    if (!command.RunQueryParser()) {
-      // some mysql commands don't have a string to parse
-      break;
-    }
-    // parse a given query
-    hsql::SQLParserResult result;
-    hsql::SQLParser::parse(command.getData(), &result);
-
-    ENVOY_CONN_LOG(trace, "mysql_proxy: msg processed {}", read_callbacks_->connection(),
-                   command.getData());
-
-    // check whether the parsing was successful
-    if (result.isValid()) {
-      // Temporary until Venil's PR is merged.
-      auto& dynamic_metadata = const_cast<envoy::api::v2::core::Metadata&>(
-          read_callbacks_->connection().streamInfo().dynamicMetadata());
-
-      ProtobufWkt::Struct metadata(
-          (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy]);
-      auto& fields = *metadata.mutable_fields();
-
-      for (auto i = 0u; i < result.size(); ++i) {
-        hsql::TableAccessMap table_access_map;
-        result.getStatement(i)->tablesAccessed(table_access_map);
-        for (auto it = table_access_map.begin(); it != table_access_map.end(); ++it) {
-          auto& operations = *fields[it->first].mutable_list_value();
-          for (auto ot = it->second.begin(); ot != it->second.end(); ++ot) {
-            operations.add_values()->set_string_value(*ot);
-          }
-        }
+  for (auto i = 0u; i < result.size(); ++i) {
+    hsql::TableAccessMap table_access_map;
+    result.getStatement(i)->tablesAccessed(table_access_map);
+    for (auto it = table_access_map.begin(); it != table_access_map.end(); ++it) {
+      auto& operations = *fields[it->first].mutable_list_value();
+      for (auto ot = it->second.begin(); ot != it->second.end(); ++ot) {
+        operations.add_values()->set_string_value(*ot);
       }
-
-      read_callbacks_->connection().streamInfo().setDynamicMetadata(
-          NetworkFilterNames::get().MySQLProxy, metadata);
-      // ProtobufTypes::String json;
-      // Protobuf::util::MessageToJsonString(metadata, &json);
-      // std::cout<<json<<'\n';
     }
-    break;
   }
 
-  // Process Command Response
-  case MySQLSession::State::MYSQL_REQ_RESP: {
-    CommandResp command_resp{};
-    command_resp.decode(message, offset, seq, len);
-    session_.setState(MySQLSession::State::MYSQL_REQ);
-    break;
-  }
-
-  case MySQLSession::State::MYSQL_ERROR:
-  case MySQLSession::State::MYSQL_NOT_HANDLED:
-  default:
-    break;
-  }
-
-  ENVOY_CONN_LOG(trace, "mysql_proxy: msg processed, session in state {}",
-                 read_callbacks_->connection(), static_cast<int>(session_.getState()));
+  read_callbacks_->connection().streamInfo().setDynamicMetadata(
+      NetworkFilterNames::get().MySQLProxy, metadata);
 }
 
 Network::FilterStatus MySQLFilter::onNewConnection() {
   config_->stats_.sessions_.inc();
-  session_.setId(read_callbacks_->connection().id());
   return Network::FilterStatus::Continue;
 }
 

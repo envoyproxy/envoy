@@ -14,13 +14,14 @@ envoy_package()
 envoy_cc_library(
     name = "proxy_lib",
     srcs = [
-        "mysql_codec.cc",
         "mysql_codec_clogin.cc",
         "mysql_codec_clogin_resp.cc",
         "mysql_codec_command.cc",
         "mysql_codec_greeting.cc",
         "mysql_codec_switch_resp.cc",
+        "mysql_decoder.cc",
         "mysql_filter.cc",
+        "mysql_utils.cc",
     ],
     hdrs = [
         "mysql_codec.h",
@@ -29,8 +30,10 @@ envoy_cc_library(
         "mysql_codec_command.h",
         "mysql_codec_greeting.h",
         "mysql_codec_switch_resp.h",
+        "mysql_decoder.h",
         "mysql_filter.h",
         "mysql_session.h",
+        "mysql_utils.h",
     ],
     external_deps = ["sqlparser"],
     deps = [

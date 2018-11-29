@@ -1,6 +1,7 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,7 +40,7 @@ int Command::decode(Buffer::Instance& buffer, uint64_t& offset, int seq, int len
   }
 
   case Command::Cmd::COM_QUERY:
-    run_query_parser_ = true;
+    is_query_ = true;
     // query string starts after mysql_hdr + one byte for comm type
     BufferHelper::peekStringBySize(buffer, offset,
                                    buffer.length() - (sizeof(uint8_t) + MYSQL_HDR_SIZE), data_);
