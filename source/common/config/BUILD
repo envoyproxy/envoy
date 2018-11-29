@@ -170,6 +170,19 @@ envoy_cc_library(
     name = "grpc_subscription_lib",
     hdrs = ["grpc_subscription_impl.h"],
     deps = [
+        ":grpc_managed_mux_subscription_lib",
+        ":grpc_mux_lib",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/grpc:async_client_interface",
+        "@envoy_api//envoy/api/v2/core:base_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "grpc_managed_mux_subscription_lib",
+    hdrs = ["grpc_managed_mux_subscription_impl.h"],
+    deps = [
         ":grpc_mux_lib",
         ":grpc_mux_subscription_lib",
         "//include/envoy/config:subscription_interface",
