@@ -133,6 +133,8 @@ protected:
     bool is_ecdsa_{};
 
     std::string getCertChainFileName() const { return cert_chain_file_path_; };
+    void addClientValidationContext(const CertificateValidationContextConfig& config,
+                                    bool require_client_cert);
   };
 
   // This is always non-empty, with the first context used for all new SSL
@@ -187,6 +189,7 @@ private:
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
   // ClientHello details.
   enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
+  void setSessionIdContext(TlsContext& ctx, const std::vector<std::string>& server_names);
 
   const std::vector<ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };

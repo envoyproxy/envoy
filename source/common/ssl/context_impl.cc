@@ -618,52 +618,10 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
             ->selectTlsContext(client_hello);
       });
   for (auto& ctx : tls_contexts_) {
-    X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
     if (config.certificateValidationContext() != nullptr &&
         !config.certificateValidationContext()->caCert().empty()) {
-      bssl::UniquePtr<BIO> bio(
-          BIO_new_mem_buf(const_cast<char*>(config.certificateValidationContext()->caCert().data()),
-                          config.certificateValidationContext()->caCert().size()));
-      RELEASE_ASSERT(bio != nullptr, "");
-      // Based on BoringSSL's SSL_add_file_cert_subjects_to_stack().
-      bssl::UniquePtr<STACK_OF(X509_NAME)> list(sk_X509_NAME_new(
-          [](const X509_NAME** a, const X509_NAME** b) -> int { return X509_NAME_cmp(*a, *b); }));
-      RELEASE_ASSERT(list != nullptr, "");
-      for (;;) {
-        bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
-        if (cert == nullptr) {
-          break;
-        }
-        X509_NAME* name = X509_get_subject_name(cert.get());
-        if (name == nullptr) {
-          throw EnvoyException(fmt::format("Failed to load trusted client CA certificates from {}",
-                                           config.certificateValidationContext()->caCertPath()));
-        }
-        // Check for duplicates.
-        if (sk_X509_NAME_find(list.get(), nullptr, name)) {
-          continue;
-        }
-        bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
-        if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
-          throw EnvoyException(fmt::format("Failed to load trusted client CA certificates from {}",
-                                           config.certificateValidationContext()->caCertPath()));
-        }
-      }
-      // Check for EOF.
-      uint32_t err = ERR_peek_last_error();
-      if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
-        ERR_clear_error();
-      } else {
-        throw EnvoyException(fmt::format("Failed to load trusted client CA certificates from {}",
-                                         config.certificateValidationContext()->caCertPath()));
-      }
-      SSL_CTX_set_client_CA_list(ctx.ssl_ctx_.get(), list.release());
-
-      // SSL_VERIFY_PEER or stronger mode was already set in ContextImpl::ContextImpl().
-      if (config.requireClientCertificate()) {
-        SSL_CTX_set_verify(ctx.ssl_ctx_.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
-                           nullptr);
-      }
+      ctx.addClientValidationContext(*config.certificateValidationContext(),
+                                     config.requireClientCertificate());
     }
 
     if (!parsed_alpn_protocols_.empty()) {
@@ -690,93 +648,97 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
           });
     }
 
-    uint8_t session_context_buf[EVP_MAX_MD_SIZE] = {};
-    unsigned session_context_len = 0;
-    EVP_MD_CTX md;
-    int rc = EVP_DigestInit(&md, EVP_sha256());
+    setSessionIdContext(ctx, server_names);
+  }
+}
+
+void ServerContextImpl::setSessionIdContext(TlsContext& ctx,
+                                            const std::vector<std::string>& server_names) {
+  X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
+  uint8_t session_context_buf[EVP_MAX_MD_SIZE] = {};
+  unsigned session_context_len = 0;
+  EVP_MD_CTX md;
+  int rc = EVP_DigestInit(&md, EVP_sha256());
+  RELEASE_ASSERT(rc == 1, "");
+
+  // Hash the CommonName/SANs of the server certificate. This makes sure that sessions can only be
+  // resumed to a certificate for the same name, but allows resuming to unique certs in the case
+  // that different Envoy instances each have their own certs.
+  X509_NAME* cert_subject = X509_get_subject_name(cert);
+  RELEASE_ASSERT(cert_subject != nullptr, "");
+  int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
+  // It's possible that the certificate doesn't have CommonName, but has SANs.
+  if (cn_index >= 0) {
+    X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
+    RELEASE_ASSERT(cn_entry != nullptr, "");
+    ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
+    RELEASE_ASSERT(ASN1_STRING_length(cn_asn1) > 0, "");
+    rc = EVP_DigestUpdate(&md, ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
     RELEASE_ASSERT(rc == 1, "");
+  }
 
-    // Hash the CommonName/SANs of the server certificate. This makes sure that sessions can only be
-    // resumed to a certificate for the same name, but allows resuming to unique certs in the case
-    // that different Envoy instances each have their own certs.
-    X509_NAME* cert_subject = X509_get_subject_name(cert);
-    RELEASE_ASSERT(cert_subject != nullptr, "");
-    int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
-    // It's possible that the certificate doesn't have CommonName, but has SANs.
-    if (cn_index >= 0) {
-      X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
-      RELEASE_ASSERT(cn_entry != nullptr, "");
-      ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
-      RELEASE_ASSERT(ASN1_STRING_length(cn_asn1) > 0, "");
-      rc = EVP_DigestUpdate(&md, ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
-      RELEASE_ASSERT(rc == 1, "");
-    }
-
-    bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
-        X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
-    if (san_names != nullptr) {
-      for (const GENERAL_NAME* san : san_names.get()) {
-        if (san->type == GEN_DNS || san->type == GEN_URI) {
-          rc = EVP_DigestUpdate(&md, ASN1_STRING_data(san->d.ia5), ASN1_STRING_length(san->d.ia5));
-          RELEASE_ASSERT(rc == 1, "");
-        }
+  bssl::UniquePtr<GENERAL_NAMES> san_names(
+      static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
+  if (san_names != nullptr) {
+    for (const GENERAL_NAME* san : san_names.get()) {
+      if (san->type == GEN_DNS || san->type == GEN_URI) {
+        rc = EVP_DigestUpdate(&md, ASN1_STRING_data(san->d.ia5), ASN1_STRING_length(san->d.ia5));
+        RELEASE_ASSERT(rc == 1, "");
       }
-    } else {
-      // Make sure that we have either CommonName or SANs.
-      RELEASE_ASSERT(cn_index >= 0, "");
     }
+  } else {
+    // Make sure that we have either CommonName or SANs.
+    RELEASE_ASSERT(cn_index >= 0, "");
+  }
 
-    X509_NAME* cert_issuer_name = X509_get_issuer_name(cert);
-    rc =
-        X509_NAME_digest(cert_issuer_name, EVP_sha256(), session_context_buf, &session_context_len);
+  X509_NAME* cert_issuer_name = X509_get_issuer_name(cert);
+  rc = X509_NAME_digest(cert_issuer_name, EVP_sha256(), session_context_buf, &session_context_len);
+  RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
+  rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
+  RELEASE_ASSERT(rc == 1, "");
+
+  // Hash all the settings that affect whether the server will allow/accept
+  // the client connection. This ensures that the client is always validated against
+  // the correct settings, even if session resumption across different listeners
+  // is enabled.
+  if (ca_cert_ != nullptr) {
+    rc = X509_digest(ca_cert_.get(), EVP_sha256(), session_context_buf, &session_context_len);
     RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
     rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
     RELEASE_ASSERT(rc == 1, "");
 
-    // Hash all the settings that affect whether the server will allow/accept
-    // the client connection. This ensures that the client is always validated against
-    // the correct settings, even if session resumption across different listeners
-    // is enabled.
-    if (ca_cert_ != nullptr) {
-      rc = X509_digest(ca_cert_.get(), EVP_sha256(), session_context_buf, &session_context_len);
-      RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
-      rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
-      RELEASE_ASSERT(rc == 1, "");
-
-      // verify_subject_alt_name_list_ can only be set with a ca_cert
-      for (const std::string& name : verify_subject_alt_name_list_) {
-        rc = EVP_DigestUpdate(&md, name.data(), name.size());
-        RELEASE_ASSERT(rc == 1, "");
-      }
-    }
-
-    for (const auto& hash : verify_certificate_hash_list_) {
-      rc = EVP_DigestUpdate(&md, hash.data(),
-                            hash.size() *
-                                sizeof(std::remove_reference<decltype(hash)>::type::value_type));
-      RELEASE_ASSERT(rc == 1, "");
-    }
-
-    for (const auto& hash : verify_certificate_spki_list_) {
-      rc = EVP_DigestUpdate(&md, hash.data(),
-                            hash.size() *
-                                sizeof(std::remove_reference<decltype(hash)>::type::value_type));
-      RELEASE_ASSERT(rc == 1, "");
-    }
-
-    // Hash configured SNIs for this context, so that sessions cannot be resumed across different
-    // filter chains, even when using the same server certificate.
-    for (const auto& name : server_names) {
+    // verify_subject_alt_name_list_ can only be set with a ca_cert
+    for (const std::string& name : verify_subject_alt_name_list_) {
       rc = EVP_DigestUpdate(&md, name.data(), name.size());
       RELEASE_ASSERT(rc == 1, "");
     }
+  }
 
-    rc = EVP_DigestFinal(&md, session_context_buf, &session_context_len);
-    RELEASE_ASSERT(rc == 1, "");
-    rc = SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_context_buf,
-                                        session_context_len);
+  for (const auto& hash : verify_certificate_hash_list_) {
+    rc = EVP_DigestUpdate(&md, hash.data(),
+                          hash.size() *
+                              sizeof(std::remove_reference<decltype(hash)>::type::value_type));
     RELEASE_ASSERT(rc == 1, "");
   }
+
+  for (const auto& hash : verify_certificate_spki_list_) {
+    rc = EVP_DigestUpdate(&md, hash.data(),
+                          hash.size() *
+                              sizeof(std::remove_reference<decltype(hash)>::type::value_type));
+    RELEASE_ASSERT(rc == 1, "");
+  }
+
+  // Hash configured SNIs for this context, so that sessions cannot be resumed across different
+  // filter chains, even when using the same server certificate.
+  for (const auto& name : server_names) {
+    rc = EVP_DigestUpdate(&md, name.data(), name.size());
+    RELEASE_ASSERT(rc == 1, "");
+  }
+
+  rc = EVP_DigestFinal(&md, session_context_buf, &session_context_len);
+  RELEASE_ASSERT(rc == 1, "");
+  rc = SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_context_buf, session_context_len);
+  RELEASE_ASSERT(rc == 1, "");
 }
 
 int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,
@@ -846,6 +808,51 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, tls_contexts_[0].ssl_ctx_.get()) != nullptr,
                  "");
   return ssl_select_cert_success;
+}
+
+void ServerContextImpl::TlsContext::addClientValidationContext(
+    const CertificateValidationContextConfig& config, bool require_client_cert) {
+  bssl::UniquePtr<BIO> bio(
+      BIO_new_mem_buf(const_cast<char*>(config.caCert().data()), config.caCert().size()));
+  RELEASE_ASSERT(bio != nullptr, "");
+  // Based on BoringSSL's SSL_add_file_cert_subjects_to_stack().
+  bssl::UniquePtr<STACK_OF(X509_NAME)> list(sk_X509_NAME_new(
+      [](const X509_NAME** a, const X509_NAME** b) -> int { return X509_NAME_cmp(*a, *b); }));
+  RELEASE_ASSERT(list != nullptr, "");
+  for (;;) {
+    bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+    if (cert == nullptr) {
+      break;
+    }
+    X509_NAME* name = X509_get_subject_name(cert.get());
+    if (name == nullptr) {
+      throw EnvoyException(fmt::format("Failed to load trusted client CA certificates from {}",
+                                       config.caCertPath()));
+    }
+    // Check for duplicates.
+    if (sk_X509_NAME_find(list.get(), nullptr, name)) {
+      continue;
+    }
+    bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
+    if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
+      throw EnvoyException(fmt::format("Failed to load trusted client CA certificates from {}",
+                                       config.caCertPath()));
+    }
+  }
+  // Check for EOF.
+  uint32_t err = ERR_peek_last_error();
+  if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
+    ERR_clear_error();
+  } else {
+    throw EnvoyException(
+        fmt::format("Failed to load trusted client CA certificates from {}", config.caCertPath()));
+  }
+  SSL_CTX_set_client_CA_list(ssl_ctx_.get(), list.release());
+
+  // SSL_VERIFY_PEER or stronger mode was already set in ContextImpl::ContextImpl().
+  if (require_client_cert) {
+    SSL_CTX_set_verify(ssl_ctx_.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
+  }
 }
 
 } // namespace Ssl
