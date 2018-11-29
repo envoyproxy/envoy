@@ -256,8 +256,8 @@ void HeaderMapImpl::HeaderEntryImpl::value(const char* value, uint32_t size) {
   value_.setCopy(value, size);
 }
 
-void HeaderMapImpl::HeaderEntryImpl::value(const std::string& value) {
-  this->value(value.c_str(), static_cast<uint32_t>(value.size()));
+void HeaderMapImpl::HeaderEntryImpl::value(absl::string_view value) {
+  this->value(value.data(), static_cast<uint32_t>(value.size()));
 }
 
 void HeaderMapImpl::HeaderEntryImpl::value(uint64_t value) { value_.setInteger(value); }

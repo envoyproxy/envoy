@@ -10,6 +10,7 @@
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_impl.h"
@@ -33,6 +34,8 @@
 #include "openssl/ssl.h"
 
 using testing::_;
+using testing::DoAll;
+using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -44,6 +47,7 @@ namespace Ssl {
 
 namespace {
 
+// TODO replace the long parameter list with an options object
 void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_yaml,
               const std::string& expected_digest, const std::string& expected_uri,
               const std::string& expected_local_uri, const std::string& expected_serial_number,
@@ -78,13 +82,13 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
                                                         client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      client_ssl_socket_factory.createTransportSocket(), nullptr);
+      client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createTransportSocket());
+            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -97,9 +101,9 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
 
-  size_t counter = 0;
-  auto stopSecondTime = [&]() {
-    if (++counter == 2) {
+  size_t connect_count = 0;
+  auto connect_second_time = [&]() {
+    if (++connect_count == 2) {
       if (!expected_digest.empty()) {
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(expected_digest, server_connection->ssl()->sha256PeerCertificateDigest());
@@ -128,24 +132,26 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
       dispatcher.exit();
     }
   };
-  auto closeSecondTime = [&]() {
-    if (++counter == 2) {
+
+  size_t close_count = 0;
+  auto close_second_time = [&close_count, &dispatcher]() {
+    if (++close_count == 2) {
       dispatcher.exit();
     }
   };
 
   if (expect_success) {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { stopSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { stopSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   } else {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
   }
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
@@ -155,6 +161,7 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
   }
 }
 
+// TODO replace the long parameter list with an options object
 const std::string testUtilV2(
     const envoy::api::v2::Listener& server_proto,
     const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto,
@@ -162,7 +169,8 @@ const std::string testUtilV2(
     const std::string& expected_protocol_version, const std::string& expected_server_cert_digest,
     const std::string& expected_client_cert_uri, const std::string& expected_requested_server_name,
     const std::string& expected_alpn_protocol, const std::string& expected_server_stats,
-    const std::string& expected_client_stats, const Network::Address::IpVersion version) {
+    const std::string& expected_client_stats, const Network::Address::IpVersion version,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   Event::SimulatedTimeSystem time_system;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   ContextManagerImpl manager(time_system);
@@ -193,7 +201,7 @@ const std::string testUtilV2(
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      client_ssl_socket_factory.createTransportSocket(), nullptr);
+      client_ssl_socket_factory.createTransportSocket(transport_socket_options), nullptr);
 
   if (!client_session.empty()) {
     const Ssl::SslSocket* ssl_socket =
@@ -212,9 +220,15 @@ const std::string testUtilV2(
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        socket->setRequestedServerName(client_ctx_proto.sni());
+        // TODO(htuch): remove std::string(..) wrappers when Google's string
+        // implementation converges with std::string.
+        std::string sni = transport_socket_options != NULL &&
+                                  transport_socket_options->serverNameOverride().has_value()
+                              ? std::string(transport_socket_options->serverNameOverride().value())
+                              : std::string(client_ctx_proto.sni());
+        socket->setRequestedServerName(sni);
         Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createTransportSocket());
+            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -227,9 +241,9 @@ const std::string testUtilV2(
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
 
-  size_t counter = 0;
-  auto stopSecondTime = [&]() {
-    if (++counter == 2) {
+  size_t connect_count = 0;
+  auto connect_second_time = [&]() {
+    if (++connect_count == 2) {
       if (!expected_server_cert_digest.empty()) {
         EXPECT_EQ(expected_server_cert_digest,
                   client_connection->ssl()->sha256PeerCertificateDigest());
@@ -244,6 +258,23 @@ const std::string testUtilV2(
       if (!expected_protocol_version.empty()) {
         EXPECT_EQ(expected_protocol_version, SSL_get_version(client_ssl_socket));
       }
+
+      absl::optional<std::string> server_ssl_requested_server_name;
+      const Ssl::SslSocket* server_ssl_socket =
+          dynamic_cast<const Ssl::SslSocket*>(server_connection->ssl());
+      SSL* server_ssl = server_ssl_socket->rawSslForTest();
+      auto requested_server_name = SSL_get_servername(server_ssl, TLSEXT_NAMETYPE_host_name);
+      if (requested_server_name != nullptr) {
+        server_ssl_requested_server_name = std::string(requested_server_name);
+      }
+
+      if (!expected_requested_server_name.empty()) {
+        EXPECT_TRUE(server_ssl_requested_server_name.has_value());
+        EXPECT_EQ(expected_requested_server_name, server_ssl_requested_server_name.value());
+      } else {
+        EXPECT_FALSE(server_ssl_requested_server_name.has_value());
+      }
+
       SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_socket);
       EXPECT_TRUE(SSL_SESSION_is_resumable(client_ssl_session));
       uint8_t* session_data;
@@ -257,27 +288,29 @@ const std::string testUtilV2(
       dispatcher.exit();
     }
   };
-  auto closeSecondTime = [&]() {
-    if (++counter == 2) {
+
+  size_t close_count = 0;
+  auto close_second_time = [&close_count, &dispatcher]() {
+    if (++close_count == 2) {
       dispatcher.exit();
     }
   };
 
   if (expect_success) {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { stopSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
           EXPECT_EQ(expected_requested_server_name, server_connection->requestedServerName());
-          stopSecondTime();
+          connect_second_time();
         }));
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   } else {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { closeSecondTime(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
   }
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
@@ -353,7 +386,7 @@ TEST_P(SslSocketTest, GetCertDigest) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
 )EOF";
 
   testUtil(client_ctx_yaml, server_ctx_yaml,
@@ -495,7 +528,8 @@ TEST_P(SslSocketTest, GetCertDigestInline) {
 
   testUtilV2(listener, client_ctx, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam());
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
 }
 
 TEST_P(SslSocketTest, GetCertDigestServerCertWithIntermediateCA) {
@@ -517,7 +551,7 @@ TEST_P(SslSocketTest, GetCertDigestServerCertWithIntermediateCA) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
 )EOF";
 
   testUtil(client_ctx_yaml, server_ctx_yaml,
@@ -544,7 +578,7 @@ TEST_P(SslSocketTest, GetCertDigestServerCertWithoutCommonName) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/san_only_dns_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
 )EOF";
 
   testUtil(client_ctx_yaml, server_ctx_yaml,
@@ -571,7 +605,7 @@ TEST_P(SslSocketTest, GetUriWithUriSan) {
         filename: "{{ test_tmpdir }}/unittestkey.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
       verify_subject_alt_name: "spiffe://lyft.com/test-team"
 )EOF";
 
@@ -598,7 +632,7 @@ TEST_P(SslSocketTest, GetNoUriWithDnsSan) {
         filename: "{{ test_tmpdir }}/unittestkey.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
 )EOF";
 
   // The SAN field only has DNS, expect "" for uriSanPeerCertificate().
@@ -643,7 +677,7 @@ TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
 )EOF";
 
   testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "spiffe://lyft.com/test-team",
@@ -669,7 +703,7 @@ TEST_P(SslSocketTest, GetSubjectsWithBothCerts) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
   require_client_certificate: true
 )EOF";
 
@@ -698,7 +732,7 @@ TEST_P(SslSocketTest, GetPeerCert) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
   require_client_certificate: true
 )EOF";
 
@@ -740,7 +774,7 @@ TEST_P(SslSocketTest, FailedClientAuthCaVerificationNoClientCert) {
         filename: "{{ test_tmpdir }}/unittestkey.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
   require_client_certificate: true
 )EOF";
 
@@ -767,7 +801,7 @@ TEST_P(SslSocketTest, FailedClientAuthCaVerification) {
         filename: "{{ test_tmpdir }}/unittestkey.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
 )EOF";
 
   testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_error",
@@ -788,7 +822,7 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
         filename: "{{ test_tmpdir }}/unittestkey.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" 
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
       verify_subject_alt_name: "example.com"
 )EOF";
 
@@ -831,7 +865,7 @@ TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
   configureServerAndExpiredClientCertificate(listener, client);
 
   testUtilV2(listener, client, "", false, "", "", "spiffe://lyft.com/test-team", "", "",
-             "ssl.fail_verify_error", "ssl.connection_error", GetParam());
+             "ssl.fail_verify_error", "ssl.connection_error", GetParam(), nullptr);
 }
 
 // Expired certificates will not be accepted when explicitly disallowed via
@@ -849,7 +883,7 @@ TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
       ->set_allow_expired_certificate(false);
 
   testUtilV2(listener, client, "", false, "", "", "spiffe://lyft.com/test-team", "", "",
-             "ssl.fail_verify_error", "ssl.connection_error", GetParam());
+             "ssl.fail_verify_error", "ssl.connection_error", GetParam(), nullptr);
 }
 
 // Expired certificates will be accepted when explicitly allowed via allow_expired_certificate.
@@ -866,7 +900,7 @@ TEST_P(SslSocketTest, ClientCertificateExpirationAllowedVerification) {
       ->set_allow_expired_certificate(true);
 
   testUtilV2(listener, client, "", true, "", "", "spiffe://lyft.com/test-team", "", "",
-             "ssl.handshake", "ssl.handshake", GetParam());
+             "ssl.handshake", "ssl.handshake", GetParam(), nullptr);
 }
 
 // Allow expired certificates, but add a certificate hash requirement so it still fails.
@@ -887,7 +921,7 @@ TEST_P(SslSocketTest, FailedClientCertAllowExpiredBadHashVerification) {
       "0000000000000000000000000000000000000000000000000000000000000000");
 
   testUtilV2(listener, client, "", false, "", "", "spiffe://lyft.com/test-team", "", "",
-             "ssl.fail_verify_cert_hash", "ssl.connection_error", GetParam());
+             "ssl.fail_verify_cert_hash", "ssl.connection_error", GetParam(), nullptr);
 }
 
 // Allow expired certificatess, but use the wrong CA so it should fail still.
@@ -910,7 +944,7 @@ TEST_P(SslSocketTest, FailedClientCertAllowServerExpiredWrongCAVerification) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/fake_ca_cert.pem"));
 
   testUtilV2(listener, client, "", false, "", "", "spiffe://lyft.com/test-team", "", "",
-             "ssl.fail_verify_error", "ssl.connection_error", GetParam());
+             "ssl.fail_verify_error", "ssl.connection_error", GetParam(), nullptr);
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashVerification) {
@@ -995,13 +1029,15 @@ TEST_P(SslSocketTest, ClientCertificateHashListVerification) {
 
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam());
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
 
   // Works even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam());
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashListVerificationNoCA) {
@@ -1032,13 +1068,15 @@ TEST_P(SslSocketTest, ClientCertificateHashListVerificationNoCA) {
 
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam());
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
 
   // Works even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam());
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoClientCertificate) {
@@ -1192,13 +1230,15 @@ TEST_P(SslSocketTest, ClientCertificateSpkiVerification) {
 
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam());
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
 
   // Works even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam());
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
 }
 
 TEST_P(SslSocketTest, ClientCertificateSpkiVerificationNoCA) {
@@ -1229,13 +1269,15 @@ TEST_P(SslSocketTest, ClientCertificateSpkiVerificationNoCA) {
 
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam());
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
 
   // Works even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam());
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoClientCertificate) {
@@ -1261,12 +1303,12 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoClientCertificate
   envoy::api::v2::auth::UpstreamTlsContext client;
 
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_no_cert",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_no_cert",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCANoClientCertificate) {
@@ -1290,12 +1332,12 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCANoClientCertifi
   envoy::api::v2::auth::UpstreamTlsContext client;
 
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_no_cert",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_no_cert",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongClientCertificate) {
@@ -1327,12 +1369,12 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongClientCertific
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"));
 
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_cert_hash",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_cert_hash",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCAWrongClientCertificate) {
@@ -1362,12 +1404,12 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCAWrongClientCert
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"));
 
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_cert_hash",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_cert_hash",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongCA) {
@@ -1399,12 +1441,12 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongCA) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
 
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_error",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_error",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerification) {
@@ -1439,13 +1481,15 @@ TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerification) {
 
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam());
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
 
   // Works even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam());
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerificationNoCA) {
@@ -1478,13 +1522,15 @@ TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerificationNoCA) {
 
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam());
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
 
   // Works even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam());
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoClientCertificate) {
@@ -1510,12 +1556,12 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoClientCert
   envoy::api::v2::auth::UpstreamTlsContext client;
 
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_no_cert",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_no_cert",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClientCertificate) {
@@ -1539,12 +1585,12 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClient
   envoy::api::v2::auth::UpstreamTlsContext client;
 
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_no_cert",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_no_cert",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongClientCertificate) {
@@ -1576,12 +1622,12 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongClientC
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"));
 
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_cert_hash",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_cert_hash",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCAWrongClientCertificate) {
@@ -1611,12 +1657,12 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCAWrongCli
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"));
 
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_cert_hash",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_cert_hash",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongCA) {
@@ -1648,12 +1694,12 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongCA) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
 
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_error",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.fail_verify_error",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 }
 
 // Make sure that we do not flush code and do an immediate close if we have not completed the
@@ -1698,7 +1744,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createTransportSocket());
+            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -1762,7 +1808,7 @@ TEST_P(SslSocketTest, HalfClose) {
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      client_ssl_socket_factory.createTransportSocket(), nullptr);
+      client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   client_connection->enableHalfClose(true);
   client_connection->addReadFilter(client_read_filter);
   client_connection->connect();
@@ -1774,7 +1820,7 @@ TEST_P(SslSocketTest, HalfClose) {
   EXPECT_CALL(listener_callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createTransportSocket());
+            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
         listener_callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))
@@ -1853,7 +1899,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(), nullptr);
+      ssl_socket_factory.createTransportSocket(nullptr), nullptr);
 
   // Verify that server sent list with 2 acceptable client certificate CA names.
   const Ssl::SslSocket* ssl_socket = dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
@@ -1873,7 +1919,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createTransportSocket());
+            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -1941,7 +1987,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket1.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(), nullptr);
+      ssl_socket_factory.createTransportSocket(nullptr), nullptr);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);
@@ -1954,8 +2000,8 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
         Network::TransportSocketFactory& tsf = socket->localAddress() == socket1.localAddress()
                                                    ? server_ssl_socket_factory1
                                                    : server_ssl_socket_factory2;
-        Network::ConnectionPtr new_connection =
-            dispatcher.createServerConnection(std::move(socket), tsf.createTransportSocket());
+        Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
+            std::move(socket), tsf.createTransportSocket(nullptr));
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -1981,7 +2027,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   client_connection = dispatcher.createClientConnection(
       socket2.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(), nullptr);
+      ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   const Ssl::SslSocket* ssl_socket = dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
   SSL_set_session(ssl_socket->rawSslForTest(), ssl_session);
@@ -1998,8 +2044,9 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   // Different tests have different order of whether client or server gets Connected event
   // first, so always wait until both have happened.
-  unsigned connect_count = 0;
-  auto stopSecondTime = [&]() {
+  size_t connect_count = 0;
+  auto connect_second_time = [&connect_count, &dispatcher, &server_connection,
+                              &client_connection]() {
     connect_count++;
     if (connect_count == 2) {
       client_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -2009,9 +2056,9 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   };
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { stopSecondTime(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { stopSecondTime(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
 
@@ -2352,7 +2399,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(), nullptr);
+      ssl_socket_factory.createTransportSocket(nullptr), nullptr);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);
@@ -2368,7 +2415,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
                                                                      : server2_ssl_socket_factory;
 
         Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
-            std::move(accepted_socket), tsf.createTransportSocket());
+            std::move(accepted_socket), tsf.createTransportSocket(nullptr));
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -2398,7 +2445,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
 
   client_connection = dispatcher_->createClientConnection(
       socket2.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(), nullptr);
+      ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   const Ssl::SslSocket* ssl_socket = dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
   SSL_set_session(ssl_socket->rawSslForTest(), ssl_session);
@@ -2420,6 +2467,259 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   EXPECT_EQ(1UL, client_stats_store.counter("ssl.connection_error").value());
   EXPECT_EQ(0UL, server_stats_store.counter("ssl.session_reused").value());
   EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
+}
+
+void testClientSessionResumption(const std::string& server_ctx_yaml,
+                                 const std::string& client_ctx_yaml, bool expect_reuse,
+                                 const Network::Address::IpVersion version) {
+  InSequence s;
+
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+
+  envoy::api::v2::auth::DownstreamTlsContext server_ctx_proto;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_ctx_proto);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_ctx_proto, factory_context);
+  Stats::IsolatedStoreImpl server_stats_store;
+  ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
+                                                   server_stats_store, std::vector<std::string>{});
+
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
+                                  true);
+  NiceMock<Network::MockListenerCallbacks> callbacks;
+  Network::MockConnectionHandler connection_handler;
+  Event::DispatcherImpl dispatcher(time_system);
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
+
+  Network::ConnectionPtr server_connection;
+  Network::MockConnectionCallbacks server_connection_callbacks;
+
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx_proto;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_ctx_proto);
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(client_ctx_proto, factory_context);
+  Stats::IsolatedStoreImpl client_stats_store;
+  ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
+                                                   client_stats_store);
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
+      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
+
+  Network::MockConnectionCallbacks client_connection_callbacks;
+  client_connection->addConnectionCallbacks(client_connection_callbacks);
+  client_connection->connect();
+
+  size_t connect_count = 0;
+  auto connect_second_time = [&connect_count, &server_connection]() {
+    if (++connect_count == 2) {
+      server_connection->close(Network::ConnectionCloseType::NoFlush);
+    }
+  };
+
+  size_t close_count = 0;
+  auto close_second_time = [&close_count, &dispatcher]() {
+    if (++close_count == 2) {
+      dispatcher.exit();
+    }
+  };
+
+  // WillRepeatedly doesn't work with InSequence.
+  EXPECT_CALL(callbacks, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
+            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
+        callbacks.onNewConnection(std::move(new_connection));
+      }));
+  EXPECT_CALL(callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection = std::move(conn);
+        server_connection->addConnectionCallbacks(server_connection_callbacks);
+      }));
+
+  const bool expect_tls13 =
+      client_ctx_proto.common_tls_context().tls_params().tls_maximum_protocol_version() ==
+          envoy::api::v2::auth::TlsParameters::TLSv1_3 &&
+      server_ctx_proto.common_tls_context().tls_params().tls_maximum_protocol_version() ==
+          envoy::api::v2::auth::TlsParameters::TLSv1_3;
+
+  // The order of "Connected" events depends on the version of the TLS protocol (1.3 or older).
+  if (expect_tls13) {
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+  } else {
+    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+  }
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(0UL, server_stats_store.counter("ssl.session_reused").value());
+  EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
+
+  connect_count = 0;
+  close_count = 0;
+
+  client_connection = dispatcher.createClientConnection(
+      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
+  client_connection->addConnectionCallbacks(client_connection_callbacks);
+  client_connection->connect();
+
+  // WillRepeatedly doesn't work with InSequence.
+  EXPECT_CALL(callbacks, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
+            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
+        callbacks.onNewConnection(std::move(new_connection));
+      }));
+  EXPECT_CALL(callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection = std::move(conn);
+        server_connection->addConnectionCallbacks(server_connection_callbacks);
+      }));
+
+  // The order of "Connected" events depends on the version of the TLS protocol (1.3 or older),
+  // and whether or not the session was successfully resumed.
+  if (expect_tls13 || expect_reuse) {
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+  } else {
+    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+  }
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(expect_reuse ? 1UL : 0UL, server_stats_store.counter("ssl.session_reused").value());
+  EXPECT_EQ(expect_reuse ? 1UL : 0UL, client_stats_store.counter("ssl.session_reused").value());
+}
+
+// Test client session resumption using default settings (should be enabled).
+TEST_P(SslSocketTest, ClientSessionResumptionDefault) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+)EOF";
+
+  testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, true, GetParam());
+}
+
+// Make sure client session resumption is not happening with TLS 1.0-1.2 when it's disabled.
+TEST_P(SslSocketTest, ClientSessionResumptionDisabledTls12) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+  max_session_keys: 0
+)EOF";
+
+  testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, false, GetParam());
+}
+
+// Test client session resumption with TLS 1.0-1.2.
+TEST_P(SslSocketTest, ClientSessionResumptionEnabledTls12) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_0
+      tls_maximum_protocol_version: TLSv1_2
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_0
+      tls_maximum_protocol_version: TLSv1_2
+  max_session_keys: 2
+)EOF";
+
+  testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, true, GetParam());
+}
+
+// Make sure client session resumption is not happening with TLS 1.3 when it's disabled.
+TEST_P(SslSocketTest, ClientSessionResumptionDisabledTls13) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+  max_session_keys: 0
+)EOF";
+
+  testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, false, GetParam());
+}
+
+// Test client session resumption with TLS 1.3 (it's different than in older versions of TLS).
+TEST_P(SslSocketTest, ClientSessionResumptionEnabledTls13) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+  max_session_keys: 2
+)EOF";
+
+  testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, true, GetParam());
 }
 
 TEST_P(SslSocketTest, SslError) {
@@ -2463,7 +2763,7 @@ TEST_P(SslSocketTest, SslError) {
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createTransportSocket());
+            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -2501,44 +2801,44 @@ TEST_P(SslSocketTest, ProtocolVersions) {
 
   // Connection using defaults (client & server) succeeds, negotiating TLSv1.2.
   testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam());
+             "ssl.handshake", GetParam(), nullptr);
 
   // Connection using defaults (client & server) succeeds, negotiating TLSv1.2,
   // even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam());
+             "ssl.handshake", GetParam(), nullptr);
   client.set_allow_renegotiation(false);
 
   // Connection using TLSv1.0 (client) and defaults (server) succeeds.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   testUtilV2(listener, client, "", true, "TLSv1", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
 
   // Connection using TLSv1.1 (client) and defaults (server) succeeds.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   testUtilV2(listener, client, "", true, "TLSv1.1", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam());
+             "ssl.handshake", GetParam(), nullptr);
 
   // Connection using TLSv1.2 (client) and defaults (server) succeeds.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
   testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam());
+             "ssl.handshake", GetParam(), nullptr);
 
   // Connection using TLSv1.3 (client) and defaults (server) fails.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.connection_error",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 
   // Connection using TLSv1.3 (client) and TLSv1.0-1.3 (server) succeeds.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client, "", true, "TLSv1.3", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam());
+             "ssl.handshake", GetParam(), nullptr);
 
   // Connection using defaults (client) and TLSv1.0 (server) succeeds.
   client_params->clear_tls_minimum_protocol_version();
@@ -2546,31 +2846,31 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   testUtilV2(listener, client, "", true, "TLSv1", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
 
   // Connection using defaults (client) and TLSv1.1 (server) succeeds.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   testUtilV2(listener, client, "", true, "TLSv1.1", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam());
+             "ssl.handshake", GetParam(), nullptr);
 
   // Connection using defaults (client) and TLSv1.2 (server) succeeds.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
   testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam());
+             "ssl.handshake", GetParam(), nullptr);
 
   // Connection using defaults (client) and TLSv1.3 (server) fails.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.connection_error",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
 
   // Connection using TLSv1.0-TLSv1.3 (client) and TLSv1.3 (server) succeeds.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client, "", true, "TLSv1.3", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam());
+             "ssl.handshake", GetParam(), nullptr);
 }
 
 TEST_P(SslSocketTest, ALPN) {
@@ -2590,32 +2890,32 @@ TEST_P(SslSocketTest, ALPN) {
 
   // Connection using defaults (client & server) succeeds, no ALPN is negotiated.
   testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
 
   // Connection using defaults (client & server) succeeds, no ALPN is negotiated,
   // even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
   client.set_allow_renegotiation(false);
 
   // Client connects without ALPN to a server with "test" ALPN, no ALPN is negotiated.
   server_ctx->add_alpn_protocols("test");
   testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
   server_ctx->clear_alpn_protocols();
 
   // Client connects with "test" ALPN to a server without ALPN, no ALPN is negotiated.
   client_ctx->add_alpn_protocols("test");
   testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
   client_ctx->clear_alpn_protocols();
 
   // Client connects with "test" ALPN to a server with "test" ALPN, "test" ALPN is negotiated.
   client_ctx->add_alpn_protocols("test");
   server_ctx->add_alpn_protocols("test");
   testUtilV2(listener, client, "", true, "", "", "", "", "test", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
   client_ctx->clear_alpn_protocols();
   server_ctx->clear_alpn_protocols();
 
@@ -2625,7 +2925,7 @@ TEST_P(SslSocketTest, ALPN) {
   client_ctx->add_alpn_protocols("test");
   server_ctx->add_alpn_protocols("test");
   testUtilV2(listener, client, "", true, "", "", "", "", "test", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
   client.set_allow_renegotiation(false);
   client_ctx->clear_alpn_protocols();
   server_ctx->clear_alpn_protocols();
@@ -2634,7 +2934,7 @@ TEST_P(SslSocketTest, ALPN) {
   client_ctx->add_alpn_protocols("test");
   server_ctx->add_alpn_protocols("test2");
   testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
   client_ctx->clear_alpn_protocols();
   server_ctx->clear_alpn_protocols();
 }
@@ -2657,12 +2957,12 @@ TEST_P(SslSocketTest, CipherSuites) {
 
   // Connection using defaults (client & server) succeeds.
   testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
 
   // Connection using defaults (client & server) succeeds, even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
   client.set_allow_renegotiation(false);
 
   // Client connects with one of the supported cipher suites, connection succeeds.
@@ -2670,7 +2970,7 @@ TEST_P(SslSocketTest, CipherSuites) {
   server_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
   testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
   client_params->clear_cipher_suites();
   server_params->clear_cipher_suites();
 
@@ -2678,7 +2978,7 @@ TEST_P(SslSocketTest, CipherSuites) {
   client_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
   server_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.connection_error",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
   client_params->clear_cipher_suites();
   server_params->clear_cipher_suites();
 }
@@ -2701,12 +3001,12 @@ TEST_P(SslSocketTest, EcdhCurves) {
 
   // Connection using defaults (client & server) succeeds.
   testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
 
   // Connection using defaults (client & server) succeeds, even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
   client.set_allow_renegotiation(false);
 
   // Client connects with one of the supported ECDH curves, connection succeeds.
@@ -2715,7 +3015,7 @@ TEST_P(SslSocketTest, EcdhCurves) {
   server_params->add_ecdh_curves("P-256");
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
   testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam());
+             GetParam(), nullptr);
   client_params->clear_ecdh_curves();
   server_params->clear_ecdh_curves();
   server_params->clear_cipher_suites();
@@ -2725,7 +3025,7 @@ TEST_P(SslSocketTest, EcdhCurves) {
   server_params->add_ecdh_curves("P-256");
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.connection_error",
-             "ssl.connection_error", GetParam());
+             "ssl.connection_error", GetParam(), nullptr);
   client_params->clear_ecdh_curves();
   server_params->clear_ecdh_curves();
   server_params->clear_cipher_suites();
@@ -2829,7 +3129,45 @@ TEST_P(SslSocketTest, GetRequestedServerName) {
   client.set_sni("lyft.com");
 
   testUtilV2(listener, client, "", true, "", "", "", "lyft.com", "", "ssl.handshake",
-             "ssl.handshake", GetParam());
+             "ssl.handshake", GetParam(), nullptr);
+}
+
+TEST_P(SslSocketTest, OverrideRequestedServerName) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  client.set_sni("lyft.com");
+
+  Network::TransportSocketOptionsSharedPtr transport_socket_options(
+      new Network::TransportSocketOptionsImpl("example.com"));
+
+  testUtilV2(listener, client, "", true, "", "", "", "example.com", "", "ssl.handshake",
+             "ssl.handshake", GetParam(), transport_socket_options);
+}
+
+TEST_P(SslSocketTest, OverrideRequestedServerNameWithoutSniInUpstreamTlsContext) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  Network::TransportSocketOptionsSharedPtr transport_socket_options(
+      new Network::TransportSocketOptionsImpl("example.com"));
+  testUtilV2(listener, client, "", true, "", "", "", "example.com", "", "ssl.handshake",
+             "ssl.handshake", GetParam(), transport_socket_options);
 }
 
 // Validate that if downstream secrets are not yet downloaded from SDS server, Envoy creates
@@ -2855,14 +3193,14 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context);
-  EXPECT_EQ(nullptr, server_cfg->tlsCertificate());
+  EXPECT_TRUE(server_cfg->tlsCertificates().empty());
   EXPECT_FALSE(server_cfg->isReady());
 
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
-  auto transport_socket = server_ssl_socket_factory.createTransportSocket();
+  auto transport_socket = server_ssl_socket_factory.createTransportSocket(nullptr);
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
   EXPECT_EQ(nullptr, transport_socket->ssl());
   Buffer::OwnedImpl buffer;
@@ -2896,13 +3234,13 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context);
-  EXPECT_EQ(nullptr, client_cfg->tlsCertificate());
+  EXPECT_TRUE(client_cfg->tlsCertificates().empty());
   EXPECT_FALSE(client_cfg->isReady());
 
   ContextManagerImpl manager(time_system);
   Ssl::ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                         stats_store);
-  auto transport_socket = client_ssl_socket_factory.createTransportSocket();
+  auto transport_socket = client_ssl_socket_factory.createTransportSocket(nullptr);
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
   EXPECT_EQ(nullptr, transport_socket->ssl());
   Buffer::OwnedImpl buffer;
@@ -2934,7 +3272,7 @@ public:
         std::move(client_cfg), *manager_, client_stats_store_);
     client_connection_ = dispatcher_->createClientConnection(
         socket_.localAddress(), source_address_,
-        client_ssl_socket_factory_->createTransportSocket(), nullptr);
+        client_ssl_socket_factory_->createTransportSocket(nullptr), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
     read_filter_.reset(new Network::MockReadFilter());
@@ -2947,7 +3285,7 @@ public:
     EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
           Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
-              std::move(socket), server_ssl_socket_factory_->createTransportSocket());
+              std::move(socket), server_ssl_socket_factory_->createTransportSocket(nullptr));
           new_connection->setBufferLimits(read_buffer_limit);
           listener_callbacks_.onNewConnection(std::move(new_connection));
         }));
@@ -3032,7 +3370,7 @@ public:
     EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
           Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
-              std::move(socket), server_ssl_socket_factory_->createTransportSocket());
+              std::move(socket), server_ssl_socket_factory_->createTransportSocket(nullptr));
           new_connection->setBufferLimits(read_buffer_limit);
           listener_callbacks_.onNewConnection(std::move(new_connection));
         }));
@@ -3156,7 +3494,7 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory_->createTransportSocket());
+            std::move(socket), server_ssl_socket_factory_->createTransportSocket(nullptr));
         new_connection->setBufferLimits(0);
         listener_callbacks_.onNewConnection(std::move(new_connection));
       }));

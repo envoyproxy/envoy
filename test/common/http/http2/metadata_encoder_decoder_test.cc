@@ -308,6 +308,45 @@ TEST_F(MetadataEncoderDecoderTest, TestDecodeBadData) {
   cleanUp();
 }
 
+// Checks if accumulated metadata size reaches size limit, returns failure.
+TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderMultipleMetadataReachSizeLimit) {
+  MetadataMap metadata_map = {};
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map,
+                                  std::placeholders::_1);
+  initialize(cb);
+
+  int result = 0;
+
+  for (int i = 0; i < 100; i++) {
+    // Cleans up the output buffer.
+    memset(output_buffer_.buf, 0, output_buffer_.length);
+    output_buffer_.length = 0;
+
+    MetadataMap metadata_map_2 = {
+        {"header_key1", std::string(10000, 'a')},
+        {"header_key2", std::string(10000, 'b')},
+    };
+
+    // Encode and decode the second MetadataMap.
+    MetadataCallback cb2 = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this,
+                                     metadata_map_2, std::placeholders::_1);
+    decoder_->callback_ = cb2;
+    encoder_.createPayload(metadata_map_2);
+    nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID, nullptr);
+    nghttp2_session_send(session_);
+    result = nghttp2_session_mem_recv(session_, output_buffer_.buf, output_buffer_.length);
+    if (result < 0) {
+      break;
+    }
+  }
+
+  // Verifies max matadata limit reached.
+  EXPECT_LT(result, 0);
+  EXPECT_LE(decoder_->max_payload_size_bound_, decoder_->total_payload_size_);
+
+  cleanUp();
+}
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy

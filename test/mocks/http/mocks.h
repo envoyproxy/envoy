@@ -173,8 +173,9 @@ public:
 
   // Http::FilterChainFactory
   MOCK_METHOD1(createFilterChain, void(FilterChainFactoryCallbacks& callbacks));
-  MOCK_METHOD2(createUpgradeFilterChain,
-               bool(absl::string_view upgrade_type, FilterChainFactoryCallbacks& callbacks));
+  MOCK_METHOD3(createUpgradeFilterChain, bool(absl::string_view upgrade_type,
+                                              const FilterChainFactory::UpgradeMap* upgrade_map,
+                                              FilterChainFactoryCallbacks& callbacks));
 };
 
 class MockStreamFilterCallbacksBase {
@@ -210,7 +211,7 @@ public:
   MOCK_METHOD0(decoderBufferLimit, uint32_t());
 
   // Http::StreamDecoderFilterCallbacks
-  void sendLocalReply(Code code, const std::string& body,
+  void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(HeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
     Utility::sendLocalReply(
@@ -231,6 +232,9 @@ public:
     encodeHeaders_(*headers, end_stream);
   }
   void encodeTrailers(HeaderMapPtr&& trailers) override { encodeTrailers_(*trailers); }
+  void encodeMetadata(MetadataMapPtr&& metadata_map) override {
+    encodeMetadata_(std::move(metadata_map));
+  }
 
   MOCK_METHOD0(continueDecoding, void());
   MOCK_METHOD2(addDecodedData, void(Buffer::Instance& data, bool streaming));
@@ -240,6 +244,7 @@ public:
   MOCK_METHOD2(encodeHeaders_, void(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers_, void(HeaderMap& trailers));
+  MOCK_METHOD1(encodeMetadata_, void(MetadataMapPtr metadata_map));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};

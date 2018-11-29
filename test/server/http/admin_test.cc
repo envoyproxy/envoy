@@ -1098,16 +1098,56 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 }
 
 TEST_P(AdminInstanceTest, GetRequest) {
-  Http::HeaderMapImpl response_headers;
-  std::string body;
-
-  EXPECT_CALL(server_.options_, toCommandLineOptions()).WillOnce(Invoke([] {
+  EXPECT_CALL(server_.options_, toCommandLineOptions()).WillRepeatedly(Invoke([] {
     Server::CommandLineOptionsPtr command_line_options =
         std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
     command_line_options->set_restart_epoch(2);
     command_line_options->set_service_cluster("cluster");
     return command_line_options;
   }));
+  NiceMock<Init::MockManager> initManager;
+  ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
+
+  {
+    Http::HeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
+    envoy::admin::v2alpha::ServerInfo server_info_proto;
+    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+                HasSubstr("application/json"));
+
+    // We only test that it parses as the proto and that some fields are correct, since
+    // values such as timestamps + Envoy version are tricky to test for.
+    MessageUtil::loadFromJson(body, server_info_proto);
+    EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::LIVE);
+    EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
+    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
+  }
+
+  {
+    Http::HeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::NotInitialized));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
+    envoy::admin::v2alpha::ServerInfo server_info_proto;
+    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+                HasSubstr("application/json"));
+
+    // We only test that it parses as the proto and that some fields are correct, since
+    // values such as timestamps + Envoy version are tricky to test for.
+    MessageUtil::loadFromJson(body, server_info_proto);
+    EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING);
+    EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
+    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
+  }
+
+  Http::HeaderMapImpl response_headers;
+  std::string body;
+
+  ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
   EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
   envoy::admin::v2alpha::ServerInfo server_info_proto;
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
@@ -1116,7 +1156,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
   // We only test that it parses as the proto and that some fields are correct, since
   // values such as timestamps + Envoy version are tricky to test for.
   MessageUtil::loadFromJson(body, server_info_proto);
-  EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::LIVE);
+  EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::INITIALIZING);
   EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
   EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
 }

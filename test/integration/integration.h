@@ -34,6 +34,7 @@ public:
   const Http::HeaderMap* continue_headers() { return continue_headers_.get(); }
   const Http::HeaderMap& headers() { return *headers_; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
+  const Http::MetadataMap& metadata_map() { return *metadata_map_; }
   void waitForContinueHeaders();
   void waitForHeaders();
   void waitForBodyData(uint64_t size);
@@ -45,7 +46,7 @@ public:
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
-  void decodeMetadata(Http::MetadataMapPtr&&) override {}
+  void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason) override;
@@ -57,6 +58,7 @@ private:
   Http::HeaderMapPtr continue_headers_;
   Http::HeaderMapPtr headers_;
   Http::HeaderMapPtr trailers_;
+  Http::MetadataMapPtr metadata_map_{new Http::MetadataMap()};
   bool waiting_for_end_stream_{};
   bool saw_end_stream_{};
   std::string body_;
@@ -126,14 +128,6 @@ public:
   BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr time_system,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
 
-  // TODO(jmarantz): this alternate constructor is a temporary hack to allow
-  // envoy-filter-example/echo2_integration_test.cc to compile so CI for #4512
-  // can pass. Once that passes, we can up update filter-examples so it can see
-  // the 3-arg version of BaseIntegrationTest, and remove this constructor
-  // variant.
-  BaseIntegrationTest(Network::Address::IpVersion version, const std::string& config)
-      : BaseIntegrationTest(version, realTime(), config) {}
-
   virtual ~BaseIntegrationTest() {}
 
   /**
@@ -183,6 +177,7 @@ public:
 
   Event::TestTimeSystem& timeSystem() { return *time_system_; }
 
+  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
 private:

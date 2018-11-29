@@ -30,7 +30,10 @@ enum class FilterHeadersStatus {
   // Do not iterate to any of the remaining filters in the chain. Returning
   // FilterDataStatus::Continue from decodeData()/encodeData() or calling
   // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
-  StopIteration
+  StopIteration,
+  // Continue iteration to remaining filters, but ignore any subsequent data or trailers. This
+  // results in creating a header only request/response.
+  ContinueAndEndStream
 };
 
 /**
@@ -226,7 +229,7 @@ public:
    *                       response headers.
    * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
    */
-  virtual void sendLocalReply(Code response_code, const std::string& body_text,
+  virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(HeaderMap& headers)> modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status) PURE;
 
@@ -264,6 +267,13 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(HeaderMapPtr&& trailers) PURE;
+
+  /**
+   * Called with metadata to be encoded.
+   *
+   * @param metadata_map supplies the unique_ptr of the metadata to be encoded.
+   */
+  virtual void encodeMetadata(MetadataMapPtr&& metadata_map) PURE;
 
   /**
    * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
@@ -577,12 +587,15 @@ public:
   /**
    * Called when a new upgrade stream is created on the connection.
    * @param upgrade supplies the upgrade header from downstream
+   * @param per_route_upgrade_map supplies the upgrade map, if any, for this route.
    * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
    *                  FilterChainFactoryCallbacks.
    * @return true if upgrades of this type are allowed and the filter chain has been created.
    *    returns false if this upgrade type is not configured, and no filter chain is created.
    */
+  typedef std::map<std::string, bool> UpgradeMap;
   virtual bool createUpgradeFilterChain(absl::string_view upgrade,
+                                        const UpgradeMap* per_route_upgrade_map,
                                         FilterChainFactoryCallbacks& callbacks) PURE;
 };
 

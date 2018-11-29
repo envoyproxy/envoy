@@ -7,11 +7,13 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
+#include "envoy/thread/thread.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/c_smart_ptr.h"
@@ -396,6 +398,15 @@ public:
   bool has(const LowerCaseString& key);
 };
 
+// Helper method to create a header map from an initializer list. Useful due to make_unique's
+// inability to infer the initializer list type.
+inline HeaderMapPtr
+makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& values) {
+  return std::make_unique<TestHeaderMapImpl,
+                          const std::initializer_list<std::pair<std::string, std::string>>&>(
+      values);
+}
+
 } // namespace Http
 
 namespace Stats {
@@ -465,6 +476,14 @@ public:
 };
 
 } // namespace Stats
+
+namespace Thread {
+ThreadFactory& threadFactoryForTest();
+} // namespace Thread
+
+namespace Api {
+ApiPtr createApiForTest(Stats::Store& stat_store);
+} // namespace Api
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, rhs, "") {
   *result_listener << *rhs << " is not equal to " << *arg;

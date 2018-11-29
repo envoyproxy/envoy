@@ -296,6 +296,7 @@ public:
   /**
    * @return const envoy::api::v2::core::Metadata& the dynamic metadata associated with this request
    */
+  virtual envoy::api::v2::core::Metadata& dynamicMetadata() PURE;
   virtual const envoy::api::v2::core::Metadata& dynamicMetadata() const PURE;
 
   /**
