@@ -61,7 +61,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     envoy::service::ratelimit::v2::RateLimitRequest request;
     Http::HeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}});
-    EXPECT_CALL(*async_client_, send(_, ProtoEq(request), _, _, _))
+    EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(client_), _, _))
         .WillOnce(
             Invoke([this](const Protobuf::MethodDescriptor& service_method,
                           const Protobuf::Message&, Grpc::AsyncRequestCallbacks&, Tracing::Span&,
