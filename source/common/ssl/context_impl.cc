@@ -32,6 +32,17 @@ int ContextImpl::sslContextIndex() {
   }());
 }
 
+enum ssl_select_cert_result_t
+ContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  // This is currently a nop, since we only have a single cert, but this
+  // is where we will implement the certificate selection logic in
+  // #1319.
+  RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl,
+                                 tls_contexts_[0].ssl_ctx_.get()) != nullptr,
+                 "");
+  return ssl_select_cert_success;
+}
+
 ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source)
     : scope_(scope), stats_(generateStats(scope)), time_source_(time_source) {
   const auto tls_certificates = config.tlsCertificates();
