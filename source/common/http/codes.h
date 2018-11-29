@@ -30,6 +30,9 @@ private:
    * are specified as a literal like "http.", or an empty-string "". We
    * are going to be passing these, as well as other tokens, to join() below,
    * which will add "." between each token.
+   *
+   * TODO(jmarantz): remove all the trailing dots in all stat prefix string
+   * literals. Then this function can be removed.
    */
   static absl::string_view stripTrailingDot(absl::string_view prefix);
 
@@ -37,6 +40,10 @@ private:
    * Joins a string-view vector with "." between each token. If there's an
    * initial blank token it is skipped. Leading blank tokens occur due to empty
    * prefixes, which are fairly common.
+   *
+   * Note: this layer probably should be called something other than join(),
+   * like joinSkipppingLeadingEmptyToken but I thought the decrease in
+   * readability at all the call-sites would not be worth it.
    */
   static std::string join(const std::vector<absl::string_view>& v);
 
