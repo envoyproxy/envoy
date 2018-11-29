@@ -413,8 +413,9 @@ makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& 
 namespace Stats {
 
 /**
- * This is a heap test allocator that works similar to how the shared memory
- * allocator works in terms of reference counting, etc.
+ * This is a RawStatDataAllocator that works with a contiguous block of
+ * heap-allocated memory, but is otheriwse identical to the shared memory
+ * allocator works in terms of reference counting, data structures, etc.
  */
 class TestAllocator : public RawStatDataAllocator {
 public:
