@@ -112,23 +112,6 @@ TEST_F(HotRestartImplTest, Consistency) {
   hot_restart_->statsAllocator().free(*stat_1);
 }
 
-TEST_F(HotRestartImplTest, RawAlloc) {
-  setup();
-
-  Stats::RawStatData* stat_1 = hot_restart_->statsAllocator().alloc("ref_name");
-  ASSERT_NE(stat_1, nullptr);
-  Stats::RawStatData* stat_2 = hot_restart_->statsAllocator().alloc("ref_name");
-  ASSERT_NE(stat_2, nullptr);
-  Stats::RawStatData* stat_3 = hot_restart_->statsAllocator().alloc("not_ref_name");
-  ASSERT_NE(stat_3, nullptr);
-  EXPECT_EQ(stat_1, stat_2);
-  EXPECT_NE(stat_1, stat_3);
-  EXPECT_NE(stat_2, stat_3);
-  hot_restart_->statsAllocator().free(*stat_1);
-  hot_restart_->statsAllocator().free(*stat_2);
-  hot_restart_->statsAllocator().free(*stat_3);
-}
-
 TEST_F(HotRestartImplTest, crossAlloc) {
   setup();
 
