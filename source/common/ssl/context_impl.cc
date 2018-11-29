@@ -81,14 +81,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     // BoringSSL.
     SSL_CTX_set_select_certificate_cb(
         ctx.ssl_ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
-          ContextImpl* context_impl =
-              static_cast<ContextImpl*>(SSL_get_app_data(client_hello->ssl));
-          // This is currently a nop, since we only have a single cert, but this is where we will
-          // implement the certificate selection logic in #1319.
-          RELEASE_ASSERT(SSL_set_SSL_CTX(client_hello->ssl,
-                                         context_impl->tls_contexts_[0].ssl_ctx_.get()) != nullptr,
-                         "");
-          return ssl_select_cert_success;
+          return static_cast<ContextImpl*>(SSL_get_app_data(client_hello->ssl))
+              ->selectTlsContext(client_hello);
         });
   }
 
