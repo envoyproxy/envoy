@@ -645,10 +645,6 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
   }
   for (auto& ctx : tls_contexts_) {
     X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
-    // Skip uninitialized certificate contexts.
-    if (cert == nullptr) {
-      continue;
-    }
     if (config.certificateValidationContext() != nullptr &&
         !config.certificateValidationContext()->caCert().empty()) {
       bssl::UniquePtr<BIO> bio(
