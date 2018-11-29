@@ -18,9 +18,9 @@ namespace Envoy {
 namespace Thread {
 
 #if !defined(WIN32)
-typedef int32_t ThreadId;
+using ThreadId = int32_t;
 #else
-typedef DWORD ThreadId;
+using ThreadId = DWORD;
 #endif
 
 class Thread {
