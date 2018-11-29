@@ -14,7 +14,9 @@
 
 using testing::_;
 using testing::AnyNumber;
+using testing::DoAll;
 using testing::Field;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -39,16 +41,38 @@ public:
     return std::make_unique<SrcIpTransparentMapper>(builder, DefaultMaxNumPools);
   }
 
+  std::unique_ptr<SrcIpTransparentMapper> makeMapperWithImmediateCallback() {
+    auto builder = [this]() { return buildPoolImmediateCallback(); };
+    return std::make_unique<SrcIpTransparentMapper>(builder, DefaultMaxNumPools);
+  }
+
   //! Called when one of the default mappers constructed above creates a new pool.
   //! This will replace next_pool_to_assign_ with a new mock. This allows the tester to control each
   //! individual mock pool by keeping track of the assigned pools where necessary.
   //! @returns @c next_pool_to_assign_.
   std::unique_ptr<ConnectionPool::Instance> buildPool() {
-    // set up tracking of the pool's callback so we can invoke them,
+    // set up tracking of the pool's callback so we can invoke them.
     drained_callbacks_.push_back([]() { FAIL() << "No callback registed"; });
     EXPECT_CALL(*next_pool_to_assign_, addDrainedCallback(_))
         .WillOnce(SaveArg<0>(&drained_callbacks_.back()));
 
+    return pushPool();
+  }
+
+  //! Called when we want a pool which calls back immediately on callbacks being added.
+  //! This will replace next_pool_to_assign_ with a new mock. This allows the tester to control each
+  //! individual mock pool by keeping track of the assigned pools where necessary.
+  //! @returns @c next_pool_to_assign_.
+  std::unique_ptr<ConnectionPool::Instance> buildPoolImmediateCallback() {
+    // set up tracking of the pool's callback so we can invoke them.
+    drained_callbacks_.push_back([]() { FAIL() << "No callback registed"; });
+    EXPECT_CALL(*next_pool_to_assign_, addDrainedCallback(_))
+        .WillOnce(DoAll(SaveArg<0>(&drained_callbacks_.back()),
+                        Invoke([](ConnectionPool::Instance::DrainedCb cb) { cb(); })));
+    return pushPool();
+  }
+
+  std::unique_ptr<ConnectionPool::Instance> pushPool() {
     auto retval = std::move(next_pool_to_assign_);
     next_pool_to_assign_ = std::make_unique<NiceMock<ConnectionPool::MockInstance>>();
     return retval;
@@ -315,7 +339,7 @@ TEST_F(SrcIpTransparentMapperTest, testMultipleIdle) {
   EXPECT_EQ(second_pool2->protocol(), Http::Protocol::Http11);
 }
 
-//! Show that we do not prevent assignment if # idle + # active is greater than the maximum
+// Show that we do not prevent assignment if # idle + # active is greater than the maximum
 // destroyed by accessing one of their members.
 TEST_F(SrcIpTransparentMapperTest, testIdleAndActiveAboveMax) {
   auto mapper = makeMapperCustomSize(2);
@@ -494,5 +518,41 @@ TEST_F(SrcIpTransparentMapperTest, remoteAddressIpv6) {
                                PointeesEq(Network::Utility::parseInternetAddress("1::2")))));
   mapper->assignPool(lb_context_mock_);
 }
+
+// Some connection pool instances may call back immediately when the drain cb is registered. Make
+// sure we handle that by instructing the pool mock to callback when the cb is registered. To show
+// that we handle it, we show that we can assign the same pool twice, and that it still drains
+// correctly.
+TEST_F(SrcIpTransparentMapperTest, immediateDrainHandled) {
+  auto mapper = makeMapperWithImmediateCallback();
+
+  setRemoteAddressToUse("[10::1]:123");
+  auto pool1 = mapper->assignPool(lb_context_mock_);
+  setRemoteAddressToUse("[10::1]:123");
+  auto pool2 = mapper->assignPool(lb_context_mock_);
+  drainPool(0);
+  setRemoteAddressToUse("12.35.16.41:546");
+  auto pool3 = mapper->assignPool(lb_context_mock_);
+
+  // Show that we always get back the same connection pool, including after draining (meaning we
+  // freed the pool up)
+  EXPECT_NE(nullptr, pool1);
+  EXPECT_EQ(pool1, pool2);
+  EXPECT_EQ(pool2, pool3);
+}
+
+// Show that we ignore the port when mapping the address to a pool.
+TEST_F(SrcIpTransparentMapperTest, portIgnoredInMapping) {
+  auto mapper = makeDefaultMapper();
+
+  setRemoteAddressToUse("[123::4]:123");
+  auto pool1 = mapper->assignPool(lb_context_mock_);
+  setRemoteAddressToUse("[123::4]:777");
+  auto pool2 = mapper->assignPool(lb_context_mock_);
+
+  EXPECT_NE(nullptr, pool1);
+  EXPECT_EQ(pool1, pool2);
+}
+
 } // namespace Http
 } // namespace Envoy

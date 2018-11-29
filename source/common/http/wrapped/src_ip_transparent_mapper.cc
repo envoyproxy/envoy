@@ -121,7 +121,7 @@ void SrcIpTransparentMapper::registerNewPool() {
   auto new_pool = builder_();
   ConnectionPool::Instance* to_return = new_pool.get();
   // Register a callback so we may be notified when the pool is drained. We will consider it idle at
-  // that point.
+  // that point. Note that it may call back immediately here. We should ignore it in that case.
   to_return->addDrainedCallback([this, to_return] { poolDrained(*to_return); });
   PoolTracker tracker;
   tracker.instance_ = std::move(new_pool);
@@ -130,7 +130,11 @@ void SrcIpTransparentMapper::registerNewPool() {
 
 void SrcIpTransparentMapper::poolDrained(ConnectionPool::Instance& instance) {
   const auto& active_iter = active_pools_.find(&instance);
-  ASSERT(active_iter != active_pools_.end());
+  if (active_iter == active_pools_.end()) {
+    // The pool may call back immediately with it being drained, since it was just created.
+    // ignore that case.
+    return;
+  }
 
   // first clean up any assignments.
   if (active_iter->second.v4_address_.has_value()) {
