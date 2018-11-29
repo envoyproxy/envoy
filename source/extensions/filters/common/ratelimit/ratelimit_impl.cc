@@ -6,8 +6,6 @@
 #include <vector>
 
 #include "envoy/api/v2/ratelimit/ratelimit.pb.h"
-#include "envoy/registry/registry.h"
-#include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"

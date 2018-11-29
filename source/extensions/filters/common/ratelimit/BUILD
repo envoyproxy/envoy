@@ -18,7 +18,6 @@ envoy_cc_library(
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/grpc:async_client_manager_interface",
         "//include/envoy/ratelimit:ratelimit_interface",
-        "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
