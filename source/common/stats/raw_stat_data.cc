@@ -37,7 +37,7 @@ uint64_t RawStatData::structSizeWithOptions(const StatsOptions& stats_options) {
 
 void RawStatData::initialize(absl::string_view key, const StatsOptions& stats_options) {
   ASSERT(!initialized());
-  ASSERT(key.length() <= stats_options.maxNameLength());
+  ASSERT(key.size() <= stats_options.maxNameLength());
   ref_count_ = 1;
   memcpy(name_, key.data(), key.size());
   name_[key.size()] = '\0';
@@ -71,7 +71,8 @@ void RawStatDataAllocator::free(Stats::RawStatData& data) {
   // We must hold the lock since the reference decrement can race with an initialize above.
   Thread::LockGuard lock(mutex_);
   ASSERT(data.ref_count_ > 0);
-  if (--data.ref_count_ > 0) {
+  --data.ref_count_;
+  if (data.ref_count_ > 0) {
     return;
   }
   bool key_removed = stats_set_.remove(data.key());
