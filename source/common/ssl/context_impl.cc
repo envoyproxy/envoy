@@ -35,9 +35,9 @@ int ContextImpl::sslContextIndex() {
 ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source)
     : scope_(scope), stats_(generateStats(scope)), time_source_(time_source) {
   const auto tls_certificates = config.tlsCertificates();
-  certificate_contexts_.resize(std::max(1UL, tls_certificates.size()));
+  tls_contexts_.resize(std::max(1UL, tls_certificates.size()));
 
-  for (auto& ctx : certificate_contexts_) {
+  for (auto& ctx : tls_contexts_) {
     ctx.ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
 
     int rc = SSL_CTX_set_ex_data(ctx.ssl_ctx_.get(), sslContextIndex(), this);
@@ -78,7 +78,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
           // is where we will implement the certificate selection logic in
           // #1319.
           RELEASE_ASSERT(SSL_set_SSL_CTX(client_hello->ssl,
-                                         context_impl->certificate_contexts_[0].ssl_ctx_.get()) !=
+                                         context_impl->tls_contexts_[0].ssl_ctx_.get()) !=
                              nullptr,
                          "");
           return ssl_select_cert_success;
@@ -101,7 +101,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
                                        config.certificateValidationContext()->caCertPath()));
     }
 
-    for (auto& ctx : certificate_contexts_) {
+    for (auto& ctx : tls_contexts_) {
       X509_STORE* store = SSL_CTX_get_cert_store(ctx.ssl_ctx_.get());
       bool has_crl = false;
       for (const X509_INFO* item : list.get()) {
@@ -154,7 +154,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
                       config.certificateValidationContext()->certificateRevocationListPath()));
     }
 
-    for (auto& ctx : certificate_contexts_) {
+    for (auto& ctx : tls_contexts_) {
       X509_STORE* store = SSL_CTX_get_cert_store(ctx.ssl_ctx_.get());
       for (const X509_INFO* item : list.get()) {
         if (item->crl) {
@@ -202,7 +202,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
   }
 
-  for (auto& ctx : certificate_contexts_) {
+  for (auto& ctx : tls_contexts_) {
     if (verify_mode != SSL_VERIFY_NONE) {
       SSL_CTX_set_verify(ctx.ssl_ctx_.get(), verify_mode, nullptr);
       SSL_CTX_set_cert_verify_callback(ctx.ssl_ctx_.get(), ContextImpl::verifyCallback, this);
@@ -210,7 +210,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
   }
 
   for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
-    auto& ctx = certificate_contexts_[i];
+    auto& ctx = tls_contexts_[i];
     // Load certificate chain.
     const auto& tls_certificate = tls_certificates[i].get();
     ctx.cert_chain_file_path_ = tls_certificate.certificateChainPath();
@@ -252,7 +252,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     }
 
     bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
-    ctx.ecdsa_ = EVP_PKEY_id(public_key.get()) == EVP_PKEY_EC;
+    ctx.is_ecdsa_ = EVP_PKEY_id(public_key.get()) == EVP_PKEY_EC;
 
     // Load private key.
     bio.reset(BIO_new_mem_buf(const_cast<char*>(tls_certificate.privateKey().data()),
@@ -266,7 +266,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
   }
 
   // use the server's cipher list preferences
-  for (auto& ctx : certificate_contexts_) {
+  for (auto& ctx : tls_contexts_) {
     SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
   }
 
@@ -318,7 +318,7 @@ bssl::UniquePtr<SSL> ContextImpl::newSsl(absl::optional<std::string>) {
   // We use the first certificate for a new SSL object, later in the
   // SSL_CTX_set_select_certificate_cb() callback following ClientHello, we
   // replace with the selected certificate via SSL_set_SSL_CTX().
-  auto ssl = bssl::UniquePtr<SSL>(SSL_new(certificate_contexts_[0].ssl_ctx_.get()));
+  auto ssl = bssl::UniquePtr<SSL>(SSL_new(tls_contexts_[0].ssl_ctx_.get()));
   SSL_set_app_data(ssl.get(), this);
   return ssl;
 }
@@ -483,7 +483,7 @@ SslStats ContextImpl::generateStats(Stats::Scope& store) {
 
 size_t ContextImpl::daysUntilFirstCertExpires() const {
   int daysUntilExpiration = Utility::getDaysUntilExpiration(ca_cert_.get(), time_source_);
-  for (auto& ctx : certificate_contexts_) {
+  for (auto& ctx : tls_contexts_) {
     daysUntilExpiration = std::min<int>(
         Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), time_source_), daysUntilExpiration);
   }
@@ -502,7 +502,7 @@ CertificateDetailsPtr ContextImpl::getCaCertInformation() const {
 
 std::vector<CertificateDetailsPtr> ContextImpl::getCertChainInformation() const {
   std::vector<CertificateDetailsPtr> cert_details;
-  for (const auto& ctx : certificate_contexts_) {
+  for (const auto& ctx : tls_contexts_) {
     if (ctx.cert_chain_ == nullptr) {
       continue;
     }
@@ -545,9 +545,9 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
       max_session_keys_(config.maxSessionKeys()) {
   // This should be guaranteed during configuration ingestion for client
   // contexts.
-  ASSERT(certificate_contexts_.size() == 1);
+  ASSERT(tls_contexts_.size() == 1);
   if (!parsed_alpn_protocols_.empty()) {
-    for (auto& ctx : certificate_contexts_) {
+    for (auto& ctx : tls_contexts_) {
       int rc = SSL_CTX_set_alpn_protos(ctx.ssl_ctx_.get(), &parsed_alpn_protocols_[0],
                                        parsed_alpn_protocols_.size());
       RELEASE_ASSERT(rc == 0, "");
@@ -555,9 +555,9 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
   }
 
   if (max_session_keys_ > 0) {
-    SSL_CTX_set_session_cache_mode(certificate_contexts_[0].ssl_ctx_.get(), SSL_SESS_CACHE_CLIENT);
+    SSL_CTX_set_session_cache_mode(tls_contexts_[0].ssl_ctx_.get(), SSL_SESS_CACHE_CLIENT);
     SSL_CTX_sess_set_new_cb(
-        certificate_contexts_[0].ssl_ctx_.get(), [](SSL* ssl, SSL_SESSION* session) -> int {
+        tls_contexts_[0].ssl_ctx_.get(), [](SSL* ssl, SSL_SESSION* session) -> int {
           ContextImpl* context_impl = static_cast<ContextImpl*>(
               SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslContextIndex()));
           ClientContextImpl* client_context_impl = dynamic_cast<ClientContextImpl*>(context_impl);
@@ -634,7 +634,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
   if (config.tlsCertificates().empty()) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
-  for (auto& ctx : certificate_contexts_) {
+  for (auto& ctx : tls_contexts_) {
     X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
     // Skip uninitialized certificate contexts.
     if (cert == nullptr) {

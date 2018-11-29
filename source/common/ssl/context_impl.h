@@ -122,7 +122,7 @@ protected:
 
   CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path) const;
 
-  struct CertificateContext {
+  struct TlsContext {
     // Each certificate specified for the context has its own SSL_CTX. SSL_CTXs
     // are identical with the exception of certificate material, and can be
     // safely substituted via SSL_set_SSL_CTX() during the
@@ -130,7 +130,7 @@ protected:
     bssl::UniquePtr<SSL_CTX> ssl_ctx_;
     bssl::UniquePtr<X509> cert_chain_;
     std::string cert_chain_file_path_;
-    bool ecdsa_{};
+    bool is_ecdsa_{};
 
     std::string getCertChainFileName() const { return cert_chain_file_path_; };
   };
@@ -139,7 +139,7 @@ protected:
   // objects. For server contexts, once we have ClientHello, we
   // potentially switch to a different CertificateContext based on certificate
   // selection.
-  std::vector<CertificateContext> certificate_contexts_;
+  std::vector<TlsContext> tls_contexts_;
   bool verify_trusted_ca_{false};
   std::vector<std::string> verify_subject_alt_name_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
