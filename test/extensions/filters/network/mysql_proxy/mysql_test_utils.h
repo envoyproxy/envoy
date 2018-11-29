@@ -30,10 +30,10 @@ public:
     return ver;
   }
 
-  std::string EncodeServerGreeting(int protocol);
-  std::string EncodeClientLogin(uint16_t client_cap, std::string user);
-  std::string EncodeClientLoginResp(uint8_t srv_resp, int it = 0);
-  std::string EncodeAuthSwitchResp();
+  std::string encodeServerGreeting(int protocol);
+  std::string encodeClientLogin(uint16_t client_cap, std::string user);
+  std::string encodeClientLoginResp(uint8_t srv_resp, int it = 0);
+  std::string encodeAuthSwitchResp();
 };
 
 } // namespace MySQLProxy

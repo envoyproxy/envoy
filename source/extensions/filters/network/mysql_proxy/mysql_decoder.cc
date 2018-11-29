@@ -17,7 +17,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
 
   // Expect Server Challenge packet
   case MySQLSession::State::MYSQL_INIT: {
-    ServerGreeting greeting;
+    ServerGreeting greeting{};
     greeting.decode(message, offset, seq, len);
     callbacks_.onServerGreeting(greeting);
 
@@ -27,7 +27,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
 
   // Process Client Handshake Response
   case MySQLSession::State::MYSQL_CHALLENGE_REQ: {
-    ClientLogin client_login;
+    ClientLogin client_login{};
     client_login.decode(message, offset, seq, len);
     callbacks_.onClientLogin(client_login);
 
@@ -46,7 +46,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
 
   case MySQLSession::State::MYSQL_CHALLENGE_RESP_41:
   case MySQLSession::State::MYSQL_CHALLENGE_RESP_320: {
-    ClientLoginResponse client_login_resp;
+    ClientLoginResponse client_login_resp{};
     client_login_resp.decode(message, offset, seq, len);
     callbacks_.onClientLoginResponse(client_login_resp);
 
@@ -63,7 +63,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
   }
 
   case MySQLSession::State::MYSQL_AUTH_SWITCH_RESP: {
-    ClientSwitchResponse client_switch_resp;
+    ClientSwitchResponse client_switch_resp{};
     client_switch_resp.decode(message, offset, seq, len);
     callbacks_.onClientSwitchResponse(client_switch_resp);
 
@@ -72,7 +72,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
   }
 
   case MySQLSession::State::MYSQL_AUTH_SWITCH_MORE: {
-    ClientLoginResponse client_login_resp;
+    ClientLoginResponse client_login_resp{};
     client_login_resp.decode(message, offset, seq, len);
     callbacks_.onMoreClientLoginResponse(client_login_resp);
 
@@ -90,7 +90,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
 
   // Process Command
   case MySQLSession::State::MYSQL_REQ: {
-    Command command;
+    Command command{};
     command.decode(message, offset, seq, len);
     callbacks_.onCommand(command);
 
@@ -100,7 +100,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
 
   // Process Command Response
   case MySQLSession::State::MYSQL_REQ_RESP: {
-    CommandResponse command_resp;
+    CommandResponse command_resp{};
     command_resp.decode(message, offset, seq, len);
     callbacks_.onCommandResponse(command_resp);
 

@@ -12,7 +12,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-std::string MySQLTestUtils::EncodeServerGreeting(int protocol) {
+std::string MySQLTestUtils::encodeServerGreeting(int protocol) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(protocol);
   std::string ver(MySQLTestUtils::getVersion());
@@ -29,7 +29,7 @@ std::string MySQLTestUtils::EncodeServerGreeting(int protocol) {
   return mysql_msg;
 }
 
-std::string MySQLTestUtils::EncodeClientLogin(uint16_t client_cap, std::string user) {
+std::string MySQLTestUtils::encodeClientLogin(uint16_t client_cap, std::string user) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(client_cap);
   mysql_clogin_encode.setExtendedClientCap(MYSQL_EXT_CLIENT_CAPAB);
@@ -43,7 +43,7 @@ std::string MySQLTestUtils::EncodeClientLogin(uint16_t client_cap, std::string u
   return mysql_msg;
 }
 
-std::string MySQLTestUtils::EncodeClientLoginResp(uint8_t srv_resp, int it) {
+std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, int it) {
   ClientLoginResponse mysql_loginok_encode{};
   mysql_loginok_encode.setRespCode(srv_resp);
   mysql_loginok_encode.setAffectedRows(MYSQL_SM_AFFECTED_ROWS);
@@ -56,7 +56,7 @@ std::string MySQLTestUtils::EncodeClientLoginResp(uint8_t srv_resp, int it) {
   return mysql_msg;
 }
 
-std::string MySQLTestUtils::EncodeAuthSwitchResp() {
+std::string MySQLTestUtils::encodeAuthSwitchResp() {
   ClientSwitchResponse mysql_switch_resp_encode{};
   std::string resp_opaque_data("mysql_opaque");
   mysql_switch_resp_encode.setAuthPluginResp(resp_opaque_data);
