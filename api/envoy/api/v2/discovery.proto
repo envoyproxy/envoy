@@ -151,7 +151,9 @@ message IncrementalDiscoveryRequest {
   repeated string resource_names_unsubscribe = 4;
 
   // This map must be populated when the IncrementalDiscoveryRequest is the
-  // first in a stream. The keys are the resources names of the xDS resources
+  // first in a stream (assuming there are any resources - this field's purpose is to enable
+  // a session to continue in a reconnected gRPC stream, and so will not be used in the very
+  // first stream of a session). The keys are the resources names of the xDS resources
   // known to the xDS client. The values in the map are the associated resource
   // level version info.
   map<string, string> initial_resource_versions = 5;

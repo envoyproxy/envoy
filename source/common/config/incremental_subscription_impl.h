@@ -71,9 +71,9 @@ public:
     }
 
     // "must be populated for first request in a stream"
-    // TODO what exactly are these "version" strings? just going to use "0" for now.
+    request_.clear_initial_resource_versions();
     for (auto const& resource : resources_) {
-      request_.mutable_initial_resource_versions()[resource] = "0";
+      (*request_.mutable_initial_resource_versions())[resource.first] = resource.second;
     }
 
     control_plane_stats_.connected_state_.set(1);
@@ -99,18 +99,39 @@ public:
   }
 
   // Enqueues and attempts to send a discovery request with no change to subscribed resources.
-  void queueDiscoveryRequest() { request_queue_.emplace(); }
+  void queueDiscoveryRequest() {
+    request_queue_.emplace();
+    drainRequests();
+  }
+
   // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
   // added to the passed 'resources' argument, relative to resources_. Updates resources_ to
   // 'resources'.
   void queueDiscoveryRequest(const std::vector<std::string>& resources) {
     ResourceNameDiff diff;
-    std::set_difference(resources.begin(), resources.end(), resources_.begin(), resources_.end(),
-                        diff.added_.begin());
-    std::set_difference(resources_.begin(), resources_.end(), resources.begin(), resources.end(),
-                        diff.removed_.begin());
-    request_queue_.push(diff);
-    resources_ = resources;
+    for (const auto& resource : resources) {
+      if (resources_.find(resource) == resources_.end()) {
+        diff.added_.push_back(resource);
+      }
+    }
+    for (const auto& entry : resources_) {
+      bool found = false;
+      for (const auto& resource : resources) {
+        if (entry.first == resource) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        diff.removed_.push_back(entry.first);
+      }
+    }
+    for (const auto& added : diff.added_) {
+      resources_[added] = "0";
+    }
+    for (const auto& removed : diff.removed_) {
+      resources_.erase(removed);
+    }
     drainRequests();
   }
 
@@ -174,6 +195,9 @@ public:
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string& version_info) {
     callbacks_->onIncrementalConfig(added_resources, removed_resources, version_info);
+    // TODO update versions of added_resources and removed_resources into resources_.... well,
+    // i guess removed_resources just get removed? since there's no provision for "it got removed"
+    // to have a version associated here; it's just a list of string resource names.
     stats_.update_success_.inc();
     stats_.update_attempt_.inc();
     stats_.version_.set(HashUtil::xxHash64(version_info));
@@ -250,7 +274,8 @@ public:
   }
 
 private:
-  std::vector<std::string> resources_;
+  // A map from resource name to per-resource version.
+  std::map<std::string, std::string> resources_;
   const std::string type_url_;
   IncrementalSubscriptionCallbacks<ResourceType>* callbacks_{};
   // In-flight or previously sent request.
