@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["connection_mapper_factory.cc"],
     hdrs = ["connection_mapper_factory.h"],
     deps = [
+        ":src_ip_transparent_mapper_lib",
         "//include/envoy/http:conn_pool_interface",
         "//include/envoy/http:connection_mapper_interface",
         "//source/common/singleton:threadsafe_singleton",
