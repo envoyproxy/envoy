@@ -38,7 +38,7 @@ public:
   int decode(Buffer::Instance&, uint64_t& offset, int seq, int len) override;
   std::string encode() override;
 
-  Cmd ParseCmd(Buffer::Instance& data, uint64_t& offset);
+  Cmd parseCmd(Buffer::Instance& data, uint64_t& offset);
   Cmd getCmd() const { return cmd_; }
   const std::string& getData() const { return data_; }
   std::string& getDb() { return db_; }

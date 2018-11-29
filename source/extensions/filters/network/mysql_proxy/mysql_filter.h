@@ -51,9 +51,10 @@ class MySQLFilterConfig {
 public:
   MySQLFilterConfig(const std::string &stat_prefix, Stats::Scope& scope);
 
+  const MySQLProxyStats& stats() { return stats_; }
+
   Stats::Scope& scope_;
   const std::string stat_prefix_;
-  const MySQLProxyStats& stats() { return stats_; }
   MySQLProxyStats stats_;
 
 private:

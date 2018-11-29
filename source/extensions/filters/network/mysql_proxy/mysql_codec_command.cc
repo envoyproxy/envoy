@@ -8,7 +8,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-Command::Cmd Command::ParseCmd(Buffer::Instance& data, uint64_t& offset) {
+Command::Cmd Command::parseCmd(Buffer::Instance& data, uint64_t& offset) {
   uint8_t cmd;
   if (BufferHelper::peekUint8(data, offset, cmd) != MYSQL_SUCCESS) {
     return Command::Cmd::COM_NULL;
@@ -23,7 +23,7 @@ void Command::setDb(std::string db) { db_ = db; }
 int Command::decode(Buffer::Instance& buffer, uint64_t& offset, int seq, int len) {
   setSeq(seq);
 
-  Command::Cmd cmd = ParseCmd(buffer, offset);
+  Command::Cmd cmd = parseCmd(buffer, offset);
   setCmd(cmd);
   if (cmd == Command::Cmd::COM_NULL) {
     return MYSQL_FAILURE;
