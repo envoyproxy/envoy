@@ -129,14 +129,6 @@ bool DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
 
   callbacks_.onNewMessage(session_.getState());
 
-  /*
-  // The sequence ID is reset on a new command.
-  if (seq == MYSQL_PKT_0) {
-    session_.setExpectedSeq(MYSQL_PKT_0);
-    ENVOY_LOG(trace, "mysql_proxy: received packet with sequence ID = 0");
-  }
-  */
-
   // Ignore duplicate and out-of-sync packets.
   if (seq != session_.getExpectedSeq()) {
     callbacks_.onProtocolError();
