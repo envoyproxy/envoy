@@ -32,15 +32,6 @@ int ContextImpl::sslContextIndex() {
   }());
 }
 
-enum ssl_select_cert_result_t
-ContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
-  // This is currently a nop, since we only have a single cert, but this is where we will implement
-  // the certificate selection logic in #1319.
-  RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, tls_contexts_[0].ssl_ctx_.get()) != nullptr,
-                 "");
-  return ssl_select_cert_success;
-}
-
 ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source)
     : scope_(scope), stats_(generateStats(scope)), time_source_(time_source) {
   const auto tls_certificates = config.tlsCertificates();
@@ -76,14 +67,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     if (!SSL_CTX_set1_curves_list(ctx.ssl_ctx_.get(), config.ecdhCurves().c_str())) {
       throw EnvoyException(fmt::format("Failed to initialize ECDH curves {}", config.ecdhCurves()));
     }
-
-    // TODO(htuch): replace with SSL_IDENTITY when we have this as a means to do multi-cert in
-    // BoringSSL.
-    SSL_CTX_set_select_certificate_cb(
-        ctx.ssl_ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
-          return static_cast<ContextImpl*>(SSL_get_app_data(client_hello->ssl))
-              ->selectTlsContext(client_hello);
-        });
   }
 
   int verify_mode = SSL_VERIFY_NONE;
@@ -635,6 +618,15 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
   if (config.tlsCertificates().empty()) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
+  // First, configure the base context for ClientHello interception.
+  // TODO(htuch): replace with SSL_IDENTITY when we have this as a means to do multi-cert in
+  // BoringSSL.
+  SSL_CTX_set_select_certificate_cb(
+      tls_contexts_[0].ssl_ctx_.get(),
+      [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
+        return static_cast<ServerContextImpl*>(SSL_get_app_data(client_hello->ssl))
+            ->selectTlsContext(client_hello);
+      });
   for (auto& ctx : tls_contexts_) {
     X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
     if (config.certificateValidationContext() != nullptr &&
@@ -855,6 +847,15 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 
     return 0; // decryption failed
   }
+}
+
+enum ssl_select_cert_result_t
+ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  // This is currently a nop, since we only have a single cert, but this is where we will implement
+  // the certificate selection logic in #1319.
+  RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, tls_contexts_[0].ssl_ctx_.get()) != nullptr,
+                 "");
+  return ssl_select_cert_success;
 }
 
 } // namespace Ssl

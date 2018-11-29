@@ -122,10 +122,6 @@ protected:
 
   CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path) const;
 
-  // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb()
-  // callback with ClientHello details.
-  enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
-
   struct TlsContext {
     // Each certificate specified for the context has its own SSL_CTX. SSL_CTXs
     // are identical with the exception of certificate material, and can be
@@ -188,6 +184,10 @@ private:
                          unsigned int inlen);
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt);
+  // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
+  // ClientHello details.
+  enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
+
 
   const std::vector<ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };
