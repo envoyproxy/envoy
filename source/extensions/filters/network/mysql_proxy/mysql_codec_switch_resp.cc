@@ -13,7 +13,7 @@ void ClientSwitchResponse::SetAuthPluginResp(std::string& auth_plugin_resp_) {
   auth_plugin_resp_.assign(auth_plugin_resp_);
 }
 
-int ClientSwitchResponse::Decode(Buffer::Instance&, int seq, int) {
+int ClientSwitchResponse::Decode(Buffer::Instance&, uint64_t&, int seq, int) {
   SetSeq(seq);
   return MYSQL_SUCCESS;
 }
@@ -21,8 +21,8 @@ int ClientSwitchResponse::Decode(Buffer::Instance&, int seq, int) {
 std::string ClientSwitchResponse::Encode() {
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
 
-  BufferHelper::BufStringAdd(*buffer, auth_plugin_resp_);
-  std::string e_string = BufferHelper::BufToString(*buffer);
+  BufferHelper::addString(*buffer, auth_plugin_resp_);
+  std::string e_string = BufferHelper::toString(*buffer);
   return e_string;
 }
 

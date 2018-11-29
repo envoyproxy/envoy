@@ -24,7 +24,7 @@ std::string MySQLTestUtils::EncodeServerGreeting(int protocol) {
   mysql_greet_encode.SetServerStatus(MYSQL_SERVER_STATUS);
   mysql_greet_encode.SetExtServerCap(MYSQL_SERVER_EXT_CAPAB);
   std::string data = mysql_greet_encode.Encode();
-  std::string mysql_msg = BufferHelper::EncodeHdr(data, GREETING_SEQ_NUM);
+  std::string mysql_msg = BufferHelper::encodeHdr(data, GREETING_SEQ_NUM);
   return mysql_msg;
 }
 
@@ -38,7 +38,7 @@ std::string MySQLTestUtils::EncodeClientLogin(uint16_t client_cap, std::string u
   std::string auth_resp(GetAuthResp());
   mysql_clogin_encode.SetAuthResp(auth_resp);
   std::string data = mysql_clogin_encode.Encode();
-  std::string mysql_msg = BufferHelper::EncodeHdr(data, CHALLENGE_SEQ_NUM);
+  std::string mysql_msg = BufferHelper::encodeHdr(data, CHALLENGE_SEQ_NUM);
   return mysql_msg;
 }
 
@@ -51,7 +51,7 @@ std::string MySQLTestUtils::EncodeClientLoginResp(uint8_t srv_resp, int it) {
   mysql_loginok_encode.SetWarnings(MYSQL_SM_SERVER_WARNINGS);
   std::string data = mysql_loginok_encode.Encode();
   int seq = CHALLENGE_RESP_SEQ_NUM + 2 * it;
-  std::string mysql_msg = BufferHelper::EncodeHdr(data, seq);
+  std::string mysql_msg = BufferHelper::encodeHdr(data, seq);
   return mysql_msg;
 }
 
@@ -60,7 +60,7 @@ std::string MySQLTestUtils::EncodeAuthSwitchResp() {
   std::string resp_opaque_data("mysql_opaque");
   mysql_switch_resp_encode.SetAuthPluginResp(resp_opaque_data);
   std::string data = mysql_switch_resp_encode.Encode();
-  std::string mysql_msg = BufferHelper::EncodeHdr(data, AUTH_SWITH_RESP_SEQ);
+  std::string mysql_msg = BufferHelper::encodeHdr(data, AUTH_SWITH_RESP_SEQ);
   return mysql_msg;
 }
 

@@ -134,7 +134,7 @@ class MySQLCodec : public Logger::Loggable<Logger::Id::filter> {
 public:
   virtual ~MySQLCodec(){};
 
-  virtual int Decode(Buffer::Instance& data, int seq, int len) PURE;
+  virtual int Decode(Buffer::Instance& data, uint64_t& offset, int seq, int len) PURE;
   virtual std::string Encode() PURE;
 
   int GetSeq() { return seq_; }
@@ -149,23 +149,24 @@ private:
  */
 class BufferHelper : public Logger::Loggable<Logger::Id::filter> {
 public:
-  static void BufUint8Add(Buffer::Instance& buffer, uint8_t val);
-  static void BufUint16Add(Buffer::Instance& buffer, uint16_t val);
-  static void BufUint32Add(Buffer::Instance& buffer, uint32_t val);
-  static void BufStringAdd(Buffer::Instance& buffer, const std::string& str);
-  static std::string BufToString(Buffer::Instance& buffer);
-  static std::string EncodeHdr(const std::string& cmd_str, int seq);
-  static bool EndOfBuffer(Buffer::Instance& buffer);
-  static int BufUint8Drain(Buffer::Instance& buffer, uint8_t& val);
-  static int BufUint16Drain(Buffer::Instance& buffer, uint16_t& val);
-  static int BufUint32Drain(Buffer::Instance& buffer, uint32_t& val);
-  static int BufUint64Drain(Buffer::Instance& buffer, uint64_t& val);
-  static int BufReadBySizeDrain(Buffer::Instance& buffer, size_t len, int& val);
-  static int ReadLengthEncodedIntegerDrain(Buffer::Instance& buffer, int& val);
-  static int DrainBytes(Buffer::Instance& buffer, size_t skip_bytes);
-  static int BufStringDrain(Buffer::Instance& buffer, std::string& str);
-  static int BufStringDrainBySize(Buffer::Instance& buffer, std::string& str, size_t len);
-  static int HdrReadDrain(Buffer::Instance& buffer, int& len, int& seq);
+  static void addUint8(Buffer::Instance& buffer, uint8_t val);
+  static void addUint16(Buffer::Instance& buffer, uint16_t val);
+  static void addUint32(Buffer::Instance& buffer, uint32_t val);
+  static void addString(Buffer::Instance& buffer, const std::string& str);
+  static std::string toString(Buffer::Instance& buffer);
+  static std::string encodeHdr(const std::string& cmd_str, int seq);
+  static bool endOfBuffer(Buffer::Instance& buffer, uint64_t& offset);
+  static int peekUint8(Buffer::Instance& buffer, uint64_t& offset, uint8_t& val);
+  static int peekUint16(Buffer::Instance& buffer, uint64_t& offset, uint16_t& val);
+  static int peekUint32(Buffer::Instance& buffer, uint64_t& offset, uint32_t& val);
+  static int peekUint64(Buffer::Instance& buffer, uint64_t& offset, uint64_t& val);
+  static int peekBySize(Buffer::Instance& buffer, uint64_t& offset, int len, int& val);
+  static int peekLengthEncodedInteger(Buffer::Instance& buffer, uint64_t& offset, int& val);
+  static int peekBytes(Buffer::Instance& buffer, uint64_t& offset, int skip_bytes);
+  static int peekString(Buffer::Instance& buffer, uint64_t& offset, std::string& str);
+  static int peekStringBySize(Buffer::Instance& buffer, uint64_t& offset, int len,
+                              std::string& str);
+  static int peekHdr(Buffer::Instance& buffer, uint64_t& offset, int& len, int& seq);
 };
 
 /**
@@ -175,7 +176,7 @@ class DecoderCallbacks {
 public:
   virtual ~DecoderCallbacks() {}
 
-  virtual void decode(Buffer::Instance& message, int seq, int len) PURE;
+  virtual void decode(Buffer::Instance& message, uint64_t& offset, int seq, int len) PURE;
   virtual void onProtocolError() PURE;
   virtual void onLoginAttempt() PURE;
 };
@@ -201,7 +202,7 @@ public:
   void onData(Buffer::Instance& data) override;
 
 private:
-  bool decode(Buffer::Instance& data);
+  bool decode(Buffer::Instance& data, uint64_t& offset);
 
   DecoderCallbacks& callbacks_;
   MySQLSession& session_;

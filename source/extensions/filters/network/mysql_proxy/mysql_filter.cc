@@ -23,26 +23,24 @@ void MySQLFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
 }
 
 Network::FilterStatus MySQLFilter::onData(Buffer::Instance& data, bool) {
-  read_buffer_.add(data);
-  doDecode(read_buffer_);
+  doDecode(data);
   return Network::FilterStatus::Continue;
 }
 
 Network::FilterStatus MySQLFilter::onWrite(Buffer::Instance& data, bool) {
-  write_buffer_.add(data);
-  doDecode(write_buffer_);
+  doDecode(data);
   return Network::FilterStatus::Continue;
 }
 
 void MySQLFilter::doDecode(Buffer::Instance& buffer) {
+  // Safety measure just to make sure that if we have a decoding error we keep going and lose stats.
+  // This can be removed once we are more confident of this code.
   if (!sniffing_) {
-    // Safety measure just to make sure that if we have a decoding error we keep going and lose
-    // stats. This can be removed once we are more confident of this code.
     buffer.drain(buffer.length());
     return;
   }
 
-  // Clear dynamic metadata
+  // Clear dynamic metadata.
   auto& dynamic_metadata = const_cast<envoy::api::v2::core::Metadata&>(
       read_callbacks_->connection().streamInfo().dynamicMetadata());
   auto& metadata =
@@ -66,17 +64,13 @@ DecoderPtr MySQLFilter::createDecoder(DecoderCallbacks& callbacks) {
   return DecoderPtr{new DecoderImpl(callbacks, session_)};
 }
 
-void MySQLFilter::decode(Buffer::Instance& message, int seq, int len) {
-  Process(message, seq, len);
-}
-
 void MySQLFilter::onProtocolError() { config_->stats_.protocol_errors_.inc(); }
 
 void MySQLFilter::onLoginAttempt() { config_->stats_.login_attempts_.inc(); }
 
-Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, int seq, int len) {
+void MySQLFilter::decode(Buffer::Instance& message, uint64_t& offset, int seq, int len) {
   ENVOY_CONN_LOG(trace, "mysql_proxy: onData, len {}", read_callbacks_->connection(),
-                 data.length());
+                 message.length());
 
   // Run the mysql state machine
   switch (session_.GetState()) {
@@ -84,7 +78,7 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, int seq, int 
   // expect Server Challenge packet
   case MySQLSession::State::MYSQL_INIT: {
     ServerGreeting greeting{};
-    greeting.Decode(data, seq, len);
+    greeting.Decode(message, offset, seq, len);
     session_.SetState(MySQLSession::State::MYSQL_CHALLENGE_REQ);
     break;
   }
@@ -92,7 +86,7 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, int seq, int 
   // Process Client Handshake Response
   case MySQLSession::State::MYSQL_CHALLENGE_REQ: {
     ClientLogin client_login{};
-    client_login.Decode(data, seq, len);
+    client_login.Decode(message, offset, seq, len);
     if (client_login.IsSSLRequest()) {
       session_.SetState(MySQLSession::State::MYSQL_SSL_PT);
       config_->stats_.upgraded_to_ssl_.inc();
@@ -105,12 +99,12 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, int seq, int 
   }
 
   case MySQLSession::State::MYSQL_SSL_PT:
-    return Network::FilterStatus::Continue;
+    break;
 
   case MySQLSession::State::MYSQL_CHALLENGE_RESP_41:
   case MySQLSession::State::MYSQL_CHALLENGE_RESP_320: {
     ClientLoginResponse client_login_resp{};
-    client_login_resp.Decode(data, seq, len);
+    client_login_resp.Decode(message, offset, seq, len);
     if (client_login_resp.GetRespCode() == MYSQL_RESP_OK) {
       session_.SetState(MySQLSession::State::MYSQL_REQ);
     } else if (client_login_resp.GetRespCode() == MYSQL_RESP_AUTH_SWITCH) {
@@ -127,14 +121,14 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, int seq, int 
 
   case MySQLSession::State::MYSQL_AUTH_SWITCH_RESP: {
     ClientSwitchResponse client_switch_resp{};
-    client_switch_resp.Decode(data, seq, len);
+    client_switch_resp.Decode(message, offset, seq, len);
     session_.SetState(MySQLSession::State::MYSQL_AUTH_SWITCH_MORE);
     break;
   }
 
   case MySQLSession::State::MYSQL_AUTH_SWITCH_MORE: {
     ClientLoginResponse client_login_resp{};
-    client_login_resp.Decode(data, seq, len);
+    client_login_resp.Decode(message, offset, seq, len);
     if (client_login_resp.GetRespCode() == MYSQL_RESP_OK) {
       session_.SetState(MySQLSession::State::MYSQL_REQ);
     } else if (client_login_resp.GetRespCode() == MYSQL_RESP_MORE) {
@@ -151,7 +145,7 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, int seq, int 
   // Process Command
   case MySQLSession::State::MYSQL_REQ: {
     Command command{};
-    command.Decode(data, seq, len);
+    command.Decode(message, offset, seq, len);
     session_.SetState(MySQLSession::State::MYSQL_REQ_RESP);
     if (!command.RunQueryParser()) {
       // some mysql commands don't have a string to parse
@@ -197,7 +191,7 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, int seq, int 
   // Process Command Response
   case MySQLSession::State::MYSQL_REQ_RESP: {
     CommandResp command_resp{};
-    command_resp.Decode(data, seq, len);
+    command_resp.Decode(message, offset, seq, len);
     session_.SetState(MySQLSession::State::MYSQL_REQ);
     break;
   }
@@ -210,8 +204,6 @@ Network::FilterStatus MySQLFilter::Process(Buffer::Instance& data, int seq, int 
 
   ENVOY_CONN_LOG(trace, "mysql_proxy: msg processed, session in state {}",
                  read_callbacks_->connection(), static_cast<int>(session_.GetState()));
-
-  return Network::FilterStatus::Continue;
 }
 
 Network::FilterStatus MySQLFilter::onNewConnection() {

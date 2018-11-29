@@ -18,7 +18,10 @@ constexpr int MYSQL_UT_LAST_ID = 0;
 constexpr int MYSQL_UT_SERVER_OK = 0;
 constexpr int MYSQL_UT_SERVER_WARNINGS = 0x0001;
 
-class MySQLCodecTest : public MySQLTestUtils, public testing::Test {};
+class MySQLCodecTest : public MySQLTestUtils, public testing::Test {
+protected:
+  uint64_t offset_{0};
+};
 
 TEST_F(MySQLCodecTest, MySQLServerChallengeV9EncDec) {
   ServerGreeting mysql_greet_encode{};
@@ -32,7 +35,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeV9EncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.Decode(*decode_data, GREETING_SEQ_NUM, decode_data->length());
+  mysql_greet_decode.Decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_greet_decode.GetSalt(), mysql_greet_encode.GetSalt());
   EXPECT_EQ(mysql_greet_decode.GetVersion(), mysql_greet_encode.GetVersion());
   EXPECT_EQ(mysql_greet_decode.GetProtocol(), mysql_greet_encode.GetProtocol());
@@ -64,7 +67,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeV10EncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.Decode(*decode_data, GREETING_SEQ_NUM, decode_data->length());
+  mysql_greet_decode.Decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_greet_decode.GetSalt(), mysql_greet_encode.GetSalt());
   EXPECT_EQ(mysql_greet_decode.GetVersion(), mysql_greet_encode.GetVersion());
   EXPECT_EQ(mysql_greet_decode.GetProtocol(), mysql_greet_encode.GetProtocol());
@@ -99,7 +102,7 @@ TEST_F(MySQLCodecTest, MySQLClLoginV41PluginAuthEncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.Decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.IsResponse41(), true);
   EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
   EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
@@ -134,7 +137,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin41SecureConnEncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.Decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.IsResponse41(), true);
   EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
   EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
@@ -164,7 +167,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin41EncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.Decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.IsResponse41(), true);
   EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
   EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
@@ -193,7 +196,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320EncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.Decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.IsResponse320(), true);
   EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
   EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
@@ -222,7 +225,7 @@ TEST_F(MySQLCodecTest, MySQLClientLoginSSLEncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.Decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.IsSSLRequest(), true);
   EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
   EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
@@ -245,7 +248,7 @@ TEST_F(MySQLCodecTest, MySQLLoginOkEncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLoginResponse mysql_loginok_decode{};
-  mysql_loginok_decode.Decode(*decode_data, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
+  mysql_loginok_decode.Decode(*decode_data, offset_, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_loginok_decode.GetRespCode(), mysql_loginok_encode.GetRespCode());
   EXPECT_EQ(mysql_loginok_decode.GetAffectedRows(), mysql_loginok_encode.GetAffectedRows());
   EXPECT_EQ(mysql_loginok_decode.GetLastInsertId(), mysql_loginok_encode.GetLastInsertId());

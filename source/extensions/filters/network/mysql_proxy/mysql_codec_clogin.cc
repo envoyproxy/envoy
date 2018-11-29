@@ -43,25 +43,25 @@ bool ClientLogin::IsClientSecureConnection() const {
   return extended_client_cap_ & MYSQL_EXT_CL_SECURE_CONNECTION;
 }
 
-int ClientLogin::Decode(Buffer::Instance& buffer, int seq, int) {
+int ClientLogin::Decode(Buffer::Instance& buffer, uint64_t& offset, int seq, int) {
   if (seq != CHALLENGE_SEQ_NUM) {
     return MYSQL_FAILURE;
   }
   SetSeq(seq);
   uint16_t client_cap = 0;
-  if (BufferHelper::BufUint16Drain(buffer, client_cap) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekUint16(buffer, offset, client_cap) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing client_cap in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
   SetClientCap(client_cap);
   uint16_t extended_client_cap = 0;
-  if (BufferHelper::BufUint16Drain(buffer, extended_client_cap) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekUint16(buffer, offset, extended_client_cap) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing extended_client_cap in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
   SetExtendedClientCap(extended_client_cap);
   uint32_t max_packet = 0;
-  if (BufferHelper::BufUint32Drain(buffer, max_packet) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekUint32(buffer, offset, max_packet) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing max_packet in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
@@ -71,17 +71,17 @@ int ClientLogin::Decode(Buffer::Instance& buffer, int seq, int) {
     return MYSQL_SUCCESS;
   }
   uint8_t charset = 0;
-  if (BufferHelper::BufUint8Drain(buffer, charset) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekUint8(buffer, offset, charset) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing charset in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
   SetCharset(charset);
-  if (BufferHelper::DrainBytes(buffer, UNSET_BYTES) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekBytes(buffer, offset, UNSET_BYTES) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error skipping unset bytes in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
   std::string username;
-  if (BufferHelper::BufStringDrain(buffer, username) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekString(buffer, offset, username) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing username in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
@@ -89,26 +89,26 @@ int ClientLogin::Decode(Buffer::Instance& buffer, int seq, int) {
   std::string auth_resp;
   if (IsClientAuthLenClData()) {
     int auth_resp_len = 0;
-    if (BufferHelper::ReadLengthEncodedIntegerDrain(buffer, auth_resp_len) != MYSQL_SUCCESS) {
+    if (BufferHelper::peekLengthEncodedInteger(buffer, offset, auth_resp_len) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing LengthEncodedInteger in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
-    if (BufferHelper::BufStringDrainBySize(buffer, auth_resp, auth_resp_len) != MYSQL_SUCCESS) {
+    if (BufferHelper::peekStringBySize(buffer, offset, auth_resp_len, auth_resp) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
   } else if (IsClientSecureConnection()) {
     uint8_t auth_resp_len = 0;
-    if (BufferHelper::BufUint8Drain(buffer, auth_resp_len) != MYSQL_SUCCESS) {
+    if (BufferHelper::peekUint8(buffer, offset, auth_resp_len) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp_len in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
-    if (BufferHelper::BufStringDrainBySize(buffer, auth_resp, auth_resp_len) != MYSQL_SUCCESS) {
+    if (BufferHelper::peekStringBySize(buffer, offset, auth_resp_len, auth_resp) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
   } else {
-    if (BufferHelper::BufStringDrain(buffer, auth_resp) != MYSQL_SUCCESS) {
+    if (BufferHelper::peekString(buffer, offset, auth_resp) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
@@ -116,7 +116,7 @@ int ClientLogin::Decode(Buffer::Instance& buffer, int seq, int) {
   SetAuthResp(auth_resp);
   if (IsConnectWithDb()) {
     std::string db;
-    if (BufferHelper::BufStringDrain(buffer, db) != MYSQL_SUCCESS) {
+    if (BufferHelper::peekString(buffer, offset, db) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
@@ -128,29 +128,29 @@ int ClientLogin::Decode(Buffer::Instance& buffer, int seq, int) {
 std::string ClientLogin::Encode() {
   uint8_t enc_end_string = 0;
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
-  BufferHelper::BufUint16Add(*buffer, client_cap_);
-  BufferHelper::BufUint16Add(*buffer, extended_client_cap_);
-  BufferHelper::BufUint32Add(*buffer, max_packet_);
-  BufferHelper::BufUint8Add(*buffer, charset_);
+  BufferHelper::addUint16(*buffer, client_cap_);
+  BufferHelper::addUint16(*buffer, extended_client_cap_);
+  BufferHelper::addUint32(*buffer, max_packet_);
+  BufferHelper::addUint8(*buffer, charset_);
   for (int idx = 0; idx < UNSET_BYTES; idx++) {
-    BufferHelper::BufUint8Add(*buffer, 0);
+    BufferHelper::addUint8(*buffer, 0);
   }
-  BufferHelper::BufStringAdd(*buffer, username_);
-  BufferHelper::BufUint8Add(*buffer, enc_end_string);
+  BufferHelper::addString(*buffer, username_);
+  BufferHelper::addUint8(*buffer, enc_end_string);
   if ((extended_client_cap_ & MYSQL_EXT_CL_PLG_AUTH_CL_DATA) ||
       (extended_client_cap_ & MYSQL_EXT_CL_SECURE_CONNECTION)) {
-    BufferHelper::BufUint8Add(*buffer, auth_resp_.length());
-    BufferHelper::BufStringAdd(*buffer, auth_resp_);
+    BufferHelper::addUint8(*buffer, auth_resp_.length());
+    BufferHelper::addString(*buffer, auth_resp_);
   } else {
-    BufferHelper::BufStringAdd(*buffer, auth_resp_);
-    BufferHelper::BufUint8Add(*buffer, enc_end_string);
+    BufferHelper::addString(*buffer, auth_resp_);
+    BufferHelper::addUint8(*buffer, enc_end_string);
   }
   if (client_cap_ & MYSQL_CLIENT_CONNECT_WITH_DB) {
-    BufferHelper::BufStringAdd(*buffer, db_);
-    BufferHelper::BufUint8Add(*buffer, enc_end_string);
+    BufferHelper::addString(*buffer, db_);
+    BufferHelper::addUint8(*buffer, enc_end_string);
   }
 
-  std::string e_string = BufferHelper::BufToString(*buffer);
+  std::string e_string = BufferHelper::toString(*buffer);
   return e_string;
 }
 

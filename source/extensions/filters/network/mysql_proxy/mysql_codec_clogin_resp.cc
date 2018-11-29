@@ -19,41 +19,41 @@ void ClientLoginResponse::SetServerStatus(uint16_t status) { server_status_ = st
 
 void ClientLoginResponse::SetWarnings(uint16_t warnings) { warnings_ = warnings; }
 
-int ClientLoginResponse::Decode(Buffer::Instance& buffer, int seq, int) {
+int ClientLoginResponse::Decode(Buffer::Instance& buffer, uint64_t& offset, int seq, int) {
   if (seq != CHALLENGE_RESP_SEQ_NUM) {
     return MYSQL_FAILURE;
   }
   SetSeq(seq);
   uint8_t resp_code = 0;
-  if (BufferHelper::BufUint8Drain(buffer, resp_code) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekUint8(buffer, offset, resp_code) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing response code in mysql Login Ok msg");
     return MYSQL_FAILURE;
   }
   SetRespCode(resp_code);
-  if ((resp_code == MYSQL_RESP_AUTH_SWITCH) && BufferHelper::EndOfBuffer(buffer)) {
+  if ((resp_code == MYSQL_RESP_AUTH_SWITCH) && BufferHelper::endOfBuffer(buffer, offset)) {
     // OldAuthSwitchRequest
     return MYSQL_SUCCESS;
   }
   uint8_t affected_rows = 0;
-  if (BufferHelper::BufUint8Drain(buffer, affected_rows) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekUint8(buffer, offset, affected_rows) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing affected_rows in mysql Login Ok msg");
     return MYSQL_FAILURE;
   }
   SetAffectedRows(affected_rows);
   uint8_t last_insert_id = 0;
-  if (BufferHelper::BufUint8Drain(buffer, last_insert_id) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekUint8(buffer, offset, last_insert_id) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing last_insert_id in mysql Login Ok msg");
     return MYSQL_FAILURE;
   }
   SetLastInsertId(last_insert_id);
   uint16_t server_status = 0;
-  if (BufferHelper::BufUint16Drain(buffer, server_status) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekUint16(buffer, offset, server_status) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing server_status in mysql Login Ok msg");
     return MYSQL_FAILURE;
   }
   SetServerStatus(server_status);
   uint16_t warnings = 0;
-  if (BufferHelper::BufUint16Drain(buffer, warnings) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekUint16(buffer, offset, warnings) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing warnings in mysql Login Ok msg");
     return MYSQL_FAILURE;
   }
@@ -63,13 +63,13 @@ int ClientLoginResponse::Decode(Buffer::Instance& buffer, int seq, int) {
 
 std::string ClientLoginResponse::Encode() {
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
-  BufferHelper::BufUint8Add(*buffer, resp_code_);
-  BufferHelper::BufUint8Add(*buffer, affected_rows_);
-  BufferHelper::BufUint8Add(*buffer, last_insert_id_);
-  BufferHelper::BufUint16Add(*buffer, server_status_);
-  BufferHelper::BufUint16Add(*buffer, warnings_);
+  BufferHelper::addUint8(*buffer, resp_code_);
+  BufferHelper::addUint8(*buffer, affected_rows_);
+  BufferHelper::addUint8(*buffer, last_insert_id_);
+  BufferHelper::addUint16(*buffer, server_status_);
+  BufferHelper::addUint16(*buffer, warnings_);
 
-  std::string e_string = BufferHelper::BufToString(*buffer);
+  std::string e_string = BufferHelper::toString(*buffer);
   return e_string;
 }
 
