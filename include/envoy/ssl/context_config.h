@@ -88,6 +88,11 @@ public:
    * @return The maximum number of session keys to store.
    */
   virtual size_t maxSessionKeys() const PURE;
+
+  /**
+   * @return const std::string& with the signature algorithms for the context.
+   */
+  virtual const std::string& sigalgs() const PURE;
 };
 
 typedef std::unique_ptr<ClientContextConfig> ClientContextConfigPtr;

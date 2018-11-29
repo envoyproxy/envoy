@@ -400,6 +400,11 @@ void ConfigHelper::initializeTls(bool ecdsa_cert,
       TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
   validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
 
+  // We'll negotiate up to TLSv1.3, but it really depends on what the client
+  // sets.
+  common_tls_context.mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::api::v2::auth::TlsParameters::TLSv1_3);
+
   auto* tls_certificate = common_tls_context.add_tls_certificates();
   if (ecdsa_cert) {
     tls_certificate->mutable_certificate_chain()->set_filename(
