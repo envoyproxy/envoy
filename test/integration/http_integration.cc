@@ -2180,4 +2180,11 @@ config: {}
   EXPECT_EQ(response->metadata_map().size(), 3);
 }
 
+std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {
+  if (version_ == Network::Address::IpVersion::v4) {
+    return "listener.127.0.0.1_0." + stat_name;
+  }
+  return "listener.[__1]_0." + stat_name;
+}
+
 } // namespace Envoy

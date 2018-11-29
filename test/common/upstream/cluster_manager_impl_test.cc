@@ -59,9 +59,10 @@ public:
                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
                                   AccessLog::AccessLogManager& log_manager,
                                   bool added_via_api) -> ClusterSharedPtr {
-          return ClusterImplBase::create(
-              cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
-              dispatcher_, log_manager, local_info_, outlier_event_logger, added_via_api);
+          return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
+                                         ssl_context_manager_, runtime_, random_, dispatcher_,
+                                         log_manager, local_info_, outlier_event_logger,
+                                         added_via_api, eds_subscription_factory_);
         }));
   }
 
@@ -126,6 +127,7 @@ public:
   Ssl::ContextManagerImpl ssl_context_manager_{dispatcher_.timeSystem()};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Secret::MockSecretManager> secret_manager_;
+  NiceMock<MockEdsSubscriptionFactory> eds_subscription_factory_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.

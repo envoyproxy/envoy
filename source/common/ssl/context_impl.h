@@ -1,5 +1,6 @@
 #pragma once
 
+#include <deque>
 #include <functional>
 #include <string>
 #include <vector>
@@ -11,6 +12,7 @@
 
 #include "common/ssl/context_manager_impl.h"
 
+#include "absl/synchronization/mutex.h"
 #include "absl/types/optional.h"
 #include "openssl/ssl.h"
 
@@ -42,7 +44,7 @@ struct SslStats {
 
 class ContextImpl : public virtual Context {
 public:
-  virtual bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name) const;
+  virtual bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name);
 
   /**
    * Logs successful TLS handshake and updates stats.
@@ -143,11 +145,17 @@ public:
   ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config,
                     TimeSource& time_source);
 
-  bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name) const override;
+  bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name) override;
 
 private:
+  int newSessionKey(SSL_SESSION* session);
+
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
+  const size_t max_session_keys_;
+  absl::Mutex session_keys_mu_;
+  std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ GUARDED_BY(session_keys_mu_);
+  bool session_keys_single_use_{false};
 };
 
 class ServerContextImpl : public ContextImpl, public ServerContext {

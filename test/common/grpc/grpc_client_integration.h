@@ -42,6 +42,12 @@ class GrpcClientIntegrationParamTest
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, ClientType>> {
 public:
   ~GrpcClientIntegrationParamTest() {}
+  static std::string protocolTestParamsToString(
+      const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, ClientType>>& p) {
+    return absl::StrCat(
+        (std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+        (std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc"));
+  }
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   ClientType clientType() const override { return std::get<1>(GetParam()); }
 };
