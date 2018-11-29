@@ -22,12 +22,16 @@ public:
 // Note: a similar test using HeapStatData* is in heap_stat_data_test.cc.
 TEST_F(RawStatDataTest, RawTruncate) {
   const std::string long_string(stats_options_.maxNameLength() + 1, 'A');
+  RawStatData* stat{};
+  EXPECT_LOG_CONTAINS("warning", " is too long ", stat = allocator_.alloc(long_string));
+  EXPECT_NE(stat->key(), long_string);
 
-  // As of now, RawStatDataAllocator requires stats to be pre-truncated before
-  // calling it. This is because the truncation is done in ThreadLocalStore so
-  // that heap-allocated overflow stats are consistently truncated. In the
-  // future the truncation should be moved into the RawStatData allocator.
-  EXPECT_DEATH(allocator_.alloc(long_string), "options_\\.maxNameLength");
+  // If I add more bytes to the key, I'll get the same allocation back
+  // due to the truncated map lookup.
+  EXPECT_EQ(stat, allocator_.alloc(long_string + " ignored"));
+
+  allocator_.free(*stat);
+  allocator_.free(*stat); // Have to free it twice as second allocation bumped ref-count.
 }
 
 // Note: a similar test using HeapStatData* is in heap_stat_data_test.cc.

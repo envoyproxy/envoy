@@ -37,7 +37,7 @@ uint64_t RawStatData::structSizeWithOptions(const StatsOptions& stats_options) {
 
 void RawStatData::initialize(absl::string_view key, const StatsOptions& stats_options) {
   ASSERT(!initialized());
-  ASSERT(key.size() <= stats_options.maxNameLength());
+  ASSERT(key.length() <= stats_options.maxNameLength());
   ref_count_ = 1;
   memcpy(name_, key.data(), key.size());
   name_[key.size()] = '\0';
@@ -46,7 +46,13 @@ void RawStatData::initialize(absl::string_view key, const StatsOptions& stats_op
 Stats::RawStatData* RawStatDataAllocator::alloc(absl::string_view name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
   Thread::LockGuard lock(mutex_);
-  ASSERT(name.length() <= options_.maxNameLength());
+  if (name.length() > options_.maxNameLength()) {
+    ENVOY_LOG_MISC(
+        warn,
+        "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
+        name, name.size(), options_.maxNameLength());
+    name = name.substr(0, options_.maxNameLength());
+  }
   auto value_created = stats_set_.insert(name);
   Stats::RawStatData* data = value_created.first;
   if (data == nullptr) {
