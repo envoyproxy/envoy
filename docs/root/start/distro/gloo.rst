@@ -6,7 +6,7 @@ Envoy as Ingress, API and Function Gateway for Kubernetes with Gloo
 Kubernetes users often need to allow traffic to flow from and to the cluster, 
 and Envoy is great for that purpose.
 The open source project `Gloo <https://gloo.solo.io>`_, which is built on top 
-of Envoy, is designed for microservices, monolithts and also applications that
+of Envoy, is designed for microservices, monoliths and also applications that
 might want to leverage function as a service. Gloo can decouple client APIs 
 from upstream APIs at the routing level. In a simplistic way, Gloo is a 
 great and easy to use tool to get traffic inside your Kubernetes cluster.
@@ -17,15 +17,15 @@ This should only take a few minutes
 Installing Gloo
 ---------------
 
-For this installation, theare are 3 main pre-requisites:
+For this installation, there are three main prerequisites:
 
 * **Kubernetes version**: Gloo requires version 1.8 or higher. `Minikube <https://kubernetes.io/docs/getting-started-guides/minikube/>`_
-  is an easy way to get access to your own Kubernetes installation.
-* **kubectl**: you need access to the kubectl command line tool.
+  is an easy way to get access to your own local Kubernetes installation.
+* **kubectl**: you need access to the `kubectl` command line tool.
 * **glooctl**: this is the Gloo command line tool which you will use to interact 
   with the open source version of Gloo. Check the `releases <https://github.com/solo-io/gloo/releases>`_ 
-  page in project repository to download the latest release. 
-  There you will find versions compatible with MacOS and Linux.
+  page under Gloo's project repository to download the latest release. 
+  There you will find versions compatible with macOS and Linux.
 
 Once all you have the above, all you need to do is run the following command:
 
@@ -34,7 +34,7 @@ Once all you have the above, all you need to do is run the following command:
    glooctl install kube 
 
 If you are familiar with Kubernetes, the command above will tell kubernetes what and 
-how it should run the gloo images. The gloo pods should be running in a namespace called
+how it should run the Gloo images. The gloo pods should be running in a namespace called
 ``gloo-system``.
 
 Your output should look similar to this:
@@ -61,7 +61,6 @@ Your output should look similar to this:
     deployment.extensions/kube-ingress-controller created
     deployment.extensions/upstream-discovery created
     Gloo successfully installed.
-
 
 Checking your Installation
 --------------------------
