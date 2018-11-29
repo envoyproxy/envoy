@@ -18,6 +18,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -62,7 +63,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                    const std::string& host, const std::string& content_type) {
 
   Stats::IsolatedStoreImpl stats_store;
-  Api::Impl api(std::chrono::milliseconds(9000), stats_store);
+  Api::Impl api(std::chrono::milliseconds(9000), Thread::threadFactoryForTest(), stats_store);
   Event::DispatcherPtr dispatcher(api.allocateDispatcher(evil_singleton_test_time_.timeSystem()));
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   Upstream::HostDescriptionConstSharedPtr host_description{
@@ -110,7 +111,7 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
                                          ReadCallback data_callback,
                                          Network::Address::IpVersion version) {
-  api_ = std::make_unique<Api::Impl>(std::chrono::milliseconds(10000), stats_store_);
+  api_ = Api::createApiForTest(stats_store_);
   dispatcher_ = api_->allocateDispatcher(IntegrationUtil::evil_singleton_test_time_.timeSystem());
   callbacks_ = std::make_unique<ConnectionCallbacks>();
   client_ = dispatcher_->createClientConnection(

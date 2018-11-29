@@ -274,6 +274,7 @@ private:
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
   bool rejects(StatName name) const;
+  //absl::string_view truncateStatNameIfNeeded(absl::string_view name);
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
 

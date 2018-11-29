@@ -223,20 +223,17 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
 }
 
 absl::string_view ThreadLocalStoreImpl::truncateStatNameIfNeeded(absl::string_view name) {
-  // If the main allocator requires stat name truncation, warn and truncate, before
-  // attempting to allocate.
+  // If the main allocator requires stat name truncation, do so now, though any
+  // warnings will be printed only if the truncated stat requires a new
+  // allocation.
   if (alloc_.requiresBoundedStatNameSize()) {
     const uint64_t max_length = stats_options_.maxNameLength();
-
-    // Note that the heap-allocator does not truncate itself; we have to
-    // truncate here if we are using heap-allocation as a fallback due to an
-    // exhausted shared-memory block
     if (name.size() > max_length) {
       ENVOY_LOG_MISC(
           warn,
           "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
           name, name.size(), max_length);
-      name = absl::string_view(name.data(), max_length);
+      name = name.substr(0, max_length);
     }
   }
   return name;
@@ -273,28 +270,19 @@ void ThreadLocalStoreImpl::ScopeImpl::extractTagsAndTruncate(
 // Manages the truncation and tag-extration of stat names. Tag extraction occurs
 // on the original, untruncated name so the extraction can complete properly,
 // even if the tag values are partially truncated.
-class TruncationExtraction {
+class TagExtraction {
 public:
-  TruncationExtraction(ThreadLocalStoreImpl& tls, StatName name) : stat_name_(name) {
+  TagExtraction(ThreadLocalStoreImpl& tls, StatName name) {
     std::string name_str = name.toString(tls.symbolTable());
     tag_extracted_name_ = tls.tagProducer().produceTags(name_str, tags_);
-    absl::string_view truncated_name = tls.truncateStatNameIfNeeded(name_str);
-    if (truncated_name.size() < name_str.size()) {
-      truncated_name_storage_ =
-          std::make_unique<StatNameTempStorage>(truncated_name, tls.symbolTable());
-      stat_name_ = truncated_name_storage_->statName();
-    }
   }
 
   const std::vector<Tag>& tags() { return tags_; }
   const std::string& tagExtractedName() { return tag_extracted_name_; }
-  StatName truncatedStatName() { return stat_name_; }
 
 private:
   std::vector<Tag> tags_;
   std::string tag_extracted_name_;
-  std::unique_ptr<StatNameTempStorage> truncated_name_storage_;
-  StatName stat_name_;
 };
 
 template <class StatType>
@@ -318,13 +306,15 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   if (p != central_cache_map.end()) {
     central_ref = &(p->second);
   } else {
-    TruncationExtraction extraction(parent_, name);
-    std::shared_ptr<StatType> stat = make_stat(parent_.alloc_, extraction.truncatedStatName(),
+    TagExtraction extraction(parent_, name);
+    //std::shared_ptr<StatType> stat = make_stat(parent_.alloc_, extraction.truncatedStatName(),
+    //extraction.tagExtractedName(), extraction.tags());
+    std::shared_ptr<StatType> stat = make_stat(parent_.alloc_, name,
                                                extraction.tagExtractedName(), extraction.tags());
     if (stat == nullptr) {
       parent_.num_last_resort_stats_.inc();
-      stat = make_stat(parent_.heap_allocator_, extraction.truncatedStatName(),
-                       extraction.tagExtractedName(), extraction.tags());
+      stat = make_stat(parent_.heap_allocator_, name, extraction.tagExtractedName(),
+                       extraction.tags());
       ASSERT(stat != nullptr);
     }
     central_ref = &central_cache_map[stat->statName()];
@@ -451,10 +441,9 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramx(StatName name) {
   if (p != central_cache_.histograms_.end()) {
     central_ref = &p->second;
   } else {
-    TruncationExtraction extraction(parent_, final_stat_name);
-    auto stat =
-        std::make_shared<ParentHistogramImpl>(extraction.truncatedStatName(), parent_, *this,
-                                              extraction.tagExtractedName(), extraction.tags());
+    TagExtraction extraction(parent_, final_stat_name);
+    auto stat = std::make_shared<ParentHistogramImpl>(
+        final_stat_name, parent_, *this, extraction.tagExtractedName(), extraction.tags());
     central_ref = &central_cache_.histograms_[stat->statName()];
     *central_ref = stat;
   }
@@ -467,7 +456,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramx(StatName name) {
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
                                                          ParentHistogramImpl& parent) {
-  if (parent_.stats_matcher_->rejects(name.toString(symbolTable()))) {
+  if (parent_.rejects(name)) {
     return parent_.null_histogram_;
   }
 

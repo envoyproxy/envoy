@@ -11,6 +11,7 @@
 #include "common/ssl/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
@@ -85,9 +86,7 @@ protected:
     auto* validation_context = secret.mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-    validation_context->add_verify_certificate_hash(
-        "E0:F3:C8:CE:5E:2E:A3:05:F0:70:1F:F5:12:E3:6E:2E:"
-        "97:92:82:84:A2:28:BC:F7:73:32:D3:39:30:A1:B6:FD");
+    validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
     return secret;
   }
 
@@ -170,9 +169,7 @@ public:
       auto* validation_context = common_tls_context->mutable_validation_context();
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-      validation_context->add_verify_certificate_hash(
-          "E0:F3:C8:CE:5E:2E:A3:05:F0:70:1F:F5:12:E3:6E:2E:"
-          "97:92:82:84:A2:28:BC:F7:73:32:D3:39:30:A1:B6:FD");
+      validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
 
       // Modify the listener ssl cert to use SDS from sds_cluster
       auto* secret_config = common_tls_context->add_tls_certificate_sds_secret_configs();
@@ -186,7 +183,7 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    client_ssl_ctx_ = createClientSslTransportSocketFactory(false, false, context_manager_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_);
   }
 
   void createUpstreams() override {
@@ -208,7 +205,8 @@ public:
   Network::ClientConnectionPtr makeSslClientConnection() {
     Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               client_ssl_ctx_->createTransportSocket(), nullptr);
+                                               client_ssl_ctx_->createTransportSocket(nullptr),
+                                               nullptr);
   }
 
 protected:
@@ -251,13 +249,8 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   sendSdsResponse(getServerSecret());
 
   // Wait for ssl_context_updated_by_sds counter.
-  if (version_ == Network::Address::IpVersion::v4) {
-    test_server_->waitForCounterGe(
-        "listener.127.0.0.1_0.server_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  } else {
-    test_server_->waitForCounterGe(
-        "listener.[__1]_0.server_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  }
+  test_server_->waitForCounterGe(
+      listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"), 1);
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
@@ -290,9 +283,7 @@ public:
         // context.
         auto* combined_config = common_tls_context->mutable_combined_validation_context();
         auto* default_validation_context = combined_config->mutable_default_validation_context();
-        default_validation_context->add_verify_certificate_hash(
-            "E0:F3:C8:CE:5E:2E:A3:05:F0:70:1F:F5:12:E3:6E:2E:"
-            "97:92:82:84:A2:28:BC:F7:73:32:D3:39:30:A1:B6:FD");
+        default_validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
         auto* secret_config = combined_config->mutable_validation_context_sds_secret_config();
         setUpSdsConfig(secret_config, validation_secret_);
       } else {
@@ -310,7 +301,7 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    client_ssl_ctx_ = createClientSslTransportSocketFactory(false, false, context_manager_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_);
   }
 
   void enableCombinedValidationContext(bool enable) { use_combined_validation_context_ = enable; }

@@ -164,7 +164,6 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
       "filters" : {
         "type" : "object",
         "properties" : {
-          "type": {"type" : "string", "enum" : ["read", "write", "both"] },
           "name" : {
             "type": "string"
           },

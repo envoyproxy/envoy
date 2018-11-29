@@ -16,3 +16,4 @@ of a :ref:`FilterChainMatch <envoy_api_msg_listener.FilterChainMatch>`.
 
 * :ref:`SNI <faq_how_to_setup_sni>`
 * :ref:`v2 API reference <envoy_api_field_listener.ListenerFilter.name>`
+* This filter should be configured with the name *envoy.listener.tls_inspector*.

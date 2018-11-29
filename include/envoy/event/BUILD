@@ -29,6 +29,7 @@ envoy_cc_library(
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/network:listener_interface",
         "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/thread:thread_interface",
     ],
 )
 

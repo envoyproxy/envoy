@@ -182,9 +182,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     SSL_CTX_set_cert_verify_callback(ctx_.get(), ContextImpl::verifyCallback, this);
   }
 
-  if (config.tlsCertificate() != nullptr) {
+  const auto tls_certificates = config.tlsCertificates();
+  if (!tls_certificates.empty()) {
     // Load certificate chain.
-    const auto& tls_certificate = *config.tlsCertificate();
+    const auto& tls_certificate = tls_certificates[0].get();
     cert_chain_file_path_ = tls_certificate.certificateChainPath();
     bssl::UniquePtr<BIO> bio(
         BIO_new_mem_buf(const_cast<char*>(tls_certificate.certificateChain().data()),
@@ -275,7 +276,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   return out;
 }
 
-bssl::UniquePtr<SSL> ContextImpl::newSsl() const {
+bssl::UniquePtr<SSL> ContextImpl::newSsl(absl::optional<std::string>) {
   return bssl::UniquePtr<SSL>(SSL_new(ctx_.get()));
 }
 
@@ -490,19 +491,34 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source),
       server_name_indication_(config.serverNameIndication()),
-      allow_renegotiation_(config.allowRenegotiation()) {
+      allow_renegotiation_(config.allowRenegotiation()),
+      max_session_keys_(config.maxSessionKeys()) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
                                      parsed_alpn_protocols_.size());
     RELEASE_ASSERT(rc == 0, "");
   }
+
+  if (max_session_keys_ > 0) {
+    SSL_CTX_set_session_cache_mode(ctx_.get(), SSL_SESS_CACHE_CLIENT);
+    SSL_CTX_sess_set_new_cb(ctx_.get(), [](SSL* ssl, SSL_SESSION* session) -> int {
+      ContextImpl* context_impl =
+          static_cast<ContextImpl*>(SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslContextIndex()));
+      ClientContextImpl* client_context_impl = dynamic_cast<ClientContextImpl*>(context_impl);
+      RELEASE_ASSERT(client_context_impl != nullptr, ""); // for Coverity
+      return client_context_impl->newSessionKey(session);
+    });
+  }
 }
 
-bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
-  bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl());
+bssl::UniquePtr<SSL> ClientContextImpl::newSsl(absl::optional<std::string> override_server_name) {
+  bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(absl::nullopt));
 
-  if (!server_name_indication_.empty()) {
-    int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication_.c_str());
+  std::string server_name_indication =
+      override_server_name.has_value() ? override_server_name.value() : server_name_indication_;
+
+  if (!server_name_indication.empty()) {
+    int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication.c_str());
     RELEASE_ASSERT(rc, "");
   }
 
@@ -510,14 +526,56 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
     SSL_set_renegotiate_mode(ssl_con.get(), ssl_renegotiate_freely);
   }
 
+  if (max_session_keys_ > 0) {
+    if (session_keys_single_use_) {
+      // Stored single-use session keys, use write/write locks.
+      absl::WriterMutexLock l(&session_keys_mu_);
+      if (!session_keys_.empty()) {
+        // Use the most recently stored session key, since it has the highest
+        // probability of still being recognized/accepted by the server.
+        SSL_SESSION* session = session_keys_.front().get();
+        SSL_set_session(ssl_con.get(), session);
+        // Remove single-use session key (TLS 1.3) after first use.
+        if (SSL_SESSION_should_be_single_use(session)) {
+          session_keys_.pop_front();
+        }
+      }
+    } else {
+      // Never stored single-use session keys, use read/write locks.
+      absl::ReaderMutexLock l(&session_keys_mu_);
+      if (!session_keys_.empty()) {
+        // Use the most recently stored session key, since it has the highest
+        // probability of still being recognized/accepted by the server.
+        SSL_SESSION* session = session_keys_.front().get();
+        SSL_set_session(ssl_con.get(), session);
+      }
+    }
+  }
+
   return ssl_con;
+}
+
+int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
+  // In case we ever store single-use session key (TLS 1.3),
+  // we need to switch to using write/write locks.
+  if (SSL_SESSION_should_be_single_use(session)) {
+    session_keys_single_use_ = true;
+  }
+  absl::WriterMutexLock l(&session_keys_mu_);
+  // Evict oldest entries.
+  while (session_keys_.size() >= max_session_keys_) {
+    session_keys_.pop_back();
+  }
+  // Add new session key at the front of the queue, so that it's used first.
+  session_keys_.push_front(bssl::UniquePtr<SSL_SESSION>(session));
+  return 1; // Tell BoringSSL that we took ownership of the session.
 }
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()) {
-  if (config.tlsCertificate() == nullptr) {
+  if (config.tlsCertificates().empty()) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
   if (config.certificateValidationContext() != nullptr &&

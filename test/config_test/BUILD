@@ -36,6 +36,7 @@ envoy_cc_test_library(
     srcs = ["config_test.cc"],
     hdrs = ["config_test.h"],
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/protobuf:utility_lib",
         "//source/server:configuration_lib",
         "//source/server/config_validation:server_lib",
