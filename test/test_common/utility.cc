@@ -27,7 +27,7 @@
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
 #include "common/common/stack_array.h"
-#include "common/common/thread.h"
+#include "common/common/thread_impl.h"
 #include "common/common/utility.h"
 #include "common/config/bootstrap_json.h"
 #include "common/json/json_loader.h"
@@ -347,7 +347,11 @@ MockedTestAllocator::~MockedTestAllocator() {}
 namespace Thread {
 
 ThreadFactory& threadFactoryForTest() {
-  static ThreadFactoryImpl* thread_factory = new ThreadFactoryImpl();
+#if !defined(WIN32)
+  static ThreadFactoryImplPosix* thread_factory = new ThreadFactoryImplPosix();
+#else
+  static ThreadFactoryImplWin32* thread_factory = new ThreadFactoryImplWin32();
+#endif
   return *thread_factory;
 }
 

@@ -10,18 +10,19 @@
 namespace Envoy {
 namespace Thread {
 
-ThreadImpl::ThreadImpl(std::function<void()> thread_routine) : thread_routine_(thread_routine) {
+ThreadImplPosix::ThreadImplPosix(std::function<void()> thread_routine)
+    : thread_routine_(thread_routine) {
   RELEASE_ASSERT(Logger::Registry::initialized(), "");
   const int rc = pthread_create(&thread_handle_, nullptr,
                                 [](void* arg) -> void* {
-                                  static_cast<ThreadImpl*>(arg)->thread_routine_();
+                                  static_cast<ThreadImplPosix*>(arg)->thread_routine_();
                                   return nullptr;
                                 },
                                 this);
   RELEASE_ASSERT(rc == 0, "");
 }
 
-void ThreadImpl::join() {
+void ThreadImplPosix::join() {
   const int rc = pthread_join(thread_handle_, nullptr);
   RELEASE_ASSERT(rc == 0, "");
 }

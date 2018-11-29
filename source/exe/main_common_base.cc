@@ -1,4 +1,4 @@
-#include "exe/main_common.h"
+#include "exe/main_common_base.h"
 
 #include <iostream>
 #include <memory>
@@ -123,44 +123,6 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
     server_->admin().request(path_and_query_buf, method_buf, response_headers, body);
     handler(response_headers, body);
   });
-}
-
-MainCommon::MainCommon(int argc, const char* const* argv)
-    : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
-      base_(options_, real_time_system_, default_test_hooks_, prod_component_factory_,
-            std::make_unique<Runtime::RandomGeneratorImpl>(), thread_factory_) {}
-
-std::string MainCommon::hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
-                                          bool hot_restart_enabled) {
-#ifdef ENVOY_HOT_RESTART
-  if (hot_restart_enabled) {
-    return Server::HotRestartImpl::hotRestartVersion(max_num_stats, max_stat_name_len);
-  }
-#else
-  UNREFERENCED_PARAMETER(hot_restart_enabled);
-  UNREFERENCED_PARAMETER(max_num_stats);
-  UNREFERENCED_PARAMETER(max_stat_name_len);
-#endif
-  return "disabled";
-}
-
-// Legacy implementation of main_common.
-//
-// TODO(jmarantz): Remove this when all callers are removed. At that time, MainCommonBase
-// and MainCommon can be merged. The current theory is that only Google calls this.
-int main_common(OptionsImpl& options) {
-  try {
-    Event::RealTimeSystem real_time_system_;
-    DefaultTestHooks default_test_hooks_;
-    ProdComponentFactory prod_component_factory_;
-    Thread::ThreadFactoryImpl thread_factory_;
-    MainCommonBase main_common(options, real_time_system_, default_test_hooks_,
-                               prod_component_factory_,
-                               std::make_unique<Runtime::RandomGeneratorImpl>(), thread_factory_);
-    return main_common.run() ? EXIT_SUCCESS : EXIT_FAILURE;
-  } catch (EnvoyException& e) {
-    return EXIT_FAILURE;
-  }
 }
 
 } // namespace Envoy

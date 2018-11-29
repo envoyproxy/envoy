@@ -11,9 +11,9 @@ namespace Thread {
  * Wrapper for a pthread thread. We don't use std::thread because it eats exceptions and leads to
  * unusable stack traces.
  */
-class ThreadImpl : public Thread {
+class ThreadImplPosix : public Thread {
 public:
-  ThreadImpl(std::function<void()> thread_routine);
+  ThreadImplPosix(std::function<void()> thread_routine);
 
   /**
    * Join on thread exit.
@@ -23,6 +23,18 @@ public:
 private:
   std::function<void()> thread_routine_;
   pthread_t thread_handle_;
+};
+
+/**
+ * Implementation of ThreadFactory
+ */
+class ThreadFactoryImplPosix : public ThreadFactory {
+public:
+  ThreadFactoryImplPosix() {}
+
+  ThreadPtr createThread(std::function<void()> thread_routine) override {
+    return std::make_unique<ThreadImplPosix>(thread_routine);
+  }
 };
 
 } // namespace Thread

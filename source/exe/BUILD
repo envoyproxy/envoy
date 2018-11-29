@@ -48,7 +48,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "envoy_main_entry_lib",
-    srcs = ["main.cc"],
+    srcs = select({
+        "//bazel:windows_x86_64": ["win32/main.cc"],
+        "//conditions:default": ["posix/main.cc"],
+    }),
     external_deps = [
         "abseil_symbolize",
     ],
@@ -59,8 +62,38 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "envoy_main_common_lib",
-    srcs = ["main_common.cc"],
-    hdrs = ["main_common.h"],
+    srcs = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": ["posix/main_common.cc"],
+    }),
+    hdrs = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": ["posix/main_common.h"],
+    }),
+    strip_include_prefix = "posix",
+    deps = [
+        ":envoy_common_lib",
+        ":envoy_main_common_base_lib",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:compiler_requirements_lib",
+        "//source/common/common:perf_annotation_lib",
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restart_nop_lib",
+        "//source/server:proto_descriptors_lib",
+        "//source/server/config_validation:server_lib",
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": [
+            ":sigaction_lib",
+            ":terminate_handler_lib",
+        ],
+    }),
+)
+
+envoy_cc_library(
+    name = "envoy_main_common_base_lib",
+    srcs = ["main_common_base.cc"],
+    hdrs = ["main_common_base.h"],
     deps = [
         ":envoy_common_lib",
         "//source/common/api:os_sys_calls_lib",

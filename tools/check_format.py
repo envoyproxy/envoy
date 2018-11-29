@@ -29,8 +29,9 @@ REPOSITORIES_BZL = "bazel/repositories.bzl"
 # For now it includes the validation server but that really should be injected too.
 REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
                        './source/common/event/real_time_system.cc',
-                       './source/common/event/real_time_system.h', './source/exe/main_common.cc',
-                       './source/exe/main_common.h', './source/server/config_validation/server.cc',
+                       './source/common/event/real_time_system.h',
+                       './source/exe/posix/main_common.cc', './source/exe/posix/main_common.h',
+                       './source/exe/win32/main.cc', './source/server/config_validation/server.cc',
                        './source/common/common/perf_annotation.h',
                        './test/test_common/simulated_time_system.cc',
                        './test/test_common/simulated_time_system.h',
