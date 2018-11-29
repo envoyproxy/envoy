@@ -92,7 +92,8 @@ SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options
 
   // Stats::RawStatData must be naturally aligned for atomics to work properly.
   RELEASE_ASSERT(
-      (reinterpret_cast<uintptr_t>(shmem->stats_set_data_) % alignof(RawStatDataSet)) == 0, "");
+      (reinterpret_cast<uintptr_t>(shmem->stats_set_data_) % alignof(Stats::RawStatDataSet)) == 0,
+      "");
 
   // Here we catch the case where a new Envoy starts up when the current Envoy has not yet fully
   // initialized. The startup logic is quite complicated, and it's not worth trying to handle this
@@ -124,17 +125,19 @@ std::string SharedMemory::version(uint64_t max_num_stats,
 HotRestartImpl::HotRestartImpl(Options& options)
     : options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
       shmem_(SharedMemory::initialize(
-          RawStatDataSet::numBytes(stats_set_options_, options_.statsOptions()), options_)),
+          Stats::RawStatDataSet::numBytes(stats_set_options_, options_.statsOptions()), options_)),
       log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
       stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
   {
     // We must hold the stat lock when attaching to an existing memory segment
     // because it might be actively written to while we sanityCheck it.
     Thread::LockGuard lock(stat_lock_);
-    stats_set_ = std::make_unique<RawStatDataSet>(stats_set_options_, options.restartEpoch() == 0,
-                                                  shmem_.stats_set_data_, options_.statsOptions());
+    stats_set_ =
+        std::make_unique<Stats::RawStatDataSet>(stats_set_options_, options.restartEpoch() == 0,
+                                                shmem_.stats_set_data_, options_.statsOptions());
   }
-  stat_allocator_ = std::make_unique<Stats::RawStatDataAllocator(stat_lock_, *stat_set_);
+  stats_allocator_ = std::make_unique<Stats::RawStatDataAllocator>(stat_lock_, *stats_set_,
+                                                                   options_.statsOptions());
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
   initDomainSocketAddress(&parent_address_);
@@ -461,18 +464,18 @@ std::string HotRestartImpl::hotRestartVersion(uint64_t max_num_stats, uint64_t m
   stats_options.max_obj_name_length_ = max_stat_name_len - stats_options.maxStatSuffixLength();
 
   const BlockMemoryHashSetOptions hash_set_options = blockMemHashOptions(max_num_stats);
-  const uint64_t bytes = RawStatDataSet::numBytes(hash_set_options, stats_options);
+  const uint64_t bytes = Stats::RawStatDataSet::numBytes(hash_set_options, stats_options);
   std::unique_ptr<uint8_t[]> mem_buffer_for_dry_run_(new uint8_t[bytes]);
 
-  RawStatDataSet stats_set(hash_set_options, true /* init */, mem_buffer_for_dry_run_.get(),
-                           stats_options);
+  Stats::RawStatDataSet stats_set(hash_set_options, true /* init */, mem_buffer_for_dry_run_.get(),
+                                  stats_options);
 
   return versionHelper(max_num_stats, stats_options, stats_set);
 }
 
 std::string HotRestartImpl::versionHelper(uint64_t max_num_stats,
                                           const Stats::StatsOptions& stats_options,
-                                          RawStatDataSet& stats_set) {
+                                          Stats::RawStatDataSet& stats_set) {
   return SharedMemory::version(max_num_stats, stats_options) + "." +
          stats_set.version(stats_options);
 }

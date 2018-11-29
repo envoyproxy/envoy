@@ -112,8 +112,7 @@ private:
 /**
  * Implementation of HotRestart built for Linux.
  */
-class HotRestartImpl : public HotRestart,
-                       Logger::Loggable<Logger::Id::main> {
+class HotRestartImpl : public HotRestart, Logger::Loggable<Logger::Id::main> {
 public:
   HotRestartImpl(Options& options);
 
@@ -128,7 +127,7 @@ public:
   std::string version() override;
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
-  Stats::StatDataAllocator& statsAllocator() override { return *stats_allocator_; }
+  Stats::RawStatDataAllocator& statsAllocator() override { return *stats_allocator_; }
 
   /**
    * envoy --hot_restart_version doesn't initialize Envoy, but computes the version string
@@ -205,13 +204,13 @@ private:
   RpcBase* receiveRpc(bool block);
   void sendMessage(sockaddr_un& address, RpcBase& rpc);
   static std::string versionHelper(uint64_t max_num_stats, const Stats::StatsOptions& stats_options,
-                                   RawStatDataSet& stats_set);
+                                   Stats::RawStatDataSet& stats_set);
 
   Options& options_;
   BlockMemoryHashSetOptions stats_set_options_;
   SharedMemory& shmem_;
-  std::unique_ptr<RawStatDataSet> stats_set_ GUARDED_BY(stat_lock_);
-  std::unique_ptr<RawStatDataAllocator> stats_allocator_;
+  std::unique_ptr<Stats::RawStatDataSet> stats_set_ GUARDED_BY(stat_lock_);
+  std::unique_ptr<Stats::RawStatDataAllocator> stats_allocator_;
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
   ProcessSharedMutex stat_lock_;

@@ -25,7 +25,6 @@
 namespace Envoy {
 namespace Stats {
 
-
 /**
  * This structure is the backing memory for both CounterImpl and GaugeImpl. It is designed so that
  * it can be allocated from shared memory if needed.
@@ -95,12 +94,11 @@ struct RawStatData {
 
 using RawStatDataSet = BlockMemoryHashSet<Stats::RawStatData>;
 
-
 class RawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
 public:
-  RawStatDataAllocator(Thread::BasicLockable& mutex, RawStatDataSet& stat_set)
-      : mutex_(mutex),
-        stat_set_(stat_set) {}
+  RawStatDataAllocator(Thread::BasicLockable& mutex, RawStatDataSet& stats_set,
+                       const StatsOptions& options)
+      : mutex_(mutex), stats_set_(stats_set), options_(options) {}
 
   // StatDataAllocator
   bool requiresBoundedStatNameSize() const override { return true; }
@@ -109,9 +107,9 @@ public:
 
 private:
   Thread::BasicLockable& mutex_;
-  RawStatDataSet& stat_set_ GUARDED_BY(mutex_);
+  RawStatDataSet& stats_set_ GUARDED_BY(mutex_);
+  const StatsOptions& options_;
 };
-
 
 } // namespace Stats
 } // namespace Envoy
