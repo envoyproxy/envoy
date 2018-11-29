@@ -2890,7 +2890,6 @@ public:
 class ProdClusterManagerFactoryTest : public testing::Test {
 public:
   ProdClusterManagerFactoryTest() : mapper_factory_{&mapper_factory_mock_} {
-
     auto info = std::make_shared<MockClusterInfo>();
     info->name_ = "test_cluster";
     host_ = makeTestHost(info, "tcp://10.0.0.1:80");
@@ -2944,15 +2943,25 @@ TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentHttp2) {
   EXPECT_CALL(mock_loader_.snapshot_, featureEnabled("upstream.use_http2", 100))
       .WillOnce(Return(true));
 
-  auto conn_pool = factory->allocateTransparentConnPool(
-      mock_dispatcher_, host_, ResourcePriority::Default, Http::Protocol::Http2,
-      Network::ConnectionSocket::OptionsSharedPtr());
+  Http::ConnectionPool::InstancePtr conn_pool;
+
+  {
+    // run this in a separate scope so that the options are cleaned up. We want to show that we
+    // properly capture the reference to them when creating the builder lambda.
+    conn_pool = factory->allocateTransparentConnPool(
+        mock_dispatcher_, host_, ResourcePriority::Default, Http::Protocol::Http2,
+        Network::ConnectionSocket::OptionsSharedPtr());
+
+    // likewise, reset the host so that we show a reference to it was taken.
+    host_.reset();
+  }
+
   auto sub_pool = mapper_fake->builder_();
   EXPECT_EQ(sub_pool->protocol(), Http::Protocol::Http2);
 }
 
 // Shows that the builder created for the wrapper allocates the proper non-http2 connection pools.
-TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentHtt) {
+TEST_F(ProdClusterManagerFactoryTest, AllocateTransparentHttp11) {
   auto factory = makeFactory();
 
   NiceMock<Http::MockConnectionMapper>* mapper_fake = new NiceMock<Http::MockConnectionMapper>();
