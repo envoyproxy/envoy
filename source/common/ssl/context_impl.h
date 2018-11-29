@@ -188,7 +188,6 @@ private:
   // ClientHello details.
   enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
 
-
   const std::vector<ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };
 
