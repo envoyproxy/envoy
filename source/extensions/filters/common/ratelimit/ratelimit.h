@@ -7,7 +7,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/ratelimit/ratelimit.h"
-#include "envoy/singleton/instance.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "absl/types/optional.h"
@@ -47,7 +46,7 @@ public:
 /**
  * A client used to query a centralized rate limit service.
  */
-class Client : public Singleton::Instance {
+class Client {
 public:
   virtual ~Client() {}
 
@@ -73,7 +72,7 @@ public:
                      Tracing::Span& parent_span) PURE;
 };
 
-typedef std::shared_ptr<Client> ClientPtr;
+typedef std::unique_ptr<Client> ClientPtr;
 
 /**
  * An interface for creating a rate limit client.

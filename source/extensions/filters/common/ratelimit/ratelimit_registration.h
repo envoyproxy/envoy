@@ -44,11 +44,10 @@ registerRateLimitServiceConfig(Server::Instance& server,
 RateLimitServiceConfigPtr rateLimitConfig(Server::Configuration::FactoryContext& context);
 
 /**
- * Returns the rate limit client. This method builds rate limit client and registers with singleton
- * manager.
+ * Returns the rate limit client.
  */
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
-                          const uint32_t timeout_ms);
+                          RateLimitServiceConfigPtr ratelimit_config, const uint32_t timeout_ms);
 
 } // namespace RateLimit
 } // namespace Common

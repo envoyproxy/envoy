@@ -20,32 +20,23 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientFactoryPtr&& factory,
-                               const absl::optional<std::chrono::milliseconds>& timeout,
-                               ThreadLocal::SlotAllocator& tls)
-    : tls_slot_(tls.allocateSlot()) {
-  SharedStateSharedPtr shared_state = std::make_shared<SharedState>(std::move(factory), timeout);
-  tls_slot_->set([shared_state](Event::Dispatcher&) {
-    return std::make_shared<GrpcTlsClientImpl>(shared_state);
-  });
-}
-
-GrpcTlsClientImpl::GrpcTlsClientImpl(const SharedStateSharedPtr& shared_state)
+GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
+                               const absl::optional<std::chrono::milliseconds>& timeout)
     : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit")),
-      async_client_(shared_state->factory_->create()), shared_state_(shared_state) {}
+      async_client_(std::move(async_client)), timeout_(timeout) {}
 
-GrpcTlsClientImpl::~GrpcTlsClientImpl() { ASSERT(!callbacks_); }
+GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
-void GrpcTlsClientImpl::cancel() {
+void GrpcClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
   request_->cancel();
   callbacks_ = nullptr;
 }
 
-void GrpcTlsClientImpl::createRequest(
-    envoy::service::ratelimit::v2::RateLimitRequest& request, const std::string& domain,
-    const std::vector<Envoy::RateLimit::Descriptor>& descriptors) {
+void GrpcClientImpl::createRequest(envoy::service::ratelimit::v2::RateLimitRequest& request,
+                                   const std::string& domain,
+                                   const std::vector<Envoy::RateLimit::Descriptor>& descriptors) {
   request.set_domain(domain);
   for (const Envoy::RateLimit::Descriptor& descriptor : descriptors) {
     envoy::api::v2::ratelimit::RateLimitDescriptor* new_descriptor = request.add_descriptors();
@@ -58,19 +49,19 @@ void GrpcTlsClientImpl::createRequest(
   }
 }
 
-void GrpcTlsClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
-                              const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                              Tracing::Span& parent_span) {
+void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
+                           const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                           Tracing::Span& parent_span) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
   envoy::service::ratelimit::v2::RateLimitRequest request;
   createRequest(request, domain, descriptors);
-  request_ =
-      async_client_->send(service_method_, request, *this, parent_span, shared_state_->timeout_ms_);
+
+  request_ = async_client_->send(service_method_, request, *this, parent_span, timeout_);
 }
 
-void GrpcTlsClientImpl::onSuccess(
+void GrpcClientImpl::onSuccess(
     std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse>&& response,
     Tracing::Span& span) {
   LimitStatus status = LimitStatus::OK;
@@ -93,8 +84,8 @@ void GrpcTlsClientImpl::onSuccess(
   callbacks_ = nullptr;
 }
 
-void GrpcTlsClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
-                                  Tracing::Span&) {
+void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
+                               Tracing::Span&) {
   ASSERT(status != Grpc::Status::GrpcStatus::Ok);
   callbacks_->complete(LimitStatus::Error, nullptr);
   callbacks_ = nullptr;
@@ -102,8 +93,7 @@ void GrpcTlsClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::st
 
 GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitServiceConfig& config,
                                  Grpc::AsyncClientManager& async_client_manager,
-                                 ThreadLocal::SlotAllocator& tls, Stats::Scope& scope)
-    : tls_(tls) {
+                                 Stats::Scope& scope) {
   envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.MergeFrom(config.grpc_service());
   // TODO(htuch): cluster_name is deprecated, remove after 1.6.0.
@@ -115,7 +105,7 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitSe
 }
 
 ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout) {
-  return std::make_shared<GrpcClientImpl>(std::move(async_client_factory_), timeout, tls_);
+  return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout);
 }
 
 } // namespace RateLimit

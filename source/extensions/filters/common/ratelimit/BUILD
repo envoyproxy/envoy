@@ -20,8 +20,6 @@ envoy_cc_library(
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//include/envoy/server:instance_interface",
-        "//include/envoy/singleton:manager_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
@@ -55,7 +53,6 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/ratelimit:ratelimit_interface",
-        "//include/envoy/server:instance_interface",
         "//include/envoy/tracing:http_tracer_interface",
     ],
 )
