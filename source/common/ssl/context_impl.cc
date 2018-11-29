@@ -24,14 +24,6 @@
 namespace Envoy {
 namespace Ssl {
 
-int ContextImpl::sslContextIndex() {
-  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
-    int ssl_context_index = SSL_CTX_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
-    RELEASE_ASSERT(ssl_context_index >= 0, "");
-    return ssl_context_index;
-  }());
-}
-
 ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source)
     : scope_(scope), stats_(generateStats(scope)), time_source_(time_source) {
   const auto tls_certificates = config.tlsCertificates();
@@ -40,7 +32,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
   for (auto& ctx : tls_contexts_) {
     ctx.ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
 
-    int rc = SSL_CTX_set_ex_data(ctx.ssl_ctx_.get(), sslContextIndex(), this);
+    int rc = SSL_CTX_set_app_data(ctx.ssl_ctx_.get(), this);
     RELEASE_ASSERT(rc == 1, "");
 
     rc = SSL_CTX_set_min_proto_version(ctx.ssl_ctx_.get(), config.minProtocolVersion());
@@ -300,11 +292,9 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
 
 bssl::UniquePtr<SSL> ContextImpl::newSsl(absl::optional<std::string>) {
   // We use the first certificate for a new SSL object, later in the
-  // SSL_CTX_set_select_certificate_cb() callback following ClientHello, we
-  // replace with the selected certificate via SSL_set_SSL_CTX().
-  auto ssl = bssl::UniquePtr<SSL>(SSL_new(tls_contexts_[0].ssl_ctx_.get()));
-  SSL_set_app_data(ssl.get(), this);
-  return ssl;
+  // SSL_CTX_set_select_certificate_cb() callback following ClientHello, we replace with the
+  // selected certificate via SSL_set_SSL_CTX().
+  return bssl::UniquePtr<SSL>(SSL_new(tls_contexts_[0].ssl_ctx_.get()));
 }
 
 int ContextImpl::ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* ctx) {
@@ -527,8 +517,7 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
       server_name_indication_(config.serverNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()),
       max_session_keys_(config.maxSessionKeys()) {
-  // This should be guaranteed during configuration ingestion for client
-  // contexts.
+  // This should be guaranteed during configuration ingestion for client contexts.
   ASSERT(tls_contexts_.size() == 1);
   if (!parsed_alpn_protocols_.empty()) {
     for (auto& ctx : tls_contexts_) {
@@ -542,8 +531,8 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
     SSL_CTX_set_session_cache_mode(tls_contexts_[0].ssl_ctx_.get(), SSL_SESS_CACHE_CLIENT);
     SSL_CTX_sess_set_new_cb(
         tls_contexts_[0].ssl_ctx_.get(), [](SSL* ssl, SSL_SESSION* session) -> int {
-          ContextImpl* context_impl = static_cast<ContextImpl*>(
-              SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslContextIndex()));
+          ContextImpl* context_impl =
+              static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
           ClientContextImpl* client_context_impl = dynamic_cast<ClientContextImpl*>(context_impl);
           RELEASE_ASSERT(client_context_impl != nullptr, ""); // for Coverity
           return client_context_impl->newSessionKey(session);
@@ -624,7 +613,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
   SSL_CTX_set_select_certificate_cb(
       tls_contexts_[0].ssl_ctx_.get(),
       [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
-        return static_cast<ServerContextImpl*>(SSL_get_app_data(client_hello->ssl))
+        return static_cast<ServerContextImpl*>(
+                   SSL_CTX_get_app_data(SSL_get_SSL_CTX(client_hello->ssl)))
             ->selectTlsContext(client_hello);
       });
   for (auto& ctx : tls_contexts_) {
@@ -691,8 +681,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
           ctx.ssl_ctx_.get(),
           [](SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
              int encrypt) -> int {
-            ContextImpl* context_impl = static_cast<ContextImpl*>(
-                SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslContextIndex()));
+            ContextImpl* context_impl =
+                static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
             ServerContextImpl* server_context_impl = dynamic_cast<ServerContextImpl*>(context_impl);
             RELEASE_ASSERT(server_context_impl != nullptr, ""); // for Coverity
             return server_context_impl->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx,
