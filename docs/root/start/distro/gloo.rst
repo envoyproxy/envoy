@@ -19,7 +19,7 @@ Installing Gloo
 
 For this installation, there are three main prerequisites:
 
-* **Kubernetes version**: Gloo requires version 1.8 or higher. `Minikube <https://kubernetes.io/docs/getting-started-guides/minikube/>`_
+* **Kubernetes version**: Gloo requires version 1.8 or higher. `Minikube <https://kubernetes.io/docs/setup/minikube/>`_
   is an easy way to get access to your own local Kubernetes installation.
 * **kubectl**: you need access to the `kubectl` command line tool.
 * **glooctl**: this is the Gloo command line tool which you will use to interact 
@@ -34,7 +34,7 @@ Once all you have the above, all you need to do is run the following command:
    glooctl install kube 
 
 If you are familiar with Kubernetes, the command above will tell kubernetes what and 
-how it should run the Gloo images. The gloo pods should be running in a namespace called
+how it should run the Gloo images. The Gloo pods should be running in a namespace called
 ``gloo-system``.
 
 Your output should look similar to this:
