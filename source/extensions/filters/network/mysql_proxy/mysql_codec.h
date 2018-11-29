@@ -91,54 +91,30 @@ constexpr int MYSQL_SUCCESS = 0;
 constexpr int MYSQL_FAILURE = -1;
 constexpr char MYSQL_STR_END = '\0';
 
-enum class PktType {
-  MYSQL_REQUEST = 0,
-  MYSQL_RESPONSE = 1,
-};
-
-enum class Cmd {
-  COM_NULL = -1,
-  COM_SLEEP = 0,
-  COM_QUIT = 1,
-  COM_INIT_DB = 2,
-  COM_QUERY = 3,
-  COM_FIELD_LIST = 4,
-  COM_CREATE_DB = 5,
-  COM_DROP_DB = 6,
-  COM_REFRESH = 7,
-  COM_SHUTDOWN = 8,
-  COM_STATISTICS = 9,
-  COM_PROCESS_INFO = 10,
-  COM_CONNECT = 11,
-  COM_PROCESS_KILL = 12,
-  COM_DEBUG = 13,
-  COM_PING = 14,
-  COM_TIME = 15,
-  COM_DELAYED_INSERT = 16,
-  COM_CHANGE_USER = 17,
-  COM_DAEMON = 29,
-  COM_RESET_CONNECTION = 31,
-};
-
-PACKED_STRUCT(struct header_fields {
-  uint32_t length : 24;
-  uint32_t seq : 8;
-});
-
-union MySQLHeader {
-  header_fields fields;
-  uint32_t bits;
-};
-
 class MySQLCodec : public Logger::Loggable<Logger::Id::filter> {
 public:
+  enum class PktType {
+    MYSQL_REQUEST = 0,
+    MYSQL_RESPONSE = 1,
+  };
+
+  PACKED_STRUCT(struct header_fields {
+    uint32_t length_ : 24;
+    uint32_t seq_ : 8;
+  });
+
+  union MySQLHeader {
+    header_fields fields_;
+    uint32_t bits_;
+  };
+
   virtual ~MySQLCodec(){};
 
-  virtual int Decode(Buffer::Instance& data, uint64_t& offset, int seq, int len) PURE;
-  virtual std::string Encode() PURE;
+  virtual int decode(Buffer::Instance& data, uint64_t& offset, int seq, int len) PURE;
+  virtual std::string encode() PURE;
 
-  int GetSeq() { return seq_; }
-  void SetSeq(int seq) { seq_ = seq; }
+  int getSeq() { return seq_; }
+  void setSeq(int seq) { seq_ = seq; }
 
 private:
   int seq_;
@@ -178,7 +154,7 @@ public:
 
   virtual void decode(Buffer::Instance& message, uint64_t& offset, int seq, int len) PURE;
   virtual void onProtocolError() PURE;
-  virtual void onLoginAttempt() PURE;
+  virtual void onNewMessage(MySQLSession::State state) PURE;
 };
 
 /**

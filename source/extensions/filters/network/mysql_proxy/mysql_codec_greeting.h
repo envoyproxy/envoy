@@ -11,25 +11,25 @@ namespace MySQLProxy {
 class ServerGreeting : public MySQLCodec {
 public:
   // MySQLCodec
-  int Decode(Buffer::Instance& buffer, uint64_t& offset, int seq, int len) override;
-  std::string Encode() override;
+  int decode(Buffer::Instance& buffer, uint64_t& offset, int seq, int len) override;
+  std::string encode() override;
 
-  int GetProtocol() const { return protocol_; }
-  const std::string& GetVersion() const { return version_; }
-  int GetThreadId() const { return thread_id_; }
-  const std::string& GetSalt() const { return salt_; };
-  int GetServerCap() const { return server_cap_; }
-  int GetServerLanguage() const { return server_language_; }
-  int GetServerStatus() const { return server_status_; }
-  int GetExtServerCap() const { return ext_server_cap_; }
-  void SetProtocol(int protocol);
-  void SetVersion(std::string& version);
-  void SetThreadId(int thread_id);
-  void SetSalt(std::string& salt);
-  void SetServerCap(int server_cap);
-  void SetServerLanguage(int server_language);
-  void SetServerStatus(int server_status);
-  void SetExtServerCap(int ext_server_cap);
+  int getProtocol() const { return protocol_; }
+  const std::string& getVersion() const { return version_; }
+  int getThreadId() const { return thread_id_; }
+  const std::string& getSalt() const { return salt_; };
+  int getServerCap() const { return server_cap_; }
+  int getServerLanguage() const { return server_language_; }
+  int getServerStatus() const { return server_status_; }
+  int getExtServerCap() const { return ext_server_cap_; }
+  void setProtocol(int protocol);
+  void setVersion(std::string& version);
+  void setThreadId(int thread_id);
+  void setSalt(std::string& salt);
+  void setServerCap(int server_cap);
+  void setServerLanguage(int server_language);
+  void setServerStatus(int server_status);
+  void setExtServerCap(int ext_server_cap);
 
 private:
   int protocol_;

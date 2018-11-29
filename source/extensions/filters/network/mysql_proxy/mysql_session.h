@@ -27,19 +27,20 @@ public:
   };
 
   MySQLSession() { cinfo_ = {}; };
-  uint64_t GetId() { return cinfo_.id; }
-  void SetId(uint64_t id) { cinfo_.id = id; }
-  void SetState(MySQLSession::State state) { cinfo_.state = state; }
-  MySQLSession::State GetState() { return cinfo_.state; }
-  int GetExpectedSeq() { return cinfo_.expected_seq; }
-  void SetExpectedSeq(int seq) { cinfo_.expected_seq = seq; }
+  uint64_t getId() { return cinfo_.id_; }
+  void setId(uint64_t id) { cinfo_.id_ = id; }
+  void setState(MySQLSession::State state) { cinfo_.state_ = state; }
+  MySQLSession::State getState() { return cinfo_.state_; }
+  int getExpectedSeq() { return cinfo_.expected_seq_; }
+  void setExpectedSeq(int seq) { cinfo_.expected_seq_ = seq; }
 
 private:
   struct ConnInfo {
-    uint64_t id;
-    MySQLSession::State state;
-    int expected_seq;
+    uint64_t id_;
+    MySQLSession::State state_;
+    int expected_seq_;
   };
+
   ConnInfo cinfo_;
 };
 

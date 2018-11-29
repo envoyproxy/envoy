@@ -19,9 +19,9 @@ constexpr int PARALLEL_SESSIONS = 4;
 class MySQLTestUtils {
 
 public:
-  static std::string GetSalt() { return "!@salt#$"; }
-  static std::string GetAuthResp() { return "p4$$w0r6"; }
-  static std::string GetVersion() {
+  static std::string getSalt() { return "!@salt#$"; }
+  static std::string getAuthResp() { return "p4$$w0r6"; }
+  static std::string getVersion() {
     std::string ver(std::to_string(MYSQL_VER_MAJOR));
     ver.append(".");
     ver.append(std::to_string(MYSQL_VER_MINOR));

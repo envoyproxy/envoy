@@ -25,25 +25,25 @@ protected:
 
 TEST_F(MySQLCodecTest, MySQLServerChallengeV9EncDec) {
   ServerGreeting mysql_greet_encode{};
-  mysql_greet_encode.SetProtocol(MYSQL_PROTOCOL_9);
-  std::string ver(MySQLTestUtils::GetVersion());
-  mysql_greet_encode.SetVersion(ver);
-  mysql_greet_encode.SetThreadId(MYSQL_THREAD_ID);
-  std::string salt(MySQLTestUtils::GetSalt());
-  mysql_greet_encode.SetSalt(salt);
-  std::string data = mysql_greet_encode.Encode();
+  mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_9);
+  std::string ver(MySQLTestUtils::getVersion());
+  mysql_greet_encode.setVersion(ver);
+  mysql_greet_encode.setThreadId(MYSQL_THREAD_ID);
+  std::string salt(MySQLTestUtils::getSalt());
+  mysql_greet_encode.setSalt(salt);
+  std::string data = mysql_greet_encode.encode();
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.Decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
-  EXPECT_EQ(mysql_greet_decode.GetSalt(), mysql_greet_encode.GetSalt());
-  EXPECT_EQ(mysql_greet_decode.GetVersion(), mysql_greet_encode.GetVersion());
-  EXPECT_EQ(mysql_greet_decode.GetProtocol(), mysql_greet_encode.GetProtocol());
-  EXPECT_EQ(mysql_greet_decode.GetThreadId(), mysql_greet_encode.GetThreadId());
-  EXPECT_EQ(mysql_greet_decode.GetServerLanguage(), 0);
-  EXPECT_EQ(mysql_greet_decode.GetServerStatus(), 0);
-  EXPECT_EQ(mysql_greet_decode.GetExtServerCap(), 0);
-  EXPECT_EQ(mysql_greet_decode.GetServerCap(), 0);
+  mysql_greet_decode.decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
+  EXPECT_EQ(mysql_greet_decode.getSalt(), mysql_greet_encode.getSalt());
+  EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
+  EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
+  EXPECT_EQ(mysql_greet_decode.getThreadId(), mysql_greet_encode.getThreadId());
+  EXPECT_EQ(mysql_greet_decode.getServerLanguage(), 0);
+  EXPECT_EQ(mysql_greet_decode.getServerStatus(), 0);
+  EXPECT_EQ(mysql_greet_decode.getExtServerCap(), 0);
+  EXPECT_EQ(mysql_greet_decode.getServerCap(), 0);
 }
 
 /*
@@ -53,29 +53,29 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeV9EncDec) {
  */
 TEST_F(MySQLCodecTest, MySQLServerChallengeV10EncDec) {
   ServerGreeting mysql_greet_encode{};
-  mysql_greet_encode.SetProtocol(MYSQL_PROTOCOL_10);
-  std::string ver(MySQLTestUtils::GetVersion());
-  mysql_greet_encode.SetVersion(ver);
-  mysql_greet_encode.SetThreadId(MYSQL_THREAD_ID);
-  std::string salt(MySQLTestUtils::GetSalt());
-  mysql_greet_encode.SetSalt(salt);
-  mysql_greet_encode.SetServerCap(MYSQL_SERVER_CAPAB);
-  mysql_greet_encode.SetServerLanguage(MYSQL_SERVER_LANGUAGE);
-  mysql_greet_encode.SetServerStatus(MYSQL_SERVER_STATUS);
-  mysql_greet_encode.SetExtServerCap(MYSQL_SERVER_EXT_CAPAB);
-  std::string data = mysql_greet_encode.Encode();
+  mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
+  std::string ver(MySQLTestUtils::getVersion());
+  mysql_greet_encode.setVersion(ver);
+  mysql_greet_encode.setThreadId(MYSQL_THREAD_ID);
+  std::string salt(MySQLTestUtils::getSalt());
+  mysql_greet_encode.setSalt(salt);
+  mysql_greet_encode.setServerCap(MYSQL_SERVER_CAPAB);
+  mysql_greet_encode.setServerLanguage(MYSQL_SERVER_LANGUAGE);
+  mysql_greet_encode.setServerStatus(MYSQL_SERVER_STATUS);
+  mysql_greet_encode.setExtServerCap(MYSQL_SERVER_EXT_CAPAB);
+  std::string data = mysql_greet_encode.encode();
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.Decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
-  EXPECT_EQ(mysql_greet_decode.GetSalt(), mysql_greet_encode.GetSalt());
-  EXPECT_EQ(mysql_greet_decode.GetVersion(), mysql_greet_encode.GetVersion());
-  EXPECT_EQ(mysql_greet_decode.GetProtocol(), mysql_greet_encode.GetProtocol());
-  EXPECT_EQ(mysql_greet_decode.GetThreadId(), mysql_greet_encode.GetThreadId());
-  EXPECT_EQ(mysql_greet_decode.GetServerLanguage(), mysql_greet_encode.GetServerLanguage());
-  EXPECT_EQ(mysql_greet_decode.GetServerStatus(), mysql_greet_encode.GetServerStatus());
-  EXPECT_EQ(mysql_greet_decode.GetExtServerCap(), mysql_greet_encode.GetExtServerCap());
-  EXPECT_EQ(mysql_greet_decode.GetServerCap(), mysql_greet_encode.GetServerCap());
+  mysql_greet_decode.decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
+  EXPECT_EQ(mysql_greet_decode.getSalt(), mysql_greet_encode.getSalt());
+  EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
+  EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
+  EXPECT_EQ(mysql_greet_decode.getThreadId(), mysql_greet_encode.getThreadId());
+  EXPECT_EQ(mysql_greet_decode.getServerLanguage(), mysql_greet_encode.getServerLanguage());
+  EXPECT_EQ(mysql_greet_decode.getServerStatus(), mysql_greet_encode.getServerStatus());
+  EXPECT_EQ(mysql_greet_decode.getExtServerCap(), mysql_greet_encode.getExtServerCap());
+  EXPECT_EQ(mysql_greet_decode.getServerCap(), mysql_greet_encode.getServerCap());
 }
 
 /*
@@ -88,29 +88,29 @@ TEST_F(MySQLCodecTest, MySQLClLoginV41PluginAuthEncDec) {
   ClientLogin mysql_clogin_encode{};
   uint16_t client_capab = 0;
   client_capab |= (MYSQL_CLIENT_CONNECT_WITH_DB | MYSQL_CLIENT_CAPAB_41VS320);
-  mysql_clogin_encode.SetClientCap(client_capab);
-  mysql_clogin_encode.SetExtendedClientCap(MYSQL_EXT_CL_PLG_AUTH_CL_DATA);
-  mysql_clogin_encode.SetMaxPacket(MYSQL_MAX_PACKET);
-  mysql_clogin_encode.SetCharset(MYSQL_CHARSET);
+  mysql_clogin_encode.setClientCap(client_capab);
+  mysql_clogin_encode.setExtendedClientCap(MYSQL_EXT_CL_PLG_AUTH_CL_DATA);
+  mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
+  mysql_clogin_encode.setCharset(MYSQL_CHARSET);
   std::string user("user1");
-  mysql_clogin_encode.SetUsername(user);
-  std::string passwd = MySQLTestUtils::GetAuthResp();
-  mysql_clogin_encode.SetAuthResp(passwd);
+  mysql_clogin_encode.setUsername(user);
+  std::string passwd = MySQLTestUtils::getAuthResp();
+  mysql_clogin_encode.setAuthResp(passwd);
   std::string db = "mysql_db";
-  mysql_clogin_encode.SetDB(db);
-  std::string data = mysql_clogin_encode.Encode();
+  mysql_clogin_encode.setDb(db);
+  std::string data = mysql_clogin_encode.encode();
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
-  EXPECT_EQ(mysql_clogin_decode.IsResponse41(), true);
-  EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
-  EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
-  EXPECT_EQ(mysql_clogin_decode.GetMaxPacket(), mysql_clogin_encode.GetMaxPacket());
-  EXPECT_EQ(mysql_clogin_decode.GetCharset(), mysql_clogin_encode.GetCharset());
-  EXPECT_EQ(mysql_clogin_decode.GetUsername(), mysql_clogin_encode.GetUsername());
-  EXPECT_EQ(mysql_clogin_decode.GetAuthResp(), mysql_clogin_encode.GetAuthResp());
-  EXPECT_EQ(mysql_clogin_decode.GetDB(), mysql_clogin_encode.GetDB());
+  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  EXPECT_EQ(mysql_clogin_decode.isResponse41(), true);
+  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
+  EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
+  EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
+  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), mysql_clogin_encode.getAuthResp());
+  EXPECT_EQ(mysql_clogin_decode.getDb(), mysql_clogin_encode.getDb());
 }
 
 /*
@@ -123,29 +123,29 @@ TEST_F(MySQLCodecTest, MySQLClientLogin41SecureConnEncDec) {
   ClientLogin mysql_clogin_encode{};
   uint16_t client_capab = 0;
   client_capab |= (MYSQL_CLIENT_CONNECT_WITH_DB | MYSQL_CLIENT_CAPAB_41VS320);
-  mysql_clogin_encode.SetClientCap(client_capab);
-  mysql_clogin_encode.SetExtendedClientCap(MYSQL_EXT_CL_SECURE_CONNECTION);
-  mysql_clogin_encode.SetMaxPacket(MYSQL_MAX_PACKET);
-  mysql_clogin_encode.SetCharset(MYSQL_CHARSET);
+  mysql_clogin_encode.setClientCap(client_capab);
+  mysql_clogin_encode.setExtendedClientCap(MYSQL_EXT_CL_SECURE_CONNECTION);
+  mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
+  mysql_clogin_encode.setCharset(MYSQL_CHARSET);
   std::string user("user1");
-  mysql_clogin_encode.SetUsername(user);
-  std::string passwd = MySQLTestUtils::GetAuthResp();
-  mysql_clogin_encode.SetAuthResp(passwd);
+  mysql_clogin_encode.setUsername(user);
+  std::string passwd = MySQLTestUtils::getAuthResp();
+  mysql_clogin_encode.setAuthResp(passwd);
   std::string db = "mysql_db";
-  mysql_clogin_encode.SetDB(db);
-  std::string data = mysql_clogin_encode.Encode();
+  mysql_clogin_encode.setDb(db);
+  std::string data = mysql_clogin_encode.encode();
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
-  EXPECT_EQ(mysql_clogin_decode.IsResponse41(), true);
-  EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
-  EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
-  EXPECT_EQ(mysql_clogin_decode.GetMaxPacket(), mysql_clogin_encode.GetMaxPacket());
-  EXPECT_EQ(mysql_clogin_decode.GetCharset(), mysql_clogin_encode.GetCharset());
-  EXPECT_EQ(mysql_clogin_decode.GetUsername(), mysql_clogin_encode.GetUsername());
-  EXPECT_EQ(mysql_clogin_decode.GetAuthResp(), mysql_clogin_encode.GetAuthResp());
-  EXPECT_EQ(mysql_clogin_decode.GetDB(), mysql_clogin_encode.GetDB());
+  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  EXPECT_EQ(mysql_clogin_decode.isResponse41(), true);
+  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
+  EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
+  EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
+  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), mysql_clogin_encode.getAuthResp());
+  EXPECT_EQ(mysql_clogin_decode.getDb(), mysql_clogin_encode.getDb());
 }
 
 /*
@@ -155,26 +155,26 @@ TEST_F(MySQLCodecTest, MySQLClientLogin41SecureConnEncDec) {
  */
 TEST_F(MySQLCodecTest, MySQLClientLogin41EncDec) {
   ClientLogin mysql_clogin_encode{};
-  mysql_clogin_encode.SetClientCap(MYSQL_CLIENT_CAPAB_41VS320);
-  mysql_clogin_encode.SetExtendedClientCap(0);
-  mysql_clogin_encode.SetMaxPacket(MYSQL_MAX_PACKET);
-  mysql_clogin_encode.SetCharset(MYSQL_CHARSET);
+  mysql_clogin_encode.setClientCap(MYSQL_CLIENT_CAPAB_41VS320);
+  mysql_clogin_encode.setExtendedClientCap(0);
+  mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
+  mysql_clogin_encode.setCharset(MYSQL_CHARSET);
   std::string user("user1");
-  mysql_clogin_encode.SetUsername(user);
-  std::string passwd = MySQLTestUtils::GetAuthResp();
-  mysql_clogin_encode.SetAuthResp(passwd);
-  std::string data = mysql_clogin_encode.Encode();
+  mysql_clogin_encode.setUsername(user);
+  std::string passwd = MySQLTestUtils::getAuthResp();
+  mysql_clogin_encode.setAuthResp(passwd);
+  std::string data = mysql_clogin_encode.encode();
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
-  EXPECT_EQ(mysql_clogin_decode.IsResponse41(), true);
-  EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
-  EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
-  EXPECT_EQ(mysql_clogin_decode.GetMaxPacket(), mysql_clogin_encode.GetMaxPacket());
-  EXPECT_EQ(mysql_clogin_decode.GetCharset(), mysql_clogin_encode.GetCharset());
-  EXPECT_EQ(mysql_clogin_decode.GetUsername(), mysql_clogin_encode.GetUsername());
-  EXPECT_EQ(mysql_clogin_decode.GetAuthResp(), mysql_clogin_encode.GetAuthResp());
+  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  EXPECT_EQ(mysql_clogin_decode.isResponse41(), true);
+  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
+  EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
+  EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
+  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), mysql_clogin_encode.getAuthResp());
 }
 
 /*
@@ -184,26 +184,26 @@ TEST_F(MySQLCodecTest, MySQLClientLogin41EncDec) {
  */
 TEST_F(MySQLCodecTest, MySQLClientLogin320EncDec) {
   ClientLogin mysql_clogin_encode{};
-  mysql_clogin_encode.SetClientCap(0);
-  mysql_clogin_encode.SetExtendedClientCap(MYSQL_EXT_CL_PLG_AUTH_CL_DATA);
-  mysql_clogin_encode.SetMaxPacket(MYSQL_MAX_PACKET);
-  mysql_clogin_encode.SetCharset(MYSQL_CHARSET);
+  mysql_clogin_encode.setClientCap(0);
+  mysql_clogin_encode.setExtendedClientCap(MYSQL_EXT_CL_PLG_AUTH_CL_DATA);
+  mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
+  mysql_clogin_encode.setCharset(MYSQL_CHARSET);
   std::string user("user1");
-  mysql_clogin_encode.SetUsername(user);
-  std::string passwd = MySQLTestUtils::GetAuthResp();
-  mysql_clogin_encode.SetAuthResp(passwd);
-  std::string data = mysql_clogin_encode.Encode();
+  mysql_clogin_encode.setUsername(user);
+  std::string passwd = MySQLTestUtils::getAuthResp();
+  mysql_clogin_encode.setAuthResp(passwd);
+  std::string data = mysql_clogin_encode.encode();
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
-  EXPECT_EQ(mysql_clogin_decode.IsResponse320(), true);
-  EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
-  EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
-  EXPECT_EQ(mysql_clogin_decode.GetMaxPacket(), mysql_clogin_encode.GetMaxPacket());
-  EXPECT_EQ(mysql_clogin_decode.GetCharset(), mysql_clogin_encode.GetCharset());
-  EXPECT_EQ(mysql_clogin_decode.GetUsername(), mysql_clogin_encode.GetUsername());
-  EXPECT_EQ(mysql_clogin_decode.GetAuthResp(), mysql_clogin_encode.GetAuthResp());
+  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  EXPECT_EQ(mysql_clogin_decode.isResponse320(), true);
+  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
+  EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
+  EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
+  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), mysql_clogin_encode.getAuthResp());
 }
 
 /*
@@ -213,23 +213,23 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320EncDec) {
  */
 TEST_F(MySQLCodecTest, MySQLClientLoginSSLEncDec) {
   ClientLogin mysql_clogin_encode{};
-  mysql_clogin_encode.SetClientCap(MYSQL_CLIENT_CAPAB_SSL | MYSQL_CLIENT_CAPAB_41VS320);
-  mysql_clogin_encode.SetExtendedClientCap(MYSQL_EXT_CL_PLG_AUTH_CL_DATA);
-  mysql_clogin_encode.SetMaxPacket(MYSQL_MAX_PACKET);
-  mysql_clogin_encode.SetCharset(MYSQL_CHARSET);
+  mysql_clogin_encode.setClientCap(MYSQL_CLIENT_CAPAB_SSL | MYSQL_CLIENT_CAPAB_41VS320);
+  mysql_clogin_encode.setExtendedClientCap(MYSQL_EXT_CL_PLG_AUTH_CL_DATA);
+  mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
+  mysql_clogin_encode.setCharset(MYSQL_CHARSET);
   std::string user("user1");
-  mysql_clogin_encode.SetUsername(user);
-  std::string passwd = MySQLTestUtils::GetAuthResp();
-  mysql_clogin_encode.SetAuthResp(passwd);
-  std::string data = mysql_clogin_encode.Encode();
+  mysql_clogin_encode.setUsername(user);
+  std::string passwd = MySQLTestUtils::getAuthResp();
+  mysql_clogin_encode.setAuthResp(passwd);
+  std::string data = mysql_clogin_encode.encode();
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.Decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
-  EXPECT_EQ(mysql_clogin_decode.IsSSLRequest(), true);
-  EXPECT_EQ(mysql_clogin_decode.GetClientCap(), mysql_clogin_encode.GetClientCap());
-  EXPECT_EQ(mysql_clogin_decode.GetExtendedClientCap(), mysql_clogin_encode.GetExtendedClientCap());
-  EXPECT_EQ(mysql_clogin_decode.GetMaxPacket(), mysql_clogin_encode.GetMaxPacket());
+  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  EXPECT_EQ(mysql_clogin_decode.isSSLRequest(), true);
+  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
 }
 
 /*
@@ -239,21 +239,21 @@ TEST_F(MySQLCodecTest, MySQLClientLoginSSLEncDec) {
  */
 TEST_F(MySQLCodecTest, MySQLLoginOkEncDec) {
   ClientLoginResponse mysql_loginok_encode{};
-  mysql_loginok_encode.SetRespCode(MYSQL_UT_RESP_OK);
-  mysql_loginok_encode.SetAffectedRows(1);
-  mysql_loginok_encode.SetLastInsertId(MYSQL_UT_LAST_ID);
-  mysql_loginok_encode.SetServerStatus(MYSQL_UT_SERVER_OK);
-  mysql_loginok_encode.SetWarnings(MYSQL_UT_SERVER_WARNINGS);
-  std::string data = mysql_loginok_encode.Encode();
+  mysql_loginok_encode.setRespCode(MYSQL_UT_RESP_OK);
+  mysql_loginok_encode.setAffectedRows(1);
+  mysql_loginok_encode.setLastInsertId(MYSQL_UT_LAST_ID);
+  mysql_loginok_encode.setServerStatus(MYSQL_UT_SERVER_OK);
+  mysql_loginok_encode.setWarnings(MYSQL_UT_SERVER_WARNINGS);
+  std::string data = mysql_loginok_encode.encode();
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLoginResponse mysql_loginok_decode{};
-  mysql_loginok_decode.Decode(*decode_data, offset_, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
-  EXPECT_EQ(mysql_loginok_decode.GetRespCode(), mysql_loginok_encode.GetRespCode());
-  EXPECT_EQ(mysql_loginok_decode.GetAffectedRows(), mysql_loginok_encode.GetAffectedRows());
-  EXPECT_EQ(mysql_loginok_decode.GetLastInsertId(), mysql_loginok_encode.GetLastInsertId());
-  EXPECT_EQ(mysql_loginok_decode.GetServerStatus(), mysql_loginok_encode.GetServerStatus());
-  EXPECT_EQ(mysql_loginok_decode.GetWarnings(), mysql_loginok_encode.GetWarnings());
+  mysql_loginok_decode.decode(*decode_data, offset_, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
+  EXPECT_EQ(mysql_loginok_decode.getRespCode(), mysql_loginok_encode.getRespCode());
+  EXPECT_EQ(mysql_loginok_decode.getAffectedRows(), mysql_loginok_encode.getAffectedRows());
+  EXPECT_EQ(mysql_loginok_decode.getLastInsertId(), mysql_loginok_encode.getLastInsertId());
+  EXPECT_EQ(mysql_loginok_decode.getServerStatus(), mysql_loginok_encode.getServerStatus());
+  EXPECT_EQ(mysql_loginok_decode.getWarnings(), mysql_loginok_encode.getWarnings());
 }
 
 } // namespace MySQLProxy

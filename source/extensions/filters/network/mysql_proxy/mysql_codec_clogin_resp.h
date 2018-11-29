@@ -13,19 +13,19 @@ namespace MySQLProxy {
 class ClientLoginResponse : public MySQLCodec {
 public:
   // MySQLCodec
-  int Decode(Buffer::Instance& buffer, uint64_t& offset, int seq, int len) override;
-  std::string Encode() override;
+  int decode(Buffer::Instance& buffer, uint64_t& offset, int seq, int len) override;
+  std::string encode() override;
 
-  uint8_t GetRespCode() const { return resp_code_; }
-  uint8_t GetAffectedRows() const { return affected_rows_; }
-  uint8_t GetLastInsertId() const { return last_insert_id_; }
-  uint16_t GetServerStatus() const { return server_status_; }
-  uint16_t GetWarnings() const { return warnings_; }
-  void SetRespCode(uint8_t resp_code);
-  void SetAffectedRows(uint8_t affected_rows);
-  void SetLastInsertId(uint8_t last_insert_id);
-  void SetServerStatus(uint16_t status);
-  void SetWarnings(uint16_t warnings);
+  uint8_t getRespCode() const { return resp_code_; }
+  uint8_t getAffectedRows() const { return affected_rows_; }
+  uint8_t getLastInsertId() const { return last_insert_id_; }
+  uint16_t getServerStatus() const { return server_status_; }
+  uint16_t getWarnings() const { return warnings_; }
+  void setRespCode(uint8_t resp_code);
+  void setAffectedRows(uint8_t affected_rows);
+  void setLastInsertId(uint8_t last_insert_id);
+  void setServerStatus(uint16_t status);
+  void setWarnings(uint16_t warnings);
 
 private:
   uint8_t resp_code_;

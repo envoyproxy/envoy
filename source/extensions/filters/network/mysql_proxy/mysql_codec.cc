@@ -28,12 +28,12 @@ std::string BufferHelper::toString(Buffer::Instance& buffer) {
 }
 
 std::string BufferHelper::encodeHdr(const std::string& cmd_str, int seq) {
-  MySQLHeader mysqlhdr;
-  mysqlhdr.fields.length = cmd_str.length();
-  mysqlhdr.fields.seq = seq;
+  MySQLCodec::MySQLHeader mysqlhdr;
+  mysqlhdr.fields_.length_ = cmd_str.length();
+  mysqlhdr.fields_.seq_ = seq;
 
   Buffer::OwnedImpl buffer;
-  addUint32(buffer, mysqlhdr.bits);
+  addUint32(buffer, mysqlhdr.bits_);
 
   std::string e_string = toString(buffer);
   e_string.append(cmd_str);
@@ -112,10 +112,7 @@ int BufferHelper::peekLengthEncodedInteger(Buffer::Instance& buffer, uint64_t& o
     return MYSQL_FAILURE;
   }
 
-  if (peekBySize(buffer, offset, size, val) == MYSQL_FAILURE) {
-    return MYSQL_FAILURE;
-  }
-  return MYSQL_SUCCESS;
+  return peekBySize(buffer, offset, size, val);
 }
 
 int BufferHelper::peekBytes(Buffer::Instance& buffer, uint64_t& offset, int skip_bytes) {
@@ -172,27 +169,24 @@ bool DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     throw EnvoyException("error parsing mysql packet header");
   }
 
-  // Fire the login attempt callback.
-  if (session_.GetState() == MySQLSession::State::MYSQL_CHALLENGE_REQ) {
-    callbacks_.onLoginAttempt();
-  }
+  callbacks_.onNewMessage(session_.getState());
 
   /*
   // The sequence ID is reset on a new command.
   if (seq == MYSQL_PKT_0) {
-    session_.SetExpectedSeq(MYSQL_PKT_0);
+    session_.setExpectedSeq(MYSQL_PKT_0);
     ENVOY_LOG(trace, "mysql_proxy: received packet with sequence ID = 0");
   }
   */
 
   // Ignore duplicate and out-of-sync packets.
-  if (seq != session_.GetExpectedSeq()) {
+  if (seq != session_.getExpectedSeq()) {
     callbacks_.onProtocolError();
     offset += len;
     ENVOY_LOG(info, "mysql_proxy: ignoring out-of-sync packet");
     return true;
   }
-  session_.SetExpectedSeq(session_.GetExpectedSeq() + 1);
+  session_.setExpectedSeq(seq + 1);
 
   // Ensure that the whole packet was consumed.
   const uint64_t prev_offset = offset;

@@ -84,7 +84,7 @@ public:
   // MySQLProxy::DecoderCallback
   void decode(Buffer::Instance& message, uint64_t& offset, int seq, int len) override;
   void onProtocolError() override;
-  void onLoginAttempt() override;
+  void onNewMessage(MySQLSession::State state) override;
 
   MySQLSession& getSession() { return session_; }
   void doDecode(Buffer::Instance& buffer);
