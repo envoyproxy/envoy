@@ -226,9 +226,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
                        ERR_func_error_string(err), ERR_GET_REASON(err),
                        ERR_reason_error_string(err));
       }
-
       throw EnvoyException(
-          fmt::format("A Failed to load certificate chain from {}", ctx.cert_chain_file_path_));
+          fmt::format("Failed to load certificate chain from {}", ctx.cert_chain_file_path_));
     }
     // Read rest of the certificate chain.
     while (true) {
@@ -238,7 +237,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
       }
       if (!SSL_CTX_add_extra_chain_cert(ctx.ssl_ctx_.get(), cert.get())) {
         throw EnvoyException(
-            fmt::format("B Failed to load certificate chain from {}", ctx.cert_chain_file_path_));
+            fmt::format("Failed to load certificate chain from {}", ctx.cert_chain_file_path_));
       }
       // SSL_CTX_add_extra_chain_cert() takes ownership.
       cert.release();
@@ -249,7 +248,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
       ERR_clear_error();
     } else {
       throw EnvoyException(
-          fmt::format("C Failed to load certificate chain from {}", ctx.cert_chain_file_path_));
+          fmt::format("Failed to load certificate chain from {}", ctx.cert_chain_file_path_));
     }
 
     bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
