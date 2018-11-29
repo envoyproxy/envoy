@@ -992,7 +992,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
-    bool is_grpc_request, Code code, const std::string& body,
+    bool is_grpc_request, Code code, absl::string_view body,
     const std::function<void(HeaderMap& headers)>& modify_headers, bool is_head_request,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
   ASSERT(response_headers_ == nullptr);

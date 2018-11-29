@@ -436,7 +436,8 @@ ClusterSharedPtr ClusterImplBase::create(
     Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
     AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
+    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
+    Upstream::EdsSubscriptionFactory& eds_subscription_factory) {
   std::unique_ptr<ClusterImplBase> new_cluster;
 
   // We make this a shared pointer to deal with the distinct ownership
@@ -493,8 +494,9 @@ ClusterSharedPtr ClusterImplBase::create(
     }
 
     // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
-    new_cluster = std::make_unique<EdsClusterImpl>(cluster, runtime, factory_context,
-                                                   std::move(stats_scope), added_via_api);
+    new_cluster =
+        std::make_unique<EdsClusterImpl>(cluster, runtime, factory_context, std::move(stats_scope),
+                                         added_via_api, eds_subscription_factory);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

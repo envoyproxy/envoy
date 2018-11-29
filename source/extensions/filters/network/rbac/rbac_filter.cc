@@ -14,7 +14,8 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::config::filter::network::rbac::v2::RBAC& proto_config, Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(), scope)),
       engine_(Filters::Common::RBAC::createEngine(proto_config)),
-      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)) {}
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)),
+      enforcement_type_(proto_config.enforcement_type()) {}
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {
   ENVOY_LOG(
@@ -31,15 +32,20 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
           : "none",
       callbacks_->connection().streamInfo().dynamicMetadata().DebugString());
 
-  if (shadow_engine_result_ == Unknown) {
-    // TODO(quanlin): Pass the shadow engine results to other filters.
-    // Only check the engine and increase stats for the first time call to onData(), any following
-    // calls to onData() could just use the cached result and no need to increase the stats anymore.
+  // When the enforcement type is continuous always do the RBAC checks. If it is a one time check,
+  // run the check once and skip it for subsequent onData calls.
+  if (config_->enforcementType() == envoy::config::filter::network::rbac::v2::RBAC::CONTINUOUS) {
     shadow_engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow);
-  }
-
-  if (engine_result_ == Unknown) {
     engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
+  } else {
+    if (shadow_engine_result_ == Unknown) {
+      // TODO(quanlin): Pass the shadow engine results to other filters.
+      shadow_engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow);
+    }
+
+    if (engine_result_ == Unknown) {
+      engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
+    }
   }
 
   if (engine_result_ == Allow) {

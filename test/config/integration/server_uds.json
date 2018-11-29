@@ -4,7 +4,6 @@
     "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
     {
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http1",
@@ -70,7 +69,7 @@
           ]
         },
         "filters": [
-          { "type": "both", "name": "health_check",
+          { "name": "health_check",
             "config": {
               "pass_through_mode": false, "endpoint": "/healthcheck"
             }
