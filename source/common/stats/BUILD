@@ -71,7 +71,9 @@ envoy_cc_library(
         ":stat_data_allocator_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:hash_lib",
+        "//source/common/common:thread_lib",
     ],
 )
 

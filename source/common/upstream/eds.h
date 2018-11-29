@@ -8,6 +8,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/locality.h"
 
+#include "common/upstream/eds_subscription_factory.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
@@ -21,7 +22,8 @@ class EdsClusterImpl : public BaseDynamicClusterImpl,
 public:
   EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                  Server::Configuration::TransportSocketFactoryContext& factory_context,
-                 Stats::ScopePtr&& stats_scope, bool added_via_api);
+                 Stats::ScopePtr&& stats_scope, bool added_via_api,
+                 EdsSubscriptionFactory& eds_subscription_factory);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Secondary; }
@@ -51,6 +53,7 @@ private:
   const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
   HostMap all_hosts_;
+  EdsSubscriptionFactory& eds_subscription_factory_;
 };
 
 } // namespace Upstream

@@ -20,6 +20,10 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
     error_pc = reinterpret_cast<void*>(ucontext->uc_mcontext->__ss.__rip);
 #elif defined(__powerpc__)
     error_pc = reinterpret_cast<void*>(ucontext->uc_mcontext.regs->nip);
+#elif defined(__aarch64__)
+    error_pc = reinterpret_cast<void*>(ucontext->uc_mcontext.pc);
+#elif defined(__arm__)
+    error_pc = reinterpret_cast<void*>(ucontext->uc_mcontext.arm_pc);
 #else
 #warning "Please enable and test PC retrieval code for your arch in signal_action.cc"
 // x86 Classic: reinterpret_cast<void*>(ucontext->uc_mcontext.gregs[REG_EIP]);

@@ -171,5 +171,9 @@ IsSubsetOfHeadersMatcher IsSubsetOfHeaders(const HeaderMap& expected_headers) {
   return IsSubsetOfHeadersMatcher(expected_headers);
 }
 
+IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers) {
+  return IsSupersetOfHeadersMatcher(expected_headers);
+}
+
 } // namespace Http
 } // namespace Envoy

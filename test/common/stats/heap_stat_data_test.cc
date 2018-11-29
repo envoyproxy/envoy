@@ -39,6 +39,7 @@ protected:
 };
 
 // No truncation occurs in the implementation of HeapStatData.
+// Note: a similar test using RawStatData* is in raw_stat_data_test.cc.
 TEST_F(HeapStatDataTest, HeapNoTruncate) {
   StatsOptionsImpl stats_options;
   const std::string long_string(stats_options.maxNameLength() + 1, 'A');
@@ -49,7 +50,7 @@ TEST_F(HeapStatDataTest, HeapNoTruncate) {
   alloc_.free(*stat);
 };
 
-// Note: a similar test using RawStatData* is in test/server/hot_restart_impl_test.cc.
+// Note: a similar test using RawStatData* is in raw_stat_data_test.cc.
 TEST_F(HeapStatDataTest, HeapAlloc) {
   HeapStatData* stat_1 = &alloc_.alloc(makeStat("ref_name"));
   ASSERT_NE(stat_1, nullptr);

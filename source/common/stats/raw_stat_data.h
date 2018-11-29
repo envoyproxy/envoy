@@ -15,7 +15,9 @@
 #include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
+#include "common/common/block_memory_hash_set.h"
 #include "common/common/hash.h"
+#include "common/common/thread.h"
 #include "common/stats/stat_data_allocator_impl.h"
 
 #include "absl/strings/string_view.h"
@@ -90,6 +92,8 @@ struct RawStatData {
   char name_[];
 };
 
+using RawStatDataSet = BlockMemoryHashSet<Stats::RawStatData>;
+
 template <class Stat> class RawStat : public Stat {
 public:
   RawStat(StatName stat_name, RawStatData& data, StatDataAllocatorImpl<RawStatData>& alloc,
@@ -106,10 +110,14 @@ private:
 
 class RawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
 public:
-  RawStatDataAllocator(SymbolTable& symbol_table) : StatDataAllocatorImpl(symbol_table) {}
+  RawStatDataAllocator(Thread::BasicLockable& mutex, RawStatDataSet& stats_set,
+                       const StatsOptions& options, SymbolTable& symbol_table)
+      : StatDataAllocatorImpl(symbol_table), mutex_(mutex), stats_set_(stats_set),
+        options_(options) {}
   ~RawStatDataAllocator();
 
-  virtual RawStatData* alloc(absl::string_view name) PURE;
+  RawStatData* alloc(absl::string_view name);
+  void free(Stats::RawStatData& data) override;
   RawStatData* allocStatName(StatName stat_name) {
     return alloc(stat_name.toString(symbolTable()));
   }
@@ -136,6 +144,11 @@ public:
                            const std::vector<Tag>& tags) override {
     return makeStat<GaugeImpl<RawStatData>>(name, tag_extracted_name, tags);
   }
+
+private:
+  Thread::BasicLockable& mutex_;
+  RawStatDataSet& stats_set_ GUARDED_BY(mutex_);
+  const StatsOptions& options_;
 };
 
 } // namespace Stats

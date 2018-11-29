@@ -58,13 +58,14 @@ Example:
 EXPECT_THAT(response->headers(), HeaderMapEqualRef(expected_headers));
 ```
 
-### IsSubsetOfHeaders
+### IsSubsetOfHeaders and IsSupersetOfHeaders
 
 Tests that one `HeaderMap` argument contains every header in another
 `HeaderMap`.
 
-Example:
+Examples:
 
 ```cpp
-EXPECT_THAT(response->headers(), IsSubsetOfHeaders(required_headers));
+EXPECT_THAT(response->headers(), IsSubsetOfHeaders(allowed_headers));
+EXPECT_THAT(response->headers(), IsSupersetOfHeaders(required_headers));
 ```
