@@ -91,9 +91,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        sha256 = "733e9b698a232cfd3aa35b4e27c59641bf1fa78e52e71d29e230af4f2070cdf5",
-        strip_prefix = "dd-opentracing-cpp-0.3.5",
-        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.5.tar.gz"],
+        sha256 = "32967149fbc672f321ba6ce6c3e5cc299b15ab914f6f5b2993c7c9ddc1894439",
+        strip_prefix = "dd-opentracing-cpp-0.3.6",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.6.tar.gz"],
     ),
     com_github_msgpack_msgpack_c = dict(
         sha256 = "bda49f996a73d2c6080ff0523e7b535917cd28c8a79c3a5da54fc29332d61d1e",
