@@ -450,7 +450,7 @@ public:
   virtual HeaderMap& addEncodedTrailers() PURE;
 
   /**
-   * Adds encoded metadata. Can be called in encodeHeaders/Data/100ContinueHeader/Trailers().
+   * Adds encoded metadata.
    *
    * @return a reference to metadata map, where new metadata can be added.
    */
@@ -525,9 +525,11 @@ public:
 
   /**
    * Called with metadata to be encoded. The function always returns continuing filter iteration.
+   * New metadata can be added directly to metadata_map or through addEncodedMetadata() interface.
+   *
    * @param metadata_map supplies the metadata to be encoded.
    */
-  virtual FilterMetadataStatus encodeMetadata(MetadataMap&) PURE;
+  virtual FilterMetadataStatus encodeMetadata(MetadataMap& metadata_map) PURE;
 
   /**
    * Called by the filter manager once to initialize the filter callbacks that the filter should

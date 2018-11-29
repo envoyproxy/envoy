@@ -2176,8 +2176,9 @@ config: {}
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadata_map().find("headers")->second, "headers");
   EXPECT_EQ(response->metadata_map().find("metadata")->second, "metadata");
+  EXPECT_EQ(response->metadata_map().find("replace")->second, "replace");
   EXPECT_EQ(response->metadata_map().find("data")->second, "data");
-  EXPECT_EQ(response->metadata_map().size(), 3);
+  EXPECT_EQ(response->metadata_map().size(), 4);
 }
 
 std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {

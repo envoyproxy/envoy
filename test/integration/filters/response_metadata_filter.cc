@@ -35,11 +35,13 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Adds a new metadata. If metadata_map contains key "consume", consumes the metadata.
+  // If metadata_map contains key "consume", consumes the metadata, and replace it with a new one.
+  // The function also adds a new metadata using addEncodedMetadata().
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap& metadata_map) override {
     auto it = metadata_map.find("consume");
     if (it != metadata_map.end()) {
       metadata_map.erase("consume");
+      metadata_map.emplace("replace", "replace");
     }
     encoder_callbacks_->addEncodedMetadata().emplace("metadata", "metadata");
     return Http::FilterMetadataStatus::Continue;

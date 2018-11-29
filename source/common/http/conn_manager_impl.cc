@@ -1228,7 +1228,13 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
     ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, *metadata_map);
     response_encoder_->encodeMetadata(*metadata_map);
   }
-  // metadata_map destroyed when function returns.
+
+  // In case new metadata is added through addEncodedMetadata(), drains it now.
+  if (!response_metadata_map_->empty()) {
+    ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, *response_metadata_map_);
+    response_encoder_->encodeMetadata(*response_metadata_map_);
+    response_metadata_map_->erase(response_metadata_map_->begin(), response_metadata_map_->end());
+  }
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
