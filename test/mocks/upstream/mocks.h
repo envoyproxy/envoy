@@ -372,6 +372,27 @@ public:
   MOCK_METHOD1(onHostAttempted, void(HostDescriptionConstSharedPtr));
 };
 
+class MockEdsSubscriptionFactory : public EdsSubscriptionFactory {
+  MOCK_METHOD8(getOrCreateMux,
+               Config::GrpcMux&(const LocalInfo::LocalInfo& local_info,
+                                Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
+                                const Protobuf::MethodDescriptor& service_method,
+                                Runtime::RandomGenerator& random,
+                                const ::envoy::api::v2::core::ApiConfigSource& config_source,
+                                Stats::Scope& scope,
+                                const Config::RateLimitSettings& rate_limit_settings));
+
+  MOCK_METHOD9(subscriptionFromConfigSource,
+               std::unique_ptr<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>>(
+                   const envoy::api::v2::core::ConfigSource& config,
+                   const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+                   Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
+                   Stats::Scope& scope,
+                   std::function<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>*()>
+                       rest_legacy_constructor,
+                   const std::string& rest_method, const std::string& grpc_method));
+};
+
 class TestRetryHostPredicateFactory : public RetryHostPredicateFactory {
 public:
   RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message&, uint32_t) override {
