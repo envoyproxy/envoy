@@ -6,6 +6,7 @@ namespace Envoy {
 namespace StreamInfo {
 
 const std::string ResponseFlagUtils::NONE = "-";
+const std::string ResponseFlagUtils::DOWNSTREAM_CONNECTION_TERMINATION = "DC";
 const std::string ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK = "LH";
 const std::string ResponseFlagUtils::NO_HEALTHY_UPSTREAM = "UH";
 const std::string ResponseFlagUtils::UPSTREAM_REQUEST_TIMEOUT = "UT";
@@ -33,6 +34,11 @@ const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info
   std::string result;
 
   static_assert(ResponseFlag::LastFlag == 0x2000, "A flag has been added. Fix this code.");
+
+  // stream_info.protocol() is only available for HTTP requests.
+  if (stream_info.protocol() && !stream_info.hasAnyResponseFlag() && !stream_info.responseCode()) {
+    appendString(result, DOWNSTREAM_CONNECTION_TERMINATION);
+  }
 
   if (stream_info.hasResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
     appendString(result, FAILED_LOCAL_HEALTH_CHECK);
