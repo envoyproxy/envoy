@@ -129,27 +129,42 @@ bool DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
 
   callbacks_.onNewMessage(session_.getState());
 
-  // Ignore duplicate and out-of-sync packets.
-  if (seq != session_.getExpectedSeq()) {
+  if (seq == session_.getExpectedSeq()) {
+    session_.setExpectedSeq(seq + 1);
+  } else {
+    // Ignore duplicate and out-of-sync packets.
     callbacks_.onProtocolError();
     offset += len;
     ENVOY_LOG(info, "mysql_proxy: ignoring out-of-sync packet");
     return true;
   }
-  session_.setExpectedSeq(seq + 1);
 
-  // Ensure that the whole packet was consumed.
+  // Handling for messages over 16 mb. See
+  // https://dev.mysql.com/doc/dev/mysql-server/8.0.2/page_protocol_basic_packets.html#sect_protocol_basic_packets_sending_mt_16mb.
   const uint64_t prev_offset = offset;
-  parseMessage(data, offset, seq, len);
-  offset = prev_offset + len;
+  if (len == MYSQL_MAX_PKT_SIZE || cache_len_ > 0) {
+    // TODO(venilnoronha): improve caching performance.
+    std::string payload;
+    BufferHelper::peekString(data, offset, payload);
+    buffer_cache_.add(payload);
+    cache_len_ += len;
+
+    if (len < MYSQL_MAX_PKT_SIZE) {
+      uint64_t buffer_cache_offset_ = 0;
+      parseMessage(buffer_cache_, buffer_cache_offset_, seq, cache_len_);
+      buffer_cache_.drain(buffer_cache_.length());
+      cache_len_ = 0;
+    }
+  } else {
+    parseMessage(data, offset, seq, len);
+  }
+  offset = prev_offset + len; // Ensure that the whole packet was consumed.
 
   ENVOY_LOG(trace, "mysql_proxy: offset after decoding is {} out of {}", offset, data.length());
   return true;
 }
 
 void DecoderImpl::onData(Buffer::Instance& data) {
-  // TODO(venilnoronha): handle messages over 16 mb. See
-  // https://dev.mysql.com/doc/dev/mysql-server/8.0.2/page_protocol_basic_packets.html#sect_protocol_basic_packets_sending_mt_16mb.
   uint64_t offset = 0;
   while (!BufferHelper::endOfBuffer(data, offset) && decode(data, offset)) {
   }
