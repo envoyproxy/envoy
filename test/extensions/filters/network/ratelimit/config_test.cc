@@ -42,9 +42,10 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectJson) {
   // Return the same singleton manager as instance so that config can be found there.
   EXPECT_CALL(context, singletonManager()).WillOnce(ReturnRef(instance.singletonManager()));
 
-  Filters::Common::RateLimit::RateLimitServiceConfigPtr config =
-      Filters::Common::RateLimit::registerRateLimitServiceConfig(
-          instance, envoy::config::bootstrap::v2::Bootstrap());
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(
+          instance, instance.clusterManager().grpcAsyncClientManager(),
+          envoy::config::bootstrap::v2::Bootstrap());
 
   RateLimitConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
