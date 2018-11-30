@@ -2,10 +2,8 @@
 
 #include "common/common/assert.h"
 
-#include <iostream>
-
-using Envoy::Api::SysCallSizeResult;
 using Envoy::Api::SysCallIntResult;
+using Envoy::Api::SysCallSizeResult;
 
 namespace Envoy {
 namespace Network {
@@ -26,9 +24,7 @@ SysCallIntResult FdIoHandleImpl::close() {
   return result;
 }
 
-bool FdIoHandleImpl::isClosed() {
-  return fd_ == -1;
-}
+bool FdIoHandleImpl::isClosed() { return fd_ == -1; }
 
 SysCallIntResult FdIoHandleImpl::bind(const sockaddr* addr, socklen_t addrlen) {
   return Api::OsSysCallsSingleton::get().bind(fd_, addr, addrlen);
@@ -40,7 +36,6 @@ SysCallIntResult FdIoHandleImpl::connect(const struct sockaddr* serv_addr, sockl
 
 SysCallIntResult FdIoHandleImpl::setSocketOption(int level, int optname, const void* optval,
                                                  socklen_t optlen) {
-  std::cerr << "=========== setSocketOption os_sys_call " << &Api::OsSysCallsSingleton::get() << "\n";
   return Api::OsSysCallsSingleton::get().setsockopt(fd_, level, optname, optval, optlen);
 }
 
@@ -50,7 +45,6 @@ SysCallIntResult FdIoHandleImpl::getSocketOption(int level, int optname, void* o
 }
 
 SysCallIntResult FdIoHandleImpl::getSocketName(sockaddr* addr, socklen_t* addr_len) {
-    std::cerr << "=========== getSocketName os_sys_call " << &Api::OsSysCallsSingleton::get() << "\n";
 
   return Api::OsSysCallsSingleton::get().getsockname(fd_, addr, addr_len);
 }
@@ -94,9 +88,7 @@ Api::SysCallIntResult FdIoHandleImpl::shutdown(int how) {
   return {rc, errno};
 }
 
-int FdIoHandleImpl::id() {
-  return fd_;
-}
+int FdIoHandleImpl::id() { return fd_; }
 
 } // namespace Network
 } // namespace Envoy
