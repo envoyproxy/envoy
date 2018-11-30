@@ -40,11 +40,9 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
   return Server::InstanceUtil::createRuntime(server, config);
 }
 
-MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_system,
-                               TestHooks& test_hooks, Server::ComponentFactory& component_factory,
-                               std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
-                               Thread::ThreadFactory& thread_factory)
-    : options_(options), component_factory_(component_factory), thread_factory_(thread_factory) {
+MainCommonBase::MainCommonBase(OptionsImpl& options, Thread::ThreadFactory& thread_factory)
+    : options_(options), thread_factory_(thread_factory),
+      random_generator_(std::make_unique<Envoy::Runtime::RandomGeneratorImpl>()) {
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
@@ -74,8 +72,9 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
                                                                  restarter_->statsAllocator());
 
     server_ = std::make_unique<Server::InstanceImpl>(
-        options_, time_system, local_address, test_hooks, *restarter_, *stats_store_,
-        access_log_lock, component_factory, std::move(random_generator), *tls_, thread_factory);
+        options_, real_time_system_, local_address, default_test_hooks_, *restarter_, *stats_store_,
+        access_log_lock, prod_component_factory_, std::move(random_generator_), *tls_,
+        thread_factory);
 
     break;
   }
@@ -104,7 +103,8 @@ bool MainCommonBase::run() {
     return true;
   case Server::Mode::Validate: {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    return Server::validateConfig(options_, local_address, component_factory_, thread_factory_);
+    return Server::validateConfig(options_, local_address, prod_component_factory_,
+                                  thread_factory_);
   }
   case Server::Mode::InitOnly:
     PERF_DUMP();

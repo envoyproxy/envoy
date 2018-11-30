@@ -52,9 +52,6 @@ private:
 #endif
 
   Envoy::OptionsImpl options_;
-  Event::RealTimeSystem real_time_system_;
-  DefaultTestHooks default_test_hooks_;
-  ProdComponentFactory prod_component_factory_;
   Thread::ThreadFactoryImplPosix thread_factory_;
   MainCommonBase base_;
 };
