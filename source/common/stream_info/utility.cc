@@ -35,7 +35,9 @@ const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info
 
   static_assert(ResponseFlag::LastFlag == 0x2000, "A flag has been added. Fix this code.");
 
-  // stream_info.protocol() is only available for HTTP requests.
+  // A downstream disconnect can be identified for HTTP requests when the upstream returns with a 0
+  // response code and when no other response flags are set. The stream_info.protocol() is only set
+  // for the HTTP protocol, and, therefore, we can identify such requests here.
   if (stream_info.protocol() && !stream_info.hasAnyResponseFlag() && !stream_info.responseCode()) {
     appendString(result, DOWNSTREAM_CONNECTION_TERMINATION);
   }
