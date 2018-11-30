@@ -307,10 +307,10 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     central_ref = &(p->second);
   } else {
     TagExtraction extraction(parent_, name);
-    //std::shared_ptr<StatType> stat = make_stat(parent_.alloc_, extraction.truncatedStatName(),
-    //extraction.tagExtractedName(), extraction.tags());
-    std::shared_ptr<StatType> stat = make_stat(parent_.alloc_, name,
-                                               extraction.tagExtractedName(), extraction.tags());
+    // std::shared_ptr<StatType> stat = make_stat(parent_.alloc_, extraction.truncatedStatName(),
+    // extraction.tagExtractedName(), extraction.tags());
+    std::shared_ptr<StatType> stat =
+        make_stat(parent_.alloc_, name, extraction.tagExtractedName(), extraction.tags());
     if (stat == nullptr) {
       parent_.num_last_resort_stats_.inc();
       stat = make_stat(parent_.heap_allocator_, name, extraction.tagExtractedName(),
