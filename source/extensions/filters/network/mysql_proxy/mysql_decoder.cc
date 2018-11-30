@@ -150,8 +150,8 @@ bool DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     cache_len_ += len;
 
     if (len < MYSQL_MAX_PKT_SIZE) {
-      uint64_t buffer_cache_offset_ = 0;
-      parseMessage(buffer_cache_, buffer_cache_offset_, seq, cache_len_);
+      uint64_t buffer_cache_offset = 0;
+      parseMessage(buffer_cache_, buffer_cache_offset, seq, cache_len_);
       buffer_cache_.drain(buffer_cache_.length());
       cache_len_ = 0;
     }
