@@ -123,6 +123,22 @@ public:
    * @see man 2 socket
    */
   virtual SysCallIntResult socket(int domain, int type, int protocol) PURE;
+
+  /**
+   * @see man 2 getsockname
+   */
+  virtual SysCallIntResult getsockname(int sockfd, struct sockaddr* addr, socklen_t* addrlen) PURE;
+
+   /**
+   * @see man 2 getpeername
+   */
+  virtual SysCallIntResult getpeername(int sockfd, struct sockaddr* addr, socklen_t* addrlen) PURE;
+
+  /**
+   * @see man 2 connect
+   */
+  virtual SysCallIntResult connect(int sockfd, const struct sockaddr* serv_addr,
+                                   socklen_t addrlen) PURE;
 };
 
 typedef std::unique_ptr<OsSysCalls> OsSysCallsPtr;
