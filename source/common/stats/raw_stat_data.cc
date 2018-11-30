@@ -42,8 +42,8 @@ void RawStatData::initialize(absl::string_view key, const StatsOptions& stats_op
   if (key.size() > stats_options.maxNameLength()) {
     ENVOY_LOG_MISC(
         warn,
-        "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
-        key, key.size(), stats_options.maxNameLength());
+        "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
+        key.size(), stats_options.maxNameLength());
     key = key.substr(0, stats_options.maxNameLength());
   }
   ref_count_ = 1;

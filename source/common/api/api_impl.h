@@ -10,8 +10,6 @@
 
 #include "common/filesystem/filesystem_impl.h"
 
-#include "common/filesystem/filesystem_impl.h"
-
 namespace Envoy {
 namespace Api {
 

@@ -439,11 +439,13 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   // The stats did not overflow yet.
   EXPECT_EQ(0UL, store_->counter("stats.overflow").value());
 
-  // The name will be truncated, so we won't be able to find it with the entire name.
-  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
+  // Truncation occurs in the underlying representation, but the by-name lookups
+  // are all based on the untruncated name.
+  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 
-  // But we can find it based on the expected truncation.
-  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
+  // Outside the stats system, no Enovy code can see the truncated view, so
+  // lookups for truncated names will fail.
+  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
 
   // The same should be true with heap allocation, which occurs when the default
   // allocator fails.
@@ -451,11 +453,11 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   EXPECT_CALL(*alloc_, alloc(_)).WillOnce(Return(nullptr));
   store_->counter(name_2);
 
-  // Same deal: the name will be truncated, so we won't be able to find it with the entire name.
-  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
+  // Same deal: the name will be truncated, but we find it with the entire name.
+  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 
-  // But we can find it based on the expected truncation.
-  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
+  // But we can't find it based on the truncation -- that name is not visible at the API.
+  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
 
   // Now the stats have overflowed.
   EXPECT_EQ(1UL, store_->counter("stats.overflow").value());
@@ -923,8 +925,7 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
 class TruncatingAllocTest : public HeapStatsThreadLocalStoreTest {
 protected:
   TruncatingAllocTest()
-      : test_alloc_(options_, symbol_table_),
-        long_name_(options_.maxNameLength() + 1, 'A') {}
+      : test_alloc_(options_, symbol_table_), long_name_(options_.maxNameLength() + 1, 'A') {}
 
   void SetUp() override {
     store_ = std::make_unique<ThreadLocalStoreImpl>(options_, test_alloc_);

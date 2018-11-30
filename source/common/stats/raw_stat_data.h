@@ -116,7 +116,7 @@ public:
         options_(options) {}
   ~RawStatDataAllocator();
 
-  RawStatData* alloc(absl::string_view name);
+  virtual RawStatData* alloc(absl::string_view name); // Virtual only for mocking.
   void free(Stats::RawStatData& data) override;
   RawStatData* allocStatName(StatName stat_name) {
     return alloc(stat_name.toString(symbolTable()));
