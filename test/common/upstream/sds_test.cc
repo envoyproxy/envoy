@@ -77,8 +77,8 @@ protected:
         sds_cluster_.alt_stat_name().empty() ? sds_cluster_.name() : sds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_);
-    cluster_.reset(
-        new EdsClusterImpl(sds_cluster_, runtime_, factory_context, std::move(scope), false));
+    cluster_.reset(new EdsClusterImpl(sds_cluster_, runtime_, factory_context, std::move(scope),
+                                      false, eds_subscription_factory_));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
   }
 
@@ -138,6 +138,7 @@ protected:
   Http::MockAsyncClientRequest request_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<MockEdsSubscriptionFactory> eds_subscription_factory_;
 };
 
 TEST_F(SdsTest, Shutdown) {

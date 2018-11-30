@@ -10,6 +10,7 @@ compromising the response time.
 Configuration
 -------------
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.gzip.v2.Gzip>`
+* This filter should be configured with the name *envoy.gzip*.
 
 .. attention::
 

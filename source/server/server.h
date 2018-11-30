@@ -137,7 +137,8 @@ public:
                Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
-               Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls);
+               Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
+               Thread::ThreadFactory& thread_factory);
 
   ~InstanceImpl() override;
 

@@ -140,6 +140,11 @@ protected:
   void testIdleTimeoutWithTwoRequests();
   void testIdleTimerDisabled();
   void testUpstreamDisconnectWithTwoRequests();
+  void testHeadersOnlyFilterEncoding();
+  void testHeadersOnlyFilterDecoding();
+  void testHeadersOnlyFilterEncodingIntermediateFilters();
+  void testHeadersOnlyFilterDecodingIntermediateFilters();
+  void testHeadersOnlyFilterInterleaved();
   // HTTP/1 tests
   void testBadFirstline();
   void testMissingDelimiter();
@@ -177,6 +182,10 @@ protected:
   void testRetryHostPredicateFilter();
   void testHittingDecoderFilterLimit();
   void testHittingEncoderFilterLimit();
+  void testEnvoyProxyMetadataInResponse();
+  void testEnvoyProxyMultipleMetadata();
+  void testEnvoyProxyInvalidMetadata();
+  void testEnvoyMultipleMetadataReachSizeLimit();
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
                                     const std::string& via = "");
   void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,
@@ -187,6 +196,8 @@ protected:
   void testTrailers(uint64_t request_size, uint64_t response_size);
 
   Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
+  // Prefix listener stat with IP:port, including IP version dependent loopback address.
+  std::string listenerStatPrefix(const std::string& stat_name);
 
   // The client making requests to Envoy.
   IntegrationCodecClientPtr codec_client_;
@@ -198,6 +209,8 @@ protected:
   Http::StreamEncoder* request_encoder_{nullptr};
   // The response headers sent by sendRequestAndWaitForResponse() by default.
   Http::TestHeaderMapImpl default_response_headers_{{":status", "200"}};
+  Http::TestHeaderMapImpl default_request_headers_{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   // The codec type for the client-to-Envoy connection
   Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
 };

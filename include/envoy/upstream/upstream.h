@@ -73,7 +73,8 @@ public:
    */
   virtual CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options) const PURE;
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
 
   /**
    * Create a health check connection for this host.
@@ -159,6 +160,7 @@ public:
 typedef std::shared_ptr<const Host> HostConstSharedPtr;
 
 typedef std::vector<HostSharedPtr> HostVector;
+typedef std::unordered_map<std::string, Upstream::HostSharedPtr> HostMap;
 typedef std::shared_ptr<HostVector> HostVectorSharedPtr;
 typedef std::shared_ptr<const HostVector> HostVectorConstSharedPtr;
 

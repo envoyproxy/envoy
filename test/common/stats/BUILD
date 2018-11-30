@@ -29,6 +29,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "raw_stat_data_test",
+    srcs = ["raw_stat_data_test.cc"],
+    deps = [
+        "//source/common/stats:raw_stat_data_lib",
+        "//source/common/stats:stats_options_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "source_impl_test",
     srcs = ["source_impl_test.cc"],
     deps = [
