@@ -27,14 +27,13 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
   ConfigSharedPtr config(new Config(proto_config, context.localInfo(), context.scope(),
                                     context.runtime(), context.clusterManager()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
-  Filters::Common::RateLimit::RateLimitServiceConfigPtr ratelimit_config =
-      Filters::Common::RateLimit::rateLimitConfig(context);
-
-  return [config, timeout_ms, ratelimit_config,
-          &context](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(context);
+  return [client_factory, timeout_ms,
+          config](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addDecoderFilter(std::make_shared<Filter>(
         config,
-        Filters::Common::RateLimit::rateLimitClient(context, ratelimit_config, timeout_ms)));
+        Filters::Common::RateLimit::rateLimitClient(std::move(client_factory), timeout_ms)));
   };
 }
 

@@ -48,9 +48,10 @@ timeout: "1.337s"
   // Return the same singleton manager as instance so that config can be found there.
   EXPECT_CALL(context, singletonManager()).WillOnce(ReturnRef(instance.singletonManager()));
 
-  Filters::Common::RateLimit::RateLimitServiceConfigPtr config =
-      Filters::Common::RateLimit::registerRateLimitServiceConfig(
-          instance, envoy::config::bootstrap::v2::Bootstrap());
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(
+          instance, instance.clusterManager().grpcAsyncClientManager(),
+          envoy::config::bootstrap::v2::Bootstrap());
 
   RateLimitFilterConfig factory;
   auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);

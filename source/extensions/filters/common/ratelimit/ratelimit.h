@@ -7,6 +7,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/ratelimit/ratelimit.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "absl/types/optional.h"
@@ -77,7 +78,7 @@ typedef std::unique_ptr<Client> ClientPtr;
 /**
  * An interface for creating a rate limit client.
  */
-class ClientFactory {
+class ClientFactory : public Singleton::Instance {
 public:
   virtual ~ClientFactory() {}
 
@@ -87,7 +88,7 @@ public:
   virtual ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout) PURE;
 };
 
-typedef std::unique_ptr<ClientFactory> ClientFactoryPtr;
+typedef std::shared_ptr<ClientFactory> ClientFactoryPtr;
 
 } // namespace RateLimit
 } // namespace Common

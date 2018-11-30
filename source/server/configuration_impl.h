@@ -125,7 +125,7 @@ private:
   std::chrono::milliseconds watchdog_megamiss_timeout_;
   std::chrono::milliseconds watchdog_kill_timeout_;
   std::chrono::milliseconds watchdog_multikill_timeout_;
-  Extensions::Filters::Common::RateLimit::RateLimitServiceConfigPtr ratelimit_service_config_;
+  Extensions::Filters::Common::RateLimit::ClientFactoryPtr ratelimit_client_factory_;
 };
 
 /**

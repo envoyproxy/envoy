@@ -40,7 +40,6 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:instance_interface",
-        "//include/envoy/singleton:manager_interface",
         "//source/common/common:assert_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
@@ -52,6 +51,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/ratelimit:ratelimit_interface",
+        "//include/envoy/singleton:manager_interface",
         "//include/envoy/tracing:http_tracer_interface",
     ],
 )

@@ -25,13 +25,13 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
   FilterConfigSharedPtr filter_config(
       new FilterConfig(proto_config, context.localInfo(), context.scope(), context.runtime()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
-  Filters::Common::RateLimit::RateLimitServiceConfigPtr ratelimit_config =
-      Filters::Common::RateLimit::rateLimitConfig(context);
-  return [filter_config, timeout_ms, ratelimit_config,
-          &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(context);
+  return [client_factory, timeout_ms,
+          filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(
-        filter_config, Filters::Common::RateLimit::rateLimitClient(
-                           context, std::move(ratelimit_config), timeout_ms)));
+        filter_config,
+        Filters::Common::RateLimit::rateLimitClient(std::move(client_factory), timeout_ms)));
   };
 }
 
