@@ -617,6 +617,12 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
                    SSL_CTX_get_app_data(SSL_get_SSL_CTX(client_hello->ssl)))
             ->selectTlsContext(client_hello);
       });
+  // Compute the session context ID hash. We use all the certificate identities,
+  // since we should have a common ID for session resumption no matter what cert
+  // is used.
+  uint8_t session_context_buf[EVP_MAX_MD_SIZE] = {};
+  unsigned session_context_len = 0;
+  hashSessionContextId(server_names, session_context_buf, session_context_len);
   for (auto& ctx : tls_contexts_) {
     if (config.certificateValidationContext() != nullptr &&
         !config.certificateValidationContext()->caCert().empty()) {
@@ -648,54 +654,58 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
           });
     }
 
-    setSessionIdContext(ctx, server_names);
+    int rc = SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_context_buf,
+                                            session_context_len);
+    RELEASE_ASSERT(rc == 1, "");
   }
 }
 
-void ServerContextImpl::setSessionIdContext(TlsContext& ctx,
-                                            const std::vector<std::string>& server_names) {
-  X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
-  uint8_t session_context_buf[EVP_MAX_MD_SIZE] = {};
-  unsigned session_context_len = 0;
+void ServerContextImpl::hashSessionContextId(const std::vector<std::string>& server_names,
+                                             uint8_t* session_context_buf,
+                                             unsigned& session_context_len) {
   EVP_MD_CTX md;
   int rc = EVP_DigestInit(&md, EVP_sha256());
   RELEASE_ASSERT(rc == 1, "");
 
-  // Hash the CommonName/SANs of the server certificate. This makes sure that sessions can only be
-  // resumed to a certificate for the same name, but allows resuming to unique certs in the case
-  // that different Envoy instances each have their own certs.
-  X509_NAME* cert_subject = X509_get_subject_name(cert);
-  RELEASE_ASSERT(cert_subject != nullptr, "");
-  int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
-  // It's possible that the certificate doesn't have CommonName, but has SANs.
-  if (cn_index >= 0) {
-    X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
-    RELEASE_ASSERT(cn_entry != nullptr, "");
-    ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
-    RELEASE_ASSERT(ASN1_STRING_length(cn_asn1) > 0, "");
-    rc = EVP_DigestUpdate(&md, ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
+  for (const auto& ctx : tls_contexts_) {
+    X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
+    // Hash the CommonName/SANs of the server certificate. This makes sure that sessions can only be
+    // resumed to a certificate for the same name, but allows resuming to unique certs in the case
+    // that different Envoy instances each have their own certs.
+    X509_NAME* cert_subject = X509_get_subject_name(cert);
+    RELEASE_ASSERT(cert_subject != nullptr, "");
+    int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
+    // It's possible that the certificate doesn't have CommonName, but has SANs.
+    if (cn_index >= 0) {
+      X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
+      RELEASE_ASSERT(cn_entry != nullptr, "");
+      ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
+      RELEASE_ASSERT(ASN1_STRING_length(cn_asn1) > 0, "");
+      rc = EVP_DigestUpdate(&md, ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
+      RELEASE_ASSERT(rc == 1, "");
+    }
+
+    bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
+        X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
+    if (san_names != nullptr) {
+      for (const GENERAL_NAME* san : san_names.get()) {
+        if (san->type == GEN_DNS || san->type == GEN_URI) {
+          rc = EVP_DigestUpdate(&md, ASN1_STRING_data(san->d.ia5), ASN1_STRING_length(san->d.ia5));
+          RELEASE_ASSERT(rc == 1, "");
+        }
+      }
+    } else {
+      // Make sure that we have either CommonName or SANs.
+      RELEASE_ASSERT(cn_index >= 0, "");
+    }
+
+    X509_NAME* cert_issuer_name = X509_get_issuer_name(cert);
+    rc =
+        X509_NAME_digest(cert_issuer_name, EVP_sha256(), session_context_buf, &session_context_len);
+    RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
+    rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
     RELEASE_ASSERT(rc == 1, "");
   }
-
-  bssl::UniquePtr<GENERAL_NAMES> san_names(
-      static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
-  if (san_names != nullptr) {
-    for (const GENERAL_NAME* san : san_names.get()) {
-      if (san->type == GEN_DNS || san->type == GEN_URI) {
-        rc = EVP_DigestUpdate(&md, ASN1_STRING_data(san->d.ia5), ASN1_STRING_length(san->d.ia5));
-        RELEASE_ASSERT(rc == 1, "");
-      }
-    }
-  } else {
-    // Make sure that we have either CommonName or SANs.
-    RELEASE_ASSERT(cn_index >= 0, "");
-  }
-
-  X509_NAME* cert_issuer_name = X509_get_issuer_name(cert);
-  rc = X509_NAME_digest(cert_issuer_name, EVP_sha256(), session_context_buf, &session_context_len);
-  RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
-  rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
-  RELEASE_ASSERT(rc == 1, "");
 
   // Hash all the settings that affect whether the server will allow/accept
   // the client connection. This ensures that the client is always validated against
@@ -736,8 +746,6 @@ void ServerContextImpl::setSessionIdContext(TlsContext& ctx,
   }
 
   rc = EVP_DigestFinal(&md, session_context_buf, &session_context_len);
-  RELEASE_ASSERT(rc == 1, "");
-  rc = SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_context_buf, session_context_len);
   RELEASE_ASSERT(rc == 1, "");
 }
 
