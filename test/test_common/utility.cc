@@ -187,30 +187,27 @@ std::vector<std::string> TestUtility::split(const std::string& source, const std
 }
 
 void TestUtility::renameFile(const std::string& old_name, const std::string& new_name) {
-#if !defined(WIN32)
-  const int rc = ::rename(old_name.c_str(), new_name.c_str());
-  ASSERT_EQ(0, rc);
-#else
+#if defined(WIN32)
   // use MoveFileEx, since ::rename will not overwrite an existing file. See
   // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/rename-wrename?view=vs-2017
   const BOOL rc = ::MoveFileEx(old_name.c_str(), new_name.c_str(), MOVEFILE_REPLACE_EXISTING);
   ASSERT_NE(0, rc);
+#else
+  const int rc = ::rename(old_name.c_str(), new_name.c_str());
+  ASSERT_EQ(0, rc);
 #endif
 };
 
 void TestUtility::createDirectory(const std::string& name) {
-#if !defined(WIN32)
-  ::mkdir(name.c_str(), S_IRWXU);
-#else
+#if defined(WIN32)
   ::_mkdir(name.c_str());
+#else
+  ::mkdir(name.c_str(), S_IRWXU);
 #endif
 }
 
 void TestUtility::createSymlink(const std::string& target, const std::string& link) {
-#if !defined(WIN32)
-  const int rc = ::symlink(target.c_str(), link.c_str());
-  ASSERT_EQ(rc, 0);
-#else
+#if defined(WIN32)
   const DWORD attributes = ::GetFileAttributes(target.c_str());
   ASSERT_NE(attributes, INVALID_FILE_ATTRIBUTES);
   int flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
@@ -220,6 +217,9 @@ void TestUtility::createSymlink(const std::string& target, const std::string& li
 
   const BOOLEAN rc = ::CreateSymbolicLink(link.c_str(), target.c_str(), flags);
   ASSERT_NE(rc, 0);
+#else
+  const int rc = ::symlink(target.c_str(), link.c_str());
+  ASSERT_EQ(rc, 0);
 #endif
 }
 void ConditionalInitializer::setReady() {
@@ -347,10 +347,10 @@ MockedTestAllocator::~MockedTestAllocator() {}
 namespace Thread {
 
 ThreadFactory& threadFactoryForTest() {
-#if !defined(WIN32)
-  static ThreadFactoryImplPosix* thread_factory = new ThreadFactoryImplPosix();
-#else
+#if defined(WIN32)
   static ThreadFactoryImplWin32* thread_factory = new ThreadFactoryImplWin32();
+#else
+  static ThreadFactoryImplPosix* thread_factory = new ThreadFactoryImplPosix();
 #endif
   return *thread_factory;
 }
