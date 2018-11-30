@@ -41,9 +41,8 @@ int Command::decode(Buffer::Instance& buffer, uint64_t& offset, int seq, int len
 
   case Command::Cmd::COM_QUERY:
     is_query_ = true;
-    // query string starts after mysql_hdr + one byte for comm type
-    BufferHelper::peekStringBySize(buffer, offset,
-                                   buffer.length() - (sizeof(uint8_t) + MYSQL_HDR_SIZE), data_);
+    // query string starts after one byte for comm type
+    BufferHelper::peekStringBySize(buffer, offset, len - 1, data_);
     setDb("");
     break;
 
