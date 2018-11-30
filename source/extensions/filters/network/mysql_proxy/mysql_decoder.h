@@ -63,8 +63,6 @@ private:
 
   DecoderCallbacks& callbacks_;
   MySQLSession session_;
-  Buffer::OwnedImpl buffer_cache_;
-  int cache_len_{0};
 };
 
 } // namespace MySQLProxy

@@ -11,7 +11,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-constexpr int MYSQL_MAX_PKT_SIZE = 0x00FFFFFF;
 constexpr int MYSQL_MAX_STR_SIZE = 256;
 constexpr int MYSQL_PKT_SIZE = 1500;
 constexpr int MYSQL_HDR_SIZE = 4;
