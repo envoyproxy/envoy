@@ -31,7 +31,8 @@ public:
   SysCallIntResult socket(int domain, int type, int protocol) override;
   SysCallIntResult getsockname(int sockfd, struct sockaddr* addr, socklen_t* addrlen) override;
   SysCallIntResult getpeername(int sockfd, struct sockaddr* addr, socklen_t* addrlen) override;
-  SysCallIntResult connect(int sockfd, const struct sockaddr* serv_addr, socklen_t addrlen) override;
+  SysCallIntResult connect(int sockfd, const struct sockaddr* serv_addr,
+                           socklen_t addrlen) override;
 };
 
 typedef ThreadSafeSingleton<OsSysCallsImpl> OsSysCallsSingleton;

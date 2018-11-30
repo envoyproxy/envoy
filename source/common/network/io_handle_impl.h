@@ -9,7 +9,7 @@ class FdIoHandleImpl : public virtual IoHandle {
 public:
   explicit FdIoHandleImpl(int fd);
 
-  ~FdIoHandleImpl() override {};
+  ~FdIoHandleImpl() override{};
 
   Api::SysCallSizeResult readv(const iovec* iovec, int num_iovec) override;
 
@@ -24,10 +24,10 @@ public:
   Api::SysCallIntResult connect(const struct sockaddr* serv_addr, socklen_t addrlen) override;
 
   Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
-                                   socklen_t optlen) override;
+                                        socklen_t optlen) override;
 
   Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
-                                   socklen_t* optlen) override;
+                                        socklen_t* optlen) override;
 
   Api::SysCallIntResult getSocketName(struct sockaddr* addr, socklen_t* addr_len) override;
 

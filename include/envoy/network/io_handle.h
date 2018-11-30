@@ -23,10 +23,10 @@ public:
   virtual Api::SysCallIntResult connect(const struct sockaddr* serv_addr, socklen_t addrlen) PURE;
 
   virtual Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
-                                           socklen_t optlen) PURE;
+                                                socklen_t optlen) PURE;
 
   virtual Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
-                                           socklen_t* optlen) PURE;
+                                                socklen_t* optlen) PURE;
 
   virtual Api::SysCallIntResult getSocketName(struct sockaddr* addr, socklen_t* addr_len) PURE;
 

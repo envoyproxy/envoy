@@ -129,7 +129,7 @@ public:
    */
   virtual SysCallIntResult getsockname(int sockfd, struct sockaddr* addr, socklen_t* addrlen) PURE;
 
-   /**
+  /**
    * @see man 2 getpeername
    */
   virtual SysCallIntResult getpeername(int sockfd, struct sockaddr* addr, socklen_t* addrlen) PURE;
