@@ -31,7 +31,7 @@ routing PRs, questions, etc. to the right place.
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@tetrate.io)
   * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
-  * Stats, abseil, and performance work.
+  * Stats, abseil, scalability, and performance.
 
 # Emeritus maintainers
 
