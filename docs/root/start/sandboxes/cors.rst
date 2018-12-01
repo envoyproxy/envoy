@@ -27,7 +27,7 @@ The CORS enforcement choices are:
     origin is envoyproxy.io. This will result in a client-side CORS error.
 
 Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 The following documentation runs through the setup of both services.
 
@@ -40,7 +40,7 @@ A simple way to achieve this is via the `Docker Toolbox <https://www.docker.com/
 
 **Step 2: Docker Machines Setup**
 
-First let's create a couple of new machines which will hold the containers::
+First let's create a couple of new machines which will hold the containers
 
 Terminal 1::
 
@@ -55,7 +55,7 @@ Terminal 2::
 **Step 4: Clone the Envoy repo, and start all of our containers**
 
 If you have not cloned the envoy repo, clone it with ``git clone git@github.com:envoyproxy/envoy``
-or ``git clone https://github.com/envoyproxy/envoy.git``::
+or ``git clone https://github.com/envoyproxy/envoy.git``
 
 Terminal 1::
 
