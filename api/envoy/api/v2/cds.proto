@@ -484,8 +484,8 @@ message Cluster {
     // merged and delivered in one shot when the duration expires. The start of the duration is when
     // the first update happens. This is useful for big clusters, with potentially noisy deploys
     // that might trigger excessive CPU usage due to a constant stream of healthcheck state changes
-    // or metadata updates. By default, this is not configured and updates apply immediately. Also,
-    // the first set of updates to be seen apply immediately as well (e.g.: a new cluster).
+    // or metadata updates. The first set of updates to be seen apply immediately (e.g.: a new
+    // cluster).
     //
     // If this is not set, we default to a merge window of 1000ms. To disable it, set the merge
     // window to 0.
