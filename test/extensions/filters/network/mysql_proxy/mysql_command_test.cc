@@ -4,10 +4,10 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
-#include "include/sqlparser/SQLParser.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "include/sqlparser/SQLParser.h"
 #include "mysql_test_utils.h"
 
 namespace Envoy {
@@ -468,7 +468,7 @@ TEST_F(MySQLCommandTest, MySQLTest16) {
   hsql::SQLParserResult result;
   EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
   EXPECT_EQ(true, result.isValid());
-  EXPECT_EQ(1UL, result.size()); 
+  EXPECT_EQ(1UL, result.size());
   EXPECT_EQ(result.getStatement(0)->type(), hsql::StatementType::kStmtAlter);
 }
 
@@ -503,7 +503,8 @@ TEST_F(MySQLCommandTest, MySQLTest18) {
  */
 TEST_F(MySQLCommandTest, MySQLTest19) {
   std::string db = "mysqldb";
-  std::string command = buildAlter(TestResource::SCHEMA, db, "default CHARACTER SET = charset_name");
+  std::string command =
+      buildAlter(TestResource::SCHEMA, db, "default CHARACTER SET = charset_name");
   hsql::SQLParserResult result;
   EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
   EXPECT_EQ(true, result.isValid());
@@ -826,8 +827,7 @@ TEST_F(MySQLCommandTest, MySQLTest38) {
   std::string table1 = "table1";
   std::string table2 = "table2";
   std::string ins_command = buildInsert("", true, table1, "");
-  std::string sel_command =
-      buildSelect("*", table2, "" /*"WHERE tbl_temp1.fld_order_id > 100"*/);
+  std::string sel_command = buildSelect("*", table2, "" /*"WHERE tbl_temp1.fld_order_id > 100"*/);
   ins_command.append(sel_command);
   hsql::SQLParserResult result;
   EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(ins_command, result));
@@ -848,8 +848,7 @@ TEST_F(MySQLCommandTest, MySQLTest39) {
   std::string table1 = "table1";
   std::string table2 = "table2";
   std::string ins_command = buildInsert("", true, table1, "");
-  std::string sel_command =
-      buildSelect("tbl_temp1.fld_order_id", table2, "");
+  std::string sel_command = buildSelect("tbl_temp1.fld_order_id", table2, "");
   ins_command.append(sel_command);
   hsql::SQLParserResult result;
   EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(ins_command, result));
