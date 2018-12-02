@@ -101,10 +101,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/msgpack/msgpack-c/archive/cpp-3.1.1.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "499f1e145c19f33031eb8fc6452d5d391b4cecfdeda23e2055386a3b33be4d41",
-        strip_prefix = "jwt_verify_lib-66792a057ec54e4b75c6a2eeda4e98220bd12a9a",
+        sha256 = "9c3a50eac39ae450d09fa69f6802df4099ab619ff93746c4f8ecfc5104463cdb",
+        strip_prefix = "jwt_verify_lib-ce0ca6865bb07631dcdf711ee96fc727e7ac7176",
         # 2018-08-16
-        urls = ["https://github.com/google/jwt_verify_lib/archive/66792a057ec54e4b75c6a2eeda4e98220bd12a9a.tar.gz"],
+        urls = ["https://github.com/google/jwt_verify_lib/archive/ce0ca6865bb07631dcdf711ee96fc727e7ac7176.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
         sha256 = "f742dc5a206958c4d0a6b2c35e3e102afb5683f55f7a7cb1eae024a03f081347",
