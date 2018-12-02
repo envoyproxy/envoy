@@ -94,7 +94,7 @@ your frontend service run the following command in terminal 1.
 
 .. code-block:: console
 
-  docker-machine ip frontend
+  $ docker-machine ip frontend
 
 In terminal 2, run the same command to get the remote origin IP that the
 frontend service will be making requests to.
@@ -111,7 +111,7 @@ If you go to ``<backend_service_ip>:8001/stats`` you will be able to view
 all of the Envoy stats for the backend. You should see the CORS stats for
 invalid and valid origins increment as you make requests from the frontend cluster.
 
-.. code-block:: console
+.. code-block:: none
 
   http.ingress_http.cors.origin_invalid: 0
   http.ingress_http.cors.origin_valid: 0
