@@ -113,7 +113,5 @@ invalid and valid origins increment as you make requests from the frontend clust
 
 .. code-block:: console
 
-  ...
   http.ingress_http.cors.origin_invalid: 0
   http.ingress_http.cors.origin_valid: 0
-  ...
