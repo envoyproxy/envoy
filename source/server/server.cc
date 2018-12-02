@@ -314,7 +314,7 @@ void InstanceImpl::initialize(Options& options,
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
   main_config->initialize(bootstrap_, *this, *cluster_manager_factory_);
-  http_context_.setTracer(config_.httpTracer());
+  http_context_.setTracer(config_->httpTracer());
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
