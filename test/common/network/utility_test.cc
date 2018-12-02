@@ -32,6 +32,17 @@ TEST(NetworkUtility, Url) {
   EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:999999999999"), EnvoyException);
 }
 
+TEST(NetworkUtility, udpUrl) {
+  EXPECT_EQ("foo", Utility::hostFromUdpUrl("udp://foo:1234"));
+  EXPECT_EQ(1234U, Utility::portFromUdpUrl("udp://foo:1234"));
+  EXPECT_THROW(Utility::hostFromUdpUrl("bogus://foo:1234"), EnvoyException);
+  EXPECT_THROW(Utility::portFromUdpUrl("bogus://foo:1234"), EnvoyException);
+  EXPECT_THROW(Utility::hostFromUdpUrl("tcp://foo"), EnvoyException);
+  EXPECT_THROW(Utility::portFromUdpUrl("tcp://foo:1234"), EnvoyException);
+  EXPECT_THROW(Utility::hostFromUdpUrl(""), EnvoyException);
+  EXPECT_THROW(Utility::portFromUdpUrl("udp://foo:999999999999"), EnvoyException);
+}
+
 TEST(NetworkUtility, resolveUrl) {
   EXPECT_THROW(Utility::resolveUrl("foo"), EnvoyException);
   EXPECT_THROW(Utility::resolveUrl("abc://foo"), EnvoyException);
@@ -43,9 +54,21 @@ TEST(NetworkUtility, resolveUrl) {
   EXPECT_THROW(Utility::resolveUrl("tcp://192.168.3.3.3:0"), EnvoyException);
   EXPECT_THROW(Utility::resolveUrl("tcp://192.168.3:0"), EnvoyException);
 
+  EXPECT_THROW(Utility::resolveUrl("udp://1.2.3.4:1234/"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("udp://127.0.0.1:8001/"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("udp://127.0.0.1:0/foo"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("udp://127.0.0.1:"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("udp://192.168.3.3"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("udp://192.168.3.3.3:0"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("udp://192.168.3:0"), EnvoyException);
+
   EXPECT_THROW(Utility::resolveUrl("tcp://[::1]"), EnvoyException);
   EXPECT_THROW(Utility::resolveUrl("tcp://[:::1]:1"), EnvoyException);
   EXPECT_THROW(Utility::resolveUrl("tcp://foo:0"), EnvoyException);
+
+  EXPECT_THROW(Utility::resolveUrl("udp://[::1]"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("udp://[:::1]:1"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("udp://foo:0"), EnvoyException);
 
   EXPECT_EQ("", Utility::resolveUrl("unix://")->asString());
   EXPECT_EQ("foo", Utility::resolveUrl("unix://foo")->asString());
@@ -61,6 +84,16 @@ TEST(NetworkUtility, resolveUrl) {
   EXPECT_EQ("[1::2:3]:4", Utility::resolveUrl("tcp://[1::2:3]:4")->asString());
   EXPECT_EQ("[a::1]:0", Utility::resolveUrl("tcp://[a::1]:0")->asString());
   EXPECT_EQ("[a:b:c:d::]:0", Utility::resolveUrl("tcp://[a:b:c:d::]:0")->asString());
+
+  EXPECT_EQ("1.2.3.4:1234", Utility::resolveUrl("udp://1.2.3.4:1234")->asString());
+  EXPECT_EQ("0.0.0.0:0", Utility::resolveUrl("udp://0.0.0.0:0")->asString());
+  EXPECT_EQ("127.0.0.1:0", Utility::resolveUrl("udp://127.0.0.1:0")->asString());
+
+  EXPECT_EQ("[::1]:1", Utility::resolveUrl("udp://[::1]:1")->asString());
+  EXPECT_EQ("[::]:0", Utility::resolveUrl("udp://[::]:0")->asString());
+  EXPECT_EQ("[1::2:3]:4", Utility::resolveUrl("udp://[1::2:3]:4")->asString());
+  EXPECT_EQ("[a::1]:0", Utility::resolveUrl("udp://[a::1]:0")->asString());
+  EXPECT_EQ("[a:b:c:d::]:0", Utility::resolveUrl("udp://[a:b:c:d::]:0")->asString());
 }
 
 TEST(NetworkUtility, ParseInternetAddress) {
