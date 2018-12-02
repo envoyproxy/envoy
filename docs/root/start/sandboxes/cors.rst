@@ -102,6 +102,13 @@ frontend service will be making requests to.
 Results of the cross-origin request will be shown on the page under *Request Results*.
 Your browser's CORS enforcement logs can be found in the console.
 
+For example:
+
+.. code-block:: javascript
+
+  Access to XMLHttpRequest at 'http://192.168.99.100:8000/cors/disabled' from origin 'http://192.168.99.101:8000'
+  has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+
 **Step 6: Check stats of backend via admin**
 
 When Envoy runs, it can listen to ``admin`` requests if a port is configured. In the example
