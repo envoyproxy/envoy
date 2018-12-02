@@ -104,7 +104,7 @@ Your browser's CORS enforcement logs can be found in the console.
 
 For example:
 
-.. code-block:: javascript
+.. code-block:: console
 
   Access to XMLHttpRequest at 'http://192.168.99.100:8000/cors/disabled' from origin 'http://192.168.99.101:8000'
   has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
