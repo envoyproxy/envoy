@@ -189,8 +189,8 @@ private:
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
   // ClientHello details.
   enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
-  void hashSessionContextId(const std::vector<std::string>& server_names,
-                            uint8_t* session_context_buf, unsigned& session_context_len);
+  void generateHashForSessionContexId(const std::vector<std::string>& server_names,
+                                      uint8_t* session_context_buf, unsigned& session_context_len);
 
   const std::vector<ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };

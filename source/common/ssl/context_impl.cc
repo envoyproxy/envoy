@@ -622,7 +622,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
   // is used.
   uint8_t session_context_buf[EVP_MAX_MD_SIZE] = {};
   unsigned session_context_len = 0;
-  hashSessionContextId(server_names, session_context_buf, session_context_len);
+  generateHashForSessionContexId(server_names, session_context_buf, session_context_len);
   for (auto& ctx : tls_contexts_) {
     if (config.certificateValidationContext() != nullptr &&
         !config.certificateValidationContext()->caCert().empty()) {
@@ -660,18 +660,20 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
   }
 }
 
-void ServerContextImpl::hashSessionContextId(const std::vector<std::string>& server_names,
-                                             uint8_t* session_context_buf,
-                                             unsigned& session_context_len) {
+void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::string>& server_names,
+                                                       uint8_t* session_context_buf,
+                                                       unsigned& session_context_len) {
   EVP_MD_CTX md;
   int rc = EVP_DigestInit(&md, EVP_sha256());
   RELEASE_ASSERT(rc == 1, "");
 
+  // Hash the CommonName/SANs of all the server certificates. This makes sure that sessions can only
+  // be resumed to certificate(s) for the same name(s), but allows resuming to unique certs in the
+  // case that different Envoy instances each have their own certs. All certificates in a
+  // ServerContextImpl context are hashed together, since they all constitute a match on a filter
+  // chain for resumption purposes.
   for (const auto& ctx : tls_contexts_) {
     X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
-    // Hash the CommonName/SANs of the server certificate. This makes sure that sessions can only be
-    // resumed to a certificate for the same name, but allows resuming to unique certs in the case
-    // that different Envoy instances each have their own certs.
     X509_NAME* cert_subject = X509_get_subject_name(cert);
     RELEASE_ASSERT(cert_subject != nullptr, "");
     int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
