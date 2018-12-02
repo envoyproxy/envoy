@@ -18,10 +18,6 @@
 namespace Envoy {
 namespace Http {
 
-CodeStatsImpl::CodeStatsImpl() {}
-
-CodeStatsImpl::~CodeStatsImpl() {}
-
 void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
                                             Code response_code) const {
   // Build a dynamic stat for the response code and increment it.

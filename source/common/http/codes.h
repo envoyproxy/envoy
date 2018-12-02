@@ -13,8 +13,7 @@ namespace Http {
 
 class CodeStatsImpl : public CodeStats {
 public:
-  CodeStatsImpl();
-  ~CodeStatsImpl() override;
+  ~CodeStatsImpl() override = default;
 
   // CodeStats
   void chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,

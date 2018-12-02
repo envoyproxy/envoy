@@ -309,8 +309,9 @@ void InstanceImpl::initialize(Options& options,
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
       localInfo(), secretManager(), api(), http_context_);
 
-  // Now the configuration gets parsed. The configuration may start setting thread local data
-  // per above. See MainImpl::initialize() for why we do this pointer dance.
+  // Now the configuration gets parsed. The configuration may start setting
+  // thread local data per above. See MainImpl::initialize() for why ConfigImpl
+  // is constructed empty and then populated after cluster_manager_factory_.
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
   http_context_.setTracer(config_.httpTracer());
 

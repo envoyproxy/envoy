@@ -3,6 +3,7 @@
 #include "envoy/http/context.h"
 
 #include "common/http/codes.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -13,7 +14,7 @@ namespace Http {
 class ContextImpl : public Context {
 public:
   ContextImpl();
-  virtual ~ContextImpl();
+  virtual ~ContextImpl() = default;
 
   Tracing::HttpTracer& tracer() override { return *tracer_; }
   CodeStats& codeStats() override { return code_stats_; }
@@ -21,7 +22,7 @@ public:
   void setTracer(Tracing::HttpTracer& tracer) { tracer_ = &tracer; }
 
 private:
-  Tracing::HttpTracerPtr tracer_storage_;
+  Tracing::HttpNullTracer null_tracer_;
   Tracing::HttpTracer* tracer_;
   Http::CodeStatsImpl code_stats_;
 };

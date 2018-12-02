@@ -5,11 +5,7 @@
 namespace Envoy {
 namespace Http {
 
-ContextImpl::ContextImpl()
-    : tracer_storage_(std::make_unique<Tracing::HttpNullTracer>()), tracer_(tracer_storage_.get()) {
-}
-
-ContextImpl::~ContextImpl() {}
+ContextImpl::ContextImpl() : tracer_(&null_tracer_) {}
 
 } // namespace Http
 } // namespace Envoy
