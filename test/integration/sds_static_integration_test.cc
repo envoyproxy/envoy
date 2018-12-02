@@ -72,7 +72,7 @@ public:
 
     registerTestServerPorts({"http"});
 
-    client_ssl_ctx_ = createClientSslTransportSocketFactory(false, false, context_manager_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_);
   }
 
   void TearDown() override {
@@ -85,7 +85,8 @@ public:
   Network::ClientConnectionPtr makeSslClientConnection() {
     Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               client_ssl_ctx_->createTransportSocket(), nullptr);
+                                               client_ssl_ctx_->createTransportSocket(nullptr),
+                                               nullptr);
   }
 
 private:

@@ -7,6 +7,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/network/address_impl.h"
+#include "common/network/transport_socket_options_impl.h"
+#include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/tcp_proxy/tcp_proxy.h"
 #include "common/upstream/upstream_impl.h"
@@ -39,6 +41,8 @@ using testing::SaveArg;
 
 namespace Envoy {
 namespace TcpProxy {
+
+using ::Envoy::Network::UpstreamServerName;
 
 namespace {
 Config constructConfigFromJson(const Json::Object& json,
@@ -413,7 +417,8 @@ public:
     {
       testing::InSequence sequence;
       for (uint32_t i = 0; i < connections; i++) {
-        EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+        EXPECT_CALL(factory_context_.cluster_manager_,
+                    tcpConnPoolForCluster("fake_cluster", _, _, _))
             .WillOnce(Return(&conn_pool_))
             .RetiresOnSaturation();
         EXPECT_CALL(conn_pool_, newConnection(_))
@@ -424,7 +429,7 @@ public:
                 }))
             .RetiresOnSaturation();
       }
-      EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
           .WillRepeatedly(Return(nullptr));
     }
 
@@ -1134,7 +1139,7 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
@@ -1156,8 +1161,40 @@ TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_,
-              tcpConnPoolForCluster("filter_state_cluster", _, _))
+              tcpConnPoolForCluster("filter_state_cluster", _, _, _))
       .WillOnce(Return(nullptr));
+
+  filter_->onNewConnection();
+}
+
+// Test that the tcp proxy forwards the requested server name from FilterState if set
+TEST_F(TcpProxyRoutingTest, UpstreamServerName) {
+  setup();
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filterState().setData("envoy.network.upstream_server_name",
+                                    std::make_unique<UpstreamServerName>("www.example.com"),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+
+  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+
+  // Expect filter to try to open a connection to a cluster with the transport socket options with
+  // override-server-name
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _, _))
+      .WillOnce(Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+                          Upstream::LoadBalancerContext*,
+                          Network::TransportSocketOptionsSharedPtr transport_socket_options)
+                           -> Tcp::ConnectionPool::Instance* {
+        EXPECT_EQ(cluster, "fake_cluster");
+        EXPECT_NE(transport_socket_options, nullptr);
+        EXPECT_TRUE(transport_socket_options->serverNameOverride().has_value());
+        EXPECT_EQ(transport_socket_options->serverNameOverride().value(), "www.example.com");
+        return nullptr;
+      }));
+
+  // Port 9999 is within the specified destination port range.
+  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   filter_->onNewConnection();
 }

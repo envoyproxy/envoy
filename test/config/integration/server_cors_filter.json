@@ -4,7 +4,6 @@
     "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
     {
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http1",

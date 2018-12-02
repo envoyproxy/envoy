@@ -118,8 +118,7 @@ message Permission {
     // A port number that describes the destination port connecting to.
     uint32 destination_port = 6 [(validate.rules).uint32.lte = 65535];
 
-    // Metadata that describes additional information about the action. Only available for HTTP
-    // request.
+    // Metadata that describes additional information about the action.
     envoy.type.matcher.MetadataMatcher metadata = 7;
 
     // Negates matching the provided permission. For instance, if the value of `not_rule` would
@@ -191,8 +190,7 @@ message Principal {
     // available for HTTP request.
     envoy.api.v2.route.HeaderMatcher header = 6;
 
-    // Metadata that describes additional information about the principal. Only available for HTTP
-    // request.
+    // Metadata that describes additional information about the principal.
     envoy.type.matcher.MetadataMatcher metadata = 7;
 
     // Negates matching the provided principal. For instance, if the value of `not_id` would match,

@@ -158,9 +158,7 @@ public:
   void setTagProducer(TagProducerPtr&& tag_producer) override {
     tag_producer_ = std::move(tag_producer);
   }
-  void setStatsMatcher(StatsMatcherPtr&& stats_matcher) override {
-    stats_matcher_ = std::move(stats_matcher);
-  }
+  void setStatsMatcher(StatsMatcherPtr&& stats_matcher) override;
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
@@ -254,6 +252,9 @@ private:
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
   absl::string_view truncateStatNameIfNeeded(absl::string_view name);
+  bool rejects(const std::string& name) const;
+  template <class StatMapClass, class StatListClass>
+  void removeRejectedStats(StatMapClass& map, StatListClass& list);
 
   const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
@@ -270,6 +271,18 @@ private:
   Counter& num_last_resort_stats_;
   HeapStatDataAllocator heap_allocator_;
   SourceImpl source_;
+
+  // Retain storage for deleted stats; these are no longer in maps because the
+  // matcher-pattern was established after they were created. Since the stats
+  // are held by reference in code that expects them to be there, we can't
+  // actually delete the stats.
+  //
+  // It seems like it would be better to have each client that expects a stat
+  // to exist to hold it as (e.g.) a CounterSharedPtr rather than a Counter&
+  // but that would be fairly complex to change.
+  std::vector<CounterSharedPtr> deleted_counters_;
+  std::vector<GaugeSharedPtr> deleted_gauges_;
+  std::vector<HistogramSharedPtr> deleted_histograms_;
 };
 
 } // namespace Stats

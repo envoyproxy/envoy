@@ -18,6 +18,8 @@ jobs:
        - setup_remote_docker
        - run: ci/docker_push.sh
        - run: ci/docker_tag.sh
+       - store_artifacts:
+           path: /build/envoy/generated/failed-testlogs
    asan:
      executor: ubuntu-build
      steps:
@@ -27,12 +29,16 @@ jobs:
        - run: curl https://api.github.com/repos/envoyproxy/envoy/pulls/$CIRCLE_PR_NUMBER/commits
        - checkout
        - run: ci/do_circle_ci.sh bazel.asan
+       - store_artifacts:
+           path: /build/envoy/generated/failed-testlogs
    tsan:
      executor: ubuntu-build
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh bazel.tsan
+       - store_artifacts:
+           path: /build/envoy/generated/failed-testlogs
    api:
      executor: ubuntu-build
      steps:
@@ -43,6 +49,8 @@ jobs:
            fingerprints:
              - "fb:f3:fe:be:1c:b2:ec:b6:25:f9:7b:a6:87:54:02:8c"
        - run: ci/api_mirror.sh
+       - store_artifacts:
+           path: /build/envoy/generated/failed-testlogs
    filter_example_mirror:
      executor: ubuntu-build
      steps:
@@ -72,6 +80,8 @@ jobs:
      - run: curl -v https://go.googlesource.com
      - run: curl -6 -v https://go.googlesource.com || true
      - run: ./ci/do_circle_ci_ipv6_tests.sh
+     - store_artifacts:
+         path: /tmp/envoy-docker/envoy/generated/failed-testlogs
 
    coverage:
      executor: ubuntu-build

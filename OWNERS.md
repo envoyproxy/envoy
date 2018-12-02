@@ -22,14 +22,10 @@ routing PRs, questions, etc. to the right place.
 
 # Maintainers
 
-* Constance Caramanolis ([ccaraman](https://github.com/ccaraman)) (ccaramanolis@lyft.com)
-  * Rate limiting, IP tagging, HTTP routing, configuration/operational questions.
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
   * Outlier detection, HTTP routing, xDS, configuration/operational questions.
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
   * Base server (watchdog, workers, startup, stack trace handling, etc.).
-* Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
-  * Redis, Python, configuration/operational questions.
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan@tetrate.io)
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions).
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@tetrate.io)
@@ -37,6 +33,7 @@ routing PRs, questions, etc. to the right place.
 
 # Emeritus maintainers
 
+* Constance Caramanolis ([ccaraman](https://github.com/ccaraman)) (ccaramanolis@lyft.com)
 * Roman Dzhabarov ([RomanDzhabarov](https://github.com/RomanDzhabarov)) (rdzhabarov@lyft.com)
 * Bill Gallagher ([wgallagher](https://github.com/wgallagher)) (bgallagher@lyft.com)
 
@@ -53,3 +50,5 @@ matter expert reviews. Feel free to loop them in as needed.
   * Bazel/build.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * abseil and performance work.
+* Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
+  * Redis, Python, configuration/operational questions.

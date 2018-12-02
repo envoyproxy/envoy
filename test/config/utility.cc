@@ -331,7 +331,7 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
                             envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
                             envoy::api::v2::route::VirtualHost::TlsRequirementType type,
                             envoy::api::v2::route::RouteAction::RetryPolicy retry_policy,
-                            bool include_attempt_count_header) {
+                            bool include_attempt_count_header, const absl::string_view upgrade) {
   RELEASE_ASSERT(!finalized_, "");
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
@@ -343,9 +343,13 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
   virtual_host->set_include_request_attempt_count(include_attempt_count_header);
   virtual_host->add_domains(domains);
   virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
-  virtual_host->mutable_routes(0)->mutable_route()->set_cluster(cluster);
-  virtual_host->mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(code);
-  virtual_host->mutable_routes(0)->mutable_route()->mutable_retry_policy()->Swap(&retry_policy);
+  auto* route = virtual_host->mutable_routes(0)->mutable_route();
+  route->set_cluster(cluster);
+  route->set_cluster_not_found_response_code(code);
+  route->mutable_retry_policy()->Swap(&retry_policy);
+  if (!upgrade.empty()) {
+    route->add_upgrade_configs()->set_upgrade_type(std::string(upgrade));
+  }
   virtual_host->set_require_tls(type);
 
   storeHttpConnectionManager(hcm_config);
@@ -378,15 +382,16 @@ void ConfigHelper::setClientCodec(
   }
 }
 
-void ConfigHelper::addSslConfig() {
+void ConfigHelper::addSslConfig(bool ecdsa_cert) {
   RELEASE_ASSERT(!finalized_, "");
 
   auto* filter_chain =
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-  initializeTls(*filter_chain->mutable_tls_context()->mutable_common_tls_context());
+  initializeTls(ecdsa_cert, *filter_chain->mutable_tls_context()->mutable_common_tls_context());
 }
 
-void ConfigHelper::initializeTls(envoy::api::v2::auth::CommonTlsContext& common_tls_context) {
+void ConfigHelper::initializeTls(bool ecdsa_cert,
+                                 envoy::api::v2::auth::CommonTlsContext& common_tls_context) {
   common_tls_context.add_alpn_protocols("h2");
   common_tls_context.add_alpn_protocols("http/1.1");
 
@@ -396,10 +401,17 @@ void ConfigHelper::initializeTls(envoy::api::v2::auth::CommonTlsContext& common_
   validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
 
   auto* tls_certificate = common_tls_context.add_tls_certificates();
-  tls_certificate->mutable_certificate_chain()->set_filename(
-      TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"));
-  tls_certificate->mutable_private_key()->set_filename(
-      TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+  if (ecdsa_cert) {
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("/test/config/integration/certs/server_ecdsacert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("/test/config/integration/certs/server_ecdsakey.pem"));
+  } else {
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+  }
 }
 
 void ConfigHelper::renameListener(const std::string& name) {

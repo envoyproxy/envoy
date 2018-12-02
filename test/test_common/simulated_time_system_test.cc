@@ -2,6 +2,7 @@
 #include "common/event/libevent.h"
 
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 #include "event2/event.h"
 #include "gtest/gtest.h"
@@ -60,7 +61,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
 
   // Run an event loop in the background to activate timers.
   std::atomic<bool> done(false);
-  auto thread = std::make_unique<Thread::ThreadImpl>([this, &done]() {
+  auto thread = Thread::threadFactoryForTest().createThread([this, &done]() {
     while (!done) {
       event_base_loop(event_system_.get(), 0);
     }

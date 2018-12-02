@@ -66,7 +66,10 @@ envoy_cc_library(
         "context_impl.h",
         "context_manager_impl.h",
     ],
-    external_deps = ["ssl"],
+    external_deps = [
+        "abseil_synchronization",
+        "ssl",
+    ],
     deps = [
         ":utility_lib",
         "//include/envoy/ssl:context_config_interface",

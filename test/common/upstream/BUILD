@@ -37,6 +37,7 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:socket_option_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
         "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",
@@ -80,6 +81,19 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
+    ],
+)
+
+envoy_cc_test(
+    name = "eds_subscription_factory_test",
+    srcs = ["eds_subscription_factory_test.cc"],
+    deps = [
+        "//source/common/upstream:eds_subscription_factory_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/upstream:upstream_mocks",
     ],
 )
 

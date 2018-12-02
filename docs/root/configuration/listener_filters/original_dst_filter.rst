@@ -12,3 +12,4 @@ destination cluster <arch_overview_service_discovery_types_original_destination>
 forward HTTP requests or TCP connections to the restored destination address.
 
 * :ref:`v2 API reference <envoy_api_field_listener.Filter.name>`
+* This filter should be configured with the name *envoy.listener.original_dst*.
