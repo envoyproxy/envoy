@@ -36,17 +36,11 @@ ClientFactoryPtr rateLimitClientFactory(Server::Instance& server,
 ClientFactoryPtr rateLimitClientFactory(Server::Configuration::FactoryContext& context) {
   return context.singletonManager().getTyped<ClientFactory>(
       SINGLETON_MANAGER_REGISTERED_NAME(ratelimit_factory), [] {
-        // This should never happen. We expect config to be registered to singleton, during
+        // This should never happen. We expect factory to be registered to singleton, during
         // configuration processing in the core at start up.
         NOT_REACHED_GCOVR_EXCL_LINE;
         return nullptr;
       });
-}
-
-ClientPtr rateLimitClient(ClientFactoryPtr client_factory, const uint32_t timeout_ms) {
-  // When we introduce rate limit service config in filters, we should validate here that it
-  // matches with bootstrap.
-  return client_factory->create(std::chrono::milliseconds(timeout_ms));
 }
 
 } // namespace RateLimit

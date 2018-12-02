@@ -30,12 +30,15 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
   Filters::Common::RateLimit::ClientFactoryPtr client_factory =
       Filters::Common::RateLimit::rateLimitClientFactory(context);
-  return
-      [client_factory, timeout_ms, filter_config](Network::FilterManager& filter_manager) -> void {
-        filter_manager.addReadFilter(std::make_shared<Filter>(
-            filter_config,
-            Filters::Common::RateLimit::rateLimitClient(std::move(client_factory), timeout_ms)));
-      };
+  return [client_factory, timeout_ms,
+          filter_config](Network::FilterManager& filter_manager) -> void {
+    // When we introduce rate limit service config in filters, we should validate here that it
+    // matches with bootstrap.
+    filter_manager.addReadFilter(
+        std::make_shared<Filter>(filter_config,
+
+                                 client_factory->create(std::chrono::milliseconds(timeout_ms))));
+  };
 }
 
 Network::FilterFactoryCb

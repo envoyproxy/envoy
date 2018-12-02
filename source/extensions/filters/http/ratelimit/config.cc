@@ -29,9 +29,10 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
       Filters::Common::RateLimit::rateLimitClientFactory(context);
   return [client_factory, timeout_ms,
           filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    // When we introduce rate limit service config in filters, we should validate here that it
+    // matches with bootstrap.
     callbacks.addStreamFilter(std::make_shared<Filter>(
-        filter_config,
-        Filters::Common::RateLimit::rateLimitClient(std::move(client_factory), timeout_ms)));
+        filter_config, client_factory->create(std::chrono::milliseconds(timeout_ms))));
   };
 }
 

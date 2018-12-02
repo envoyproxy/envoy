@@ -31,9 +31,10 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
       Filters::Common::RateLimit::rateLimitClientFactory(context);
   return [client_factory, timeout_ms,
           config](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
+    // When we introduce rate limit service config in filters, we should validate here that it
+    // matches with bootstrap.
     callbacks.addDecoderFilter(std::make_shared<Filter>(
-        config,
-        Filters::Common::RateLimit::rateLimitClient(std::move(client_factory), timeout_ms)));
+        config, client_factory->create(std::chrono::milliseconds(timeout_ms))));
   };
 }
 

@@ -25,11 +25,6 @@ ClientFactoryPtr rateLimitClientFactory(Server::Instance& server,
  */
 ClientFactoryPtr rateLimitClientFactory(Server::Configuration::FactoryContext& context);
 
-/**
- * Returns the rate limit client.
- */
-ClientPtr rateLimitClient(ClientFactoryPtr client_factory, const uint32_t timeout_ms);
-
 } // namespace RateLimit
 } // namespace Common
 } // namespace Filters
