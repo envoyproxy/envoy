@@ -8,6 +8,8 @@
 
 #include "common/protobuf/utility.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
+#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
 #include "extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
 
 namespace Envoy {
@@ -25,10 +27,14 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
   ConfigSharedPtr config(new Config(proto_config, context.localInfo(), context.scope(),
                                     context.runtime(), context.clusterManager()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
-  return [config, timeout_ms,
-          &context](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(context);
+  return [client_factory, timeout_ms,
+          config](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
+    // When we introduce rate limit service config in filters, we should validate here that it
+    // matches with bootstrap.
     callbacks.addDecoderFilter(std::make_shared<Filter>(
-        config, context.rateLimitClient(std::chrono::milliseconds(timeout_ms))));
+        config, client_factory->create(std::chrono::milliseconds(timeout_ms))));
   };
 }
 

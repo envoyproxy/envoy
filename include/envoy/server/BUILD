@@ -37,7 +37,6 @@ envoy_cc_library(
     hdrs = ["configuration.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
     ],
@@ -98,7 +97,6 @@ envoy_cc_library(
         "//include/envoy/http:query_params_interface",
         "//include/envoy/init:init_interface",
         "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/server:overload_manager_interface",
@@ -148,7 +146,6 @@ envoy_cc_library(
         "//include/envoy/json:json_object_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:drain_decision_interface",
-        "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:overload_manager_interface",
         "//include/envoy/singleton:manager_interface",
