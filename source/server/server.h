@@ -163,10 +163,6 @@ public:
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
   Runtime::RandomGenerator& random() override { return *random_generator_; }
-  RateLimit::ClientPtr
-  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
-    return config_->rateLimitClientFactory().create(timeout);
-  }
   Runtime::Loader& runtime() override;
   void shutdown() override;
   bool isShutdown() override final { return shutdown_; }
