@@ -11,7 +11,8 @@ configure and code each application independently. Envoy supports various types 
 
 * **Cluster maximum connections**: The maximum number of connections that Envoy will establish to
   all hosts in an upstream cluster. In practice this is only applicable to HTTP/1.1 clusters since
-  HTTP/2 uses a single connection to each host.
+  HTTP/2 uses a single connection to each host. If this circuit breaker overflows the :ref:`upstream_cx_overflow
+  <config_cluster_manager_cluster_stats>` counter for the cluster will increment.
 * **Cluster maximum pending requests**: The maximum number of requests that will be queued while
   waiting for a ready connection pool connection. In practice this is only applicable to HTTP/1.1
   clusters since HTTP/2 connection pools never queue requests. HTTP/2 requests are multiplexed
