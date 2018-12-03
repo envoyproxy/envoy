@@ -87,7 +87,8 @@ enum class FilterTrailersStatus {
 };
 
 /**
- * Return codes for encode metadata filter invocations. Metadata should not stop filter iteration.
+ * Return codes for encode metadata filter invocations. Metadata currently can not stop filter
+ * iteration.
  */
 enum class FilterMetadataStatus {
   // Continue filter chain iteration.
@@ -524,10 +525,11 @@ public:
   virtual FilterTrailersStatus encodeTrailers(HeaderMap& trailers) PURE;
 
   /**
-   * Called with metadata to be encoded. The function always returns continuing filter iteration.
-   * New metadata can be added directly to metadata_map or through addEncodedMetadata() interface.
+   * Called with metadata to be encoded. New metadata can be added directly to metadata_map or
+   * through addEncodedMetadata() interface.
    *
    * @param metadata_map supplies the metadata to be encoded.
+   * @return FilterMetadataStatus, which currently is always FilterMetadataStatus::Continue;
    */
   virtual FilterMetadataStatus encodeMetadata(MetadataMap& metadata_map) PURE;
 

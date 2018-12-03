@@ -1044,11 +1044,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     }
   }
 
-  if (!response_metadata_map_->empty()) {
-    ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, *response_metadata_map_);
-    response_encoder_->encodeMetadata(*response_metadata_map_);
-    response_metadata_map_->erase(response_metadata_map_->begin(), response_metadata_map_->end());
-  }
+  drainMetadata();
 
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
@@ -1101,11 +1097,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     }
   }
 
-  if (!response_metadata_map_->empty()) {
-    ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, *response_metadata_map_);
-    response_encoder_->encodeMetadata(*response_metadata_map_);
-    response_metadata_map_->erase(response_metadata_map_->begin(), response_metadata_map_->end());
-  }
+  drainMetadata();
 
   // Base headers.
   connection_manager_.config_.dateProvider().setDateHeader(headers);
@@ -1229,7 +1221,10 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
     response_encoder_->encodeMetadata(*metadata_map);
   }
 
-  // In case new metadata is added through addEncodedMetadata(), drains it now.
+  drainMetadata();
+}
+
+void ConnectionManagerImpl::ActiveStream::drainMetadata() {
   if (!response_metadata_map_->empty()) {
     ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, *response_metadata_map_);
     response_encoder_->encodeMetadata(*response_metadata_map_);
@@ -1315,11 +1310,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     }
   }
 
-  if (!response_metadata_map_->empty()) {
-    ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, *response_metadata_map_);
-    response_encoder_->encodeMetadata(*response_metadata_map_);
-    response_metadata_map_->erase(response_metadata_map_->begin(), response_metadata_map_->end());
-  }
+  drainMetadata();
 
   ENVOY_STREAM_LOG(trace, "encoding data via codec (size={} end_stream={})", *this, data.length(),
                    end_stream);
@@ -1359,11 +1350,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
     }
   }
 
-  if (!response_metadata_map_->empty()) {
-    ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, *response_metadata_map_);
-    response_encoder_->encodeMetadata(*response_metadata_map_);
-    response_metadata_map_->erase(response_metadata_map_->begin(), response_metadata_map_->end());
-  }
+  drainMetadata();
 
   ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
 
