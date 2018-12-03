@@ -29,6 +29,8 @@ following statistics:
 
   decoding_error, Counter, Number of MongoDB protocol decoding errors
   delay_injected, Counter, Number of times the delay is injected
+  op_delete, Counter, Number of OP_DELETE messages
+  op_delete_single, Counter, Number of OP_DELETE messages that targeted the removal of a single document
   op_get_more, Counter, Number of OP_GET_MORE messages
   op_insert, Counter, Number of OP_INSERT messages
   op_kill_cursors, Counter, Number of OP_KILL_CURSORS messages
@@ -45,6 +47,9 @@ following statistics:
   op_reply_cursor_not_found, Counter, Number of OP_REPLY with cursor not found flag set
   op_reply_query_failure, Counter, Number of OP_REPLY with query failure flag set
   op_reply_valid_cursor, Counter, Number of OP_REPLY with a valid cursor
+  op_update, Counter, Number of OP_UPDATE messages
+  op_multi_update, Counter, Number of OP_UPDATE messages that targeted the update of multiple documents
+  op_upsert, Counter, Number of OP_UPDATE messages that targeted an upsert
   cx_destroy_local_with_active_rq, Counter, Connections destroyed locally with an active query
   cx_destroy_remote_with_active_rq, Counter, Connections destroyed remotely with an active query
   cx_drain_close, Counter, Connections gracefully closed on reply boundaries during server drain

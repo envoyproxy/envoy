@@ -86,6 +86,63 @@ private:
   std::list<Bson::DocumentSharedPtr> documents_;
 };
 
+class UpdateMessageImpl : public MessageImpl,
+                          public UpdateMessage,
+                          Logger::Loggable<Logger::Id::mongo> {
+public:
+  using MessageImpl::MessageImpl;
+
+  // MessageImpl
+  void fromBuffer(uint32_t message_length, Buffer::Instance& data) override;
+
+  // Mongo::Message
+  std::string toString(bool full) const override;
+
+  // Mongo::UpdateMessage
+  bool operator==(const UpdateMessage& rhs) const override;
+  const std::string& fullCollectionName() const override { return full_collection_name_; }
+  void fullCollectionName(const std::string& name) override { full_collection_name_ = name; }
+  int32_t flags() const override { return flags_; }
+  void flags(int32_t flags) override { flags_ = flags; }
+  virtual const Bson::Document* selector() const override { return selector_.get(); }
+  void selector(Bson::DocumentSharedPtr&& selector) override { selector_ = std::move(selector); }
+  virtual const Bson::Document* update() const override { return update_.get(); }
+  void update(Bson::DocumentSharedPtr&& update) override { update_ = std::move(update); }
+
+private:
+  std::string full_collection_name_;
+  int32_t flags_{};
+  Bson::DocumentSharedPtr selector_;
+  Bson::DocumentSharedPtr update_;
+};
+
+class DeleteMessageImpl : public MessageImpl,
+                          public DeleteMessage,
+                          Logger::Loggable<Logger::Id::mongo> {
+public:
+  using MessageImpl::MessageImpl;
+
+  // MessageImpl
+  void fromBuffer(uint32_t message_length, Buffer::Instance& data) override;
+
+  // Mongo::Message
+  std::string toString(bool full) const override;
+
+  // Mongo::DeleteMessage
+  bool operator==(const DeleteMessage& rhs) const override;
+  const std::string& fullCollectionName() const override { return full_collection_name_; }
+  void fullCollectionName(const std::string& name) override { full_collection_name_ = name; }
+  int32_t flags() const override { return flags_; }
+  void flags(int32_t flags) override { flags_ = flags; }
+  virtual const Bson::Document* selector() const override { return selector_.get(); }
+  void selector(Bson::DocumentSharedPtr&& selector) override { selector_ = std::move(selector); }
+
+private:
+  std::string full_collection_name_;
+  int32_t flags_{};
+  Bson::DocumentSharedPtr selector_;
+};
+
 class KillCursorsMessageImpl : public MessageImpl,
                                public KillCursorsMessage,
                                Logger::Loggable<Logger::Id::mongo> {
@@ -269,6 +326,8 @@ public:
   // Mongo::Encoder
   void encodeGetMore(const GetMoreMessage& message) override;
   void encodeInsert(const InsertMessage& message) override;
+  void encodeUpdate(const UpdateMessage& message) override;
+  void encodeDelete(const DeleteMessage& message) override;
   void encodeKillCursors(const KillCursorsMessage& message) override;
   void encodeQuery(const QueryMessage& message) override;
   void encodeReply(const ReplyMessage& message) override;

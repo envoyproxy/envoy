@@ -231,6 +231,31 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
   EXPECT_EQ("insert", metadata.fields().at("db.test").list_value().values(0).string_value());
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    UpdateMessagePtr message(new UpdateMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b10);
+    message->selector(Bson::DocumentImpl::create());
+    message->update(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeUpdate(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_TRUE(metadata.fields().find("db.test") != metadata.fields().end());
+  EXPECT_EQ("update", metadata.fields().at("db.test").list_value().values(0).string_value());
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    DeleteMessagePtr message(new DeleteMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b1);
+    message->selector(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeDelete(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_TRUE(metadata.fields().find("db.test") != metadata.fields().end());
+  EXPECT_EQ("delete", metadata.fields().at("db.test").list_value().values(0).string_value());
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message1(new QueryMessageImpl(0, 0));
     message1->fullCollectionName("db1.test1");
     message1->flags(0b1110010);
@@ -272,6 +297,31 @@ TEST_F(MongoProxyFilterTest, DynamicMetadataDisabled) {
     message->fullCollectionName("db.test");
     message->documents().push_back(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeInsert(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(
+                   NetworkFilterNames::get().MongoProxy));
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    UpdateMessagePtr message(new UpdateMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b10);
+    message->selector(Bson::DocumentImpl::create());
+    message->update(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeUpdate(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(
+                   NetworkFilterNames::get().MongoProxy));
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    DeleteMessagePtr message(new DeleteMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b1);
+    message->selector(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeDelete(std::move(message));
   }));
   filter_->onData(fake_data_, false);
 
@@ -345,6 +395,52 @@ TEST_F(MongoProxyFilterTest, Stats) {
   filter_->onData(fake_data_, false);
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    UpdateMessagePtr message(new UpdateMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->selector(Bson::DocumentImpl::create());
+    message->update(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeUpdate(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    UpdateMessagePtr message(new UpdateMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b1);
+    message->selector(Bson::DocumentImpl::create());
+    message->update(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeUpdate(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    UpdateMessagePtr message(new UpdateMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b10);
+    message->selector(Bson::DocumentImpl::create());
+    message->update(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeUpdate(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    DeleteMessagePtr message(new DeleteMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->selector(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeDelete(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    DeleteMessagePtr message(new DeleteMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b1);
+    message->selector(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeDelete(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     KillCursorsMessagePtr message(new KillCursorsMessageImpl(0, 0));
     message->numberOfCursorIds(1);
     message->cursorIds({1});
@@ -372,6 +468,11 @@ TEST_F(MongoProxyFilterTest, Stats) {
 
   EXPECT_EQ(1U, store_.counter("test.op_get_more").value());
   EXPECT_EQ(1U, store_.counter("test.op_insert").value());
+  EXPECT_EQ(3U, store_.counter("test.op_update").value());
+  EXPECT_EQ(1U, store_.counter("test.op_multi_update").value());
+  EXPECT_EQ(1U, store_.counter("test.op_upsert").value());
+  EXPECT_EQ(2U, store_.counter("test.op_delete").value());
+  EXPECT_EQ(1U, store_.counter("test.op_delete_single").value());
   EXPECT_EQ(1U, store_.counter("test.op_kill_cursors").value());
   EXPECT_EQ(0U, store_.counter("test.delays_injected").value());
   EXPECT_EQ(1U, store_.counter("test.op_command").value());

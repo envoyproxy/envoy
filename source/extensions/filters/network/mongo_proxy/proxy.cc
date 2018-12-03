@@ -28,7 +28,6 @@ class DynamicMetadataKeys {
 public:
   const std::string OperationInsert{"insert"};
   const std::string OperationQuery{"query"};
-  // TODO: Parse out the delete/update operation from the commands
   const std::string OperationUpdate{"update"};
   const std::string OperationDelete{"delete"};
 };
@@ -108,6 +107,43 @@ void ProxyFilter::decodeInsert(InsertMessagePtr&& message) {
   stats_.op_insert_.inc();
   logMessage(*message, true);
   ENVOY_LOG(debug, "decoded INSERT: {}", message->toString(true));
+}
+
+void ProxyFilter::decodeUpdate(UpdateMessagePtr&& message) {
+  tryInjectDelay();
+
+  if (emit_dynamic_metadata_) {
+    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationUpdate,
+                       message->fullCollectionName());
+  }
+
+  stats_.op_update_.inc();
+  if (message->flags() & UpdateMessage::Flags::MultiUpdate) {
+    stats_.op_multi_update_.inc();
+  }
+  if (message->flags() & UpdateMessage::Flags::Upsert) {
+    stats_.op_upsert_.inc();
+  }
+
+  logMessage(*message, true);
+  ENVOY_LOG(debug, "decoded UPDATE: {}", message->toString(true));
+}
+
+void ProxyFilter::decodeDelete(DeleteMessagePtr&& message) {
+  tryInjectDelay();
+
+  if (emit_dynamic_metadata_) {
+    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationDelete,
+                       message->fullCollectionName());
+  }
+
+  stats_.op_delete_.inc();
+  if (message->flags() & DeleteMessage::Flags::SingleRemove) {
+    stats_.op_delete_single_.inc();
+  }
+
+  logMessage(*message, true);
+  ENVOY_LOG(debug, "decoded DELETE: {}", message->toString(true));
 }
 
 void ProxyFilter::decodeKillCursors(KillCursorsMessagePtr&& message) {

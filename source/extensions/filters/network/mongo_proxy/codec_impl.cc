@@ -99,6 +99,86 @@ std::string InsertMessageImpl::toString(bool full) const {
       full ? documentListToString(documents_) : std::to_string(documents_.size()));
 }
 
+void UpdateMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
+  ENVOY_LOG(trace, "decoding update message");
+  uint64_t original_buffer_length = data.length();
+  ASSERT(message_length <= original_buffer_length);
+
+  Bson::BufferHelper::removeInt32(data); // zero
+  full_collection_name_ = Bson::BufferHelper::removeCString(data);
+  flags_ = Bson::BufferHelper::removeInt32(data);
+  selector_ = Bson::DocumentImpl::create(data);
+  update_ = Bson::DocumentImpl::create(data);
+
+  ENVOY_LOG(trace, "{}", toString(true));
+}
+
+bool UpdateMessageImpl::operator==(const UpdateMessage& rhs) const {
+  if (!(requestId() == rhs.requestId() && responseTo() == rhs.responseTo() &&
+        fullCollectionName() == rhs.fullCollectionName() && flags() == rhs.flags() &&
+        !selector() == !rhs.selector() && !update() == !rhs.update())) {
+    return false;
+  }
+
+  if (selector()) {
+    if (!(*selector() == *rhs.selector())) {
+      return false;
+    }
+  }
+
+  if (update()) {
+    if (!(*update() == *rhs.update())) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+std::string UpdateMessageImpl::toString(bool full) const {
+  return fmt::format(
+      R"EOF({{"opcode": "OP_UPDATE", "id": {}, "response_to": {}, )EOF"
+      R"EOF("collection": "{}", "flags": "{:#x}", "selector": {}, "update": {}}})EOF",
+      request_id_, response_to_, full_collection_name_, flags_,
+      full ? selector_->toString() : "\"{...}\"", full ? update_->toString() : "\"{...}\"");
+}
+
+void DeleteMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
+  ENVOY_LOG(trace, "decoding delete message");
+  uint64_t original_buffer_length = data.length();
+  ASSERT(message_length <= original_buffer_length);
+
+  Bson::BufferHelper::removeInt32(data); // zero
+  full_collection_name_ = Bson::BufferHelper::removeCString(data);
+  flags_ = Bson::BufferHelper::removeInt32(data);
+  selector_ = Bson::DocumentImpl::create(data);
+
+  ENVOY_LOG(trace, "{}", toString(true));
+}
+
+bool DeleteMessageImpl::operator==(const DeleteMessage& rhs) const {
+  if (!(requestId() == rhs.requestId() && responseTo() == rhs.responseTo() &&
+        fullCollectionName() == rhs.fullCollectionName() && flags() == rhs.flags() &&
+        !selector() == !rhs.selector())) {
+    return false;
+  }
+
+  if (selector()) {
+    if (!(*selector() == *rhs.selector())) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+std::string DeleteMessageImpl::toString(bool full) const {
+  return fmt::format(R"EOF({{"opcode": "OP_UPDATE", "id": {}, "response_to": {}, )EOF"
+                     R"EOF("collection": "{}", "flags": "{:#x}", "selector": {}}})EOF",
+                     request_id_, response_to_, full_collection_name_, flags_,
+                     full ? selector_->toString() : "\"{...}\"");
+}
+
 void KillCursorsMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
   ENVOY_LOG(trace, "decoding kill cursors message");
   Bson::BufferHelper::removeInt32(data); // zero
@@ -394,6 +474,20 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
     break;
   }
 
+  case Message::OpCode::OP_UPDATE: {
+    std::unique_ptr<UpdateMessageImpl> message(new UpdateMessageImpl(request_id, response_to));
+    message->fromBuffer(message_length, data);
+    callbacks_.decodeUpdate(std::move(message));
+    break;
+  }
+
+  case Message::OpCode::OP_DELETE: {
+    std::unique_ptr<DeleteMessageImpl> message(new DeleteMessageImpl(request_id, response_to));
+    message->fromBuffer(message_length, data);
+    callbacks_.decodeDelete(std::move(message));
+    break;
+  }
+
   case Message::OpCode::OP_KILL_CURSORS: {
     std::unique_ptr<KillCursorsMessageImpl> message(
         new KillCursorsMessageImpl(request_id, response_to));
@@ -473,6 +567,42 @@ void EncoderImpl::encodeInsert(const InsertMessage& message) {
   for (const Bson::DocumentSharedPtr& document : message.documents()) {
     document->encode(output_);
   }
+}
+
+void EncoderImpl::encodeUpdate(const UpdateMessage& message) {
+  if (message.fullCollectionName().empty() || !message.selector() || !message.update()) {
+    throw EnvoyException("invalid update message");
+  }
+
+  // https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/#op-update
+  int32_t total_size = Message::MessageHeaderSize + Message::Int32Length +
+                       message.fullCollectionName().size() + Message::StringPaddingLength +
+                       Message::Int32Length + message.selector()->byteSize() +
+                       message.update()->byteSize();
+
+  encodeCommonHeader(total_size, message, Message::OpCode::OP_UPDATE);
+  Bson::BufferHelper::writeInt32(output_, 0);
+  Bson::BufferHelper::writeCString(output_, message.fullCollectionName());
+  Bson::BufferHelper::writeInt32(output_, message.flags());
+  message.selector()->encode(output_);
+  message.update()->encode(output_);
+}
+
+void EncoderImpl::encodeDelete(const DeleteMessage& message) {
+  if (message.fullCollectionName().empty() || !message.selector()) {
+    throw EnvoyException("invalid delete message");
+  }
+
+  // https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/#op-delete
+  int32_t total_size = Message::MessageHeaderSize + Message::Int32Length +
+                       message.fullCollectionName().size() + Message::StringPaddingLength +
+                       Message::Int32Length + message.selector()->byteSize();
+
+  encodeCommonHeader(total_size, message, Message::OpCode::OP_DELETE);
+  Bson::BufferHelper::writeInt32(output_, 0);
+  Bson::BufferHelper::writeCString(output_, message.fullCollectionName());
+  Bson::BufferHelper::writeInt32(output_, message.flags());
+  message.selector()->encode(output_);
 }
 
 void EncoderImpl::encodeKillCursors(const KillCursorsMessage& message) {

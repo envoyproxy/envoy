@@ -82,6 +82,53 @@ public:
 typedef std::unique_ptr<InsertMessage> InsertMessagePtr;
 
 /**
+ * Mongo OP_UPDATE message.
+ */
+class UpdateMessage : public virtual Message {
+public:
+  struct Flags {
+    // clang-format off
+    static const int32_t Upsert      = 0x1 << 0;
+    static const int32_t MultiUpdate = 0x1 << 1;
+    // clang-format on
+  };
+
+  virtual bool operator==(const UpdateMessage& rhs) const PURE;
+
+  virtual const std::string& fullCollectionName() const PURE;
+  virtual void fullCollectionName(const std::string& name) PURE;
+  virtual int32_t flags() const PURE;
+  virtual void flags(int32_t flags) PURE;
+  virtual const Bson::Document* selector() const PURE;
+  virtual void selector(Bson::DocumentSharedPtr&& selector) PURE;
+  virtual const Bson::Document* update() const PURE;
+  virtual void update(Bson::DocumentSharedPtr&& update) PURE;
+};
+
+typedef std::unique_ptr<UpdateMessage> UpdateMessagePtr;
+
+/**
+ * Mongo OP_DELETE message.
+ */
+class DeleteMessage : public virtual Message {
+public:
+  struct Flags {
+    static const int32_t SingleRemove = 0x1 << 0;
+  };
+
+  virtual bool operator==(const DeleteMessage& rhs) const PURE;
+
+  virtual const std::string& fullCollectionName() const PURE;
+  virtual void fullCollectionName(const std::string& name) PURE;
+  virtual int32_t flags() const PURE;
+  virtual void flags(int32_t flags) PURE;
+  virtual const Bson::Document* selector() const PURE;
+  virtual void selector(Bson::DocumentSharedPtr&& selector) PURE;
+};
+
+typedef std::unique_ptr<DeleteMessage> DeleteMessagePtr;
+
+/**
  * Mongo OP_KILL_CURSORS message.
  */
 class KillCursorsMessage : public virtual Message {
@@ -196,6 +243,8 @@ public:
 
   virtual void decodeGetMore(GetMoreMessagePtr&& message) PURE;
   virtual void decodeInsert(InsertMessagePtr&& message) PURE;
+  virtual void decodeUpdate(UpdateMessagePtr&& message) PURE;
+  virtual void decodeDelete(DeleteMessagePtr&& message) PURE;
   virtual void decodeKillCursors(KillCursorsMessagePtr&& message) PURE;
   virtual void decodeQuery(QueryMessagePtr&& message) PURE;
   virtual void decodeReply(ReplyMessagePtr&& message) PURE;
@@ -224,6 +273,8 @@ public:
 
   virtual void encodeGetMore(const GetMoreMessage& message) PURE;
   virtual void encodeInsert(const InsertMessage& message) PURE;
+  virtual void encodeUpdate(const UpdateMessage& message) PURE;
+  virtual void encodeDelete(const DeleteMessage& message) PURE;
   virtual void encodeKillCursors(const KillCursorsMessage& message) PURE;
   virtual void encodeQuery(const QueryMessage& message) PURE;
   virtual void encodeReply(const ReplyMessage& message) PURE;

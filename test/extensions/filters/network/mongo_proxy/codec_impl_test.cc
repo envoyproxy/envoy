@@ -24,6 +24,8 @@ class TestDecoderCallbacks : public DecoderCallbacks {
 public:
   void decodeGetMore(GetMoreMessagePtr&& message) override { decodeGetMore_(message); }
   void decodeInsert(InsertMessagePtr&& message) override { decodeInsert_(message); }
+  void decodeUpdate(UpdateMessagePtr&& message) override { decodeUpdate_(message); }
+  void decodeDelete(DeleteMessagePtr&& message) override { decodeDelete_(message); }
   void decodeKillCursors(KillCursorsMessagePtr&& message) override { decodeKillCursors_(message); }
   void decodeQuery(QueryMessagePtr&& message) override { decodeQuery_(message); }
   void decodeReply(ReplyMessagePtr&& message) override { decodeReply_(message); }
@@ -34,6 +36,8 @@ public:
 
   MOCK_METHOD1(decodeGetMore_, void(GetMoreMessagePtr& message));
   MOCK_METHOD1(decodeInsert_, void(InsertMessagePtr& message));
+  MOCK_METHOD1(decodeUpdate_, void(UpdateMessagePtr& message));
+  MOCK_METHOD1(decodeDelete_, void(DeleteMessagePtr& message));
   MOCK_METHOD1(decodeKillCursors_, void(KillCursorsMessagePtr& message));
   MOCK_METHOD1(decodeQuery_, void(QueryMessagePtr& message));
   MOCK_METHOD1(decodeReply_, void(ReplyMessagePtr& message));
@@ -236,6 +240,99 @@ TEST_F(MongoCodecImplTest, Insert) {
   decoder_.onData(output_);
 }
 
+TEST_F(MongoCodecImplTest, UpdateEqual) {
+  {
+    UpdateMessageImpl u1(0, 0);
+    UpdateMessageImpl u2(1, 1);
+    EXPECT_FALSE(u1 == u2);
+  }
+
+  {
+    UpdateMessageImpl u1(0, 0);
+    u1.fullCollectionName("hello");
+    UpdateMessageImpl u2(0, 0);
+    u2.fullCollectionName("world");
+    EXPECT_FALSE(u1 == u2);
+  }
+
+  {
+    UpdateMessageImpl u1(0, 0);
+    u1.fullCollectionName("hello");
+    u1.selector(Bson::DocumentImpl::create()->addString("hello", "world"));
+    UpdateMessageImpl u2(0, 0);
+    u2.fullCollectionName("hello");
+    u2.selector(Bson::DocumentImpl::create()->addString("world", "hello"));
+    EXPECT_FALSE(u1 == u2);
+  }
+
+  {
+    UpdateMessageImpl u1(0, 0);
+    u1.fullCollectionName("hello");
+    u1.selector(Bson::DocumentImpl::create()->addString("hello", "world"));
+    u1.update(Bson::DocumentImpl::create()->addString("foo", "bar"));
+    UpdateMessageImpl u2(0, 0);
+    u2.fullCollectionName("hello");
+    u2.selector(Bson::DocumentImpl::create()->addString("hello", "world"));
+    u2.update(Bson::DocumentImpl::create()->addString("bar", "foo"));
+    EXPECT_FALSE(u1 == u2);
+  }
+}
+
+TEST_F(MongoCodecImplTest, Update) {
+  UpdateMessageImpl update(4, 4);
+  update.flags(0x2);
+  update.fullCollectionName("test");
+  update.selector(Bson::DocumentImpl::create()->addString("hello", "world"));
+  update.update(Bson::DocumentImpl::create()->addString("foo", "bar"));
+
+  EXPECT_NO_THROW(Json::Factory::loadFromString(update.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(update.toString(false)));
+
+  encoder_.encodeUpdate(update);
+  EXPECT_CALL(callbacks_, decodeUpdate_(Pointee(Eq(update))));
+  decoder_.onData(output_);
+}
+
+TEST_F(MongoCodecImplTest, DeleteEqual) {
+  {
+    DeleteMessageImpl d1(0, 0);
+    DeleteMessageImpl d2(1, 1);
+    EXPECT_FALSE(d1 == d2);
+  }
+
+  {
+    DeleteMessageImpl d1(0, 0);
+    d1.fullCollectionName("hello");
+    DeleteMessageImpl d2(0, 0);
+    d2.fullCollectionName("world");
+    EXPECT_FALSE(d1 == d2);
+  }
+
+  {
+    DeleteMessageImpl d1(0, 0);
+    d1.fullCollectionName("hello");
+    d1.selector(Bson::DocumentImpl::create()->addString("hello", "world"));
+    DeleteMessageImpl d2(0, 0);
+    d2.fullCollectionName("hello");
+    d2.selector(Bson::DocumentImpl::create()->addString("world", "hello"));
+    EXPECT_FALSE(d1 == d2);
+  }
+}
+
+TEST_F(MongoCodecImplTest, Delete) {
+  DeleteMessageImpl del(4, 4);
+  del.flags(0x1);
+  del.fullCollectionName("test");
+  del.selector(Bson::DocumentImpl::create()->addString("hello", "world"));
+
+  EXPECT_NO_THROW(Json::Factory::loadFromString(del.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(del.toString(false)));
+
+  encoder_.encodeDelete(del);
+  EXPECT_CALL(callbacks_, decodeDelete_(Pointee(Eq(del))));
+  decoder_.onData(output_);
+}
+
 TEST_F(MongoCodecImplTest, KillCursorsEqual) {
   {
     KillCursorsMessageImpl k1(0, 0);
@@ -296,6 +393,22 @@ TEST_F(MongoCodecImplTest, EncodeExceptions) {
   EXPECT_THROW(encoder_.encodeInsert(i), EnvoyException);
   i.documents().push_back(Bson::DocumentImpl::create());
   encoder_.encodeInsert(i);
+
+  UpdateMessageImpl u(0, 0);
+  EXPECT_THROW(encoder_.encodeUpdate(u), EnvoyException);
+  u.fullCollectionName("hello");
+  EXPECT_THROW(encoder_.encodeUpdate(u), EnvoyException);
+  u.selector(Bson::DocumentImpl::create());
+  EXPECT_THROW(encoder_.encodeUpdate(u), EnvoyException);
+  u.update(Bson::DocumentImpl::create());
+  encoder_.encodeUpdate(u);
+
+  DeleteMessageImpl d(0, 0);
+  EXPECT_THROW(encoder_.encodeDelete(d), EnvoyException);
+  d.fullCollectionName("hello");
+  EXPECT_THROW(encoder_.encodeDelete(d), EnvoyException);
+  d.selector(Bson::DocumentImpl::create());
+  encoder_.encodeDelete(d);
 
   GetMoreMessageImpl g(0, 0);
   EXPECT_THROW(encoder_.encodeGetMore(g), EnvoyException);

@@ -32,6 +32,7 @@ Version history
 * load balancer: added a `configuration <envoy_api_msg_Cluster.LeastRequestLbConfig>` option to specify the number of choices made in P2C.
 * logging: added missing [ in log prefix.
 * mongo_proxy: added :ref:`dynamic metadata <config_network_filters_mongo_proxy_dynamic_metadata>`.
+* mongo_proxy: added op_update, op_multi_update, op_upsert, op_delete and op_single_delete :ref:`stats <config_network_filters_mongo_proxy_stats>`.
 * network: removed the reference to `FilterState` in `Connection` in favor of `StreamInfo`.
 * rate-limit: added :ref:`configuration <envoy_api_field_config.filter.http.rate_limit.v2.RateLimit.rate_limited_as_resource_exhausted>`
   to specify whether the `GrpcStatus` status returned should be `RESOURCE_EXHAUSTED` or

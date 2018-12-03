@@ -52,6 +52,11 @@ typedef ConstSingleton<MongoRuntimeConfigKeys> MongoRuntimeConfig;
   COUNTER(delays_injected)                                                                         \
   COUNTER(op_get_more)                                                                             \
   COUNTER(op_insert)                                                                               \
+  COUNTER(op_update)                                                                               \
+  COUNTER(op_multi_update)                                                                         \
+  COUNTER(op_upsert)                                                                               \
+  COUNTER(op_delete)                                                                               \
+  COUNTER(op_delete_single)                                                                        \
   COUNTER(op_kill_cursors)                                                                         \
   COUNTER(op_query)                                                                                \
   COUNTER(op_query_tailable_cursor)                                                                \
@@ -147,6 +152,8 @@ public:
   // Mongo::DecoderCallback
   void decodeGetMore(GetMoreMessagePtr&& message) override;
   void decodeInsert(InsertMessagePtr&& message) override;
+  void decodeUpdate(UpdateMessagePtr&& message) override;
+  void decodeDelete(DeleteMessagePtr&& message) override;
   void decodeKillCursors(KillCursorsMessagePtr&& message) override;
   void decodeQuery(QueryMessagePtr&& message) override;
   void decodeReply(ReplyMessagePtr&& message) override;
