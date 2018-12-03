@@ -696,6 +696,38 @@ TEST(ClientContextConfigImplTest, PasswordProtectedTlsCertificates) {
             client_context_config.tlsCertificates()[0].get().password());
 }
 
+// Validate that not supplying a passphrase for password-protected TLS certificates
+// triggers a failure.
+TEST(ClientContextConfigImplTest, PasswordNotSuppliedTlsCertificates) {
+  envoy::api::v2::auth::Secret secret_config;
+  secret_config.set_name("abc.com");
+
+  auto* tls_certificate = secret_config.mutable_tls_certificate();
+  tls_certificate->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/password_protected_cert.pem"));
+  const std::string private_key_path = TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/password_protected_key.pem");
+  tls_certificate->mutable_private_key()->set_filename(private_key_path);
+  // Don't supply the password.
+
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()
+      ->mutable_tls_certificate_sds_secret_configs()
+      ->Add()
+      ->set_name("abc.com");
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  factory_context.secretManager().addStaticSecret(secret_config);
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+                          EnvoyException,
+                          fmt::format("Failed to load private key from {}", private_key_path));
+}
+
 // Validate that client context config with static certificate validation context is created
 // successfully.
 TEST(ClientContextConfigImplTest, StaticCertificateValidationContext) {

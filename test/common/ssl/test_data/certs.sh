@@ -37,8 +37,8 @@ openssl req -new -key no_san_key.pem -out no_san_cert.csr -config no_san_cert.cf
 openssl x509 -req -days 730 -in no_san_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out no_san_cert.pem -extensions v3_ca -extfile no_san_cert.cfg
 
 # Generate password_protected_cert.pem.
-openssl req -new -key password_protected_key.pem -out password_protected_cert.csr -config password_protected_cert.cfg -batch -sha256 -passin file:password.txt
-openssl x509 -req -days 730 -in password_protected_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out password_protected_cert.pem -extensions v3_ca -extfile password_protected_cert.cfg -passin file:password.txt
+openssl req -new -key password_protected_key.pem -out password_protected_cert.csr -config san_uri_cert.cfg -batch -sha256 -passin file:password.txt
+openssl x509 -req -days 730 -in password_protected_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out password_protected_cert.pem -extensions v3_ca -extfile san_uri_cert.cfg -passin file:password.txt
 
 # Generate san_dns_cert.pem.
 openssl req -new -key san_dns_key.pem -out san_dns_cert.csr -config san_dns_cert.cfg -batch -sha256

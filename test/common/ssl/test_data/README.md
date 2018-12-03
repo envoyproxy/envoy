@@ -13,7 +13,7 @@ There are 11 identities:
 - **No SAN**: It has the certificate *no_san_cert.pem*, signed by the **CA**.
   The certificate does not have SAN field. *no_san_key.pem* is its private key.
 - **Password-protected**: The password-protected certificate *password_protected_cert.pem*,
-  using the config *password_protected_cert.cfg*. *password_protected_key.pem* is
+  using the config *san_uri_cert.cfg*. *password_protected_key.pem* is
   its private key encrypted using the password supplied in *password.txt*.
 - **SAN With URI**: It has the certificate *san_uri_cert.pem*, which is signed
   by the **CA** using the config *san_uri_cert.cfg*. The certificate has SAN

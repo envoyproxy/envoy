@@ -1231,14 +1231,14 @@ TEST_P(SslSocketTest, ServerCertificateWithPassword) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
 
   testUtilV2(listener, client, "", true, "",
-             "6682a309e8ce7cefbfeeb1da23bd3b69ad1676dd24470eb8f3cf065dcb335ec6",
+             "ceefb953bb940c94e2e88f82e2af3ee43611bdad522bf4595e8d1acff3b500fc",
              "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
              nullptr);
 
   // Works even with client renegotiation.
   client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", true, "",
-             "6682a309e8ce7cefbfeeb1da23bd3b69ad1676dd24470eb8f3cf065dcb335ec6",
+             "ceefb953bb940c94e2e88f82e2af3ee43611bdad522bf4595e8d1acff3b500fc",
              "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
              nullptr);
 }
@@ -1261,7 +1261,7 @@ TEST_P(SslSocketTest, ClientCertificateWithPassword) {
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_hash(
-      "6682a309e8ce7cefbfeeb1da23bd3b69ad1676dd24470eb8f3cf065dcb335ec6");
+      "ceefb953bb940c94e2e88f82e2af3ee43611bdad522bf4595e8d1acff3b500fc");
 
   envoy::api::v2::auth::UpstreamTlsContext client;
   envoy::api::v2::auth::TlsCertificate* client_cert =
@@ -1270,8 +1270,8 @@ TEST_P(SslSocketTest, ClientCertificateWithPassword) {
       "{{ test_rundir }}/test/common/ssl/test_data/password_protected_cert.pem"));
   client_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/password_protected_key.pem"));
-  client_cert->mutable_password()->set_filename(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/password.txt"));
+  client_cert->mutable_password()->set_inline_string(TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/password.txt")));
 
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
