@@ -312,7 +312,8 @@ void InstanceImpl::initialize(Options& options,
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
-  // is constructed empty and then populated after cluster_manager_factory_.
+  // is constructed as part of the InstanceImpl and then populated once
+  // cluster_manager_factory_ is available.
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
