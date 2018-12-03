@@ -61,7 +61,7 @@ public:
   // Server::Instance
   Admin& admin() override { return admin_; }
   Api::Api& api() override { return *api_; }
-  Upstream::ClusterManager& clusterManager() override { return *config_->clusterManager(); }
+  Upstream::ClusterManager& clusterManager() override { return *config_.clusterManager(); }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
@@ -77,10 +77,6 @@ public:
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
-  RateLimit::ClientPtr
-  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
-    return config_->rateLimitClientFactory().create(timeout);
-  }
   Runtime::Loader& runtime() override { return *runtime_loader_; }
   void shutdown() override;
   bool isShutdown() override { return false; }
@@ -99,7 +95,7 @@ public:
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
-    return config_->statsFlushInterval();
+    return config_.statsFlushInterval();
   }
 
   // Server::ListenerComponentFactory
@@ -151,7 +147,7 @@ private:
   Runtime::LoaderPtr runtime_loader_;
   Runtime::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
-  std::unique_ptr<Configuration::Main> config_;
+  Configuration::MainImpl config_;
   LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
