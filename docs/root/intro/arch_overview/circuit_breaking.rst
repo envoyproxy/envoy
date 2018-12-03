@@ -16,7 +16,7 @@ configure and code each application independently. Envoy supports various types 
   waiting for a ready connection pool connection. Since HTTP/2 requests are sent over a single
   connection, this circuit breaker only comes into play as the initial connection is created,
   as requests will be multiplexed immediately afterwards. For HTTP/1.1, requests are added to the list
-  of pending requests whenever there aren't enough upstream connections available to immeditely dispatch
+  of pending requests whenever there aren't enough upstream connections available to immediately dispatch
   the request, so this circuit breaker will remain in play for the lifetime of the process.
   If this circuit breaker overflows the
   :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` counter for the cluster will
