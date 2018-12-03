@@ -82,14 +82,13 @@ void GuardDogImpl::threadRoutine() {
   } while (waitOrDetectStop());
 }
 
-WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadId thread_id) {
+WatchDogSharedPtr GuardDogImpl::createWatchDog(Api::Api& api) {
   // Timer started by WatchDog will try to fire at 1/2 of the interval of the
   // minimum timeout specified. loop_interval_ is const so all shared state
   // accessed out of the locked section below is const (time_system_ has no
   // state).
   auto wd_interval = loop_interval_ / 2;
-  WatchDogSharedPtr new_watchdog =
-      std::make_shared<WatchDogImpl>(thread_id, time_system_, wd_interval);
+  WatchDogSharedPtr new_watchdog = std::make_shared<WatchDogImpl>(time_system_, wd_interval, api);
   WatchedDog watched_dog;
   watched_dog.dog_ = new_watchdog;
   {

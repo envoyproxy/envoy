@@ -18,6 +18,7 @@ envoy_cc_library(
     srcs = ["manager_impl.cc"],
     hdrs = ["manager_impl.h"],
     deps = [
+        "//include/envoy/api:api_interface",
         "//include/envoy/registry",
         "//include/envoy/singleton:manager_interface",
         "//source/common/common:assert_lib",

@@ -52,6 +52,11 @@ public:
    * @param thread_routine supplies the function to invoke in the thread.
    */
   virtual Thread::ThreadPtr createThread(std::function<void()> thread_routine) PURE;
+
+  /**
+   * Return the current system thread ID
+   */
+  virtual Thread::ThreadIdPtr currentThreadId() PURE;
 };
 
 typedef std::unique_ptr<Api> ApiPtr;

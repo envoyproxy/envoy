@@ -16,7 +16,7 @@ Impl::Impl(std::chrono::milliseconds file_flush_interval_msec,
       file_system_(file_flush_interval_msec, thread_factory, stats_store) {}
 
 Event::DispatcherPtr Impl::allocateDispatcher(Event::TimeSystem& time_system) {
-  return Event::DispatcherPtr{new Event::DispatcherImpl(time_system)};
+  return Event::DispatcherPtr{new Event::DispatcherImpl(time_system, *this)};
 }
 
 Filesystem::FileSharedPtr Impl::createFile(const std::string& path, Event::Dispatcher& dispatcher,
@@ -31,6 +31,8 @@ std::string Impl::fileReadToEnd(const std::string& path) { return Filesystem::fi
 Thread::ThreadPtr Impl::createThread(std::function<void()> thread_routine) {
   return thread_factory_.createThread(thread_routine);
 }
+
+Thread::ThreadIdPtr Impl::currentThreadId() { return thread_factory_.currentThreadId(); }
 
 } // namespace Api
 } // namespace Envoy

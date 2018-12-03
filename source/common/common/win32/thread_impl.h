@@ -1,11 +1,31 @@
 #pragma once
 
+#include <windows.h>
+
+// <windows.h> defines some macros that interfere with our code, so undef them
+#undef DELETE
+#undef GetMessage
+
 #include <functional>
 
 #include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Thread {
+
+class ThreadIdImplWin32 : public ThreadId {
+public:
+  ThreadIdImplWin32(DWORD id);
+
+  std::string string() const override;
+
+  bool operator==(const ThreadId& rhs) const override;
+
+  bool isCurrentThreadId() const override;
+
+private:
+  DWORD id_;
+};
 
 /**
  * Wrapper for a win32 thread. We don't use std::thread because it eats exceptions and leads to
@@ -33,9 +53,9 @@ class ThreadFactoryImplWin32 : public ThreadFactory {
 public:
   ThreadFactoryImplWin32() {}
 
-  ThreadPtr createThread(std::function<void()> thread_routine) override {
-    return std::make_unique<ThreadImplWin32>(thread_routine);
-  }
+  ThreadPtr createThread(std::function<void()> thread_routine) override;
+
+  ThreadIdPtr currentThreadId() override;
 };
 
 } // namespace Thread

@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <string>
 
 #include "envoy/thread/thread.h"
 
@@ -9,11 +10,6 @@
 
 namespace Envoy {
 namespace Thread {
-
-/**
- * Get current thread id.
- */
-ThreadId currentThreadId();
 
 /**
  * Implementation of BasicLockable

@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 
+#include "envoy/api/api.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/watchdog.h"
@@ -17,15 +18,14 @@ namespace Server {
 class WatchDogImpl : public WatchDog {
 public:
   /**
-   * @param thread_id A system thread ID (such as from Thread::currentThreadId())
    * @param interval WatchDog timer interval (used after startWatchdog())
    */
-  WatchDogImpl(Thread::ThreadId thread_id, TimeSource& tsource, std::chrono::milliseconds interval)
-      : thread_id_(thread_id), time_source_(tsource),
+  WatchDogImpl(TimeSource& tsource, std::chrono::milliseconds interval, Api::Api& api)
+      : thread_id_(api.currentThreadId()), time_source_(tsource),
         latest_touch_time_since_epoch_(tsource.monotonicTime().time_since_epoch()),
         timer_interval_(interval) {}
 
-  Thread::ThreadId threadId() const override { return thread_id_; }
+  std::string threadId() const override { return thread_id_->string(); }
   MonotonicTime lastTouchTime() const override {
     return MonotonicTime(latest_touch_time_since_epoch_.load());
   }
@@ -37,7 +37,7 @@ public:
   }
 
 private:
-  const Thread::ThreadId thread_id_;
+  Thread::ThreadIdPtr thread_id_;
   TimeSource& time_source_;
   std::atomic<std::chrono::steady_clock::duration> latest_touch_time_since_epoch_;
   Event::TimerPtr timer_;

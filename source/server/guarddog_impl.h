@@ -54,7 +54,7 @@ public:
   }
 
   // Server::GuardDog
-  WatchDogSharedPtr createWatchDog(Thread::ThreadId thread_id) override;
+  WatchDogSharedPtr createWatchDog(Api::Api& api) override;
   void stopWatching(WatchDogSharedPtr wd) override;
 
 private:

@@ -28,6 +28,7 @@ public:
   bool fileExists(const std::string& path) override;
   std::string fileReadToEnd(const std::string& path) override;
   Thread::ThreadPtr createThread(std::function<void()> thread_routine) override;
+  Thread::ThreadIdPtr currentThreadId() override;
   Filesystem::Instance& fileSystem() { return file_system_; }
 
 private:

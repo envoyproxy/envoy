@@ -1,8 +1,8 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/common/pure.h"
 #include "envoy/server/watchdog.h"
-#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Server {
@@ -27,9 +27,9 @@ public:
    * to avoid triggering the GuardDog. If no longer needed use the
    * stopWatching() method to remove it from the list of watched objects.
    *
-   * @param thread_id A numeric thread ID, like from Thread::currentThreadId()
+   * @param api A reference to an Api::Api object the WatchDog uses to get its system thread ID
    */
-  virtual WatchDogSharedPtr createWatchDog(Thread::ThreadId thread_id) PURE;
+  virtual WatchDogSharedPtr createWatchDog(Api::Api& api) PURE;
 
   /**
    * Tell the GuardDog to forget about this WatchDog.

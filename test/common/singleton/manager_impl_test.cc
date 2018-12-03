@@ -1,6 +1,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/singleton/manager_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -11,7 +12,10 @@ namespace Singleton {
 
 // Must be a dedicated function so that TID is within the death test.
 static void deathTestWorker() {
-  ManagerImpl manager;
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  ManagerImpl manager(*api);
+
   manager.get("foo", [] { return nullptr; });
 }
 
@@ -33,7 +37,9 @@ public:
 };
 
 TEST(SingletonManagerImplTest, Basic) {
-  ManagerImpl manager;
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  ManagerImpl manager(*api);
 
   std::shared_ptr<TestSingleton> singleton = std::make_shared<TestSingleton>();
   EXPECT_EQ(singleton, manager.get("test_singleton", [singleton] { return singleton; }));

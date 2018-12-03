@@ -7,21 +7,19 @@
 
 #include "common/common/thread_annotations.h"
 
-#if defined(WIN32)
-#include <Windows.h>
-// <windows.h> defines some macros that interfere with our code, so undef them
-#undef DELETE
-#undef GetMessage
-#endif
-
 namespace Envoy {
 namespace Thread {
 
-#if !defined(WIN32)
-using ThreadId = int32_t;
-#else
-using ThreadId = DWORD;
-#endif
+class ThreadId {
+public:
+  virtual ~ThreadId() {}
+
+  virtual std::string string() const PURE;
+  virtual bool operator==(const ThreadId& rhs) const PURE;
+  virtual bool isCurrentThreadId() const PURE;
+};
+
+typedef std::unique_ptr<ThreadId> ThreadIdPtr;
 
 class Thread {
 public:
@@ -47,6 +45,11 @@ public:
    * @param thread_routine supplies the function to invoke in the thread.
    */
   virtual ThreadPtr createThread(std::function<void()> thread_routine) PURE;
+
+  /**
+   * Return the current system thread ID
+   */
+  virtual ThreadIdPtr currentThreadId() PURE;
 };
 
 /**

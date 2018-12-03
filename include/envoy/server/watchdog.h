@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
@@ -36,7 +37,7 @@ public:
    * This can be used if this is later used on a thread where there is no dispatcher.
    */
   virtual void touch() PURE;
-  virtual Thread::ThreadId threadId() const PURE;
+  virtual std::string threadId() const PURE;
   virtual MonotonicTime lastTouchTime() const PURE;
 };
 
