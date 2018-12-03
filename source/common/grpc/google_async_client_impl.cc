@@ -176,7 +176,8 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
 void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
                                               Http::HeaderMapPtr trailing_metadata,
                                               const std::string& message) {
-  if (grpc_status > Status::GrpcStatus::MaximumValid) {
+  if (grpc_status > Status::GrpcStatus::MaximumValid || grpc_status < 0) {
+    ENVOY_LOG(error, "notifyRemoteClose unknown gRPC status code {}", grpc_status);
     grpc_status = Status::GrpcStatus::Unknown;
   }
   ENVOY_LOG(debug, "notifyRemoteClose {} {}", grpc_status, message);
@@ -326,10 +327,10 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     ENVOY_LOG(debug, "Finish with grpc-status code {}", status_.error_code());
     Http::HeaderMapPtr trailing_metadata = std::make_unique<Http::HeaderMapImpl>();
     metadataTranslate(ctxt_.GetServerTrailingMetadata(), *trailing_metadata);
-    const Status::GrpcStatus grpc_status =
-        status_.error_code() <= grpc::StatusCode::DATA_LOSS
-            ? static_cast<Status::GrpcStatus>(status_.error_code())
-            : Status::GrpcStatus::InvalidCode;
+    Status::GrpcStatus grpc_status = static_cast<Status::GrpcStatus>(status_.error_code());
+    if (grpc_status > Status::GrpcStatus::MaximumValid) {
+      grpc_status = Status::GrpcStatus::InvalidCode;
+    }
     notifyRemoteClose(grpc_status, std::move(trailing_metadata), status_.error_message());
     cleanup();
     break;
