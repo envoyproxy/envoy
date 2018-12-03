@@ -47,6 +47,7 @@ int Command::decode(Buffer::Instance& buffer, uint64_t& offset, int seq, int len
     break;
 
   default:
+    offset += len - 1;
     setDb("");
     break;
   }

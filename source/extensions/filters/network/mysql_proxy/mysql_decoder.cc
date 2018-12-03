@@ -52,12 +52,16 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
 
     if (client_login_resp.getRespCode() == MYSQL_RESP_OK) {
       session_.setState(MySQLSession::State::MYSQL_REQ);
-    } else if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
-      session_.setState(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP);
-    } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
-      session_.setState(MySQLSession::State::MYSQL_ERROR);
+      // reset seq# when entering REQ state
+      session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
     } else {
-      session_.setState(MySQLSession::State::MYSQL_NOT_HANDLED);
+      if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
+        session_.setState(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP);
+      } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
+        session_.setState(MySQLSession::State::MYSQL_ERROR);
+      } else {
+        session_.setState(MySQLSession::State::MYSQL_NOT_HANDLED);
+      }
     }
     break;
   }
@@ -93,8 +97,9 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
     Command command{};
     command.decode(message, offset, seq, len);
     callbacks_.onCommand(command);
-
-    session_.setState(MySQLSession::State::MYSQL_REQ_RESP);
+    if (offset ==  message.length()) {
+      session_.setState(MySQLSession::State::MYSQL_REQ_RESP);
+    }
     break;
   }
 
@@ -103,8 +108,10 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
     CommandResponse command_resp{};
     command_resp.decode(message, offset, seq, len);
     callbacks_.onCommandResponse(command_resp);
-
-    session_.setState(MySQLSession::State::MYSQL_REQ);
+    if ((offset + len) ==  message.length()) {
+      session_.setState(MySQLSession::State::MYSQL_REQ);
+      session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
+    }
     break;
   }
 

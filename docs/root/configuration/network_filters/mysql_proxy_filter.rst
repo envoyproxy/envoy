@@ -23,5 +23,7 @@ following statistics:
   login_attempts, Counter, Number of login attempts
   login_failures, Counter, Number of login failures
   protocol_errors, Counter, Number of out of sequence protocol messages encountered in a session
+  queries_parse_error, Counter, Number of MySQL queries parsed with errors
+  queries_parsed, Counter, Number of MySQL queries successfully parsed
   sessions, Counter, Number of MySQL sessions since start
   upgraded_to_ssl, Counter, Number of sessions/connections that were upgraded to SSL

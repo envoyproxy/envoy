@@ -1,5 +1,6 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_filter.h"
+#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 #include "test/mocks/network/mocks.h"
 
@@ -417,6 +418,47 @@ TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchWromgSeqTest) {
   Buffer::InstancePtr server_resp_ok_data(new Buffer::OwnedImpl(srv_resp_ok_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_ok_data, false));
   EXPECT_EQ(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP, filter_->getSession().getState());
+}
+
+/*
+ * Test Mysql query handler, after handshake completes
+ * SM: greeting(p=10) -> challenge-req(v41) -> serv-resp-ok ->
+ * -> Query-request -> Query-response
+ * validate counters and state-machine
+ */
+TEST_F(MySQLFilterTest, MySqlLoginAndQueryTest) {
+  initialize();
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(1UL, config_->stats().sessions_.value());
+
+  std::string greeting_data = encodeServerGreeting(MYSQL_PROTOCOL_10);
+  Buffer::InstancePtr greet_data(new Buffer::OwnedImpl(greeting_data));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
+  EXPECT_EQ(MySQLSession::State::MYSQL_CHALLENGE_REQ, filter_->getSession().getState());
+
+  std::string clogin_data = encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, "user1");
+  Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
+  EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
+  EXPECT_EQ(MySQLSession::State::MYSQL_CHALLENGE_RESP_41, filter_->getSession().getState());
+
+  std::string srv_resp_data = encodeClientLoginResp(MYSQL_RESP_OK);
+  Buffer::InstancePtr server_resp_data(new Buffer::OwnedImpl(srv_resp_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_data, false));
+  EXPECT_EQ(MySQLSession::State::MYSQL_REQ, filter_->getSession().getState());
+
+  Command mysql_cmd_encode{};
+  mysql_cmd_encode.setCmd(Command::Cmd::COM_QUERY);
+  std::string query = "CREATE DATABASE mysqldb";
+  mysql_cmd_encode.setData(query);
+  std::string query_data = mysql_cmd_encode.encode();
+  std::string mysql_msg = BufferHelper::encodeHdr(query_data, 0);
+  Buffer::InstancePtr client_query_data(new Buffer::OwnedImpl(mysql_msg));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_query_data, false));
+  EXPECT_EQ(MySQLSession::State::MYSQL_REQ_RESP, filter_->getSession().getState());
+  EXPECT_EQ(1UL, config_->stats().queries_parsed_.value());
 }
 
 } // namespace MySQLProxy

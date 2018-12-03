@@ -35,6 +35,8 @@ namespace MySQLProxy {
   COUNTER(protocol_errors)                                                       \
   COUNTER(upgraded_to_ssl)                                                       \
   COUNTER(auth_switch_request)                                                   \
+  COUNTER(queries_parsed)                                                        \
+  COUNTER(queries_parse_error)                                                   \
 // clang-format on
 
 /**

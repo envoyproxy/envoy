@@ -21,6 +21,7 @@ constexpr int MYSQL_UNAME_PKT_NUM = 1;
 constexpr int MYSQL_HDR_PKT_SIZE_MASK = 0x00FFFFFF;
 constexpr int MYSQL_HDR_SEQ_MASK = 0x000000FF;
 constexpr int MYSQL_LOGIN_RESP_PKT_NUM = 2;
+constexpr int MYSQL_REQUEST_PKT_NUM = 0;
 constexpr int MYSQL_RESPONSE_PKT_NUM = 1;
 constexpr int MAX_MYSQL_QUERY_STRING = 256;
 constexpr int MAX_MYSQL_USER_STRING = 256;

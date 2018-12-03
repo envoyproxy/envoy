@@ -105,8 +105,10 @@ void MySQLFilter::onCommand(Command& command) {
                  command.getData());
 
   if (!result.isValid()) {
+    config_->stats_.queries_parse_error_.inc();
     return;
   }
+  config_->stats_.queries_parsed_.inc();
 
   // Set dynamic metadata
   auto& dynamic_metadata = const_cast<envoy::api::v2::core::Metadata&>(
@@ -116,6 +118,9 @@ void MySQLFilter::onCommand(Command& command) {
   auto& fields = *metadata.mutable_fields();
 
   for (auto i = 0u; i < result.size(); ++i) {
+    if (result.getStatement(i)->type() == hsql::StatementType::kStmtShow) {
+      continue;
+    }
     hsql::TableAccessMap table_access_map;
     result.getStatement(i)->tablesAccessed(table_access_map);
     for (auto it = table_access_map.begin(); it != table_access_map.end(); ++it) {
