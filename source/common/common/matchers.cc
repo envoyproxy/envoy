@@ -68,6 +68,8 @@ bool StringMatcher::match(const absl::string_view value) const {
   switch (matcher_.match_pattern_case()) {
   case envoy::type::matcher::StringMatcher::kExact:
     return matcher_.exact() == value;
+  case envoy::type::matcher::StringMatcher::kNotExact:
+    return matcher_.not_exact() != value;
   case envoy::type::matcher::StringMatcher::kPrefix:
     return absl::StartsWith(value, matcher_.prefix());
   case envoy::type::matcher::StringMatcher::kSuffix:

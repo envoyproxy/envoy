@@ -13,49 +13,119 @@ namespace Common {
 namespace ExtAuthz {
 
 namespace {
-const Http::HeaderMap& getZeroContentLengthHeader() {
-  static const Http::HeaderMap* header_map =
-      new Http::HeaderMapImpl{{Http::Headers::get().ContentLength, std::to_string(0)}};
-  return *header_map;
+
+// Static header map used for creating authorization requests.
+const Http::HeaderMap& lengthZeroHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::HeaderMapImpl,
+                         {Http::Headers::get().ContentLength, std::to_string(0)});
 }
 
-const Response& getErrorResponse() {
-  static const Response* response =
-      new Response{CheckStatus::Error, Http::HeaderVector{}, Http::HeaderVector{}, std::string{},
-                   Http::Code::Forbidden};
-  return *response;
+// Static response used for creating authorization ERROR responses.
+const Response& errorResponse() {
+  CONSTRUCT_ON_FIRST_USE(Response,
+                         Response{CheckStatus::Error, Http::HeaderVector{}, Http::HeaderVector{},
+                                  EMPTY_STRING, Http::Code::Forbidden});
 }
 
-const Response& getDeniedResponse() {
-  static const Response* response =
-      new Response{CheckStatus::Denied, Http::HeaderVector{}, Http::HeaderVector{}, std::string{}};
-  return *response;
-}
+// SuccessResponse used for creating either DENIED or OK authorization responses.
+struct SuccessResponse {
+  SuccessResponse(const Http::HeaderMap& headers,
+                  const std::vector<Matchers::StringMatcher>& matchers, Response&& response)
+      : headers_(headers), matchers_(matchers), response_(std::make_unique<Response>(response)) {
+    headers_.iterate(
+        [](const Http::HeaderEntry& header, void* ctx) -> Http::HeaderMap::Iterate {
+          auto* context = static_cast<SuccessResponse*>(ctx);
+          for (const auto& matcher : context->matchers_) {
+            if (matcher.match(header.key().getStringView())) {
+              context->response_->headers_to_add.emplace_back(
+                  Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
+              return Http::HeaderMap::Iterate::Continue;
+            }
+          }
+          return Http::HeaderMap::Iterate::Continue;
+        },
+        this);
+  }
 
-const Response& getOkResponse() {
-  static const Response* response = new Response{
-      CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{}, std::string{}, Http::Code::OK};
-  return *response;
-}
-
-struct ResponseContext {
+  const Http::HeaderMap& headers_;
+  const std::vector<Matchers::StringMatcher>& matchers_;
   ResponsePtr response_;
-  const std::vector<Matchers::StringMatcher>* matchers_;
 };
+
 } // namespace
 
-RawHttpClientImpl::RawHttpClientImpl(
-    Upstream::ClusterManager& cluster_manager, const std::string& cluster_name,
-    const std::string& path_prefix, const absl::optional<std::chrono::milliseconds>& timeout,
-    const std::vector<Matchers::StringMatcher>& allowed_request_headers,
-    const std::vector<Matchers::StringMatcher>& allowed_client_headers,
-    const std::vector<Matchers::StringMatcher>& allowed_upstream_headers,
-    const Http::LowerCaseStrPairVector& authorization_headers_to_add)
-    : cm_(cluster_manager), cluster_name_(cluster_name), path_prefix_(path_prefix),
-      timeout_(timeout), allowed_request_headers_(allowed_request_headers),
-      allowed_client_headers_(allowed_client_headers),
-      allowed_upstream_headers_(allowed_upstream_headers),
-      authorization_headers_to_add_(authorization_headers_to_add) {}
+ClientConfig::ClientConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
+                           uint32_t timeout, absl::string_view path_prefix)
+    : request_header_matchers_(
+          toRequestMatchers(config.http_service().authorization_request().allowed_headers())),
+      client_header_matchers_(toClientMatchers(
+          config.http_service().authorization_response().allowed_client_headers())),
+      upstream_header_matchers_(toUpstreamMatchers(
+          config.http_service().authorization_response().allowed_upstream_headers())),
+      authorization_headers_to_add_(
+          toHeadersAdd(config.http_service().authorization_request().headers_to_add())),
+      cluster_name_(config.grpc_service().envoy_grpc().cluster_name()), timeout_(timeout),
+      path_prefix_(path_prefix) {}
+
+std::vector<Matchers::StringMatcher>
+ClientConfig::toRequestMatchers(const envoy::type::matcher::ListStringMatcher& list) {
+  const std::vector<Http::LowerCaseString> keys{
+      {Http::Headers::get().Authorization, Http::Headers::get().Method, Http::Headers::get().Path,
+       Http::Headers::get().Host}};
+
+  std::vector<Matchers::StringMatcher> matchers{list.patterns().begin(), list.patterns().end()};
+  for (const auto& key : keys) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_exact(key.get());
+    matchers.push_back(matcher);
+  }
+  matchers.shrink_to_fit();
+  return matchers;
+}
+
+std::vector<Matchers::StringMatcher>
+ClientConfig::toClientMatchers(const envoy::type::matcher::ListStringMatcher& list) {
+  // If list is empty, all authorization response headers, except Host, should be included to
+  // the client response. If not empty, user input matchers and a default list of exact matches will
+  // be used.
+  std::vector<Matchers::StringMatcher> matchers{list.patterns().begin(), list.patterns().end()};
+  if (matchers.empty()) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_not_exact(Http::Headers::get().Host.get());
+    matchers.push_back(matcher);
+  } else {
+    std::vector<Http::LowerCaseString> keys{
+        {Http::Headers::get().Status, Http::Headers::get().ContentLength,
+         Http::Headers::get().WWWAuthenticate, Http::Headers::get().Location}};
+    for (const auto& key : keys) {
+      envoy::type::matcher::StringMatcher matcher;
+      matcher.set_exact(key.get());
+      matchers.push_back(matcher);
+    }
+  }
+  matchers.shrink_to_fit();
+  return matchers;
+}
+
+std::vector<Matchers::StringMatcher>
+ClientConfig::toUpstreamMatchers(const envoy::type::matcher::ListStringMatcher& list) {
+  std::vector<Matchers::StringMatcher> matchers{list.patterns().begin(), list.patterns().end()};
+  matchers.shrink_to_fit();
+  return matchers;
+}
+
+Http::LowerCaseStrPairVector ClientConfig::toHeadersAdd(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& headers) {
+  Http::LowerCaseStrPairVector header_vec;
+  header_vec.reserve(headers.size());
+  for (const auto& header : headers) {
+    header_vec.emplace_back(Http::LowerCaseString(header.key()), header.value());
+  }
+  return header_vec;
+}
+
+RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config)
+    : cm_(cm), config_(config) {}
 
 RawHttpClientImpl::~RawHttpClientImpl() { ASSERT(!callbacks_); }
 
@@ -71,86 +141,72 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
-  Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(getZeroContentLengthHeader());
+  Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(lengthZeroHeader());
   for (const auto& header : request.attributes().request().http().headers()) {
     const Http::LowerCaseString key{header.first};
-    if (std::any_of(allowed_request_headers_.begin(), allowed_request_headers_.end(),
-                    [&key](auto matcher) { return matcher.match(key.get()); })) {
-      if (key == Http::Headers::get().Path && !path_prefix_.empty()) {
+    const bool is_match = std::any_of(config_->requestHeaderMatchers().begin(),
+                                      config_->requestHeaderMatchers().end(),
+                                      [&key](auto matcher) { return matcher.match(key.get()); });
+    if (is_match) {
+      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
         std::string value;
-        absl::StrAppend(&value, path_prefix_, header.second);
+        absl::StrAppend(&value, config_->pathPrefix(), header.second);
         headers->addCopy(key, value);
       } else {
         headers->addCopy(key, header.second);
       }
     }
   }
-  for (const auto& header_to_add : authorization_headers_to_add_) {
+
+  for (const auto& header_to_add : config_->headersToAdd()) {
     headers->setReference(header_to_add.first, header_to_add.second);
   }
 
-  request_ = cm_.httpAsyncClientForCluster(cluster_name_)
+  request_ = cm_.httpAsyncClientForCluster(config_->cluster())
                  .send(std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers)), *this,
-                       Http::AsyncClient::RequestOptions().setTimeout(timeout_));
+                       Http::AsyncClient::RequestOptions().setTimeout(config_->timeout()));
 }
 
 void RawHttpClientImpl::onSuccess(Http::MessagePtr&& message) {
-  callbacks_->onComplete(messageToResponse(std::move(message)));
+  callbacks_->onComplete(toResponse(std::move(message)));
   callbacks_ = nullptr;
 }
 
 void RawHttpClientImpl::onFailure(Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
-  callbacks_->onComplete(std::make_unique<Response>(getErrorResponse()));
+  callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
   callbacks_ = nullptr;
 }
 
-ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
+ResponsePtr RawHttpClientImpl::toResponse(Http::MessagePtr message) {
   // Set an error status if parsing status code fails. A Forbidden response is sent to the client
   // if the filter has not been configured with failure_mode_allow.
   uint64_t status_code{};
   if (!StringUtil::atoul(message->headers().Status()->value().c_str(), status_code)) {
     ENVOY_LOG(warn, "ext_authz HTTP client failed to parse the HTTP status code.");
-    return std::make_unique<Response>(getErrorResponse());
+    return std::make_unique<Response>(errorResponse());
   }
 
   // Set an error status if the call to the authorization server returns any of the 5xx HTTP error
   // codes. A Forbidden response is sent to the client if the filter has not been configured with
   // failure_mode_allow.
   if (Http::CodeUtility::is5xx(status_code)) {
-    return std::make_unique<Response>(getErrorResponse());
+    return std::make_unique<Response>(errorResponse());
   }
 
-  // If the authorization server returned HTTP status 200 OK, set an authorized response object,
-  // otherwise set a rejected response.
-  ResponseContext ctx;
+  // Create an Ok authorization response.
   if (status_code == enumToInt(Http::Code::OK)) {
-    ctx.matchers_ = &allowed_upstream_headers_;
-    ctx.response_ = std::make_unique<Response>(getOkResponse());
-  } else {
-    ctx.matchers_ = &allowed_client_headers_;
-    ctx.response_ = std::make_unique<Response>(getDeniedResponse());
-    ctx.response_->status_code = static_cast<Http::Code>(status_code);
-    ctx.response_->body = message->bodyAsString();
+    SuccessResponse ok{message->headers(), config_->upstreamHeaderMatchers(),
+                       Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{},
+                                EMPTY_STRING, Http::Code::OK}};
+    return std::move(ok.response_);
   }
 
-  if (ctx.matchers_ != nullptr) {
-    message->headers().iterate(
-        [](const Http::HeaderEntry& header, void* ctx) -> Http::HeaderMap::Iterate {
-          auto* context = static_cast<ResponseContext*>(ctx);
-          for (const auto& matcher : *(context->matchers_)) {
-            if (matcher.match(header.key().getStringView())) {
-              context->response_->headers_to_add.emplace_back(
-                  Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
-              return Http::HeaderMap::Iterate::Continue;
-            }
-          }
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        &ctx);
-  }
-
-  return std::move(ctx.response_);
+  // Create a Denied authorization response.
+  SuccessResponse denied{message->headers(), config_->clientHeaderMatchers(),
+                         Response{CheckStatus::Denied, Http::HeaderVector{}, Http::HeaderVector{},
+                                  message->bodyAsString(), static_cast<Http::Code>(status_code)}};
+  return std::move(denied.response_);
 }
 
 } // namespace ExtAuthz

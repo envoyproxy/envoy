@@ -30,28 +30,52 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-// typedef std::vector<envoy::api::v2::core::HeaderValueOption> HeaderValueOptionVector;
-
 class ExtAuthzHttpClientTest : public testing::Test {
 public:
   ExtAuthzHttpClientTest()
-      : cluster_manager_{}, cluster_name_{"foo"}, path_prefix_{"/bar"}, timeout_{},
-        allowed_request_headers_{{TestUtility::createExactMatcher(":method"),
-                                  TestUtility::createExactMatcher(":path"),
-                                  TestUtility::createPrefixMatcher("x-")}},
-        allowed_client_headers_{{TestUtility::createExactMatcher("foo"),
-                                 TestUtility::createExactMatcher(":status"),
-                                 TestUtility::createPrefixMatcher("x-")}},
-        allowed_upstream_headers_{{TestUtility::createExactMatcher("bar")},
-                                  {TestUtility::createPrefixMatcher("x-")}},
-        authorization_headers_to_add_{
-            {std::make_pair(Http::LowerCaseString("x-authz-header1"), "value"),
-             std::make_pair(Http::LowerCaseString("x-authz-header2"), "value")}},
-        async_client_{}, async_request_{&async_client_},
-        client_(cluster_manager_, cluster_name_, path_prefix_, timeout_, allowed_request_headers_,
-                allowed_client_headers_, allowed_upstream_headers_, authorization_headers_to_add_) {
-    ON_CALL(cluster_manager_, httpAsyncClientForCluster(cluster_name_))
+      : cm_{}, async_client_{},
+        async_request_{&async_client_}, config_{createConfig()}, client_{cm_, config_} {
+    ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
         .WillByDefault(ReturnRef(async_client_));
+  }
+
+  static ClientConfigSharedPtr createConfig(std::string yaml = "", uint32_t timeout = 200,
+                                            std::string path_prefix = "/bar") {
+    envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
+    if (yaml.empty()) {
+      std::string default_yaml = R"EOF(
+        http_service:
+          server_uri:
+            uri: "ext_authz:9000"
+            cluster: "ext_authz"
+            timeout: 0.25s  
+
+          authorization_request: 
+            allowed_headers: 
+              patterns: 
+              - exact: baz
+              - prefix: "x-"
+            headers_to_add:
+            - key: "x-authz-header1"
+              value: "value"
+            - key: "x-authz-header2"
+              value: "value"
+
+          authorization_response: 
+            allowed_upstream_headers: 
+              patterns: 
+              - exact: bar
+              - prefix: "x-"
+            allowed_client_headers: 
+              patterns: 
+              - exact: foo
+              - prefix: "x-"
+        )EOF";
+      MessageUtil::loadFromYaml(default_yaml, proto_config);
+    } else {
+      MessageUtil::loadFromYaml(yaml, proto_config);
+    }
+    return std::make_shared<ClientConfig>(ClientConfig{proto_config, timeout, path_prefix});
   }
 
   Http::MessagePtr sendRequest(std::unordered_map<std::string, std::string>&& headers) {
@@ -83,16 +107,10 @@ public:
     return message_ptr;
   }
 
-  NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  std::string cluster_name_;
-  std::string path_prefix_;
-  absl::optional<std::chrono::milliseconds> timeout_;
-  std::vector<Matchers::StringMatcher> allowed_request_headers_;
-  std::vector<Matchers::StringMatcher> allowed_client_headers_;
-  std::vector<Matchers::StringMatcher> allowed_upstream_headers_;
-  Http::LowerCaseStrPairVector authorization_headers_to_add_;
+  NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<Http::MockAsyncClientRequest> async_request_;
+  ClientConfigSharedPtr config_;
   RawHttpClientImpl client_;
   MockRequestCallbacks request_callbacks_;
 };
@@ -164,10 +182,9 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   (*mutable_headers)[std::string{":x-authz-header2"}] = std::string{"forged-value"};
 
   // Expect that header1 will be added and header2 correctly overwritten.
-  EXPECT_CALL(async_client_,
-              send_(AllOf(ContainsPairAsHeader(authorization_headers_to_add_.front()),
-                          ContainsPairAsHeader(authorization_headers_to_add_.back())),
-                    _, _));
+  EXPECT_CALL(async_client_, send_(AllOf(ContainsPairAsHeader(config_->headersToAdd().front()),
+                                         ContainsPairAsHeader(config_->headersToAdd().back())),
+                                   _, _));
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
   EXPECT_CALL(request_callbacks_,
@@ -275,7 +292,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
   client_.onSuccess(std::move(check_response));
 }
 
-// Test the client when a call to authorization server returns a status code that cannot be parsed.
+// Test the client when a call to authorization server returns a status code that cannot be
+// parsed.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestErrorParsingStatusCode) {
   Http::MessagePtr check_response(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "foo"}}}));

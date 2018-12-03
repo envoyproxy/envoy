@@ -67,11 +67,11 @@ Version history
   scaling locality weights by number of hosts removed by subset lb predicates.
 * upstream: changed how load calculation for :ref:`priority levels<arch_overview_load_balancing_priority_levels>` and :ref:`panic thresholds<arch_overview_load_balancing_panic_threshold>` interact. As long as normalized total health is 100% panic thresholds are disregarded.
 * upstream: changed the default hash for :ref:`ring hash <envoy_api_msg_Cluster.RingHashLbConfig>` from std::hash to `xxHash <https://github.com/Cyan4973/xxHash>`_.
-* ext_authz: authorization request and response configuration has been separated split into two distinct objects: :ref:`authorization request 
+* ext_authz: authorization request and response configuration has been separated and split into two distinct objects: :ref:`authorization request 
   <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_request>` and :ref:`authorization response 
   <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_response>`. In addition :ref:`client headers 
   <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_client_headers>` and :ref:`upstream headers 
-  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_upstream_headers>` which replaces the old *allowed_authorization_headers* object, also added support to string matcher.
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_upstream_headers>` which replaces the old *allowed_authorization_headers* object and also supports :ref:`string matcher <envoy_api_msg_type.matcher.StringMatcher>`.
 * upstream: when using active health checking and STRICT_DNS with several addresses that resolve
   to the same hosts, Envoy will now health check each host independently.
 

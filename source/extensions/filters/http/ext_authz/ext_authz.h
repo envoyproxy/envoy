@@ -32,45 +32,26 @@ namespace ExtAuthz {
 enum class FilterRequestType { Internal, External, Both };
 
 /**
- * Global configuration for the HTTP authorization (ext_authz) filter.
+ * Configuration for the External Authorization (ext_authz) filter.
  */
 class FilterConfig {
 public:
-  FilterConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz&,
-               const LocalInfo::LocalInfo&, const Runtime::Loader&, Stats::Scope& scope,
-               Upstream::ClusterManager&);
+  FilterConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
+               const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+               Runtime::Loader& runtime)
+      : failure_mode_allow_(config.failure_mode_allow()), local_info_(local_info), scope_(scope),
+        runtime_(runtime) {}
 
-  const LocalInfo::LocalInfo& localInfo();
-  const Runtime::Loader& runtime();
-  const std::string& cluster();
-  const std::vector<Matchers::StringMatcher>& allowedRequestHeaders();
-  const std::vector<Matchers::StringMatcher>& allowedClientHeaders();
-  const std::vector<Matchers::StringMatcher>& allowedUpstreamHeaders();
-  const Http::LowerCaseStrPairVector& authorizationHeadersToAdd();
-  Stats::Scope& scope() const;
-  Upstream::ClusterManager& cm() const;
-  bool failureModeAllow() const;
+  bool failureModeAllow() const { return failure_mode_allow_; }
+  const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
+  Runtime::Loader& runtime() { return runtime_; }
+  Stats::Scope& scope() { return scope_; }
 
 private:
-  static std::vector<Matchers::StringMatcher>
-  toRequestHeader(const envoy::type::matcher::ListStringMatcher&);
-  static std::vector<Matchers::StringMatcher>
-  toClientHeader(const envoy::type::matcher::ListStringMatcher&);
-  static std::vector<Matchers::StringMatcher>
-  toUpstreamHeader(const envoy::type::matcher::ListStringMatcher&);
-  static Http::LowerCaseStrPairVector
-  toAuthorizationHeaderToAdd(const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>&);
-
-  const std::vector<Matchers::StringMatcher> allowed_request_headers_;
-  const std::vector<Matchers::StringMatcher> allowed_client_headers_;
-  const std::vector<Matchers::StringMatcher> allowed_upstream_headers_;
-  const Http::LowerCaseStrPairVector authorization_headers_to_add_;
-  const LocalInfo::LocalInfo& local_info_;
-  const Runtime::Loader& runtime_;
-  const std::string cluster_name_;
-  Stats::Scope& scope_;
-  Upstream::ClusterManager& cm_;
   bool failure_mode_allow_{};
+  const LocalInfo::LocalInfo& local_info_;
+  Stats::Scope& scope_;
+  Runtime::Loader& runtime_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
@@ -133,14 +114,17 @@ public:
 
 private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
+
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling
   // it or has completed.
   enum class State { NotStarted, Calling, Complete };
+
   // FilterReturn is used to capture what the return code should be to the filter chain.
   // if this filter is either in the middle of calling the service or the result is denied then
   // the filter chain should stop. Otherwise the filter chain can continue to the next filter.
   enum class FilterReturn { ContinueDecoding, StopDecoding };
+
   void initiateCall(const Http::HeaderMap& headers);
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);
   FilterConfigSharedPtr config_;
@@ -150,6 +134,7 @@ private:
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;
+
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool initiating_call_{};
   envoy::service::auth::v2alpha::CheckRequest check_request_{};
