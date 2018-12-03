@@ -16,6 +16,8 @@
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -82,9 +84,9 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  * HTTP rate limit filter. Depending on the route configuration, this filter calls the global
  * rate limiting service before allowing further filter iteration.
  */
-class Filter : public Http::StreamFilter, public RateLimit::RequestCallbacks {
+class Filter : public Http::StreamFilter, public Filters::Common::RateLimit::RequestCallbacks {
 public:
-  Filter(FilterConfigSharedPtr config, RateLimit::ClientPtr&& client)
+  Filter(FilterConfigSharedPtr config, Filters::Common::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
 
   // Http::StreamFilterBase
@@ -104,12 +106,13 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   // RateLimit::RequestCallbacks
-  void complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& headers) override;
+  void complete(Filters::Common::RateLimit::LimitStatus status,
+                Http::HeaderMapPtr&& headers) override;
 
 private:
   void initiateCall(const Http::HeaderMap& headers);
   void populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
-                                    std::vector<RateLimit::Descriptor>& descriptors,
+                                    std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                                     const Router::RouteEntry* route_entry,
                                     const Http::HeaderMap& headers) const;
   void addHeaders(Http::HeaderMap& headers);
@@ -117,7 +120,7 @@ private:
   enum class State { NotStarted, Calling, Complete, Responded };
 
   FilterConfigSharedPtr config_;
-  RateLimit::ClientPtr client_;
+  Filters::Common::RateLimit::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;

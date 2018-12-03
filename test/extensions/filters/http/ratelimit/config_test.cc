@@ -2,6 +2,7 @@
 
 #include "common/config/filter_json.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
 #include "extensions/filters/http/ratelimit/config.h"
 
 #include "test/mocks/server/mocks.h"
@@ -10,6 +11,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -33,6 +35,16 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectJson) {
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::MockInstance> instance;
+
+  // Return the same singleton manager as instance so that config can be found there.
+  EXPECT_CALL(context, singletonManager()).WillOnce(ReturnRef(instance.singletonManager()));
+
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(
+          instance, instance.clusterManager().grpcAsyncClientManager(),
+          envoy::config::bootstrap::v2::Bootstrap());
+
   RateLimitFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -53,6 +65,16 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {
   Envoy::Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::MockInstance> instance;
+
+  // Return the same singleton manager as instance so that config can be found there.
+  EXPECT_CALL(context, singletonManager()).WillOnce(ReturnRef(instance.singletonManager()));
+
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(
+          instance, instance.clusterManager().grpcAsyncClientManager(),
+          envoy::config::bootstrap::v2::Bootstrap());
+
   RateLimitFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -69,6 +91,16 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::MockInstance> instance;
+
+  // Return the same singleton manager as instance so that config can be found there.
+  EXPECT_CALL(context, singletonManager()).WillOnce(ReturnRef(instance.singletonManager()));
+
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(
+          instance, instance.clusterManager().grpcAsyncClientManager(),
+          envoy::config::bootstrap::v2::Bootstrap());
+
   RateLimitFilterConfig factory;
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
@@ -93,6 +125,7 @@ TEST(RateLimitFilterConfigTest, BadRateLimitFilterConfig) {
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
+
   RateLimitFilterConfig factory;
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
 }
