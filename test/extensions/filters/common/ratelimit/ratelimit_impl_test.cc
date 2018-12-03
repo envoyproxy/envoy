@@ -7,8 +7,9 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/ratelimit/ratelimit_impl.h"
 #include "common/tracing/http_tracer_impl.h"
+
+#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -26,6 +27,9 @@ using testing::Return;
 using testing::WithArg;
 
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace RateLimit {
 
 class MockRequestCallbacks : public RequestCallbacks {
@@ -169,4 +173,7 @@ TEST(RateLimitNullFactoryTest, Basic) {
 }
 
 } // namespace RateLimit
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy

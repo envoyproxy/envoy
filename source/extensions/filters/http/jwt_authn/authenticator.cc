@@ -131,7 +131,7 @@ void AuthenticatorImpl::startVerify() {
   // the abseil time functionality instead or use the jwt_verify_lib to check
   // the validity of a JWT.
   // Check "exp" claim.
-  const auto unix_timestamp =
+  const uint64_t unix_timestamp =
       std::chrono::duration_cast<std::chrono::seconds>(timeSource().systemTime().time_since_epoch())
           .count();
   // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
