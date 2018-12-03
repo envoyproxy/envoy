@@ -118,6 +118,8 @@ InstanceImpl::~InstanceImpl() {
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clusterManager(); }
 
+Tracing::HttpTracer& InstanceImpl::httpTracer() { return config_.httpTracer(); }
+
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
   listener_manager_->stopListeners();

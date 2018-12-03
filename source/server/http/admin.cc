@@ -817,9 +817,9 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap& response_
       envoy::admin::v2alpha::CertificateDetails* ca_certificate = certificate.add_ca_cert();
       *ca_certificate = *context.getCaCertInformation();
     }
-    if (context.getCertChainInformation() != nullptr) {
+    for (const auto& cert_details : context.getCertChainInformation()) {
       envoy::admin::v2alpha::CertificateDetails* cert_chain = certificate.add_cert_chain();
-      *cert_chain = *context.getCertChainInformation();
+      *cert_chain = *cert_details;
     }
   });
   response.add(MessageUtil::getJsonStringFromMessage(certificates, true, true));
