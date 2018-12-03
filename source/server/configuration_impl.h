@@ -79,14 +79,17 @@ public:
 };
 
 /**
- * Implementation of Server::Configuration::Main that reads a configuration from a JSON file.
+ * Implementation of Server::Configuration::Main that reads a configuration from
+ * a JSON file.
  */
 class MainImpl : Logger::Loggable<Logger::Id::config>, public Main {
 public:
   /**
-   * Initialize the configuration. This happens here vs. the constructor because the initialization
-   * will call through the server into the config to get the cluster manager so the config object
-   * must be created already.
+   * MainImpl is created in two phases. In the first phase it is
+   * default-constructed without a configuration as part of the server. The
+   * server won't be fully populated yet. initialize() applies the
+   * configuration in the second phase, as it requires a fully populated server.
+   *
    * @param bootstrap v2 bootstrap proto.
    * @param server supplies the owning server.
    * @param cluster_manager_factory supplies the cluster manager creation factory.
