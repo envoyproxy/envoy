@@ -327,7 +327,7 @@ They should also ignore any local `.bazelrc` for reproducibility. This can be
 achieved with:
 
 ```
-bazel --bazelrc=/dev/null build -c opt //source/exe:envoy-static.stripped.stamped
+bazel --bazelrc=/dev/null build -c opt //source/exe:envoy-static.stripped
 ```
 
 One caveat to note is that the Git SHA1 is truncated to 16 bytes today as a
