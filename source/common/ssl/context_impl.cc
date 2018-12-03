@@ -674,6 +674,7 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
   // chain for resumption purposes.
   for (const auto& ctx : tls_contexts_) {
     X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
+    RELEASE_ASSERT(cert != nullptr, "");
     X509_NAME* cert_subject = X509_get_subject_name(cert);
     RELEASE_ASSERT(cert_subject != nullptr, "");
     int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
