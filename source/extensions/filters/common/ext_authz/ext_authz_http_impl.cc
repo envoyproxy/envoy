@@ -64,7 +64,7 @@ ClientConfig::ClientConfig(const envoy::config::filter::http::ext_authz::v2alpha
           config.http_service().authorization_response().allowed_upstream_headers())),
       authorization_headers_to_add_(
           toHeadersAdd(config.http_service().authorization_request().headers_to_add())),
-      cluster_name_(config.grpc_service().envoy_grpc().cluster_name()), timeout_(timeout),
+      cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(path_prefix) {}
 
 std::vector<Matchers::StringMatcher>
