@@ -149,6 +149,7 @@ public:
   MOCK_METHOD1(healthFlagSet, void(HealthFlag flag));
   MOCK_METHOD1(setActiveHealthFailureType, void(ActiveHealthFailureType type));
   MOCK_CONST_METHOD0(healthy, bool());
+  MOCK_CONST_METHOD0(degraded, bool());
   MOCK_CONST_METHOD0(hostname, const std::string&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
   MOCK_METHOD1(setHealthChecker_, void(HealthCheckHostMonitorPtr& health_checker));

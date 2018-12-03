@@ -208,16 +208,6 @@ HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& 
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-HostVectorConstSharedPtr HdsCluster::createHealthyHostList(const HostVector& hosts) {
-  HostVectorSharedPtr healthy_list(new HostVector());
-  for (const auto& host : hosts) {
-    if (host->healthy()) {
-      healthy_list->emplace_back(host);
-    }
-  }
-  return healthy_list;
-}
-
 ClusterInfoConstSharedPtr ProdClusterInfoFactory::createClusterInfo(
     Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
     const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
@@ -256,10 +246,12 @@ void HdsCluster::initialize(std::function<void()> callback) {
   }
 
   auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-  auto healthy = createHealthyHostList(*initial_hosts_);
+  auto healthy = ClusterImplBase::createHealthyHostList(*initial_hosts_);
+  auto degraded = ClusterImplBase::createDegradedHostList(*initial_hosts_);
 
-  first_host_set.updateHosts(initial_hosts_, healthy, HostsPerLocalityImpl::empty(),
-                             HostsPerLocalityImpl::empty(), {}, *initial_hosts_, {}, absl::nullopt);
+  first_host_set.updateHosts(initial_hosts_, healthy, degraded, HostsPerLocalityImpl::empty(),
+                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
+                             *initial_hosts_, {}, absl::nullopt);
 }
 
 void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {

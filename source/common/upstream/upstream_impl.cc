@@ -209,8 +209,10 @@ HostsPerLocalityImpl::filter(std::function<bool(const Host&)> predicate) const {
 
 void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
                               HostVectorConstSharedPtr healthy_hosts,
+                              HostVectorConstSharedPtr degraded_hosts,
                               HostsPerLocalityConstSharedPtr hosts_per_locality,
                               HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                              HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
                               LocalityWeightsConstSharedPtr locality_weights,
                               const HostVector& hosts_added, const HostVector& hosts_removed,
                               absl::optional<uint32_t> overprovisioning_factor) {
@@ -220,8 +222,10 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
   }
   hosts_ = std::move(hosts);
   healthy_hosts_ = std::move(healthy_hosts);
+  degraded_hosts_ = std::move(degraded_hosts);
   hosts_per_locality_ = std::move(hosts_per_locality);
   healthy_hosts_per_locality_ = std::move(healthy_hosts_per_locality);
+  degraded_hosts_per_locality_ = std::move(degraded_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
   // Rebuild the locality scheduler by computing the effective weight of each
   // locality in this priority. The scheduler is reset by default, and is rebuilt only if we have
@@ -558,9 +562,25 @@ HostVectorConstSharedPtr ClusterImplBase::createHealthyHostList(const HostVector
   return healthy_list;
 }
 
+HostVectorConstSharedPtr ClusterImplBase::createDegradedHostList(const HostVector& hosts) {
+  HostVectorSharedPtr degraded_list(new HostVector());
+  for (const auto& host : hosts) {
+    if (host->degraded()) {
+      degraded_list->emplace_back(host);
+    }
+  }
+
+  return degraded_list;
+}
+
 HostsPerLocalityConstSharedPtr
 ClusterImplBase::createHealthyHostLists(const HostsPerLocality& hosts) {
   return hosts.filter([](const Host& host) { return host.healthy(); });
+}
+
+HostsPerLocalityConstSharedPtr
+ClusterImplBase::createDegradedHostLists(const HostsPerLocality& hosts) {
+  return hosts.filter([](const Host& host) { return host.degraded(); });
 }
 
 bool ClusterInfoImpl::maintenanceMode() const {
@@ -665,8 +685,9 @@ void ClusterImplBase::reloadHealthyHosts() {
     HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
     host_set->updateHosts(hosts_copy, createHealthyHostList(host_set->hosts()),
-                          hosts_per_locality_copy,
+                          createDegradedHostList(host_set->hosts()), hosts_per_locality_copy,
                           createHealthyHostLists(host_set->hostsPerLocality()),
+                          createDegradedHostLists(host_set->hostsPerLocality()),
                           host_set->localityWeights(), {}, {}, absl::nullopt);
   }
 }
@@ -862,8 +883,10 @@ void PriorityStateManager::updateClusterPrioritySet(
 
   auto& host_set = static_cast<PrioritySetImpl&>(parent_.prioritySet())
                        .getOrCreateHostSet(priority, overprovisioning_factor);
-  host_set.updateHosts(hosts, ClusterImplBase::createHealthyHostList(*hosts), per_locality_shared,
+  host_set.updateHosts(hosts, ClusterImplBase::createHealthyHostList(*hosts),
+                       ClusterImplBase::createDegradedHostList(*hosts), per_locality_shared,
                        ClusterImplBase::createHealthyHostLists(*per_locality_shared),
+                       ClusterImplBase::createDegradedHostLists(*per_locality_shared),
                        std::move(locality_weights), hosts_added.value_or(*hosts),
                        hosts_removed.value_or<HostVector>({}), overprovisioning_factor);
 }
