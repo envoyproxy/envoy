@@ -229,14 +229,7 @@ void AuthenticatorImpl::verifyKey() {
     curr_token_->removeJwt(*headers_);
   }
   if (set_payload_cb_ && !provider.payload_in_metadata().empty()) {
-    Protobuf::util::JsonParseOptions options;
-    ProtobufWkt::Struct payload_pb;
-    const auto status =
-        Protobuf::util::JsonStringToMessage(jwt_->payload_str_, &payload_pb, options);
-    // payload_str_ have been verified as valid JSON already.
-    // All valid JSON should be able to parse into a protobuf Struct.
-    RELEASE_ASSERT(status.ok(), "Failed to parse JWT payload json into protobuf Struct");
-    set_payload_cb_(provider.payload_in_metadata(), payload_pb);
+    set_payload_cb_(provider.payload_in_metadata(), jwt_->payload_pb_);
   }
 
   doneWithStatus(Status::Ok);
