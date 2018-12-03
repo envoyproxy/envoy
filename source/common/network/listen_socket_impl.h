@@ -88,7 +88,6 @@ public:
     setupSocket(options, bind_to_port);
   }
 
-  //NetworkListenSocket(int fd, const Address::InstanceConstSharedPtr& address,
   NetworkListenSocket(const IoHandlePtr& io_handle, const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options)
       : ListenSocketImpl(io_handle, address) {
