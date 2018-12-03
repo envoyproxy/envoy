@@ -19,7 +19,8 @@ namespace RBACFilter {
 
 class RoleBasedAccessControlNetworkFilterTest : public testing::Test {
 public:
-  RoleBasedAccessControlFilterConfigSharedPtr setupConfig(bool with_policy = true) {
+  RoleBasedAccessControlFilterConfigSharedPtr setupConfig(bool with_policy = true,
+                                                          bool continuous = false) {
     envoy::config::filter::network::rbac::v2::RBAC config;
     config.set_stat_prefix("tcp.");
 
@@ -39,6 +40,10 @@ public:
       shadow_policy.add_principals()->set_any(true);
       config.mutable_shadow_rules()->set_action(envoy::config::rbac::v2alpha::RBAC::ALLOW);
       (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
+    }
+
+    if (continuous) {
+      config.set_enforcement_type(envoy::config::filter::network::rbac::v2::RBAC::CONTINUOUS);
     }
 
     return std::make_shared<RoleBasedAccessControlFilterConfig>(config, store_);
@@ -83,7 +88,7 @@ public:
   std::string requested_server_name_;
 };
 
-TEST_F(RoleBasedAccessControlNetworkFilterTest, Allowed) {
+TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithOneTimeEnforcement) {
   setDestinationPort(123);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
@@ -95,6 +100,23 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Allowed) {
   EXPECT_EQ(0U, config_->stats().denied_.value());
   EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithContinuousEnforcement) {
+  config_ = setupConfig(true, true /* continuous enforcement */);
+  filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
+  filter_->initializeReadFilterCallbacks(callbacks_);
+  setDestinationPort(123);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Call onData() twice, should increase stats twice.
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(2U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
+  EXPECT_EQ(2U, config_->stats().shadow_denied_.value());
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, RequestedServerName) {

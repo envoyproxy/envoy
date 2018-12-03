@@ -75,6 +75,7 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/singleton:const_singleton",
+        "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/config/filter/network/mongo_proxy/v2:mongo_proxy_cc",
     ],
 )

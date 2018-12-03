@@ -13,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/http/codec_client.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
@@ -99,6 +100,7 @@ private:
   };
 
   Api::ApiPtr api_;
+  Stats::IsolatedStoreImpl stats_store_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;

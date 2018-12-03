@@ -361,6 +361,7 @@ public:
   MOCK_METHOD0(close, void());
 
   Address::InstanceConstSharedPtr local_address_;
+  Address::InstanceConstSharedPtr remote_address_;
 };
 
 class MockListenerConfig : public ListenerConfig {
@@ -471,7 +472,7 @@ public:
   ~MockTransportSocketFactory();
 
   MOCK_CONST_METHOD0(implementsSecureTransport, bool());
-  MOCK_CONST_METHOD0(createTransportSocket, TransportSocketPtr());
+  MOCK_CONST_METHOD1(createTransportSocket, TransportSocketPtr(TransportSocketOptionsSharedPtr));
 };
 
 class MockTransportSocketCallbacks : public TransportSocketCallbacks {

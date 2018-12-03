@@ -131,9 +131,10 @@ public:
    * Can return nullptr if there is no host available in the cluster or if the cluster does not
    * exist.
    */
-  virtual Tcp::ConnectionPool::Instance* tcpConnPoolForCluster(const std::string& cluster,
-                                                               ResourcePriority priority,
-                                                               LoadBalancerContext* context) PURE;
+  virtual Tcp::ConnectionPool::Instance*
+  tcpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
+                        LoadBalancerContext* context,
+                        Network::TransportSocketOptionsSharedPtr transport_socket_options) PURE;
 
   /**
    * Allocate a load balanced TCP connection for a cluster. The created connection is already
@@ -143,8 +144,9 @@ public:
    * Returns both a connection and the host that backs the connection. Both can be nullptr if there
    * is no host available in the cluster.
    */
-  virtual Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
-                                                       LoadBalancerContext* context) PURE;
+  virtual Host::CreateConnectionData
+  tcpConnForCluster(const std::string& cluster, LoadBalancerContext* context,
+                    Network::TransportSocketOptionsSharedPtr transport_socket_options) PURE;
 
   /**
    * Returns a client that can be used to make async HTTP calls against the given cluster. The
@@ -271,7 +273,8 @@ public:
   virtual Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
-                      const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
+                      const Network::ConnectionSocket::OptionsSharedPtr& options,
+                      Network::TransportSocketOptionsSharedPtr transport_socket_options) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

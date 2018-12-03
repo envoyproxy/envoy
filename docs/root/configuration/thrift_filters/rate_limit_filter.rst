@@ -5,6 +5,7 @@ Rate limit
 
 * Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.thrift.rate_limit.v2alpha1.RateLimit>`
+* This filter should be configured with the name *envoy.ratelimit*.
 
 The Thrift rate limit filter will call the rate limit service when the request's route has one or
 more :ref:`rate limit configurations

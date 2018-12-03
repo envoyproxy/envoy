@@ -31,7 +31,7 @@ public:
   /**
    * @return certificate details conforming to proto admin.v2alpha.certs.
    */
-  virtual CertificateDetailsPtr getCertChainInformation() const PURE;
+  virtual std::vector<CertificateDetailsPtr> getCertChainInformation() const PURE;
 };
 typedef std::shared_ptr<Context> ContextSharedPtr;
 

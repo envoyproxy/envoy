@@ -63,14 +63,14 @@ public:
 class OwnedImpl : public LibEventInstance {
 public:
   OwnedImpl();
-  OwnedImpl(const std::string& data);
+  OwnedImpl(absl::string_view data);
   OwnedImpl(const Instance& data);
   OwnedImpl(const void* data, uint64_t size);
 
   // LibEventInstance
   void add(const void* data, uint64_t size) override;
   void addBufferFragment(BufferFragment& fragment) override;
-  void add(const std::string& data) override;
+  void add(absl::string_view data) override;
   void add(const Instance& data) override;
   void prepend(absl::string_view data) override;
   void prepend(Instance& data) override;

@@ -1,9 +1,11 @@
 #include <chrono>
 
+#include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "server/config_validation/api.h"
 
@@ -22,12 +24,14 @@ public:
   ConfigValidation() {
     Event::Libevent::Global::initialize();
 
-    validation_ = std::make_unique<Api::ValidationImpl>(std::chrono::milliseconds(1000));
+    validation_ = std::make_unique<Api::ValidationImpl>(
+        std::chrono::milliseconds(1000), Thread::threadFactoryForTest(), stats_store_);
     dispatcher_ = validation_->allocateDispatcher(test_time_.timeSystem());
   }
 
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
+  Stats::IsolatedStoreImpl stats_store_;
 
 private:
   // Using config validation API.

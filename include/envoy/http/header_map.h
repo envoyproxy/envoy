@@ -187,14 +187,16 @@ public:
   virtual const HeaderString& key() const PURE;
 
   /**
-   * Set the header value by copying data into it.
+   * Set the header value by copying data into it (deprecated, use absl::string_view variant
+   * instead).
+   * TODO(htuch): Cleanup deprecated call sites.
    */
   virtual void value(const char* value, uint32_t size) PURE;
 
   /**
    * Set the header value by copying data into it.
    */
-  virtual void value(const std::string& value) PURE;
+  virtual void value(absl::string_view value) PURE;
 
   /**
    * Set the header value by copying an integer into it.
