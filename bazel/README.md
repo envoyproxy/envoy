@@ -47,7 +47,7 @@ dnf install cmake libtool libstdc++
 
 On OS X, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
 ```
-brew install coreutils wget cmake libtool go bazel automake ninja
+brew install coreutils wget cmake libtool go bazel automake ninja clang-format
 ```
 _note_: `coreutils` is used for realpath
 

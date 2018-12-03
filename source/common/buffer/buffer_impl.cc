@@ -29,8 +29,8 @@ void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
       [](const void*, size_t, void* arg) { static_cast<BufferFragment*>(arg)->done(); }, &fragment);
 }
 
-void OwnedImpl::add(const std::string& data) {
-  evbuffer_add(buffer_.get(), data.c_str(), data.size());
+void OwnedImpl::add(absl::string_view data) {
+  evbuffer_add(buffer_.get(), data.data(), data.size());
 }
 
 void OwnedImpl::add(const Instance& data) {
@@ -191,7 +191,7 @@ Api::SysCallIntResult OwnedImpl::write(int fd) {
 
 OwnedImpl::OwnedImpl() : buffer_(evbuffer_new()) {}
 
-OwnedImpl::OwnedImpl(const std::string& data) : OwnedImpl() { add(data); }
+OwnedImpl::OwnedImpl(absl::string_view data) : OwnedImpl() { add(data); }
 
 OwnedImpl::OwnedImpl(const Instance& data) : OwnedImpl() { add(data); }
 

@@ -213,7 +213,7 @@ public:
   MOCK_METHOD0(recreateStream, bool());
 
   // Http::StreamDecoderFilterCallbacks
-  void sendLocalReply(Code code, const std::string& body,
+  void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(HeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
     Utility::sendLocalReply(

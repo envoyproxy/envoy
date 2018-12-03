@@ -229,7 +229,7 @@ public:
    *                       response headers.
    * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
    */
-  virtual void sendLocalReply(Code response_code, const std::string& body_text,
+  virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(HeaderMap& headers)> modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status) PURE;
 

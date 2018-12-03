@@ -183,7 +183,7 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    client_ssl_ctx_ = createClientSslTransportSocketFactory(false, false, context_manager_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_);
   }
 
   void createUpstreams() override {
@@ -249,13 +249,8 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   sendSdsResponse(getServerSecret());
 
   // Wait for ssl_context_updated_by_sds counter.
-  if (version_ == Network::Address::IpVersion::v4) {
-    test_server_->waitForCounterGe(
-        "listener.127.0.0.1_0.server_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  } else {
-    test_server_->waitForCounterGe(
-        "listener.[__1]_0.server_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  }
+  test_server_->waitForCounterGe(
+      listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"), 1);
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
@@ -306,7 +301,7 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    client_ssl_ctx_ = createClientSslTransportSocketFactory(false, false, context_manager_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_);
   }
 
   void enableCombinedValidationContext(bool enable) { use_combined_validation_context_ = enable; }
