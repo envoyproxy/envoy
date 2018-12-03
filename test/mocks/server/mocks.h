@@ -307,11 +307,6 @@ public:
   MockInstance();
   ~MockInstance();
 
-  // Server::Instance
-  RateLimit::ClientPtr rateLimitClient(const absl::optional<std::chrono::milliseconds>&) override {
-    return RateLimit::ClientPtr{rateLimitClient_()};
-  }
-
   Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
 
   MOCK_METHOD0(admin, Admin&());
@@ -333,7 +328,6 @@ public:
   MOCK_METHOD0(options, Options&());
   MOCK_METHOD0(overloadManager, OverloadManager&());
   MOCK_METHOD0(random, Runtime::RandomGenerator&());
-  MOCK_METHOD0(rateLimitClient_, RateLimit::Client*());
   MOCK_METHOD0(runtime, Runtime::Loader&());
   MOCK_METHOD0(shutdown, void());
   MOCK_METHOD0(isShutdown, bool());
@@ -386,7 +380,6 @@ public:
 
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager*());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
-  MOCK_METHOD0(rateLimitClientFactory, RateLimit::ClientFactory&());
   MOCK_METHOD0(statsSinks, std::list<Stats::SinkPtr>&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMissTimeout, std::chrono::milliseconds());
@@ -405,10 +398,6 @@ public:
   MockFactoryContext();
   ~MockFactoryContext();
 
-  RateLimit::ClientPtr rateLimitClient(const absl::optional<std::chrono::milliseconds>&) override {
-    return RateLimit::ClientPtr{rateLimitClient_()};
-  }
-
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
@@ -417,7 +406,6 @@ public:
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(initManager, Init::Manager&());
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
-  MOCK_METHOD0(rateLimitClient_, RateLimit::Client*());
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
   MOCK_METHOD0(scope, Stats::Scope&());
   MOCK_METHOD0(singletonManager, Singleton::Manager&());

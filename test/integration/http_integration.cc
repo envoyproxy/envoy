@@ -2072,4 +2072,12 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
     EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
   }
 }
+
+std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {
+  if (version_ == Network::Address::IpVersion::v4) {
+    return "listener.127.0.0.1_0." + stat_name;
+  }
+  return "listener.[__1]_0." + stat_name;
+}
+
 } // namespace Envoy

@@ -196,6 +196,8 @@ protected:
   void testTrailers(uint64_t request_size, uint64_t response_size);
 
   Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
+  // Prefix listener stat with IP:port, including IP version dependent loopback address.
+  std::string listenerStatPrefix(const std::string& stat_name);
 
   // The client making requests to Envoy.
   IntegrationCodecClientPtr codec_client_;

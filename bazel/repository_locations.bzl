@@ -91,9 +91,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        sha256 = "733e9b698a232cfd3aa35b4e27c59641bf1fa78e52e71d29e230af4f2070cdf5",
-        strip_prefix = "dd-opentracing-cpp-0.3.5",
-        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.5.tar.gz"],
+        sha256 = "32967149fbc672f321ba6ce6c3e5cc299b15ab914f6f5b2993c7c9ddc1894439",
+        strip_prefix = "dd-opentracing-cpp-0.3.6",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.6.tar.gz"],
     ),
     com_github_msgpack_msgpack_c = dict(
         sha256 = "bda49f996a73d2c6080ff0523e7b535917cd28c8a79c3a5da54fc29332d61d1e",
@@ -101,10 +101,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/msgpack/msgpack-c/archive/cpp-3.1.1.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "499f1e145c19f33031eb8fc6452d5d391b4cecfdeda23e2055386a3b33be4d41",
-        strip_prefix = "jwt_verify_lib-66792a057ec54e4b75c6a2eeda4e98220bd12a9a",
-        # 2018-08-16
-        urls = ["https://github.com/google/jwt_verify_lib/archive/66792a057ec54e4b75c6a2eeda4e98220bd12a9a.tar.gz"],
+        sha256 = "700be26170c1917e83d1319b88a2112dccd1179cd78c5672940483e7c45ca6ae",
+        strip_prefix = "jwt_verify_lib-85cf0edf1f1bc507ff7d96a8d6a9bc20307b0fcf",
+        # 2018-12-01
+        urls = ["https://github.com/google/jwt_verify_lib/archive/85cf0edf1f1bc507ff7d96a8d6a9bc20307b0fcf.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
         sha256 = "f742dc5a206958c4d0a6b2c35e3e102afb5683f55f7a7cb1eae024a03f081347",

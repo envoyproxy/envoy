@@ -57,7 +57,8 @@ void Filter::onDestroy() {
   }
 }
 
-void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& headers) {
+void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
+                      Http::HeaderMapPtr&& headers) {
   // TODO(zuercher): Store headers to append to a response. Adding them to a local reply (over
   // limit or error) is a matter of modifying the callbacks to allow it. Adding them to an upstream
   // response requires either response (aka encoder) filters or some other mechanism.
@@ -66,10 +67,10 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
   state_ = State::Complete;
 
   switch (status) {
-  case RateLimit::LimitStatus::OK:
+  case Filters::Common::RateLimit::LimitStatus::OK:
     cluster_->statsScope().counter("ratelimit.ok").inc();
     break;
-  case RateLimit::LimitStatus::Error:
+  case Filters::Common::RateLimit::LimitStatus::Error:
     cluster_->statsScope().counter("ratelimit.error").inc();
     if (!config_->failureModeAllow()) {
       state_ = State::Responded;
@@ -81,7 +82,7 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
     }
     cluster_->statsScope().counter("ratelimit.failure_mode_allowed").inc();
     break;
-  case RateLimit::LimitStatus::OverLimit:
+  case Filters::Common::RateLimit::LimitStatus::OverLimit:
     cluster_->statsScope().counter("ratelimit.over_limit").inc();
     if (config_->runtime().snapshot().featureEnabled("ratelimit.thrift_filter_enforcing", 100)) {
       state_ = State::Responded;

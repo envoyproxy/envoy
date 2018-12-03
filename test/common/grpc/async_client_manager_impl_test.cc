@@ -18,10 +18,11 @@ namespace {
 
 class AsyncClientManagerImplTest : public testing::Test {
 public:
-  AsyncClientManagerImplTest() : api_(Api::createApiForTest()) {}
+  AsyncClientManagerImplTest() : api_(Api::createApiForTest(api_stats_store_)) {}
 
   Upstream::MockClusterManager cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::IsolatedStoreImpl api_stats_store_;
   Stats::MockStore scope_;
   DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
