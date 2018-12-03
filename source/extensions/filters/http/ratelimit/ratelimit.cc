@@ -36,7 +36,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
     return;
   }
 
-  std::vector<RateLimit::Descriptor> descriptors;
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
   const Router::RouteEntry* route_entry = route->routeEntry();
   // Get all applicable rate limit policy entries for the route.
@@ -113,18 +113,19 @@ void Filter::onDestroy() {
   }
 }
 
-void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& headers) {
+void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
+                      Http::HeaderMapPtr&& headers) {
   state_ = State::Complete;
   headers_to_add_ = std::move(headers);
 
   switch (status) {
-  case RateLimit::LimitStatus::OK:
+  case Filters::Common::RateLimit::LimitStatus::OK:
     cluster_->statsScope().counter("ratelimit.ok").inc();
     break;
-  case RateLimit::LimitStatus::Error:
+  case Filters::Common::RateLimit::LimitStatus::Error:
     cluster_->statsScope().counter("ratelimit.error").inc();
     break;
-  case RateLimit::LimitStatus::OverLimit:
+  case Filters::Common::RateLimit::LimitStatus::OverLimit:
     cluster_->statsScope().counter("ratelimit.over_limit").inc();
     Http::CodeUtility::ResponseStatInfo info{config_->scope(),
                                              cluster_->statsScope(),
@@ -142,14 +143,14 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
     break;
   }
 
-  if (status == RateLimit::LimitStatus::OverLimit &&
+  if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
     callbacks_->sendLocalReply(Http::Code::TooManyRequests, "",
                                [this](Http::HeaderMap& headers) { addHeaders(headers); },
                                config_->rateLimitedGrpcStatus());
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
-  } else if (status == RateLimit::LimitStatus::Error) {
+  } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
     if (config_->failureModeAllow()) {
       cluster_->statsScope().counter("ratelimit.failure_mode_allowed").inc();
       if (!initiating_call_) {

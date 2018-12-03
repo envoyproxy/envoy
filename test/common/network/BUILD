@@ -92,6 +92,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/filters/network/ratelimit:ratelimit_lib",
         "//test/common/upstream:utility_lib",
+        "//test/extensions/filters/common/ratelimit:ratelimit_mocks",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ratelimit:ratelimit_mocks",
