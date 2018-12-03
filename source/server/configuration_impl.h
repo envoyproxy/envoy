@@ -81,8 +81,6 @@ public:
 /**
  * Implementation of Server::Configuration::Main that reads a configuration from
  * a JSON file.
- *
- * containing blan
  */
 class MainImpl : Logger::Loggable<Logger::Id::config>, public Main {
 public:
