@@ -1211,7 +1211,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTransparentConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options) {
-  auto builder = [this, &dispatcher, host, &priority, &protocol,
+  auto builder = [this, &dispatcher, host, priority, protocol,
                   options]() -> Http::ConnectionPool::InstancePtr {
     // note: we take a copy of host and options to claim a reference.
     return this->allocateConnPool(dispatcher, host, priority, protocol, options);
