@@ -38,6 +38,7 @@ public:
     hsql::SQLParser::parse(mysql_cmd_decode.getData(), &result);
     return MYSQL_SUCCESS;
   }
+
   enum TestResource {
     TABLE,
     DB,
@@ -45,6 +46,7 @@ public:
     EVENT,
     INDEX,
   };
+
   const std::string SPACE = " ";
   const std::string FROM = "FROM ";
   const std::string INTO = "INTO ";

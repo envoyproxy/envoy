@@ -58,7 +58,7 @@ public:
   MySQLSession& getSession() override { return session_; }
 
 private:
-  bool decode(Buffer::Instance& data, uint64_t& offset);
+  void decode(Buffer::Instance& data, uint64_t& offset);
   void parseMessage(Buffer::Instance& message, uint64_t& offset, int seq, int len);
 
   DecoderCallbacks& callbacks_;

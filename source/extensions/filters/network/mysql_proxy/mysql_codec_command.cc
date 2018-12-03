@@ -20,9 +20,7 @@ void Command::setCmd(Command::Cmd cmd) { cmd_ = cmd; }
 
 void Command::setDb(std::string db) { db_ = db; }
 
-int Command::decode(Buffer::Instance& buffer, uint64_t& offset, int seq, int len) {
-  setSeq(seq);
-
+int Command::parseMessage(Buffer::Instance& buffer, uint64_t& offset, int len) {
   Command::Cmd cmd = parseCmd(buffer, offset);
   setCmd(cmd);
   if (cmd == Command::Cmd::COM_NULL) {
@@ -47,7 +45,6 @@ int Command::decode(Buffer::Instance& buffer, uint64_t& offset, int seq, int len
     break;
 
   default:
-    offset += len - 1;
     setDb("");
     break;
   }

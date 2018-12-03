@@ -44,11 +44,10 @@ bool ClientLogin::isClientSecureConnection() const {
   return extended_client_cap_ & MYSQL_EXT_CL_SECURE_CONNECTION;
 }
 
-int ClientLogin::decode(Buffer::Instance& buffer, uint64_t& offset, int seq, int) {
-  if (seq != CHALLENGE_SEQ_NUM) {
+int ClientLogin::parseMessage(Buffer::Instance& buffer, uint64_t& offset, int) {
+  if (seq_ != CHALLENGE_SEQ_NUM) {
     return MYSQL_FAILURE;
   }
-  setSeq(seq);
   uint16_t client_cap = 0;
   if (BufferHelper::peekUint16(buffer, offset, client_cap) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing client_cap in mysql ClientLogin msg");

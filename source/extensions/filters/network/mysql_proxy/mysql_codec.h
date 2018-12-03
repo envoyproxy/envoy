@@ -107,15 +107,21 @@ public:
     uint32_t bits_;
   };
 
-  virtual ~MySQLCodec(){};
+  virtual ~MySQLCodec() {}
 
-  virtual int decode(Buffer::Instance& data, uint64_t& offset, int seq, int len) PURE;
+  int decode(Buffer::Instance& data, uint64_t& offset, int seq, int len) {
+    seq_ = seq;
+    const uint64_t prev_offset = offset;
+    int result = parseMessage(data, offset, len);
+    offset = prev_offset + len; // Ensure that the whole message was consumed
+    return result;
+  }
+
   virtual std::string encode() PURE;
 
-  int getSeq() { return seq_; }
-  void setSeq(int seq) { seq_ = seq; }
+protected:
+  virtual int parseMessage(Buffer::Instance& data, uint64_t& offset, int len) PURE;
 
-private:
   int seq_;
 };
 

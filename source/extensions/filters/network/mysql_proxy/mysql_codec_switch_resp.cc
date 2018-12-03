@@ -12,10 +12,7 @@ void ClientSwitchResponse::setAuthPluginResp(std::string& auth_plugin_resp_) {
   auth_plugin_resp_.assign(auth_plugin_resp_);
 }
 
-int ClientSwitchResponse::decode(Buffer::Instance&, uint64_t&, int seq, int) {
-  setSeq(seq);
-  return MYSQL_SUCCESS;
-}
+int ClientSwitchResponse::parseMessage(Buffer::Instance&, uint64_t&, int) { return MYSQL_SUCCESS; }
 
 std::string ClientSwitchResponse::encode() {
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());

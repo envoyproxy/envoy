@@ -52,16 +52,14 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
 
     if (client_login_resp.getRespCode() == MYSQL_RESP_OK) {
       session_.setState(MySQLSession::State::MYSQL_REQ);
-      // reset seq# when entering REQ state
+      // reset seq# when entering the REQ state
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
+    } else if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
+      session_.setState(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP);
+    } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
+      session_.setState(MySQLSession::State::MYSQL_ERROR);
     } else {
-      if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
-        session_.setState(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP);
-      } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
-        session_.setState(MySQLSession::State::MYSQL_ERROR);
-      } else {
-        session_.setState(MySQLSession::State::MYSQL_NOT_HANDLED);
-      }
+      session_.setState(MySQLSession::State::MYSQL_NOT_HANDLED);
     }
     break;
   }
@@ -97,7 +95,8 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
     Command command{};
     command.decode(message, offset, seq, len);
     callbacks_.onCommand(command);
-    if (offset ==  message.length()) {
+
+    if (BufferHelper::endOfBuffer(message, offset)) {
       session_.setState(MySQLSession::State::MYSQL_REQ_RESP);
     }
     break;
@@ -108,7 +107,8 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
     CommandResponse command_resp{};
     command_resp.decode(message, offset, seq, len);
     callbacks_.onCommandResponse(command_resp);
-    if ((offset + len) ==  message.length()) {
+
+    if (BufferHelper::endOfBuffer(message, offset)) {
       session_.setState(MySQLSession::State::MYSQL_REQ);
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
     }
@@ -125,7 +125,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
             static_cast<int>(session_.getState()));
 }
 
-bool DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
+void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   ENVOY_LOG(trace, "mysql_proxy: decoding {} bytes at offset {}", data.length(), offset);
 
   int len = 0;
@@ -141,24 +141,20 @@ bool DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     callbacks_.onProtocolError();
     offset += len;
     ENVOY_LOG(info, "mysql_proxy: ignoring out-of-sync packet");
-    return true;
+    return;
   }
   session_.setExpectedSeq(seq + 1);
 
-  // Ensure that the whole packet was consumed.
-  const uint64_t prev_offset = offset;
   parseMessage(data, offset, seq, len);
-  offset = prev_offset + len;
-
   ENVOY_LOG(trace, "mysql_proxy: offset after decoding is {} out of {}", offset, data.length());
-  return true;
 }
 
 void DecoderImpl::onData(Buffer::Instance& data) {
   // TODO(venilnoronha): handle messages over 16 mb. See
   // https://dev.mysql.com/doc/dev/mysql-server/8.0.2/page_protocol_basic_packets.html#sect_protocol_basic_packets_sending_mt_16mb.
   uint64_t offset = 0;
-  while (!BufferHelper::endOfBuffer(data, offset) && decode(data, offset)) {
+  while (!BufferHelper::endOfBuffer(data, offset)) {
+    decode(data, offset);
   }
 }
 
