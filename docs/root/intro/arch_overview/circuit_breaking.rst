@@ -15,9 +15,12 @@ configure and code each application independently. Envoy supports various types 
 * **Cluster maximum pending requests**: The maximum number of requests that will be queued while
   waiting for a ready connection pool connection. Since HTTP/2 requests are sent over a single
   connection, this circuit breaker only comes into play as the initial connection is created,
-  as requests will be multiplexed immediately afterwards. If this circuit breaker overflows the
-  :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` counter for the cluster
-  will increment.
+  as requests will be multiplexed immediately afterwards. For HTTP/1.1 requests are added to the list
+  of pending requests whenever there aren't enough upstreams connections available to immeditely dispatch
+  the request, so this circuit breaker will remain in play for the lifetime of the process.
+  If this circuit breaker overflows the
+  :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` counter for the cluster will
+  increment.
 * **Cluster maximum requests**: The maximum number of requests that can be outstanding to all hosts
   in a cluster at any given time. In practice this is applicable to HTTP/2 clusters since HTTP/1.1
   clusters are governed by the maximum connections circuit breaker. If this circuit breaker
