@@ -13,7 +13,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/simulated_time_system.h"
 
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
 
 namespace Envoy {
 

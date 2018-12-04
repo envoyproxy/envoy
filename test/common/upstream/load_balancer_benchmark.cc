@@ -10,7 +10,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/upstream/mocks.h"
 
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
 
 namespace Envoy {
 namespace Upstream {

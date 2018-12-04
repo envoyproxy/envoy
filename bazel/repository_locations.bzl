@@ -26,6 +26,11 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "backward-cpp-1.4",
         urls = ["https://github.com/bombela/backward-cpp/archive/v1.4.tar.gz"],
     ),
+    com_github_c_ares_c_ares = dict(
+        sha256 = "7deb7872cbd876c29036d5f37e30c4cbc3cc068d59d8b749ef85bb0736649f04",
+        strip_prefix = "c-ares-cares-1_15_0",
+        urls = ["https://github.com/c-ares/c-ares/archive/cares-1_15_0.tar.gz"],
+    ),
     com_github_circonus_labs_libcircllhist = dict(
         sha256 = "9949e2864b8ad00ee5c3e9c1c3c01e51b6b68bb442a919652fc66b9776477987",
         strip_prefix = "libcircllhist-fd8a14463739d247b414825cc56ca3946792a3b9",
@@ -74,6 +79,11 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "nanopb-f8ac463766281625ad710900479130c7fcb4d63b",
         urls = ["https://github.com/nanopb/nanopb/archive/f8ac463766281625ad710900479130c7fcb4d63b.tar.gz"],
     ),
+    com_github_nghttp2_nghttp2 = dict(
+        sha256 = "8889399ddd38aa0405f6e84f1c050a292286089441686b8a9c5e937de4f5b61d",
+        strip_prefix = "nghttp2-1.34.0",
+        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.34.0/nghttp2-1.34.0.tar.gz"],
+    ),
     io_opentracing_cpp = dict(
         sha256 = "4455ca507936bc4b658ded10a90d8ebbbd61c58f06207be565a4ffdc885687b5",
         strip_prefix = "opentracing-cpp-1.5.0",
@@ -94,6 +104,27 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "32967149fbc672f321ba6ce6c3e5cc299b15ab914f6f5b2993c7c9ddc1894439",
         strip_prefix = "dd-opentracing-cpp-0.3.6",
         urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.6.tar.gz"],
+    ),
+    com_github_google_benchmark = dict(
+        # TODO (moderation) change back to tarball method on next benchmark release
+        sha256 = "0de43b6eaddd356f1d6cd164f73f37faf2f6c96fd684e1f7ea543ce49c1d144e",
+        strip_prefix = "benchmark-505be96ab23056580a3a2315abba048f4428b04e",
+        urls = ["https://github.com/google/benchmark/archive/505be96ab23056580a3a2315abba048f4428b04e.tar.gz"],
+    ),
+    com_github_libevent_libevent = dict(
+        sha256 = "316ddb401745ac5d222d7c529ef1eada12f58f6376a66c1118eee803cb70f83d",
+        strip_prefix = "libevent-release-2.1.8-stable",
+        urls = ["https://github.com/libevent/libevent/archive/release-2.1.8-stable.tar.gz"],
+    ),
+    com_github_madler_zlib = dict(
+        sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
+        strip_prefix = "zlib-1.2.11",
+        urls = ["https://github.com/madler/zlib/archive/v1.2.11.tar.gz"],
+    ),
+    com_github_jbeder_yaml_cpp = dict(
+        sha256 = "53dcffd55f3433b379fcc694f45c54898711c0e29159a7bd02e82a3e0253bac3",
+        strip_prefix = "yaml-cpp-0f9a586ca1dc29c2ecb8dd715a315b93e3f40f79",
+        urls = ["https://github.com/jbeder/yaml-cpp/archive/0f9a586ca1dc29c2ecb8dd715a315b93e3f40f79.tar.gz"],
     ),
     com_github_msgpack_msgpack_c = dict(
         sha256 = "bda49f996a73d2c6080ff0523e7b535917cd28c8a79c3a5da54fc29332d61d1e",
