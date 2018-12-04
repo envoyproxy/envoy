@@ -528,9 +528,10 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
     }
   }
 
-  if (!config.sigalgs().empty()) {
+  if (!config.signingAlgorithmsForTest().empty()) {
     for (auto& ctx : tls_contexts_) {
-      int rc = SSL_CTX_set1_sigalgs_list(ctx.ssl_ctx_.get(), config.sigalgs().c_str());
+      int rc =
+          SSL_CTX_set1_sigalgs_list(ctx.ssl_ctx_.get(), config.signingAlgorithmsForTest().c_str());
       RELEASE_ASSERT(rc == 1, "");
     }
   }

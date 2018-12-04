@@ -187,7 +187,7 @@ public:
 
   ClientSslTransportOptions rsaOnlyClientOptions() {
     if (tls_version_ == envoy::api::v2::auth::TlsParameters::TLSv1_3) {
-      return ClientSslTransportOptions().setSigalgs("rsa_pss_rsae_sha256");
+      return ClientSslTransportOptions().setSigningAlgorithmsForTest("rsa_pss_rsae_sha256");
     } else {
       return ClientSslTransportOptions().setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
     }
@@ -195,7 +195,7 @@ public:
 
   ClientSslTransportOptions ecdsaOnlyClientOptions() {
     if (tls_version_ == envoy::api::v2::auth::TlsParameters::TLSv1_3) {
-      return ClientSslTransportOptions().setSigalgs("ecdsa_secp256r1_sha256");
+      return ClientSslTransportOptions().setSigningAlgorithmsForTest("ecdsa_secp256r1_sha256");
     } else {
       return ClientSslTransportOptions().setCipherSuites({"ECDHE-ECDSA-AES128-GCM-SHA256"});
     }

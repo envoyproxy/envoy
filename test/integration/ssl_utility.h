@@ -30,7 +30,7 @@ struct ClientSslTransportOptions {
     return *this;
   }
 
-  ClientSslTransportOptions& setSigalgs(const std::string& sigalgs) {
+  ClientSslTransportOptions& setSigningAlgorithmsForTest(const std::string& sigalgs) {
     sigalgs_ = sigalgs;
     return *this;
   }

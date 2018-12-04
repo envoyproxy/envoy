@@ -106,7 +106,7 @@ public:
   const std::string& serverNameIndication() const override { return server_name_indication_; }
   bool allowRenegotiation() const override { return allow_renegotiation_; }
   size_t maxSessionKeys() const override { return max_session_keys_; }
-  const std::string& sigalgs() const override { return sigalgs_; }
+  const std::string& signingAlgorithmsForTest() const override { return sigalgs_; }
 
 private:
   const std::string server_name_indication_;

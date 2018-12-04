@@ -92,7 +92,7 @@ public:
   /**
    * @return const std::string& with the signature algorithms for the context.
    */
-  virtual const std::string& sigalgs() const PURE;
+  virtual const std::string& signingAlgorithmsForTest() const PURE;
 };
 
 typedef std::unique_ptr<ClientContextConfig> ClientContextConfigPtr;
