@@ -7,6 +7,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
