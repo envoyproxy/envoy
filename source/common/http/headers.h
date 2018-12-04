@@ -39,7 +39,6 @@ public:
   const LowerCaseString EnvoyExternalAddress{"x-envoy-external-address"};
   const LowerCaseString EnvoyForceTrace{"x-envoy-force-trace"};
   const LowerCaseString EnvoyImmediateHealthCheckFail{"x-envoy-immediate-health-check-fail"};
-  const LowerCaseString EnvoyInternalRedirect{"x-envoy-internal-redirect"};
   const LowerCaseString EnvoyOriginalUrl{"x-envoy-original-url"};
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
   const LowerCaseString EnvoyIpTags{"x-envoy-ip-tags"};

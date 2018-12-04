@@ -37,27 +37,15 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-RedirectAction convertInternalRedirectAction(const envoy::api::v2::route::RouteAction& route) {
+InternalRedirectAction
+convertInternalRedirectAction(const envoy::api::v2::route::RouteAction& route) {
   switch (route.internal_redirect_action()) {
-  case envoy::api::v2::route::RouteAction::REJECT_INTERNAL_REDIRECT:
-    return RedirectAction::Reject;
   case envoy::api::v2::route::RouteAction::PASS_THROUGH_INTERNAL_REDIRECT:
-    return RedirectAction::PassThrough;
+    return InternalRedirectAction::PassThrough;
   case envoy::api::v2::route::RouteAction::HANDLE_INTERNAL_REDIRECT:
-    return RedirectAction::Handle;
+    return InternalRedirectAction::Handle;
   default:
-    return RedirectAction::Reject;
-  }
-}
-
-RedirectAction convertRedirectAction(const envoy::api::v2::route::RouteAction& route) {
-  switch (route.redirect_action()) {
-  case envoy::api::v2::route::RouteAction::PASS_THROUGH_REDIRECT:
-    return RedirectAction::PassThrough;
-  case envoy::api::v2::route::RouteAction::HANDLE_REDIRECT:
-    return RedirectAction::Handle;
-  default:
-    return RedirectAction::PassThrough;
+    return InternalRedirectAction::PassThrough;
   }
 }
 
@@ -343,8 +331,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route)),
       per_filter_configs_(route.per_filter_config(), factory_context),
       time_system_(factory_context.dispatcher().timeSystem()),
-      internal_redirect_action_(convertInternalRedirectAction(route.route())),
-      redirect_action_(convertRedirectAction(route.route())) {
+      internal_redirect_action_(convertInternalRedirectAction(route.route())) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);

@@ -232,11 +232,8 @@ private:
 
     bool includeAttemptCount() const override { return false; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
-    Router::RedirectAction internalRedirectAction() const override {
-      return Router::RedirectAction::Reject;
-    }
-    Router::RedirectAction redirectAction() const override {
-      return Router::RedirectAction::PassThrough;
+    Router::InternalRedirectAction internalRedirectAction() const override {
+      return Router::InternalRedirectAction::PassThrough;
     }
 
     static const NullRateLimitPolicy rate_limit_policy_;

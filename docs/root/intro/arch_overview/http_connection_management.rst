@@ -120,27 +120,12 @@ Envoy supports handling 302 redirects internally, that is capturing a 302 redire
 synthesizing a new request, sending it to the upstream specified by the new route match, and
 returning the redirected response as the response of the original request.
 
-There are two modes of redirect handling, "Internal redirects", for internal or private URLs,
-general redirects, which capture all 302s. They are configured separately via the
-:ref:`internal redirect action
-<envoy_api_field_route.RouteAction.internal_redirect_action>`
-and :ref:`redirect action
-<envoy_api_field_route.RouteAction.redirect_action>` fields in 
-route configuration respectively.
+Internal redirects are configured via the ref:`redirect action
+<envoy_api_field_route.RouteAction.redirect_action>` field in
+route configuration. When redirect handling is on, any 302 response from upstream is
+subject to the redirect being handled by Envoy.
 
-Internal redirect handling is triggered via the x-envoy-internal-redirect header. Any response
-with this header will be treated as an internal redirect, and if the route is not configured for
-redirects, or the redirect is invalid, it will be translated to a 500 downstream. Internal redirects
-basically fail closed: it is assumed that the Location header may contain PII, or have passed auth
-checks, and should never be returned to untrusted clients. For multi-level deployments, a upstream
-Envoy can be configured to PASS_THROUGH internal redirects to the downstream Envoy, so that via
-configuration the redirects can be fielded at either level of infrastructure.
-
-Conversely, where basic redirect handling is configured on, Envoy will do best-effort handling for
-all 302 responses which do not contain an x-envoy-internal-redirect. This handling is fail-open:
-if the preconditions are not met, the 302 will be forwarded downstream.
-
-For a redirect to be successful it must pass the following checks
+For a redirect to be handled successfully it must pass the following checks
 
 1. Be a 302 response
 2. Have a *location* header with a valid, fully qualified URL matching the scheme of the original request.
@@ -148,7 +133,7 @@ For a redirect to be successful it must pass the following checks
 4. The request must not have a body
 5. The request must have not been previously redirected, as determined by the presence of an x-envoy-original-url header
 
-Any failure will result in redirect processing not taking place (500 for internal redirects, pass through for redirects)
+Any failure will result in redirect being passed downstream instead.
 
 Once the redirect has passed these checks, the request headers which were shipped to the original
 upstream will be modified by
@@ -166,8 +151,7 @@ undesired header values.
 A sample redirect flow might look like this:
 
 1. Client sends a GET request for *\http://foo.com/bar*
-2. Upstream 1 (not necessarily Envoy based) sends a 302 with *"x-envoy-internal-redirect: yes"*
-   and *"location: \http://baz.com/eep"*
+2. Upstream 1 sends a 302 with  *"location: \http://baz.com/eep"*
 3. Envoy is configured to allow redirects on the original route, and sends a new GET request to
    Upstream 2, to fetch *\http://baz.com/eep* with the additional request header
    *"x-envoy-original-url: \http://foo.com/bar"*

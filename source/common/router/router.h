@@ -358,7 +358,7 @@ private:
                           Upstream::HostDescriptionConstSharedPtr upstream_host, bool dropped);
   void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host,
                           bool dropped);
-  void cleanup(bool reset_stream = false);
+  void cleanup();
   virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
                                          Http::HeaderMap& request_headers,
                                          const Upstream::ClusterInfo& cluster,
@@ -385,9 +385,6 @@ private:
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream);
   TimeSource& timeSource() { return config_.timeSource(); }
-
-  // FIXME comment.
-  bool handledRedirect(const uint64_t response_code, Http::HeaderMap& headers, bool end_stream);
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};

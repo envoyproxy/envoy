@@ -406,7 +406,7 @@ message CorsPolicy {
   google.protobuf.BoolValue enabled = 7;
 }
 
-// [#comment:next free field: 28]
+// [#comment:next free field: 27]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -775,20 +775,11 @@ message RouteAction {
   repeated UpgradeConfig upgrade_configs = 25;
 
   // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
-  enum RedirectAction {
-    PASS_THROUGH_REDIRECT = 0;
-    HANDLE_REDIRECT = 1;
-  }
-  // TODO(alyssawilk) it's really annoying to have a completely seprate enum
-  // because proto3 doesn't have defaults. Check with htuch@ for better
-  // workarounds.
   enum InternalRedirectAction {
-    REJECT_INTERNAL_REDIRECT = 0;
-    PASS_THROUGH_INTERNAL_REDIRECT = 1;
-    HANDLE_INTERNAL_REDIRECT = 2;
+    PASS_THROUGH_INTERNAL_REDIRECT = 0;
+    HANDLE_INTERNAL_REDIRECT = 1;
   }
   InternalRedirectAction internal_redirect_action = 26;
-  RedirectAction redirect_action = 27;
 }
 
 message RedirectAction {

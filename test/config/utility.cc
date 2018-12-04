@@ -332,8 +332,7 @@ void ConfigHelper::addRoute(
     envoy::api::v2::route::VirtualHost::TlsRequirementType type,
     envoy::api::v2::route::RouteAction::RetryPolicy retry_policy, bool include_attempt_count_header,
     const absl::string_view upgrade,
-    envoy::api::v2::route::RouteAction::InternalRedirectAction internal_redirect_action,
-    envoy::api::v2::route::RouteAction::RedirectAction redirect_action) {
+    envoy::api::v2::route::RouteAction::InternalRedirectAction internal_redirect_action) {
   RELEASE_ASSERT(!finalized_, "");
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
@@ -353,7 +352,6 @@ void ConfigHelper::addRoute(
     route->add_upgrade_configs()->set_upgrade_type(std::string(upgrade));
   }
   route->set_internal_redirect_action(internal_redirect_action);
-  route->set_redirect_action(redirect_action);
   virtual_host->set_require_tls(type);
 
   storeHttpConnectionManager(hcm_config);

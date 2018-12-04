@@ -379,11 +379,7 @@ private:
       bool created_filter_chain_ : 1;
 
       // True if this stream is internally created. Currently only used for
-      // internal redirects, though filters can force this via recreateStream().
-      //
-      // We can't infer redirect state from headers, as we don't want to allow untrusted users to
-      // set x-envoy-original-url and need internally initiated streams to be able to set it on
-      // requests from untrusted origins so it is an explicit parameter for newStream.
+      // internal redirects or other streams created via recreateStream().
       bool is_internally_created_ : 1;
     };
 

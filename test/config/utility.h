@@ -86,9 +86,7 @@ public:
                 envoy::api::v2::route::RouteAction::RetryPolicy retry_policy = {},
                 bool include_attempt_count_header = false, const absl::string_view upgrade = "",
                 const envoy::api::v2::route::RouteAction::InternalRedirectAction internal_action =
-                    envoy::api::v2::route::RouteAction::REJECT_INTERNAL_REDIRECT,
-                const envoy::api::v2::route::RouteAction::RedirectAction action =
-                    envoy::api::v2::route::RouteAction::PASS_THROUGH_REDIRECT);
+                    envoy::api::v2::route::RouteAction::PASS_THROUGH_INTERNAL_REDIRECT);
 
   // Add an HTTP filter prior to existing filters.
   void addFilter(const std::string& filter_yaml);
