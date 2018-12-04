@@ -21,6 +21,7 @@ private:
   static void appendString(std::string& result, const std::string& append);
 
   const static std::string NONE;
+  const static std::string DOWNSTREAM_CONNECTION_TERMINATION;
   const static std::string FAILED_LOCAL_HEALTH_CHECK;
   const static std::string NO_HEALTHY_UPSTREAM;
   const static std::string UPSTREAM_REQUEST_TIMEOUT;

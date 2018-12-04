@@ -196,6 +196,7 @@ The following command operators are supported:
     * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
     * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code.
   HTTP only
+    * **DC**: Downstream connection termination.
     * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
     * **UT**: Upstream request timeout in addition to 504 response code.
     * **LR**: Connection local reset in addition to 503 response code.

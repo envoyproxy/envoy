@@ -22,10 +22,12 @@ following are the command line options that Envoy supports.
 .. option:: --config-yaml <yaml string>
 
   *(optional)* The YAML string for a v2 bootstrap configuration. If :option:`--config-path` is also set,
-   the values in this YAML string will override and merge with the bootstrap loaded from :option:`--config-path`.
-   Because YAML is a superset of JSON, a JSON string may also be passed to :option:`--config-yaml`.
+  the values in this YAML string will override and merge with the bootstrap loaded from :option:`--config-path`.
+  Because YAML is a superset of JSON, a JSON string may also be passed to :option:`--config-yaml`.
 
-   Example overriding the node id on the command line:
+  Example overriding the node id on the command line:
+
+    .. code-block:: console
 
       ./envoy -c bootstrap.yaml --config-yaml "node: {id: 'node1'}"
 
