@@ -45,7 +45,7 @@ public:
                   Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                   Runtime::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer,
                   Http::Context& http_context);
-  ~AsyncClientImpl();
+  ~AsyncClientImpl() override;
 
   // Http::AsyncClient
   Request* send(MessagePtr&& request, Callbacks& callbacks,

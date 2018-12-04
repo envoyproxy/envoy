@@ -14,7 +14,7 @@ namespace Http {
 class ContextImpl : public Context {
 public:
   ContextImpl();
-  virtual ~ContextImpl() = default;
+  ~ContextImpl() override = default;
 
   Tracing::HttpTracer& tracer() override { return *tracer_; }
   CodeStats& codeStats() override { return code_stats_; }
