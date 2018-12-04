@@ -16,16 +16,31 @@ MetadataEncoder::MetadataEncoder() {
   deflater_ = Deflater(deflater);
 }
 
-bool MetadataEncoder::createPayload(const MetadataMap& metadata_map) {
+bool MetadataEncoder::createPayloadMetadataMap(const MetadataMap& metadata_map) {
   ASSERT(!metadata_map.empty());
-  // TODO(soya3129): If we need to send more than one METADATA header blocks on one stream, save the
-  // metadata_map if the previous payload hasn't been consumed by nghttp2.
-  ASSERT(payload_.length() == 0);
 
+  uint64_t payload_size_before = payload_.length();
   bool success = createHeaderBlockUsingNghttp2(metadata_map);
-  if (!success) {
+  uint64_t payload_size_after = payload_.length();
+
+  if (!success || payload_size_after == payload_size_before) {
     ENVOY_LOG(error, "Failed to create payload.");
     return false;
+  }
+
+  payload_size_queue_.push(payload_size_after - payload_size_before);
+  return true;
+}
+
+bool MetadataEncoder::createPayload(const MetadataMapVec& metadata_map_vec) {
+  ASSERT(payload_.length() == 0);
+  ASSERT(payload_size_queue_.empty());
+
+  for (const auto& metadata_map : metadata_map_vec) {
+    bool success =createPayloadMetadataMap(*metadata_map);
+    if (!success) {
+      return false;
+    }
   }
   return true;
 }
@@ -44,7 +59,7 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(const MetadataMap& metadata_
 
   // Estimates the upper bound of output payload.
   size_t buflen = nghttp2_hd_deflate_bound(deflater_.get(), nva.begin(), nvlen);
-  if (buflen > max_payload_size_bound_) {
+  if (buflen + payload_.length() > max_payload_size_bound_) {
     ENVOY_LOG(error, "Payload size {} exceeds the max bound.", buflen);
     return false;
   }
@@ -63,9 +78,38 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(const MetadataMap& metadata_
   return true;
 }
 
-void MetadataEncoder::releasePayload(uint64_t len) { payload_.drain(len); }
-
 bool MetadataEncoder::hasNextFrame() { return payload_.length() > 0; }
+
+uint64_t MetadataEncoder::packNextFramePayload(uint8_t* buf, size_t len) {
+  const uint64_t current_payload_size = std::min(METADATA_MAX_PAYLOAD_SIZE,
+                                         payload_size_queue_.front());
+
+  // nghttp2 guarantees len is at least 16KiB. If the check fails, please verify
+  // NGHTTP2_MAX_PAYLOADLEN is consistent with METADATA_MAX_PAYLOAD_SIZE.
+  ASSERT(len >= current_payload_size);
+
+  // Copies payload to the destination memory.
+  payload_.copyOut(0, current_payload_size, buf);
+
+  // Updates the remaining size of the current metadata_map. If no data left, removes the size entry from the queue.
+  payload_size_queue_.front() -= current_payload_size;
+  if (payload_size_queue_.front() == 0) {
+    payload_size_queue_.pop();
+  }
+
+  // Releases the payload that has been copied out.
+  payload_.drain(current_payload_size);
+
+  return current_payload_size;
+}
+
+uint8_t MetadataEncoder::nextEndMetadata() {
+  return payload_size_queue_.front() > METADATA_MAX_PAYLOAD_SIZE ? 0 : END_METADATA_FLAG;
+}
+
+uint64_t MetadataEncoder::frameCountUpperBound() {
+  return payload_.length() / METADATA_MAX_PAYLOAD_SIZE + payload_size_queue_.size();
+}
 
 } // namespace Http2
 } // namespace Http

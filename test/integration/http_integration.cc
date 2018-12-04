@@ -1050,7 +1050,7 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   const std::string key = "key";
   std::string value = std::string(80 * 1024, '1');
   Http::MetadataMap metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeMetadata({&metadata_map});
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(12, true);
 
@@ -1067,7 +1067,7 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   value = std::string(10, '2');
   upstream_request_->encodeHeaders(default_response_headers_, false);
   metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeMetadata({&metadata_map});
   upstream_request_->encodeData(0, true);
 
   // Verifies metadata is received by the client.
@@ -1083,7 +1083,7 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   value = std::string(10, '3');
   upstream_request_->encodeHeaders(default_response_headers_, false);
   metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeMetadata({&metadata_map});
   upstream_request_->encodeData(10, true);
 
   // Verifies metadata is received by the client.
@@ -1100,7 +1100,7 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(10, false);
   metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeMetadata({&metadata_map});
   upstream_request_->encodeData(10, true);
 
   // Verifies metadata is received by the client.
@@ -1117,7 +1117,7 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(10, false);
   metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeMetadata({&metadata_map});
   upstream_request_->encodeData(0, true);
 
   // Verifies metadata is received by the client.
@@ -1134,7 +1134,7 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(10, false);
   metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeMetadata({&metadata_map});
   upstream_request_->encodeResetStream();
 
   // Verifies stream is reset.
@@ -1163,12 +1163,12 @@ void HttpIntegrationTest::testEnvoyProxyMultipleMetadata() {
                                                         {
                                                             {"3", "333"},
                                                         }};
-  upstream_request_->encodeMetadata(metadata_map_vector[0]);
-  upstream_request_->encodeMetadata(metadata_map_vector[1]);
+  upstream_request_->encodeMetadata({&metadata_map_vector[0]});
+  upstream_request_->encodeMetadata({&metadata_map_vector[1]});
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeMetadata(metadata_map_vector[2]);
+  upstream_request_->encodeMetadata({&metadata_map_vector[2]});
   upstream_request_->encodeData(12, false);
-  upstream_request_->encodeMetadata(metadata_map_vector[3]);
+  upstream_request_->encodeMetadata({&metadata_map_vector[3]});
   upstream_request_->encodeData(12, true);
 
   // Verifies multiple metadata are received by the client.
@@ -1194,11 +1194,11 @@ void HttpIntegrationTest::testEnvoyProxyInvalidMetadata() {
   const std::string key = "key";
   std::string value = std::string(1024 * 1024, 'a');
   Http::MetadataMap metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeMetadata({&metadata_map});
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeMetadata({&metadata_map});
   upstream_request_->encodeData(12, false);
-  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeMetadata({&metadata_map});
   upstream_request_->encodeData(12, true);
 
   // Verifies metadata is not received by the client.
@@ -1221,7 +1221,7 @@ void HttpIntegrationTest::testEnvoyMultipleMetadataReachSizeLimit() {
   Http::MetadataMap metadata_map = {{key, value}};
   upstream_request_->encodeHeaders(default_response_headers_, false);
   for (int i = 0; i < 200; i++) {
-    upstream_request_->encodeMetadata(metadata_map);
+    upstream_request_->encodeMetadata({&metadata_map});
   }
   upstream_request_->encodeData(12, true);
 

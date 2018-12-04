@@ -380,7 +380,7 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
   response_encoder_->encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
 }
 
-TEST_P(Http2CodecImplTest, SmallMetadataTest) {
+TEST_P(Http2CodecImplTest, SmallMetadataVecTest) {
   allow_metadata_ = true;
   initialize();
 
@@ -397,14 +397,20 @@ TEST_P(Http2CodecImplTest, SmallMetadataTest) {
       {"header_key4", "header_value4"},
   };
 
-  EXPECT_CALL(request_decoder_, decodeMetadata_(_));
-  request_encoder_->encodeMetadata(metadata_map);
+  MetadataMapVec metadata_map_vec;
+  const int size = 10;
+  for (int i = 0 ; i < size; i++) {
+    metadata_map_vec.push_back(&metadata_map);
+  }
 
-  EXPECT_CALL(response_decoder_, decodeMetadata_(_));
-  response_encoder_->encodeMetadata(metadata_map);
+  EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(size);
+  request_encoder_->encodeMetadata(metadata_map_vec);
+
+  EXPECT_CALL(response_decoder_, decodeMetadata_(_)).Times(size);
+  response_encoder_->encodeMetadata(metadata_map_vec);
 }
 
-TEST_P(Http2CodecImplTest, LargeMetadataTest) {
+TEST_P(Http2CodecImplTest, LargeMetadataVecTest) {
   allow_metadata_ = true;
   initialize();
 
@@ -418,14 +424,20 @@ TEST_P(Http2CodecImplTest, LargeMetadataTest) {
       {"header_key1", std::string(50 * 1024, 'a')},
   };
 
-  EXPECT_CALL(request_decoder_, decodeMetadata_(_));
-  request_encoder_->encodeMetadata(metadata_map);
+  MetadataMapVec metadata_map_vec;
+  const int size = 10;
+  for (int i = 0 ; i < size; i++) {
+    metadata_map_vec.push_back(&metadata_map);
+  }
 
-  EXPECT_CALL(response_decoder_, decodeMetadata_(_));
-  response_encoder_->encodeMetadata(metadata_map);
+  EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(size);
+  request_encoder_->encodeMetadata(metadata_map_vec);
+
+  EXPECT_CALL(response_decoder_, decodeMetadata_(_)).Times(size);
+  response_encoder_->encodeMetadata(metadata_map_vec);
 }
 
-TEST_P(Http2CodecImplTest, BadMetadataReceivedTest) {
+TEST_P(Http2CodecImplTest, BadMetadataVecReceivedTest) {
   allow_metadata_ = true;
   initialize();
 
@@ -443,10 +455,9 @@ TEST_P(Http2CodecImplTest, BadMetadataReceivedTest) {
   };
 
   corrupt_data_ = true;
-  EXPECT_THROW_WITH_MESSAGE(request_encoder_->encodeMetadata(metadata_map), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(request_encoder_->encodeMetadata({&metadata_map}), EnvoyException,
                             "The user callback function failed");
 }
-
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
 
 TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {

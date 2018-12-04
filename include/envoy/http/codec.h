@@ -55,10 +55,10 @@ public:
   virtual Stream& getStream() PURE;
 
   /**
-   * Encode METADATA.
-   * @param metadata_map is the METADATA to encode.
+   * Encode metadata.
+   * @param metadata_map_vec is the vector of metadata map to encode.
    */
-  virtual void encodeMetadata(const MetadataMap& metadata_map) PURE;
+  virtual void encodeMetadata(const MetadataMapVec& metadata_map_vec) PURE;
 };
 
 /**

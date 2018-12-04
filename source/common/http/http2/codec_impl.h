@@ -164,7 +164,7 @@ protected:
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(const HeaderMap& trailers) override;
     Stream& getStream() override { return *this; }
-    void encodeMetadata(const MetadataMap& metadata_map) override;
+    void encodeMetadata(const MetadataMapVec& metadata_map_vec) override;
 
     // Http::Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }

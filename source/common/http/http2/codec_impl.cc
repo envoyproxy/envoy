@@ -131,14 +131,14 @@ void ConnectionImpl::StreamImpl::encodeTrailers(const HeaderMap& trailers) {
   }
 }
 
-void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMap& metadata_map) {
+void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVec& metadata_map_vec) {
   ASSERT(parent_.allow_metadata_);
 
-  getMetadataEncoder().createPayload(metadata_map);
+  getMetadataEncoder().createPayload(metadata_map_vec);
 
   // Estimates the number of frames to generate, and breaks the while loop when the size is reached
   // in case submitting succeeds and packing fails, and we don't get error from packing.
-  const size_t frame_count = metadata_encoder_->payload().length() / METADATA_MAX_PAYLOAD_SIZE + 1;
+  const size_t frame_count = metadata_encoder_->frameCountUpperBound();
   size_t count = 0;
   // Keep submitting extension frames if there is payload left in the encoder.
   while (metadata_encoder_->hasNextFrame() && count++ <= frame_count) {
@@ -215,10 +215,8 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
 
 void ConnectionImpl::StreamImpl::submitMetadata() {
   ASSERT(stream_id_ > 0);
-  uint64_t payload_size = metadata_encoder_->payload().length();
-  const uint8_t flag = payload_size > METADATA_MAX_PAYLOAD_SIZE ? 0 : END_METADATA_FLAG;
   int result =
-      nghttp2_submit_extension(parent_.session_, METADATA_FRAME_TYPE, flag, stream_id_, nullptr);
+      nghttp2_submit_extension(parent_.session_, METADATA_FRAME_TYPE, metadata_encoder_->nextEndMetadata(), stream_id_, nullptr);
   ASSERT(result == 0);
 }
 
@@ -623,18 +621,8 @@ ssize_t ConnectionImpl::packMetadata(int32_t stream_id, uint8_t* buf, size_t len
   ASSERT(stream != nullptr);
 
   MetadataEncoder& encoder = stream->getMetadataEncoder();
-  const uint64_t size_to_copy = std::min(METADATA_MAX_PAYLOAD_SIZE, encoder.payload().length());
-  // nghttp2 guarantees len is at least 16KiB. If the check fails, please verify
-  // NGHTTP2_MAX_PAYLOADLEN is consistent with METADATA_MAX_PAYLOAD_SIZE.
-  ASSERT(len >= size_to_copy);
-
-  Buffer::OwnedImpl& p = encoder.payload();
-  p.copyOut(0, size_to_copy, buf);
-
-  // Releases the payload that has been copied to nghttp2.
-  encoder.releasePayload(size_to_copy);
-
-  return static_cast<ssize_t>(size_to_copy);
+  uint64_t payload_size = encoder.packNextFramePayload(buf, len);
+  return static_cast<ssize_t>(payload_size);
 }
 
 int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,

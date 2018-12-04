@@ -36,6 +36,8 @@ public:
 
 using MetadataMapPtr = std::unique_ptr<MetadataMap>;
 
+using MetadataMapVec = std::vector<MetadataMap*>;
+
 using MetadataCallback = std::function<void(std::unique_ptr<MetadataMap>)>;
 
 } // namespace Http
