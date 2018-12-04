@@ -232,6 +232,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
   if (config.forwardClientCert() == Http::ForwardClientCertType::Sanitize ||
       !(connection.ssl() && connection.ssl()->peerCertificatePresented())) {
     request_headers.removeForwardedClientCert();
+    request_headers.removeForwardedUntrustedClientCert();
     return;
   }
 
