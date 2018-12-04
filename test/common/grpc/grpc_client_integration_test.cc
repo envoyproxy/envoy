@@ -293,6 +293,16 @@ TEST_P(GrpcClientIntegrationTest, ResourceExhaustedError) {
   dispatcher_helper_.runDispatcher();
 }
 
+// Validate that a trailers UNAUTHENTICATED reply is handled.
+TEST_P(GrpcClientIntegrationTest, UnauthenticatedError) {
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendServerTrailers(Status::GrpcStatus::Unauthenticated, "error message",
+                             empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
 // Validate that we can continue to receive after a local close.
 TEST_P(GrpcClientIntegrationTest, ReceiveAfterLocalClose) {
   initialize();
