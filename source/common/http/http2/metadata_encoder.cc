@@ -37,7 +37,7 @@ bool MetadataEncoder::createPayload(const MetadataMapVec& metadata_map_vec) {
   ASSERT(payload_size_queue_.empty());
 
   for (const auto& metadata_map : metadata_map_vec) {
-    bool success =createPayloadMetadataMap(*metadata_map);
+    bool success = createPayloadMetadataMap(*metadata_map);
     if (!success) {
       return false;
     }
@@ -81,8 +81,8 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(const MetadataMap& metadata_
 bool MetadataEncoder::hasNextFrame() { return payload_.length() > 0; }
 
 uint64_t MetadataEncoder::packNextFramePayload(uint8_t* buf, size_t len) {
-  const uint64_t current_payload_size = std::min(METADATA_MAX_PAYLOAD_SIZE,
-                                         payload_size_queue_.front());
+  const uint64_t current_payload_size =
+      std::min(METADATA_MAX_PAYLOAD_SIZE, payload_size_queue_.front());
 
   // nghttp2 guarantees len is at least 16KiB. If the check fails, please verify
   // NGHTTP2_MAX_PAYLOADLEN is consistent with METADATA_MAX_PAYLOAD_SIZE.
@@ -91,7 +91,8 @@ uint64_t MetadataEncoder::packNextFramePayload(uint8_t* buf, size_t len) {
   // Copies payload to the destination memory.
   payload_.copyOut(0, current_payload_size, buf);
 
-  // Updates the remaining size of the current metadata_map. If no data left, removes the size entry from the queue.
+  // Updates the remaining size of the current metadata_map. If no data left, removes the size entry
+  // from the queue.
   payload_size_queue_.front() -= current_payload_size;
   if (payload_size_queue_.front() == 0) {
     payload_size_queue_.pop();

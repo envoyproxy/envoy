@@ -399,7 +399,7 @@ TEST_P(Http2CodecImplTest, SmallMetadataVecTest) {
 
   MetadataMapVec metadata_map_vec;
   const int size = 10;
-  for (int i = 0 ; i < size; i++) {
+  for (int i = 0; i < size; i++) {
     metadata_map_vec.push_back(&metadata_map);
   }
 
@@ -426,7 +426,7 @@ TEST_P(Http2CodecImplTest, LargeMetadataVecTest) {
 
   MetadataMapVec metadata_map_vec;
   const int size = 10;
-  for (int i = 0 ; i < size; i++) {
+  for (int i = 0; i < size; i++) {
     metadata_map_vec.push_back(&metadata_map);
   }
 

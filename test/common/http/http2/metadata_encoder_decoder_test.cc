@@ -116,7 +116,6 @@ public:
 
   void verifyMetadataMapVec(MetadataMapVec& expect, std::unique_ptr<MetadataMap> metadata_map) {
     for (const auto& metadata : *metadata_map) {
-      ENVOY_LOG_MISC(error, "+++++++ metadata.first: {}, metadata.second: {}", metadata.first, metadata.second);
       EXPECT_EQ(expect.front()->find(metadata.first)->second, metadata.second);
     }
     expect.erase(expect.begin());
@@ -126,8 +125,8 @@ public:
     // Creates metadata payload.
     encoder_.createPayload(metadata_map_vec);
     while (encoder_.hasNextFrame()) {
-      int result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, encoder_.nextEndMetadata(),
-                                            STREAM_ID, nullptr);
+      int result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE,
+                                            encoder_.nextEndMetadata(), STREAM_ID, nullptr);
       EXPECT_EQ(0, result);
       // Sends METADATA to nghttp2.
       result = nghttp2_session_send(session_);
@@ -158,8 +157,8 @@ TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
   metadata_map_vec.push_back(&metadata_map);
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadataMapVec, this, metadata_map_vec,
-                                  std::placeholders::_1);
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadataMapVec, this,
+                                  metadata_map_vec, std::placeholders::_1);
   initialize(cb);
 
   // metadata_map exceeds size limit.
@@ -180,8 +179,8 @@ TEST_F(MetadataEncoderDecoderTest, TestDecodeBadData) {
   metadata_map_vec.push_back(&metadata_map);
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadataMapVec, this, metadata_map_vec,
-                                  std::placeholders::_1);
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadataMapVec, this,
+                                  metadata_map_vec, std::placeholders::_1);
   initialize(cb);
   submitMetadata(metadata_map_vec);
 
@@ -274,7 +273,7 @@ TEST_F(MetadataEncoderDecoderTest, EncodeMetadataMapVecLarge) {
   };
 
   MetadataMapVec metadata_map_vec;
-  for (int i = 0 ; i < 10; i++) {
+  for (int i = 0; i < 10; i++) {
     metadata_map_vec.push_back(&metadata_map);
   }
 
@@ -301,7 +300,7 @@ TEST_F(MetadataEncoderDecoderTest, TestFrameCountUpperBound) {
 
   int size = 10;
   MetadataMapVec metadata_map_vec;
-  for (int i = 0 ; i < size; i++) {
+  for (int i = 0; i < size; i++) {
     metadata_map_vec.push_back(&metadata_map);
   }
 

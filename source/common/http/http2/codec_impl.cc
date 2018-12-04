@@ -215,8 +215,8 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
 
 void ConnectionImpl::StreamImpl::submitMetadata() {
   ASSERT(stream_id_ > 0);
-  int result =
-      nghttp2_submit_extension(parent_.session_, METADATA_FRAME_TYPE, metadata_encoder_->nextEndMetadata(), stream_id_, nullptr);
+  int result = nghttp2_submit_extension(parent_.session_, METADATA_FRAME_TYPE,
+                                        metadata_encoder_->nextEndMetadata(), stream_id_, nullptr);
   ASSERT(result == 0);
 }
 
