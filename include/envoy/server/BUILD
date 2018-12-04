@@ -62,6 +62,7 @@ envoy_cc_library(
     name = "guarddog_interface",
     hdrs = ["guarddog.h"],
     deps = [
+        "//include/envoy/api:api_interface",
         "//include/envoy/server:watchdog_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/thread:thread_interface",
