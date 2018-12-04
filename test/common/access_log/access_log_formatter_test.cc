@@ -105,7 +105,7 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter protocol_format("PROTOCOL");
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
-    EXPECT_CALL(stream_info, protocol()).WillOnce(Return(protocol));
+    EXPECT_CALL(stream_info, protocol()).Times(2).WillRepeatedly(Return(protocol));
     EXPECT_EQ("HTTP/1.1", protocol_format.format(header, header, header, stream_info));
   }
 
@@ -138,6 +138,7 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter response_flags_format("RESPONSE_FLAGS");
+    ON_CALL(stream_info, hasAnyResponseFlag()).WillByDefault(Return(true));
     ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
         .WillByDefault(Return(true));
     EXPECT_EQ("LR", response_flags_format.format(header, header, header, stream_info));
