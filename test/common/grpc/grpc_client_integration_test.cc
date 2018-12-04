@@ -298,8 +298,7 @@ TEST_P(GrpcClientIntegrationTest, UnauthenticatedError) {
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
-  stream->sendServerTrailers(Status::GrpcStatus::Unauthenticated, "error message",
-                             empty_metadata_);
+  stream->sendServerTrailers(Status::GrpcStatus::Unauthenticated, "error message", empty_metadata_);
   dispatcher_helper_.runDispatcher();
 }
 
