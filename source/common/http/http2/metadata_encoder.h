@@ -51,7 +51,7 @@ public:
 
   /**
    * Estimates upper bound of the number of frames the payload_ can generate.
-   * @return true if size limit is reached.
+   * @return frame count upper bound.
    */
   uint64_t frameCountUpperBound();
 
@@ -84,9 +84,9 @@ private:
   typedef CSmartPtr<nghttp2_hd_deflater, nghttp2_hd_deflate_del> Deflater;
   Deflater deflater_;
 
-  // Stores the payload size of each metadata_map to be packed. The payload size is needed so that
-  // we know when END_METADATA should be set. The payload size gets updated when the payload is
-  // packed into metadata frames.
+  // Stores the remaining payload size of each metadata_map to be packed. The payload size is needed
+  // so that we know when END_METADATA should be set. The payload size gets updated when the payload
+  // is packed into metadata frames.
   std::queue<uint64_t> payload_size_queue_;
 };
 
