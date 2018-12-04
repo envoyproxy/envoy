@@ -289,10 +289,17 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
 
   const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
   if (config.forwardClientCert() == Http::ForwardClientCertType::AppendForward) {
-    HeaderMapImpl::appendToHeader(request_headers.insertForwardedClientCert().value(),
+    HeaderMapImpl::appendToHeader(connection.ssl()->peerCertificateValidated() ? request_headers.insertForwardedClientCert().value() :
+                                                                                 request_headers.insertForwardedUntrustedClientCert().value(),
                                   client_cert_details_str);
   } else if (config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
-    request_headers.insertForwardedClientCert().value(client_cert_details_str);
+    if (connection.ssl()->peerCertificateValidated()) {
+      request_headers.insertForwardedClientCert().value(client_cert_details_str);
+      request_headers.removeForwardedUntrustedClientCert();
+    } else {
+      request_headers.removeForwardedClientCert();
+      request_headers.insertForwardedUntrustedClientCert().value(client_cert_details_str);
+    }
   } else {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

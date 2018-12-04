@@ -31,6 +31,14 @@ int ContextImpl::sslContextIndex() {
   }());
 }
 
+int ContextImpl::sslCustomDataIndex() {
+  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
+    int ssl_context_index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    RELEASE_ASSERT(ssl_context_index >= 0, "");
+    return ssl_context_index;
+  }());
+}
+
 ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source)
     : ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)),
       time_source_(time_source) {
@@ -65,6 +73,16 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
   }
 
   int verify_mode = SSL_VERIFY_NONE;
+  if (config.certificateValidationContext() != nullptr &&
+      config.certificateValidationContext()->requestClientCertificate()) {
+    verify_mode = SSL_VERIFY_PEER;
+  }
+
+  const int verify_mode_validation_context =
+    config.certificateValidationContext() != nullptr &&
+    config.certificateValidationContext()->validationPermitsNoClientCertificate() ?
+      SSL_VERIFY_PEER : SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+
   if (config.certificateValidationContext() != nullptr &&
       !config.certificateValidationContext()->caCert().empty()) {
     ca_file_path_ = config.certificateValidationContext()->caCertPath();
@@ -145,7 +163,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
       !config.certificateValidationContext()->verifySubjectAltNameList().empty()) {
     verify_subject_alt_name_list_ =
         config.certificateValidationContext()->verifySubjectAltNameList();
-    verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+    verify_mode = verify_mode_validation_context;
   }
 
   if (config.certificateValidationContext() != nullptr &&
@@ -162,7 +180,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
       }
       verify_certificate_hash_list_.push_back(decoded);
     }
-    verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+    verify_mode = verify_mode_validation_context;
   }
 
   if (config.certificateValidationContext() != nullptr &&
@@ -174,7 +192,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
       }
       verify_certificate_spki_list_.emplace_back(decoded.begin(), decoded.end());
     }
-    verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+    verify_mode = verify_mode_validation_context;
   }
 
   if (verify_mode != SSL_VERIFY_NONE) {
@@ -231,6 +249,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
 
   // use the server's cipher list preferences
   SSL_CTX_set_options(ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
+
+  if (config.certificateValidationContext() != nullptr) {
+    permit_untrusted_certificate_ = config.certificateValidationContext()->permitUntrustedClientCertificate();
+  }
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
 }
@@ -293,26 +315,49 @@ int ContextImpl::ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* ctx
 
 int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   ContextImpl* impl = reinterpret_cast<ContextImpl*>(arg);
+  SSL* ssl = reinterpret_cast<SSL*>(
+      X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
+  ClientValidationStatus* clientValidationStatus =
+    reinterpret_cast<ClientValidationStatus*>(SSL_get_ex_data(ssl, ContextImpl::sslCustomDataIndex()));
 
   if (impl->verify_trusted_ca_) {
     int ret = X509_verify_cert(store_ctx);
+    if (clientValidationStatus) {
+      clientValidationStatus->status = ret == 1 ?
+                                  ClientValidationStatus::Status::Validated :
+                                  ClientValidationStatus::Status::Failed;
+    }
     if (ret <= 0) {
       impl->stats_.fail_verify_error_.inc();
-      return ret;
+      return impl->permit_untrusted_certificate_ ? 1 : ret;
     }
   }
 
-  SSL* ssl = reinterpret_cast<SSL*>(
-      X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
-  return impl->verifyCertificate(cert.get());
+
+  auto validated = impl->verifyCertificate(cert.get());
+  if (clientValidationStatus) {
+    if (clientValidationStatus->status == ClientValidationStatus::Status::NotValidated) {
+      clientValidationStatus->status = validated;
+    }
+    else if (validated != ClientValidationStatus::Status::NotValidated) {
+      clientValidationStatus->status = validated;
+    }
+  }
+
+  // permit connection through if 'permit_untrusted_certificate' configured
+  return impl->permit_untrusted_certificate_ ? 1 :
+    (validated != ClientValidationStatus::Status::Failed);
 }
 
-int ContextImpl::verifyCertificate(X509* cert) {
-  if (!verify_subject_alt_name_list_.empty() &&
-      !verifySubjectAltName(cert, verify_subject_alt_name_list_)) {
-    stats_.fail_verify_san_.inc();
-    return 0;
+ClientValidationStatus::Status ContextImpl::verifyCertificate(X509* cert) {
+  ClientValidationStatus::Status validated = ClientValidationStatus::Status::NotValidated;
+  if (!verify_subject_alt_name_list_.empty()) {
+    if (!verifySubjectAltName(cert, verify_subject_alt_name_list_)) {
+      stats_.fail_verify_san_.inc();
+      return ClientValidationStatus::Status::Failed;
+    }
+    validated = ClientValidationStatus::Status::Validated;
   }
 
   if (!verify_certificate_hash_list_.empty() || !verify_certificate_spki_list_.empty()) {
@@ -325,11 +370,13 @@ int ContextImpl::verifyCertificate(X509* cert) {
 
     if (!valid_certificate_hash && !valid_certificate_spki) {
       stats_.fail_verify_cert_hash_.inc();
-      return 0;
+      return ClientValidationStatus::Status::Failed;
     }
+
+    validated = ClientValidationStatus::Status::Validated;
   }
 
-  return 1;
+  return validated;
 }
 
 void ContextImpl::logHandshake(SSL* ssl) const {
