@@ -27,7 +27,7 @@ following are the command line options that Envoy supports.
 
   Example overriding the node id on the command line:
 
-    .. code-block:: none
+    .. code-block:: console
 
       ./envoy -c bootstrap.yaml --config-yaml "node: {id: 'node1'}"
 
