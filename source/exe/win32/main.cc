@@ -45,6 +45,9 @@ int main(int argc, char** argv) {
 
   std::unique_ptr<Envoy::MainCommonBase> main_common_base;
   std::unique_ptr<Envoy::OptionsImpl> options;
+  Envoy::Event::RealTimeSystem real_time_system;
+  Envoy::DefaultTestHooks default_test_hooks;
+  Envoy::ProdComponentFactory prod_component_factory;
   Envoy::Thread::ThreadFactoryImplWin32 thread_factory;
   auto hotRestartVersion = [](uint64_t, uint64_t, bool) -> std::string { return "disabled"; };
 
@@ -54,7 +57,9 @@ int main(int argc, char** argv) {
   try {
     options =
         std::make_unique<Envoy::OptionsImpl>(argc, argv, hotRestartVersion, spdlog::level::info);
-    main_common_base = std::make_unique<Envoy::MainCommonBase>(*options, thread_factory);
+    main_common_base = std::make_unique<Envoy::MainCommonBase>(
+        *options, real_time_system, default_test_hooks, prod_component_factory,
+        std::make_unique<Envoy::Runtime::RandomGeneratorImpl>(), thread_factory);
   } catch (const Envoy::NoServingException& e) {
     return EXIT_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {
