@@ -28,6 +28,14 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
   Filters::Common::RateLimit::ClientFactoryPtr client_factory =
       Filters::Common::RateLimit::rateLimitClientFactory(context);
+  if (proto_config.has_rate_limit_service() && client_factory->rateLimitConfig().has_value() &&
+  !Envoy::Protobuf::util::MessageDifferencer::Equals(*client_factory->rateLimitConfig(),proto_config.rate_limit_service())) {
+     throw EnvoyException("rate limit service config in filter does not match with bootstrap");
+  } 
+  if (proto_config.has_rate_limit_service()) {
+      client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(context, proto_config.rate_limit_service());
+  }
   return [client_factory, timeout_ms,
           filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     // When we introduce rate limit service config in filters, we should validate here that it

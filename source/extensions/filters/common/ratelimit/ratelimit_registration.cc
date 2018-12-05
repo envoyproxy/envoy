@@ -33,6 +33,18 @@ ClientFactoryPtr rateLimitClientFactory(Server::Instance& server,
       });
 }
 
+ClientFactoryPtr rateLimitClientFactory(Server::Configuration::FactoryContext& context,
+                                        const envoy::config::ratelimit::v2::RateLimitServiceConfig& ratelimit_config) {
+  return context.singletonManager().getTyped<ClientFactory>(
+      SINGLETON_MANAGER_REGISTERED_NAME(ratelimit_factory),
+      [&ratelimit_config, &context] {
+        return
+              std::make_shared<Envoy::Extensions::Filters::Common::RateLimit::GrpcFactoryImpl>(
+                  ratelimit_config, context.clusterManager().grpcAsyncClientManager(), context.scope());
+      
+      });
+}
+
 ClientFactoryPtr rateLimitClientFactory(Server::Configuration::FactoryContext& context) {
   return context.singletonManager().getTyped<ClientFactory>(
       SINGLETON_MANAGER_REGISTERED_NAME(ratelimit_factory), [] {

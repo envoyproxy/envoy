@@ -21,6 +21,13 @@ ClientFactoryPtr rateLimitClientFactory(Server::Instance& server,
                                         const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
 
 /**
+ * Builds the ClientFactory and registers with singleton manager.
+ * @return ClientFactoryPtr the registered client factory.
+ */
+ClientFactoryPtr rateLimitClientFactory(Server::Configuration::FactoryContext& context,
+                                        const envoy::config::ratelimit::v2::RateLimitServiceConfig& ratelimit_config);
+
+/**
  * Returns the registered ClientFactory from singleton manager.
  */
 ClientFactoryPtr rateLimitClientFactory(Server::Configuration::FactoryContext& context);
