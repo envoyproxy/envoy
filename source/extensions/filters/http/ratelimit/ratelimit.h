@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.h"
+#include "envoy/http/context.h"
 #include "envoy/http/filter.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/ratelimit/ratelimit.h"
@@ -35,7 +36,7 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::config::filter::http::rate_limit::v2::RateLimit& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime)
+               Runtime::Loader& runtime, Http::Context& http_context)
       : domain_(config.domain()), stage_(static_cast<uint64_t>(config.stage())),
         request_type_(config.request_type().empty() ? stringToType("both")
                                                     : stringToType(config.request_type())),
@@ -44,7 +45,8 @@ public:
         rate_limited_grpc_status_(
             config.rate_limited_as_resource_exhausted()
                 ? absl::make_optional(Grpc::Status::GrpcStatus::ResourceExhausted)
-                : absl::nullopt) {}
+                : absl::nullopt),
+        http_context_(http_context) {}
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
@@ -55,6 +57,7 @@ public:
   const absl::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
     return rate_limited_grpc_status_;
   }
+  Http::Context& httpContext() { return http_context_; }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -76,6 +79,7 @@ private:
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
   const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
+  Http::Context& http_context_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
@@ -116,6 +120,7 @@ private:
                                     const Router::RouteEntry* route_entry,
                                     const Http::HeaderMap& headers) const;
   void addHeaders(Http::HeaderMap& headers);
+  Http::Context& httpContext() { return config_->httpContext(); }
 
   enum class State { NotStarted, Calling, Complete, Responded };
 

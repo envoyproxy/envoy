@@ -305,6 +305,8 @@ envoy_cc_library(
         "//source/common/config:bootstrap_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:async_client_manager_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/http:context_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/memory:stats_lib",
         "//source/common/protobuf:utility_lib",
