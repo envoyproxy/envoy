@@ -7,6 +7,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
@@ -48,10 +49,12 @@ void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& opti
 template <>
 void NetworkListenSocket<
     NetworkSocketTrait<Address::SocketType::Stream>>::setPrebindSocketOptions() {
-  // TODO(htuch): This might benefit from moving to SocketOptionImpl.
+
   int on = 1;
-  int rc = setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-  RELEASE_ASSERT(rc != -1, "");
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  Api::SysCallIntResult status =
+      os_syscalls.setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+  RELEASE_ASSERT(status.rc_ != -1, "failed to set SO_REUSEADDR socket option");
 }
 
 template <>
