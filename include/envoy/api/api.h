@@ -35,8 +35,7 @@ public:
    */
   virtual Filesystem::FileSharedPtr createFile(const std::string& path,
                                                Event::Dispatcher& dispatcher,
-                                               Thread::BasicLockable& lock,
-                                               Stats::Store& stats_store) PURE;
+                                               Thread::BasicLockable& lock) PURE;
 
   /**
    * @return bool whether a file exists and can be opened for read on disk.

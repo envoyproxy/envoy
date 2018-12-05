@@ -5,6 +5,7 @@ Version history
 ===============
 * access log: added a :ref:`JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format.
 * access log: added dynamic metadata to access log messages streamed over gRPC.
+* access log: added DOWNSTREAM_CONNECTION_TERMINATION.
 * admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * admin: :http:get:`/server_info` now responds with a JSON object instead of a single string.
 * admin: :http:get:`/server_info` now exposes what stage of initialization the server is currently in.
@@ -28,6 +29,7 @@ Version history
   value to override the default HTTP to gRPC status mapping.
 * http: no longer close the TCP connection when a HTTP/1 request is retried due
   to a response with empty body.
+* listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using :ref:`source_type <envoy_api_field_listener.FilterChainMatch.source_type>`.
 * load balancer: added a `configuration <envoy_api_msg_Cluster.LeastRequestLbConfig>` option to specify the number of choices made in P2C.
 * logging: added missing [ in log prefix.
 * mongo_proxy: added :ref:`dynamic metadata <config_network_filters_mongo_proxy_dynamic_metadata>`.
@@ -37,6 +39,7 @@ Version history
   `UNAVAILABLE` when a gRPC call is rate limited.
 * rate-limit: removed support for the legacy ratelimit service and made the data-plane-api
   :ref:`rls.proto <envoy_api_file_envoy/service/ratelimit/v2/rls.proto>` based implementation default.
+* rate-limit: removed the deprecated cluster_name attribute in :ref:`rate limit service configuration <envoy_api_file_envoy/config/ratelimit/v2/rls.proto>`.
 * rbac: added dynamic metadata to the network level filter.
 * rbac: added support for permission matching by :ref:`requested server name <envoy_api_field_config.rbac.v2alpha.Permission.requested_server_name>`.
 * redis: static cluster configuration is no longer required. Redis proxy will work with clusters
@@ -60,6 +63,7 @@ Version history
   its behaviour within TCP and HTTP implementations.
 * stream: renamed `perRequestState` to `filterState` in `StreamInfo`.
 * thrift_proxy: introduced thrift rate limiter filter
+* tls: add support for :ref:`client-side session resumption <envoy_api_field_auth.UpstreamTlsContext.max_session_keys>`.
 * tls: add support for CRLs in :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
 * tracing: added support to the Zipkin tracer for the :ref:`b3 <config_http_conn_man_headers_b3>` single header format.
 * tracing: added support for :ref:`Datadog <arch_overview_tracing>` tracer.

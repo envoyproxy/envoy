@@ -24,13 +24,13 @@ namespace Event {
 class DispatchedThreadTest : public testing::Test {
 protected:
   DispatchedThreadTest()
-      : config_(1000, 1000, 1000, 1000), api_(Api::createApiForTest()),
+      : config_(1000, 1000, 1000, 1000), api_(Api::createApiForTest(fakestats_)),
         thread_(*api_, test_time_.timeSystem()),
         guard_dog_(fakestats_, config_, test_time_.timeSystem(), *api_) {}
 
   void SetUp() { thread_.start(guard_dog_); }
   NiceMock<Server::Configuration::MockMain> config_;
-  NiceMock<Stats::MockStore> fakestats_;
+  Stats::IsolatedStoreImpl fakestats_;
   DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
   DispatchedThreadImpl thread_;

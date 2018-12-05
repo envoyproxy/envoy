@@ -21,6 +21,7 @@
 #include "envoy/stats/stats_options.h"
 #include "envoy/thread/thread.h"
 
+#include "common/http/context_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
@@ -307,11 +308,6 @@ public:
   MockInstance();
   ~MockInstance();
 
-  // Server::Instance
-  RateLimit::ClientPtr rateLimitClient(const absl::optional<std::chrono::milliseconds>&) override {
-    return RateLimit::ClientPtr{rateLimitClient_()};
-  }
-
   Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
 
   MOCK_METHOD0(admin, Admin&());
@@ -333,7 +329,6 @@ public:
   MOCK_METHOD0(options, Options&());
   MOCK_METHOD0(overloadManager, OverloadManager&());
   MOCK_METHOD0(random, Runtime::RandomGenerator&());
-  MOCK_METHOD0(rateLimitClient_, RateLimit::Client*());
   MOCK_METHOD0(runtime, Runtime::Loader&());
   MOCK_METHOD0(shutdown, void());
   MOCK_METHOD0(isShutdown, bool());
@@ -342,10 +337,9 @@ public:
   MOCK_METHOD0(startTimeCurrentEpoch, time_t());
   MOCK_METHOD0(startTimeFirstEpoch, time_t());
   MOCK_METHOD0(stats, Stats::Store&());
-  MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
+  MOCK_METHOD0(httpContext, Http::Context&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
-  // MOCK_METHOD0(timeSystem, Event::TestTimeSystem&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
   Event::TestTimeSystem& timeSystem() override { return test_time_.timeSystem(); }
@@ -353,7 +347,6 @@ public:
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
-  testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
   std::shared_ptr<testing::NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new testing::NiceMock<Network::MockDnsResolver>()};
   testing::NiceMock<Api::MockApi> api_;
@@ -374,6 +367,7 @@ public:
   testing::NiceMock<MockListenerManager> listener_manager_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Singleton::ManagerPtr singleton_manager_;
+  Http::ContextImpl http_context_;
 };
 
 namespace Configuration {
@@ -386,7 +380,6 @@ public:
 
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager*());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
-  MOCK_METHOD0(rateLimitClientFactory, RateLimit::ClientFactory&());
   MOCK_METHOD0(statsSinks, std::list<Stats::SinkPtr>&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMissTimeout, std::chrono::milliseconds());
@@ -405,10 +398,6 @@ public:
   MockFactoryContext();
   ~MockFactoryContext();
 
-  RateLimit::ClientPtr rateLimitClient(const absl::optional<std::chrono::milliseconds>&) override {
-    return RateLimit::ClientPtr{rateLimitClient_()};
-  }
-
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
@@ -417,7 +406,6 @@ public:
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(initManager, Init::Manager&());
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
-  MOCK_METHOD0(rateLimitClient_, RateLimit::Client*());
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
   MOCK_METHOD0(scope, Stats::Scope&());
   MOCK_METHOD0(singletonManager, Singleton::Manager&());
@@ -429,6 +417,8 @@ public:
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
+
+  Http::Context& httpContext() override { return http_context_; }
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -446,6 +436,8 @@ public:
   Stats::IsolatedStoreImpl listener_scope_;
   Event::SimulatedTimeSystem time_system_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
+  Tracing::HttpNullTracer null_tracer_;
+  Http::ContextImpl http_context_;
 };
 
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {

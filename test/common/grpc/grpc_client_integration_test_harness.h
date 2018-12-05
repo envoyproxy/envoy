@@ -7,6 +7,7 @@
 #include "common/grpc/async_client_impl.h"
 #include "common/grpc/google_async_client_impl.h"
 #include "common/http/async_client_impl.h"
+#include "common/http/codes.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/network/connection_impl.h"
 #include "common/network/raw_buffer_socket.h"
@@ -209,7 +210,7 @@ class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        dispatcher_(test_time_.timeSystem()), api_(Api::createApiForTest()) {}
+        dispatcher_(test_time_.timeSystem()), api_(Api::createApiForTest(*stats_store_)) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -274,7 +275,7 @@ public:
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
         cluster_info_ptr_, *stats_store_, dispatcher_, local_info_, cm_, runtime_, random_,
-        std::move(shadow_writer_ptr_));
+        std::move(shadow_writer_ptr_), http_context_);
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
     EXPECT_CALL(cm_, get(fake_cluster_name_)).WillRepeatedly(Return(&thread_local_cluster_));
@@ -396,15 +397,15 @@ public:
     return stream;
   }
 
+  DangerousDeprecatedTestTime test_time_;
   std::unique_ptr<FakeUpstream> fake_upstream_;
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   DispatcherHelper dispatcher_helper_{dispatcher_};
-  Api::ApiPtr api_;
   Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
+  Api::ApiPtr api_;
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
   TestMetadata service_wide_initial_metadata_;
 #ifdef ENVOY_GOOGLE_GRPC
@@ -427,6 +428,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
+  Http::ContextImpl http_context_;
   envoy::api::v2::core::Locality host_locality_;
   Upstream::MockHost* mock_host_ = new NiceMock<Upstream::MockHost>();
   Upstream::MockHostDescription* mock_host_description_ =

@@ -192,6 +192,7 @@ protected:
     return envoy_return_;
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Thread::Thread> envoy_thread_;
   std::unique_ptr<MainCommon> main_common_;
   absl::Notification started_;

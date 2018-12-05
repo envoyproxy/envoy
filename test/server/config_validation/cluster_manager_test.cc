@@ -2,6 +2,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/api/api_impl.h"
+#include "common/http/context_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
 #include "server/config_validation/cluster_manager.h"
@@ -23,10 +24,10 @@ namespace Envoy {
 namespace Upstream {
 
 TEST(ValidationClusterManagerTest, MockedMethods) {
-  Api::ApiPtr api(Api::createApiForTest());
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api(Api::createApiForTest(stats_store));
   NiceMock<Runtime::MockLoader> runtime;
   Event::SimulatedTimeSystem time_system;
-  Stats::IsolatedStoreImpl stats;
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Runtime::MockRandomGenerator> random;
   testing::NiceMock<Secret::MockSecretManager> secret_manager;
@@ -35,15 +36,16 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   NiceMock<Event::MockDispatcher> dispatcher;
   LocalInfo::MockLocalInfo local_info;
   NiceMock<Server::MockAdmin> admin;
+  Http::ContextImpl http_context;
 
-  ValidationClusterManagerFactory factory(runtime, stats, tls, random, dns_resolver,
+  ValidationClusterManagerFactory factory(runtime, stats_store, tls, random, dns_resolver,
                                           ssl_context_manager, dispatcher, local_info,
-                                          secret_manager, *api);
+                                          secret_manager, *api, http_context);
 
   AccessLog::MockAccessLogManager log_manager;
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(
-      bootstrap, stats, tls, runtime, random, local_info, log_manager, admin);
+      bootstrap, stats_store, tls, runtime, random, local_info, log_manager, admin);
   EXPECT_EQ(nullptr, cluster_manager->httpConnPoolForCluster("cluster", ResourcePriority::Default,
                                                              Http::Protocol::Http11, nullptr));
   Host::CreateConnectionData data = cluster_manager->tcpConnForCluster("cluster", nullptr, nullptr);

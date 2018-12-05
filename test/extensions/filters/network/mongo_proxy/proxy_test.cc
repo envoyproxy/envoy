@@ -216,9 +216,8 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
 
   auto& metadata =
       stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().MongoProxy);
-  auto& query_message = metadata.fields().at("messages").list_value().values(0).struct_value();
-  EXPECT_EQ("OP_QUERY", query_message.fields().at("operation").string_value());
-  EXPECT_EQ("db.test", query_message.fields().at("resource").string_value());
+  EXPECT_TRUE(metadata.fields().find("db.test") != metadata.fields().end());
+  EXPECT_EQ("query", metadata.fields().at("db.test").list_value().values(0).string_value());
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     InsertMessagePtr message(new InsertMessageImpl(0, 0));
@@ -228,9 +227,8 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
   }));
   filter_->onData(fake_data_, false);
 
-  auto& insert_message = metadata.fields().at("messages").list_value().values(0).struct_value();
-  EXPECT_EQ("OP_INSERT", insert_message.fields().at("operation").string_value());
-  EXPECT_EQ("db.test", insert_message.fields().at("resource").string_value());
+  EXPECT_TRUE(metadata.fields().find("db.test") != metadata.fields().end());
+  EXPECT_EQ("insert", metadata.fields().at("db.test").list_value().values(0).string_value());
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message1(new QueryMessageImpl(0, 0));
@@ -246,15 +244,10 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
   }));
   filter_->onData(fake_data_, false);
 
-  auto& multiple_messages = metadata.fields().at("messages").list_value();
-  EXPECT_EQ("OP_QUERY",
-            multiple_messages.values(0).struct_value().fields().at("operation").string_value());
-  EXPECT_EQ("db1.test1",
-            multiple_messages.values(0).struct_value().fields().at("resource").string_value());
-  EXPECT_EQ("OP_INSERT",
-            multiple_messages.values(1).struct_value().fields().at("operation").string_value());
-  EXPECT_EQ("db2.test2",
-            multiple_messages.values(1).struct_value().fields().at("resource").string_value());
+  EXPECT_TRUE(metadata.fields().find("db1.test1") != metadata.fields().end());
+  EXPECT_EQ("query", metadata.fields().at("db1.test1").list_value().values(0).string_value());
+  EXPECT_TRUE(metadata.fields().find("db2.test2") != metadata.fields().end());
+  EXPECT_EQ("insert", metadata.fields().at("db2.test2").list_value().values(0).string_value());
 }
 
 TEST_F(MongoProxyFilterTest, DynamicMetadataDisabled) {

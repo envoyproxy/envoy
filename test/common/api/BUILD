@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["api_impl_test.cc"],
     deps = [
         "//source/common/api:api_lib",
+        "//source/common/stats:isolated_store_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],

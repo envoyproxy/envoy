@@ -26,11 +26,11 @@ namespace MongoProxy {
 
 class DynamicMetadataKeys {
 public:
-  const std::string MessagesField{"messages"};
-  const std::string OperationField{"operation"};
-  const std::string OperationInsert{"OP_INSERT"};
-  const std::string OperationQuery{"OP_QUERY"};
-  const std::string ResourceField{"resource"};
+  const std::string OperationInsert{"insert"};
+  const std::string OperationQuery{"query"};
+  // TODO: Parse out the delete/update operation from the commands
+  const std::string OperationUpdate{"update"};
+  const std::string OperationDelete{"delete"};
 };
 
 typedef ConstSingleton<DynamicMetadataKeys> DynamicMetadataKeysSingleton;
@@ -81,11 +81,9 @@ void ProxyFilter::setDynamicMetadata(std::string operation, std::string resource
             .dynamicMetadata()
             .mutable_filter_metadata())[NetworkFilterNames::get().MongoProxy]);
   auto& fields = *metadata.mutable_fields();
-  auto& list = *fields[DynamicMetadataKeysSingleton::get().MessagesField].mutable_list_value();
-  auto& message = *list.add_values()->mutable_struct_value()->mutable_fields();
-
-  message[DynamicMetadataKeysSingleton::get().OperationField].set_string_value(operation);
-  message[DynamicMetadataKeysSingleton::get().ResourceField].set_string_value(resource);
+  // TODO(rshriram): reverse the resource string (table.db)
+  auto& operations = *fields[resource].mutable_list_value();
+  operations.add_values()->set_string_value(operation);
 
   read_callbacks_->connection().streamInfo().setDynamicMetadata(
       NetworkFilterNames::get().MongoProxy, metadata);
