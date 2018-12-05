@@ -98,6 +98,7 @@ public:
    * should be updated. The new listener must have the same configured address. The old listener
    * will be gracefully drained once the new listener is ready to take traffic (e.g. when RDS has
    * been initialized).
+   * TODO this documentation says nothing about needing to run it from a particular thread
    * @param config supplies the configuration proto.
    * @param version_info supplies the xDS version of the listener.
    * @param modifiable supplies whether the added listener can be updated or removed. If the
