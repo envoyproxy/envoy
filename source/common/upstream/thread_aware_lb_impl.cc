@@ -57,7 +57,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   }
   const uint64_t h = hash ? hash.value() : random_.random();
 
-  const uint32_t priority = LoadBalancerBase::choosePriority(h, *per_priority_load_);
+  const uint32_t priority = LoadBalancerBase::choosePriority(h, *per_priority_load_, stats_);
   const auto& per_priority_state = (*per_priority_state_)[priority];
   if (per_priority_state->global_panic_) {
     stats_.lb_healthy_panic_.inc();

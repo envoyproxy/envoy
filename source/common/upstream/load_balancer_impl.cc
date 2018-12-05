@@ -22,7 +22,7 @@ static const std::string RuntimePanicThreshold = "upstream.healthy_panic_thresho
 } // namespace
 
 uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
-                                          const std::vector<uint32_t>& per_priority_load) {
+                                          const std::vector<uint32_t>& per_priority_load, ClusterStats& stats) {
   hash = hash % 100 + 1; // 1-100
   uint32_t aggregate_percentage_load = 0;
   // As with tryChooseLocalLocalityHosts, this can be refactored for efficiency
@@ -31,6 +31,7 @@ uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
   for (size_t priority = 0; priority < per_priority_load.size(); ++priority) {
     aggregate_percentage_load += per_priority_load[priority];
     if (hash <= aggregate_percentage_load) {
+      stats.lb_priority_chosen_.recordValue(priority);
       return priority;
     }
   }
@@ -164,11 +165,11 @@ HostSet& LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
     const auto& per_priority_load =
         context->determinePriorityLoad(priority_set_, per_priority_load_);
 
-    const uint32_t priority = choosePriority(random_.random(), per_priority_load);
+    const uint32_t priority = choosePriority(random_.random(), per_priority_load, stats_);
     return *priority_set_.hostSetsPerPriority()[priority];
   }
 
-  const uint32_t priority = choosePriority(random_.random(), per_priority_load_);
+  const uint32_t priority = choosePriority(random_.random(), per_priority_load_, stats_);
   return *priority_set_.hostSetsPerPriority()[priority];
 }
 
