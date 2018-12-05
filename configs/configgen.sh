@@ -16,7 +16,8 @@ for FILE in $*; do
     cp "$FILE" "$OUT_DIR/certs"
     ;;
   *)
-    cp "$FILE" "$OUT_DIR"
+    # Configuration filenames may conflict. To avoid this we use the full path.
+    cp -v "$FILE" "$OUT_DIR/${FILE//\//_}"
     ;;
   esac
 done
