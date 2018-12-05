@@ -229,6 +229,14 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
 
     bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
     ctx.is_ecdsa_ = EVP_PKEY_id(public_key.get()) == EVP_PKEY_EC;
+    if (ctx.is_ecdsa_) {
+      // We only support P-256 ECDSA today.
+      EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
+      const int nid = EC_GROUP_get_curve_name(EC_KEY_get0_group(ecdsa_public_key));
+      if (nid != NID_X9_62_prime256v1) {
+        throw EnvoyException(fmt::format("ECDSA key is not P256 (NID = {})", nid));
+      }
+    }
 
     // Load private key.
     bio.reset(BIO_new_mem_buf(const_cast<char*>(tls_certificate.privateKey().data()),
