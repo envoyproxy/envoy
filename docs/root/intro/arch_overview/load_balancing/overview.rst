@@ -11,6 +11,26 @@ of accomplishing this, so Envoy provides several different load balancing strate
 At a high level, we can break these strategies into two categories: global
 load balancing and distributed load balancing.
 
+.. _arch_overview_load_balancing_distributed_lb:
+
+Distributed Load Balancing
+--------------------------
+
+Distributed load balancing refers to having Envoy itself deteremine how load should be distributed
+to the endpoints based on knowing the location of the upstream hosts.
+
+Examples
+^^^^^^^^
+
+* :ref:`Active health checking <arch_overview_health_checking>`: by health checking upstream
+  hosts, Envoy can adjust the weights of priorities and localities to account for unavailable
+  hosts.
+* :ref:`Zone aware routing <arch_overview_load_balancing_zone_aware_routing>`: this can be used
+  to make Envoy prefer closer endpoints without having to explicitly configure priorities in the
+  control plane.
+* :ref:`Load balancing algorithms <arch_overview_load_balancing_types>`: Envoy can use several
+  different algorithms to use the provided weights to determine which host to select.
+
 .. _arch_overview_load_balancing_global_lb:
 
 Global Load Balancing
@@ -31,24 +51,4 @@ it in the control plane is that it gets around some of the
 A more complicated setup could have resource usage being reported to the control plane, allowing
 it to adjust the weight of endpoints or :ref:`localities <arch_overview_load_balancing_locality_weighted_lb>`
 to account for the current resource usage, attempting to route new requests to idle hosts over busy ones.
-
-.. _arch_overview_load_balancing_distributed_lb:
-
-Distributed Load Balancing
---------------------------
-
-Distributed load balancing refers to having Envoy itself deteremine how load should be distributed
-to the endpoints based on knowing the location of the upstream hosts.
-
-Examples
-^^^^^^^^
-
-* :ref:`Active health checking <arch_overview_health_checking>`: by health checking upstream
-  hosts, Envoy can adjust the weights of priorities and localities to account for unavailable
-  hosts.
-* :ref:`Zone aware routing <arch_overview_load_balancing_zone_aware_routing>`: this can be used
-  to make Envoy prefer closer endpoints without having to explicitly configure priorities in the
-  control plane.
-* :ref:`Load balancing algorithms <arch_overview_load_balancing_types>`: Envoy can use several
-  different algorithms to use the provided weights to determine which host to select.
 
