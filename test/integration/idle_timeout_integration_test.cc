@@ -25,7 +25,13 @@ public:
             hcm.mutable_request_timeout()->set_seconds(0);
             hcm.mutable_request_timeout()->set_nanos(RequestTimeoutMs * 1000 * 1000);
           }
-
+          if (enable_sleeping_filter_) {
+            auto* http_filter = hcm.add_http_filters();
+            http_filter->set_name("sleeping-filter");
+            auto* config = http_filter->mutable_config();
+            auto* fields = config->mutable_fields();
+            (*fields)["sleep_ms"].set_number_value(RequestTimeoutMs * 2);
+          }
           // For validating encode100ContinueHeaders() timer kick.
           hcm.set_proxy_100_continue(true);
         });
@@ -75,6 +81,7 @@ public:
   bool enable_global_idle_timeout_{false};
   bool enable_per_stream_idle_timeout_{false};
   bool enable_request_timeout_{false};
+  bool enable_sleeping_filter_{false};
   DangerousDeprecatedTestTime test_time_;
 };
 
@@ -295,8 +302,20 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsNotDisarmedByEncode100Continu
   EXPECT_EQ("request timeout", response->body());
 }
 
-// TODO(auni53) create a test filter that hangs and does not send data upstream, which would
-// trigger a configured request_timer
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsNotDisarmedByASlowFilter) {
+  enable_request_timeout_ = true;
+  enable_sleeping_filter_ = true;
+
+  auto response = setupPerStreamIdleTimeoutTest("POST");
+
+  waitForTimeout(*response, "downstream_rq_timeout");
+
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("408", response->headers().Status()->value().c_str());
+  EXPECT_EQ("request timeout", response->body());
+}
 
 } // namespace
 } // namespace Envoy

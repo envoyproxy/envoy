@@ -235,6 +235,7 @@ envoy_cc_test(
     srcs = ["idle_timeout_integration_test.cc"],
     deps = [
         ":http_protocol_integration_lib",
+        "//test/integration/filters:sleeping_filter_lib",
         "//test/test_common:test_time_lib",
     ],
 )

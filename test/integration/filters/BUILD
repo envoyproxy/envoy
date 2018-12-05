@@ -4,9 +4,15 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
+
+envoy_proto_library(
+    name = "sleeping_filter_proto",
+    srcs = ["sleeping_filter.proto"],
+)
 
 envoy_cc_test_library(
     name = "add_trailers_filter_config_lib",
@@ -91,5 +97,19 @@ envoy_cc_test_library(
         "//source/extensions/filters/http/common:empty_http_filter_config_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "sleeping_filter_lib",
+    srcs = [
+        "sleeping_filter.cc",
+    ],
+    deps = [
+        ":sleeping_filter_proto_cc",
+        "//include/envoy/registry",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/test_common:test_time_system_interface",
     ],
 )
