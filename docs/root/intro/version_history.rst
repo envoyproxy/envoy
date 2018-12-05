@@ -32,7 +32,7 @@ Version history
   to a response with empty body.
 * listeners: all listener filters are now governed by the :ref:`listener_filters_timeout
   <envoy_api_field_Listener.listener_filters_timeout>` setting. The hard coded 15s timeout in
-  the :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` is superceeded by
+  the :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` is superseded by
   this setting.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using :ref:`source_type <envoy_api_field_listener.FilterChainMatch.source_type>`.
 * load balancer: added a `configuration <envoy_api_msg_Cluster.LeastRequestLbConfig>` option to specify the number of choices made in P2C.
