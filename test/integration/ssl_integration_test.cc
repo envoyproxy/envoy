@@ -27,7 +27,7 @@ namespace Envoy {
 namespace Ssl {
 
 void SslIntegrationTestBase::initialize() {
-  config_helper_.addSslConfig(server_ecdsa_cert_);
+  config_helper_.addSslConfig(server_ecdsa_cert_, server_tlsv1_3_);
   HttpIntegrationTest::initialize();
 
   context_manager_ = std::make_unique<ContextManagerImpl>(timeSystem());
@@ -174,7 +174,9 @@ class SslCertficateIntegrationTest
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion,
                                                envoy::api::v2::auth::TlsParameters_TlsProtocol>> {
 public:
-  SslCertficateIntegrationTest() : SslIntegrationTestBase(std::get<0>(GetParam())) {}
+  SslCertficateIntegrationTest() : SslIntegrationTestBase(std::get<0>(GetParam())) {
+    server_tlsv1_3_ = true;
+  }
 
   Network::ClientConnectionPtr
   makeSslClientConnection(const ClientSslTransportOptions& options) override {

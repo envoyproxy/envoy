@@ -91,6 +91,9 @@ public:
 
   /**
    * @return const std::string& with the signature algorithms for the context.
+   *         This is a :-delimited list of algorithms, see
+   *         https://tools.ietf.org/id/draft-ietf-tls-tls13-21.html#rfc.section.4.2.3
+   *         for names.
    */
   virtual const std::string& signingAlgorithmsForTest() const PURE;
 };

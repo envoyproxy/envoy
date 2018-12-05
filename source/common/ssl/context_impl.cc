@@ -24,6 +24,24 @@
 namespace Envoy {
 namespace Ssl {
 
+namespace {
+
+bool cbsContainsU16(CBS& cbs, uint16_t n) {
+  while (CBS_len(&cbs) > 0) {
+    uint16_t v;
+    if (!CBS_get_u16(&cbs, &v)) {
+      return false;
+    }
+    if (v == n) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+} // namespace
+
 ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source)
     : scope_(scope), stats_(generateStats(scope)), time_source_(time_source),
       tls_max_version_(config.maxProtocolVersion()) {
@@ -822,13 +840,9 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 }
 
 bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  const uint16_t client_version = ssl_client_hello->version;
   CBS client_hello;
   CBS_init(&client_hello, ssl_client_hello->client_hello, ssl_client_hello->client_hello_len);
-
-  uint16_t client_version;
-  if (!CBS_get_u16(&client_hello, &client_version)) {
-    return false;
-  }
 
   // This is the TLSv1.3 case (TLSv1.2 on the wire and the supported_versions extensions present).
   // We just need to loook at signature algorithms.
@@ -850,16 +864,8 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_
             CBS_len(&signature_algorithms_ext) != 0) {
           return false;
         }
-
-        while (CBS_len(&signature_algorithms) > 0) {
-          uint16_t sigalg;
-          if (!CBS_get_u16(&signature_algorithms, &sigalg)) {
-            return false;
-          }
-
-          if (sigalg == SSL_SIGN_ECDSA_SECP256R1_SHA256) {
-            return true;
-          }
+        if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP256R1_SHA256)) {
+          return true;
         }
       }
 
@@ -879,20 +885,8 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_
   CBS curvelist;
   CBS_init(&curvelist, curvelist_data, curvelist_len);
 
-  bool p256_ok = false;
-  while (CBS_len(&curvelist) > 0) {
-    uint16_t named_curve;
-    if (!CBS_get_u16(&curvelist, &named_curve)) {
-      return false;
-    }
-
-    if (named_curve == 23 /* secp256r1 */) {
-      p256_ok = true;
-      break;
-    }
-  }
-
-  if (!p256_ok) {
+  // We only support P256 ECDSA curves today.
+  if (!cbsContainsU16(curvelist, SSL_CURVE_SECP256R1)) {
     return false;
   }
 
@@ -990,9 +984,7 @@ void ServerContextImpl::TlsContext::addClientValidationContext(
 }
 
 bool ServerContextImpl::TlsContext::isCipherEnabled(const SSL_CIPHER* cipher) {
-  STACK_OF(SSL_CIPHER)* our_ciphers = SSL_CTX_get_ciphers(ssl_ctx_.get());
-  for (size_t j = 0; j < sk_SSL_CIPHER_num(our_ciphers); j++) {
-    const SSL_CIPHER* our_c = sk_SSL_CIPHER_value(our_ciphers, j);
+  for (const SSL_CIPHER* our_c : SSL_CTX_get_ciphers(ssl_ctx_.get())) {
     if (SSL_CIPHER_get_id(our_c) == SSL_CIPHER_get_id(cipher)) {
       return true;
     }

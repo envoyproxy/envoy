@@ -59,7 +59,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 
 Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
-  ConfigHelper::initializeTls(false, *tls_context.mutable_common_tls_context());
+  ConfigHelper::initializeTls(false, false, *tls_context.mutable_common_tls_context());
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, mock_factory_ctx);
