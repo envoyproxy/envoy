@@ -91,6 +91,27 @@ TEST_F(AccessLogImplTest, LogMoreData) {
             output_);
 }
 
+TEST_F(AccessLogImplTest, DownstreamDisconnect) {
+  const std::string json = R"EOF(
+      {
+        "path": "/dev/null"
+      }
+      )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
+
+  EXPECT_CALL(*file_, write(_));
+
+  std::shared_ptr<Upstream::MockClusterInfo> cluster{new Upstream::MockClusterInfo()};
+  stream_info_.upstream_host_ = Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234");
+  stream_info_.response_flags_ = StreamInfo::ResponseFlag::DownstreamConnectionTermination;
+
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 DC 1 2 3 - \"-\" \"-\" \"-\" \"-\" "
+            "\"10.0.0.5:1234\"\n",
+            output_);
+}
+
 TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
   const std::string json = R"EOF(
   {
