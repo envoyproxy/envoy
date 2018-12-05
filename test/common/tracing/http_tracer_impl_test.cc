@@ -125,7 +125,7 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
-  EXPECT_CALL(stream_info, protocol()).WillOnce(ReturnPointee(&protocol));
+  EXPECT_CALL(stream_info, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
 
@@ -151,7 +151,7 @@ TEST(HttpConnManFinalizerImpl, NoGeneratedId) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
-  EXPECT_CALL(stream_info, protocol()).WillOnce(ReturnPointee(&protocol));
+  EXPECT_CALL(stream_info, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
 
@@ -218,7 +218,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
-  EXPECT_CALL(stream_info, protocol()).WillOnce(ReturnPointee(&protocol));
+  EXPECT_CALL(stream_info, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol));
   const std::string service_node = "i-453";
 
   // Check that span is populated correctly.
@@ -238,7 +238,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   EXPECT_CALL(span, setTag(Tracing::Tags::get().HTTP_STATUS_CODE, "0"));
   EXPECT_CALL(span, setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE));
   EXPECT_CALL(span, setTag(Tracing::Tags::get().RESPONSE_SIZE, "100"));
-  EXPECT_CALL(span, setTag(Tracing::Tags::get().RESPONSE_FLAGS, "-"));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().RESPONSE_FLAGS, "DC"));
   EXPECT_CALL(span, setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, _)).Times(0);
 
   NiceMock<MockConfig> config;
@@ -259,7 +259,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   request_headers.insertClientTraceId().value(std::string("client_trace_id"));
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
-  EXPECT_CALL(stream_info, protocol()).WillOnce(ReturnPointee(&protocol));
+  EXPECT_CALL(stream_info, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol));
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   const std::string service_node = "i-453";
 

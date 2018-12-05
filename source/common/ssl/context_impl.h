@@ -74,7 +74,7 @@ public:
   // Ssl::Context
   size_t daysUntilFirstCertExpires() const override;
   CertificateDetailsPtr getCaCertInformation() const override;
-  CertificateDetailsPtr getCertChainInformation() const override;
+  std::vector<CertificateDetailsPtr> getCertChainInformation() const override;
 
 protected:
   ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source);
@@ -119,11 +119,29 @@ protected:
   static SslStats generateStats(Stats::Scope& scope);
 
   std::string getCaFileName() const { return ca_file_path_; };
-  std::string getCertChainFileName() const { return cert_chain_file_path_; };
 
   CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path) const;
 
-  bssl::UniquePtr<SSL_CTX> ctx_;
+  struct TlsContext {
+    // Each certificate specified for the context has its own SSL_CTX. SSL_CTXs
+    // are identical with the exception of certificate material, and can be
+    // safely substituted via SSL_set_SSL_CTX() during the
+    // SSL_CTX_set_select_certificate_cb() callback following ClientHello.
+    bssl::UniquePtr<SSL_CTX> ssl_ctx_;
+    bssl::UniquePtr<X509> cert_chain_;
+    std::string cert_chain_file_path_;
+    bool is_ecdsa_{};
+
+    std::string getCertChainFileName() const { return cert_chain_file_path_; };
+    void addClientValidationContext(const CertificateValidationContextConfig& config,
+                                    bool require_client_cert);
+  };
+
+  // This is always non-empty, with the first context used for all new SSL
+  // objects. For server contexts, once we have ClientHello, we
+  // potentially switch to a different CertificateContext based on certificate
+  // selection.
+  std::vector<TlsContext> tls_contexts_;
   bool verify_trusted_ca_{false};
   std::vector<std::string> verify_subject_alt_name_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
@@ -168,6 +186,11 @@ private:
                          unsigned int inlen);
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt);
+  // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
+  // ClientHello details.
+  enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
+  void generateHashForSessionContexId(const std::vector<std::string>& server_names,
+                                      uint8_t* session_context_buf, unsigned& session_context_len);
 
   const std::vector<ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };

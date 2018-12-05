@@ -34,6 +34,10 @@ Driver::Driver(const envoy::config::trace::v2::DatadogConfig& datadog_config,
   // Default tracer options.
   tracer_options_.operation_name_override = "envoy.proxy";
   tracer_options_.service = "envoy";
+  tracer_options_.inject = std::set<datadog::opentracing::PropagationStyle>{
+      datadog::opentracing::PropagationStyle::Datadog};
+  tracer_options_.extract = std::set<datadog::opentracing::PropagationStyle>{
+      datadog::opentracing::PropagationStyle::Datadog};
 
   // Configuration overrides for tracer options.
   if (!datadog_config.service_name().empty()) {

@@ -15,6 +15,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/macros.h"
 #include "common/http/conn_manager_impl.h"
+#include "common/http/context_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
@@ -87,6 +88,8 @@ public:
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
         listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))} {
 
+    http_context_.setTracer(tracer_);
+
     // response_encoder_ is not a NiceMock on purpose. This prevents complaining about this
     // method only.
     EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
@@ -110,7 +113,7 @@ public:
     filter_callbacks_.connection_.remote_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
     conn_manager_ = std::make_unique<ConnectionManagerImpl>(
-        *this, drain_close_, random_, tracer_, runtime_, local_info_, cluster_manager_,
+        *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
         &overload_manager_, test_time_.timeSystem());
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
@@ -256,6 +259,7 @@ public:
   DangerousDeprecatedTestTime test_time_;
   RouteConfigProvider route_config_provider_;
   NiceMock<Tracing::MockHttpTracer> tracer_;
+  Http::ContextImpl http_context_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   std::string access_log_path_;

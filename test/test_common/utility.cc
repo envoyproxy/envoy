@@ -328,13 +328,13 @@ bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nul
 namespace Stats {
 
 MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options)
-    : alloc_(stats_options) {
+    : TestAllocator(stats_options) {
   ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
-    return alloc_.alloc(name);
+    return TestAllocator::alloc(name);
   }));
 
   ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
-    return alloc_.free(data);
+    return TestAllocator::free(data);
   }));
 
   EXPECT_CALL(*this, alloc(absl::string_view("stats.overflow")));
