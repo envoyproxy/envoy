@@ -1,12 +1,6 @@
-#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/grpc/status.h"
-#include "envoy/service/discovery/v2/ads.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/protobuf_link_hacks.h"
