@@ -97,7 +97,7 @@ void WorkerImpl::stopListeners() {
 
 void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   ENVOY_LOG(debug, "worker entering dispatch loop");
-  auto watchdog = guard_dog.createWatchDog(api_);
+  auto watchdog = guard_dog.createWatchDog(api_.threadFactory().currentThreadId());
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(debug, "worker exited dispatch loop");

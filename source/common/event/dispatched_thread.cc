@@ -27,7 +27,7 @@ void DispatchedThreadImpl::exit() {
 
 void DispatchedThreadImpl::threadRoutine(Server::GuardDog& guard_dog) {
   ENVOY_LOG(debug, "dispatched thread entering dispatch loop");
-  auto watchdog = guard_dog.createWatchDog(api_);
+  auto watchdog = guard_dog.createWatchDog(api_.threadFactory().currentThreadId());
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->run(Dispatcher::RunType::Block);
   ENVOY_LOG(debug, "dispatched thread exited dispatch loop");

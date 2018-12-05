@@ -20,12 +20,13 @@ public:
   /**
    * @param interval WatchDog timer interval (used after startWatchdog())
    */
-  WatchDogImpl(TimeSource& tsource, std::chrono::milliseconds interval, Api::Api& api)
-      : thread_id_(api.threadFactory().currentThreadId()), time_source_(tsource),
+  WatchDogImpl(Thread::ThreadIdPtr&& thread_id, TimeSource& tsource,
+               std::chrono::milliseconds interval)
+      : thread_id_(std::move(thread_id)), time_source_(tsource),
         latest_touch_time_since_epoch_(tsource.monotonicTime().time_since_epoch()),
         timer_interval_(interval) {}
 
-  std::string threadId() const override { return thread_id_->debugString(); }
+  const Thread::ThreadId& threadId() const override { return *thread_id_; }
   MonotonicTime lastTouchTime() const override {
     return MonotonicTime(latest_touch_time_since_epoch_.load());
   }

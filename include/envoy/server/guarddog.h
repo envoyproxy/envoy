@@ -27,9 +27,9 @@ public:
    * to avoid triggering the GuardDog. If no longer needed use the
    * stopWatching() method to remove it from the list of watched objects.
    *
-   * @param api A reference to an Api::Api object the WatchDog uses to get its system thread ID
+   * @param thread_id a Thread::ThreadIdPtr containing the system thread id
    */
-  virtual WatchDogSharedPtr createWatchDog(Api::Api& api) PURE;
+  virtual WatchDogSharedPtr createWatchDog(Thread::ThreadIdPtr&& thread_id) PURE;
 
   /**
    * Tell the GuardDog to forget about this WatchDog.

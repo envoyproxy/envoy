@@ -37,7 +37,7 @@ public:
    * This can be used if this is later used on a thread where there is no dispatcher.
    */
   virtual void touch() PURE;
-  virtual std::string threadId() const PURE;
+  virtual const Thread::ThreadId& threadId() const PURE;
   virtual MonotonicTime lastTouchTime() const PURE;
 };
 

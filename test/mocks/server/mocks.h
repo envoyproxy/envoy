@@ -159,7 +159,7 @@ public:
   // Server::WatchDog
   MOCK_METHOD1(startWatchdog, void(Event::Dispatcher& dispatcher));
   MOCK_METHOD0(touch, void());
-  MOCK_CONST_METHOD0(threadId, std::string());
+  MOCK_CONST_METHOD0(threadId, const Thread::ThreadId&());
   MOCK_CONST_METHOD0(lastTouchTime, MonotonicTime());
 };
 
@@ -169,7 +169,7 @@ public:
   ~MockGuardDog();
 
   // Server::GuardDog
-  MOCK_METHOD1(createWatchDog, WatchDogSharedPtr(Api::Api& api));
+  MOCK_METHOD1(createWatchDog, WatchDogSharedPtr(Thread::ThreadIdPtr&&));
   MOCK_METHOD1(stopWatching, void(WatchDogSharedPtr wd));
 
   std::shared_ptr<MockWatchDog> watch_dog_;
