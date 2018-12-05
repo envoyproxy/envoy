@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/api/api.h"
 #include "envoy/common/pure.h"
 #include "envoy/server/watchdog.h"
 

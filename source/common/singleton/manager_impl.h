@@ -2,7 +2,6 @@
 
 #include <unordered_map>
 
-#include "envoy/api/api.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/thread/thread.h"
 
@@ -16,7 +15,7 @@ namespace Singleton {
  */
 class ManagerImpl : public Manager {
 public:
-  ManagerImpl(Api::Api& api) : run_tid_(api.threadFactory().currentThreadId()) {}
+  ManagerImpl(Thread::ThreadIdPtr&& thread_id) : run_tid_(std::move(thread_id)) {}
 
   // Singleton::Manager
   InstanceSharedPtr get(const std::string& name, SingletonFactoryCb cb) override;

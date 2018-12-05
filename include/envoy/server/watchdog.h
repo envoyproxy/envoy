@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <string>
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"

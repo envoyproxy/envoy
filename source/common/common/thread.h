@@ -2,7 +2,6 @@
 
 #include <functional>
 #include <memory>
-#include <string>
 
 #include "envoy/thread/thread.h"
 

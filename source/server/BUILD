@@ -333,7 +333,6 @@ envoy_cc_library(
     srcs = ["watchdog_impl.cc"],
     hdrs = ["watchdog_impl.h"],
     deps = [
-        "//include/envoy/api:api_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/server:watchdog_interface",

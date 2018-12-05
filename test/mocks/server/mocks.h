@@ -419,7 +419,6 @@ public:
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
   Http::Context& httpContext() override { return http_context_; }
 
-  testing::NiceMock<Api::MockApi> api_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
