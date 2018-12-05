@@ -337,8 +337,8 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   auto port_it = port_names.cbegin();
   auto listeners = test_server_->server().listenerManager().listeners();
   auto listener_it = listeners.cbegin();
-  ENVOY_LOG(debug, "there are {} ports to register, and {} listeners.",
-            port_names.size(), listeners.size());
+  ENVOY_LOG(debug, "there are {} ports to register, and {} listeners.", port_names.size(),
+            listeners.size());
   for (; port_it != port_names.end() && listener_it != listeners.end(); ++port_it, ++listener_it) {
     const auto listen_addr = listener_it->get().socket().localAddress();
     if (listen_addr->type() == Network::Address::Type::Ip) {

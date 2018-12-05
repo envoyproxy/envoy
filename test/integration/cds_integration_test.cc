@@ -41,8 +41,7 @@ admin:
       port_value: 0
 )EOF";
 
-class CdsIntegrationTest : public HttpIntegrationTest,
-                         public Grpc::GrpcClientIntegrationParamTest {
+class CdsIntegrationTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
 public:
   CdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), kConfig) {}
@@ -112,7 +111,8 @@ public:
   }
 
   envoy::api::v2::Cluster buildCluster(const std::string& name) {
-    return TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(R"EOF(
+    return TestUtility::parseYaml<envoy::api::v2::Cluster>(
+        fmt::format(R"EOF(
       name: {}
       connect_timeout: 5s
       type: STATIC
@@ -128,59 +128,49 @@ public:
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {{}}
     )EOF",
-    name, name, Network::Test::getLoopbackAddressString(ipVersion()),
-    fake_upstreams_[0]->localAddress()->ip()->port()));
+                    name, name, Network::Test::getLoopbackAddressString(ipVersion()),
+                    fake_upstreams_[0]->localAddress()->ip()->port()));
   }
 
   void initializeCds() {
-    config_helper_.addConfigModifier(
-        [this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-          // Setup cds and corresponding gRPC cluster.
-          auto* cds_config = bootstrap.mutable_dynamic_resources()->mutable_cds_config()
-              ->mutable_api_config_source();
-          bootstrap.mutable_dynamic_resources()->clear_ads_config();
-          bootstrap.mutable_dynamic_resources()->clear_lds_config();
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      // Setup cds and corresponding gRPC cluster.
+      auto* cds_config =
+          bootstrap.mutable_dynamic_resources()->mutable_cds_config()->mutable_api_config_source();
+      bootstrap.mutable_dynamic_resources()->clear_ads_config();
+      bootstrap.mutable_dynamic_resources()->clear_lds_config();
 
-          cds_config->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
-          cds_config->mutable_request_timeout()->set_seconds(1);
-          auto* grpc_service = cds_config->add_grpc_services();
-          setGrpcService(*grpc_service, "my_cds_cluster", fake_upstreams_[0]->localAddress());
-          grpc_service->mutable_envoy_grpc()->set_cluster_name("my_cds_cluster");
-          
-          auto* cds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-          cds_cluster->set_name("my_cds_cluster");
-          cds_cluster->mutable_connect_timeout()->set_seconds(5);
-          auto* sockaddr = cds_cluster->add_hosts()->mutable_socket_address();
-          sockaddr->set_protocol(envoy::api::v2::core::SocketAddress::TCP);
-          sockaddr->set_address(Network::Test::getLoopbackAddressString(ipVersion()));
-          sockaddr->set_port_value(0);
-          cds_cluster->clear_http2_protocol_options();
-          
-          auto* upstream_cluster = bootstrap.mutable_static_resources()->add_clusters();
-          upstream_cluster->set_name("FAKE_cluster_0");
-          upstream_cluster->mutable_connect_timeout()->set_seconds(5);
-          sockaddr = upstream_cluster->add_hosts()->mutable_socket_address();
-          sockaddr->set_protocol(envoy::api::v2::core::SocketAddress::TCP);
-          sockaddr->set_address(Network::Test::getLoopbackAddressString(ipVersion()));
-          sockaddr->set_port_value(0);
-          upstream_cluster->clear_http2_protocol_options();
-        });
+      cds_config->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+      cds_config->mutable_request_timeout()->set_seconds(1);
+      auto* grpc_service = cds_config->add_grpc_services();
+      setGrpcService(*grpc_service, "my_cds_cluster", fake_upstreams_[0]->localAddress());
+      grpc_service->mutable_envoy_grpc()->set_cluster_name("my_cds_cluster");
+
+      auto* cds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      cds_cluster->set_name("my_cds_cluster");
+      cds_cluster->mutable_connect_timeout()->set_seconds(5);
+      auto* sockaddr = cds_cluster->add_hosts()->mutable_socket_address();
+      sockaddr->set_protocol(envoy::api::v2::core::SocketAddress::TCP);
+      sockaddr->set_address(Network::Test::getLoopbackAddressString(ipVersion()));
+      sockaddr->set_port_value(0);
+      cds_cluster->clear_http2_protocol_options();
+    });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 
     HttpIntegrationTest::initialize();
 
     fake_upstreams_[0]->set_allow_unexpected_disconnects(false);
     // Causes cds_connection_ to be filled with a newly constructed FakeHttpConnection.
-    AssertionResult result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_,
-                                                                      cds_connection_);
+    AssertionResult result =
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, cds_connection_);
     RELEASE_ASSERT(result, result.message());
     result = cds_connection_->waitForNewStream(*dispatcher_, cds_stream_);
     RELEASE_ASSERT(result, result.message());
-    cds_stream_->startGrpcStream();    
+    cds_stream_->startGrpcStream();
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
     sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
-                                                  {buildCluster("cluster_0")}, "1");
+                                                   {buildCluster("cluster_0")}, "1");
   }
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
@@ -191,42 +181,36 @@ public:
 
 // GoogleGrpc causes problems.
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest,
-                        testing::Combine(
-                            testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                    
-                            testing::Values(Grpc::ClientType::EnvoyGrpc)));
+                        testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                                         testing::Values(Grpc::ClientType::EnvoyGrpc)));
 
 // Tests Envoy HTTP health checking a single healthy endpoint and reporting that it is
 // indeed healthy to the server.
 TEST_P(CdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   // Controls how many fake_upstreams_.emplace_back(new FakeUpstream) will happen in
   // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
-  setUpstreamCount(2);
-  
+  setUpstreamCount(1);
   initializeCds();
 
-  //testRouterRequestAndResponseWithBody(1024, 512, false);
-  {
-    int request_size = 1024;
-    int response_size = 512;
-    codec_client_ = makeHttpConnection(
-        makeClientConnection(fake_upstreams_[0]->localAddress()->ip()->port()));
-        //makeClientConnection(lookupPort("http")));
-    Http::TestHeaderMapImpl request_headers{
-        {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
-        {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
-    auto response = sendRequestAndWaitForResponse(request_headers, request_size,
-                                                  default_response_headers_, response_size);
+  // Adapted from HttpIntegrationTest::testRouterRequestAndResponseWithBody(1024, 512, false).
+  int request_size = 1024;
+  int response_size = 512;
+  codec_client_ =
+      makeHttpConnection(makeClientConnection(fake_upstreams_[0]->localAddress()->ip()->port()));
+  Http::TestHeaderMapImpl request_headers{
+      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
+      {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, request_size,
+                                                default_response_headers_, response_size);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
 
-    EXPECT_TRUE(upstream_request_->complete());
-    EXPECT_EQ(request_size, upstream_request_->bodyLength());
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ(response_size, response->body().size());
 
-    ASSERT_TRUE(response->complete());
-    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-    EXPECT_EQ(response_size, response->body().size());
-
-    cleanupUpstreamAndDownstream();
-    fake_upstream_connection_ = nullptr;
-  }
+  cleanupUpstreamAndDownstream();
+  fake_upstream_connection_ = nullptr;
 }
 
 } // namespace
