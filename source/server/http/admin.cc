@@ -341,7 +341,7 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
           host_status.mutable_success_rate()->set_value(success_rate);
         }
 
-        host_status.set_weight(host->weight() > 0 ? host->weight() : 1);
+        host_status.set_weight(host->weight());
       }
     }
   }
