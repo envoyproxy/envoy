@@ -21,7 +21,7 @@ class Ip;
 } // namespace Network
 
 namespace Http {
-class SrcIpTransparentMapper : public ConnectionMapper {
+class SrcIpTransparentMapper : Logger::Loggable<Logger::Id::http>, public ConnectionMapper {
 public:
   SrcIpTransparentMapper(ConnPoolBuilder builder, uint64_t max_num_pools);
   ~SrcIpTransparentMapper();

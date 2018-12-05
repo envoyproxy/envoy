@@ -55,7 +55,8 @@ private:
   //! cancellable object in tact for the original caller.
   class StreamWrapper : public LinkedObject<StreamWrapper>,
                         public ConnectionPool::Cancellable,
-                        public ConnectionPool::Callbacks {
+                        public ConnectionPool::Callbacks,
+                        Logger::Loggable<Logger::Id::http> {
   public:
     StreamWrapper(Http::StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks,
                   const Upstream::LoadBalancerContext& context, WrappedConnectionPool& parent);

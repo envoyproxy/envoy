@@ -35,6 +35,7 @@ SrcIpTransparentMapper::assignPool(const Upstream::LoadBalancerContext& context)
 void SrcIpTransparentMapper::addIdleCallback(IdleCb cb) { idle_callbacks_.push_back(cb); }
 
 void SrcIpTransparentMapper::drainPools() {
+  ENVOY_LOG(debug, "Draining pools");
   std::for_each(active_pools_.begin(), active_pools_.end(),
                 [](auto& pool_iter) { pool_iter.second.instance_->drainConnections(); });
 }
@@ -82,6 +83,7 @@ ConnectionPool::Instance* SrcIpTransparentMapper::assignPool(const Ip& address) 
   // This should only be called if we've guranteed there's an idle pool.
   ASSERT(!idle_pools_.empty());
 
+  ENVOY_LOG(debug, "Assigning a pool for {}", address.addressAsString());
   PoolTracker next_up = std::move(idle_pools_.top());
   idle_pools_.pop();
 
@@ -133,6 +135,7 @@ void SrcIpTransparentMapper::poolDrained(ConnectionPool::Instance& instance) {
   if (active_iter == active_pools_.end()) {
     // The pool may call back immediately with it being drained, since it was just created.
     // ignore that case.
+    ENVOY_LOG(debug, "Got a callback from an idle connection pool.");
     return;
   }
 
