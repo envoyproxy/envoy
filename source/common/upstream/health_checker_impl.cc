@@ -520,9 +520,10 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::St
 
   // TODO(baranov1ch): according to all HTTP standards, we should check if reason is one of
   // Http::StreamResetReason::RemoteRefusedStreamReset (which may mean GOAWAY),
-  // Http::StreamResetReason::RemoteReset or Http::StreamResetReason::ConnectionTermination (both
-  // mean connection close), check if connection is not fresh (was used for at least 1 request)
-  // and silently retry request on the fresh connection. This is also true for HTTP/1.1 healthcheck.
+  // Http::StreamResetReason::RemoteReset or Http::StreamResetReason::UpstreamConnectionTermination
+  // or Http::StreamResetReason::DownstreamConnectionTermination (all mean connection close), check
+  // if connection is not fresh (was used for at least 1 request) and silently retry request on the
+  // fresh connection. This is also true for HTTP/1.1 healthcheck.
   handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
 }
 

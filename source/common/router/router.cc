@@ -557,8 +557,10 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   switch (reset_reason) {
   case Http::StreamResetReason::ConnectionFailure:
     return StreamInfo::ResponseFlag::UpstreamConnectionFailure;
-  case Http::StreamResetReason::ConnectionTermination:
+  case Http::StreamResetReason::UpstreamConnectionTermination:
     return StreamInfo::ResponseFlag::UpstreamConnectionTermination;
+  case Http::StreamResetReason::DownstreamConnectionTermination:
+    return StreamInfo::ResponseFlag::DownstreamConnectionTermination;
   case Http::StreamResetReason::LocalReset:
   case Http::StreamResetReason::LocalRefusedStreamReset:
     return StreamInfo::ResponseFlag::LocalReset;

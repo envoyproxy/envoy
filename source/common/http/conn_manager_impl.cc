@@ -237,7 +237,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       // In the protocol error case, we need to reset all streams now. Since we do a flush write and
       // delayed close, the connection might stick around long enough for a pending stream to come
       // back and try to encode.
-      resetAllStreams();
+      resetAllStreams(StreamResetReason::UpstreamConnectionTermination);
 
       read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
       return Network::FilterStatus::StopIteration;
@@ -265,16 +265,19 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
   return Network::FilterStatus::StopIteration;
 }
 
-void ConnectionManagerImpl::resetAllStreams() {
+void ConnectionManagerImpl::resetAllStreams(StreamResetReason reason) {
   while (!streams_.empty()) {
     // Mimic a downstream reset in this case.
-    streams_.front()->onResetStream(StreamResetReason::ConnectionTermination);
+    streams_.front()->onResetStream(reason);
   }
 }
 
 void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
+  StreamResetReason reason = StreamResetReason::UpstreamConnectionTermination;
+
   if (event == Network::ConnectionEvent::LocalClose) {
     stats_.named_.downstream_cx_destroy_local_.inc();
+    reason = StreamResetReason::DownstreamConnectionTermination;
   }
 
   if (event == Network::ConnectionEvent::RemoteClose) {
@@ -304,7 +307,7 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 
     stats_.named_.downstream_cx_destroy_active_rq_.inc();
     user_agent_.onConnectionDestroy(event, true);
-    resetAllStreams();
+    resetAllStreams(reason);
   }
 }
 
