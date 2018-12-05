@@ -155,28 +155,29 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     const std::string zone_name = config_.local_info_.zoneName();
     const std::string upstream_zone = upstreamZone(upstream_host);
 
-    Http::CodeUtility::ResponseStatInfo info{config_.scope_,
-                                             cluster_->statsScope(),
-                                             EMPTY_STRING,
-                                             response_status_code,
-                                             internal_request,
-                                             route_entry_->virtualHost().name(),
-                                             request_vcluster_ ? request_vcluster_->name()
-                                                               : EMPTY_STRING,
-                                             zone_name,
-                                             upstream_zone,
-                                             is_canary};
+    Http::CodeStats::ResponseStatInfo info{config_.scope_,
+                                           cluster_->statsScope(),
+                                           EMPTY_STRING,
+                                           response_status_code,
+                                           internal_request,
+                                           route_entry_->virtualHost().name(),
+                                           request_vcluster_ ? request_vcluster_->name()
+                                                             : EMPTY_STRING,
+                                           zone_name,
+                                           upstream_zone,
+                                           is_canary};
 
-    Http::CodeUtility::chargeResponseStat(info);
+    Http::CodeStats& code_stats = httpContext().codeStats();
+    code_stats.chargeResponseStat(info);
 
     if (!alt_stat_prefix_.empty()) {
-      Http::CodeUtility::ResponseStatInfo info{config_.scope_,   cluster_->statsScope(),
-                                               alt_stat_prefix_, response_status_code,
-                                               internal_request, EMPTY_STRING,
-                                               EMPTY_STRING,     zone_name,
-                                               upstream_zone,    is_canary};
+      Http::CodeStats::ResponseStatInfo info{config_.scope_,   cluster_->statsScope(),
+                                             alt_stat_prefix_, response_status_code,
+                                             internal_request, EMPTY_STRING,
+                                             EMPTY_STRING,     zone_name,
+                                             upstream_zone,    is_canary};
 
-      Http::CodeUtility::chargeResponseStat(info);
+      code_stats.chargeResponseStat(info);
     }
 
     if (dropped) {
@@ -624,8 +625,9 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
     // upstream_request_.
     const auto upstream_host = upstream_request_->upstream_host_;
     if (retry_status == RetryStatus::Yes && setupRetry(end_stream)) {
-      Http::CodeUtility::chargeBasicResponseStat(cluster_->statsScope(), "retry.",
-                                                 static_cast<Http::Code>(response_code));
+      Http::CodeStats& code_stats = httpContext().codeStats();
+      code_stats.chargeBasicResponseStat(cluster_->statsScope(), "retry.",
+                                         static_cast<Http::Code>(response_code));
       upstream_host->stats().rq_error_.inc();
       return;
     } else if (retry_status == RetryStatus::NoOverflow) {
@@ -725,33 +727,34 @@ void Filter::onUpstreamComplete() {
     // TODO(mattklein123): Remove copy when G string compat issues are fixed.
     const std::string zone_name = config_.local_info_.zoneName();
 
-    Http::CodeUtility::ResponseTimingInfo info{config_.scope_,
+    Http::CodeStats& code_stats = httpContext().codeStats();
+    Http::CodeStats::ResponseTimingInfo info{config_.scope_,
+                                             cluster_->statsScope(),
+                                             EMPTY_STRING,
+                                             response_time,
+                                             upstream_request_->upstream_canary_,
+                                             internal_request,
+                                             route_entry_->virtualHost().name(),
+                                             request_vcluster_ ? request_vcluster_->name()
+                                                               : EMPTY_STRING,
+                                             zone_name,
+                                             upstreamZone(upstream_request_->upstream_host_)};
+
+    code_stats.chargeResponseTiming(info);
+
+    if (!alt_stat_prefix_.empty()) {
+      Http::CodeStats::ResponseTimingInfo info{config_.scope_,
                                                cluster_->statsScope(),
-                                               EMPTY_STRING,
+                                               alt_stat_prefix_,
                                                response_time,
                                                upstream_request_->upstream_canary_,
                                                internal_request,
-                                               route_entry_->virtualHost().name(),
-                                               request_vcluster_ ? request_vcluster_->name()
-                                                                 : EMPTY_STRING,
+                                               EMPTY_STRING,
+                                               EMPTY_STRING,
                                                zone_name,
                                                upstreamZone(upstream_request_->upstream_host_)};
 
-    Http::CodeUtility::chargeResponseTiming(info);
-
-    if (!alt_stat_prefix_.empty()) {
-      Http::CodeUtility::ResponseTimingInfo info{config_.scope_,
-                                                 cluster_->statsScope(),
-                                                 alt_stat_prefix_,
-                                                 response_time,
-                                                 upstream_request_->upstream_canary_,
-                                                 internal_request,
-                                                 EMPTY_STRING,
-                                                 EMPTY_STRING,
-                                                 zone_name,
-                                                 upstreamZone(upstream_request_->upstream_host_)};
-
-      Http::CodeUtility::chargeResponseTiming(info);
+      code_stats.chargeResponseTiming(info);
     }
   }
 
