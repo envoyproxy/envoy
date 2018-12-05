@@ -85,10 +85,6 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:cds_cc",
         "@envoy_api//envoy/api/v2:discovery_cc",
-        "@envoy_api//envoy/api/v2:eds_cc",
-        "@envoy_api//envoy/api/v2:lds_cc",
-        "@envoy_api//envoy/api/v2:rds_cc",
-        "@envoy_api//envoy/service/discovery/v2:ads_cc",
     ],
 )
 
