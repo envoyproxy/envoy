@@ -67,7 +67,7 @@ protected:
       : api_(Api::createApiForTest(stat_store_)),
         dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSystem(), *api_)),
         work_finished_(false) {
-    dispatcher_thread_ = api_->createThread([this]() {
+    dispatcher_thread_ = api_->threadFactory().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);
       keepalive_timer_ = dispatcher_->createTimer(

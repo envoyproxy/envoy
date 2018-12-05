@@ -154,7 +154,7 @@ void DispatcherImpl::post(std::function<void()> callback) {
 }
 
 void DispatcherImpl::run(RunType type) {
-  run_tid_ = api_.currentThreadId();
+  run_tid_ = api_.threadFactory().currentThreadId();
 
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does

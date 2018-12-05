@@ -11,9 +11,7 @@ class ThreadIdImplPosix : public ThreadId {
 public:
   ThreadIdImplPosix(int32_t id);
 
-  std::string string() const override;
-
-  bool operator==(const ThreadId& rhs) const override;
+  std::string debugString() const override;
 
   bool isCurrentThreadId() const override;
 

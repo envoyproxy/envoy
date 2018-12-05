@@ -28,11 +28,7 @@ bool Impl::fileExists(const std::string& path) { return Filesystem::fileExists(p
 
 std::string Impl::fileReadToEnd(const std::string& path) { return Filesystem::fileReadToEnd(path); }
 
-Thread::ThreadPtr Impl::createThread(std::function<void()> thread_routine) {
-  return thread_factory_.createThread(thread_routine);
-}
-
-Thread::ThreadIdPtr Impl::currentThreadId() { return thread_factory_.currentThreadId(); }
+Thread::ThreadFactory& Impl::threadFactory() { return thread_factory_; }
 
 } // namespace Api
 } // namespace Envoy

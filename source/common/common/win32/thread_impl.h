@@ -17,9 +17,7 @@ class ThreadIdImplWin32 : public ThreadId {
 public:
   ThreadIdImplWin32(DWORD id);
 
-  std::string string() const override;
-
-  bool operator==(const ThreadId& rhs) const override;
+  std::string debugString() const override;
 
   bool isCurrentThreadId() const override;
 

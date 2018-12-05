@@ -14,7 +14,8 @@ namespace Envoy {
 namespace Event {
 
 void DispatchedThreadImpl::start(Server::GuardDog& guard_dog) {
-  thread_ = api_.createThread([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
+  thread_ =
+      api_.threadFactory().createThread([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
 }
 
 void DispatchedThreadImpl::exit() {

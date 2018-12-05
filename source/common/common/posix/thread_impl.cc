@@ -12,6 +12,7 @@ namespace Thread {
 
 namespace {
 
+// TODO(sesmith177): use pid_t as type on Linux and upcast to uint64_t
 int32_t getCurrentThreadId() {
 #ifdef __linux__
   return syscall(SYS_gettid);
@@ -28,11 +29,7 @@ int32_t getCurrentThreadId() {
 
 ThreadIdImplPosix::ThreadIdImplPosix(int32_t id) : id_(id) {}
 
-std::string ThreadIdImplPosix::string() const { return std::to_string(id_); }
-
-bool ThreadIdImplPosix::operator==(const ThreadId& rhs) const {
-  return id_ == dynamic_cast<const ThreadIdImplPosix&>(rhs).id_;
-}
+std::string ThreadIdImplPosix::debugString() const { return std::to_string(id_); }
 
 bool ThreadIdImplPosix::isCurrentThreadId() const { return id_ == getCurrentThreadId(); }
 

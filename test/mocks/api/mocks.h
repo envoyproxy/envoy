@@ -36,11 +36,8 @@ public:
                                          Thread::BasicLockable& lock));
   MOCK_METHOD1(fileExists, bool(const std::string& path));
   MOCK_METHOD1(fileReadToEnd, std::string(const std::string& path));
-  MOCK_METHOD1(createThread, Thread::ThreadPtr(std::function<void()> thread_routine));
 
-  Thread::ThreadIdPtr currentThreadId() override {
-    return Thread::threadFactoryForTest().currentThreadId();
-  }
+  Thread::ThreadFactory& threadFactory() override { return Thread::threadFactoryForTest(); }
 
   std::shared_ptr<Filesystem::MockFile> file_{new Filesystem::MockFile()};
 };

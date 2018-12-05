@@ -71,7 +71,8 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
 
 void WorkerImpl::start(GuardDog& guard_dog) {
   ASSERT(!thread_);
-  thread_ = api_.createThread([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
+  thread_ =
+      api_.threadFactory().createThread([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
 }
 
 void WorkerImpl::stop() {

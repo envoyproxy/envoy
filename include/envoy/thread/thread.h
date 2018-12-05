@@ -14,8 +14,7 @@ class ThreadId {
 public:
   virtual ~ThreadId() {}
 
-  virtual std::string string() const PURE;
-  virtual bool operator==(const ThreadId& rhs) const PURE;
+  virtual std::string debugString() const PURE;
   virtual bool isCurrentThreadId() const PURE;
 };
 

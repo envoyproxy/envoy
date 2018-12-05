@@ -136,7 +136,7 @@ bool GuardDogImpl::waitOrDetectStop() {
 
 void GuardDogImpl::start(Api::Api& api) {
   run_thread_ = true;
-  thread_ = api.createThread([this]() -> void { threadRoutine(); });
+  thread_ = api.threadFactory().createThread([this]() -> void { threadRoutine(); });
 }
 
 void GuardDogImpl::stop() {

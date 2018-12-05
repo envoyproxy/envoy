@@ -247,7 +247,7 @@ TEST_F(GuardDogTestBase, WatchDogThreadIdTest) {
   NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
   GuardDogImpl gd(stats, config, time_system_, *api_);
   auto watched_dog = gd.createWatchDog(*api_);
-  EXPECT_EQ(watched_dog->threadId(), api_->currentThreadId()->string());
+  EXPECT_EQ(watched_dog->threadId(), api_->threadFactory().currentThreadId()->debugString());
   gd.stopWatching(watched_dog);
 }
 
