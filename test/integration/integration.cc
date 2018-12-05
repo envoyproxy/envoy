@@ -322,7 +322,8 @@ uint32_t BaseIntegrationTest::lookupPort(const std::string& key) {
   if (it != port_map_.end()) {
     return it->second;
   }
-  RELEASE_ASSERT(false, "");
+  ENVOY_LOG(error, "{} is not in port_map_.", key);
+  RELEASE_ASSERT(false, "lookupPort() called on service type that has not been added to port_map_");
 }
 
 void BaseIntegrationTest::setUpstreamAddress(uint32_t upstream_index,
@@ -336,9 +337,12 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   auto port_it = port_names.cbegin();
   auto listeners = test_server_->server().listenerManager().listeners();
   auto listener_it = listeners.cbegin();
+  ENVOY_LOG(debug, "there are {} ports to register, and {} listeners.",
+            port_names.size(), listeners.size());
   for (; port_it != port_names.end() && listener_it != listeners.end(); ++port_it, ++listener_it) {
     const auto listen_addr = listener_it->get().socket().localAddress();
     if (listen_addr->type() == Network::Address::Type::Ip) {
+      ENVOY_LOG(debug, "registered '{}' as port {}.", *port_it, listen_addr->ip()->port());
       registerPort(*port_it, listen_addr->ip()->port());
     }
   }
