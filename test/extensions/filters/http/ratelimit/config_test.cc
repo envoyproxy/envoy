@@ -82,6 +82,43 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {
   cb(filter_callback);
 }
 
+TEST(RateLimitFilterConfigTest, RateLimitFilterWithServiceConfig) {
+  std::string json_string = R"EOF(
+  {
+    "domain" : "test",
+    "timeout_ms" : 1337,
+    "rate_limit_service": {
+     "grpc_service": {
+      "envoy_grpc": {
+       "cluster_name": "rate_limit_cluster"
+      }
+     }
+    }
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
+  Envoy::Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::MockInstance> instance;
+
+  // Return the same singleton manager as instance so that config can be found there.
+  EXPECT_CALL(context, singletonManager()).WillOnce(ReturnRef(instance.singletonManager()));
+
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(
+          instance, instance.clusterManager().grpcAsyncClientManager(),
+          envoy::config::bootstrap::v2::Bootstrap());
+
+  RateLimitFilterConfig factory;
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
 TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
   std::string json_string = R"EOF(
   {
