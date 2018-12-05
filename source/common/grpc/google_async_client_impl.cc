@@ -327,11 +327,8 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     ENVOY_LOG(debug, "Finish with grpc-status code {}", status_.error_code());
     Http::HeaderMapPtr trailing_metadata = std::make_unique<Http::HeaderMapImpl>();
     metadataTranslate(ctxt_.GetServerTrailingMetadata(), *trailing_metadata);
-    Status::GrpcStatus grpc_status = static_cast<Status::GrpcStatus>(status_.error_code());
-    if (grpc_status > Status::GrpcStatus::MaximumValid) {
-      grpc_status = Status::GrpcStatus::InvalidCode;
-    }
-    notifyRemoteClose(grpc_status, std::move(trailing_metadata), status_.error_message());
+    notifyRemoteClose(static_cast<Status::GrpcStatus>(status_.error_code()),
+                      std::move(trailing_metadata), status_.error_message());
     cleanup();
     break;
   }

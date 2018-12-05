@@ -293,12 +293,24 @@ TEST_P(GrpcClientIntegrationTest, ResourceExhaustedError) {
   dispatcher_helper_.runDispatcher();
 }
 
-// Validate that a trailers UNAUTHENTICATED reply is handled.
+// Validate that a trailers Unauthenticated reply is handled.
 TEST_P(GrpcClientIntegrationTest, UnauthenticatedError) {
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendServerTrailers(Status::GrpcStatus::Unauthenticated, "error message", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
+// Validate that a trailers reply is still handled even if a grpc status code larger than
+// MaximumValid, is handled.
+TEST_P(GrpcClientIntegrationTest, MaximumValidPlusOne) {
+  SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendServerTrailers(static_cast<Status::GrpcStatus>(Status::GrpcStatus::MaximumValid + 1),
+                             "error message", empty_metadata_);
   dispatcher_helper_.runDispatcher();
 }
 
