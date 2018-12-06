@@ -4,7 +4,6 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gtest/gtest.h"
 
@@ -16,14 +15,6 @@ namespace Network {
 class SocketOptionFactoryTest : public testing::Test {
 public:
   SocketOptionFactoryTest() = default;
-
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{[this]() {
-    // Before injecting OsSysCallsImpl, make sure validateIpv{4,6}Supported is called so the static
-    // bool is initialized without requiring to mock ::socket and ::close. :( :(
-    std::make_unique<Address::Ipv4Instance>("1.2.3.4", 5678);
-    std::make_unique<Address::Ipv6Instance>("::1:2:3:4", 5678);
-    return &os_sys_calls_mock_;
-  }()};
 
 protected:
   testing::NiceMock<MockListenSocket> socket_mock_;
@@ -56,8 +47,13 @@ protected:
   }
 };
 
-TEST_F(SocketOptionFactoryTest, TestBuildSocketMarkOptions) {
+#define CHECK_OPTION_SUPPORTED(option)                                                             \
+  if (!option.has_value()) {                                                                       \
+    return;                                                                                        \
+  }
 
+TEST_F(SocketOptionFactoryTest, TestBuildSocketMarkOptions) {
+  CHECK_OPTION_SUPPORTED(ENVOY_SOCKET_SO_MARK);
   auto options = SocketOptionFactory::buildSocketMarkOptions(100);
 
   auto applied_option = findSocketOptionInfo(*options, ENVOY_SOCKET_SO_MARK,
@@ -67,6 +63,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildSocketMarkOptions) {
 }
 
 TEST_F(SocketOptionFactoryTest, TestBuildIpv4TransparentOptions) {
+  CHECK_OPTION_SUPPORTED(ENVOY_SOCKET_IP_TRANSPARENT);
   makeSocketV4();
 
   auto options = SocketOptionFactory::buildIpTransparentOptions();
@@ -82,6 +79,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv4TransparentOptions) {
 }
 
 TEST_F(SocketOptionFactoryTest, TestBuildIpv6TransparentOptions) {
+  CHECK_OPTION_SUPPORTED(ENVOY_SOCKET_IP_TRANSPARENT);
   makeSocketV6();
 
   auto options = SocketOptionFactory::buildIpTransparentOptions();

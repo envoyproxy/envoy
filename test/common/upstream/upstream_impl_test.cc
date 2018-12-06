@@ -1561,6 +1561,11 @@ TEST(PrioritySet, Extend) {
   }
 }
 
+#define CHECK_OPTION_SUPPORTED(option)                                                             \
+  if (!option.has_value()) {                                                                       \
+    return;                                                                                        \
+  }
+
 class ClusterInfoImplTest : public testing::Test {
 public:
   std::unique_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml) {
@@ -1862,6 +1867,8 @@ TEST_F(ClusterInfoImplTest, TestNoSocketOptionsDefault) {
 }
 
 TEST_F(ClusterInfoImplTest, TestMarkSocketOptions) {
+  CHECK_OPTION_SUPPORTED(ENVOY_SOCKET_SO_MARK);
+
   auto cluster = makeCluster(strictDnsClusterWithAttrYaml(R"EOF(
     upstream_connection_options:
       mark: 145
@@ -1879,6 +1886,7 @@ TEST_F(ClusterInfoImplTest, TestMarkSocketOptions) {
 }
 
 TEST_F(ClusterInfoImplTest, TestTransparentSocketOptions) {
+  CHECK_OPTION_SUPPORTED(ENVOY_SOCKET_IP_TRANSPARENT);
   auto cluster = makeCluster(strictDnsClusterWithAttrYaml(R"EOF(
     upstream_connection_options:
       src_transparent: true
