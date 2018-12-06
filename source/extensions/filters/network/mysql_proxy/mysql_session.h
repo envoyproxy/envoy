@@ -26,21 +26,14 @@ public:
     MYSQL_ERROR = 12,
   };
 
-  MySQLSession() { cinfo_ = {}; };
-  uint64_t GetId() { return cinfo_.id; }
-  void SetId(uint64_t id) { cinfo_.id = id; }
-  void SetState(MySQLSession::State state) { cinfo_.state = state; }
-  MySQLSession::State GetState() { return cinfo_.state; }
-  int GetExpectedSeq() { return cinfo_.expected_seq; }
-  void SetExpectedSeq(int seq) { cinfo_.expected_seq = seq; }
+  void setState(MySQLSession::State state) { state_ = state; }
+  MySQLSession::State getState() { return state_; }
+  int getExpectedSeq() { return expected_seq_; }
+  void setExpectedSeq(int seq) { expected_seq_ = seq; }
 
 private:
-  struct ConnInfo {
-    uint64_t id;
-    MySQLSession::State state;
-    int expected_seq;
-  };
-  ConnInfo cinfo_;
+  MySQLSession::State state_{State::MYSQL_INIT};
+  int expected_seq_{0};
 };
 
 } // namespace MySQLProxy

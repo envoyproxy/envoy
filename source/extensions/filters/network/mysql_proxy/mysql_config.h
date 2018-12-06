@@ -13,7 +13,7 @@ namespace NetworkFilters {
 namespace MySQLProxy {
 
 /**
- * Config registration for the mysql proxy filter.
+ * Config registration for the MySQL proxy filter.
  */
 class MySQLConfigFactory : public Common::FactoryBase<
                                envoy::config::filter::network::mysql_proxy::v1alpha1::MySQLProxy> {

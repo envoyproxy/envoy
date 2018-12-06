@@ -11,17 +11,14 @@ namespace MySQLProxy {
 class ClientSwitchResponse : public MySQLCodec {
 public:
   // MySQLCodec
-  int Decode(Buffer::Instance& buffer) override;
-  std::string Encode() override;
+  int parseMessage(Buffer::Instance& buffer, uint64_t& offset, int len) override;
+  std::string encode() override;
 
-  int GetSeq() const { return seq_; }
-  void SetSeq(int seq);
-  const std::string& GetAuthPluginResp() const { return auth_plugin_resp_; }
-  void SetAuthPluginResp(std::string& auth_swith_resp);
+  const std::string& getAuthPluginResp() const { return auth_plugin_resp_; }
+  void setAuthPluginResp(std::string& auth_swith_resp);
 
 private:
   std::string auth_plugin_resp_;
-  int seq_;
 };
 
 } // namespace MySQLProxy

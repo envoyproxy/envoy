@@ -1,162 +1,156 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-void ClientLogin::SetClientCap(int client_cap) { client_cap_ = client_cap; }
+void ClientLogin::setClientCap(int client_cap) { client_cap_ = client_cap; }
 
-void ClientLogin::SetExtendedClientCap(int extended_client_cap) {
+void ClientLogin::setExtendedClientCap(int extended_client_cap) {
   extended_client_cap_ = extended_client_cap;
 }
 
-void ClientLogin::SetMaxPacket(int max_packet) { max_packet_ = max_packet; }
+void ClientLogin::setMaxPacket(int max_packet) { max_packet_ = max_packet; }
 
-void ClientLogin::SetCharset(int charset) { charset_ = charset; }
+void ClientLogin::setCharset(int charset) { charset_ = charset; }
 
-void ClientLogin::SetUsername(std::string& username) {
+void ClientLogin::setUsername(std::string& username) {
   if (username.length() <= MYSQL_MAX_USER_LEN) {
     username_.assign(username);
   }
 }
 
-void ClientLogin::SetDB(std::string& db) { db_ = db; }
+void ClientLogin::setDb(std::string& db) { db_ = db; }
 
-void ClientLogin::SetAuthResp(std::string& auth_resp) { auth_resp_.assign(auth_resp); }
+void ClientLogin::setAuthResp(std::string& auth_resp) { auth_resp_.assign(auth_resp); }
 
-bool ClientLogin::IsResponse41() const { return client_cap_ & MYSQL_CLIENT_CAPAB_41VS320; }
+bool ClientLogin::isResponse41() const { return client_cap_ & MYSQL_CLIENT_CAPAB_41VS320; }
 
-bool ClientLogin::IsResponse320() const { return !(client_cap_ & MYSQL_CLIENT_CAPAB_41VS320); }
+bool ClientLogin::isResponse320() const { return !(client_cap_ & MYSQL_CLIENT_CAPAB_41VS320); }
 
-bool ClientLogin::IsSSLRequest() const { return client_cap_ & MYSQL_CLIENT_CAPAB_SSL; }
+bool ClientLogin::isSSLRequest() const { return client_cap_ & MYSQL_CLIENT_CAPAB_SSL; }
 
-bool ClientLogin::IsConnectWithDb() const { return client_cap_ & MYSQL_CLIENT_CONNECT_WITH_DB; }
+bool ClientLogin::isConnectWithDb() const { return client_cap_ & MYSQL_CLIENT_CONNECT_WITH_DB; }
 
-bool ClientLogin::IsClientAuthLenClData() const {
+bool ClientLogin::isClientAuthLenClData() const {
   return extended_client_cap_ & MYSQL_EXT_CL_PLG_AUTH_CL_DATA;
 }
 
-bool ClientLogin::IsClientSecureConnection() const {
+bool ClientLogin::isClientSecureConnection() const {
   return extended_client_cap_ & MYSQL_EXT_CL_SECURE_CONNECTION;
 }
 
-int ClientLogin::Decode(Buffer::Instance& buffer) {
-  int len = 0;
-  int seq = 0;
-  if (HdrReadDrain(buffer, len, seq) != MYSQL_SUCCESS) {
-    ENVOY_LOG(info, "error parsing mysql HDR in mysql ClientLogin msg");
+int ClientLogin::parseMessage(Buffer::Instance& buffer, uint64_t& offset, int) {
+  if (seq_ != CHALLENGE_SEQ_NUM) {
     return MYSQL_FAILURE;
   }
-  if (seq != CHALLENGE_SEQ_NUM) {
-    return MYSQL_FAILURE;
-  }
-  SetSeq(seq);
   uint16_t client_cap = 0;
-  if (BufUint16Drain(buffer, client_cap) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekUint16(buffer, offset, client_cap) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing client_cap in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
-  SetClientCap(client_cap);
+  setClientCap(client_cap);
   uint16_t extended_client_cap = 0;
-  if (BufUint16Drain(buffer, extended_client_cap) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekUint16(buffer, offset, extended_client_cap) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing extended_client_cap in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
-  SetExtendedClientCap(extended_client_cap);
+  setExtendedClientCap(extended_client_cap);
   uint32_t max_packet = 0;
-  if (BufUint32Drain(buffer, max_packet) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekUint32(buffer, offset, max_packet) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing max_packet in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
-  SetMaxPacket(max_packet);
-  if (IsSSLRequest()) {
+  setMaxPacket(max_packet);
+  if (isSSLRequest()) {
     // Stop Parsing if CLIENT_SSL flag is set
     return MYSQL_SUCCESS;
   }
   uint8_t charset = 0;
-  if (BufUint8Drain(buffer, charset) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekUint8(buffer, offset, charset) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing charset in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
-  SetCharset(charset);
-  if (DrainBytes(buffer, UNSET_BYTES) != MYSQL_SUCCESS) {
+  setCharset(charset);
+  if (BufferHelper::peekBytes(buffer, offset, UNSET_BYTES) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error skipping unset bytes in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
   std::string username;
-  if (BufStringDrain(buffer, username) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekString(buffer, offset, username) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing username in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
-  SetUsername(username);
+  setUsername(username);
   std::string auth_resp;
-  if (IsClientAuthLenClData()) {
+  if (isClientAuthLenClData()) {
     int auth_resp_len = 0;
-    if (ReadLengthEncodedIntegerDrain(buffer, auth_resp_len) != MYSQL_SUCCESS) {
+    if (BufferHelper::peekLengthEncodedInteger(buffer, offset, auth_resp_len) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing LengthEncodedInteger in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
-    if (BufStringDrainBySize(buffer, auth_resp, auth_resp_len) != MYSQL_SUCCESS) {
+    if (BufferHelper::peekStringBySize(buffer, offset, auth_resp_len, auth_resp) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
-  } else if (IsClientSecureConnection()) {
+  } else if (isClientSecureConnection()) {
     uint8_t auth_resp_len = 0;
-    if (BufUint8Drain(buffer, auth_resp_len) != MYSQL_SUCCESS) {
+    if (BufferHelper::peekUint8(buffer, offset, auth_resp_len) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp_len in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
-    if (BufStringDrainBySize(buffer, auth_resp, auth_resp_len) != MYSQL_SUCCESS) {
+    if (BufferHelper::peekStringBySize(buffer, offset, auth_resp_len, auth_resp) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
   } else {
-    if (BufStringDrain(buffer, auth_resp) != MYSQL_SUCCESS) {
+    if (BufferHelper::peekString(buffer, offset, auth_resp) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
   }
-  SetAuthResp(auth_resp);
-  if (IsConnectWithDb()) {
+  setAuthResp(auth_resp);
+  if (isConnectWithDb()) {
     std::string db;
-    if (BufStringDrain(buffer, db) != MYSQL_SUCCESS) {
+    if (BufferHelper::peekString(buffer, offset, db) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
-    SetDB(db);
+    setDb(db);
   }
   return MYSQL_SUCCESS;
 }
 
-std::string ClientLogin::Encode() {
+std::string ClientLogin::encode() {
   uint8_t enc_end_string = 0;
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
-  BufUint16Add(*buffer, client_cap_);
-  BufUint16Add(*buffer, extended_client_cap_);
-  BufUint32Add(*buffer, max_packet_);
-  BufUint8Add(*buffer, charset_);
+  BufferHelper::addUint16(*buffer, client_cap_);
+  BufferHelper::addUint16(*buffer, extended_client_cap_);
+  BufferHelper::addUint32(*buffer, max_packet_);
+  BufferHelper::addUint8(*buffer, charset_);
   for (int idx = 0; idx < UNSET_BYTES; idx++) {
-    BufUint8Add(*buffer, 0);
+    BufferHelper::addUint8(*buffer, 0);
   }
-  BufStringAdd(*buffer, username_);
-  BufUint8Add(*buffer, enc_end_string);
+  BufferHelper::addString(*buffer, username_);
+  BufferHelper::addUint8(*buffer, enc_end_string);
   if ((extended_client_cap_ & MYSQL_EXT_CL_PLG_AUTH_CL_DATA) ||
       (extended_client_cap_ & MYSQL_EXT_CL_SECURE_CONNECTION)) {
-    BufUint8Add(*buffer, auth_resp_.length());
-    BufStringAdd(*buffer, auth_resp_);
+    BufferHelper::addUint8(*buffer, auth_resp_.length());
+    BufferHelper::addString(*buffer, auth_resp_);
   } else {
-    BufStringAdd(*buffer, auth_resp_);
-    BufUint8Add(*buffer, enc_end_string);
+    BufferHelper::addString(*buffer, auth_resp_);
+    BufferHelper::addUint8(*buffer, enc_end_string);
   }
   if (client_cap_ & MYSQL_CLIENT_CONNECT_WITH_DB) {
-    BufStringAdd(*buffer, db_);
-    BufUint8Add(*buffer, enc_end_string);
+    BufferHelper::addString(*buffer, db_);
+    BufferHelper::addUint8(*buffer, enc_end_string);
   }
 
-  std::string e_string = BufToString(*buffer);
+  std::string e_string = BufferHelper::toString(*buffer);
   return e_string;
 }
 

@@ -10,35 +10,60 @@ namespace MySQLProxy {
 
 class Command : public MySQLCodec {
 public:
-  // MySQLCodec
-  int Decode(Buffer::Instance&) override;
-  std::string Encode() override;
+  enum class Cmd {
+    COM_NULL = -1,
+    COM_SLEEP = 0,
+    COM_QUIT = 1,
+    COM_INIT_DB = 2,
+    COM_QUERY = 3,
+    COM_FIELD_LIST = 4,
+    COM_CREATE_DB = 5,
+    COM_DROP_DB = 6,
+    COM_REFRESH = 7,
+    COM_SHUTDOWN = 8,
+    COM_STATISTICS = 9,
+    COM_PROCESS_INFO = 10,
+    COM_CONNECT = 11,
+    COM_PROCESS_KILL = 12,
+    COM_DEBUG = 13,
+    COM_PING = 14,
+    COM_TIME = 15,
+    COM_DELAYED_INSERT = 16,
+    COM_CHANGE_USER = 17,
+    COM_DAEMON = 29,
+    COM_RESET_CONNECTION = 31,
+  };
 
-  MySQLCodec::Cmd GetCmd() const { return cmd_; }
-  const std::string& GetData() const { return data_; }
-  std::string& GetDb() { return db_; }
-  void SetCmd(MySQLCodec::Cmd cmd);
-  void SetData(std::string& data);
-  void SetDb(std::string db);
-  bool RunQueryParser() { return run_query_parser_; }
+  // MySQLCodec
+  int parseMessage(Buffer::Instance&, uint64_t& offset, int len) override;
+  std::string encode() override;
+
+  Cmd parseCmd(Buffer::Instance& data, uint64_t& offset);
+  Cmd getCmd() const { return cmd_; }
+  const std::string& getData() const { return data_; }
+  std::string& getDb() { return db_; }
+  void setCmd(Cmd cmd);
+  void setData(std::string& data);
+  void setDb(std::string db);
+  bool isQuery() { return is_query_; }
 
 private:
-  MySQLCodec::Cmd cmd_;
+  Cmd cmd_;
   std::string data_;
   std::string db_;
-  bool run_query_parser_;
+  bool is_query_;
 };
 
-class CommandResp : public MySQLCodec {
+class CommandResponse : public MySQLCodec {
 public:
   // MySQLCodec
-  int Decode(Buffer::Instance&) override { return 0; }
-  std::string Encode() override { return ""; }
+  int parseMessage(Buffer::Instance&, uint64_t&, int) override { return MYSQL_SUCCESS; }
+  std::string encode() override { return ""; }
 
-  uint16_t GetServerStatus() const { return server_status_; }
-  uint16_t GetWarnings() const { return warnings_; }
-  void SetServerStatus(uint16_t status);
-  void SetWarnings(uint16_t warnings);
+  uint16_t getServerStatus() const { return server_status_; }
+  uint16_t getWarnings() const { return warnings_; }
+  void setServerStatus(uint16_t status);
+  void setWarnings(uint16_t warnings);
 
 private:
   uint16_t server_status_;

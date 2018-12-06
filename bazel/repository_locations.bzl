@@ -38,9 +38,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/Cyan4973/xxHash/archive/v0.6.5.tar.gz"],
     ),
     com_github_rshriram_sqlparser = dict(
-        sha256 = "5aacb8b2b34c7738a72d23c44c15d55a907f79579c99ca1dd8f56a88e06cc873",
-        strip_prefix = "sql-parser-0.3-envoy",
-        urls = ["https://github.com/rshriram/sql-parser/archive/v0.3-envoy.tar.gz"],
+        sha256 = "2869642cb868b26e242cb8ff1c196634171b1a826f797780fddbf90d7414a979",
+        strip_prefix = "sql-parser-6197eecaab3a9f50f48dd253e0c5ef3d0c78add0",
+        urls = ["https://github.com/rshriram/sql-parser/archive/6197eecaab3a9f50f48dd253e0c5ef3d0c78add0.tar.gz"],
     ),
     com_github_eile_tclap = dict(
         sha256 = "f0ede0721dddbb5eba3a47385a6e8681b14f155e1129dd39d1a959411935098f",

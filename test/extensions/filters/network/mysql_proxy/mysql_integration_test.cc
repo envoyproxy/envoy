@@ -106,18 +106,18 @@ TEST_P(MySQLIntegrationTest, MysqLoginTest) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
   // greeting
-  std::string greeting = EncodeServerGreeting(MYSQL_PROTOCOL_10);
+  std::string greeting = encodeServerGreeting(MYSQL_PROTOCOL_10);
   ASSERT_TRUE(fake_upstream_connection->write(greeting));
   tcp_client->waitForData(str);
 
   // Client username/password and capabilities
-  std::string login = EncodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, user);
+  std::string login = encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, user);
   tcp_client->write(login);
   ASSERT_TRUE(fake_upstream_connection->waitForData(login.length(), &rcvd_data));
   EXPECT_EQ(login, rcvd_data);
 
   // Server response OK to username/password
-  std::string loginok = EncodeClientLoginResp(MYSQL_RESP_OK);
+  std::string loginok = encodeClientLoginResp(MYSQL_RESP_OK);
   ASSERT_TRUE(fake_upstream_connection->write(loginok));
   tcp_client->waitForData(str);
 
@@ -161,18 +161,18 @@ TEST_P(MySQLIntegrationTest, MySQLUnitTestMultiClientsLoop) {
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
     // greeting
-    std::string greeting = EncodeServerGreeting(MYSQL_PROTOCOL_10);
+    std::string greeting = encodeServerGreeting(MYSQL_PROTOCOL_10);
     ASSERT_TRUE(fake_upstream_connection->write(greeting));
     tcp_client->waitForData(str);
 
     // Client username/password and capabilities
-    std::string login = EncodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, user);
+    std::string login = encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, user);
     tcp_client->write(login);
     ASSERT_TRUE(fake_upstream_connection->waitForData(login.length(), &rcvd_data));
     EXPECT_EQ(login, rcvd_data);
 
     // Server response OK to username/password
-    std::string loginok = EncodeClientLoginResp(MYSQL_RESP_OK);
+    std::string loginok = encodeClientLoginResp(MYSQL_RESP_OK);
     ASSERT_TRUE(fake_upstream_connection->write(loginok));
     tcp_client->waitForData(str);
 
