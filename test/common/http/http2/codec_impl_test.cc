@@ -390,17 +390,17 @@ TEST_P(Http2CodecImplTest, SmallMetadataVecTest) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
 
-  MetadataMap metadata_map = {
-      {"header_key1", "header_value1"},
-      {"header_key2", "header_value2"},
-      {"header_key3", "header_value3"},
-      {"header_key4", "header_value4"},
-  };
-
-  MetadataMapVec metadata_map_vec;
+  MetadataMapVector metadata_map_vec;
   const int size = 10;
   for (int i = 0; i < size; i++) {
-    metadata_map_vec.push_back(&metadata_map);
+    MetadataMap metadata_map = {
+        {"header_key1", "header_value1"},
+        {"header_key2", "header_value2"},
+        {"header_key3", "header_value3"},
+        {"header_key4", "header_value4"},
+    };
+    MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
+    metadata_map_vec.push_back(std::move(metadata_map_ptr));
   }
 
   EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(size);
@@ -420,14 +420,14 @@ TEST_P(Http2CodecImplTest, LargeMetadataVecTest) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
 
-  MetadataMap metadata_map = {
-      {"header_key1", std::string(50 * 1024, 'a')},
-  };
-
-  MetadataMapVec metadata_map_vec;
+  MetadataMapVector metadata_map_vec;
   const int size = 10;
   for (int i = 0; i < size; i++) {
-    metadata_map_vec.push_back(&metadata_map);
+    MetadataMap metadata_map = {
+        {"header_key1", std::string(50 * 1024, 'a')},
+    };
+    MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
+    metadata_map_vec.push_back(std::move(metadata_map_ptr));
   }
 
   EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(size);
@@ -453,9 +453,12 @@ TEST_P(Http2CodecImplTest, BadMetadataVecReceivedTest) {
       {"header_key3", "header_value3"},
       {"header_key4", "header_value4"},
   };
+  MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
+  MetadataMapVector metadata_map_vec;
+  metadata_map_vec.push_back(std::move(metadata_map_ptr));
 
   corrupt_data_ = true;
-  EXPECT_THROW_WITH_MESSAGE(request_encoder_->encodeMetadata({&metadata_map}), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(request_encoder_->encodeMetadata(metadata_map_vec), EnvoyException,
                             "The user callback function failed");
 }
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};

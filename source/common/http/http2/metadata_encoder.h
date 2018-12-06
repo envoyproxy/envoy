@@ -28,7 +28,7 @@ public:
    * @param metadata_map_vec supplies the metadata map vector to encode.
    * @return whether encoding is successful.
    */
-  bool createPayload(const MetadataMapVec& metadata_map_vec);
+  bool createPayload(const MetadataMapVector& metadata_map_vec);
 
   /**
    * @return true if there is payload to be submitted.

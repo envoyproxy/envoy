@@ -56,9 +56,9 @@ public:
 
   /**
    * Encode metadata.
-   * @param metadata_map_vec is the vector of metadata map to encode.
+   * @param metadata_map_vec is the vector of metadata maps to encode.
    */
-  virtual void encodeMetadata(const MetadataMapVec& metadata_map_vec) PURE;
+  virtual void encodeMetadata(const MetadataMapVector& metadata_map_vec) PURE;
 };
 
 /**

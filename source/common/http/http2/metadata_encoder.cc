@@ -32,13 +32,12 @@ bool MetadataEncoder::createPayloadMetadataMap(const MetadataMap& metadata_map) 
   return true;
 }
 
-bool MetadataEncoder::createPayload(const MetadataMapVec& metadata_map_vec) {
+bool MetadataEncoder::createPayload(const MetadataMapVector& metadata_map_vec) {
   ASSERT(payload_.length() == 0);
   ASSERT(payload_size_queue_.empty());
 
   for (const auto& metadata_map : metadata_map_vec) {
-    bool success = createPayloadMetadataMap(*metadata_map);
-    if (!success) {
+    if (!createPayloadMetadataMap(*metadata_map)) {
       return false;
     }
   }
