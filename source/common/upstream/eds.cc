@@ -154,7 +154,8 @@ bool EdsClusterImpl::updateHostsPerLocality(
     ASSERT(std::all_of(current_hosts_copy->begin(), current_hosts_copy->end(),
                        [&](const auto& host) { return host->priority() == priority; }));
     locality_weights_map = new_locality_weights_map;
-    ENVOY_LOG(debug, "EDS hosts or locality weights changed for cluster: {} ({}) priority {}",
+    ENVOY_LOG(debug,
+              "EDS hosts or locality weights changed for cluster: {} current hosts {} priority {}",
               info_->name(), host_set.hosts().size(), host_set.priority());
 
     priority_state_manager.updateClusterPrioritySet(priority, std::move(current_hosts_copy),

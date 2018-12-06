@@ -24,7 +24,6 @@ envoy_cc_library(
     deps = [
         ":config_tracker_interface",
         "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:query_params_interface",
@@ -37,6 +36,8 @@ envoy_cc_library(
     hdrs = ["configuration.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        "//include/envoy/http:context_interface",
+        "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
     ],
@@ -94,6 +95,7 @@ envoy_cc_library(
         "//include/envoy/api:api_interface",
         "//include/envoy/common:mutex_tracer",
         "//include/envoy/event:timer_interface",
+        "//include/envoy/http:context_interface",
         "//include/envoy/http:query_params_interface",
         "//include/envoy/init:init_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -141,6 +143,8 @@ envoy_cc_library(
     deps = [
         ":admin_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/http:context_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/init:init_interface",
         "//include/envoy/json:json_object_interface",

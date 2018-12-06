@@ -340,6 +340,8 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         if (success_rate >= 0.0) {
           host_status.mutable_success_rate()->set_value(success_rate);
         }
+
+        host_status.set_weight(host->weight());
       }
     }
   }
@@ -532,7 +534,7 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response
   memory.set_total_thread_cache(Memory::Stats::totalThreadCacheBytes());
   memory.set_pageheap_unmapped(Memory::Stats::totalPageHeapUnmapped());
   memory.set_pageheap_free(Memory::Stats::totalPageHeapFree());
-  response.add(MessageUtil::getJsonStringFromMessage(memory, true)); // pretty-print
+  response.add(MessageUtil::getJsonStringFromMessage(memory, true, true)); // pretty-print
   return Http::Code::OK;
 }
 
@@ -1033,7 +1035,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   // Don't pass in the overload manager so that the admin interface is accessible even when
   // the envoy is overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-      *this, server_.drainManager(), server_.random(), server_.httpTracer(), server_.runtime(),
+      *this, server_.drainManager(), server_.random(), server_.httpContext(), server_.runtime(),
       server_.localInfo(), server_.clusterManager(), nullptr, server_.timeSystem())});
   return true;
 }
