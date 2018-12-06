@@ -232,9 +232,13 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     if (ctx.is_ecdsa_) {
       // We only support P-256 ECDSA today.
       EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
-      const int nid = EC_GROUP_get_curve_name(EC_KEY_get0_group(ecdsa_public_key));
-      if (nid != NID_X9_62_prime256v1) {
-        throw EnvoyException(fmt::format("ECDSA key is not P256 (NID = {})", nid));
+      // Since we checked the key type above, this should be valid.
+      ASSERT(ecdsa_public_key != nullptr);
+      const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
+      if (ecdsa_group == nullptr || EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
+        throw EnvoyException(fmt::format("Failed to load certificate from chain {}, only P-256 "
+                                         "certificates are supported",
+                                         ctx.cert_chain_file_path_));
       }
     }
 
