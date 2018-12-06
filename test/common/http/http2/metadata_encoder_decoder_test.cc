@@ -114,17 +114,16 @@ public:
     nghttp2_option_del(option_);
   }
 
-  void verifyMetadataMapVector(MetadataMapVector* expect,
-                               std::unique_ptr<MetadataMap> metadata_map) {
-    for (const auto& metadata : *metadata_map) {
-      EXPECT_EQ(expect->front()->find(metadata.first)->second, metadata.second);
+  void verifyMetadataMapVector(MetadataMapVector& expect, MetadataMapPtr metadata_map_ptr) {
+    for (const auto& metadata : *metadata_map_ptr) {
+      EXPECT_EQ(expect.front()->find(metadata.first)->second, metadata.second);
     }
-    expect->erase(expect->begin());
+    expect.erase(expect.begin());
   }
 
-  void submitMetadata(const MetadataMapVector& metadata_map_vec) {
+  void submitMetadata(const MetadataMapVector& metadata_map_vector) {
     // Creates metadata payload.
-    encoder_.createPayload(metadata_map_vec);
+    encoder_.createPayload(metadata_map_vector);
     while (encoder_.hasNextFrame()) {
       int result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE,
                                             encoder_.nextEndMetadata(), STREAM_ID, nullptr);
@@ -140,6 +139,7 @@ public:
   MetadataEncoder encoder_;
   std::unique_ptr<MetadataDecoder> decoder_;
   nghttp2_option* option_;
+  int count_ = 0;
 
   // Stores data received by peer.
   TestBuffer output_buffer_;
@@ -155,16 +155,16 @@ TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
       {"header_key1", std::string(1024 * 1024 + 1, 'a')},
   };
   MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
-  MetadataMapVector metadata_map_vec;
-  metadata_map_vec.push_back(std::move(metadata_map_ptr));
+  MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadataMapVector, this,
-                                  &metadata_map_vec, std::placeholders::_1);
-  initialize(cb);
+  initialize([this, &metadata_map_vector](MetadataMapPtr metadata_map_ptr) -> void {
+    this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
+  });
 
   // metadata_map exceeds size limit.
-  EXPECT_FALSE(encoder_.createPayload(metadata_map_vec));
+  EXPECT_FALSE(encoder_.createPayload(metadata_map_vector));
 
   std::string payload = std::string(1024 * 1024 + 1, 'a');
   EXPECT_FALSE(
@@ -178,14 +178,14 @@ TEST_F(MetadataEncoderDecoderTest, TestDecodeBadData) {
       {"header_key1", "header_value1"},
   };
   MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
-  MetadataMapVector metadata_map_vec;
-  metadata_map_vec.push_back(std::move(metadata_map_ptr));
+  MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadataMapVector, this,
-                                  &metadata_map_vec, std::placeholders::_1);
-  initialize(cb);
-  submitMetadata(metadata_map_vec);
+  initialize([this, &metadata_map_vector](MetadataMapPtr metadata_map_ptr) -> void {
+    this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
+  });
+  submitMetadata(metadata_map_vector);
 
   // Messes up with the encoded payload, and passes it to the decoder.
   output_buffer_.buf[10] |= 0xff;
@@ -213,14 +213,14 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderMultipleMetadataReachSize
         {"header_key2", std::string(10000, 'b')},
     };
     MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
-    MetadataMapVector metadata_map_vec;
-    metadata_map_vec.push_back(std::move(metadata_map_ptr));
+    MetadataMapVector metadata_map_vector;
+    metadata_map_vector.push_back(std::move(metadata_map_ptr));
 
     // Encode and decode the second MetadataMap.
-    MetadataCallback cb2 = std::bind(&MetadataEncoderDecoderTest::verifyMetadataMapVector, this,
-                                     &metadata_map_vec, std::placeholders::_1);
-    decoder_->callback_ = cb2;
-    submitMetadata(metadata_map_vec);
+    decoder_->callback_ = [this, &metadata_map_vector](MetadataMapPtr metadata_map_ptr) -> void {
+      this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
+    };
+    submitMetadata(metadata_map_vector);
 
     result = nghttp2_session_mem_recv(session_, output_buffer_.buf, output_buffer_.length);
     if (result < 0) {
@@ -252,16 +252,16 @@ TEST_F(MetadataEncoderDecoderTest, EncodeMetadataMapVectorSmall) {
   };
   MetadataMapPtr metadata_map_ptr_3 = std::make_unique<MetadataMap>(metadata_map);
 
-  MetadataMapVector metadata_map_vec;
-  metadata_map_vec.push_back(std::move(metadata_map_ptr));
-  metadata_map_vec.push_back(std::move(metadata_map_ptr_2));
-  metadata_map_vec.push_back(std::move(metadata_map_ptr_3));
+  MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  metadata_map_vector.push_back(std::move(metadata_map_ptr_2));
+  metadata_map_vector.push_back(std::move(metadata_map_ptr_3));
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadataMapVector, this,
-                                  &metadata_map_vec, std::placeholders::_1);
-  initialize(cb);
-  submitMetadata(metadata_map_vec);
+  initialize([this, &metadata_map_vector](MetadataMapPtr metadata_map_ptr) -> void {
+    this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
+  });
+  submitMetadata(metadata_map_vector);
 
   // Verifies flag and payload are encoded correctly.
   const uint64_t consume_size = random_generator_.random() % output_buffer_.length;
@@ -274,20 +274,20 @@ TEST_F(MetadataEncoderDecoderTest, EncodeMetadataMapVectorSmall) {
 
 // Tests encoding/decoding large metadata map vectors.
 TEST_F(MetadataEncoderDecoderTest, EncodeMetadataMapVectorLarge) {
-  MetadataMapVector metadata_map_vec;
+  MetadataMapVector metadata_map_vector;
   for (int i = 0; i < 10; i++) {
     MetadataMap metadata_map = {
         {"header_key1", std::string(50000, 'a')},
         {"header_key2", std::string(50000, 'b')},
     };
     MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
-    metadata_map_vec.push_back(std::move(metadata_map_ptr));
+    metadata_map_vector.push_back(std::move(metadata_map_ptr));
   }
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadataMapVector, this,
-                                  &metadata_map_vec, std::placeholders::_1);
-  initialize(cb);
-  submitMetadata(metadata_map_vec);
+  initialize([this, &metadata_map_vector](MetadataMapPtr metadata_map_ptr) -> void {
+    this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
+  });
+  submitMetadata(metadata_map_vector);
   // Verifies flag and payload are encoded correctly.
   const uint64_t consume_size = random_generator_.random() % output_buffer_.length;
   nghttp2_session_mem_recv(session_, output_buffer_.buf, consume_size);
@@ -298,7 +298,7 @@ TEST_F(MetadataEncoderDecoderTest, EncodeMetadataMapVectorLarge) {
 
 // Tests encoding/decoding with fuzzed metadata size.
 TEST_F(MetadataEncoderDecoderTest, EncodeFuzzedMetadata) {
-  MetadataMapVector metadata_map_vec;
+  MetadataMapVector metadata_map_vector;
   for (int i = 0; i < 10; i++) {
     Runtime::RandomGeneratorImpl random;
     int value_size_1 = random.random() % (2 * Http::METADATA_MAX_PAYLOAD_SIZE) + 1;
@@ -308,14 +308,14 @@ TEST_F(MetadataEncoderDecoderTest, EncodeFuzzedMetadata) {
         {"header_key2", std::string(value_size_2, 'a')},
     };
     MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
-    metadata_map_vec.push_back(std::move(metadata_map_ptr));
+    metadata_map_vector.push_back(std::move(metadata_map_ptr));
   }
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadataMapVector, this,
-                                  &metadata_map_vec, std::placeholders::_1);
-  initialize(cb);
-  submitMetadata(metadata_map_vec);
+  initialize([this, &metadata_map_vector](MetadataMapPtr metadata_map_ptr) -> void {
+    this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
+  });
+  submitMetadata(metadata_map_vector);
 
   // Verifies flag and payload are encoded correctly.
   nghttp2_session_mem_recv(session_, output_buffer_.buf, output_buffer_.length);
@@ -325,22 +325,22 @@ TEST_F(MetadataEncoderDecoderTest, EncodeFuzzedMetadata) {
 
 TEST_F(MetadataEncoderDecoderTest, TestFrameCountUpperBound) {
   int size = 10;
-  MetadataMapVector metadata_map_vec;
+  MetadataMapVector metadata_map_vector;
   for (int i = 0; i < size; i++) {
     MetadataMap metadata_map = {
         {"header_key1", std::string(5, 'a')},
         {"header_key2", std::string(5, 'b')},
     };
     MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
-    metadata_map_vec.push_back(std::move(metadata_map_ptr));
+    metadata_map_vector.push_back(std::move(metadata_map_ptr));
   }
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadataMapVector, this,
-                                  &metadata_map_vec, std::placeholders::_1);
-  initialize(cb);
+  initialize([this, &metadata_map_vector](MetadataMapPtr metadata_map_ptr) -> void {
+    this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
+  });
 
-  encoder_.createPayload(metadata_map_vec);
+  encoder_.createPayload(metadata_map_vector);
   EXPECT_LE(size, encoder_.frameCountUpperBound());
 
   cleanUp();

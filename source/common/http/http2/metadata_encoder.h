@@ -25,10 +25,10 @@ public:
 
   /**
    * Creates wire format HTTP/2 header block from a vector of metadata maps.
-   * @param metadata_map_vec supplies the metadata map vector to encode.
+   * @param metadata_map_vector supplies the metadata map vector to encode.
    * @return whether encoding is successful.
    */
-  bool createPayload(const MetadataMapVector& metadata_map_vec);
+  bool createPayload(const MetadataMapVector& metadata_map_vector);
 
   /**
    * @return true if there is payload to be submitted.
@@ -41,7 +41,7 @@ public:
    * is the largest length the memory can hold.
    * @return the size of frame payload.
    */
-  uint64_t packNextFramePayload(uint8_t* buf, size_t len);
+  uint64_t packNextFramePayload(uint8_t* buf, const size_t len);
 
   /**
    * Returns end_metadata value for the next metadata frame.

@@ -11,7 +11,7 @@ namespace Http2 {
 
 MetadataEncoder::MetadataEncoder() {
   nghttp2_hd_deflater* deflater;
-  int rv = nghttp2_hd_deflate_new(&deflater, header_table_size_);
+  const int rv = nghttp2_hd_deflate_new(&deflater, header_table_size_);
   ASSERT(rv == 0);
   deflater_ = Deflater(deflater);
 }
@@ -19,9 +19,9 @@ MetadataEncoder::MetadataEncoder() {
 bool MetadataEncoder::createPayloadMetadataMap(const MetadataMap& metadata_map) {
   ASSERT(!metadata_map.empty());
 
-  uint64_t payload_size_before = payload_.length();
-  bool success = createHeaderBlockUsingNghttp2(metadata_map);
-  uint64_t payload_size_after = payload_.length();
+  const uint64_t payload_size_before = payload_.length();
+  const bool success = createHeaderBlockUsingNghttp2(metadata_map);
+  const uint64_t payload_size_after = payload_.length();
 
   if (!success || payload_size_after == payload_size_before) {
     ENVOY_LOG(error, "Failed to create payload.");
@@ -32,11 +32,11 @@ bool MetadataEncoder::createPayloadMetadataMap(const MetadataMap& metadata_map) 
   return true;
 }
 
-bool MetadataEncoder::createPayload(const MetadataMapVector& metadata_map_vec) {
+bool MetadataEncoder::createPayload(const MetadataMapVector& metadata_map_vector) {
   ASSERT(payload_.length() == 0);
   ASSERT(payload_size_queue_.empty());
 
-  for (const auto& metadata_map : metadata_map_vec) {
+  for (const auto& metadata_map : metadata_map_vector) {
     if (!createPayloadMetadataMap(*metadata_map)) {
       return false;
     }
@@ -57,7 +57,7 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(const MetadataMap& metadata_
   }
 
   // Estimates the upper bound of output payload.
-  size_t buflen = nghttp2_hd_deflate_bound(deflater_.get(), nva.begin(), nvlen);
+  const size_t buflen = nghttp2_hd_deflate_bound(deflater_.get(), nva.begin(), nvlen);
   if (buflen + payload_.length() > max_payload_size_bound_) {
     ENVOY_LOG(error, "Payload size {} exceeds the max bound.", buflen);
     return false;
@@ -68,7 +68,7 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(const MetadataMap& metadata_
 
   // Creates payload using nghttp2.
   uint8_t* buf = reinterpret_cast<uint8_t*>(iovec.mem_);
-  ssize_t result = nghttp2_hd_deflate_hd(deflater_.get(), buf, buflen, nva.begin(), nvlen);
+  const ssize_t result = nghttp2_hd_deflate_hd(deflater_.get(), buf, buflen, nva.begin(), nvlen);
   ASSERT(result > 0);
   iovec.len_ = result;
 
@@ -79,7 +79,7 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(const MetadataMap& metadata_
 
 bool MetadataEncoder::hasNextFrame() { return payload_.length() > 0; }
 
-uint64_t MetadataEncoder::packNextFramePayload(uint8_t* buf, size_t len) {
+uint64_t MetadataEncoder::packNextFramePayload(uint8_t* buf, const size_t len) {
   const uint64_t current_payload_size =
       std::min(METADATA_MAX_PAYLOAD_SIZE, payload_size_queue_.front());
 

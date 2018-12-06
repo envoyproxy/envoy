@@ -1052,9 +1052,9 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   std::string value = std::string(80 * 1024, '1');
   Http::MetadataMap metadata_map = {{key, value}};
   Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-  Http::MetadataMapVector metadata_map_vec;
-  metadata_map_vec.push_back(std::move(metadata_map_ptr));
-  upstream_request_->encodeMetadata(metadata_map_vec);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(12, true);
 
@@ -1072,9 +1072,9 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   metadata_map = {{key, value}};
   metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-  metadata_map_vec.erase(metadata_map_vec.begin());
-  metadata_map_vec.push_back(std::move(metadata_map_ptr));
-  upstream_request_->encodeMetadata(metadata_map_vec);
+  metadata_map_vector.erase(metadata_map_vector.begin());
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeData(0, true);
 
   // Verifies metadata is received by the client.
@@ -1091,9 +1091,9 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   metadata_map = {{key, value}};
   metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-  metadata_map_vec.erase(metadata_map_vec.begin());
-  metadata_map_vec.push_back(std::move(metadata_map_ptr));
-  upstream_request_->encodeMetadata(metadata_map_vec);
+  metadata_map_vector.erase(metadata_map_vector.begin());
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeData(10, true);
 
   // Verifies metadata is received by the client.
@@ -1111,9 +1111,9 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   upstream_request_->encodeData(10, false);
   metadata_map = {{key, value}};
   metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-  metadata_map_vec.erase(metadata_map_vec.begin());
-  metadata_map_vec.push_back(std::move(metadata_map_ptr));
-  upstream_request_->encodeMetadata(metadata_map_vec);
+  metadata_map_vector.erase(metadata_map_vector.begin());
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeData(10, true);
 
   // Verifies metadata is received by the client.
@@ -1131,9 +1131,9 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   upstream_request_->encodeData(10, false);
   metadata_map = {{key, value}};
   metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-  metadata_map_vec.erase(metadata_map_vec.begin());
-  metadata_map_vec.push_back(std::move(metadata_map_ptr));
-  upstream_request_->encodeMetadata(metadata_map_vec);
+  metadata_map_vector.erase(metadata_map_vector.begin());
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeData(0, true);
 
   // Verifies metadata is received by the client.
@@ -1151,9 +1151,9 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   upstream_request_->encodeData(10, false);
   metadata_map = {{key, value}};
   metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-  metadata_map_vec.erase(metadata_map_vec.begin());
-  metadata_map_vec.push_back(std::move(metadata_map_ptr));
-  upstream_request_->encodeMetadata(metadata_map_vec);
+  metadata_map_vector.erase(metadata_map_vector.begin());
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeResetStream();
 
   // Verifies stream is reset.
@@ -1211,13 +1211,13 @@ void HttpIntegrationTest::testEnvoyProxyInvalidMetadata() {
   std::string value = std::string(1024 * 1024, 'a');
   Http::MetadataMap metadata_map = {{key, value}};
   Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-  Http::MetadataMapVector metadata_map_vec;
-  metadata_map_vec.push_back(std::move(metadata_map_ptr));
-  upstream_request_->encodeMetadata(metadata_map_vec);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeMetadata(metadata_map_vec);
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeData(12, false);
-  upstream_request_->encodeMetadata(metadata_map_vec);
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeData(12, true);
 
   // Verifies metadata is not received by the client.

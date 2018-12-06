@@ -131,10 +131,10 @@ void ConnectionImpl::StreamImpl::encodeTrailers(const HeaderMap& trailers) {
   }
 }
 
-void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vec) {
+void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector) {
   ASSERT(parent_.allow_metadata_);
 
-  getMetadataEncoder().createPayload(metadata_map_vec);
+  getMetadataEncoder().createPayload(metadata_map_vector);
 
   // Estimates the number of frames to generate, and breaks the while loop when the size is reached
   // in case submitting succeeds and packing fails, and we don't get error from packing.
@@ -215,7 +215,7 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
 
 void ConnectionImpl::StreamImpl::submitMetadata() {
   ASSERT(stream_id_ > 0);
-  int result = nghttp2_submit_extension(parent_.session_, METADATA_FRAME_TYPE,
+  const int result = nghttp2_submit_extension(parent_.session_, METADATA_FRAME_TYPE,
                                         metadata_encoder_->nextEndMetadata(), stream_id_, nullptr);
   ASSERT(result == 0);
 }
@@ -321,16 +321,16 @@ MetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
 
 MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
   if (metadata_decoder_ == nullptr) {
-    auto cb = [this](std::unique_ptr<MetadataMap> metadata_map) {
-      this->onMetadataDecoded(std::move(metadata_map));
+    auto cb = [this](MetadataMapPtr metadata_map_ptr) {
+      this->onMetadataDecoded(std::move(metadata_map_ptr));
     };
     metadata_decoder_ = std::make_unique<MetadataDecoder>(cb);
   }
   return *metadata_decoder_;
 }
 
-void ConnectionImpl::StreamImpl::onMetadataDecoded(std::unique_ptr<MetadataMap> metadata_map) {
-  decoder_->decodeMetadata(std::move(metadata_map));
+void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr metadata_map_ptr) {
+  decoder_->decodeMetadata(std::move(metadata_map_ptr));
 }
 
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
@@ -621,7 +621,7 @@ ssize_t ConnectionImpl::packMetadata(int32_t stream_id, uint8_t* buf, size_t len
   ASSERT(stream != nullptr);
 
   MetadataEncoder& encoder = stream->getMetadataEncoder();
-  uint64_t payload_size = encoder.packNextFramePayload(buf, len);
+  const uint64_t payload_size = encoder.packNextFramePayload(buf, len);
   return static_cast<ssize_t>(payload_size);
 }
 

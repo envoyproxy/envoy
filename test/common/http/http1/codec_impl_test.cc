@@ -364,9 +364,9 @@ TEST_F(Http1ServerConnectionImplTest, MetadataTest) {
 
   MetadataMap metadata_map = {{"key", "value"}};
   MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
-  MetadataMapVector metadata_map_vec;
-  metadata_map_vec.push_back(std::move(metadata_map_ptr));
-  EXPECT_DEATH_LOG_TO_STDERR(response_encoder->encodeMetadata(metadata_map_vec), "");
+  MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  EXPECT_DEATH_LOG_TO_STDERR(response_encoder->encodeMetadata(metadata_map_vector), "");
 }
 
 TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {

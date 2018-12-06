@@ -1211,9 +1211,9 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
 
   // Now encode metadata via the codec.
   if (!metadata_map->empty()) {
-    MetadataMapVector metadata_map_vec;
-    metadata_map_vec.push_back(std::move(metadata_map));
-    response_encoder_->encodeMetadata(metadata_map_vec);
+    MetadataMapVector metadata_map_vector;
+    metadata_map_vector.push_back(std::move(metadata_map));
+    response_encoder_->encodeMetadata(metadata_map_vector);
   }
   // metadata_map destroyed when function returns.
 }
