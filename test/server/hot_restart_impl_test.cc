@@ -104,41 +104,24 @@ TEST_F(HotRestartImplTest, Consistency) {
   const uint64_t max_name_length = stats_options_.maxNameLength();
 
   const std::string name_1(max_name_length, 'A');
-  Stats::RawStatData* stat_1 = hot_restart_->alloc(name_1);
+  Stats::RawStatData* stat_1 = hot_restart_->statsAllocator().alloc(name_1);
   const uint64_t stat_size = sizeof(Stats::RawStatData) + max_name_length;
   const std::string stat_hex_dump_1 = Hex::encode(reinterpret_cast<uint8_t*>(stat_1), stat_size);
   EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_1), expected_hash);
   EXPECT_EQ(name_1, stat_1->key());
-  hot_restart_->free(*stat_1);
-}
-
-TEST_F(HotRestartImplTest, RawAlloc) {
-  setup();
-
-  Stats::RawStatData* stat_1 = hot_restart_->alloc("ref_name");
-  ASSERT_NE(stat_1, nullptr);
-  Stats::RawStatData* stat_2 = hot_restart_->alloc("ref_name");
-  ASSERT_NE(stat_2, nullptr);
-  Stats::RawStatData* stat_3 = hot_restart_->alloc("not_ref_name");
-  ASSERT_NE(stat_3, nullptr);
-  EXPECT_EQ(stat_1, stat_2);
-  EXPECT_NE(stat_1, stat_3);
-  EXPECT_NE(stat_2, stat_3);
-  hot_restart_->free(*stat_1);
-  hot_restart_->free(*stat_2);
-  hot_restart_->free(*stat_3);
+  hot_restart_->statsAllocator().free(*stat_1);
 }
 
 TEST_F(HotRestartImplTest, crossAlloc) {
   setup();
 
-  Stats::RawStatData* stat1 = hot_restart_->alloc("stat1");
-  Stats::RawStatData* stat2 = hot_restart_->alloc("stat2");
-  Stats::RawStatData* stat3 = hot_restart_->alloc("stat3");
-  Stats::RawStatData* stat4 = hot_restart_->alloc("stat4");
-  Stats::RawStatData* stat5 = hot_restart_->alloc("stat5");
-  hot_restart_->free(*stat2);
-  hot_restart_->free(*stat4);
+  Stats::RawStatData* stat1 = hot_restart_->statsAllocator().alloc("stat1");
+  Stats::RawStatData* stat2 = hot_restart_->statsAllocator().alloc("stat2");
+  Stats::RawStatData* stat3 = hot_restart_->statsAllocator().alloc("stat3");
+  Stats::RawStatData* stat4 = hot_restart_->statsAllocator().alloc("stat4");
+  Stats::RawStatData* stat5 = hot_restart_->statsAllocator().alloc("stat5");
+  hot_restart_->statsAllocator().free(*stat2);
+  hot_restart_->statsAllocator().free(*stat4);
   stat2 = nullptr;
   stat4 = nullptr;
 
@@ -148,9 +131,9 @@ TEST_F(HotRestartImplTest, crossAlloc) {
       .WillOnce(Return(Api::SysCallPtrResult{buffer_.data(), 0}));
   EXPECT_CALL(os_sys_calls_, bind(_, _, _));
   HotRestartImpl hot_restart2(options_);
-  Stats::RawStatData* stat1_prime = hot_restart2.alloc("stat1");
-  Stats::RawStatData* stat3_prime = hot_restart2.alloc("stat3");
-  Stats::RawStatData* stat5_prime = hot_restart2.alloc("stat5");
+  Stats::RawStatData* stat1_prime = hot_restart2.statsAllocator().alloc("stat1");
+  Stats::RawStatData* stat3_prime = hot_restart2.statsAllocator().alloc("stat3");
+  Stats::RawStatData* stat5_prime = hot_restart2.statsAllocator().alloc("stat5");
   EXPECT_EQ(stat1, stat1_prime);
   EXPECT_EQ(stat3, stat3_prime);
   EXPECT_EQ(stat5, stat5_prime);
@@ -160,9 +143,9 @@ TEST_F(HotRestartImplTest, allocFail) {
   EXPECT_CALL(options_, maxStats()).WillRepeatedly(Return(2));
   setup();
 
-  Stats::RawStatData* s1 = hot_restart_->alloc("1");
-  Stats::RawStatData* s2 = hot_restart_->alloc("2");
-  Stats::RawStatData* s3 = hot_restart_->alloc("3");
+  Stats::RawStatData* s1 = hot_restart_->statsAllocator().alloc("1");
+  Stats::RawStatData* s2 = hot_restart_->statsAllocator().alloc("2");
+  Stats::RawStatData* s3 = hot_restart_->statsAllocator().alloc("3");
   EXPECT_NE(s1, nullptr);
   EXPECT_NE(s2, nullptr);
   EXPECT_EQ(s3, nullptr);
@@ -193,7 +176,7 @@ TEST_P(HotRestartImplAlignmentTest, objectAlignment) {
 
   std::set<Stats::RawStatData*> used;
   for (uint64_t i = 0; i < num_stats_; i++) {
-    Stats::RawStatData* stat = hot_restart_->alloc(fmt::format("stat {}", i));
+    Stats::RawStatData* stat = hot_restart_->statsAllocator().alloc(fmt::format("stat {}", i));
     EXPECT_TRUE((reinterpret_cast<uintptr_t>(stat) % alignof(decltype(*stat))) == 0);
     EXPECT_TRUE(used.find(stat) == used.end());
     used.insert(stat);
@@ -216,7 +199,7 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
                                    i)
                            .substr(0, stats_options_.maxNameLength());
     TestStat ts;
-    ts.stat_ = hot_restart_->alloc(name);
+    ts.stat_ = hot_restart_->statsAllocator().alloc(name);
     ts.name_ = ts.stat_->name_;
     ts.index_ = i;
 

@@ -9,6 +9,8 @@
 #include "common/config/filter_json.h"
 #include "common/protobuf/utility.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
+#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
 #include "extensions/filters/network/ratelimit/ratelimit.h"
 
 namespace Envoy {
@@ -26,10 +28,16 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
 
   ConfigSharedPtr filter_config(new Config(proto_config, context.scope(), context.runtime()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(context);
+  return [client_factory, timeout_ms,
+          filter_config](Network::FilterManager& filter_manager) -> void {
+    // When we introduce rate limit service config in filters, we should validate here that it
+    // matches with bootstrap.
+    filter_manager.addReadFilter(
+        std::make_shared<Filter>(filter_config,
 
-  return [filter_config, timeout_ms, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<Filter>(
-        filter_config, context.rateLimitClient(std::chrono::milliseconds(timeout_ms))));
+                                 client_factory->create(std::chrono::milliseconds(timeout_ms))));
   };
 }
 

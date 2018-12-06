@@ -46,6 +46,16 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
     EXPECT_EQ("-", ResponseFlagUtils::toShortString(stream_info));
   }
 
+  // Downstream connection terminated.
+  {
+    NiceMock<MockStreamInfo> stream_info;
+    ON_CALL(stream_info, hasResponseFlag(_)).WillByDefault(Return(false));
+    ON_CALL(stream_info, protocol())
+        .WillByDefault(Return(absl::make_optional<Http::Protocol>(Http::Protocol::Http11)));
+    ON_CALL(stream_info, responseCode()).WillByDefault(Return(absl::nullopt));
+    EXPECT_EQ("DC", ResponseFlagUtils::toShortString(stream_info));
+  }
+
   // Test combinations.
   // These are not real use cases, but are used to cover multiple response flags case.
   {

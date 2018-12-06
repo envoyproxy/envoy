@@ -85,6 +85,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "eds_subscription_factory_test",
+    srcs = ["eds_subscription_factory_test.cc"],
+    deps = [
+        "//source/common/upstream:eds_subscription_factory_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = ["health_checker_impl_test.cc"],
     deps = [

@@ -14,7 +14,7 @@ routing PRs, questions, etc. to the right place.
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
   * HTTP, flow control, cluster manager, load balancing, and core networking (listeners,
     connections, etc.).
-* Stephan Zuercher ([zuercher](https://github.com/zuercher)) (stephan@turbinelabs.io)
+* Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
     (metadata, etc.), and OSX build.
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
@@ -30,6 +30,8 @@ routing PRs, questions, etc. to the right place.
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions).
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@tetrate.io)
   * Lua, access logging, and general miscellany.
+* Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
+  * Stats, abseil, scalability, and performance.
 
 # Emeritus maintainers
 
@@ -48,7 +50,5 @@ matter expert reviews. Feel free to loop them in as needed.
   * Istio, APIs, HTTP routing, and WebSocket.
 * John Millikin ([jmillikin-stripe](https://github.com/jmillikin-stripe)) (jmillikin@stripe.com)
   * Bazel/build.
-* Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
-  * abseil and performance work.
 * Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
   * Redis, Python, configuration/operational questions.

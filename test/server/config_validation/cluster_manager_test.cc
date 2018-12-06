@@ -2,6 +2,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/api/api_impl.h"
+#include "common/http/context_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
 #include "server/config_validation/cluster_manager.h"
@@ -35,10 +36,11 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   NiceMock<Event::MockDispatcher> dispatcher;
   LocalInfo::MockLocalInfo local_info;
   NiceMock<Server::MockAdmin> admin;
+  Http::ContextImpl http_context;
 
   ValidationClusterManagerFactory factory(runtime, stats_store, tls, random, dns_resolver,
                                           ssl_context_manager, dispatcher, local_info,
-                                          secret_manager, *api);
+                                          secret_manager, *api, http_context);
 
   AccessLog::MockAccessLogManager log_manager;
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;

@@ -3,7 +3,7 @@
   {
     "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
-      { "type": "read", "name": "tcp_proxy",
+      { "name": "tcp_proxy",
         "config": {
           "stat_prefix": "test_tcp",
           "route_config": {
@@ -27,7 +27,7 @@
     "address": "tcp://{{ ip_loopback_address }}:0",
     "per_connection_buffer_limit_bytes": 1024,
     "filters": [
-      { "type": "read", "name": "tcp_proxy",
+      { "name": "tcp_proxy",
         "config": {
           "stat_prefix": "tcp_with_write_limits",
           "route_config": {
@@ -51,7 +51,7 @@
       "alpn_protocols": "h2,http/1.1"
     },
     "filters": [
-      { "type": "read", "name": "tcp_proxy",
+      { "name": "tcp_proxy",
         "config": {
           "stat_prefix": "test_tcp_sans_tls",
           "route_config": {
@@ -63,7 +63,7 @@
           }
         }
       },
-      { "type": "read", "name": "client_ssl_auth",
+      { "name": "client_ssl_auth",
         "config": {
                 "auth_api_cluster": "ssl_auth",
                 "stat_prefix": "ssl_stats",

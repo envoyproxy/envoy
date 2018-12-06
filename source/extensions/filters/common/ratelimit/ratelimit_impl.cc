@@ -1,4 +1,4 @@
-#include "common/ratelimit/ratelimit_impl.h"
+#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -13,6 +13,9 @@
 #include "common/http/headers.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace RateLimit {
 
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
@@ -31,11 +34,11 @@ void GrpcClientImpl::cancel() {
 
 void GrpcClientImpl::createRequest(envoy::service::ratelimit::v2::RateLimitRequest& request,
                                    const std::string& domain,
-                                   const std::vector<Descriptor>& descriptors) {
+                                   const std::vector<Envoy::RateLimit::Descriptor>& descriptors) {
   request.set_domain(domain);
-  for (const Descriptor& descriptor : descriptors) {
+  for (const Envoy::RateLimit::Descriptor& descriptor : descriptors) {
     envoy::api::v2::ratelimit::RateLimitDescriptor* new_descriptor = request.add_descriptors();
-    for (const DescriptorEntry& entry : descriptor.entries_) {
+    for (const Envoy::RateLimit::DescriptorEntry& entry : descriptor.entries_) {
       envoy::api::v2::ratelimit::RateLimitDescriptor::Entry* new_entry =
           new_descriptor->add_entries();
       new_entry->set_key(entry.key_);
@@ -45,7 +48,8 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v2::RateLimitReque
 }
 
 void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
-                           const std::vector<Descriptor>& descriptors, Tracing::Span& parent_span) {
+                           const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                           Tracing::Span& parent_span) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
@@ -90,11 +94,6 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitSe
                                  Stats::Scope& scope) {
   envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.MergeFrom(config.grpc_service());
-  // TODO(htuch): cluster_name is deprecated, remove after 1.6.0.
-  if (config.service_specifier_case() ==
-      envoy::config::ratelimit::v2::RateLimitServiceConfig::kClusterName) {
-    grpc_service.mutable_envoy_grpc()->set_cluster_name(config.cluster_name());
-  }
   async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }
 
@@ -103,4 +102,7 @@ ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds
 }
 
 } // namespace RateLimit
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy
