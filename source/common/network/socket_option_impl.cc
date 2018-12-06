@@ -23,6 +23,17 @@ bool SocketOptionImpl::setOption(Socket& socket,
   return true;
 }
 
+absl::optional<Socket::Option::Information> SocketOptionImpl::getOptionInformation(
+    const Socket&, envoy::api::v2::core::SocketOption::SocketState state) const {
+  if (state != in_state_) {
+    return absl::nullopt;
+  }
+  Socket::Option::Information info;
+  info.name_ = optname_;
+  info.value_ = value_;
+  return absl::optional<Option::Information>(std::move(info));
+}
+
 bool SocketOptionImpl::isSupported() const { return optname_.has_value(); }
 
 Api::SysCallIntResult SocketOptionImpl::setSocketOption(Socket& socket,
