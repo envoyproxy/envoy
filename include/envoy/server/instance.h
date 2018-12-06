@@ -216,7 +216,7 @@ public:
   /**
    * @return Http::CodeStats the http response-code stats
    */
-  //virtual Http::CodeStats& codeStats() PURE;
+  // virtual Http::CodeStats& codeStats() PURE;
 };
 
 } // namespace Server

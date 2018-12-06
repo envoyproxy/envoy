@@ -22,10 +22,10 @@
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/common/logger.h"
-#include "common/stats/symbol_table_impl.h"
 #include "common/config/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 

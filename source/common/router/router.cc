@@ -167,7 +167,8 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                            response_status_code,
                                            internal_request,
                                            route_entry_->virtualHost().name(),
-                                           request_vcluster_ ? request_vcluster_->name() : EMPTY_STRING,
+                                           request_vcluster_ ? request_vcluster_->name()
+                                                             : EMPTY_STRING,
                                            zone_name,
                                            upstream_zone,
                                            is_canary};

@@ -94,7 +94,7 @@ public:
   Event::TimeSystem& timeSystem() override { return time_system_; }
   Stats::SymbolTable& symbolTable() override { return stats_store_.symbolTable(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
-  //Http::CodeStats& codeStats() override { return code_stats_; }
+  // Http::CodeStats& codeStats() override { return code_stats_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();

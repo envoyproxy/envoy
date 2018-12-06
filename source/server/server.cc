@@ -65,7 +65,7 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock), terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
-                    : nullptr),
+                                                  : nullptr),
       http_context_(store.symbolTable()) {
 
   try {

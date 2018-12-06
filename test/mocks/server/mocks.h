@@ -420,7 +420,7 @@ public:
   MOCK_METHOD0(timeSource, TimeSource&());
 
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
-  //Http::CodeStats& codeStats() override { return code_stats_; }
+  // Http::CodeStats& codeStats() override { return code_stats_; }
 
   Http::Context& httpContext() override { return http_context_; }
 
