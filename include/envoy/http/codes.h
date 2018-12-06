@@ -78,9 +78,14 @@ enum class Code {
   // clang-format on
 };
 
+/**
+ * Manages updating of statistics for HTTP Status Codes. Sets up string-tokens
+ * for fast combining of tokens based on scope, status-code buckets (2xx,
+ * 4xx...), and exact status code.
+ */
 class CodeStats {
 public:
-  virtual ~CodeStats() {}
+  virtual ~CodeStats() = default;
 
   struct ResponseStatInfo {
     Stats::Scope& global_scope_;
@@ -111,22 +116,20 @@ public:
   /**
    * Charge a simple response stat to an upstream.
    */
-  virtual void chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
-                                       Code response_code) PURE;
   virtual void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
-                                       Code response_code) PURE;
+                                       Code response_code) const PURE;
 
   /**
    * Charge a response stat to both agg counters (*xx) as well as code specific counters. This
    * routine also looks for the x-envoy-upstream-canary header and if it is set, also charges
    * canary stats.
    */
-  virtual void chargeResponseStat(const ResponseStatInfo& info) PURE;
+  virtual void chargeResponseStat(const ResponseStatInfo& info) const PURE;
 
   /**
    * Charge a response timing to the various dynamic stat postfixes.
    */
-  virtual void chargeResponseTiming(const ResponseTimingInfo& info) PURE;
+  virtual void chargeResponseTiming(const ResponseTimingInfo& info) const PURE;
 };
 
 } // namespace Http

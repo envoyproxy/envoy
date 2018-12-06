@@ -52,7 +52,7 @@ Stats::StatName CodeStatsImpl::makeStatName(absl::string_view name) {
 }
 
 void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
-                                            Code response_code) {
+                                            Code response_code) const {
   ASSERT(scope.symbolTable().interoperable(symbol_table_));
   ASSERT(symbol_table_.interoperable(scope.symbolTable()));
 
@@ -62,13 +62,14 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
   scope.counterx(Join(prefix, upstream_rq_.statName(response_code)).statName()).inc();
 }
 
-void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
-                                            Code response_code) {
-  Stats::StatNameTempStorage prefix_storage(stripTrailingDot(prefix), symbol_table_);
-  return chargeBasicResponseStat(scope, prefix_storage.statName(), response_code);
+/*
+void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
+                                            Code response_code) const {
+  return chargeBasicResponseStat(scope, prefix, response_code);
 }
+*/
 
-void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) {
+void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
   Stats::StatNameTempStorage prefix_storage(stripTrailingDot(info.prefix_), symbol_table_);
   Stats::StatName prefix = prefix_storage.statName();
   Code code = static_cast<Code>(info.response_status_code_);
@@ -135,7 +136,7 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) {
   }
 }
 
-void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) {
+void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
   Stats::StatNameTempStorage prefix_storage(stripTrailingDot(info.prefix_), symbol_table_);
   Stats::StatName prefix = prefix_storage.statName();
 
@@ -186,7 +187,9 @@ absl::string_view CodeStatsImpl::stripTrailingDot(absl::string_view str) {
 }
 
 std::string CodeStatsImpl::join(const std::vector<absl::string_view>& v) {
-  ASSERT(!v.empty());
+  if (v.empty()) {
+    return "";
+  }
   auto iter = v.begin();
   if (iter->empty()) {
     ++iter; // Skip any initial empty prefix.

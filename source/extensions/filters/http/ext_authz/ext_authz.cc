@@ -120,7 +120,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                                            EMPTY_STRING,
                                            EMPTY_STRING,
                                            false};
-    config_->codeStats().chargeResponseStat(info);
+    config_->httpContext().codeStats().chargeResponseStat(info);
     break;
   }
 

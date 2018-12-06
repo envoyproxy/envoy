@@ -30,6 +30,8 @@ routing PRs, questions, etc. to the right place.
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions).
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@tetrate.io)
   * Lua, access logging, and general miscellany.
+* Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
+  * Stats, abseil, scalability, and performance.
 
 # Emeritus maintainers
 
@@ -48,7 +50,5 @@ matter expert reviews. Feel free to loop them in as needed.
   * Istio, APIs, HTTP routing, and WebSocket.
 * John Millikin ([jmillikin-stripe](https://github.com/jmillikin-stripe)) (jmillikin@stripe.com)
   * Bazel/build.
-* Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
-  * abseil and performance work.
 * Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
   * Redis, Python, configuration/operational questions.

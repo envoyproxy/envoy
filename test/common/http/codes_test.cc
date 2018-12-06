@@ -235,7 +235,45 @@ TEST_F(CodeUtilityTest, ResponseTimingTest) {
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name, "prefix.zone.from_az.to_az.upstream_rq_time"), 5));
-  code_stats_.chargeResponseTiming(info);
+  Http::CodeStatsImpl code_stats(symbol_table_);
+  code_stats.chargeResponseTiming(info);
+}
+
+class CodeStatsTest : public testing::Test {
+protected:
+  CodeStatsTest() : code_stats_(symbol_table_) {}
+
+  absl::string_view stripTrailingDot(absl::string_view prefix) {
+    return CodeStatsImpl::stripTrailingDot(prefix);
+  }
+
+  std::string join(const std::vector<absl::string_view>& v) {
+    std::vector<std::unique_ptr<Stats::StatNameTempStorage>> storage_vec;
+    std::vector<Stats::StatName> stat_name_vec;
+    for (auto str : v) {
+      storage_vec.emplace_back(std::make_unique<Stats::StatNameTempStorage>(str, symbol_table_));
+      stat_name_vec.push_back(storage_vec.back()->statName());
+    }
+    return CodeStatsImpl::Join(stat_name_vec).statName().toString(symbol_table_);
+  }
+
+  Stats::SymbolTableImpl symbol_table_;
+  CodeStatsImpl code_stats_;
+};
+
+TEST_F(CodeStatsTest, StripTrailingDot) {
+  EXPECT_EQ("", stripTrailingDot(""));
+  EXPECT_EQ("foo", stripTrailingDot("foo."));
+  EXPECT_EQ(".foo", stripTrailingDot(".foo"));  // no change
+  EXPECT_EQ("foo.", stripTrailingDot("foo..")); // only one dot gets stripped.
+}
+
+TEST_F(CodeStatsTest, Join) {
+  EXPECT_EQ("hello.world", join({"hello", "world"}));
+  EXPECT_EQ("hello.world", join({"", "hello", "world"})); // leading empty token ignored.
+  //EXPECT_EQ("hello.", join({"hello", ""}));               // trailing empty token not ignored.
+  EXPECT_EQ("hello", join({"hello"}));
+  EXPECT_EQ("", join({""}));
 }
 
 } // namespace Http

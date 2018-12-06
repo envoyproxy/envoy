@@ -14,8 +14,6 @@
 #include "common/protobuf/utility.h"
 #include "common/singleton/manager_impl.h"
 
-#include "server/configuration_impl.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -47,7 +45,7 @@ ValidationInstance::ValidationInstance(Options& options, Event::TimeSystem& time
       dispatcher_(api_->allocateDispatcher(time_system)),
       singleton_manager_(new Singleton::ManagerImpl()),
       access_log_manager_(*api_, *dispatcher_, access_log_lock), mutex_tracer_(nullptr),
-      code_stats_(store.symbolTable()) {
+      http_context_(store.symbolTable()) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
@@ -92,12 +90,9 @@ void ValidationInstance::initialize(Options& options,
   ssl_context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(time_system_);
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo(), *secret_manager_, api());
-
-  Configuration::MainImpl* main_config = new Configuration::MainImpl();
-  config_.reset(main_config);
-  main_config->initialize(bootstrap, *this, *cluster_manager_factory_);
-
+      localInfo(), *secret_manager_, api(), http_context_);
+  config_.initialize(bootstrap, *this, *cluster_manager_factory_);
+  http_context_.setTracer(config_.httpTracer());
   clusterManager().setInitializedCb(
       [this]() -> void { init_manager_.initialize([]() -> void {}); });
 }
@@ -107,8 +102,8 @@ void ValidationInstance::shutdown() {
   // do an abbreviated shutdown here since there's less to clean up -- for example, no workers to
   // exit.
   thread_local_.shutdownGlobalThreading();
-  if (config_ != nullptr && config_->clusterManager() != nullptr) {
-    config_->clusterManager()->shutdown();
+  if (config_.clusterManager() != nullptr) {
+    config_.clusterManager()->shutdown();
   }
   thread_local_.shutdownThread();
 }

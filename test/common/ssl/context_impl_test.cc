@@ -171,7 +171,8 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
   EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
-  EXPECT_TRUE(message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
@@ -223,7 +224,8 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
   EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
-  EXPECT_TRUE(message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
@@ -271,7 +273,7 @@ TEST_F(SslContextImplTest, TestNoCert) {
   ClientContextConfigImpl cfg(*loader, factory_context_);
   ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
   EXPECT_EQ(nullptr, context->getCaCertInformation());
-  EXPECT_EQ(nullptr, context->getCertChainInformation());
+  EXPECT_TRUE(context->getCertChainInformation().empty());
 }
 
 class SslServerContextImplTicketTest : public SslContextImplTest {

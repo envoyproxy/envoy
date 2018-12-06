@@ -2,7 +2,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/api/api_impl.h"
-#include "common/http/codes.h"
+#include "common/http/context_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
 #include "server/config_validation/cluster_manager.h"
@@ -36,17 +36,17 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   NiceMock<Event::MockDispatcher> dispatcher;
   LocalInfo::MockLocalInfo local_info;
   NiceMock<Server::MockAdmin> admin;
+  Http::ContextImpl http_context(stats_store.symbolTable());
 
   ValidationClusterManagerFactory factory(runtime, stats_store, tls, random, dns_resolver,
                                           ssl_context_manager, dispatcher, local_info,
-                                          secret_manager, *api);
+                                          secret_manager, *api, http_context);
 
   AccessLog::MockAccessLogManager log_manager;
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;
   Stats::SymbolTableImpl symbol_table;
-  Http::CodeStatsImpl code_stats(symbol_table);
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(
-      bootstrap, stats_store, tls, runtime, random, local_info, log_manager, admin, code_stats);
+      bootstrap, stats_store, tls, runtime, random, local_info, log_manager, admin);
   EXPECT_EQ(nullptr, cluster_manager->httpConnPoolForCluster("cluster", ResourcePriority::Default,
                                                              Http::Protocol::Http11, nullptr));
   Host::CreateConnectionData data = cluster_manager->tcpConnForCluster("cluster", nullptr, nullptr);

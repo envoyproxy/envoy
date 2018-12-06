@@ -8,7 +8,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
-#include "common/http/codes.h"
+#include "common/http/context_impl.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
@@ -82,11 +82,11 @@ TEST(HttpExtAuthzFilterConfigPerRouteTest, MergeConfig) {
 
 class HttpExtAuthzFilterTestBase {
 public:
-  HttpExtAuthzFilterTestBase() : code_stats_(stats_store_.symbolTable()) {}
+  HttpExtAuthzFilterTestBase() : http_context_(stats_store_.symbolTable()) {}
 
   void initConfig(envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& proto_config) {
     config_ = std::make_unique<FilterConfig>(proto_config, local_info_, stats_store_, runtime_, cm_,
-                                             code_stats_);
+                                             http_context_);
   }
 
   FilterConfigSharedPtr config_;
@@ -102,7 +102,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
-  Http::CodeStatsImpl code_stats_;
+  Http::ContextImpl http_context_;
 
   void prepareCheck() {
     ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
@@ -113,8 +113,6 @@ public:
 
 class HttpExtAuthzFilterTest : public testing::Test, public HttpExtAuthzFilterTestBase {
 public:
-  HttpExtAuthzFilterTest() {}
-
   void initialize(const std::string yaml) {
     envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
     MessageUtil::loadFromYaml(yaml, proto_config);

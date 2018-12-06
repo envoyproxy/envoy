@@ -19,14 +19,14 @@ public:
   ~CodeStatsImpl() override;
 
   // CodeStats
-  void chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
-                               Code response_code) override;
   void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
-                               Code response_code) override;
-  void chargeResponseStat(const ResponseStatInfo& info) override;
-  void chargeResponseTiming(const ResponseTimingInfo& info) override;
+                               Code response_code) const override;
+  void chargeResponseStat(const ResponseStatInfo& info) const override;
+  void chargeResponseTiming(const ResponseTimingInfo& info) const override;
 
 private:
+  friend class CodeStatsTest;
+
   using Join = Stats::StatNameJoiner;
 
   class RequestCodeGroup {
@@ -104,10 +104,10 @@ private:
   Stats::StatName vhost_;
   Stats::StatName zone_;
 
-  RequestCodeGroup canary_upstream_rq_;
-  RequestCodeGroup external_upstream_rq_;
-  RequestCodeGroup internal_upstream_rq_;
-  RequestCodeGroup upstream_rq_;
+  mutable RequestCodeGroup canary_upstream_rq_;
+  mutable RequestCodeGroup external_upstream_rq_;
+  mutable RequestCodeGroup internal_upstream_rq_;
+  mutable RequestCodeGroup upstream_rq_;
 };
 
 /**
