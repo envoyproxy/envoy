@@ -79,7 +79,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv4TransparentOptions) {
 }
 
 TEST_F(SocketOptionFactoryTest, TestBuildIpv6TransparentOptions) {
-  CHECK_OPTION_SUPPORTED(ENVOY_SOCKET_IP_TRANSPARENT);
+  CHECK_OPTION_SUPPORTED(ENVOY_SOCKET_IPV6_TRANSPARENT);
   makeSocketV6();
 
   auto options = SocketOptionFactory::buildIpTransparentOptions();
