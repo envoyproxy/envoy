@@ -233,6 +233,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, EmptyFilter) {
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
   manager_->addOrUpdateListener(parseListenerFromJson(json), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
+  EXPECT_EQ(std::chrono::milliseconds(15000),
+            manager_->listeners().front().get().listenerFiltersTimeout());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, DefaultListenerPerConnectionBufferLimit) {
@@ -373,6 +375,22 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
 
   EXPECT_EQ(1UL, server_.stats_store_.counter("bar").value());
   EXPECT_EQ(1UL, server_.stats_store_.counter("listener.127.0.0.1_1234.foo").value());
+}
+
+TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
+  const std::string json = R"EOF(
+    name: "foo"
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 10000 }
+    filter_chains:
+    - filters:
+    listener_filters_timeout: 0s
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(json), "", true));
+  EXPECT_EQ(std::chrono::milliseconds(),
+            manager_->listeners().front().get().listenerFiltersTimeout());
 }
 
 TEST_F(ListenerManagerImplTest, ReversedWriteFilterOrder) {
