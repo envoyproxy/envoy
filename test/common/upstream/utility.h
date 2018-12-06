@@ -163,6 +163,20 @@ parseHealthCheckFromV1Json(const std::string& json_string) {
   return health_check;
 }
 
+inline absl::optional<Network::Socket::Option::Information>
+findSocketOptionInfo(const Network::Socket::Options& options, const Network::Socket& socket,
+                     const Network::SocketOptionName& name,
+                     envoy::api::v2::core::SocketOption::SocketState state) {
+  for (const auto& option : options) {
+    auto info = option->getOptionInformation(socket, state);
+    if (info.has_value() && info->name_ == name) {
+      return info;
+    }
+  }
+
+  return absl::nullopt;
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -36,88 +36,66 @@ protected:
   void makeSocketV6() {
     socket_mock_.local_address_ = std::make_unique<Address::Ipv6Instance>("::1:2:3:4", 5678);
   }
-};
 
-#define CHECK_OPTION_SUPPORTED(option)                                                             \
-  if (!option.has_value()) {                                                                       \
-    return;                                                                                        \
+  absl::optional<Network::Socket::Option::Information>
+  findSocketOptionInfo(const Network::Socket::Options& options,
+                       const Network::SocketOptionName& name,
+                       envoy::api::v2::core::SocketOption::SocketState state) {
+    for (const auto& option : options) {
+      auto info = option->getOptionInformation(socket_mock_, state);
+      if (info.has_value() && info->name_ == name) {
+        return info;
+      }
+    }
+
+    return absl::nullopt;
   }
+
+  std::string intToBinaryString(int value) {
+    return std::string{absl::string_view(reinterpret_cast<const char*>(&value), sizeof(value))};
+  }
+};
 
 TEST_F(SocketOptionFactoryTest, TestBuildSocketMarkOptions) {
 
-  // use a shared_ptr due to applyOptions requiring one
-  std::shared_ptr<Socket::Options> options = SocketOptionFactory::buildSocketMarkOptions(100);
+  auto options = SocketOptionFactory::buildSocketMarkOptions(100);
 
-  const auto expected_option = ENVOY_SOCKET_SO_MARK;
-  CHECK_OPTION_SUPPORTED(expected_option);
-
-  const int type = expected_option.value().first;
-  const int option = expected_option.value().second;
-  EXPECT_CALL(os_sys_calls_mock_, setsockopt_(_, _, _, _, sizeof(int)))
-      .WillOnce(Invoke([type, option](int, int input_type, int input_option, const void* optval,
-                                      socklen_t) -> int {
-        EXPECT_EQ(100, *static_cast<const int*>(optval));
-        EXPECT_EQ(type, input_type);
-        EXPECT_EQ(option, input_option);
-        return 0;
-      }));
-
-  EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
-                                            envoy::api::v2::core::SocketOption::STATE_PREBIND));
+  auto applied_option = findSocketOptionInfo(*options, ENVOY_SOCKET_SO_MARK,
+                                             envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  ASSERT_TRUE(applied_option.has_value());
+  EXPECT_EQ(intToBinaryString(100), applied_option->value_);
 }
 
 TEST_F(SocketOptionFactoryTest, TestBuildIpv4TransparentOptions) {
   makeSocketV4();
 
-  // use a shared_ptr due to applyOptions requiring one
-  std::shared_ptr<Socket::Options> options = SocketOptionFactory::buildIpTransparentOptions();
+  auto options = SocketOptionFactory::buildIpTransparentOptions();
 
   const auto expected_option = ENVOY_SOCKET_IP_TRANSPARENT;
-  CHECK_OPTION_SUPPORTED(expected_option);
 
-  const int type = expected_option.value().first;
-  const int option = expected_option.value().second;
-  EXPECT_CALL(os_sys_calls_mock_, setsockopt_(_, _, _, _, sizeof(int)))
-      .Times(2)
-      .WillRepeatedly(Invoke([type, option](int, int input_type, int input_option,
-                                            const void* optval, socklen_t) -> int {
-        EXPECT_EQ(type, input_type);
-        EXPECT_EQ(option, input_option);
-        EXPECT_EQ(1, *static_cast<const int*>(optval));
-        return 0;
-      }));
-
-  EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
-                                            envoy::api::v2::core::SocketOption::STATE_PREBIND));
-  EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
-                                            envoy::api::v2::core::SocketOption::STATE_BOUND));
+  auto prebind_option = findSocketOptionInfo(*options, ENVOY_SOCKET_IP_TRANSPARENT,
+                                             envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  auto bound_option = findSocketOptionInfo(*options, ENVOY_SOCKET_IP_TRANSPARENT,
+                                           envoy::api::v2::core::SocketOption::STATE_BOUND);
+  ASSERT_TRUE(prebind_option.has_value());
+  EXPECT_EQ(intToBinaryString(1), prebind_option->value_);
+  ASSERT_TRUE(bound_option.has_value());
+  EXPECT_EQ(intToBinaryString(1), bound_option->value_);
 }
 
 TEST_F(SocketOptionFactoryTest, TestBuildIpv6TransparentOptions) {
   makeSocketV6();
 
-  // use a shared_ptr due to applyOptions requiring one
-  std::shared_ptr<Socket::Options> options = SocketOptionFactory::buildIpTransparentOptions();
+  auto options = SocketOptionFactory::buildIpTransparentOptions();
 
-  const auto expected_option = ENVOY_SOCKET_IPV6_TRANSPARENT;
-  CHECK_OPTION_SUPPORTED(expected_option);
-
-  const int type = expected_option.value().first;
-  const int option = expected_option.value().second;
-  EXPECT_CALL(os_sys_calls_mock_, setsockopt_(_, _, _, _, sizeof(int)))
-      .Times(2)
-      .WillRepeatedly(Invoke([type, option](int, int input_type, int input_option,
-                                            const void* optval, socklen_t) -> int {
-        EXPECT_EQ(type, input_type);
-        EXPECT_EQ(option, input_option);
-        EXPECT_EQ(1, *static_cast<const int*>(optval));
-        return 0;
-      }));
-
-  EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
-                                            envoy::api::v2::core::SocketOption::STATE_PREBIND));
-  EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
-                                            envoy::api::v2::core::SocketOption::STATE_BOUND));
+  auto prebind_option = findSocketOptionInfo(*options, ENVOY_SOCKET_IPV6_TRANSPARENT,
+                                             envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  auto bound_option = findSocketOptionInfo(*options, ENVOY_SOCKET_IPV6_TRANSPARENT,
+                                           envoy::api::v2::core::SocketOption::STATE_BOUND);
+  ASSERT_TRUE(prebind_option.has_value());
+  EXPECT_EQ(intToBinaryString(1), prebind_option->value_);
+  ASSERT_TRUE(bound_option.has_value());
+  EXPECT_EQ(intToBinaryString(1), bound_option->value_);
 }
 
 } // namespace Network

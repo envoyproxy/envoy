@@ -1561,11 +1561,6 @@ TEST(PrioritySet, Extend) {
   }
 }
 
-#define CHECK_OPTION_SUPPORTED(option)                                                             \
-  if (!option.has_value()) {                                                                       \
-    return;                                                                                        \
-  }
-
 class ClusterInfoImplTest : public testing::Test {
 public:
   std::unique_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml) {
@@ -1873,22 +1868,14 @@ TEST_F(ClusterInfoImplTest, TestMarkSocketOptions) {
   )EOF"));
   auto options = cluster->info()->clusterSocketOptions();
 
-  const auto expected_option = ENVOY_SOCKET_SO_MARK;
-  CHECK_OPTION_SUPPORTED(expected_option);
-  const int type = expected_option.value().first;
-  const int option = expected_option.value().second;
+  auto applied_option = findSocketOptionInfo(*options, socket_mock_, ENVOY_SOCKET_SO_MARK,
+                                             envoy::api::v2::core::SocketOption::STATE_PREBIND);
 
-  EXPECT_CALL(os_sys_calls_mock_, setsockopt_(_, _, _, _, sizeof(int)))
-      .WillOnce(Invoke([type, option](int, int input_type, int input_option, const void* optval,
-                                      socklen_t) -> int {
-        EXPECT_EQ(145, *static_cast<const int*>(optval));
-        EXPECT_EQ(type, input_type);
-        EXPECT_EQ(option, input_option);
-        return 0;
-      }));
-
-  Envoy::Network::Socket::applyOptions(options, socket_mock_,
-                                       envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  ASSERT_TRUE(applied_option.has_value());
+  int expected_value = 145;
+  std::string expected_value_str{
+      absl::string_view(reinterpret_cast<const char*>(&expected_value), sizeof(expected_value))};
+  EXPECT_EQ(expected_value_str, applied_option->value_);
 }
 
 TEST_F(ClusterInfoImplTest, TestTransparentSocketOptions) {
@@ -1897,25 +1884,14 @@ TEST_F(ClusterInfoImplTest, TestTransparentSocketOptions) {
       src_transparent: true
   )EOF"));
   auto options = cluster->info()->clusterSocketOptions();
+  auto applied_option = findSocketOptionInfo(*options, socket_mock_, ENVOY_SOCKET_IP_TRANSPARENT,
+                                             envoy::api::v2::core::SocketOption::STATE_PREBIND);
 
-  const auto expected_option = ENVOY_SOCKET_IP_TRANSPARENT;
-  CHECK_OPTION_SUPPORTED(expected_option);
-  const int type = expected_option.value().first;
-  const int option = expected_option.value().second;
-  socket_mock_.local_address_ =
-      std::make_unique<Envoy::Network::Address::Ipv4Instance>("1.2.3.4", 5678);
-
-  EXPECT_CALL(os_sys_calls_mock_, setsockopt_(_, _, _, _, sizeof(int)))
-      .WillOnce(Invoke([type, option](int, int input_type, int input_option, const void* optval,
-                                      socklen_t) -> int {
-        EXPECT_EQ(type, input_type);
-        EXPECT_EQ(option, input_option);
-        EXPECT_EQ(1, *static_cast<const int*>(optval));
-        return 0;
-      }));
-
-  Envoy::Network::Socket::applyOptions(options, socket_mock_,
-                                       envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  ASSERT_TRUE(applied_option.has_value());
+  int expected_value = 1;
+  std::string expected_value_str{
+      absl::string_view(reinterpret_cast<const char*>(&expected_value), sizeof(expected_value))};
+  EXPECT_EQ(expected_value_str, applied_option->value_);
 }
 
 // Validate empty singleton for HostsPerLocalityImpl.
