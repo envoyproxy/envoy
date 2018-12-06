@@ -81,7 +81,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   // Initialize client stats.
   stats_.streams_total_ = &scope_->counter("streams_total");
   for (uint32_t i = 0; i <= Status::GrpcStatus::MaximumValid; ++i) {
-    stats_.streams_closed_[i] = &scope_->counter(fmt::format("streams_closed_{}", i-1));
+    stats_.streams_closed_[i] = &scope_->counter(fmt::format("streams_closed_{}", i - 1));
   }
 }
 
@@ -178,7 +178,8 @@ void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
                                               const std::string& message) {
   if (grpc_status > Status::GrpcStatus::MaximumValid || grpc_status < 0) {
     ENVOY_LOG(error, "notifyRemoteClose invalid gRPC status code {}", grpc_status);
-    // Set the grpc_status as InvalidCode but increment the Unknown stream to avoid out-of-range crash..
+    // Set the grpc_status as InvalidCode but increment the Unknown stream to avoid out-of-range
+    // crash..
     grpc_status = Status::GrpcStatus::InvalidCode;
     parent_.stats_.streams_closed_[Status::GrpcStatus::Unknown]->inc();
   } else {
