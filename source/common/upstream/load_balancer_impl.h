@@ -28,7 +28,8 @@ public:
   // a priority vector in the style of per_priority_load_
   //
   // Returns the priority, a number between 0 and per_priority_load.size()-1
-  static uint32_t choosePriority(uint64_t hash, const std::vector<uint32_t>& per_priority_load, ClusterStats& stats);
+  static uint32_t choosePriority(uint64_t hash, const std::vector<uint32_t>& per_priority_load,
+                                 ClusterStats& stats);
 
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 

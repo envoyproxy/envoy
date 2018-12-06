@@ -22,7 +22,8 @@ static const std::string RuntimePanicThreshold = "upstream.healthy_panic_thresho
 } // namespace
 
 uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
-                                          const std::vector<uint32_t>& per_priority_load, ClusterStats& stats) {
+                                          const std::vector<uint32_t>& per_priority_load,
+                                          ClusterStats& stats) {
   hash = hash % 100 + 1; // 1-100
   uint32_t aggregate_percentage_load = 0;
   // As with tryChooseLocalLocalityHosts, this can be refactored for efficiency
