@@ -212,11 +212,6 @@ public:
    * @return the flush interval of stats sinks.
    */
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
-
-  /**
-   * @return Http::CodeStats the http response-code stats
-   */
-  // virtual Http::CodeStats& codeStats() PURE;
 };
 
 } // namespace Server

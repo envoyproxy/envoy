@@ -66,7 +66,6 @@ private:
   };
 
   static absl::string_view stripTrailingDot(absl::string_view prefix);
-  static std::string join(const std::vector<absl::string_view>& v);
   Stats::StatName makeStatName(absl::string_view name);
   Stats::StatName upstreamRqGroup(Code response_code) const;
 

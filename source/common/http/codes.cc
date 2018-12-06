@@ -62,13 +62,6 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
   scope.counterx(Join(prefix, upstream_rq_.statName(response_code)).statName()).inc();
 }
 
-/*
-void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
-                                            Code response_code) const {
-  return chargeBasicResponseStat(scope, prefix, response_code);
-}
-*/
-
 void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
   Stats::StatNameTempStorage prefix_storage(stripTrailingDot(info.prefix_), symbol_table_);
   Stats::StatName prefix = prefix_storage.statName();
@@ -184,17 +177,6 @@ absl::string_view CodeStatsImpl::stripTrailingDot(absl::string_view str) {
     str.remove_suffix(1);
   }
   return str;
-}
-
-std::string CodeStatsImpl::join(const std::vector<absl::string_view>& v) {
-  if (v.empty()) {
-    return "";
-  }
-  auto iter = v.begin();
-  if (iter->empty()) {
-    ++iter; // Skip any initial empty prefix.
-  }
-  return absl::StrJoin(iter, v.end(), ".");
 }
 
 Stats::StatName CodeStatsImpl::upstreamRqGroup(Code response_code) const {
