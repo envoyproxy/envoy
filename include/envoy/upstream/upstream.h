@@ -112,6 +112,7 @@ public:
 
   /**
    * @return whether in aggregate a host is degraded. A host is never both degraded and healthy.
+   *         A host may be degraded either through active health checking or through EDS updates.
    */
   virtual bool degraded() const PURE;
 
@@ -244,7 +245,7 @@ public:
   /**
    * @return all degraded hosts contained in the set at the current time. NOTE: This set is
    *         eventually consistent. There is a time window where a host in this set may become
-   *         undgraded and calling degraded() on it will return false. Code should be written to
+   *         undegraded and calling degraded() on it will return false. Code should be written to
    *         deal with this case if it matters.
    */
   virtual const HostVector& degradedHosts() const PURE;
