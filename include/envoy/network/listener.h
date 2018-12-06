@@ -61,7 +61,7 @@ public:
   /**
    * @return std::chrono::milliseconds the timeout to wait for all listener filters to complete
    *         operation. If the timeout is reached, the accepted socket is closed without a
-   *         connection being created. 0 Specifies a disabled timeout.
+   *         connection being created. 0 specifies a disabled timeout.
    */
   virtual std::chrono::milliseconds listenerFiltersTimeout() const PURE;
 

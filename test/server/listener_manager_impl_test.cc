@@ -377,7 +377,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
   EXPECT_EQ(1UL, server_.stats_store_.counter("listener.127.0.0.1_1234.foo").value());
 }
 
-TEST_F(ListenerManagerImplTest, NotDefaultListerFiltersTimeout) {
+TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
   const std::string json = R"EOF(
     name: "foo"
     address:
