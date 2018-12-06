@@ -4,7 +4,6 @@
     "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
     {
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http1",
@@ -47,7 +46,7 @@
           ]
         },
         "filters": [
-          { "type": "both", "name": "grpc_json_transcoder",
+          { "name": "grpc_json_transcoder",
             "config": {
               "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
               "services": ["bookstore.Bookstore"]

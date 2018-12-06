@@ -49,7 +49,8 @@ public:
                        Event::TimeSystem& time_system);
 
   // Network::TransportSocketFactory
-  Network::TransportSocketPtr createTransportSocket() const override;
+  Network::TransportSocketPtr
+  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
 
 private:

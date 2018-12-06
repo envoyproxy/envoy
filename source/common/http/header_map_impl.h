@@ -93,7 +93,7 @@ protected:
     // HeaderEntry
     const HeaderString& key() const override { return key_; }
     void value(const char* value, uint32_t size) override;
-    void value(const std::string& value) override;
+    void value(absl::string_view value) override;
     void value(uint64_t value) override;
     void value(const HeaderEntry& header) override;
     const HeaderString& value() const override { return value_; }

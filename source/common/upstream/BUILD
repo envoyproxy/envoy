@@ -29,6 +29,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "eds_subscription_factory_lib",
+    srcs = ["eds_subscription_factory.cc"],
+    hdrs = ["eds_subscription_factory.h"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//source/common/config:grpc_managed_mux_subscription_lib",
+        "//source/common/config:grpc_mux_lib",
+        "//source/common/config:subscription_factory_lib",
+        "//source/common/config:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "cds_subscription_lib",
     srcs = ["cds_subscription.cc"],
     hdrs = ["cds_subscription.h"],
@@ -83,6 +98,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/common/tcp:conn_pool_lib",
+        "//source/common/upstream:eds_subscription_factory_lib",
         "//source/common/upstream:upstream_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2/core:base_cc",
@@ -296,6 +312,7 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/upstream:eds_subscription_factory_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/api/v2/core:base_cc",
         "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
@@ -401,6 +418,7 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/upstream:eds_subscription_factory_lib",
         "//source/server:init_manager_lib",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",

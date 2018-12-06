@@ -389,10 +389,10 @@ void TcpProxySslIntegrationTest::setupConnections() {
   // Set up the SSl client.
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
-  context_ = Ssl::createClientSslTransportSocketFactory(false, false, *context_manager_);
+  context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_);
   ssl_client_ =
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                          context_->createTransportSocket(), nullptr);
+                                          context_->createTransportSocket(nullptr), nullptr);
 
   // Perform the SSL handshake. Loopback is whitelisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.

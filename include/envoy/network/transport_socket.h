@@ -4,6 +4,8 @@
 #include "envoy/common/pure.h"
 #include "envoy/ssl/connection.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -137,6 +139,32 @@ public:
 typedef std::unique_ptr<TransportSocket> TransportSocketPtr;
 
 /**
+ * Options for creating transport sockets.
+ */
+class TransportSocketOptions {
+public:
+  virtual ~TransportSocketOptions() {}
+
+  /**
+   * @return the const optional server name to set in the transport socket, for example SNI for
+   *         SSL, regardless of the upstream cluster configuration. Filters that influence
+   *         upstream connection selection, such as tcp_proxy, should take this option into account
+   *         and should pass it through to the connection pool to ensure the correct endpoints are
+   *         selected and the upstream connection is set up accordingly.
+   */
+  virtual const absl::optional<std::string>& serverNameOverride() const PURE;
+
+  /**
+   * @param vector of bytes to which the option should append hash key data that will be used
+   *        to separate connections based on the option. Any data already in the key vector must
+   *        not be modified.
+   */
+  virtual void hashKey(std::vector<uint8_t>& key) const PURE;
+};
+
+typedef std::shared_ptr<TransportSocketOptions> TransportSocketOptionsSharedPtr;
+
+/**
  * A factory for creating transport socket. It will be associated to filter chains and clusters.
  */
 class TransportSocketFactory {
@@ -149,9 +177,11 @@ public:
   virtual bool implementsSecureTransport() const PURE;
 
   /**
+   * @param options for creating the transport socket
    * @return Network::TransportSocketPtr a transport socket to be passed to connection.
    */
-  virtual TransportSocketPtr createTransportSocket() const PURE;
+  virtual TransportSocketPtr
+  createTransportSocket(TransportSocketOptionsSharedPtr options) const PURE;
 };
 
 typedef std::unique_ptr<TransportSocketFactory> TransportSocketFactoryPtr;

@@ -173,8 +173,9 @@ public:
 
   // Http::FilterChainFactory
   MOCK_METHOD1(createFilterChain, void(FilterChainFactoryCallbacks& callbacks));
-  MOCK_METHOD2(createUpgradeFilterChain,
-               bool(absl::string_view upgrade_type, FilterChainFactoryCallbacks& callbacks));
+  MOCK_METHOD3(createUpgradeFilterChain, bool(absl::string_view upgrade_type,
+                                              const FilterChainFactory::UpgradeMap* upgrade_map,
+                                              FilterChainFactoryCallbacks& callbacks));
 };
 
 class MockStreamFilterCallbacksBase {
@@ -210,7 +211,7 @@ public:
   MOCK_METHOD0(decoderBufferLimit, uint32_t());
 
   // Http::StreamDecoderFilterCallbacks
-  void sendLocalReply(Code code, const std::string& body,
+  void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(HeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
     Utility::sendLocalReply(
@@ -231,6 +232,9 @@ public:
     encodeHeaders_(*headers, end_stream);
   }
   void encodeTrailers(HeaderMapPtr&& trailers) override { encodeTrailers_(*trailers); }
+  void encodeMetadata(MetadataMapPtr&& metadata_map) override {
+    encodeMetadata_(std::move(metadata_map));
+  }
 
   MOCK_METHOD0(continueDecoding, void());
   MOCK_METHOD2(addDecodedData, void(Buffer::Instance& data, bool streaming));
@@ -240,6 +244,7 @@ public:
   MOCK_METHOD2(encodeHeaders_, void(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers_, void(HeaderMap& trailers));
+  MOCK_METHOD1(encodeMetadata_, void(MetadataMapPtr metadata_map));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
@@ -608,6 +613,62 @@ private:
 };
 
 IsSubsetOfHeadersMatcher IsSubsetOfHeaders(const HeaderMap& expected_headers);
+
+template <typename HeaderMapT>
+class IsSupersetOfHeadersMatcherImpl : public testing::MatcherInterface<HeaderMapT> {
+public:
+  explicit IsSupersetOfHeadersMatcherImpl(const HeaderMap& expected_headers)
+      : expected_headers_(expected_headers) {}
+
+  IsSupersetOfHeadersMatcherImpl(IsSupersetOfHeadersMatcherImpl&& other)
+      : expected_headers_(other.expected_headers_) {}
+
+  IsSupersetOfHeadersMatcherImpl(const IsSupersetOfHeadersMatcherImpl& other)
+      : expected_headers_(other.expected_headers_) {}
+
+  bool MatchAndExplain(HeaderMapT headers, testing::MatchResultListener* listener) const override {
+    // Collect header maps into vectors, to use for IsSupersetOf.
+    auto get_headers_cb = [](const HeaderEntry& header, void* headers) {
+      static_cast<std::vector<std::pair<absl::string_view, absl::string_view>>*>(headers)
+          ->push_back(std::make_pair(header.key().getStringView(), header.value().getStringView()));
+      return HeaderMap::Iterate::Continue;
+    };
+    std::vector<std::pair<absl::string_view, absl::string_view>> arg_headers_vec;
+    headers.iterate(get_headers_cb, &arg_headers_vec);
+    std::vector<std::pair<absl::string_view, absl::string_view>> expected_headers_vec;
+    expected_headers_.iterate(get_headers_cb, &expected_headers_vec);
+
+    return ExplainMatchResult(testing::IsSupersetOf(expected_headers_vec), arg_headers_vec,
+                              listener);
+  }
+
+  void DescribeTo(std::ostream* os) const override {
+    *os << "is a superset of headers:\n" << expected_headers_;
+  }
+
+  const HeaderMapImpl expected_headers_;
+};
+
+class IsSupersetOfHeadersMatcher {
+public:
+  IsSupersetOfHeadersMatcher(const HeaderMap& expected_headers)
+      : expected_headers_(expected_headers) {}
+
+  IsSupersetOfHeadersMatcher(IsSupersetOfHeadersMatcher&& other)
+      : expected_headers_(static_cast<const HeaderMap&>(other.expected_headers_)) {}
+
+  IsSupersetOfHeadersMatcher(const IsSupersetOfHeadersMatcher& other)
+      : expected_headers_(static_cast<const HeaderMap&>(other.expected_headers_)) {}
+
+  template <typename HeaderMapT> operator testing::Matcher<HeaderMapT>() const {
+    return testing::MakeMatcher(new IsSupersetOfHeadersMatcherImpl<HeaderMapT>(expected_headers_));
+  }
+
+private:
+  HeaderMapImpl expected_headers_;
+};
+
+IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers);
 
 } // namespace Http
 

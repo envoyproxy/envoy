@@ -154,6 +154,7 @@ envoy_cc_test(
     srcs = ["router_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/http:context_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:router_lib",
         "//source/common/upstream:upstream_includes",
