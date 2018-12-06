@@ -81,7 +81,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   // Initialize client stats.
   stats_.streams_total_ = &scope_->counter("streams_total");
   for (uint32_t i = 0; i <= Status::GrpcStatus::MaximumValid; ++i) {
-    stats_.streams_closed_[i] = &scope_->counter(fmt::format("streams_closed_{}", i));
+    stats_.streams_closed_[i] = &scope_->counter(fmt::format("streams_closed_{}", i-1));
   }
 }
 
@@ -177,11 +177,14 @@ void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
                                               Http::HeaderMapPtr trailing_metadata,
                                               const std::string& message) {
   if (grpc_status > Status::GrpcStatus::MaximumValid || grpc_status < 0) {
-    ENVOY_LOG(error, "notifyRemoteClose unknown gRPC status code {}", grpc_status);
-    grpc_status = Status::GrpcStatus::Unknown;
+    ENVOY_LOG(error, "notifyRemoteClose invalid gRPC status code {}", grpc_status);
+    // Set the grpc_status as InvalidCode but increment the Unknown stream to avoid out-of-range crash..
+    grpc_status = Status::GrpcStatus::InvalidCode;
+    parent_.stats_.streams_closed_[Status::GrpcStatus::Unknown]->inc();
+  } else {
+    parent_.stats_.streams_closed_[grpc_status]->inc();
   }
   ENVOY_LOG(debug, "notifyRemoteClose {} {}", grpc_status, message);
-  parent_.stats_.streams_closed_[grpc_status]->inc();
   callbacks_.onReceiveTrailingMetadata(trailing_metadata ? std::move(trailing_metadata)
                                                          : std::make_unique<Http::HeaderMapImpl>());
   callbacks_.onRemoteClose(grpc_status, message);

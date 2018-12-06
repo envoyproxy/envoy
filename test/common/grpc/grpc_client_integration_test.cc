@@ -305,7 +305,6 @@ TEST_P(GrpcClientIntegrationTest, UnauthenticatedError) {
 // Validate that a trailers reply is still handled even if a grpc status code larger than
 // MaximumValid, is handled.
 TEST_P(GrpcClientIntegrationTest, MaximumValidPlusOne) {
-  SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
