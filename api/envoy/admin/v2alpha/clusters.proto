@@ -58,6 +58,9 @@ message HostStatus {
   // success rate or the cluster did not have enough hosts to run through success rate outlier
   // ejection.
   envoy.type.Percent success_rate = 4;
+
+  // The host's weight. If not configured, the value defaults to 1.
+  uint32 weight = 5;
 }
 
 // Health status for a host.
