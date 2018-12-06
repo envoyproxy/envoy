@@ -226,6 +226,56 @@ TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchTest) {
 }
 
 /**
+ * Test MySQL Handshake with protocol version 320
+ * Server responds with Auth Switch and error
+ * SM: greeting(p=10) -> challenge-req(v320) -> serv-resp-auth-switch ->
+ * -> auth_switch_resp -> serv-resp-err
+ */
+TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchErrTest) {
+  initialize();
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(1UL, config_->stats().sessions_.value());
+
+  std::string greeting_data = encodeServerGreeting(MYSQL_PROTOCOL_10);
+  Buffer::InstancePtr greet_data(new Buffer::OwnedImpl(greeting_data));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
+  EXPECT_EQ(MySQLSession::State::MYSQL_CHALLENGE_REQ, filter_->getSession().getState());
+
+  std::string clogin_data = encodeClientLogin(0, "user1");
+  Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
+  EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
+  EXPECT_EQ(MySQLSession::State::MYSQL_CHALLENGE_RESP_320, filter_->getSession().getState());
+
+  std::string srv_resp_data = encodeClientLoginResp(MYSQL_RESP_AUTH_SWITCH);
+  Buffer::InstancePtr server_resp_data(new Buffer::OwnedImpl(srv_resp_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_data, false));
+
+  std::string auth_switch_resp = encodeAuthSwitchResp();
+  Buffer::InstancePtr client_switch_resp(new Buffer::OwnedImpl(auth_switch_resp));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_switch_resp, false));
+  EXPECT_EQ(MySQLSession::State::MYSQL_AUTH_SWITCH_MORE, filter_->getSession().getState());
+
+  std::string srv_resp_ok_data = encodeClientLoginResp(MYSQL_RESP_ERR, 1);
+  Buffer::InstancePtr server_resp_ok_data(new Buffer::OwnedImpl(srv_resp_ok_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_ok_data, false));
+  EXPECT_EQ(MySQLSession::State::MYSQL_RESYNC, filter_->getSession().getState());
+
+  Command mysql_cmd_encode{};
+  mysql_cmd_encode.setCmd(Command::Cmd::COM_QUERY);
+  std::string query = "CREATE DATABASE mysqldb";
+  mysql_cmd_encode.setData(query);
+  std::string query_data = mysql_cmd_encode.encode();
+  std::string mysql_msg = BufferHelper::encodeHdr(query_data, 0);
+  Buffer::InstancePtr client_query_data(new Buffer::OwnedImpl(mysql_msg));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_query_data, false));
+  EXPECT_EQ(MySQLSession::State::MYSQL_REQ_RESP, filter_->getSession().getState());
+  EXPECT_EQ(1UL, config_->stats().queries_parsed_.value());
+}
+
+/**
  * Negative sequence
  * Test MySQL Handshake with protocol version 41
  * - send 2 back-to-back Greeting message (duplicated message)
