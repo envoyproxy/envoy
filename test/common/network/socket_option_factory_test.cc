@@ -71,8 +71,6 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv4TransparentOptions) {
 
   auto options = SocketOptionFactory::buildIpTransparentOptions();
 
-  const auto expected_option = ENVOY_SOCKET_IP_TRANSPARENT;
-
   auto prebind_option = findSocketOptionInfo(*options, ENVOY_SOCKET_IP_TRANSPARENT,
                                              envoy::api::v2::core::SocketOption::STATE_PREBIND);
   auto bound_option = findSocketOptionInfo(*options, ENVOY_SOCKET_IP_TRANSPARENT,
