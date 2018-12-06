@@ -11,7 +11,9 @@
 
 namespace Envoy {
 
-// A test filter that inserts sleeps during the decode/encode phase.
+// A test filter that inserts sleeps during the decode/encode phase. Sleep is induced by invoking a
+// thread sleep, and it is done so to simulate a slow/hanging filter that causes the thread
+// executing the filter callbacks to block.
 class SleepingFilter : public Http::PassThroughFilter {
 public:
   // The dynamic_cast from Event::TimeSystem& to Event::TestTimeSystem& is necessary for exposing
