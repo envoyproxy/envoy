@@ -201,6 +201,10 @@ const Http::HeaderMap& AdminFilter::getRequestHeaders() const {
 }
 
 bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
+  if (params.size() == 0) {
+    return true;
+  }
+
   if (params.size() != 1) {
     return false;
   }
