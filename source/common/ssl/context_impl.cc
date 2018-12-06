@@ -899,23 +899,10 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_
     if (!CBS_get_u16(&cipher_suites, &cipher_id)) {
       return false;
     }
-
-    const SSL_CIPHER* c = SSL_get_cipher_by_value(cipher_id);
-    if (c == nullptr) {
-      continue;
-    }
-
-    // Skip TLS 1.2 only ciphersuites unless the client supports it.
-    if (SSL_CIPHER_get_min_version(c) > client_version) {
-      continue;
-    }
-
-    if (SSL_CIPHER_get_auth_nid(c) == NID_auth_ecdsa) {
-      // All tls_context_ share the same set of enabled ciphers, so we can just look at the base
-      // context.
-      if (tls_contexts_[0].isCipherEnabled(c)) {
-        return true;
-      }
+    // All tls_context_ share the same set of enabled ciphers, so we can just look at the base
+    // context.
+    if (tls_contexts_[0].isCipherEnabled(cipher_id, client_version)) {
+      return true;
     }
   }
 
@@ -983,9 +970,20 @@ void ServerContextImpl::TlsContext::addClientValidationContext(
   }
 }
 
-bool ServerContextImpl::TlsContext::isCipherEnabled(const SSL_CIPHER* cipher) {
+bool ServerContextImpl::TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) {
+  const SSL_CIPHER* c = SSL_get_cipher_by_value(cipher_id);
+  if (c == nullptr) {
+    return false;
+  }
+  // Skip TLS 1.2 only ciphersuites unless the client supports it.
+  if (SSL_CIPHER_get_min_version(c) > client_version) {
+    return false;
+  }
+  if (SSL_CIPHER_get_auth_nid(c) != NID_auth_ecdsa) {
+    return false;
+  }
   for (const SSL_CIPHER* our_c : SSL_CTX_get_ciphers(ssl_ctx_.get())) {
-    if (SSL_CIPHER_get_id(our_c) == SSL_CIPHER_get_id(cipher)) {
+    if (SSL_CIPHER_get_id(our_c) == SSL_CIPHER_get_id(c)) {
       return true;
     }
   }

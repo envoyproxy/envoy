@@ -135,7 +135,7 @@ protected:
     std::string getCertChainFileName() const { return cert_chain_file_path_; };
     void addClientValidationContext(const CertificateValidationContextConfig& config,
                                     bool require_client_cert);
-    bool isCipherEnabled(const SSL_CIPHER* cipher);
+    bool isCipherEnabled(uint16_t cipher_id, uint16_t client_version);
   };
 
   // This is always non-empty, with the first context used for all new SSL
