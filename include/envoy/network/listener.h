@@ -59,7 +59,7 @@ public:
   virtual uint32_t perConnectionBufferLimitBytes() PURE;
 
   /**
-   * @return std::chrono::milliseconds the timeout to wait for all listener filters to complete
+   * @return std::chrono::milliseconds the time to wait for all listener filters to complete
    *         operation. If the timeout is reached, the accepted socket is closed without a
    *         connection being created. 0 specifies a disabled timeout.
    */
