@@ -127,7 +127,7 @@ TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
 
   // When we get a remote close with an active request we should try to send zero bytes through
   // the codec.
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::UpstreamConnectionTermination));
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination));
   EXPECT_CALL(*codec_, dispatch(_));
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
   connection_cb_->onEvent(Network::ConnectionEvent::RemoteClose);
@@ -181,7 +181,7 @@ TEST_F(CodecClientTest, IdleTimerClientRemoteCloseWithActiveRequests) {
 
   // When we get a remote close with an active request validate idleTimer is reset after client
   // close
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::UpstreamConnectionTermination));
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination));
   EXPECT_CALL(*codec_, dispatch(_));
   EXPECT_NE(client_->numActiveRequests(), 0);
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
@@ -204,7 +204,7 @@ TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
   request_encoder.getStream().addCallbacks(callbacks);
 
   // When we get a local close with an active request validate idleTimer is reset after client close
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::DownstreamConnectionTermination));
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination));
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
   // TODO(ramaraochavali): Use default connection mock handlers for raising events.
   client_->close();

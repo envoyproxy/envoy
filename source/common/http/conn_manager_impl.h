@@ -447,7 +447,7 @@ private:
    */
   void doEndStream(ActiveStream& stream);
 
-  void resetAllStreams(StreamResetReason reason);
+  void resetAllStreams();
   void onIdleTimeout();
   void onDrainTimeout();
   void startDrainSequence();

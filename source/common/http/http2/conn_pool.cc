@@ -237,8 +237,7 @@ void ConnPoolImpl::onStreamDestroy(ActiveClient& client) {
 }
 
 void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason reason) {
-  if (reason == StreamResetReason::DownstreamConnectionTermination ||
-      reason == StreamResetReason::UpstreamConnectionTermination ||
+  if (reason == StreamResetReason::ConnectionTermination ||
       reason == StreamResetReason::ConnectionFailure) {
     host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
     client.closed_with_active_rq_ = true;

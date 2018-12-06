@@ -115,10 +115,8 @@ enum class StreamResetReason {
   RemoteRefusedStreamReset,
   // If the stream was locally reset by a connection pool due to an initial connection failure.
   ConnectionFailure,
-  // If the stream was reset due to an upstream connection termination.
-  UpstreamConnectionTermination,
-  // If the stream was reset due to a downstream connection termination.
-  DownstreamConnectionTermination,
+  // If the stream was locally reset due to connection termination.
+  ConnectionTermination,
   // The stream was reset because of a resource overflow.
   Overflow
 };

@@ -82,14 +82,11 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
                    active_requests_.size());
     disableIdleTimer();
     idle_timer_.reset();
-
-    StreamResetReason reason = (event == Network::ConnectionEvent::LocalClose)
-                                   ? StreamResetReason::DownstreamConnectionTermination
-                                   : StreamResetReason::UpstreamConnectionTermination;
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.
       active_requests_.front()->encoder_->getStream().resetStream(
-          connected_ ? reason : StreamResetReason::ConnectionFailure);
+          connected_ ? StreamResetReason::ConnectionTermination
+                     : StreamResetReason::ConnectionFailure);
     }
   }
 }

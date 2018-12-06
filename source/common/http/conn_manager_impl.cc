@@ -237,7 +237,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       // In the protocol error case, we need to reset all streams now. Since we do a flush write and
       // delayed close, the connection might stick around long enough for a pending stream to come
       // back and try to encode.
-      resetAllStreams(StreamResetReason::UpstreamConnectionTermination);
+      resetAllStreams();
 
       read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
       return Network::FilterStatus::StopIteration;
@@ -265,19 +265,16 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
   return Network::FilterStatus::StopIteration;
 }
 
-void ConnectionManagerImpl::resetAllStreams(StreamResetReason reason) {
+void ConnectionManagerImpl::resetAllStreams() {
   while (!streams_.empty()) {
     // Mimic a downstream reset in this case.
-    streams_.front()->onResetStream(reason);
+    streams_.front()->onResetStream(StreamResetReason::ConnectionTermination);
   }
 }
 
 void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
-  StreamResetReason reason = StreamResetReason::UpstreamConnectionTermination;
-
   if (event == Network::ConnectionEvent::LocalClose) {
     stats_.named_.downstream_cx_destroy_local_.inc();
-    reason = StreamResetReason::DownstreamConnectionTermination;
   }
 
   if (event == Network::ConnectionEvent::RemoteClose) {
@@ -307,7 +304,7 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 
     stats_.named_.downstream_cx_destroy_active_rq_.inc();
     user_agent_.onConnectionDestroy(event, true);
-    resetAllStreams(reason);
+    resetAllStreams();
   }
 }
 
@@ -399,6 +396,10 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   stream_info_.onRequestComplete();
+
+  if (!stream_info_.hasAnyResponseFlag() && !stream_info_.responseCode()) {
+    stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination);
+  }
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
