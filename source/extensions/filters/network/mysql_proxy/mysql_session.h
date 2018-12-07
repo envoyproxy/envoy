@@ -22,8 +22,9 @@ public:
     MYSQL_AUTH_SWITCH_MORE = 8,
     MYSQL_REQ_RESP = 9,
     MYSQL_REQ = 10,
-    MYSQL_NOT_HANDLED = 11,
-    MYSQL_ERROR = 12,
+    MYSQL_RESYNC = 11,
+    MYSQL_NOT_HANDLED = 12,
+    MYSQL_ERROR = 13,
   };
 
   void setState(MySQLSession::State state) { state_ = state; }

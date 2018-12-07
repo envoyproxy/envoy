@@ -57,6 +57,8 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
     } else if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
       session_.setState(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP);
     } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
+      // client/server should close the connection:
+      // https://dev.mysql.com/doc/internals/en/connection-phase.html
       session_.setState(MySQLSession::State::MYSQL_ERROR);
     } else {
       session_.setState(MySQLSession::State::MYSQL_NOT_HANDLED);
@@ -83,15 +85,27 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
     } else if (client_login_resp.getRespCode() == MYSQL_RESP_MORE) {
       session_.setState(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP);
     } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
-      session_.setState(MySQLSession::State::MYSQL_ERROR);
+      // stop parsing auth req/response, attempt to resync in command state
+      session_.setState(MySQLSession::State::MYSQL_RESYNC);
+      session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
     } else {
       session_.setState(MySQLSession::State::MYSQL_NOT_HANDLED);
     }
     break;
   }
 
+  case MySQLSession::State::MYSQL_RESYNC: {
+    if (seq == MYSQL_REQUEST_PKT_NUM) {
+      // re-sync to MYSQL_REQ state if seq# is 0
+      session_.setState(MySQLSession::State::MYSQL_REQ);
+      goto mysql_request_state;
+    }
+    break;
+  }
+
   // Process Command
   case MySQLSession::State::MYSQL_REQ: {
+  mysql_request_state:
     Command command{};
     command.decode(message, offset, seq, len);
     callbacks_.onCommand(command);
