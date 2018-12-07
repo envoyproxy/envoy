@@ -36,11 +36,9 @@ bool ConfigSubscriptionInstance::checkAndApplyConfig(const Protobuf::Message& co
   }
 
   config_info_ = {new_hash, version_info};
-  // route_config_proto_ = route_config;
-  // stats_.config_reload_.inc();
   ENVOY_LOG(debug, "{}: loading new configuration: config_name={} hash={}", name_, config_name,
             new_hash);
-  // TODO(aguedez): let's share the actual config impl as well as the proto...
+
   ASSERT(!dynamic_config_providers_.empty());
   ConfigProvider::ConfigConstSharedPtr new_config;
   for (auto* provider : dynamic_config_providers_) {
