@@ -4,6 +4,7 @@ IMAGE=$1
 RUN_REMOTE=$2
 LOCAL_MOUNT=$3
 TEST_PATH=$(realpath $4)
+shift 4
 
 CONTAINER_NAME="envoy-test-runner"
 ENVFILE=$(mktemp -t "bazel-test-env.XXXXXX")
@@ -21,7 +22,7 @@ echo "TEST_WORKSPACE=/tmp/workspace" >> "$ENVFILE"
 echo "TEST_SRCDIR=/tmp/src" >> "$ENVFILE"
 echo "ENVOY_IP_TEST_VERSIONS=v4only" >> "$ENVFILE"
 
-CMDLINE='set -a && . /env && env && /test'
+CMDLINE="set -a && . /env && env && /test $@"
 LIB_PATHS="/lib/x86_64-linux-gnu/ /lib64/"
 
 if [ "$RUN_REMOTE" != "yes" ]
