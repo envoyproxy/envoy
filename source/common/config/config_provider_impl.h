@@ -21,16 +21,38 @@ namespace Config {
 // ConfigProvider/ConfigProviderManager interfaces, which in tandem provide a framework for
 // implementing static and dynamic configuration for Envoy.
 //
-// Envoy's dynamic configuration is distributed via xDS APIs (see
+// Dynamic configuration is distributed via xDS APIs (see
 // https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md). The framework exposed
-// by the classes below enables client xDS implementations following a shared ownership model, where
-// according to the config source specification, a config subscription to the API server, config
-// protos received over the subscription and the subsequent config "implementation" (i.e., data
-// structures and associated business logic) are shared across ConfigProvider objects and Envoy
-// worker threads.
+// by these classes simplifies creation of client xDS implementations following a shared ownership
+// model, where according to the config source specification, a config subscription, config protos
+// received over the subscription and the subsequent config "implementation" (i.e., data structures
+// and associated business logic) are shared across ConfigProvider objects and Envoy worker threads.
 //
-// This approach enables linear configuration scalability based primarily on the size of the
-// configuration set.
+// This approach enables linear memory scalability based primarily on the size of the configuration
+// set.
+//
+// A blueprint to follow for implementing static and dynamic config providers is as follows:
+//
+// For both:
+//   1) Create a class derived from ConfigProviderManagerImpl and implement the required interface.
+//      When implementing createXdsConfigProvider(), it is expected that getSubscription<T>() will
+//      be called to fetch either an existing ConfigSubscriptionInstance if the config source
+//      configuration matches, or a newly instantiated subscription otherwise.
+//
+// For static providers:
+//   1) Create a class derived from StaticConfigProviderImpl and implement the required interface.
+//
+// For dynamic (xDS) providers:
+//   1) Create a class derived from DynamicConfigProviderImpl and implement the required interface.
+//   2) Create a class derived from ConfigSubscriptionInstance; this is the entity responsible for
+//   owning and managing the Envoy::Config::Subscription<ConfigProto> that provides the underlying
+//   config subscription.
+//     - When subscription callbacks (onConfigUpdate, onConfigUpdateFailed) are issued by the
+//     underlying subscription, the corresponding ConfigSubscriptionInstance functions must be
+//     called as well.
+//     - On a successful config update, checkAndApplyConfig() should be called to instantiate the
+//     new config implementation and propagate it to the shared config providers and all
+//     worker threads.
 
 class ConfigProviderManagerImpl;
 
@@ -87,7 +109,7 @@ public:
 
   /**
    * Starts the subscription corresponding to a config source.
-   * A derived class must manage the configuration proto specific Envoy::Config::Subscription to be
+   * A derived class must own the configuration proto specific Envoy::Config::Subscription to be
    * started.
    */
   virtual void start() PURE;
