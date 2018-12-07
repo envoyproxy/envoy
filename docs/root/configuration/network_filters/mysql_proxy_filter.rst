@@ -42,5 +42,5 @@ The MySQL filter emits the following dynamic metadata for each SQL query parsed:
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  <table.db>, string, The resource name in *table.db* format. If the database cannot be inferred, the resource name contains the table being accessed.
-  [], list, A list of strings, representing the operations executed on the resource. Operations can be one of insert,update,select,drop,delete,create,alter,show.
+  <table.db>, string, The resource name in *table.db* format. The resource name defaults to the table being accessed if the database cannot be inferred.
+  [], list, A list of strings representing the operations executed on the resource. Operations can be one of insert/update/select/drop/delete/create/alter/show.
