@@ -519,6 +519,47 @@ TEST(ClientContextConfigImplTest, InvalidCertificateSpki) {
                           EnvoyException, "Invalid base64-encoded SHA-256 .*");
 }
 
+// Validate that P256 ECDSA certs load.
+TEST(ClientContextConfigImplTest, P256EcdsaCert) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p256.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p256.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  manager.createSslClientContext(store, client_context_config);
+}
+
+// Validate that non-P256 ECDSA certs are rejected.
+TEST(ClientContextConfigImplTest, NonP256EcdsaCert) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p384.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p384.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+                          EnvoyException,
+                          "Failed to load certificate from chain .*selfsigned_cert_ecdsa_p384.pem, "
+                          "only P-256 ECDSA certificates are supported");
+}
+
 // Multiple TLS certificates are not yet supported.
 // TODO(PiotrSikora): Support multiple TLS certificates.
 TEST(ClientContextConfigImplTest, MultipleTlsCertificates) {
