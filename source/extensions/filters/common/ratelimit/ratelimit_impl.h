@@ -80,9 +80,10 @@ public:
   // Filters::Common::RateLimit::ClientFactory
   ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout) override;
 
-const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig> rateLimitConfig() const override {
-  return config_;
-}
+  const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig>
+  rateLimitConfig() const override {
+    return config_;
+  }
 
 private:
   Grpc::AsyncClientFactoryPtr async_client_factory_;
@@ -108,7 +109,8 @@ public:
     return ClientPtr{new NullClientImpl()};
   }
 
-  const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig> rateLimitConfig() const override {
+  const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig>
+  rateLimitConfig() const override {
     return absl::nullopt;
   }
 };

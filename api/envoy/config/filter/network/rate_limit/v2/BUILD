@@ -6,7 +6,7 @@ api_proto_library_internal(
     name = "rate_limit",
     srcs = ["rate_limit.proto"],
     deps = [
-        "//envoy/config/ratelimit/v2:rls",
         "//envoy/api/v2/ratelimit",
+        "//envoy/config/ratelimit/v2:rls",
     ],
 )
