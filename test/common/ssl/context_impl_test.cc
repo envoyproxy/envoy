@@ -557,7 +557,7 @@ TEST(ClientContextConfigImplTest, NonP256EcdsaCert) {
   EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
                           EnvoyException,
                           "Failed to load certificate from chain .*selfsigned_cert_ecdsa_p384.pem, "
-                          "only P-256 certificates are supported");
+                          "only P-256 ECDSA certificates are supported");
 }
 
 // Multiple TLS certificates are not yet supported.

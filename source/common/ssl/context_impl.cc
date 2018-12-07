@@ -237,7 +237,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
       const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
       if (ecdsa_group == nullptr || EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
         throw EnvoyException(fmt::format("Failed to load certificate from chain {}, only P-256 "
-                                         "certificates are supported",
+                                         "ECDSA certificates are supported",
                                          ctx.cert_chain_file_path_));
       }
     }
