@@ -7,6 +7,7 @@ Version history
 * access log: added dynamic metadata to access log messages streamed over gRPC.
 * access log: added DOWNSTREAM_CONNECTION_TERMINATION.
 * admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
+* admin: added host weight to the :http:get:`/clusters?format=json` end point response.
 * admin: :http:get:`/server_info` now responds with a JSON object instead of a single string.
 * admin: :http:get:`/server_info` now exposes what stage of initialization the server is currently in.
 * admin: added support for displaying command line options in :http:get:`/server_info` end point.
@@ -29,6 +30,10 @@ Version history
   value to override the default HTTP to gRPC status mapping.
 * http: no longer close the TCP connection when a HTTP/1 request is retried due
   to a response with empty body.
+* listeners: all listener filters are now governed by the :ref:`listener_filters_timeout
+  <envoy_api_field_Listener.listener_filters_timeout>` setting. The hard coded 15s timeout in
+  the :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` is superseded by
+  this setting.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using :ref:`source_type <envoy_api_field_listener.FilterChainMatch.source_type>`.
 * load balancer: added a `configuration <envoy_api_msg_Cluster.LeastRequestLbConfig>` option to specify the number of choices made in P2C.
 * logging: added missing [ in log prefix.
