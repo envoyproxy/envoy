@@ -2456,6 +2456,19 @@ public:
         });
   }
 
+  void setupCustomAuthorityHC(const std::string& authority) {
+    auto config = createGrpcHealthCheckConfig();
+    config.mutable_grpc_health_check()->set_service_name("service");
+    config.mutable_grpc_health_check()->set_authority(authority);
+    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_,
+                                                        random_,
+                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
+  }
+
   void setupNoReuseConnectionHC() {
     auto config = createGrpcHealthCheckConfig();
     config.mutable_reuse_connection()->set_value(false);
@@ -2663,6 +2676,54 @@ TEST_F(GrpcHealthCheckerImplTest, Success) {
         EXPECT_EQ(Http::Headers::get().SchemeValues.Http, headers.Scheme()->value().c_str());
         EXPECT_NE(nullptr, headers.Method());
         EXPECT_NE(nullptr, headers.Host());
+      }));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        std::vector<Grpc::Frame> decoded_frames;
+        Grpc::Decoder decoder;
+        ASSERT_TRUE(decoder.decode(data, decoded_frames));
+        ASSERT_EQ(1U, decoded_frames.size());
+        auto& frame = decoded_frames[0];
+        Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
+        grpc::health::v1::HealthCheckRequest request;
+        ASSERT_TRUE(request.ParseFromZeroCopyStream(&stream));
+        EXPECT_EQ("service", request.service());
+      }));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  expectHealthcheckStop(0, 45000);
+
+  // Host state should not be changed (remains healty).
+  EXPECT_CALL(*this, onHostStatus(cluster_->prioritySet().getMockHostSet(0)->hosts_[0],
+                                  HealthTransition::Unchanged));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+}
+
+// Test single host check success with custom authority.
+TEST_F(GrpcHealthCheckerImplTest, SuccessWithCustomAuthority) {
+  std::string authority = "www.envoyproxy.io";
+
+  setupCustomAuthorityHC(authority);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
+        EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
+                  headers.ContentType()->value().c_str());
+        EXPECT_EQ(std::string("/grpc.health.v1.Health/Check"), headers.Path()->value().c_str());
+        EXPECT_EQ(Http::Headers::get().SchemeValues.Http, headers.Scheme()->value().c_str());
+        EXPECT_NE(nullptr, headers.Method());
+        EXPECT_EQ(authority, headers.Host()->value().c_str());
       }));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
