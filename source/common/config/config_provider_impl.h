@@ -16,12 +16,28 @@
 namespace Envoy {
 namespace Config {
 
+// This file provides a set of base classes, (StaticConfigProviderImpl, DynamicConfigProviderImpl,
+// ConfigProviderManagerImpl, ConfigSubscriptionInstance), conforming to the
+// ConfigProvider/ConfigProviderManager interfaces, which in tandem provide a framework for
+// implementing static and dynamic configuration for Envoy.
+//
+// Envoy's dynamic configuration is distributed via xDS APIs (see
+// https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md). The framework exposed
+// by the classes below enables client xDS implementations following a shared ownership model, where
+// according to the config source specification, a config subscription to the API server, config
+// protos received over the subscription and the subsequent config "implementation" (i.e., data
+// structures and associated business logic) are shared across ConfigProvider objects and Envoy
+// worker threads.
+//
+// This approach enables linear configuration scalability based primarily on the size of the
+// configuration set.
+
 class ConfigProviderManagerImpl;
 
 /**
  * ConfigProvider implementation for statically specified configuration.
  *
- * This class can not instantiated directly; instead, it provides the foundation for
+ * This class can not be instantiated directly; instead, it provides the foundation for
  * static config provider implementations which derive from it.
  */
 class StaticConfigProviderImpl : public ConfigProvider {
