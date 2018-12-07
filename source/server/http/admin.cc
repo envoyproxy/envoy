@@ -201,10 +201,6 @@ const Http::HeaderMap& AdminFilter::getRequestHeaders() const {
 }
 
 bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
-  if (params.size() == 0) {
-    return true;
-  }
-
   if (params.size() != 1) {
     return false;
   }
@@ -506,7 +502,7 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
   Http::Code rc = Http::Code::OK;
-  if (!changeLogLevel(query_params)) {
+  if (query_params.size() > 0 && !changeLogLevel(query_params)) {
     response.add("usage: /logging?<name>=<level> (change single level)\n");
     response.add("usage: /logging?level=<level> (change all levels)\n");
     response.add("levels: ");
