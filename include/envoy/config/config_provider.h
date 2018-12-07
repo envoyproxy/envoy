@@ -39,7 +39,7 @@ public:
   virtual ~ConfigProvider() {}
 
   /**
-   * Returns ConfigInfo associated with the provider.
+   * Returns a ConfigInfo associated with the provider.
    * @return absl::optional<ConfigInfo<P>> an optional ConfigInfo; the value is set when a config is
    *         available.
    */
@@ -74,14 +74,14 @@ public:
 protected:
   /**
    * Returns the config proto associated with the provider.
-   * @return Protobuf::Message* the config proto corresponding to the Config contained by the
+   * @return Protobuf::Message* the config proto corresponding to the Config instantiated by the
    *         provider.
    */
   virtual const Protobuf::Message* getConfigProto() const PURE;
 
   /**
-   * Returns the config version associated with dynamically delivered configuration.
-   * @return std::string the version associated with the config.
+   * Returns the config version associated with the provider.
+   * @return std::string the config version.
    */
   virtual std::string getConfigVersion() const PURE;
 
