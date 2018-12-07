@@ -285,7 +285,6 @@ public:
    * @return the downstream directly connected address. This will never be nullptr. This is
    * equivalent to the address of the physical connection.
    */
-
   virtual const Network::Address::InstanceConstSharedPtr&
   downstreamDirectlyConnectedAddress() const PURE;
 
