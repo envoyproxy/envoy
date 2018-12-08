@@ -38,7 +38,7 @@ weight greater than 1.
   choices). The P2C load balancer has the property that a host with the highest number of active
   requests in the cluster will never receive new requests. It will be allowed to drain until it is
   less than or equal to all of the other hosts.
-* *all weights not 1*:  If any host in the cluster has a load balancing weight greater than 1, the
+* *not all weights 1*:  If any host in the cluster has a load balancing weight greater than 1, the
   load balancer shifts into a mode where it uses a weighted round robin schedule in which weights
   are dynamically adjusted based on the host's request load at the time of selection (weight is
   divided by the current active request count. For example, a host with weight 2 and an active
