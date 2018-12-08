@@ -378,5 +378,19 @@ TEST_P(ServerInstanceImplTest, MutexContentionEnabled) {
   EXPECT_NO_THROW(initialize(std::string()));
 }
 
+TEST_P(ServerInstanceImplTest, NoHttpTracing) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&server_->httpContext().tracer()));
+}
+
+TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_NO_THROW(initialize("test/server/zipkin_tracing.yaml"));
+  EXPECT_EQ(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&server_->httpContext().tracer()));
+}
+
 } // namespace Server
 } // namespace Envoy
