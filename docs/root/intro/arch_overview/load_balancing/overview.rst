@@ -52,3 +52,12 @@ A more complicated setup could have resource usage being reported to the control
 it to adjust the weight of endpoints or :ref:`localities <arch_overview_load_balancing_locality_weighted_lb>`
 to account for the current resource usage, attempting to route new requests to idle hosts over busy ones.
 
+Both Distributed and Global
+---------------------------
+
+Most sophisticated deployments will make use of features from both categories. For instance, global load
+balancing could be used to define the high level routing priorities and weights, while distributed load balancing
+could be used to react to changes in the system (e.g. using active health checking). By combining these you can
+get the best of both worlds: a globally aware authority that can control the flow of traffic on the macro
+level while still having the individual proxies be able to react to changes on the micro level.
+
