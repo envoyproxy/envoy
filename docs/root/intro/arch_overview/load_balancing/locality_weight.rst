@@ -3,11 +3,12 @@
 Locality weighted load balancing
 --------------------------------
 
-Another approach to determining how to weight assignments across different zones
+One approach to determining how to weight assignments across different zones
 and geographical locations is by using explicit weights supplied via EDS in the
 :ref:`LocalityLbEndpoints <envoy_api_msg_endpoint.LocalityLbEndpoints>` message.
-This approach is mutually exclusive with the above zone aware routing, since in
-the case of locality aware LB, we rely on the management server to provide the
+This approach is mutually exclusive with 
+:ref:`zone aware routing <arch_overview_load_balancing_zone_aware_routing>`, since
+in the case of locality aware LB, we rely on the management server to provide the
 locality weighting, rather than the Envoy-side heuristics used in zone aware
 routing.
 
