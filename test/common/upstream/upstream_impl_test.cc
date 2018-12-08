@@ -1875,8 +1875,8 @@ TEST_F(ClusterInfoImplTest, TestMarkSocketOptions) {
   )EOF"));
   auto options = cluster->info()->clusterSocketOptions();
 
-  auto applied_option = findSocketOptionInfo(*options, socket_mock_, ENVOY_SOCKET_SO_MARK,
-                                             envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  auto applied_option = findSocketOptionDetails(*options, socket_mock_, ENVOY_SOCKET_SO_MARK,
+                                                envoy::api::v2::core::SocketOption::STATE_PREBIND);
 
   ASSERT_TRUE(applied_option.has_value());
   int expected_value = 145;
@@ -1892,8 +1892,8 @@ TEST_F(ClusterInfoImplTest, TestTransparentSocketOptions) {
       src_transparent: true
   )EOF"));
   auto options = cluster->info()->clusterSocketOptions();
-  auto applied_option = findSocketOptionInfo(*options, socket_mock_, ENVOY_SOCKET_IP_TRANSPARENT,
-                                             envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  auto applied_option = findSocketOptionDetails(*options, socket_mock_, ENVOY_SOCKET_IP_TRANSPARENT,
+                                                envoy::api::v2::core::SocketOption::STATE_PREBIND);
 
   ASSERT_TRUE(applied_option.has_value());
   int expected_value = 1;

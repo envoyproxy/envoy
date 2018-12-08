@@ -23,15 +23,16 @@ bool SocketOptionImpl::setOption(Socket& socket,
   return true;
 }
 
-absl::optional<Socket::Option::Information> SocketOptionImpl::getOptionInformation(
-    const Socket&, envoy::api::v2::core::SocketOption::SocketState state) const {
+absl::optional<Socket::Option::Details>
+SocketOptionImpl::getOptionDetails(const Socket&,
+                                   envoy::api::v2::core::SocketOption::SocketState state) const {
   if (state != in_state_) {
     return absl::nullopt;
   }
-  Socket::Option::Information info;
+  Socket::Option::Details info;
   info.name_ = optname_;
   info.value_ = value_;
-  return absl::optional<Option::Information>(std::move(info));
+  return absl::optional<Option::Details>(std::move(info));
 }
 
 bool SocketOptionImpl::isSupported() const { return optname_.has_value(); }

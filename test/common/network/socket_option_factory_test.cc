@@ -28,12 +28,12 @@ protected:
     socket_mock_.local_address_ = std::make_unique<Address::Ipv6Instance>("::1:2:3:4", 5678);
   }
 
-  absl::optional<Network::Socket::Option::Information>
+  absl::optional<Network::Socket::Option::Details>
   findSocketOptionInfo(const Network::Socket::Options& options,
                        const Network::SocketOptionName& name,
                        envoy::api::v2::core::SocketOption::SocketState state) {
     for (const auto& option : options) {
-      auto info = option->getOptionInformation(socket_mock_, state);
+      auto info = option->getOptionDetails(socket_mock_, state);
       if (info.has_value() && info->name_ == name) {
         return info;
       }

@@ -333,8 +333,8 @@ public:
   MOCK_CONST_METHOD2(setOption,
                      bool(Socket&, envoy::api::v2::core::SocketOption::SocketState state));
   MOCK_CONST_METHOD1(hashKey, void(std::vector<uint8_t>&));
-  MOCK_CONST_METHOD2(getOptionInformation,
-                     absl::optional<Socket::Option::Information>(
+  MOCK_CONST_METHOD2(getOptionDetails,
+                     absl::optional<Socket::Option::Details>(
                          const Socket&, envoy::api::v2::core::SocketOption::SocketState state));
 };
 

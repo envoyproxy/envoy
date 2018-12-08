@@ -63,13 +63,13 @@ public:
     virtual void hashKey(std::vector<uint8_t>& key) const PURE;
 
     /**
-     * Contains information about what this option applies to a socket.
+     * Contains details about what this option applies to a socket.
      */
-    struct Information {
+    struct Details {
       SocketOptionName name_;
       std::string value_; ///< Binary string representation of an option's value.
 
-      bool operator==(const Information& other) const {
+      bool operator==(const Details& other) const {
         return name_ == other.name_ && value_ == other.value_;
       }
     };
@@ -79,9 +79,9 @@ public:
      * @param state The state at which we would apply the options.
      * @return What we would apply to the socket at the provided state. Empty if we'd apply nothing.
      */
-    virtual absl::optional<Information>
-    getOptionInformation(const Socket& socket,
-                         envoy::api::v2::core::SocketOption::SocketState state) const PURE;
+    virtual absl::optional<Details>
+    getOptionDetails(const Socket& socket,
+                     envoy::api::v2::core::SocketOption::SocketState state) const PURE;
   };
 
   typedef std::shared_ptr<const Option> OptionConstSharedPtr;
