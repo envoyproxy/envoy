@@ -385,13 +385,6 @@ TEST_P(ServerInstanceImplTest, NoHttpTracing) {
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&server_->httpContext().tracer()));
 }
 
-TEST_P(ServerInstanceImplTest, JaegerHttpTracingEnabled) {
-  options_.service_cluster_name_ = "some_cluster_name";
-  options_.service_node_name_ = "some_node_name";
-  EXPECT_NO_THROW(initialize("test/server/jaeger_tracing.yaml"));
-  EXPECT_EQ(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&server_->httpContext().tracer()));
-}
-
 TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";

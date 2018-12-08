@@ -200,7 +200,6 @@ envoy_cc_test(
         ":cluster_health_check_bootstrap.yaml",
         ":empty_bootstrap.yaml",
         ":empty_runtime.yaml",
-        ":jaeger_tracing.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",
         ":node_bootstrap_without_access_log.yaml",
