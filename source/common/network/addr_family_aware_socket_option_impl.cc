@@ -59,7 +59,7 @@ bool AddrFamilyAwareSocketOptionImpl::setOption(
   return setIpSocketOption(socket, state, ipv4_option_, ipv6_option_);
 }
 
-absl::optional<Socket::Option::Information> AddrFamilyAwareSocketOptionImpl::getOptionInformation(
+absl::optional<Socket::Option::Details> AddrFamilyAwareSocketOptionImpl::getOptionDetails(
     const Socket& socket, envoy::api::v2::core::SocketOption::SocketState state) const {
   auto option = getOptionForSocket(socket, *ipv4_option_, *ipv6_option_);
 
@@ -67,7 +67,7 @@ absl::optional<Socket::Option::Information> AddrFamilyAwareSocketOptionImpl::get
     return absl::nullopt;
   }
 
-  return option->get().getOptionInformation(socket, state);
+  return option->get().getOptionDetails(socket, state);
 }
 
 bool AddrFamilyAwareSocketOptionImpl::setIpSocketOption(

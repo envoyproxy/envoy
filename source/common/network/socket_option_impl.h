@@ -95,9 +95,9 @@ public:
   // The common socket options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override {}
 
-  absl::optional<Information>
-  getOptionInformation(const Socket& socket,
-                       envoy::api::v2::core::SocketOption::SocketState state) const override;
+  absl::optional<Details>
+  getOptionDetails(const Socket& socket,
+                   envoy::api::v2::core::SocketOption::SocketState state) const override;
 
   bool isSupported() const;
 

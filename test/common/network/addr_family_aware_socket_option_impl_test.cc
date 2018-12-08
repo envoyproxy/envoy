@@ -128,10 +128,10 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4GetSocketOptionName) {
                                                 Network::SocketOptionName(std::make_pair(5, 10)),
                                                 Network::SocketOptionName(std::make_pair(6, 11)),
                                                 1};
-  auto result = socket_option.getOptionInformation(
-      socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  auto result =
+      socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), makeInformation(std::make_pair(5, 10), 1));
+  EXPECT_EQ(result.value(), makeDetails(std::make_pair(5, 10), 1));
 }
 
 // GetSocketOptionName returns the v4 information for a v6 address
@@ -142,10 +142,10 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6GetSocketOptionName) {
                                                 Network::SocketOptionName(std::make_pair(5, 10)),
                                                 Network::SocketOptionName(std::make_pair(6, 11)),
                                                 5};
-  auto result = socket_option.getOptionInformation(
-      socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  auto result =
+      socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), makeInformation(std::make_pair(6, 11), 5));
+  EXPECT_EQ(result.value(), makeDetails(std::make_pair(6, 11), 5));
 }
 
 // GetSocketOptionName returns nullopt if the state is wrong
@@ -157,7 +157,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, GetSocketOptionWrongState) {
                                                 Network::SocketOptionName(std::make_pair(6, 11)),
                                                 5};
   auto result =
-      socket_option.getOptionInformation(socket_, envoy::api::v2::core::SocketOption::STATE_BOUND);
+      socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_BOUND);
   EXPECT_FALSE(result.has_value());
 }
 
@@ -169,8 +169,8 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, GetSocketOptionCannotDetermineVersio
                                                 5};
 
   EXPECT_CALL(socket_, fd()).WillOnce(Return(-1));
-  auto result = socket_option.getOptionInformation(
-      socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  auto result =
+      socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
   EXPECT_FALSE(result.has_value());
 }
 } // namespace
