@@ -1,0 +1,11 @@
+static_resources:
+  clusters:
+  - name: jaeger
+    connect_timeout: 1s
+tracing:
+  http:
+    name: envoy.zipkin
+    config:
+      collector_cluster: jaeger
+      collector_endpoint: "/api/v1/spans"
+
