@@ -515,10 +515,10 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     bool host_seen = predicate_added.count(host) == 1;
     if (host_seen || predicate(*host)) {
       hosts->emplace_back(host);
-      if (host->healthy()) {
+      if (host->health() == Host::Health::Healthy) {
         healthy_hosts->emplace_back(host);
       }
-      if (host->degraded()) {
+      if (host->health() == Host::Health::Degraded) {
         degraded_hosts->emplace_back(host);
       }
     }
@@ -541,13 +541,15 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     hosts_per_locality = original_host_set_.hostsPerLocality().filter(predicate);
   }
 
-  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
-      hosts_per_locality->filter([](const Host& host) { return host.healthy(); });
-  HostsPerLocalityConstSharedPtr degraded_hosts_per_locality =
-      hosts_per_locality->filter([](const Host& host) { return host.degraded(); });
+  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality = hosts_per_locality->filter(
+      [](const Host& host) { return host.health() == Host::Health::Healthy; });
+  HostsPerLocalityConstSharedPtr degraded_hosts_per_locality = hosts_per_locality->filter(
+      [](const Host& host) { return host.health() == Host::Health::Degraded; });
 
-  HostSetImpl::updateHosts(hosts, healthy_hosts, degraded_hosts, hosts_per_locality,
-                           healthy_hosts_per_locality, degraded_hosts_per_locality,
+  // TODO(snowp): Use partitionHosts here.
+  HostSetImpl::updateHosts(HostSetImpl::updateHostsParams(
+                               hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality,
+                               degraded_hosts, degraded_hosts_per_locality),
                            determineLocalityWeights(*hosts_per_locality), filtered_added,
                            filtered_removed);
 }
