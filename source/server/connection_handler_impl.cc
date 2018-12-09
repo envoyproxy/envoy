@@ -84,8 +84,9 @@ ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& par
                                                       Network::ListenerPtr&& listener,
                                                       Network::ListenerConfig& config)
     : parent_(parent), listener_(std::move(listener)),
-      stats_(generateStats(config.listenerScope())), listener_tag_(config.listenerTag()),
-      config_(config) {}
+      stats_(generateStats(config.listenerScope())),
+      listener_filters_timeout_(config.listenerFiltersTimeout()),
+      listener_tag_(config.listenerTag()), config_(config) {}
 
 ConnectionHandlerImpl::ActiveListener::~ActiveListener() {
   // Purge sockets that have not progressed to connections. This should only happen when
@@ -137,6 +138,27 @@ ConnectionHandlerImpl::findActiveListenerByAddress(const Network::Address::Insta
   return (listener_it != listeners_.end()) ? listener_it->second.get() : nullptr;
 }
 
+void ConnectionHandlerImpl::ActiveSocket::onTimeout() {
+  listener_.stats_.downstream_pre_cx_timeout_.inc();
+  ASSERT(inserted());
+  unlink();
+}
+
+void ConnectionHandlerImpl::ActiveSocket::startTimer() {
+  if (listener_.listener_filters_timeout_.count() > 0) {
+    timer_ = listener_.parent_.dispatcher_.createTimer([this]() -> void { onTimeout(); });
+    timer_->enableTimer(listener_.listener_filters_timeout_);
+  }
+}
+
+void ConnectionHandlerImpl::ActiveSocket::unlink() {
+  ActiveSocketPtr removed = removeFromList(listener_.sockets_);
+  if (removed->timer_ != nullptr) {
+    removed->timer_->disableTimer();
+  }
+  listener_.parent_.dispatcher_.deferredDelete(std::move(removed));
+}
+
 void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
   if (success) {
     if (iter_ == accept_filters_.end()) {
@@ -180,8 +202,7 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
 
   // Filter execution concluded, unlink and delete this ActiveSocket if it was linked.
   if (inserted()) {
-    ActiveSocketPtr removed = removeFromList(listener_.sockets_);
-    listener_.parent_.dispatcher_.deferredDelete(std::move(removed));
+    unlink();
   }
 }
 
@@ -198,6 +219,7 @@ void ConnectionHandlerImpl::ActiveListener::onAccept(
   // Move active_socket to the sockets_ list if filter iteration needs to continue later.
   // Otherwise we let active_socket be destructed when it goes out of scope.
   if (active_socket->iter_ != active_socket->accept_filters_.end()) {
+    active_socket->startTimer();
     active_socket->moveIntoListBack(std::move(active_socket), sockets_);
   }
 }

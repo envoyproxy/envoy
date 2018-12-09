@@ -88,13 +88,6 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
 
-  // TODO(PiotrSikora): make this configurable.
-  timer_ = cb.dispatcher().createTimer([this]() -> void { onTimeout(); });
-  timer_->enableTimer(std::chrono::milliseconds(15000));
-
-  // TODO(ggreenway): Move timeout and close-detection to the filter manager
-  // so that it applies to all listener filters.
-
   cb_ = &cb;
   return Network::FilterStatus::StopIteration;
 }
@@ -166,15 +159,8 @@ void Filter::onRead() {
   }
 }
 
-void Filter::onTimeout() {
-  ENVOY_LOG(trace, "tls inspector: timeout");
-  config_->stats().read_timeout_.inc();
-  done(false);
-}
-
 void Filter::done(bool success) {
   ENVOY_LOG(trace, "tls inspector: done: {}", success);
-  timer_.reset();
   file_event_.reset();
   cb_->continueFilterChain(success);
 }
