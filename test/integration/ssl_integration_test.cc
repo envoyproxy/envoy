@@ -167,8 +167,7 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
-// Validate certificate selection across different certificate types and client
-// TLS versions.
+// Validate certificate selection across different certificate types and client TLS versions.
 class SslCertficateIntegrationTest
     : public SslIntegrationTestBase,
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion,
@@ -223,8 +222,7 @@ INSTANTIATE_TEST_CASE_P(
                                      envoy::api::v2::auth::TlsParameters::TLSv1_3)),
     SslCertficateIntegrationTest::ipClientVersionTestParamsToString);
 
-// Server with an RSA certificate and a client with RSA/ECDSA cipher suites
-// works.
+// Server with an RSA certificate and a client with RSA/ECDSA cipher suites works.
 TEST_P(SslCertficateIntegrationTest, ServerRsa) {
   server_ecdsa_cert_ = false;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
@@ -234,8 +232,7 @@ TEST_P(SslCertficateIntegrationTest, ServerRsa) {
   checkStats();
 }
 
-// Server with an ECDSA certificate and a client with RSA/ECDSA cipher suites
-// works.
+// Server with an ECDSA certificate and a client with RSA/ECDSA cipher suites works.
 TEST_P(SslCertficateIntegrationTest, ServerEcdsa) {
   server_ecdsa_cert_ = true;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
@@ -245,8 +242,7 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsa) {
   checkStats();
 }
 
-// Server with an RSA certificate and a client with only RSA cipher suites
-// works.
+// Server with an RSA certificate and a client with only RSA cipher suites works.
 TEST_P(SslCertficateIntegrationTest, ClientRsaOnly) {
   server_ecdsa_cert_ = false;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
@@ -256,8 +252,7 @@ TEST_P(SslCertficateIntegrationTest, ClientRsaOnly) {
   checkStats();
 }
 
-// Server has only an ECDSA certificate, client is only RSA capable, leads
-// to a connection fail.
+// Server has only an ECDSA certificate, client is only RSA capable, leads to a connection fail.
 TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
   server_ecdsa_cert_ = true;
   initialize();
