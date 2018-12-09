@@ -171,7 +171,8 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
   EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
-  EXPECT_TRUE(message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
@@ -223,7 +224,8 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
   EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
-  EXPECT_TRUE(message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
@@ -271,7 +273,7 @@ TEST_F(SslContextImplTest, TestNoCert) {
   ClientContextConfigImpl cfg(*loader, factory_context_);
   ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
   EXPECT_EQ(nullptr, context->getCaCertInformation());
-  EXPECT_EQ(nullptr, context->getCertChainInformation());
+  EXPECT_TRUE(context->getCertChainInformation().empty());
 }
 
 class SslServerContextImplTicketTest : public SslContextImplTest {
@@ -515,6 +517,47 @@ TEST(ClientContextConfigImplTest, InvalidCertificateSpki) {
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
                           EnvoyException, "Invalid base64-encoded SHA-256 .*");
+}
+
+// Validate that P256 ECDSA certs load.
+TEST(ClientContextConfigImplTest, P256EcdsaCert) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p256.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p256.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  manager.createSslClientContext(store, client_context_config);
+}
+
+// Validate that non-P256 ECDSA certs are rejected.
+TEST(ClientContextConfigImplTest, NonP256EcdsaCert) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p384.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p384.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+                          EnvoyException,
+                          "Failed to load certificate from chain .*selfsigned_cert_ecdsa_p384.pem, "
+                          "only P-256 ECDSA certificates are supported");
 }
 
 // Multiple TLS certificates are not yet supported.

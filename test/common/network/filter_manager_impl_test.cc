@@ -10,6 +10,7 @@
 #include "extensions/filters/network/ratelimit/ratelimit.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/extensions/filters/common/ratelimit/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
@@ -232,9 +233,10 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   Extensions::NetworkFilters::RateLimitFilter::ConfigSharedPtr rl_config(
       new Extensions::NetworkFilters::RateLimitFilter::Config(proto_config, factory_context.scope_,
                                                               factory_context.runtime_loader_));
-  RateLimit::MockClient* rl_client = new RateLimit::MockClient();
+  Extensions::Filters::Common::RateLimit::MockClient* rl_client =
+      new Extensions::Filters::Common::RateLimit::MockClient();
   manager.addReadFilter(std::make_shared<Extensions::NetworkFilters::RateLimitFilter::Filter>(
-      rl_config, RateLimit::ClientPtr{rl_client}));
+      rl_config, Extensions::Filters::Common::RateLimit::ClientPtr{rl_client}));
 
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy;
   tcp_proxy.set_stat_prefix("name");
@@ -244,21 +246,22 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
       std::make_shared<TcpProxy::Filter>(tcp_proxy_config, factory_context.cluster_manager_,
                                          factory_context.dispatcher().timeSystem()));
 
-  RateLimit::RequestCallbacks* request_callbacks{};
+  Extensions::Filters::Common::RateLimit::RequestCallbacks* request_callbacks{};
   EXPECT_CALL(*rl_client, limit(_, "foo",
                                 testing::ContainerEq(
                                     std::vector<RateLimit::Descriptor>{{{{"hello", "world"}}}}),
                                 testing::A<Tracing::Span&>()))
-      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
-        request_callbacks = &callbacks;
-      })));
+      .WillOnce(WithArgs<0>(
+          Invoke([&](Extensions::Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks = &callbacks;
+          })));
 
   EXPECT_EQ(manager.initializeReadFilters(), true);
 
   EXPECT_CALL(factory_context.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
       .WillOnce(Return(&conn_pool));
 
-  request_callbacks->complete(RateLimit::LimitStatus::OK, nullptr);
+  request_callbacks->complete(Extensions::Filters::Common::RateLimit::LimitStatus::OK, nullptr);
 
   conn_pool.poolReady(upstream_connection);
 

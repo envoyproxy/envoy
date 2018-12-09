@@ -10,6 +10,7 @@ import "envoy/api/v2/discovery.proto";
 import "envoy/api/v2/listener/listener.proto";
 
 import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
@@ -36,6 +37,7 @@ service ListenerDiscoveryService {
   }
 }
 
+// [#comment:next free field: 16]
 message Listener {
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
@@ -119,6 +121,11 @@ message Listener {
   // filters are processed sequentially right after a socket has been accepted by the listener, and
   // before a connection is created.
   repeated listener.ListenerFilter listener_filters = 9 [(gogoproto.nullable) = false];
+
+  // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
+  // the accepted socket is closed without a connection being created. Specify 0 to disable the
+  // timeout. If not specified, a default timeout of 15s is used.
+  google.protobuf.Duration listener_filters_timeout = 15 [(gogoproto.stdduration) = true];
 
   // Whether the listener should be set as a transparent socket.
   // When this flag is set to true, connections can be redirected to the listener using an
