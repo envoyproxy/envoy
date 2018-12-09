@@ -259,11 +259,7 @@ public:
         hosts_(new HostVector()), healthy_hosts_(new HostVector()),
         degraded_hosts_(new HostVector()) {}
 
-  void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
-                   HostVectorConstSharedPtr degraded_hosts,
-                   HostsPerLocalityConstSharedPtr hosts_per_locality,
-                   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
-                   HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
+  void updateHosts(UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                    const HostVector& hosts_removed,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
@@ -295,6 +291,24 @@ public:
   absl::optional<uint32_t> chooseLocality() override;
   uint32_t priority() const override { return priority_; }
   uint32_t overprovisioning_factor() const override { return overprovisioning_factor_; }
+
+  // Utility methods for creating UpdateHostsParams.
+  static UpdateHostsParams updateHostsParams(HostVectorConstSharedPtr hosts,
+                                             HostsPerLocalityConstSharedPtr hosts_per_locality);
+  static UpdateHostsParams
+  updateHostsParams(HostVectorConstSharedPtr hosts,
+                    HostsPerLocalityConstSharedPtr hosts_per_locality,
+                    HostVectorConstSharedPtr healthy_hosts,
+                    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality);
+  static UpdateHostsParams
+  updateHostsParams(HostVectorConstSharedPtr hosts,
+                    HostsPerLocalityConstSharedPtr hosts_per_locality,
+                    HostVectorConstSharedPtr healthy_hosts,
+                    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                    HostVectorConstSharedPtr degraded_hosts,
+                    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality);
+  static UpdateHostsParams partitionHosts(HostVectorConstSharedPtr hosts,
+                                          HostsPerLocalityConstSharedPtr hosts_per_locality);
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {

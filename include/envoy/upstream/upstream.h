@@ -287,24 +287,27 @@ public:
   virtual absl::optional<uint32_t> chooseLocality() PURE;
 
   /**
+   * Parameter class for updateHosts.
+   */
+  struct UpdateHostsParams {
+    HostVectorConstSharedPtr hosts;
+    HostVectorConstSharedPtr healthy_hosts;
+    HostVectorConstSharedPtr degraded_hosts;
+    HostsPerLocalityConstSharedPtr hosts_per_locality;
+    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
+    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
+  };
+
+  /**
    * Updates the hosts in a given host set.
    *
-   * @param hosts supplies the (usually new) list of hosts in the host set.
-   * @param healthy hosts supplies the subset of hosts which are healthy.
-   * @param healthy hosts supplies the subset of hosts which are degraded and healthy.
-   * @param hosts_per_locality supplies the hosts subdivided by locality.
-   * @param hosts_per_locality supplies the healthy hosts subdivided by locality.
-   * @param hosts_per_locality supplies the degraded and not healhty hosts subdivided by locality.
+   * @param update_hosts_param supplies the ;ist of hosts and hosts per localitiy.
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
    * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
    */
-  virtual void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
-                           HostVectorConstSharedPtr degraded_hosts,
-                           HostsPerLocalityConstSharedPtr hosts_per_locality,
-                           HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
-                           HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
+  virtual void updateHosts(UpdateHostsParams&& update_host_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
                            absl::optional<uint32_t> overprovisioning_factor) PURE;

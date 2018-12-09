@@ -246,12 +246,10 @@ void HdsCluster::initialize(std::function<void()> callback) {
   }
 
   auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-  auto healthy = ClusterImplBase::createHealthyHostList(*initial_hosts_);
-  auto degraded = ClusterImplBase::createDegradedHostList(*initial_hosts_);
 
-  first_host_set.updateHosts(initial_hosts_, healthy, degraded, HostsPerLocalityImpl::empty(),
-                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
-                             *initial_hosts_, {}, absl::nullopt);
+  first_host_set.updateHosts(
+      HostSetImpl::partitionHosts(initial_hosts_, HostsPerLocalityImpl::empty()), {},
+      *initial_hosts_, {}, absl::nullopt);
 }
 
 void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {
