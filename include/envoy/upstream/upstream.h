@@ -104,17 +104,28 @@ public:
    */
   virtual void healthFlagSet(HealthFlag flag) PURE;
 
-  /**
-   * @return whether in aggregate a host is healthy and routable. Multiple health flags and other
-   *         information may be considered.
-   */
-  virtual bool healthy() const PURE;
+  enum class Health {
+    /**
+     * Host is unhealthy and is not able to serve traffic. A host may be marked as unhealthy either
+     * through EDS or through active health checking.
+     */
+    Unhealthy,
+    /**
+     * Host is healthy, but degraded. It is able to serve traffic, but hosts that aren't degraded
+     * should be preferred. A host may be marked as degraded either through EDS or through active
+     * health checking.
+     */
+    Degraded,
+    /**
+     * Host is healthy and is able to serve traffic.
+     */
+    Healthy,
+  };
 
   /**
-   * @return whether in aggregate a host is degraded. A host is never both degraded and healthy.
-   *         A host may be degraded either through active health checking or through EDS updates.
+   * @return the health of the host.
    */
-  virtual bool degraded() const PURE;
+  virtual Health health() const PURE;
 
   /**
    * Returns the host's ActiveHealthFailureType. Types are specified in ActiveHealthFailureType.

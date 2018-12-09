@@ -78,7 +78,7 @@ HdsDelegate::sendResponse() {
         Network::Utility::addressToProtobufAddress(
             *host->address(), *endpoint->mutable_endpoint()->mutable_address());
         // TODO(lilika): Add support for more granular options of envoy::api::v2::core::HealthStatus
-        if (host->healthy()) {
+        if (host->health() == Host::Health::Healthy) {
           endpoint->set_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
         } else {
           if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::TIMEOUT) {

@@ -194,10 +194,9 @@ public:
   void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
     outlier_detector_ = std::move(outlier_detector);
   }
-  bool healthy() const override { return !health_flags_; }
-  bool degraded() const override {
-    // TODO(snowp): Make this read from EDS + active health checking.
-    return false;
+  Host::Health health() const override {
+    // TODO(snowp): Support degraded.
+    return health_flags_ ? Host::Health::Unhealthy : Host::Health::Healthy;
   }
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight) override;

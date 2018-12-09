@@ -554,7 +554,7 @@ ClusterImplBase::ClusterImplBase(
 HostVectorConstSharedPtr ClusterImplBase::createHealthyHostList(const HostVector& hosts) {
   HostVectorSharedPtr healthy_list(new HostVector());
   for (const auto& host : hosts) {
-    if (host->healthy()) {
+    if (host->health() == Host::Health::Healthy) {
       healthy_list->emplace_back(host);
     }
   }
@@ -565,7 +565,7 @@ HostVectorConstSharedPtr ClusterImplBase::createHealthyHostList(const HostVector
 HostVectorConstSharedPtr ClusterImplBase::createDegradedHostList(const HostVector& hosts) {
   HostVectorSharedPtr degraded_list(new HostVector());
   for (const auto& host : hosts) {
-    if (host->degraded()) {
+    if (host->health() == Host::Health::Degraded) {
       degraded_list->emplace_back(host);
     }
   }
@@ -575,12 +575,12 @@ HostVectorConstSharedPtr ClusterImplBase::createDegradedHostList(const HostVecto
 
 HostsPerLocalityConstSharedPtr
 ClusterImplBase::createHealthyHostLists(const HostsPerLocality& hosts) {
-  return hosts.filter([](const Host& host) { return host.healthy(); });
+  return hosts.filter([](const Host& host) { return host.health() == Host::Health::Healthy; });
 }
 
 HostsPerLocalityConstSharedPtr
 ClusterImplBase::createDegradedHostLists(const HostsPerLocality& hosts) {
-  return hosts.filter([](const Host& host) { return host.degraded(); });
+  return hosts.filter([](const Host& host) { return host.health() == Host::Health::Degraded; });
 }
 
 bool ClusterInfoImpl::maintenanceMode() const {
@@ -995,7 +995,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
       if (existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH) !=
           host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
-        const bool previously_healthy = existing_host->second->healthy();
+        // TODO(snowp): To accomodate degraded, this bit should be checking for any changes
+        // to the health flag, not just healthy vs not healthy.
+        const bool previously_healthy = existing_host->second->health() == Host::Health::Healthy;
         if (host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
           existing_host->second->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
           // If the host was previously healthy and we're now unhealthy, we need to
@@ -1005,7 +1007,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
           existing_host->second->healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
           // If the host was previously unhealthy and now healthy, we need to
           // rebuild.
-          hosts_changed |= !previously_healthy && existing_host->second->healthy();
+          hosts_changed |=
+              !previously_healthy && existing_host->second->health() == Host::Health::Healthy;
         }
       }
 
