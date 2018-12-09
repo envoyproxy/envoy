@@ -265,7 +265,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     bio.reset(BIO_new_mem_buf(const_cast<char*>(tls_certificate.privateKey().data()),
                               tls_certificate.privateKey().size()));
     RELEASE_ASSERT(bio != nullptr, "");
-    bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+    bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(
+        bio.get(), nullptr, nullptr,
+        !tls_certificate.password().empty() ? const_cast<char*>(tls_certificate.password().c_str())
+                                            : nullptr));
     if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ctx.ssl_ctx_.get(), pkey.get())) {
       throw EnvoyException(
           fmt::format("Failed to load private key from {}", tls_certificate.privateKeyPath()));
