@@ -149,6 +149,9 @@ protected:
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
 
+  // Returns the server's tracer as a pointer, for use in dynamic_cast tests.
+  Tracing::HttpTracer* tracer() { return &server_->httpContext().tracer(); };
+
   Network::Address::IpVersion version_;
   testing::NiceMock<MockOptions> options_;
   DefaultTestHooks hooks_;
@@ -382,14 +385,22 @@ TEST_P(ServerInstanceImplTest, NoHttpTracing) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
-  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&server_->httpContext().tracer()));
+  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(tracer()));
+  EXPECT_EQ(nullptr, dynamic_cast<Tracing::HttpTracerImpl*>(tracer()));
 }
 
 TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/zipkin_tracing.yaml"));
-  EXPECT_EQ(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&server_->httpContext().tracer()));
+  EXPECT_EQ(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(tracer()));
+
+  // Note: there is no ZipkingTracerImpl object;
+  // source/extensions/tracers/zipkin/config.cc instantiates the tracer with
+  //     std::make_unique<Tracing::HttpTracerImpl>(std::move(zipkin_driver), server.localInfo());
+  // so we look for a successful dynamic cast to HttpTracerImpl, rather
+  // than HttpNullTracer.
+  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpTracerImpl*>(tracer()));
 }
 
 } // namespace Server
