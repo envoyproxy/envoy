@@ -33,7 +33,7 @@ public:
   ConfigHelper(const Network::Address::IpVersion version,
                const std::string& config = HTTP_PROXY_CONFIG);
 
-  static void initializeTls(bool ecdsa_cert,
+  static void initializeTls(bool ecdsa_cert, bool tlsv1_3,
                             envoy::api::v2::auth::CommonTlsContext& common_context);
 
   typedef std::function<void(envoy::config::bootstrap::v2::Bootstrap&)> ConfigModifierFunction;
@@ -94,7 +94,7 @@ public:
           type);
 
   // Add the default SSL configuration.
-  void addSslConfig(bool ecdsa_cert = false);
+  void addSslConfig(bool ecdsa_cert = false, bool tlsv1_3 = false);
 
   // Renames the first listener to the name specified.
   void renameListener(const std::string& name);
