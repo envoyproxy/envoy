@@ -7,8 +7,9 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/ratelimit/ratelimit_impl.h"
 #include "common/tracing/http_tracer_impl.h"
+
+#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -26,6 +27,9 @@ using testing::Return;
 using testing::WithArg;
 
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace RateLimit {
 
 class MockRequestCallbacks : public RequestCallbacks {
@@ -142,23 +146,6 @@ TEST(RateLimitGrpcFactoryTest, Create) {
   factory.create(absl::optional<std::chrono::milliseconds>());
 }
 
-// TODO(htuch): cluster_name is deprecated, remove after 1.6.0.
-TEST(RateLimitGrpcFactoryTest, CreateLegacy) {
-  envoy::config::ratelimit::v2::RateLimitServiceConfig config;
-  config.set_cluster_name("foo");
-  Grpc::MockAsyncClientManager async_client_manager;
-  Stats::MockStore scope;
-  envoy::api::v2::core::GrpcService expected_grpc_service;
-  expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
-  EXPECT_CALL(async_client_manager,
-              factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), _))
-      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
-        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-      }));
-  GrpcFactoryImpl factory(config, async_client_manager, scope);
-  factory.create(absl::optional<std::chrono::milliseconds>());
-}
-
 TEST(RateLimitNullFactoryTest, Basic) {
   NullFactoryImpl factory;
   ClientPtr client = factory.create(absl::optional<std::chrono::milliseconds>());
@@ -169,4 +156,7 @@ TEST(RateLimitNullFactoryTest, Basic) {
 }
 
 } // namespace RateLimit
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy

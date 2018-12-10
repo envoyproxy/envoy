@@ -11,6 +11,7 @@ This filter also supports policy in both enforcement and shadow modes. Shadow mo
 users, it is used to test that a new set of policies work before rolling out to production.
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.network.rbac.v2.RBAC>`
+* This filter should be configured with the name *envoy.filters.network.rbac*.
 
 Statistics
 ----------

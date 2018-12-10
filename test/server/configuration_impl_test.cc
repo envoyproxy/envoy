@@ -53,12 +53,14 @@ TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
 class ConfigurationImplTest : public testing::Test {
 protected:
   ConfigurationImplTest()
-      : cluster_manager_factory_(server_.runtime(), server_.stats(), server_.threadLocal(),
-                                 server_.random(), server_.dnsResolver(),
-                                 server_.sslContextManager(), server_.dispatcher(),
-                                 server_.localInfo(), server_.secretManager(), api_) {}
+      : api_(Api::createApiForTest(stats_store_)),
+        cluster_manager_factory_(
+            server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
+            server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
+            server_.localInfo(), server_.secretManager(), *api_, server_.httpContext()) {}
 
-  Api::Impl api_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
   Upstream::ProdClusterManagerFactory cluster_manager_factory_;
 };

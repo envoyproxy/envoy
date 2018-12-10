@@ -361,6 +361,7 @@ public:
   MOCK_METHOD0(close, void());
 
   Address::InstanceConstSharedPtr local_address_;
+  Address::InstanceConstSharedPtr remote_address_;
 };
 
 class MockListenerConfig : public ListenerConfig {
@@ -374,6 +375,7 @@ public:
   MOCK_METHOD0(bindToPort, bool());
   MOCK_CONST_METHOD0(handOffRestoredDestinationConnections, bool());
   MOCK_METHOD0(perConnectionBufferLimitBytes, uint32_t());
+  MOCK_CONST_METHOD0(listenerFiltersTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(listenerTag, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
@@ -471,7 +473,7 @@ public:
   ~MockTransportSocketFactory();
 
   MOCK_CONST_METHOD0(implementsSecureTransport, bool());
-  MOCK_CONST_METHOD0(createTransportSocket, TransportSocketPtr());
+  MOCK_CONST_METHOD1(createTransportSocket, TransportSocketPtr(TransportSocketOptionsSharedPtr));
 };
 
 class MockTransportSocketCallbacks : public TransportSocketCallbacks {

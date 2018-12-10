@@ -195,8 +195,11 @@ MockSocketOption::MockSocketOption() {
 
 MockSocketOption::~MockSocketOption() {}
 
-MockConnectionSocket::MockConnectionSocket() : local_address_(new Address::Ipv4Instance(80)) {
+MockConnectionSocket::MockConnectionSocket()
+    : local_address_(new Address::Ipv4Instance(80)),
+      remote_address_(new Address::Ipv4Instance(80)) {
   ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
+  ON_CALL(*this, remoteAddress()).WillByDefault(ReturnRef(remote_address_));
 }
 
 MockConnectionSocket::~MockConnectionSocket() {}

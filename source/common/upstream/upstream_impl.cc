@@ -146,22 +146,24 @@ parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
 
 } // namespace
 
-Host::CreateConnectionData
-HostImpl::createConnection(Event::Dispatcher& dispatcher,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options) const {
-  return {createConnection(dispatcher, *cluster_, address_, options), shared_from_this()};
+Host::CreateConnectionData HostImpl::createConnection(
+    Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
+  return {createConnection(dispatcher, *cluster_, address_, options, transport_socket_options),
+          shared_from_this()};
 }
 
 Host::CreateConnectionData
 HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), nullptr),
+  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), nullptr, nullptr),
           shared_from_this()};
 }
 
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                            Network::Address::InstanceConstSharedPtr address,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options) {
+                           const Network::ConnectionSocket::OptionsSharedPtr& options,
+                           Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
   if (cluster.clusterSocketOptions() != nullptr) {
     if (options) {
@@ -177,7 +179,8 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   }
 
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
+      address, cluster.sourceAddress(),
+      cluster.transportSocketFactory().createTransportSocket(transport_socket_options),
       connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;
@@ -433,7 +436,8 @@ ClusterSharedPtr ClusterImplBase::create(
     Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
     AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
+    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
+    Upstream::EdsSubscriptionFactory& eds_subscription_factory) {
   std::unique_ptr<ClusterImplBase> new_cluster;
 
   // We make this a shared pointer to deal with the distinct ownership
@@ -490,8 +494,9 @@ ClusterSharedPtr ClusterImplBase::create(
     }
 
     // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
-    new_cluster = std::make_unique<EdsClusterImpl>(cluster, runtime, factory_context,
-                                                   std::move(stats_scope), added_via_api);
+    new_cluster =
+        std::make_unique<EdsClusterImpl>(cluster, runtime, factory_context, std::move(stats_scope),
+                                         added_via_api, eds_subscription_factory);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -902,10 +907,12 @@ void StaticClusterImpl::startPreInit() {
   onPreInitComplete();
 }
 
-bool BaseDynamicClusterImpl::updateDynamicHostList(
-    const HostVector& new_hosts, HostVector& current_priority_hosts,
-    HostVector& hosts_added_to_current_priority, HostVector& hosts_removed_from_current_priority,
-    std::unordered_map<std::string, HostSharedPtr>& updated_hosts) {
+bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
+                                                   HostVector& current_priority_hosts,
+                                                   HostVector& hosts_added_to_current_priority,
+                                                   HostVector& hosts_removed_from_current_priority,
+                                                   HostMap& updated_hosts,
+                                                   const HostMap& all_hosts) {
   uint64_t max_host_weight = 1;
 
   // Did hosts change?
@@ -941,8 +948,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     }
 
     // To match a new host with an existing host means comparing their addresses.
-    auto existing_host = all_hosts_.find(host->address()->asString());
-    const bool existing_host_found = existing_host != all_hosts_.end();
+    auto existing_host = all_hosts.find(host->address()->asString());
+    const bool existing_host_found = existing_host != all_hosts.end();
 
     // Check if in-place host update should be skipped, i.e. when the following criteria are met
     // (currently there is only one criterion, but we might add more in the future):
@@ -1203,7 +1210,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         HostVector hosts_added;
         HostVector hosts_removed;
         if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                          updated_hosts)) {
+                                          updated_hosts, all_hosts_)) {
           ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
           ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
             return host->priority() == locality_lb_endpoint_.priority();
@@ -1213,24 +1220,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           parent_.info_->stats().update_no_rebuild_.inc();
         }
 
-        // TODO(dio): As reported in https://github.com/envoyproxy/envoy/issues/4548, we leaked
-        // cluster members. This happened since whenever a target resolved, it would set its hosts
-        // as all_hosts_, so that when another target resolved it wouldn't see its own hosts in
-        // all_hosts_. It would think that they're new hosts, so it would add them to its host list
-        // over and over again. To completely fix this issue, we need to think through on
-        // reconciling the differences in behavior between STRICT_DNS and EDS, especially on
-        // handling host sets updates. This is tracked in
-        // https://github.com/envoyproxy/envoy/issues/4590.
-        //
-        // The following block is acceptable for now as a patch to make sure parent_.all_hosts_ is
-        // updated with all resolved hosts from all priorities. This reconciliation is required
-        // since we check each new host against this list.
-        for (const auto& set : parent_.prioritySet().hostSetsPerPriority()) {
-          for (const auto& host : set->hosts()) {
-            updated_hosts.insert({host->address()->asString(), host});
-          }
-        }
-        parent_.updateHostMap(std::move(updated_hosts));
+        all_hosts_ = std::move(updated_hosts);
 
         // If there is an initialize callback, fire it now. Note that if the cluster refers to
         // multiple DNS names, this will return initialized after a single DNS resolution

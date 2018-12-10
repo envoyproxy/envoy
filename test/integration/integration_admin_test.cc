@@ -519,8 +519,7 @@ TEST_P(StatsMatcherIntegrationTest, IncludeExact) {
       "listener_manager.listener_create_success");
   initialize();
   makeRequest();
-  EXPECT_THAT(response_->body(),
-              testing::Eq("listener_manager.listener_create_success: 1\nstats.overflow: 0\n"));
+  EXPECT_EQ(response_->body(), "listener_manager.listener_create_success: 1\n");
 }
 
 } // namespace Envoy

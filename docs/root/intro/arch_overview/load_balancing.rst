@@ -481,6 +481,13 @@ key may be a structured value or list), but the subset load balancer only compar
 and values. Therefore when using structured values, a route's match criteria will only match if an
 identical structured value appears in the host's metadata.
 
+Subsets may be used alongside locality weights by specifying the
+:ref:`locality_aware <envoy_api_field_Cluster.LbSubsetConfig.locality_weight_aware>` flag.
+This will route to each locality based on the original locality weights declared for the cluster.
+The :ref:`scale_locality_weight <envoy_api_field_Cluster.LbSubsetConfig.scale_locality_weight>` can
+be used to scale the locality weights based on the fraction of hosts remaining in the locality
+after the subset predicate has been applied.
+
 Examples
 ^^^^^^^^
 
@@ -549,7 +556,6 @@ v: 1.0, stage: prod   v: 1.1, stage: canary            v: 1.1, stage: canary
 v: 1.0                (none)                           v: 1.0
 ====================  ===============================  ====================
 
-
 Example Host With Metadata
 **************************
 
@@ -588,3 +594,37 @@ An RDS ``Route`` with metadata match criteria:
         envoy.lb:
           version: '1.0'
           stage: 'prod'
+
+Scaled Locality Weights
+-----------------------
+
+When both locality weight and locality weight scaling is enabled, the weight
+of each locality will depend on the fraction of endpoints removed from the locality
+due to the subsetting.
+
+Consider the following:
+
+======  ======== ========
+Host    Metadata Locality
+======  ======== ========
+host1   v: 1.0   L1
+host2   v: 1.0   L1
+host3   v: 1.1   L1
+host4   v: 1.0   L2
+host5   v: 1.2   L3
+======  ======== ========
+
+Where the load between L1, L2 and L3 is split evenly (33/33/33).
+
+Each subset will scale the locality weight of each locality with the formula
+(original locality weight) * (hosts in locality in subset) / (hosts in locality in original host set).
+
+This causes the following locality weighting for each subset:
+
+======  ================
+Subset  Locality Weights
+======  ================
+v: 1.0  {22, 33, 0}
+v: 1.1  {11, 0, 0}
+v: 1.2  {0, 0, 33}
+======  ================

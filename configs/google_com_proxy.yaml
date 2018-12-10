@@ -2,7 +2,6 @@ listeners:
 - address: tcp://127.0.0.1:10000
   filters:
   - name: http_connection_manager
-    type: read
     config:
       codec_type: auto
       stat_prefix: ingress_http

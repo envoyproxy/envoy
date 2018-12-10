@@ -22,10 +22,12 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
 
+#include "common/api/api_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
 #include "common/common/stack_array.h"
+#include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/config/bootstrap_json.h"
 #include "common/json/json_loader.h"
@@ -326,13 +328,13 @@ bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nul
 namespace Stats {
 
 MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options)
-    : alloc_(stats_options) {
+    : TestAllocator(stats_options) {
   ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
-    return alloc_.alloc(name);
+    return TestAllocator::alloc(name);
   }));
 
   ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
-    return alloc_.free(data);
+    return TestAllocator::free(data);
   }));
 
   EXPECT_CALL(*this, alloc(absl::string_view("stats.overflow")));
@@ -341,5 +343,23 @@ MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options)
 MockedTestAllocator::~MockedTestAllocator() {}
 
 } // namespace Stats
+
+namespace Thread {
+
+ThreadFactory& threadFactoryForTest() {
+  static ThreadFactoryImpl* thread_factory = new ThreadFactoryImpl();
+  return *thread_factory;
+}
+
+} // namespace Thread
+
+namespace Api {
+
+ApiPtr createApiForTest(Stats::Store& stat_store) {
+  return std::make_unique<Impl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
+                                stat_store);
+}
+
+} // namespace Api
 
 } // namespace Envoy

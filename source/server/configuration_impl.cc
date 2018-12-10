@@ -18,7 +18,6 @@
 #include "common/config/lds_json.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/ratelimit/ratelimit_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -58,6 +57,12 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(
       bootstrap, server.stats(), server.threadLocal(), server.runtime(), server.random(),
       server.localInfo(), server.accessLogManager(), server.admin());
+
+  // TODO(ramaraochavali): remove this dependency on extension when rate limit service config is
+  // deprecated and removed from bootstrap. For now, just call in to extensions to register the rate
+  // limit service config, so that extensions can build rate limit client.
+  ratelimit_client_factory_ = Envoy::Extensions::Filters::Common::RateLimit::rateLimitClientFactory(
+      server, cluster_manager_->grpcAsyncClientManager(), bootstrap);
   const auto& listeners = bootstrap.static_resources().listeners();
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
   for (ssize_t i = 0; i < listeners.size(); i++) {
@@ -79,14 +84,6 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
 
   initializeTracers(bootstrap.tracing(), server);
-
-  if (bootstrap.has_rate_limit_service()) {
-    ratelimit_client_factory_ = std::make_unique<RateLimit::GrpcFactoryImpl>(
-        bootstrap.rate_limit_service(), cluster_manager_->grpcAsyncClientManager(), server.stats());
-  } else {
-    ratelimit_client_factory_ = std::make_unique<RateLimit::NullFactoryImpl>();
-  }
-
   initializeStatsSinks(bootstrap, server);
 }
 

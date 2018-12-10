@@ -42,12 +42,12 @@ sudo apt-get install \
 
 On Fedora (maybe also other red hat distros), run the following:
 ```
-dnf install cmake libtool libstdc++
+dnf install cmake libtool libstdc++ ninja-build lld patch
 ```
 
 On OS X, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
 ```
-brew install coreutils wget cmake libtool go bazel automake ninja
+brew install coreutils wget cmake libtool go bazel automake ninja clang-format
 ```
 _note_: `coreutils` is used for realpath
 
@@ -327,7 +327,7 @@ They should also ignore any local `.bazelrc` for reproducibility. This can be
 achieved with:
 
 ```
-bazel --bazelrc=/dev/null build -c opt //source/exe:envoy-static.stripped.stamped
+bazel --bazelrc=/dev/null build -c opt //source/exe:envoy-static.stripped
 ```
 
 One caveat to note is that the Git SHA1 is truncated to 16 bytes today as a
