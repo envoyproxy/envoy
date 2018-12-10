@@ -11,10 +11,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/boringssl/archive/77e47de9e16ec8865d1bc6d614dd918141f094d2.tar.gz"],
     ),
     com_google_absl = dict(
-        sha256 = "e35082e88b9da04f4d68094c05ba112502a5063712f3021adfa465306d238c76",
-        strip_prefix = "abseil-cpp-cc8dcd307b76a575d2e3e0958a4fe4c7193c2f68",
+        sha256 = "3ad76de484192b2d5afd49d90492b5ed0bc59eb1a4e8e0deecc7a2a077a90251",
+        strip_prefix = "abseil-cpp-f197d7c72a54064cfde5a2058f1513a4a0ee36fb",
         # 2018-10-31
-        urls = ["https://github.com/abseil/abseil-cpp/archive/cc8dcd307b76a575d2e3e0958a4fe4c7193c2f68.tar.gz"],
+        urls = ["https://github.com/abseil/abseil-cpp/archive/f197d7c72a54064cfde5a2058f1513a4a0ee36fb.tar.gz"],
     ),
     com_github_apache_thrift = dict(
         sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",
@@ -189,5 +189,15 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "eddbfc920e9cd565500370114316757848b672deba06dc2336acfa81b4ac0e6d",
         strip_prefix = "subpar-1.3.0",
         urls = ["https://github.com/google/subpar/archive/1.3.0.tar.gz"],
+    ),
+    io_opencensus_cpp = dict(
+        sha256 = "b967e22fd6be41e2e78bb2fee2d7027ed48cc6b9e0ce2620c2f3db3a8913ff9c",
+        strip_prefix = "opencensus-cpp-e9d986ebeb413acb4f8ec1bdff33485866a794b7",
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/e9d986ebeb413acb4f8ec1bdff33485866a794b7.tar.gz"],
+    ),
+    com_github_curl = dict(
+        sha256 = "d483b89062832e211c887d7cf1b65c902d591b48c11fe7d174af781681580b41",
+        strip_prefix = "curl-7.63.0",
+        urls = ["https://github.com/curl/curl/releases/download/curl-7_63_0/curl-7.63.0.tar.gz"],
     ),
 )

@@ -301,10 +301,25 @@ api_proto_library(
     visibility = ["//visibility:public"],
 )
 
+api_proto_library(
+    name = "trace_config",
+    srcs = [
+        "trace_config.proto",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 go_proto_library(
     name = "trace_model_go_proto",
     importpath = "trace_model",
     proto = ":trace_model",
+    visibility = ["//visibility:public"],
+)
+
+go_proto_library(
+    name = "trace_config_go_proto",
+    importpath = "trace_config",
+    proto = ":trace_config",
     visibility = ["//visibility:public"],
 )
         """,
