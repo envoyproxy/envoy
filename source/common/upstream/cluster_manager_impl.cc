@@ -949,7 +949,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
 
   ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
   const auto& cluster_entry = config.thread_local_clusters_[name];
-  ENVOY_LOG(debug, "membership update for TLS cluster {}", name);
+  ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
+            hosts_added.size(), hosts_removed.size());
   cluster_entry->priority_set_.getOrCreateHostSet(priority).updateHosts(
       std::move(hosts), std::move(healthy_hosts), std::move(hosts_per_locality),
       std::move(healthy_hosts_per_locality), std::move(locality_weights), hosts_added,

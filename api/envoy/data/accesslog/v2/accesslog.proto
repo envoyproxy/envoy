@@ -153,7 +153,7 @@ message ResponseFlags {
   // Indicates there was a local reset by a connection pool due to an initial connection failure.
   bool upstream_connection_failure = 6;
 
-  // Indicates the stream was reset locally due to connection termination.
+  // Indicates the stream was reset due to an upstream connection termination.
   bool upstream_connection_termination = 7;
 
   // Indicates the stream was reset because of a resource overflow.
@@ -188,6 +188,9 @@ message ResponseFlags {
   // [#not-implemented-hide:] Hide from docs.
   // Indicates that the request was rejected because there was an error in rate limit service.
   bool rate_limit_service_error = 14;
+
+  // Indicates the stream was reset due to a downstream connection termination.
+  bool downstream_connection_termination = 15;
 }
 
 // [#not-implemented-hide:]
