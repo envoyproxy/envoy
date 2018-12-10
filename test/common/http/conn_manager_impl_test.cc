@@ -935,7 +935,8 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
   constexpr char local_address[] = "0.0.0.0";
   constexpr char xff_address[] = "1.2.3.4";
 
-  // stream_info.directRemoteAddress() will populate from xff
+  // stream_info.downstreamRemoteAddress will infer the address from request
+  // headers instead of the physical connection
   use_remote_address_ = false;
   setup(false, "");
 
@@ -955,11 +956,11 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
         EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
         EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamDirectlyConnectedAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
         EXPECT_NE(nullptr, stream_info.routeEntry());
 
         EXPECT_EQ(stream_info.downstreamRemoteAddress()->ip()->addressAsString(), xff_address);
-        EXPECT_EQ(stream_info.downstreamDirectlyConnectedAddress()->ip()->addressAsString(),
+        EXPECT_EQ(stream_info.downstreamDirectRemoteAddress()->ip()->addressAsString(),
                   local_address);
       }));
 
@@ -1005,7 +1006,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
         EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
         EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamDirectlyConnectedAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
         EXPECT_NE(nullptr, stream_info.routeEntry());
       }));
 
@@ -1053,7 +1054,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(400));
         EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
         EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamDirectlyConnectedAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
         EXPECT_EQ(nullptr, stream_info.routeEntry());
       }));
 

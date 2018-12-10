@@ -49,12 +49,12 @@ MockStreamInfo::MockStreamInfo()
             downstream_local_address_ = downstream_local_address;
           }));
   ON_CALL(*this, downstreamLocalAddress()).WillByDefault(ReturnRef(downstream_local_address_));
-  ON_CALL(*this, setDownstreamDirectlyConnectedAddress(_))
+  ON_CALL(*this, setDownstreamDirectRemoteAddress(_))
       .WillByDefault(Invoke([this](const Network::Address::InstanceConstSharedPtr&
                                        downstream_directly_connected_address) {
         downstream_directly_connected_address_ = downstream_directly_connected_address;
       }));
-  ON_CALL(*this, downstreamDirectlyConnectedAddress())
+  ON_CALL(*this, downstreamDirectRemoteAddress())
       .WillByDefault(ReturnRef(downstream_directly_connected_address_));
   ON_CALL(*this, setDownstreamRemoteAddress(_))
       .WillByDefault(

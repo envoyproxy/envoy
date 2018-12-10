@@ -369,7 +369,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   }
   stream_info_.setDownstreamLocalAddress(
       connection_manager_.read_callbacks_->connection().localAddress());
-  stream_info_.setDownstreamDirectlyConnectedAddress(
+  stream_info_.setDownstreamDirectRemoteAddress(
       connection_manager_.read_callbacks_->connection().remoteAddress());
   // Initially, the downstream remote address is the source address of the
   // downstream connection. That can change later in the request's lifecycle,

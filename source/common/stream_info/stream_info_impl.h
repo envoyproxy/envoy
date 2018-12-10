@@ -165,13 +165,13 @@ struct StreamInfoImpl : public StreamInfo {
     return downstream_local_address_;
   }
 
-  void setDownstreamDirectlyConnectedAddress(const Network::Address::InstanceConstSharedPtr&
+  void setDownstreamDirectRemoteAddress(const Network::Address::InstanceConstSharedPtr&
                                                  downstream_directly_connected_address) override {
     downstream_directly_connected_address_ = downstream_directly_connected_address;
   }
 
   const Network::Address::InstanceConstSharedPtr&
-  downstreamDirectlyConnectedAddress() const override {
+  downstreamDirectRemoteAddress() const override {
     return downstream_directly_connected_address_;
   }
 

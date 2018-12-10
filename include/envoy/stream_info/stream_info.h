@@ -278,7 +278,7 @@ public:
    * @param downstream_directly_connected_address sets the direct physical address of downstream
    * connection.
    */
-  virtual void setDownstreamDirectlyConnectedAddress(
+  virtual void setDownstreamDirectRemoteAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_directly_connected_address) PURE;
 
   /**
@@ -286,7 +286,7 @@ public:
    * equivalent to the address of the physical connection.
    */
   virtual const Network::Address::InstanceConstSharedPtr&
-  downstreamDirectlyConnectedAddress() const PURE;
+  downstreamDirectRemoteAddress() const PURE;
 
   /**
    * @param downstream_remote_address sets the remote address of downstream connection.
@@ -296,7 +296,7 @@ public:
 
   /**
    * @return the downstream remote address. Note that this will never be nullptr. This may be
-   * equivalent to downstreamDirectlyConnectedAddress, unless the remote address is inferred from a
+   * equivalent to downstreamDirectRemoteAddress, unless the remote address is inferred from a
    * proxy proto, x-forwarded-for, etc.
    */
   virtual const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const PURE;

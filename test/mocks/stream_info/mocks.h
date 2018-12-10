@@ -55,9 +55,9 @@ public:
   MOCK_METHOD1(healthCheck, void(bool is_hc));
   MOCK_METHOD1(setDownstreamLocalAddress, void(const Network::Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(downstreamLocalAddress, const Network::Address::InstanceConstSharedPtr&());
-  MOCK_METHOD1(setDownstreamDirectlyConnectedAddress,
+  MOCK_METHOD1(setDownstreamDirectRemoteAddress,
                void(const Network::Address::InstanceConstSharedPtr&));
-  MOCK_CONST_METHOD0(downstreamDirectlyConnectedAddress,
+  MOCK_CONST_METHOD0(downstreamDirectRemoteAddress,
                      const Network::Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setDownstreamRemoteAddress, void(const Network::Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(downstreamRemoteAddress, const Network::Address::InstanceConstSharedPtr&());
