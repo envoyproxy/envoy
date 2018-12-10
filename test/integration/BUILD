@@ -24,7 +24,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
-        ":http_integration_lib",
+        ":xds_integration_test_base",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
@@ -70,14 +70,10 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
-        ":http_integration_lib",
+        ":xds_integration_test_base",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/ssl:context_config_lib",
-        "//source/common/ssl:context_lib",
-        "//source/common/ssl:ssl_socket_lib",
-        "//source/extensions/transport_sockets/ssl:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
@@ -639,6 +635,30 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "xds_integration_test_base",
+    srcs = [
+        "xds_integration_test_base.cc",
+    ],
+    hdrs = [
+        "xds_integration_test_base.h",
+    ],
+    deps = [
+        ":http_integration_lib",
+        ":test_host_predicate_lib",
+        "//include/envoy/event:timer_interface",
+        "//source/common/common:thread_annotations",
+        "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
+        "//test/common/upstream:utility_lib",
+        "//test/integration/filters:add_trailers_filter_config_lib",
+        "//test/integration/filters:headers_only_filter_config_lib",
+        "//test/integration/filters:passthrough_filter_config_lib",
+        "//test/integration/filters:pause_filter_lib",
+        "//test/test_common:registry_lib",
     ],
 )
 

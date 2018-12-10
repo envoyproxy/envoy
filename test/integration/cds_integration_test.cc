@@ -9,8 +9,8 @@
 #include "common/protobuf/utility.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
-#include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
+#include "test/integration/xds_integration_test_base.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
@@ -35,73 +35,20 @@ admin:
       port_value: 0
 )EOF";
 
-class CdsIntegrationTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
+class CdsIntegrationTest : public XdsIntegrationTestBase,
+                           public Grpc::GrpcClientIntegrationParamTest {
 public:
   CdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), kConfig) {}
+      : XdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, ipVersion(), kConfig) {}
 
   void TearDown() override {
-    AssertionResult result = cds_connection_->close();
+    AssertionResult result = xds_connection_->close();
     RELEASE_ASSERT(result, result.message());
-    result = cds_connection_->waitForDisconnect();
+    result = xds_connection_->waitForDisconnect();
     RELEASE_ASSERT(result, result.message());
-    cds_connection_.reset();
+    xds_connection_.reset();
     test_server_.reset();
     fake_upstreams_.clear();
-  }
-
-  AssertionResult
-  compareDiscoveryRequest(const std::string& expected_type_url, const std::string& expected_version,
-                          const std::vector<std::string>& expected_resource_names,
-                          const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
-                          const std::string& expected_error_message = "") {
-    envoy::api::v2::DiscoveryRequest discovery_request;
-    VERIFY_ASSERTION(cds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
-
-    EXPECT_TRUE(discovery_request.has_node());
-    EXPECT_FALSE(discovery_request.node().id().empty());
-    EXPECT_FALSE(discovery_request.node().cluster().empty());
-
-    // TODO(PiotrSikora): Remove this hack once fixed internally.
-    if (!(expected_type_url == discovery_request.type_url())) {
-      return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
-                                               discovery_request.type_url(), expected_type_url);
-    }
-    if (!(expected_error_code == discovery_request.error_detail().code())) {
-      return AssertionFailure() << fmt::format("error_code {} does not match expected {}",
-                                               discovery_request.error_detail().code(),
-                                               expected_error_code);
-    }
-    EXPECT_TRUE(
-        IsSubstring("", "", expected_error_message, discovery_request.error_detail().message()));
-    const std::vector<std::string> resource_names(discovery_request.resource_names().cbegin(),
-                                                  discovery_request.resource_names().cend());
-    if (expected_resource_names != resource_names) {
-      return AssertionFailure() << fmt::format(
-                 "resources {} do not match expected {} in {}",
-                 fmt::join(resource_names.begin(), resource_names.end(), ","),
-                 fmt::join(expected_resource_names.begin(), expected_resource_names.end(), ","),
-                 discovery_request.DebugString());
-    }
-    // TODO(PiotrSikora): Remove this hack once fixed internally.
-    if (!(expected_version == discovery_request.version_info())) {
-      return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",
-                                               discovery_request.version_info(), expected_version,
-                                               discovery_request.DebugString());
-    }
-    return AssertionSuccess();
-  }
-
-  template <class T>
-  void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                             const std::string& version) {
-    envoy::api::v2::DiscoveryResponse discovery_response;
-    discovery_response.set_version_info(version);
-    discovery_response.set_type_url(type_url);
-    for (const auto& message : messages) {
-      discovery_response.add_resources()->PackFrom(message);
-    }
-    cds_stream_->sendGrpcMessage(discovery_response);
   }
 
   envoy::api::v2::Cluster buildCluster(const std::string& name) {
@@ -154,23 +101,18 @@ public:
     HttpIntegrationTest::initialize();
 
     fake_upstreams_[0]->set_allow_unexpected_disconnects(false);
-    // Causes cds_connection_ to be filled with a newly constructed FakeHttpConnection.
+    // Causes xds_connection_ to be filled with a newly constructed FakeHttpConnection.
     AssertionResult result =
-        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, cds_connection_);
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
     RELEASE_ASSERT(result, result.message());
-    result = cds_connection_->waitForNewStream(*dispatcher_, cds_stream_);
+    result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result, result.message());
-    cds_stream_->startGrpcStream();
+    xds_stream_->startGrpcStream();
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
     sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                    {buildCluster("cluster_0")}, "1");
   }
-
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
-  FakeStreamPtr cds_stream_;
-  FakeHttpConnectionPtr cds_connection_;
-  FakeHttpConnectionPtr upstream_connection_;
 };
 
 // GoogleGrpc causes problems.
