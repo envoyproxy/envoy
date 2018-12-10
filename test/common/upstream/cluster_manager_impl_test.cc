@@ -2905,7 +2905,8 @@ public:
 
     return absl::make_unique<ProdClusterManagerFactory>(
         mock_loader_, mock_stats_store_, mock_tls_, mock_random_generator_, mock_dns_resolver_,
-        mock_context_manager_, mock_dispatcher_, mock_local_info_, mock_secret_manager_, mock_api_);
+        mock_context_manager_, mock_dispatcher_, mock_local_info_, mock_secret_manager_, mock_api_,
+        http_context_);
   }
 
   MockConnectionMapperFactory mapper_factory_mock_;
@@ -2922,6 +2923,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> mock_local_info_;
   NiceMock<Secret::MockSecretManager> mock_secret_manager_;
   NiceMock<Api::MockApi> mock_api_;
+  Http::ContextImpl http_context_;
 };
 
 // a simple test to show that we create wrapped connection pools.
