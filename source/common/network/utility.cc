@@ -37,11 +37,14 @@ namespace Envoy {
 namespace Network {
 
 const std::string Utility::TCP_SCHEME = "tcp://";
+const std::string Utility::UDP_SCHEME = "udp://";
 const std::string Utility::UNIX_SCHEME = "unix://";
 
 Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   if (urlIsTcpScheme(url)) {
     return parseInternetAddressAndPort(url.substr(TCP_SCHEME.size()));
+  } else if (urlIsUdpScheme(url)) {
+    return parseInternetAddressAndPort(url.substr(UDP_SCHEME.size()));
   } else if (urlIsUnixScheme(url)) {
     return Address::InstanceConstSharedPtr{
         new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
@@ -50,30 +53,42 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   }
 }
 
-bool Utility::urlIsTcpScheme(const std::string& url) { return url.find(TCP_SCHEME) == 0; }
+bool Utility::urlIsTcpScheme(const std::string& url) {
+  return StringUtil::startsWith(url.c_str(), TCP_SCHEME, true);
+}
 
-bool Utility::urlIsUnixScheme(const std::string& url) { return url.find(UNIX_SCHEME) == 0; }
+bool Utility::urlIsUdpScheme(const std::string& url) {
+  return StringUtil::startsWith(url.c_str(), UDP_SCHEME, true);
+}
 
-std::string Utility::hostFromTcpUrl(const std::string& url) {
-  if (!urlIsTcpScheme(url)) {
-    throw EnvoyException(fmt::format("expected TCP scheme, got: {}", url));
+bool Utility::urlIsUnixScheme(const std::string& url) {
+  return StringUtil::startsWith(url.c_str(), UNIX_SCHEME, true);
+}
+
+namespace {
+
+std::string hostFromUrl(const std::string& url, const std::string& scheme,
+                        const std::string& scheme_name) {
+  if (url.find(scheme) != 0) {
+    throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
-  size_t colon_index = url.find(':', TCP_SCHEME.size());
+  size_t colon_index = url.find(':', scheme.size());
 
   if (colon_index == std::string::npos) {
     throw EnvoyException(fmt::format("malformed url: {}", url));
   }
 
-  return url.substr(TCP_SCHEME.size(), colon_index - TCP_SCHEME.size());
+  return url.substr(scheme.size(), colon_index - scheme.size());
 }
 
-uint32_t Utility::portFromTcpUrl(const std::string& url) {
-  if (!urlIsTcpScheme(url)) {
-    throw EnvoyException(fmt::format("expected TCP scheme, got: {}", url));
+uint32_t portFromUrl(const std::string& url, const std::string& scheme,
+                     const std::string& scheme_name) {
+  if (url.find(scheme) != 0) {
+    throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
-  size_t colon_index = url.find(':', TCP_SCHEME.size());
+  size_t colon_index = url.find(':', scheme.size());
 
   if (colon_index == std::string::npos) {
     throw EnvoyException(fmt::format("malformed url: {}", url));
@@ -86,6 +101,24 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
   } catch (const std::out_of_range& e) {
     throw EnvoyException(e.what());
   }
+}
+
+} // namespace
+
+std::string Utility::hostFromTcpUrl(const std::string& url) {
+  return hostFromUrl(url, TCP_SCHEME, "TCP");
+}
+
+uint32_t Utility::portFromTcpUrl(const std::string& url) {
+  return portFromUrl(url, TCP_SCHEME, "TCP");
+}
+
+std::string Utility::hostFromUdpUrl(const std::string& url) {
+  return hostFromUrl(url, UDP_SCHEME, "UDP");
+}
+
+uint32_t Utility::portFromUdpUrl(const std::string& url) {
+  return portFromUrl(url, UDP_SCHEME, "UDP");
 }
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address,
