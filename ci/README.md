@@ -24,8 +24,11 @@ Currently there are three build images:
 
 * `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
 * `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 16.04 (Xenial) which uses the GCC 5.4 compiler.
+* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 which uses the GCC 5.3.1 compiler (devtoolset-4).
 
-We also install and use the clang-7 compiler for some sanitizing runs.
+For Ubuntu, we also install and use the clang-7 compiler for some sanitizing runs.
+
+On CentOS 7, we install the clang-5 compiler. However, the sanitizing runs have not been tested there!
 
 # Building and running tests as a developer
 
@@ -59,7 +62,7 @@ For a release version of the Envoy binary you can run:
 ```
 
 The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy` (or wherever
-`$ENVOY_DOCKER_BUILD_DIR` points).
+`$ENVOY_DOCKER_BUILD_DIR` points) and the same binary are in `<PROJECT_ROOT>/build_release`. In addition, a stripped version has been created in `<PROJECT_ROOT>/build_release_stripped`.
 
 For a debug version of the Envoy binary you can run:
 
@@ -106,6 +109,38 @@ IMAGE_NAME="envoyproxy/envoy-build-${DISTRO}" IMAGE_ID=my_tag ./ci/run_envoy_doc
 ```
 
 This build the Ubuntu based `envoyproxy/envoy-build-ubuntu` image, and the final call will run against your local copy of the build image.
+
+# Building a CentOS 7 Binary
+
+Currently, there is no binary image for CentOS 7 available on Docker Hub. However, a build image based on CentOS 7 has been created and pushed again so you can create your own binary for CentOS 7.
+
+Here are some instructions on how to do that locally.
+
+## Pre-Requisites
+
+For a sufficiently fast build, you should have access to a computer or cloud VM with a minimum of 8GB RAM and 4 CPUs/Cores running a later Linux (CentOS 7, Ubuntu 16.04 or 18.04) with Docker CE installed. The build image requres at least Docker 17.03.0-ce. The latest build image has been tested on Docker CE 18.09.0.
+
+Please refer to the Docker documentation on how to install and setup Docker on your specific OS.
+
+## Building
+
+Once you have cloned this repository onto your build machine, you can run the following command to build a binary for CentOS 7:
+
+`IMAGE_NAME=envoyproxy/envoy-build-centos IMAGE_ID="latest" ./ci/run_envoy_docker.sh 'BAZEL_BUILD_EXTRA_OPTIONS=--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 ./ci/do_ci.sh bazel.release.server_only'`
+
+This will pull the latest CentOS build image from Docker Hub.
+
+In case you want to build a binary from a specific tag, you will need to get the git commit hash (the full length hash and not just the first 7 characters) and replace the `latest` with this hash string in the `IMAGE_ID` above.
+
+Please note the important 
+
+`BAZEL_BUILD_EXTRA_OPTIONS=--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1`
+
+passed into the build script!
+
+If you don't add this, your build will fail due to a incompatibility between GCC 5.3 on CentOS and the code developed and build under GCC 5.4. This option will have to be used until both Ubuntu and CentOS have been synchronized on the same build toolchain.
+
+**One last note**: the build image has only been tested with the `bazel.release.server_only` target. All other targets, especially those using `clang` are not guaranteed to work on CentOS since the only purpose of this image is to produce an `envoy` binary for CentOS 7.
 
 # MacOS Build Flow
 
