@@ -3,9 +3,13 @@ set -e
 IMAGE=$1
 RUN_REMOTE=$2
 LOCAL_MOUNT=$3
-TEST_PATH=$(realpath $4)
-shift 4
+DOCKER_ENV=$4
+TEST_PATH=$(realpath $5)
+shift 5
 
+echo "Using docker environment from $DOCKER_ENV:"
+cat $DOCKER_ENV
+. $DOCKER_ENV
 CONTAINER_NAME="envoy-test-runner"
 ENVFILE=$(mktemp -t "bazel-test-env.XXXXXX")
 function cleanup() {

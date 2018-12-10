@@ -28,6 +28,22 @@ else
   RUN_REMOTE=yes
 fi
 
+# Pass through the docker environment
+DOCKER_ENV=$(mktemp -t docker_env.XXXXXX)
+function cleanup() {
+  rm -f "DOCKER_ENV"
+}
+
+trap cleanup EXIT
+cat > $DOCKER_ENV <<EOF
+  #!/bin/bash
+  export DOCKER_CERT_PATH=$DOCKER_CERT_PATH
+  export DOCKER_HOST=$DOCKER_HOST
+  export DOCKER_MACHINE_NAME=$DOCKER_MACHINE_NAME
+  export DOCKER_TLS_VERIFY=$DOCKER_TLS_VERIFY
+  export NO_PROXY=$NO_PROXY
+EOF
+
 . ./ci/envoy_build_sha.sh
 IMAGE=envoyproxy/envoy-build:${ENVOY_BUILD_SHA}
 
@@ -35,4 +51,4 @@ IMAGE=envoyproxy/envoy-build:${ENVOY_BUILD_SHA}
 # name is passed in.
 "${BAZEL}" test "$@" --strategy=TestRunner=standalone --cache_test_results=no \
   --test_output=summary --run_under="${SCRIPT_DIR}/docker_wrapper.sh ${IMAGE} ${RUN_REMOTE} \
-   ${LOCAL_MOUNT}"
+   ${LOCAL_MOUNT} $DOCKER_ENV"
