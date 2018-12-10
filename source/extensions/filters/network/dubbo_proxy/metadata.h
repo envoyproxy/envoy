@@ -16,8 +16,7 @@ namespace DubboProxy {
 class MessageMetadata {
 public:
   struct ParameterValue {
-    ParameterValue(uint32_t index, const std::string& value)
-        : index_(index), value_(value) {}
+    ParameterValue(uint32_t index, const std::string& value) : index_(index), value_(value) {}
 
     uint32_t index_;
     std::string value_;
@@ -70,8 +69,9 @@ public:
   const ParameterValue* getParameterValue(uint32_t index) const {
     if (parameter_map_.has_value()) {
       auto itor = parameter_map_.value()->find(index);
-      if (itor != parameter_map_.value()->end())
+      if (itor != parameter_map_.value()->end()) {
         return &itor->second;
+      }
     }
 
     return nullptr;
