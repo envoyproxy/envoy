@@ -73,7 +73,8 @@ message TlsCertificate {
   // The TLS private key.
   core.DataSource private_key = 2;
 
-  // [#not-implemented-hide:]
+  // The password to decrypt the TLS private key. If this field is not set, it is assumed that the
+  // TLS private key is not password encrypted.
   core.DataSource password = 3;
 
   // [#not-implemented-hide:]

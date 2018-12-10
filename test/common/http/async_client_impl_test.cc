@@ -5,6 +5,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/async_client_impl.h"
+#include "common/http/context_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
@@ -38,7 +39,7 @@ public:
   AsyncClientImplTest()
       : client_(cm_.thread_local_cluster_.cluster_.info_, stats_store_, dispatcher_, local_info_,
                 cm_, runtime_, random_,
-                Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}) {
+                Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}, http_context_) {
     message_->headers().insertMethod().value(std::string("GET"));
     message_->headers().insertHost().value(std::string("host"));
     message_->headers().insertPath().value(std::string("/"));
@@ -72,6 +73,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Http::ContextImpl http_context_;
   AsyncClientImpl client_;
 };
 

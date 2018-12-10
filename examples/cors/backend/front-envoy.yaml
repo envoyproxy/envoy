@@ -1,0 +1,70 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 80
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        config:
+          codec_type: auto
+          stat_prefix: ingress_http
+          access_log:
+            - name: envoy.file_access_log
+              config:
+                path: "/var/log/access.log"
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: services
+              domains:
+              - "*"
+              cors:
+                allow_origin:
+                - "*"
+                allow_methods: "GET"
+              routes:
+              - match:
+                  prefix: "/cors/open"
+                route:
+                  cluster: backend_service
+              - match:
+                  prefix: "/cors/disabled"
+                route:
+                  cluster: backend_service
+                  cors:
+                    enabled: false
+              - match:
+                  prefix: "/cors/restricted"
+                route:
+                  cluster: backend_service
+                  cors:
+                    allow_origin:
+                    - "envoyproxy.io"
+                    allow_methods: "GET"
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: backend_service
+          http_filters:
+          - name: envoy.cors
+            config: {}
+          - name: envoy.router
+            config: {}
+  clusters:
+  - name: backend_service
+    connect_timeout: 0.25s
+    type: strict_dns
+    lb_policy: round_robin
+    http2_protocol_options: {}
+    hosts:
+    - socket_address:
+        address: backendservice
+        port_value: 80
+admin:
+  access_log_path: "/dev/null"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8001

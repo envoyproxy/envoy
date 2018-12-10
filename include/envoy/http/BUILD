@@ -32,6 +32,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "codes_interface",
     hdrs = ["codes.h"],
+    deps = ["//include/envoy/stats:stats_interface"],
 )
 
 envoy_cc_library(
@@ -48,7 +49,15 @@ envoy_cc_library(
 envoy_cc_library(
     name = "connection_mapper_interface",
     hdrs = ["connection_mapper.h"],
+    deps = [],
+)
+
+envoy_cc_library(
+    name = "context_interface",
+    hdrs = ["context.h"],
     deps = [
+        ":codes_interface",
+        "//include/envoy/tracing:http_tracer_interface",
     ],
 )
 

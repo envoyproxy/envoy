@@ -9,6 +9,7 @@
 #include "common/api/api_impl.h"
 #include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
+#include "common/http/context_impl.h"
 #include "common/http/wrapped/connection_mapper_factory.h"
 #include "common/http/wrapped/wrapped_connection_pool.h"
 #include "common/network/socket_option_impl.h"
@@ -66,9 +67,10 @@ public:
                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
                                   AccessLog::AccessLogManager& log_manager,
                                   bool added_via_api) -> ClusterSharedPtr {
-          return ClusterImplBase::create(
-              cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
-              dispatcher_, log_manager, local_info_, outlier_event_logger, added_via_api);
+          return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
+                                         ssl_context_manager_, runtime_, random_, dispatcher_,
+                                         log_manager, local_info_, outlier_event_logger,
+                                         added_via_api, eds_subscription_factory_);
         }));
   }
 
@@ -142,6 +144,7 @@ public:
   Ssl::ContextManagerImpl ssl_context_manager_{dispatcher_.timeSystem()};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Secret::MockSecretManager> secret_manager_;
+  NiceMock<MockEdsSubscriptionFactory> eds_subscription_factory_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.
@@ -163,7 +166,7 @@ public:
                          Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                          Api::Api& api, MockLocalClusterUpdate& local_cluster_update)
       : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
-                           main_thread_dispatcher, admin, api),
+                           main_thread_dispatcher, admin, api, http_context_),
         local_cluster_update_(local_cluster_update) {}
 
 protected:
@@ -172,6 +175,7 @@ protected:
                                     const HostVector& hosts_removed) override {
     local_cluster_update_.post(priority, hosts_added, hosts_removed);
   }
+  Http::ContextImpl http_context_;
   MockLocalClusterUpdate& local_cluster_update_;
 };
 
@@ -190,7 +194,7 @@ public:
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<ClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_);
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_, http_context_);
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -267,6 +271,7 @@ public:
   NiceMock<Server::MockAdmin> admin_;
   Event::SimulatedTimeSystem time_system_;
   MockLocalClusterUpdate local_cluster_update_;
+  Http::ContextImpl http_context_;
 };
 
 envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {

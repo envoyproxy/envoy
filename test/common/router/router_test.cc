@@ -6,6 +6,7 @@
 #include "common/common/empty_string.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
+#include "common/http/context_impl.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/router.h"
@@ -77,7 +78,7 @@ public:
       : shadow_writer_(new MockShadowWriter()),
         config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
                 ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
-                test_time_.timeSystem()),
+                test_time_.timeSystem(), http_context_),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
     upstream_locality_.set_zone("to_az");
@@ -189,6 +190,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::ConnectionPool::MockCancellable cancellable_;
+  Http::ContextImpl http_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   MockShadowWriter* shadow_writer_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

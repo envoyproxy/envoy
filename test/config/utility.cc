@@ -382,15 +382,16 @@ void ConfigHelper::setClientCodec(
   }
 }
 
-void ConfigHelper::addSslConfig(bool ecdsa_cert) {
+void ConfigHelper::addSslConfig(bool ecdsa_cert, bool tlsv1_3) {
   RELEASE_ASSERT(!finalized_, "");
 
   auto* filter_chain =
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-  initializeTls(ecdsa_cert, *filter_chain->mutable_tls_context()->mutable_common_tls_context());
+  initializeTls(ecdsa_cert, tlsv1_3,
+                *filter_chain->mutable_tls_context()->mutable_common_tls_context());
 }
 
-void ConfigHelper::initializeTls(bool ecdsa_cert,
+void ConfigHelper::initializeTls(bool ecdsa_cert, bool tlsv1_3,
                                  envoy::api::v2::auth::CommonTlsContext& common_tls_context) {
   common_tls_context.add_alpn_protocols("h2");
   common_tls_context.add_alpn_protocols("http/1.1");
@@ -399,6 +400,13 @@ void ConfigHelper::initializeTls(bool ecdsa_cert,
   validation_context->mutable_trusted_ca()->set_filename(
       TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
   validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
+
+  // We'll negotiate up to TLSv1.3 for the tests that care, but it really
+  // depends on what the client sets.
+  if (tlsv1_3) {
+    common_tls_context.mutable_tls_params()->set_tls_maximum_protocol_version(
+        envoy::api::v2::auth::TlsParameters::TLSv1_3);
+  }
 
   auto* tls_certificate = common_tls_context.add_tls_certificates();
   if (ecdsa_cert) {

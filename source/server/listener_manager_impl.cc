@@ -35,7 +35,6 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
   std::vector<Network::FilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
-    const ProtobufTypes::String string_type = proto_config.deprecated_v1().type();
     const ProtobufTypes::String string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
@@ -133,7 +132,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, bugfix_reverse_write_filter_order, true)),
       modifiable_(modifiable), workers_started_(workers_started), hash_(hash),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
-      config_(config), version_info_(version_info) {
+      config_(config), version_info_(version_info),
+      listener_filters_timeout_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)) {
   if (config.has_transparent()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }

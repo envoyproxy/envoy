@@ -13,7 +13,8 @@ namespace {
 
 // Parameterize the loopback test server socket address and gRPC client type.
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, GrpcClientIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+                        GRPC_CLIENT_INTEGRATION_PARAMS,
+                        GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Validate that a simple request-reply stream works.
 TEST_P(GrpcClientIntegrationTest, BasicStream) {
@@ -292,6 +293,26 @@ TEST_P(GrpcClientIntegrationTest, ResourceExhaustedError) {
   dispatcher_helper_.runDispatcher();
 }
 
+// Validate that a trailers Unauthenticated reply is handled.
+TEST_P(GrpcClientIntegrationTest, UnauthenticatedError) {
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendServerTrailers(Status::GrpcStatus::Unauthenticated, "error message", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
+// Validate that a trailers reply is still handled even if a grpc status code larger than
+// MaximumValid, is handled.
+TEST_P(GrpcClientIntegrationTest, MaximumValidPlusOne) {
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendServerTrailers(static_cast<Status::GrpcStatus>(Status::GrpcStatus::MaximumValid + 1),
+                             "error message", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
 // Validate that we can continue to receive after a local close.
 TEST_P(GrpcClientIntegrationTest, ReceiveAfterLocalClose) {
   initialize();
@@ -328,7 +349,8 @@ TEST_P(GrpcClientIntegrationTest, CancelRequest) {
 
 // Parameterize the loopback test server socket address and gRPC client type.
 INSTANTIATE_TEST_CASE_P(SslIpVersionsClientType, GrpcSslClientIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+                        GRPC_CLIENT_INTEGRATION_PARAMS,
+                        GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Validate that a simple request-reply unary RPC works with SSL.
 TEST_P(GrpcSslClientIntegrationTest, BasicSslRequest) {
@@ -390,7 +412,8 @@ public:
 
 // Parameterize the loopback test server socket address and gRPC client type.
 INSTANTIATE_TEST_CASE_P(SslIpVersionsClientType, GrpcAccessTokenClientIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+                        GRPC_CLIENT_INTEGRATION_PARAMS,
+                        GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Validate that a simple request-reply unary RPC works with AccessToken auth.
 TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthRequest) {

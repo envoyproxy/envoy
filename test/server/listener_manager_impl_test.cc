@@ -233,6 +233,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, EmptyFilter) {
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
   manager_->addOrUpdateListener(parseListenerFromJson(json), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
+  EXPECT_EQ(std::chrono::milliseconds(15000),
+            manager_->listeners().front().get().listenerFiltersTimeout());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, DefaultListenerPerConnectionBufferLimit) {
@@ -309,7 +311,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterConfig) {
     "address": "tcp://127.0.0.1:1234",
     "filters": [
       {
-        "type" : "type",
+        "foo" : "type",
         "name" : "name",
         "config" : {}
       }
@@ -327,7 +329,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
     "address": "tcp://127.0.0.1:1234",
     "filters": [
       {
-        "type" : "write",
         "name" : "invalid",
         "config" : {}
       }
@@ -361,7 +362,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
     "bind_to_port": false,
     "filters": [
       {
-        "type" : "read",
         "name" : "stats_test",
         "config" : {}
       }
@@ -375,6 +375,22 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
 
   EXPECT_EQ(1UL, server_.stats_store_.counter("bar").value());
   EXPECT_EQ(1UL, server_.stats_store_.counter("listener.127.0.0.1_1234.foo").value());
+}
+
+TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
+  const std::string json = R"EOF(
+    name: "foo"
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 10000 }
+    filter_chains:
+    - filters:
+    listener_filters_timeout: 0s
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(json), "", true));
+  EXPECT_EQ(std::chrono::milliseconds(),
+            manager_->listeners().front().get().listenerFiltersTimeout());
 }
 
 TEST_F(ListenerManagerImplTest, ReversedWriteFilterOrder) {
@@ -556,7 +572,7 @@ dynamic_draining_listeners:
     "name": "foo",
     "address": "tcp://127.0.0.1:1234",
     "filters": [
-      { "type" : "read", "name" : "fake", "config" : {} }
+      { "name" : "fake", "config" : {} }
     ]
   }
   )EOF";
@@ -822,7 +838,7 @@ dynamic_draining_listeners:
     "name": "baz",
     "address": "tcp://127.0.0.1:1236",
     "filters": [
-      { "type" : "read", "name" : "fake", "config" : {} }
+      { "name" : "fake", "config" : {} }
     ]
   }
   )EOF";
@@ -1018,7 +1034,7 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
     "name": "foo",
     "address": "tcp://127.0.0.1:1234",
     "filters": [
-      { "type" : "read", "name" : "fake", "config" : {} }
+      { "name" : "fake", "config" : {} }
     ]
   }
   )EOF";

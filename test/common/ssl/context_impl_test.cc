@@ -171,7 +171,8 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
   EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
-  EXPECT_TRUE(message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
@@ -223,7 +224,8 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
   EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
-  EXPECT_TRUE(message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
@@ -271,7 +273,7 @@ TEST_F(SslContextImplTest, TestNoCert) {
   ClientContextConfigImpl cfg(*loader, factory_context_);
   ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
   EXPECT_EQ(nullptr, context->getCaCertInformation());
-  EXPECT_EQ(nullptr, context->getCertChainInformation());
+  EXPECT_TRUE(context->getCertChainInformation().empty());
 }
 
 class SslServerContextImplTicketTest : public SslContextImplTest {
@@ -517,6 +519,47 @@ TEST(ClientContextConfigImplTest, InvalidCertificateSpki) {
                           EnvoyException, "Invalid base64-encoded SHA-256 .*");
 }
 
+// Validate that P256 ECDSA certs load.
+TEST(ClientContextConfigImplTest, P256EcdsaCert) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p256.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p256.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  manager.createSslClientContext(store, client_context_config);
+}
+
+// Validate that non-P256 ECDSA certs are rejected.
+TEST(ClientContextConfigImplTest, NonP256EcdsaCert) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p384.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p384.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+                          EnvoyException,
+                          "Failed to load certificate from chain .*selfsigned_cert_ecdsa_p384.pem, "
+                          "only P-256 ECDSA certificates are supported");
+}
+
 // Multiple TLS certificates are not yet supported.
 // TODO(PiotrSikora): Support multiple TLS certificates.
 TEST(ClientContextConfigImplTest, MultipleTlsCertificates) {
@@ -655,6 +698,75 @@ tls_certificate:
   const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             client_context_config.tlsCertificates()[0].get().privateKey());
+}
+
+// Validate that client context config with password-protected TLS certificates is created
+// successfully.
+TEST(ClientContextConfigImplTest, PasswordProtectedTlsCertificates) {
+  envoy::api::v2::auth::Secret secret_config;
+  secret_config.set_name("abc.com");
+
+  auto* tls_certificate = secret_config.mutable_tls_certificate();
+  tls_certificate->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/password_protected_cert.pem"));
+  tls_certificate->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/password_protected_key.pem"));
+  tls_certificate->mutable_password()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/password.txt"));
+
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()
+      ->mutable_tls_certificate_sds_secret_configs()
+      ->Add()
+      ->set_name("abc.com");
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  factory_context.secretManager().addStaticSecret(secret_config);
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+
+  const std::string cert_pem =
+      "{{ test_rundir }}/test/common/ssl/test_data/password_protected_cert.pem";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
+            client_context_config.tlsCertificates()[0].get().certificateChain());
+  const std::string key_pem =
+      "{{ test_rundir }}/test/common/ssl/test_data/password_protected_key.pem";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
+            client_context_config.tlsCertificates()[0].get().privateKey());
+  const std::string password_file = "{{ test_rundir }}/test/common/ssl/test_data/password.txt";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(password_file)),
+            client_context_config.tlsCertificates()[0].get().password());
+}
+
+// Validate that not supplying a passphrase for password-protected TLS certificates
+// triggers a failure.
+TEST(ClientContextConfigImplTest, PasswordNotSuppliedTlsCertificates) {
+  envoy::api::v2::auth::Secret secret_config;
+  secret_config.set_name("abc.com");
+
+  auto* tls_certificate = secret_config.mutable_tls_certificate();
+  tls_certificate->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/password_protected_cert.pem"));
+  const std::string private_key_path = TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/password_protected_key.pem");
+  tls_certificate->mutable_private_key()->set_filename(private_key_path);
+  // Don't supply the password.
+
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()
+      ->mutable_tls_certificate_sds_secret_configs()
+      ->Add()
+      ->set_name("abc.com");
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  factory_context.secretManager().addStaticSecret(secret_config);
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+                          EnvoyException,
+                          fmt::format("Failed to load private key from {}", private_key_path));
 }
 
 // Validate that client context config with static certificate validation context is created
