@@ -300,6 +300,7 @@ private:
 class DnsResolverImplPeer {
 public:
   DnsResolverImplPeer(DnsResolverImpl* resolver) : resolver_(resolver) {}
+
   ares_channel channel() const { return resolver_->channel_; }
   const std::unordered_map<int, Event::FileEventPtr>& events() { return resolver_->events_; }
   // Reset the channel state for a DnsResolverImpl such that it will only use
@@ -326,6 +327,7 @@ class DnsImplConstructor : public testing::Test {
 protected:
   DnsImplConstructor()
       : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   DangerousDeprecatedTestTime test_time_;

@@ -11,8 +11,8 @@ class ThreadIdImplPosix : public ThreadId {
 public:
   ThreadIdImplPosix(int32_t id);
 
+  // Thread::ThreadId
   std::string debugString() const override;
-
   bool isCurrentThreadId() const override;
 
 private:
@@ -27,9 +27,7 @@ class ThreadImplPosix : public Thread {
 public:
   ThreadImplPosix(std::function<void()> thread_routine);
 
-  /**
-   * Join on thread exit.
-   */
+  // Thread::Thread
   void join() override;
 
 private:

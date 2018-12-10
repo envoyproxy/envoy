@@ -89,6 +89,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   ConnectionImplTest() : api_(Api::createApiForTest(stats_store_)) {}
+
   void setUpBasicConnection() {
     if (dispatcher_.get() == nullptr) {
       dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_, *api_);
@@ -1569,6 +1570,7 @@ class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVer
 protected:
   TcpClientConnectionImplTest()
       : api_(Api::createApiForTest(stats_store_)), dispatcher_(time_system_, *api_) {}
+
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::SimulatedTimeSystem time_system_;
@@ -1613,6 +1615,7 @@ class PipeClientConnectionImplTest : public testing::Test {
 protected:
   PipeClientConnectionImplTest()
       : api_(Api::createApiForTest(stats_store_)), dispatcher_(time_system_, *api_) {}
+
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::SimulatedTimeSystem time_system_;

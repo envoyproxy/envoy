@@ -17,8 +17,8 @@ class ThreadIdImplWin32 : public ThreadId {
 public:
   ThreadIdImplWin32(DWORD id);
 
+  // Thread::ThreadId
   std::string debugString() const override;
-
   bool isCurrentThreadId() const override;
 
 private:
@@ -34,9 +34,7 @@ public:
   ThreadImplWin32(std::function<void()> thread_routine);
   ~ThreadImplWin32();
 
-  /**
-   * Join on thread exit.
-   */
+  // Thread::Thread
   void join() override;
 
 private:

@@ -4,6 +4,9 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
     "envoy_cc_library",
+    "envoy_cc_platform_dep",
+    "envoy_cc_posix_library",
+    "envoy_cc_win32_library",
     "envoy_package",
 )
 load(
@@ -23,7 +26,7 @@ alias(
 envoy_cc_binary(
     name = "envoy-static",
     stamped = True,
-    deps = ["envoy_main_entry_lib"],
+    deps = envoy_cc_platform_dep("envoy_main_entry_lib"),
 )
 
 envoy_cc_library(
@@ -46,30 +49,28 @@ envoy_cc_library(
     }),
 )
 
-envoy_cc_library(
+envoy_cc_posix_library(
     name = "envoy_main_entry_lib",
-    srcs = select({
-        "//bazel:windows_x86_64": ["win32/main.cc"],
-        "//conditions:default": ["posix/main.cc"],
-    }),
+    srcs = ["posix/main.cc"],
     external_deps = [
         "abseil_symbolize",
     ],
-    deps = [
-        ":envoy_main_common_lib",
-    ],
+    deps = envoy_cc_platform_dep("envoy_main_common_lib"),
 )
 
-envoy_cc_library(
+envoy_cc_win32_library(
+    name = "envoy_main_entry_lib",
+    srcs = ["win32/main.cc"],
+    external_deps = [
+        "abseil_symbolize",
+    ],
+    deps = envoy_cc_platform_dep("envoy_main_common_lib"),
+)
+
+envoy_cc_posix_library(
     name = "envoy_main_common_lib",
-    srcs = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": ["posix/main_common.cc"],
-    }),
-    hdrs = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": ["posix/main_common.h"],
-    }),
+    srcs = ["posix/main_common.cc"],
+    hdrs = ["posix/main_common.h"],
     strip_include_prefix = "posix",
     deps = [
         ":envoy_common_lib",
@@ -88,6 +89,11 @@ envoy_cc_library(
             ":terminate_handler_lib",
         ],
     }),
+)
+
+envoy_cc_win32_library(
+    name = "envoy_main_common_lib",
+    deps = [":envoy_main_common_base_lib"],
 )
 
 envoy_cc_library(
