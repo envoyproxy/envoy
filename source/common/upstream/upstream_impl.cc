@@ -1029,7 +1029,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
       if (existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH) !=
           host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
-        // TODO(snowp): To accomodate degraded, this bit should be checking for any changes
+        // TODO(snowp): To accommodate degraded, this bit should be checking for any changes
         // to the health flag, not just healthy vs not healthy.
         const bool previously_healthy = existing_host->second->health() == Host::Health::Healthy;
         if (host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
