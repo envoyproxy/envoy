@@ -16,22 +16,30 @@ namespace Envoy {
 class ResponseMetadataStreamFilter : public Http::PassThroughFilter {
 public:
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override {
-    encoder_callbacks_->addEncodedMetadata().emplace("headers", "headers");
+    Http::MetadataMap metadata_map = {{"headers", "headers"}};
+    Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    encoder_callbacks_->addEncodedMetadata().emplace_back(std::move(metadata_map_ptr));
     return Http::FilterHeadersStatus::Continue;
   }
 
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
-    encoder_callbacks_->addEncodedMetadata().emplace("data", "data");
+    Http::MetadataMap metadata_map = {{"data", "data"}};
+    Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    encoder_callbacks_->addEncodedMetadata().emplace_back(std::move(metadata_map_ptr));
     return Http::FilterDataStatus::Continue;
   }
 
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
-    encoder_callbacks_->addEncodedMetadata().emplace("trailers", "trailers");
+    Http::MetadataMap metadata_map = {{"trailers", "trailers"}};
+    Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    encoder_callbacks_->addEncodedMetadata().emplace_back(std::move(metadata_map_ptr));
     return Http::FilterTrailersStatus::Continue;
   }
 
   Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
-    encoder_callbacks_->addEncodedMetadata().emplace("100-continue", "100-continue");
+    Http::MetadataMap metadata_map = {{"100-continue", "100-continue"}};
+    Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    encoder_callbacks_->addEncodedMetadata().emplace_back(std::move(metadata_map_ptr));
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -43,7 +51,9 @@ public:
       metadata_map.erase("consume");
       metadata_map.emplace("replace", "replace");
     }
-    encoder_callbacks_->addEncodedMetadata().emplace("metadata", "metadata");
+    Http::MetadataMap metadata_map_add = {{"metadata", "metadata"}};
+    Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map_add);
+    encoder_callbacks_->addEncodedMetadata().emplace_back(std::move(metadata_map_ptr));
     return Http::FilterMetadataStatus::Continue;
   }
 };

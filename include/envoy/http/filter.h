@@ -453,9 +453,9 @@ public:
   /**
    * Adds encoded metadata.
    *
-   * @return a reference to metadata map, where new metadata can be added.
+   * @return a reference to a vector of metadata maps, where a new metadata map can be added.
    */
-  virtual MetadataMap& addEncodedMetadata() PURE;
+  virtual MetadataMapVector& addEncodedMetadata() PURE;
 
   /**
    * Called when an encoder filter goes over its high watermark.

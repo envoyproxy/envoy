@@ -14,6 +14,22 @@ fi
 
 echo "building using ${NUM_CPUS} CPUs"
 
+function bazel_with_collection() {
+  declare -r BAZEL_OUTPUT="${ENVOY_SRCDIR}"/bazel.output.txt
+  bazel $* | tee "${BAZEL_OUTPUT}"
+  declare BAZEL_STATUS="${PIPESTATUS[0]}"
+  if [ "${BAZEL_STATUS}" != "0" ]
+  then
+    declare -r FAILED_TEST_LOGS="$(grep "  /build.*test.log" "${BAZEL_OUTPUT}" | sed -e 's/  \/build.*\/testlogs\/\(.*\)/\1/')"
+    cd bazel-testlogs
+    for f in ${FAILED_TEST_LOGS}
+    do
+      cp --parents -f $f "${ENVOY_FAILED_TEST_LOGS}"
+    done
+    exit "${BAZEL_STATUS}"
+  fi
+}
+
 function bazel_release_binary_build() {
   echo "Building..."
   cd "${ENVOY_CI_DIR}"
@@ -61,14 +77,14 @@ if [[ "$1" == "bazel.release" ]]; then
     echo "Testing $* ..."
     # Run only specified tests. Argument can be a single test
     # (e.g. '//test/common/common:assert_test') or a test group (e.g. '//test/common/...')
-    bazel test ${BAZEL_TEST_OPTIONS} -c opt $*
+    bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c opt $*
   else
     echo "Testing..."
     # We have various test binaries in the test directory such as tools, benchmarks, etc. We
     # run a build pass to make sure they compile.
     bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
     # Now run all of the tests which should already be compiled.
-    bazel test ${BAZEL_TEST_OPTIONS} -c opt //test/...
+    bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c opt //test/...
   fi
   exit 0
 elif [[ "$1" == "bazel.release.server_only" ]]; then
@@ -93,7 +109,7 @@ elif [[ "$1" == "bazel.asan" ]]; then
   echo "bazel ASAN/UBSAN debug build with tests..."
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   echo "Building and testing..."
-  bazel test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/... \
+  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/... \
     //:echo2_integration_test //:envoy_binary_test
   # Also validate that integration test traffic capture (useful when debugging etc.)
   # works. This requires that we set CAPTURE_ENV. We do this under bazel.asan to
@@ -101,7 +117,7 @@ elif [[ "$1" == "bazel.asan" ]]; then
   CAPTURE_TMP=/tmp/capture/
   rm -rf "${CAPTURE_TMP}"
   mkdir -p "${CAPTURE_TMP}"
-  bazel test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
+  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
     @envoy//test/integration:ssl_integration_test \
     --test_env=CAPTURE_PATH="${CAPTURE_TMP}/capture"
   # Verify that some pb_text files have been created. We can't check for pcap,
@@ -114,7 +130,7 @@ elif [[ "$1" == "bazel.tsan" ]]; then
   echo "bazel TSAN debug build with tests..."
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   echo "Building and testing..."
-  bazel test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan @envoy//test/... \
+  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan @envoy//test/... \
     //:echo2_integration_test //:envoy_binary_test
   exit 0
 elif [[ "$1" == "bazel.dev" ]]; then
@@ -149,7 +165,7 @@ elif [[ "$1" == "bazel.ipv6_tests" ]]; then
   setup_clang_toolchain
   echo "Testing..."
   cd "${ENVOY_CI_DIR}"
-  bazel test ${BAZEL_TEST_OPTIONS} --test_env=ENVOY_IP_TEST_VERSIONS=v6only -c fastbuild \
+  bazel_with_collection test ${BAZEL_TEST_OPTIONS} --test_env=ENVOY_IP_TEST_VERSIONS=v6only -c fastbuild \
     //test/integration/... //test/common/network/...
   exit 0
 elif [[ "$1" == "bazel.api" ]]; then
@@ -158,7 +174,7 @@ elif [[ "$1" == "bazel.api" ]]; then
   echo "Building API..."
   bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//envoy/...
   echo "Testing API..."
-  bazel test ${BAZEL_TEST_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
+  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
     @envoy_api//tools:capture2pcap_test
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then

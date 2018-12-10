@@ -182,7 +182,7 @@ private:
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(HeaderMapPtr&& trailers) override;
-    void encodeMetadata(MetadataMapPtr&& metadata_map) override;
+    void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void
@@ -239,7 +239,7 @@ private:
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data, bool streaming) override;
     HeaderMap& addEncodedTrailers() override;
-    MetadataMap& addEncodedMetadata() override;
+    MetadataMapVector& addEncodedMetadata() override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
     void setEncoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
@@ -285,7 +285,7 @@ private:
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addEncodedTrailers();
-    MetadataMap& addEncodedMetadata();
+    MetadataMapVector& addEncodedMetadata();
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                         const std::function<void(HeaderMap& headers)>& modify_headers,
                         bool is_head_request,
@@ -294,7 +294,7 @@ private:
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
-    void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map);
+    void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
     void drainMetadata();
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
@@ -402,7 +402,7 @@ private:
     HeaderMapPtr request_headers_;
     Buffer::WatermarkBufferPtr buffered_request_data_;
     HeaderMapPtr request_trailers_;
-    MetadataMapPtr response_metadata_map_;
+    MetadataMapVector response_metadata_map_vector_;
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;

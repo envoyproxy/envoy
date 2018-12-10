@@ -125,7 +125,7 @@ public:
   MOCK_METHOD2(encodeHeaders, void(const HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers, void(const HeaderMap& trailers));
-  MOCK_METHOD1(encodeMetadata, void(const MetadataMap& metadata_map));
+  MOCK_METHOD1(encodeMetadata, void(const MetadataMapVector& metadata_map_vector));
   MOCK_METHOD0(getStream, Stream&());
 
   testing::NiceMock<MockStream> stream_;
@@ -280,7 +280,7 @@ public:
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD2(addEncodedData, void(Buffer::Instance& data, bool streaming));
   MOCK_METHOD0(addEncodedTrailers, HeaderMap&());
-  MOCK_METHOD0(addEncodedMetadata, MetadataMap&());
+  MOCK_METHOD0(addEncodedMetadata, MetadataMapVector&());
   MOCK_METHOD0(continueEncoding, void());
   MOCK_METHOD0(encodingBuffer, const Buffer::Instance*());
 
