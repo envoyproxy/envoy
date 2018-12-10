@@ -1222,14 +1222,13 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
     response_encoder_->encodeMetadata(metadata_map_vector);
   }
 
+  // Drains metadata that is added by filters.
   drainMetadata();
 }
 
 void ConnectionManagerImpl::ActiveStream::drainMetadata() {
   if (!response_metadata_map_vector_.empty()) {
     ENVOY_STREAM_LOG(debug, "encoding metadata_map_vector_ via codec:\n{}", *this,
-                     response_metadata_map_vector_);
-    ENVOY_STREAM_LOG(error, "+++++++++++encoding metadata_map_vector_ via codec:\n{}", *this,
                      response_metadata_map_vector_);
     response_encoder_->encodeMetadata(response_metadata_map_vector_);
     response_metadata_map_vector_.clear();
@@ -1354,7 +1353,6 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
     }
   }
 
-  ENVOY_LOG_MISC(error, "++++++++++ drain trailers metadata");
   drainMetadata();
 
   ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);

@@ -2116,7 +2116,8 @@ config: {}
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadata_map().find("headers")->second, "headers");
-  EXPECT_EQ(response->metadata_map().size(), 1);
+  EXPECT_EQ(response->metadata_map().find("duplicate")->second, "duplicate");
+  EXPECT_EQ(response->metadata_map().size(), 2);
 
   // Upstream responds with headers and data.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -2129,7 +2130,9 @@ config: {}
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadata_map().find("headers")->second, "headers");
   EXPECT_EQ(response->metadata_map().find("data")->second, "data");
-  EXPECT_EQ(response->metadata_map().size(), 2);
+  EXPECT_EQ(response->metadata_map().find("duplicate")->second, "duplicate");
+  EXPECT_EQ(response->metadata_map().size(), 3);
+  EXPECT_EQ(response->keyCount("duplicate"), 2);
 
   // Upstream responds with headers, data and trailers.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -2145,7 +2148,9 @@ config: {}
   EXPECT_EQ(response->metadata_map().find("headers")->second, "headers");
   EXPECT_EQ(response->metadata_map().find("data")->second, "data");
   EXPECT_EQ(response->metadata_map().find("trailers")->second, "trailers");
-  EXPECT_EQ(response->metadata_map().size(), 3);
+  EXPECT_EQ(response->metadata_map().find("duplicate")->second, "duplicate");
+  EXPECT_EQ(response->metadata_map().size(), 4);
+  EXPECT_EQ(response->keyCount("duplicate"), 3);
 
   // Upstream responds with headers, 100-continue and data.
   response = codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -2167,7 +2172,9 @@ config: {}
   EXPECT_EQ(response->metadata_map().find("headers")->second, "headers");
   EXPECT_EQ(response->metadata_map().find("data")->second, "data");
   EXPECT_EQ(response->metadata_map().find("100-continue")->second, "100-continue");
-  EXPECT_EQ(response->metadata_map().size(), 3);
+  EXPECT_EQ(response->metadata_map().find("duplicate")->second, "duplicate");
+  EXPECT_EQ(response->metadata_map().size(), 4);
+  EXPECT_EQ(response->keyCount("duplicate"), 4);
 
   // Upstream responds with headers and a metadata that will not be consumed.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -2185,7 +2192,9 @@ config: {}
   EXPECT_EQ(response->metadata_map().find("headers")->second, "headers");
   EXPECT_EQ(response->metadata_map().find("metadata")->second, "metadata");
   EXPECT_EQ(response->metadata_map().find("aaa")->second, "bbb");
-  EXPECT_EQ(response->metadata_map().size(), 3);
+  EXPECT_EQ(response->metadata_map().find("duplicate")->second, "duplicate");
+  EXPECT_EQ(response->metadata_map().size(), 4);
+  EXPECT_EQ(response->keyCount("duplicate"), 3);
 
   // Upstream responds with headers, data and a metadata that will be consumed.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -2205,7 +2214,9 @@ config: {}
   EXPECT_EQ(response->metadata_map().find("metadata")->second, "metadata");
   EXPECT_EQ(response->metadata_map().find("replace")->second, "replace");
   EXPECT_EQ(response->metadata_map().find("data")->second, "data");
-  EXPECT_EQ(response->metadata_map().size(), 4);
+  EXPECT_EQ(response->metadata_map().find("duplicate")->second, "duplicate");
+  EXPECT_EQ(response->metadata_map().size(), 5);
+  EXPECT_EQ(response->keyCount("duplicate"), 4);
 }
 
 std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {

@@ -16,14 +16,14 @@ namespace Envoy {
 class ResponseMetadataStreamFilter : public Http::PassThroughFilter {
 public:
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override {
-    Http::MetadataMap metadata_map = {{"headers", "headers"}};
+    Http::MetadataMap metadata_map = {{"headers", "headers"}, {"duplicate", "duplicate"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     encoder_callbacks_->addEncodedMetadata().emplace_back(std::move(metadata_map_ptr));
     return Http::FilterHeadersStatus::Continue;
   }
 
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
-    Http::MetadataMap metadata_map = {{"data", "data"}};
+    Http::MetadataMap metadata_map = {{"data", "data"}, {"duplicate", "duplicate"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     encoder_callbacks_->addEncodedMetadata().emplace_back(std::move(metadata_map_ptr));
     return Http::FilterDataStatus::Continue;
@@ -33,12 +33,18 @@ public:
     Http::MetadataMap metadata_map = {{"trailers", "trailers"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     encoder_callbacks_->addEncodedMetadata().emplace_back(std::move(metadata_map_ptr));
+    metadata_map = {{"duplicate", "duplicate"}};
+    metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    encoder_callbacks_->addEncodedMetadata().emplace_back(std::move(metadata_map_ptr));
     return Http::FilterTrailersStatus::Continue;
   }
 
   Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
-    Http::MetadataMap metadata_map = {{"100-continue", "100-continue"}};
+    Http::MetadataMap metadata_map = {{"100-continue", "100-continue"}, {"duplicate", "duplicate"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    encoder_callbacks_->addEncodedMetadata().emplace_back(std::move(metadata_map_ptr));
+    metadata_map = {{"duplicate", "duplicate"}};
+    metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     encoder_callbacks_->addEncodedMetadata().emplace_back(std::move(metadata_map_ptr));
     return Http::FilterHeadersStatus::Continue;
   }
@@ -51,8 +57,11 @@ public:
       metadata_map.erase("consume");
       metadata_map.emplace("replace", "replace");
     }
-    Http::MetadataMap metadata_map_add = {{"metadata", "metadata"}};
+    Http::MetadataMap metadata_map_add = {{"metadata", "metadata"}, {"duplicate", "duplicate"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map_add);
+    encoder_callbacks_->addEncodedMetadata().emplace_back(std::move(metadata_map_ptr));
+    metadata_map_add = {{"duplicate", "duplicate"}};
+    metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map_add);
     encoder_callbacks_->addEncodedMetadata().emplace_back(std::move(metadata_map_ptr));
     return Http::FilterMetadataStatus::Continue;
   }
