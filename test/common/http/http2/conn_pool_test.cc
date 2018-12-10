@@ -162,8 +162,10 @@ public:
   NiceMock<Http::MockStreamEncoder> inner_encoder_;
 };
 
-//! Used to invoke the LBContext version of newStream while still providing the ActiveTestRequest
-//! interface.
+/**
+ *  Used to invoke the LBContext version of newStream while still providing the ActiveTestRequest
+ *  interface.
+ */
 class LBContextActiveTestRequest : public ActiveTestRequest {
 public:
   LBContextActiveTestRequest(Http2ConnPoolImplTest& test) {

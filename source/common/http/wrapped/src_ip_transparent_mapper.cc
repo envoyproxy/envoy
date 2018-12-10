@@ -49,7 +49,7 @@ ConnectionPool::Instance* SrcIpTransparentMapper::findActivePool(const Ip& ip) c
   }
 
   const Network::Address::Ipv6* v6_addr = ip.ipv6();
-  ASSERT(v6_addr); // we expect an address to be either v4 or v6.
+  ASSERT(v6_addr); // We expect an address to be either v4 or v6.
   return findActiveV6(*v6_addr);
 }
 
@@ -80,7 +80,7 @@ SrcIpTransparentMapper::findActiveV6(const Network::Address::Ipv6& v6_addr) cons
 }
 
 ConnectionPool::Instance* SrcIpTransparentMapper::assignPool(const Ip& address) {
-  // This should only be called if we've guranteed there's an idle pool.
+  // This should only be called if we've guaranteed there's an idle pool.
   ASSERT(!idle_pools_.empty());
 
   ENVOY_LOG(debug, "Assigning a pool for {}", address.addressAsString());
@@ -101,7 +101,7 @@ ConnectionPool::Instance* SrcIpTransparentMapper::assignPool(const Ip& address) 
   }
 
   ConnectionPool::UpstreamSourceInformation info;
-  // build up an Address::Instance object with the port set to 0 so we don't actually set the port
+  // Build up an Address::Instance object with the port set to 0 so we don't actually set the port
   // when establishing the connetion.
   info.source_address_ = Network::Utility::getAddressWithPort(
       *Network::Utility::copyInternetAddressAndPort(address), 0);
@@ -112,7 +112,7 @@ ConnectionPool::Instance* SrcIpTransparentMapper::assignPool(const Ip& address) 
 
 ConnectionPool::Instance* SrcIpTransparentMapper::allocateAndAssignPool(const Ip& address) {
   if (idle_pools_.empty()) {
-    // make sure we have a free pool!
+    // Make sure we have a free pool!
     registerNewPool();
   }
 
@@ -139,13 +139,13 @@ void SrcIpTransparentMapper::poolDrained(ConnectionPool::Instance& instance) {
     return;
   }
 
-  // first clean up any assignments.
+  // First clean up any assignments.
   if (active_iter->second.v4_address_.has_value()) {
     v4_assigned_.erase(active_iter->second.v4_address_.value());
     active_iter->second.v4_address_.reset();
   }
 
-  // while these should be mutually exclusive, can't hurt to be safe.
+  // While these should be mutually exclusive, can't hurt to be safe.
   if (active_iter->second.v6_address_.has_value()) {
     v6_assigned_.erase(active_iter->second.v6_address_.value());
     active_iter->second.v6_address_.reset();

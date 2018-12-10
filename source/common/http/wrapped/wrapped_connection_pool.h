@@ -41,18 +41,24 @@ public:
   // ConnPoolImplBase
   void checkForDrained() override;
 
-  //! @return The number of streams waiting to be processed after being assigned a pool
+  /**
+   * @return The number of streams waiting to be processed after being assigned a pool
+   */
   size_t numWaitingStreams() const;
 
-  //! @return The number of wrappers in the pending state.
+  /**
+   *  @return The number of wrappers in the pending state.
+   */
   size_t numPendingStreams() const;
 
 private:
-  //! This lets us invoke different cancellation logic depending on in what stage of a request
-  //! lifetime we're in. For example, on an initial request, we may just want to remove from the
-  //! pending list. However, later we may want to remove from a pending list elsewhere, due to the
-  //! ownership of the request actually changing. This lets us do so while keeping the original
-  //! cancellable object in tact for the original caller.
+  /**
+   * This lets us invoke different cancellation logic depending on in what stage of a request
+   * lifetime we're in. For example, on an initial request, we may just want to remove from the
+   * pending list. However, later we may want to remove from a pending list elsewhere, due to the
+   * ownership of the request actually changing. This lets us do so while keeping the original
+   * cancellable object in tact for the original caller.
+   */
   class StreamWrapper : public LinkedObject<StreamWrapper>,
                         public ConnectionPool::Cancellable,
                         public ConnectionPool::Callbacks,
@@ -62,10 +68,14 @@ private:
                   const Upstream::LoadBalancerContext& context, WrappedConnectionPool& parent);
     ~StreamWrapper();
 
-    //! ConnectionPool::Cancellable
+    /**
+     * ConnectionPool::Cancellable
+     */
     void cancel() override;
 
-    //! ConnectionPool::Callbacks
+    /**
+     * ConnectionPool::Callbacks
+     */
     void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
 
@@ -80,18 +90,22 @@ private:
       waiting_cancel_ = &cancellable;
     }
 
-    //! Assigns a new stream in the given pool with the wrapped stream parameters.
-    //! Note: *this should be considered "waiting" at this point, since invoking this function
-    //! may invalidate it, which will assume it is in the waiting state.
-    //! @param pool the pool on which to assign the new stream
-    //! @return the result of creating the new stream. May be nullptr with all the semantics of
-    //!         ConnectionPool::Instance::newStream.
+    /**
+     * Assigns a new stream in the given pool with the wrapped stream parameters.
+     * Note: *this should be considered "waiting" at this point, since invoking this function
+     * may invalidate it, which will assume it is in the waiting state.
+     * @param pool the pool on which to assign the new stream
+     * @return the result of creating the new stream. May be nullptr with all the semantics of
+     *         ConnectionPool::Instance::newStream.
+     */
     ConnectionPool::Cancellable* newStreamWrapped(ConnectionPool::Instance& pool);
 
-    //! Tries to allocate a pending request if there is one.
-    //! @param mapper The mapper to use to allocate the pool for the request
-    //! @param pending_list the list owning any pending requests so we can cleanup when done.
-    //! @return The connection pool one was allocated. False otherwise.
+    /**
+     * Tries to allocate a pending request if there is one.
+     * @param mapper The mapper to use to allocate the pool for the request
+     * @param pending_list the list owning any pending requests so we can cleanup when done.
+     * @return The connection pool one was allocated. False otherwise.
+     */
     ConnectionPool::Instance*
     allocatePending(ConnectionMapper& mapper,
                     std::list<ConnPoolImplBase::PendingRequestPtr>& pending_list);
@@ -117,16 +131,24 @@ private:
                                            ConnectionPool::Callbacks& callbacks,
                                            const Upstream::LoadBalancerContext& context);
 
-  //! @return true if there is nothing going on so we can drain any connections
+  /**
+   * @return true if there is nothing going on so we can drain any connections
+   */
   bool drainable() const;
 
-  //! Tries to allocate any pending requests
+  /**
+   * Tries to allocate any pending requests
+   */
   void allocatePendingRequests();
 
-  //! Called when a wrapped request has been cancelled so we can free it up.
+  /**
+   * Called when a wrapped request has been cancelled so we can free it up.
+   */
   void onWrappedRequestPendingCancel(StreamWrapper& wrapper);
 
-  //! Called when a wrapped request has either been cancelled, or finished waiting.
+  /**
+   * Called when a wrapped request has either been cancelled, or finished waiting.
+   */
   void onWrappedRequestWaitingFinished(StreamWrapper& wrapper);
 
   std::unique_ptr<ConnectionMapper> mapper_;

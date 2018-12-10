@@ -28,7 +28,9 @@ public:
   MOCK_METHOD0(drainPools, void());
   MOCK_CONST_METHOD0(allPoolsIdle, bool());
 
-  //! May be used to track the builder passed to a mapper on construction.
+  /**
+   * May be used to track the builder passed to a mapper on construction.
+   */
   ConnPoolBuilder builder_;
   std::vector<ConnectionMapper::IdleCb> idle_callbacks_;
 };

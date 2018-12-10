@@ -31,7 +31,7 @@ WrappedConnectionPool::newStream(Http::StreamDecoder& decoder, ConnectionPool::C
     return pushPending(std::move(wrapper), decoder, callbacks, context);
   }
 
-  // grab a reference so when we move it into the list, we still have it!
+  // Grab a reference so when we move it into the list, we still have it!
   StreamWrapper& wrapper_ref = *wrapper;
   wrapper->moveIntoList(std::move(wrapper), wrapped_waiting_);
   return wrapper_ref.newStreamWrapped(*pool);
@@ -63,7 +63,7 @@ WrappedConnectionPool::StreamWrapper::~StreamWrapper() = default;
 
 void WrappedConnectionPool::StreamWrapper::cancel() {
   ENVOY_LOG(debug, "Cancelling...");
-  // we should only be called in a state where wrapped_cancel is not null.
+  // We should only be called in a state where wrapped_cancel is not null.
   ASSERT(wrapped_pending_ != nullptr || waiting_cancel_ != nullptr);
   if (wrapped_pending_) {
     ENVOY_LOG(debug, "Cancelling Stream while pending");
@@ -96,7 +96,7 @@ ConnectionPool::Cancellable*
 WrappedConnectionPool::StreamWrapper::newStreamWrapped(ConnectionPool::Instance& pool) {
   ConnectionPool::Cancellable* cancellable = pool.newStream(decoder_, *this, context_);
 
-  // we need to be careful at this point. If cancellable is null, this may no longer be valid.
+  // We need to be careful at this point. If cancellable is null, this may no longer be valid.
   if (!cancellable) {
     return nullptr;
   }
@@ -137,7 +137,7 @@ ConnectionPool::Cancellable* WrappedConnectionPool::pushPending(
   }
 
   ENVOY_LOG(debug, "max pending requests overflow");
-  // unfortunately, we need to increment these here. Normally we wouldn't, because a partioned pool
+  // Unfortunately, we need to increment these here. Normally we wouldn't, because a partioned pool
   // would do it for us. But, since there aren't any, we have to.
   host_->cluster().stats().upstream_rq_total_.inc();
   host_->stats().rq_total_.inc();
@@ -155,7 +155,7 @@ bool WrappedConnectionPool::drainable() const {
 
 void WrappedConnectionPool::allocatePendingRequests() {
   ENVOY_LOG(debug, "A pool is idle. Looking for pending requests");
-  // for simplicitly, we simply iterate through each pending request and see if it can be assigned.
+  // For simplicity, we simply iterate through each pending request and see if it can be assigned.
   // we do this, since we don't know which requests will be assigned to which pools. It's possible
   // that every request could be assigned to a single free pool, so go through them all at the
   // expense of potentially processing more than necessary.

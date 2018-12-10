@@ -786,8 +786,11 @@ public:
     info.source_address_ = std::move(address);
     return info;
   }
-  //! Call this after invoking newStream -- we have a bunch of stuff that validates stats on destoy
-  //! so we need to make sure those stats are good.
+
+  /**
+   *  Call this after invoking newStream -- we have a bunch of stuff that validates stats on destoy
+   *  so we need to make sure those stats are good.
+   */
   void cleanupStreams() {
     EXPECT_CALL(conn_pool_, onClientDestroy());
     EXPECT_CALL(callbacks_.pool_failure_, ready());

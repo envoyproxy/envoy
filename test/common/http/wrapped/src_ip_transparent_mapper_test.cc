@@ -46,26 +46,30 @@ public:
     return std::make_unique<SrcIpTransparentMapper>(builder, DefaultMaxNumPools);
   }
 
-  //! Called when one of the default mappers constructed above creates a new pool.
-  //! This will replace next_pool_to_assign_ with a new mock. This allows the tester to control each
-  //! individual mock pool by keeping track of the assigned pools where necessary.
-  //! @returns @c next_pool_to_assign_.
+  /**
+   * Called when one of the default mappers constructed above creates a new pool.
+   * This will replace next_pool_to_assign_ with a new mock. This allows the tester to control each
+   * individual mock pool by keeping track of the assigned pools where necessary.
+   * @returns @c next_pool_to_assign_.
+   */
   std::unique_ptr<ConnectionPool::Instance> buildPool() {
     // set up tracking of the pool's callback so we can invoke them.
-    drained_callbacks_.push_back([]() { FAIL() << "No callback registed"; });
+    drained_callbacks_.push_back([]() { FAIL() << "No callback registered"; });
     EXPECT_CALL(*next_pool_to_assign_, addDrainedCallback(_))
         .WillOnce(SaveArg<0>(&drained_callbacks_.back()));
 
     return pushPool();
   }
 
-  //! Called when we want a pool which calls back immediately on callbacks being added.
-  //! This will replace next_pool_to_assign_ with a new mock. This allows the tester to control each
-  //! individual mock pool by keeping track of the assigned pools where necessary.
-  //! @returns @c next_pool_to_assign_.
+  /**
+   * Called when we want a pool which calls back immediately on callbacks being added.
+   * This will replace next_pool_to_assign_ with a new mock. This allows the tester to control each
+   * individual mock pool by keeping track of the assigned pools where necessary.
+   * @returns @c next_pool_to_assign_.
+   */
   std::unique_ptr<ConnectionPool::Instance> buildPoolImmediateCallback() {
     // set up tracking of the pool's callback so we can invoke them.
-    drained_callbacks_.push_back([]() { FAIL() << "No callback registed"; });
+    drained_callbacks_.push_back([]() { FAIL() << "No callback registered"; });
     EXPECT_CALL(*next_pool_to_assign_, addDrainedCallback(_))
         .WillOnce(DoAll(SaveArg<0>(&drained_callbacks_.back()),
                         Invoke([](ConnectionPool::Instance::DrainedCb cb) { cb(); })));
@@ -78,12 +82,16 @@ public:
     return retval;
   }
 
-  //! Invokes the last callback registered with the Nth (zero-based) created pool. If the pool
-  //! never registered a callback, this will fail.
+  /**
+   * Invokes the last callback registered with the Nth (zero-based) created pool. If the pool
+   * never registered a callback, this will fail.
+   */
   void drainPool(size_t pool_index) { drained_callbacks_[pool_index](); }
 
-  //! Sets the connection to use the provided remote address
-  //! @param The address to use in the form of "ip:port".
+  /**
+   * Sets the connection to use the provided remote address
+   * @param The address to use in the form of "ip:port".
+   */
   void setRemoteAddressToUse(const std::string& address) {
     // The connection mock returns a reference to remote_address_ by default as its implementation
     // of remoteAddress(). So, we simply change the value.
