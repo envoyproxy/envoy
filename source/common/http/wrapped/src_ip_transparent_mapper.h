@@ -23,7 +23,7 @@ class Ip;
 namespace Http {
 class SrcIpTransparentMapper : Logger::Loggable<Logger::Id::http>, public ConnectionMapper {
 public:
-  SrcIpTransparentMapper(ConnPoolBuilder builder, uint64_t max_num_pools);
+  SrcIpTransparentMapper(ConnPoolBuilder builder, size_t max_num_pools);
   ~SrcIpTransparentMapper();
 
   ConnectionPool::Instance* assignPool(const Upstream::LoadBalancerContext& context) override;

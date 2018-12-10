@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Http {
 
 namespace {
-constexpr uint64_t DEFAULT_MAX_POOLS = 100;
+constexpr size_t DEFAULT_MAX_POOLS = 100;
 }
 
 ConnectionMapperFactory::~ConnectionMapperFactory() = default;
