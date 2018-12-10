@@ -7,12 +7,15 @@ set -e
 # openssl genrsa -out intermediate_ca_key.pem 1024
 # openssl genrsa -out fake_ca_key.pem 1024
 # openssl genrsa -out no_san_key.pem 1024
+# openssl genrsa -aes128 -passout file:password.txt -out password_protected_key.pem 1024
 # openssl genrsa -out san_dns_key.pem 1024
 # openssl genrsa -out san_dns_key2.pem 1024
 # openssl genrsa -out san_dns_key3.pem 1024
 # openssl genrsa -out san_multiple_dns_key.pem 1024
 # openssl genrsa -out san_uri_key.pem 1024
 # openssl genrsa -out selfsigned_key.pem 1024
+# openssl ecparam -name secp256r1 -genkey -out selfsigned_key_ecdsa_p256.pem
+# openssl ecparam -name secp384r1 -genkey -out selfsigned_key_ecdsa_p384.pem
 # openssl genrsa -out expired_key.pem 1024
 # openssl genrsa -out expired_san_uri_key.pem 1024
 
@@ -34,6 +37,10 @@ cat fake_ca_cert.pem ca_cert.pem > ca_certificates.pem
 # Generate no_san_cert.pem.
 openssl req -new -key no_san_key.pem -out no_san_cert.csr -config no_san_cert.cfg -batch -sha256
 openssl x509 -req -days 730 -in no_san_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out no_san_cert.pem -extensions v3_ca -extfile no_san_cert.cfg
+
+# Generate password_protected_cert.pem.
+openssl req -new -key password_protected_key.pem -out password_protected_cert.csr -config san_uri_cert.cfg -batch -sha256 -passin file:password.txt
+openssl x509 -req -days 730 -in password_protected_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out password_protected_cert.pem -extensions v3_ca -extfile san_uri_cert.cfg -passin file:password.txt
 
 # Generate san_dns_cert.pem.
 openssl req -new -key san_dns_key.pem -out san_dns_cert.csr -config san_dns_cert.cfg -batch -sha256
@@ -64,6 +71,12 @@ openssl x509 -req -days 730 -in san_uri_cert.csr -sha256 -CA ca_cert.pem -CAkey 
 
 # Generate selfsigned_cert.pem.
 openssl req -new -x509 -days 730 -key selfsigned_key.pem -out selfsigned_cert.pem -config selfsigned_cert.cfg -batch -sha256
+
+# Generate selfsigned_cert_ecdsa_p256.pem.
+openssl req -new -x509 -days 730 -key selfsigned_key_ecdsa_p256.pem -out selfsigned_cert_ecdsa_p256.pem -config selfsigned_cert.cfg -batch -sha256
+
+# Generate selfsigned_cert_ecdsa_p384.pem.
+openssl req -new -x509 -days 730 -key selfsigned_key_ecdsa_p384.pem -out selfsigned_cert_ecdsa_p384.pem -config selfsigned_cert.cfg -batch -sha256
 
 # Generate expired_cert.pem as a self-signed, expired cert (will fail on Mac OS 10.13+ because of negative days value).
 openssl req -new -key expired_key.pem -out expired_cert.csr -config selfsigned_cert.cfg -batch -sha256

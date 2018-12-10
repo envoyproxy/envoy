@@ -19,7 +19,10 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
               .value_or(certificate_chain_.empty() ? EMPTY_STRING : INLINE_STRING)),
       private_key_(Config::DataSource::read(config.private_key(), true)),
       private_key_path_(Config::DataSource::getPath(config.private_key())
-                            .value_or(private_key_.empty() ? EMPTY_STRING : INLINE_STRING)) {
+                            .value_or(private_key_.empty() ? EMPTY_STRING : INLINE_STRING)),
+      password_(Config::DataSource::read(config.password(), true)),
+      password_path_(Config::DataSource::getPath(config.password())
+                         .value_or(password_.empty() ? EMPTY_STRING : INLINE_STRING)) {
 
   if (certificate_chain_.empty() || private_key_.empty()) {
     throw EnvoyException(fmt::format("Failed to load incomplete certificate from {}, {}",

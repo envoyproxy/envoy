@@ -246,6 +246,9 @@ public:
     return hand_off_restored_destination_connections_;
   }
   uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
+  std::chrono::milliseconds listenerFiltersTimeout() const override {
+    return listener_filters_timeout_;
+  }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
@@ -399,6 +402,7 @@ private:
   const envoy::api::v2::Listener config_;
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
+  const std::chrono::milliseconds listener_filters_timeout_;
 };
 
 class FilterChainImpl : public Network::FilterChain {
