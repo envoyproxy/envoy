@@ -26,7 +26,7 @@ alias(
 envoy_cc_binary(
     name = "envoy-static",
     stamped = True,
-    deps = envoy_cc_platform_dep("envoy_main_entry_lib"),
+    deps = [":envoy_main_entry_lib"],
 )
 
 envoy_cc_library(
@@ -49,8 +49,13 @@ envoy_cc_library(
     }),
 )
 
-envoy_cc_posix_library(
+envoy_cc_library(
     name = "envoy_main_entry_lib",
+    deps = envoy_cc_platform_dep("envoy_main_entry"),
+)
+
+envoy_cc_posix_library(
+    name = "envoy_main_entry",
     srcs = ["posix/main.cc"],
     external_deps = [
         "abseil_symbolize",
@@ -59,7 +64,7 @@ envoy_cc_posix_library(
 )
 
 envoy_cc_win32_library(
-    name = "envoy_main_entry_lib",
+    name = "envoy_main_entry",
     srcs = ["win32/main.cc"],
     external_deps = [
         "abseil_symbolize",
