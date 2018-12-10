@@ -90,3 +90,12 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "metadata_test",
+    srcs = ["metadata_test.cc"],
+    extension_name = "envoy.filters.network.dubbo_proxy",
+    deps = [
+        "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
+    ],
+)
