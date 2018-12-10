@@ -48,8 +48,8 @@ table <arch_overview_http_routing>`. The route table can be specified in one of 
 Retry plugin configuration
 --------------------------
 
-Normally during retries, hosts selection follows the same process as the original request. To modify this behavior retry plugins can be used, which fall into
-two categories:
+Normally during retries, hosts selection follows the same process as the original request. To modify 
+this behavior retry plugins can be used, which fall into two categories:
 
 * :ref:`Host Predicates <envoy_api_field_route.RouteAction.RetryPolicy.retry_host_predicate>`:
   These predicates can be used to "reject" a host, which will cause host selection to be reattempted. 
