@@ -109,6 +109,31 @@ private:
 
   typedef std::unique_ptr<ActiveListener> ActiveListenerPtr;
 
+  // TODO(conqerAtapple): Add implementation.
+  struct ActiveUdpListener : public Network::UdpListenerCallbacks {
+    ActiveUdpListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config);
+
+    ActiveUdpListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
+                      Network::ListenerConfig& config);
+
+    ~ActiveUdpListener();
+
+    // Network::UdpListenerCallbacks
+    void onNewConnection(Network::ConnectionPtr&& new_connection) override;
+
+    /**
+     * Create a new connection from a socket accepted by the listener.
+     */
+    void newConnection(Network::ConnectionSocketPtr&& socket);
+
+    ConnectionHandlerImpl& parent_;
+    Network::ListenerPtr listener_;
+    ListenerStats stats_;
+    const std::chrono::milliseconds listener_filters_timeout_;
+    const uint64_t listener_tag_;
+    Network::ListenerConfig& config_;
+  };
+
   /**
    * Wrapper for an active connection owned by this handler.
    */
@@ -181,6 +206,7 @@ private:
   spdlog::logger& logger_;
   Event::Dispatcher& dispatcher_;
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>> listeners_;
+  // TODO(conqerAtapple): Add container that manages UDP listeners.
   std::atomic<uint64_t> num_connections_{};
   bool disable_listeners_;
 };

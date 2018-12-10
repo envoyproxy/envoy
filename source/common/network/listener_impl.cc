@@ -16,10 +16,6 @@
 namespace Envoy {
 namespace Network {
 
-Address::InstanceConstSharedPtr ListenerImpl::getLocalAddress(int fd) {
-  return Address::addressFromFd(fd);
-}
-
 void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,
                                   int remote_addr_len, void* arg) {
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
@@ -44,37 +40,29 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
                          listener->hand_off_restored_destination_connections_);
 }
 
-ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
-                           bool bind_to_port, bool hand_off_restored_destination_connections)
-    : local_address_(nullptr), cb_(cb),
-      hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
-      listener_(nullptr) {
-  const auto ip = socket.localAddress()->ip();
+void ListenerImpl::setupServerSocket(const Event::DispatcherImpl& dispatcher, Socket& socket) {
+  listener_.reset(evconnlistener_new(&dispatcher.base(), listenCallback, this, 0, -1, socket.fd()));
 
-  // Only use the listen socket's local address for new connections if it is not the all hosts
-  // address (e.g., 0.0.0.0 for IPv4).
-  if (!(ip && ip->isAnyAddress())) {
-    local_address_ = socket.localAddress();
+  if (!listener_) {
+    throw CreateListenerException(
+        fmt::format("cannot listen on socket: {}", socket.localAddress()->asString()));
   }
 
-  if (bind_to_port) {
-    listener_.reset(
-        evconnlistener_new(&dispatcher.base(), listenCallback, this, 0, -1, socket.fd()));
-
-    if (!listener_) {
-      throw CreateListenerException(
-          fmt::format("cannot listen on socket: {}", socket.localAddress()->asString()));
-    }
-
-    if (!Network::Socket::applyOptions(socket.options(), socket,
-                                       envoy::api::v2::core::SocketOption::STATE_LISTENING)) {
-      throw CreateListenerException(fmt::format(
-          "cannot set post-listen socket option on socket: {}", socket.localAddress()->asString()));
-    }
-
-    evconnlistener_set_error_cb(listener_.get(), errorCallback);
+  if (!Network::Socket::applyOptions(socket.options(), socket,
+                                     envoy::api::v2::core::SocketOption::STATE_LISTENING)) {
+    throw CreateListenerException(fmt::format("cannot set post-listen socket option on socket: {}",
+                                              socket.localAddress()->asString()));
   }
+
+  evconnlistener_set_error_cb(listener_.get(), errorCallback);
 }
+
+ListenerImpl::ListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket,
+                           ListenerCallbacks& cb, bool bind_to_port,
+                           bool hand_off_restored_destination_connections)
+    : BaseListenerImpl(dispatcher, socket, bind_to_port), cb_(cb),
+      hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
+      listener_(nullptr) {}
 
 void ListenerImpl::errorCallback(evconnlistener*, void*) {
   // We should never get an error callback. This can happen if we run out of FDs or memory. In those

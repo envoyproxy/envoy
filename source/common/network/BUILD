@@ -125,10 +125,14 @@ envoy_cc_library(
 envoy_cc_library(
     name = "listener_lib",
     srcs = [
+        "base_listener_impl.cc",
         "listener_impl.cc",
+        "udp_listener_impl.cc",
     ],
     hdrs = [
+        "base_listener_impl.h",
         "listener_impl.h",
+        "udp_listener_impl.h",
     ],
     deps = [
         ":address_lib",

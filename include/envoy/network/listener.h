@@ -115,6 +115,22 @@ public:
 };
 
 /**
+ * UDP listener callbacks.
+ */
+class UdpListenerCallbacks {
+public:
+  virtual ~UdpListenerCallbacks() = default;
+
+  // TODO(conqerAtapple): Refactor `Connection` to accomodate UDP/QUIC.
+
+  /**
+   * Called when a new connection is received.
+   * @param new_connection supplies the new connection that is moved into the callee.
+   */
+  virtual void onNewConnection(ConnectionPtr&& new_connection) PURE;
+};
+
+/**
  * An abstract socket listener. Free the listener to stop listening on the socket.
  */
 class Listener {

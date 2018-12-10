@@ -30,7 +30,7 @@ public:
   /**
    * @return event_base& the libevent base.
    */
-  event_base& base() { return *base_; }
+  event_base& base() const { return *base_; }
 
   // Event::Dispatcher
   TimeSystem& timeSystem() override { return time_system_; }
