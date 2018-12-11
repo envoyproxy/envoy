@@ -62,7 +62,7 @@ For a release version of the Envoy binary you can run:
 ```
 
 The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy` (or wherever
-`$ENVOY_DOCKER_BUILD_DIR` points) and the same binary are in `<PROJECT_ROOT>/build_release`. In addition, a stripped version has been created in `<PROJECT_ROOT>/build_release_stripped`.
+`$ENVOY_DOCKER_BUILD_DIR` points) and the same binary is in `<PROJECT_ROOT>/build_release`. In addition, a stripped version has been created in `<PROJECT_ROOT>/build_release_stripped`.
 
 For a debug version of the Envoy binary you can run:
 
@@ -138,7 +138,7 @@ Please note the important
 
 passed into the build script!
 
-If you don't add this, your build will fail due to a incompatibility between GCC 5.3 on CentOS and the code developed and build under GCC 5.4. This option will have to be used until both Ubuntu and CentOS have been synchronized on the same build toolchain.
+If you don't add this, your build will fail due to a incompatibility between GCC 5.3 on CentOS and the code developed and built under GCC 5.4. This option will have to be used until both Ubuntu and CentOS have been synchronized on the same build toolchain.
 
 **One last note**: the build image has only been tested with the `bazel.release.server_only` target. All other targets, especially those using `clang` are not guaranteed to work on CentOS since the only purpose of this image is to produce an `envoy` binary for CentOS 7.
 
