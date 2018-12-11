@@ -53,28 +53,24 @@ this behavior retry plugins can be used, which fall into two categories:
 
 * :ref:`Host Predicates <envoy_api_field_route.RouteAction.RetryPolicy.retry_host_predicate>`:
   These predicates can be used to "reject" a host, which will cause host selection to be reattempted. 
-  Any number of these predicates can be specified, and the host will be rejected if
-  any of the predicates reject the host. Host selection will continue until either the host predicates
-  accept the host or a configurable
-  :ref:`max attempts <envoy_api_field_route.RouteAction.RetryPolicy.host_selection_retry_max_attempts>`
-  has been reached. 
+  Any number of these predicates can be specified, and the host will be rejected if any of the predicates reject the host. 
 
   Envoy supports the following built-in host predicates
 
-  * *envoy.retry_host_predicates.previous_hosts* : This will keep track of previously attempted hosts, and allows to choose hosts
-    that haven't been attempted already.
+  * *envoy.retry_host_predicates.previous_hosts* : This will keep track of previously attempted hosts, and rejects
+    hosts that have already been attempted.
   
 * :ref:`Priority Predicates<envoy_api_field_route.RouteAction.RetryPolicy.retry_priority>`: These predicates can
   be used to adjust the priority load used when selecting a priority for a retry attempt. Only one such
-  predicate may be specified. Host selection will continue until either the configured predicate
-  accepts the host or a configurable
-  :ref:`max attempts <envoy_api_field_route.RouteAction.RetryPolicy.host_selection_retry_max_attempts>`
-  has been reached. 
+  predicate may be specified.
 
   Envoy supports the following built-in priority predicates
 
   * *envoy.retry_priority.previous_priorities* : This will keep track of previously attempted priorities, 
     and adjust the priority load such that other priorites will be targeted in subsequent retry attempts.
+
+Host selection will continue until either the configured predicates accept the host or a configurable
+:ref:`max attempts <envoy_api_field_route.RouteAction.RetryPolicy.host_selection_retry_max_attempts>` has been reached. 
 
 These plugins can be combined to affect both host selection and priority load. Envoy can also be extended 
 with custom retry plugins similar to how custom filters can be added.
@@ -89,7 +85,7 @@ For example, to configure retries to prefer hosts that haven't been attempted al
 
   retry_policy:
     retry_host_predicate:
-      name: envoy.retry_host_predicates.previous_hosts
+    - name: envoy.retry_host_predicates.previous_hosts
     host_selection_retry_max_attempts: 3
 
 This will reject hosts previously attempted, retrying host selection a maximum of 3 times. The bound
