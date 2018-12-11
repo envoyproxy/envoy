@@ -8,9 +8,9 @@
 # toolchain than the envoy-build container, passing in LOCAL_MOUNT=yes will force it to copy the
 # local libraries into the container.
 
-if [[ ! "$1" =~ (@[a-zA-Z0-9_-]+)?//.*:[a-zA-Z0-9_-]+ ]]; then
-  echo "First argument to $0 must be a [@repo]//test/foo:bar label identifying a single test to run"
-  echo "$1 does not match this pattern"
+if [[ -z "$1" ]]; then
+  echo "First argument to $0 must be a [@repo]//test/foo:bar label identifying a set of test to run"
+  echo "\"$1\" does not match this pattern"
   exit 1
 fi
 
