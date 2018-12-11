@@ -48,12 +48,12 @@ if [ "${RUN_REMOTE}" != "yes" ]; then
   fi
 
 # Note: we don't quote LIB_MOUNTS on purpose; we want it to expand.
-docker run --rm --cap-add NET_ADMIN  -v "${TEST_PATH}:/test" $LIB_MOUNTS -i -v "${ENVFILE}:/env" \
+docker run --rm --privileged  -v "${TEST_PATH}:/test" $LIB_MOUNTS -i -v "${ENVFILE}:/env" \
   "${IMAGE}" bash -c "${CMDLINE}"
 else
   # In this case, we need to create the container, then make new layers on top of it, since we
   # can't mount everything into it.
-  docker create -t --cap-add NET_ADMIN --name "${CONTAINER_NAME}" "${IMAGE}" \
+  docker create -t --privileged  --name "${CONTAINER_NAME}" "${IMAGE}" \
     bash -c "${CMDLINE}"
   docker cp "$TEST_PATH" "${CONTAINER_NAME}:/test"
   docker cp "$ENVFILE" "${CONTAINER_NAME}:/env"
