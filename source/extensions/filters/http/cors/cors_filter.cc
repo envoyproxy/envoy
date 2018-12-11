@@ -45,10 +45,11 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
     return Http::FilterHeadersStatus::Continue;
   }
 
-  is_cors_request_ = true;
   config_->stats().origin_valid_.inc();
   if (shadowEnabled() && !enabled())
     return Http::FilterHeadersStatus::Continue;
+
+  is_cors_request_ = true;
 
   const auto method = headers.Method();
   if (method == nullptr || method->value().c_str() != Http::Headers::get().MethodValues.Options)
@@ -184,30 +185,28 @@ bool CorsFilter::allowCredentials() {
   return false;
 }
 
-std::string CorsFilter::runtimeKey(const Envoy::Router::CorsPolicy* policy,
-                                   const std::string& key) {
-  if (policy->runtimeKey().empty())
-    return EMPTY_STRING;
-  return "cors." + policy->runtimeKey() + "." + key;
+std::string CorsFilter::runtimeKey(const std::string& key) {
+  for (const auto policy : policies_) {
+    if (!policy)
+      continue;
+    if (!policy->runtimeKey().empty())
+      return "cors." + policy->runtimeKey() + "." + key;
+  }
+  return EMPTY_STRING;
 }
 
 bool CorsFilter::shadowEnabled() {
-  for (const auto policy : policies_) {
-    if (!policy)
-      continue;
-    const auto shadowMode = runtimeKey(policy, "shadow_enabled");
-    if (shadowMode == EMPTY_STRING)
-      break;
-    return config_->runtime().snapshot().featureEnabled(shadowMode, 0);
-  }
-  return false;
+  const auto shadowMode = runtimeKey("shadow_enabled");
+  if (shadowMode == EMPTY_STRING)
+    return false;
+  return config_->runtime().snapshot().featureEnabled(shadowMode, 0);
 }
 
 bool CorsFilter::enabled() {
+  const auto filterEnabled = runtimeKey("filter_enabled");
   for (const auto policy : policies_) {
     if (!policy)
       continue;
-    const auto filterEnabled = runtimeKey(policy, "filter_enabled");
     bool policyEnabled = policy->enabled();
     if (filterEnabled == EMPTY_STRING)
       return policyEnabled;
