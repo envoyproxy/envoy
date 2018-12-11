@@ -405,7 +405,7 @@ message CorsPolicy {
   // Specifies if CORS is enabled. Defaults to true. Only effective on route.
   google.protobuf.BoolValue enabled = 7;
 
-  // Specifies if root runtime key for flags related to this policy. Defaults to "".
+  // Specifies the root runtime key for flags related to this policy. Defaults to "".
   string runtime_key = 9;
 }
 

@@ -48,7 +48,6 @@ void RdsJson::translateCors(const Json::Object& json_cors,
   JSON_UTIL_SET_STRING(json_cors, cors, max_age);
   JSON_UTIL_SET_BOOL(json_cors, cors, allow_credentials);
   JSON_UTIL_SET_BOOL(json_cors, cors, enabled);
-  JSON_UTIL_SET_STRING(json_cors, cors, runtime_key);
 }
 
 void RdsJson::translateRateLimit(const Json::Object& json_rate_limit,
