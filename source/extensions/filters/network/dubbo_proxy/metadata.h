@@ -24,22 +24,19 @@ public:
   typedef std::unordered_map<uint32_t, ParameterValue> ParameterValueMap;
   typedef std::unique_ptr<ParameterValueMap> ParameterValueMapPtr;
 
-  MessageMetadata() {}
+  typedef std::unique_ptr<Http::HeaderMapImpl> HeaderMapPtr;
 
   void setServiceName(const std::string& name) { service_name_ = name; }
   const std::string& service_name() const { return service_name_; }
 
   void setMethodName(const std::string& name) { method_name_ = name; }
-  const std::string& method_name() const { return method_name_.value(); }
-  bool hasMethodName() const { return method_name_.has_value(); }
+  const absl::optional<std::string>& method_name() const { return method_name_; }
 
   void setServiceVersion(const std::string& version) { service_version_ = version; }
-  const std::string& service_version() const { return service_version_.value(); }
-  bool hasServiceVersion() const { return service_version_.has_value(); }
+  const absl::optional<std::string>& service_version() const { return service_version_; }
 
   void setServiceGroup(const std::string& group) { group_ = group; }
-  const std::string& service_group() const { return group_.value(); }
-  bool hasServiceGroup() const { return group_.has_value(); }
+  const absl::optional<std::string>& service_group() const { return group_; }
 
   void setMessageType(MessageType type) { message_type_ = type; }
   MessageType message_type() const { return message_type_; }
@@ -57,47 +54,54 @@ public:
   bool is_event() const { return is_event_; }
 
   void setResponseStatus(ResponseStatus status) { response_status_ = status; }
-  ResponseStatus response_status() const { return response_status_.value(); }
-  bool hasResponseStatus() const { return response_status_.has_value(); }
+  const absl::optional<ResponseStatus>& response_status() const { return response_status_; }
 
   void addParameterValue(uint32_t index, const std::string& value) {
-    if (!parameter_map_.has_value()) {
-      parameter_map_ = std::make_unique<ParameterValueMap>();
-    }
-    parameter_map_.value()->emplace(index, ParameterValue(index, value));
+    assignParameterIfNeed();
+    parameter_map_->emplace(index, ParameterValue(index, value));
   }
   const ParameterValue* getParameterValue(uint32_t index) const {
-    if (parameter_map_.has_value()) {
-      auto itor = parameter_map_.value()->find(index);
-      if (itor != parameter_map_.value()->end()) {
+    if (parameter_map_) {
+      auto itor = parameter_map_->find(index);
+      if (itor != parameter_map_->end()) {
         return &itor->second;
       }
     }
 
     return nullptr;
   }
-  bool hasParameters() const { return parameter_map_.has_value(); }
-  size_t parameter_count() const {
-    return parameter_map_.has_value() ? parameter_map_.value()->size() : 0;
+  bool hasParameters() const { return parameter_map_ != nullptr; }
+  const ParameterValueMap& parameters() {
+    assignParameterIfNeed();
+    return *parameter_map_;
   }
 
-  bool hasHeaders() const { return headers_.has_value(); }
-  const Http::HeaderMap& headers() const { return *(headers_.value()); }
+  bool hasHeaders() const { return headers_ != nullptr; }
+  const Http::HeaderMap& headers() {
+    assignHeaderIfNeed();
+    return *headers_;
+  }
   void addHeader(const std::string& key, const std::string& value) {
-    if (!headers_.has_value()) {
-      headers_ = std::make_unique<Http::HeaderMapImpl>();
-    }
-    headers_.value()->addCopy(Http::LowerCaseString(key), value);
+    assignHeaderIfNeed();
+    headers_->addCopy(Http::LowerCaseString(key), value);
   }
   void addHeaderReference(const Http::LowerCaseString& key, const std::string& value) {
-    if (!headers_.has_value()) {
-      headers_ = std::make_unique<Http::HeaderMapImpl>();
-    }
-    headers_.value()->addReference(key, value);
+    assignHeaderIfNeed();
+    headers_->addReference(key, value);
   }
-  size_t header_count() const { return headers_.has_value() ? headers_.value()->size() : 0; }
 
 private:
+  inline void assignHeaderIfNeed() {
+    if (!headers_) {
+      headers_ = std::make_unique<Http::HeaderMapImpl>();
+    }
+  }
+  inline void assignParameterIfNeed() {
+    if (!parameter_map_) {
+      parameter_map_ = std::make_unique<ParameterValueMap>();
+    }
+  }
+
   bool is_two_way_{false};
   bool is_event_{false};
 
@@ -112,8 +116,8 @@ private:
   absl::optional<std::string> method_name_;
   absl::optional<std::string> service_version_;
   absl::optional<std::string> group_;
-  absl::optional<ParameterValueMapPtr> parameter_map_;
-  absl::optional<std::unique_ptr<Http::HeaderMapImpl>> headers_; // attachment
+  ParameterValueMapPtr parameter_map_;
+  HeaderMapPtr headers_; // attachment
 };
 
 typedef std::shared_ptr<MessageMetadata> MessageMetadataSharedPtr;
