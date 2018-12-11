@@ -78,8 +78,6 @@ public:
       // Setup cds and corresponding gRPC cluster.
       auto* cds_config =
           bootstrap.mutable_dynamic_resources()->mutable_cds_config()->mutable_api_config_source();
-      bootstrap.mutable_dynamic_resources()->clear_ads_config();
-      bootstrap.mutable_dynamic_resources()->clear_lds_config();
 
       cds_config->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
       cds_config->mutable_request_timeout()->set_seconds(1);
@@ -115,13 +113,8 @@ public:
   }
 };
 
-// GoogleGrpc causes problems.
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest,
-                        testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                         testing::Values(Grpc::ClientType::EnvoyGrpc)));
+INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
 
-// Tests Envoy HTTP health checking a single healthy endpoint and reporting that it is
-// indeed healthy to the server.
 TEST_P(CdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   // Controls how many fake_upstreams_.emplace_back(new FakeUpstream) will happen in
   // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
