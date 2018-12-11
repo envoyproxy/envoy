@@ -8,8 +8,7 @@
 # toolchain than the envoy-build container, passing in LOCAL_MOUNT=yes will force it to copy the
 # local libraries into the container.
 
-if [[ ! "$1" =~ (@[a-zA-Z0-9_-]+)?//.*:[a-zA-Z0-9_-]+ ]]
-then
+if [[ ! "$1" =~ (@[a-zA-Z0-9_-]+)?//.*:[a-zA-Z0-9_-]+ ]]; then
   echo "First argument to $0 must be a [@repo]//test/foo:bar label identifying a single test to run"
   echo "$1 does not match this pattern"
   exit 1
@@ -19,8 +18,7 @@ SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 [[ -z "${BAZEL}" ]] && BAZEL=bazel
 [[ -z "${DOCKER}" ]] && DOCKER=docker
 
-if [[ -z "$RUN_REMOTE" ]]
-then
+if [[ -z "${RUN_REMOTE}" ]]; then
   LOCAL_MOUNT=${LOCAL_MOUNT:-"yes"}
   RUN_REMOTE=no
 else
@@ -35,7 +33,7 @@ function cleanup() {
 }
 
 trap cleanup EXIT
-cat > $DOCKER_ENV <<EOF
+cat > "${DOCKER_ENV}" <<EOF
   #!/bin/bash
   export DOCKER_CERT_PATH=$DOCKER_CERT_PATH
   export DOCKER_HOST=$DOCKER_HOST
@@ -51,4 +49,4 @@ IMAGE=envoyproxy/envoy-build:${ENVOY_BUILD_SHA}
 # name is passed in.
 "${BAZEL}" test "$@" --strategy=TestRunner=standalone --cache_test_results=no \
   --test_output=summary --run_under="${SCRIPT_DIR}/docker_wrapper.sh ${IMAGE} ${RUN_REMOTE} \
-   ${LOCAL_MOUNT} $DOCKER_ENV"
+   ${LOCAL_MOUNT} ${DOCKER_ENV}"
