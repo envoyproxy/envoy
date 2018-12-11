@@ -34,7 +34,8 @@ ENVOY_IP_TEST_VERSIONS=v4only
 EOF
 
 CMDLINE="set -a && . /env && env && /test $@"
-LIB_PATHS="/lib/x86_64-linux-gnu/ /lib64/"
+LIB_PATHS="/lib/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/ /lib64/"
+
 
 if [ "${RUN_REMOTE}" != "yes" ]; then
   # We're running locally. If told to, mount the library directories locally.
