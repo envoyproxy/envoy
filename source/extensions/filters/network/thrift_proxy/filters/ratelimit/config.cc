@@ -36,7 +36,7 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
                                                          proto_config.rate_limit_service())) {
     throw EnvoyException("rate limit service config in filter does not match with bootstrap");
   }
-  
+
   return [client_factory, proto_config, &context, timeout_ms,
           config](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addDecoderFilter(std::make_shared<Filter>(
