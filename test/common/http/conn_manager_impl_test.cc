@@ -936,8 +936,8 @@ TEST_F(HttpConnectionManagerImplTest,
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
-  constexpr char local_address[] = "0.0.0.0";
-  constexpr char xff_address[] = "1.2.3.4";
+  static constexpr char local_address[] = "0.0.0.0";
+  static constexpr char xff_address[] = "1.2.3.4";
 
   // stream_info.downstreamRemoteAddress will infer the address from request
   // headers instead of the physical connection
