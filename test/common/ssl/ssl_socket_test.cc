@@ -2916,6 +2916,19 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client, "", true, "TLSv1.3", "", "", "", "", "ssl.handshake",
              "ssl.handshake", GetParam(), nullptr);
+
+  // Protocol version logged correctly when connecting using TLSv1.0-TLSv1.3
+  // for the client and TLSv1.3 for the server.
+  testUtilV2(listener, client, "", true, "TLSv1.3", "", "", "", "", "ssl.versions.TLSv1.3",
+             "ssl.versions.TLSv1.3", GetParam(), nullptr);
+
+  // Protocol version logged correctly when connecting using TLSv1.0 for both.
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  testUtilV2(listener, client, "", true, "TLSv1", "", "", "", "", "ssl.versions.TLSv1",
+             "ssl.versions.TLSv1", GetParam(), nullptr);
 }
 
 TEST_P(SslSocketTest, ALPN) {
