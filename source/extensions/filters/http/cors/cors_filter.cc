@@ -205,7 +205,7 @@ bool CorsFilter::allowCredentials() {
   return false;
 }
 
-std::string CorsFilter::runtimeKey(const std::string& key) {
+absl::optional<std::string> CorsFilter::runtimeKey(const std::string& key) {
   for (const auto policy : policies_) {
     if (!policy) {
       continue;
@@ -218,7 +218,7 @@ std::string CorsFilter::runtimeKey(const std::string& key) {
 }
 
 bool CorsFilter::shadowEnabled() {
-  const auto shadowMode = runtimeKey("shadow_enabled");
+  const auto shadowMode = runtimeKey("shadow_enabled").value();
   if (shadowMode == EMPTY_STRING) {
     return false;
   }
@@ -226,7 +226,7 @@ bool CorsFilter::shadowEnabled() {
 }
 
 bool CorsFilter::enabled() {
-  const auto filterEnabled = runtimeKey("filter_enabled");
+  const auto filterEnabled = runtimeKey("filter_enabled").value();
   for (const auto policy : policies_) {
     if (!policy) {
       continue;
