@@ -17,7 +17,7 @@ namespace StreamInfo {
 
 MockStreamInfo::MockStreamInfo()
     : downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
-      downstream_directly_connected_address_(new Network::Address::Ipv4Instance("127.0.0.1")),
+      downstream_direct_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")),
       downstream_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")) {
   ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
@@ -50,12 +50,12 @@ MockStreamInfo::MockStreamInfo()
           }));
   ON_CALL(*this, downstreamLocalAddress()).WillByDefault(ReturnRef(downstream_local_address_));
   ON_CALL(*this, setDownstreamDirectRemoteAddress(_))
-      .WillByDefault(Invoke([this](const Network::Address::InstanceConstSharedPtr&
-                                       downstream_directly_connected_address) {
-        downstream_directly_connected_address_ = downstream_directly_connected_address;
-      }));
+      .WillByDefault(Invoke(
+          [this](const Network::Address::InstanceConstSharedPtr& downstream_direct_remote_address) {
+            downstream_direct_remote_address_ = downstream_direct_remote_address;
+          }));
   ON_CALL(*this, downstreamDirectRemoteAddress())
-      .WillByDefault(ReturnRef(downstream_directly_connected_address_));
+      .WillByDefault(ReturnRef(downstream_direct_remote_address_));
   ON_CALL(*this, setDownstreamRemoteAddress(_))
       .WillByDefault(
           Invoke([this](const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {

@@ -277,11 +277,11 @@ public:
   virtual const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const PURE;
 
   /**
-   * @param downstream_directly_connected_address sets the direct physical address of downstream
+   * @param downstream_direct_remote_address sets the direct physical address of downstream
    * connection.
    */
   virtual void setDownstreamDirectRemoteAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_directly_connected_address) PURE;
+      const Network::Address::InstanceConstSharedPtr& downstream_direct_remote_address) PURE;
 
   /**
    * @return the downstream directly connected address. This will never be nullptr. This is
