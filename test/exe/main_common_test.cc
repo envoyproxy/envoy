@@ -5,7 +5,9 @@
 #include "common/common/thread.h"
 #include "common/runtime/runtime_impl.h"
 
+#include "exe/legacy_main.h"
 #include "exe/main_common.h"
+#include "exe/platform_setup.h"
 
 #include "server/options_impl.h"
 
@@ -40,7 +42,8 @@ protected:
             TestEnvironment::PortMap(), GetParam())),
         random_string_(fmt::format("{}", computeBaseId())),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
-               nullptr}) {}
+               nullptr}),
+        platform_setup_(argc(), argv()) {}
 
   /**
    * Computes a numeric ID to incorporate into the names of
@@ -83,24 +86,25 @@ protected:
   std::string config_file_;
   std::string random_string_;
   std::vector<const char*> argv_;
+  PlatformSetup platform_setup_;
 };
 
 // Exercise the codepath to instantiate MainCommon and destruct it, with hot restart.
 TEST_P(MainCommonTest, ConstructDestructHotRestartEnabled) {
-  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv(), platform_setup_));
 }
 
 // Exercise the codepath to instantiate MainCommon and destruct it, without hot restart.
 TEST_P(MainCommonTest, ConstructDestructHotRestartDisabled) {
   addArg("--disable-hot-restart");
-  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv(), platform_setup_));
 }
 
 // Exercise init_only explicitly.
 TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   addArg("--disable-hot-restart");
   initOnly();
-  MainCommon main_common(argc(), argv());
+  MainCommon main_common(argc(), argv(), platform_setup_);
   EXPECT_TRUE(main_common.run());
 }
 
@@ -162,7 +166,7 @@ protected:
       // is race-free, as MainCommon::run() does not return until
       // triggered with an adminRequest POST to /quitquitquit, which
       // is done in the testing thread.
-      main_common_ = std::make_unique<MainCommon>(argc(), argv());
+      main_common_ = std::make_unique<MainCommon>(argc(), argv(), platform_setup_);
       envoy_started_ = true;
       started_.Notify();
       pauseResumeInterlock(pause_before_run_);
@@ -335,7 +339,7 @@ TEST_P(AdminRequestTest, AdminRequestAfterRun) {
 // Verifies that the Logger::Registry is usable after constructing and
 // destructing MainCommon.
 TEST_P(MainCommonTest, ConstructDestructLogger) {
-  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv(), platform_setup_));
 
   const std::string logger_name = "logger";
   spdlog::details::log_msg log_msg(&logger_name, spdlog::level::level_enum::err);

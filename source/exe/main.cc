@@ -1,6 +1,5 @@
 #include "exe/main_common.h"
-
-#include "absl/debugging/symbolize.h"
+#include "exe/platform_setup.h"
 
 // NOLINT(namespace-envoy)
 
@@ -12,18 +11,14 @@
  * after setting up command line options.
  */
 int main(int argc, char** argv) {
-#ifndef __APPLE__
-  // absl::Symbolize mostly works without this, but this improves corner case
-  // handling, such as running in a chroot jail.
-  absl::InitializeSymbolizer(argv[0]);
-#endif
+  Envoy::PlatformSetup setup(argc, argv);
   std::unique_ptr<Envoy::MainCommon> main_common;
 
   // Initialize the server's main context under a try/catch loop and simply return EXIT_FAILURE
   // as needed. Whatever code in the initialization path that fails is expected to log an error
   // message so the user can diagnose.
   try {
-    main_common = std::make_unique<Envoy::MainCommon>(argc, argv);
+    main_common = std::make_unique<Envoy::MainCommon>(argc, argv, setup);
   } catch (const Envoy::NoServingException& e) {
     return EXIT_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {

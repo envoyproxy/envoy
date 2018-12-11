@@ -26,7 +26,7 @@ alias(
 envoy_cc_binary(
     name = "envoy-static",
     stamped = True,
-    deps = [":envoy_main_entry_lib"],
+    deps = ["envoy_main_entry_lib"],
 )
 
 envoy_cc_library(
@@ -51,60 +51,31 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "envoy_main_entry_lib",
-    deps = envoy_cc_platform_dep("envoy_main_entry"),
-)
-
-envoy_cc_posix_library(
-    name = "envoy_main_entry",
-    srcs = ["posix/main.cc"],
+    srcs = ["main.cc"],
     external_deps = [
         "abseil_symbolize",
     ],
-    deps = envoy_cc_platform_dep("envoy_main_common_lib"),
-)
-
-envoy_cc_win32_library(
-    name = "envoy_main_entry",
-    srcs = ["win32/main.cc"],
-    external_deps = [
-        "abseil_symbolize",
-    ],
-    deps = envoy_cc_platform_dep("envoy_main_common_lib"),
-)
-
-envoy_cc_posix_library(
-    name = "envoy_main_common_lib",
-    srcs = ["posix/main_common.cc"],
-    hdrs = ["posix/main_common.h"],
-    strip_include_prefix = "posix",
     deps = [
-        ":envoy_common_lib",
-        ":envoy_main_common_base_lib",
-        "//source/common/api:os_sys_calls_lib",
-        "//source/common/common:compiler_requirements_lib",
-        "//source/common/common:perf_annotation_lib",
-        "//source/server:hot_restart_lib",
-        "//source/server:hot_restart_nop_lib",
-        "//source/server:proto_descriptors_lib",
-        "//source/server/config_validation:server_lib",
-    ] + select({
-        "//bazel:disable_signal_trace": [],
-        "//conditions:default": [
-            ":sigaction_lib",
-            ":terminate_handler_lib",
-        ],
-    }),
+        ":envoy_main_common_lib",
+    ] + envoy_cc_platform_dep("platform_setup_lib"),
+)
+
+envoy_cc_posix_library(
+    name = "legacy_main_lib",
+    srcs = ["posix/legacy_main.cc"],
+    hdrs = ["posix/legacy_main.h"],
+    strip_include_prefix = "posix",
+    deps = [":envoy_main_common_lib"],
 )
 
 envoy_cc_win32_library(
-    name = "envoy_main_common_lib",
-    deps = [":envoy_main_common_base_lib"],
+    name = "legacy_main_lib",
 )
 
 envoy_cc_library(
-    name = "envoy_main_common_base_lib",
-    srcs = ["main_common_base.cc"],
-    hdrs = ["main_common_base.h"],
+    name = "envoy_main_common_lib",
+    srcs = ["main_common.cc"],
+    hdrs = ["main_common.h"],
     deps = [
         ":envoy_common_lib",
         "//source/common/api:os_sys_calls_lib",
@@ -120,7 +91,24 @@ envoy_cc_library(
             ":sigaction_lib",
             ":terminate_handler_lib",
         ],
-    }),
+    }) + envoy_cc_platform_dep("platform_setup_lib"),
+)
+
+envoy_cc_posix_library(
+    name = "platform_setup_lib",
+    hdrs = ["posix/platform_setup.h"],
+    strip_include_prefix = "posix",
+    deps = ["//source/common/common:thread_lib"],
+)
+
+envoy_cc_win32_library(
+    name = "platform_setup_lib",
+    hdrs = ["win32/platform_setup.h"],
+    strip_include_prefix = "win32",
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:thread_lib",
+    ],
 )
 
 envoy_cc_library(
