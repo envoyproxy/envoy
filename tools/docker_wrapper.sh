@@ -48,7 +48,7 @@ if [ "${RUN_REMOTE}" != "yes" ]; then
   fi
 
 # Note: we don't quote LIB_MOUNTS on purpose; we want it to expand.
-docker run --rm --privileged  -v "${TEST_PATH}:/test" $LIB_MOUNTS -i -v "${ENVFILE}:/env" \
+docker run --rm --privileged  -v "${TEST_PATH}:/test" ${LIB_MOUNTS} -i -v "${ENVFILE}:/env" \
   "${IMAGE}" bash -c "${CMDLINE}"
 else
   # In this case, we need to create the container, then make new layers on top of it, since we
@@ -60,7 +60,7 @@ else
 
   # If some local libraries are necessary, copy them over.
   if [ "${LOCAL_MOUNT}" == "yes" ]; then
-    for path in $LIB_PATHS; do
+    for path in ${LIB_PATHS}; do
       # $path. gives us a path ending it /. This means that we will copy the contents into the
       # destination directory, not overwrite the entire directory.
       docker cp -L "${path}." "${CONTAINER_NAME}:${path}"

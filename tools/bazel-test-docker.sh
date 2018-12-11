@@ -19,27 +19,27 @@ SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 [[ -z "${DOCKER}" ]] && DOCKER=docker
 
 if [[ -z "${RUN_REMOTE}" ]]; then
-  LOCAL_MOUNT=${LOCAL_MOUNT:-"yes"}
+  LOCAL_MOUNT="${LOCAL_MOUNT:-yes}"
   RUN_REMOTE=no
 else
-  LOCAL_MOUNT=${LOCAL_MOUNT:-"no"}
+  LOCAL_MOUNT="${LOCAL_MOUNT:-no}"
   RUN_REMOTE=yes
 fi
 
 # Pass through the docker environment
 DOCKER_ENV=$(mktemp -t docker_env.XXXXXX)
 function cleanup() {
-  rm -f "DOCKER_ENV"
+  rm -f "${DOCKER_ENV}"
 }
 
 trap cleanup EXIT
 cat > "${DOCKER_ENV}" <<EOF
   #!/bin/bash
-  export DOCKER_CERT_PATH=$DOCKER_CERT_PATH
-  export DOCKER_HOST=$DOCKER_HOST
-  export DOCKER_MACHINE_NAME=$DOCKER_MACHINE_NAME
-  export DOCKER_TLS_VERIFY=$DOCKER_TLS_VERIFY
-  export NO_PROXY=$NO_PROXY
+  export DOCKER_CERT_PATH="${DOCKER_CERT_PATH}"
+  export DOCKER_HOST="${DOCKER_HOST}"
+  export DOCKER_MACHINE_NAME="${DOCKER_MACHINE_NAME}"
+  export DOCKER_TLS_VERIFY="${DOCKER_TLS_VERIFY}"
+  export NO_PROXY="${NO_PROXY}"
 EOF
 
 . ./ci/envoy_build_sha.sh

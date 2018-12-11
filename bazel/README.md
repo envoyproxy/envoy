@@ -207,9 +207,9 @@ them with elevated privileges, e.g. `sudo test`. However, that may not always be
 particularly if the test needs to run in a CI pipeline. `tools/bazel-test-docker.sh` may be used in
 such situations to run the tests in a privileged docker container.
 
-The script works by wrapping the test execution in the current repositories circle ci build
+The script works by wrapping the test execution in the current repository's circle ci build
 container, then executing it either locally or on a remote docker container. In both cases, the
-container runs with the `-privileged` flag, allowing it to execute operations which would otherwise
+container runs with the `--privileged` flag, allowing it to execute operations which would otherwise
 be restricted.
 
 The command line format is:
@@ -224,7 +224,7 @@ Use `RUN_REMOTE=yes` when you don't want to run against your local docker instan
 will need to override a few environment variables to set up the remote docker. The list of variables
 can be found in the [Documentation](https://docs.docker.com/engine/reference/commandline/cli/).
 
-Use `LOCAL_MOUNT=yes` when you are not building with the envoy build continair. This will ensure
+Use `LOCAL_MOUNT=yes` when you are not building with the envoy build container. This will ensure
 that the libraries against which the tests dynmically link will be available and of the correct
 version.
 
@@ -236,7 +236,7 @@ Running the http integration test in a privileged container:
 tools/bazel-test-docker.sh  //test/integration:integration_test --jobs=4 -c dbg
 ```
 
-Running the http integration test compiled locally against a privileged remote container
+Running the http integration test compiled locally against a privileged remote container:
 
 ```bash
 setup_remote_docker_variables
