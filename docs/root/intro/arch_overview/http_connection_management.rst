@@ -57,7 +57,7 @@ this behavior retry plugins can be used, which fall into two categories:
 
   Envoy supports the following built-in host predicates
 
-  * *envoy.retry_host_predicates.previous_hosts* : This will keep track of previously attempted hosts, and rejects
+  * *envoy.retry_host_predicates.previous_hosts*: This will keep track of previously attempted hosts, and rejects
     hosts that have already been attempted.
   
 * :ref:`Priority Predicates<envoy_api_field_route.RouteAction.RetryPolicy.retry_priority>`: These predicates can
@@ -66,7 +66,7 @@ this behavior retry plugins can be used, which fall into two categories:
 
   Envoy supports the following built-in priority predicates
 
-  * *envoy.retry_priority.previous_priorities* : This will keep track of previously attempted priorities, 
+  * *envoy.retry_priority.previous_priorities*: This will keep track of previously attempted priorities, 
     and adjust the priority load such that other priorites will be targeted in subsequent retry attempts.
 
 Host selection will continue until either the configured predicates accept the host or a configurable
