@@ -661,7 +661,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     // Allow non websocket requests to go through websocket enabled routes.
   }
 
-  if (cached_route_.value()) {
+  if (cached_route_.has_value()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     if (route_entry != nullptr && route_entry->idleTimeout()) {
       idle_timeout_ms_ = route_entry->idleTimeout().value();
@@ -709,7 +709,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
   // be broken in the case a filter changes the route.
 
   // If a decorator has been defined, apply it to the active span.
-  if (cached_route_.value() && cached_route_.value()->decorator()) {
+  if (cached_route_.has_value() && cached_route_.value()->decorator()) {
     cached_route_.value()->decorator()->apply(*active_span_);
 
     // Cache decorated operation.
@@ -1411,7 +1411,7 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
   state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
     const Router::RouteEntry::UpgradeMap* upgrade_map = nullptr;
-    if (cached_route_.value() && cached_route_.value()->routeEntry()) {
+    if (cached_route_.has_value() && cached_route_.value()->routeEntry()) {
       upgrade_map = &cached_route_.value()->routeEntry()->upgradeMap();
     }
     if (connection_manager_.config_.filterFactory().createUpgradeFilterChain(
