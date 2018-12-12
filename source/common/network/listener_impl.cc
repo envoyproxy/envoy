@@ -60,9 +60,13 @@ void ListenerImpl::setupServerSocket(const Event::DispatcherImpl& dispatcher, So
 ListenerImpl::ListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket,
                            ListenerCallbacks& cb, bool bind_to_port,
                            bool hand_off_restored_destination_connections)
-    : BaseListenerImpl(dispatcher, socket, bind_to_port), cb_(cb),
+    : BaseListenerImpl(dispatcher, socket), cb_(cb),
       hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
-      listener_(nullptr) {}
+      listener_(nullptr) {
+  if (bind_to_port) {
+    setupServerSocket(dispatcher, socket);
+  }
+}
 
 void ListenerImpl::errorCallback(evconnlistener*, void*) {
   // We should never get an error callback. This can happen if we run out of FDs or memory. In those

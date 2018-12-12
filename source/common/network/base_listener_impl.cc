@@ -20,9 +20,8 @@ Address::InstanceConstSharedPtr BaseListenerImpl::getLocalAddress(int fd) {
   return Address::addressFromFd(fd);
 }
 
-BaseListenerImpl::BaseListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket,
-                                   bool bind_to_port)
-    : local_address_(nullptr) {
+BaseListenerImpl::BaseListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket)
+    : local_address_(nullptr), dispatcher_(dispatcher), socket_(socket) {
   const auto ip = socket.localAddress()->ip();
 
   // Only use the listen socket's local address for new connections if it is not the all hosts
@@ -30,19 +29,6 @@ BaseListenerImpl::BaseListenerImpl(const Event::DispatcherImpl& dispatcher, Sock
   if (!(ip && ip->isAnyAddress())) {
     local_address_ = socket.localAddress();
   }
-
-  if (bind_to_port) {
-    setupServerSocket(dispatcher, socket);
-  }
-}
-
-void BaseListenerImpl::setupServerSocket(const Event::DispatcherImpl& dispatcher, Socket& socket) {
-  assert(false);
-
-  (void)dispatcher;
-  (void)socket;
-
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Network

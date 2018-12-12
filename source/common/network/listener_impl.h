@@ -14,11 +14,11 @@ public:
   ListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
                bool bind_to_port, bool hand_off_restored_destination_connections);
 
-protected:
-  void setupServerSocket(const Event::DispatcherImpl& dispatcher, Socket& socket) override;
-
   void disable() override;
   void enable() override;
+
+protected:
+  void setupServerSocket(const Event::DispatcherImpl& dispatcher, Socket& socket);
 
   ListenerCallbacks& cb_;
   const bool hand_off_restored_destination_connections_;

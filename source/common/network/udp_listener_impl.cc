@@ -16,15 +16,11 @@
 namespace Envoy {
 namespace Network {
 
-void UdpListenerImpl::setupServerSocket(const Event::DispatcherImpl& dispatcher, Socket& socket) {
-  // TODO(conqerAtapple): Implementation.
-  (void)dispatcher;
-  (void)socket;
-}
-
 UdpListenerImpl::UdpListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket,
                                  UdpListenerCallbacks& cb, bool bind_to_port)
-    : BaseListenerImpl(dispatcher, socket, bind_to_port), cb_(cb) {}
+    : BaseListenerImpl(dispatcher, socket), cb_(cb) {
+  (void)bind_to_port;
+}
 
 } // namespace Network
 } // namespace Envoy

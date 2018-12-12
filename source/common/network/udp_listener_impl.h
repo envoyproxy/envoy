@@ -14,8 +14,6 @@ public:
                   bool bind_to_port);
 
 protected:
-  void setupServerSocket(const Event::DispatcherImpl& dispatcher, Socket& socket) override;
-
   UdpListenerCallbacks& cb_;
 };
 
