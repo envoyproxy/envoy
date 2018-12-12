@@ -47,9 +47,9 @@ if [ "${RUN_REMOTE}" != "yes" ]; then
       done
   fi
 
-# Note: we don't quote LIB_MOUNTS on purpose; we want it to expand.
-docker run --rm --privileged  -v "${TEST_PATH}:/test" ${LIB_MOUNTS} -i -v "${ENVFILE}:/env" \
-  "${IMAGE}" bash -c "${CMDLINE}"
+  # Note: we don't quote LIB_MOUNTS on purpose; we want it to expand.
+  docker run --rm --privileged  -v "${TEST_PATH}:/test" ${LIB_MOUNTS} -i -v "${ENVFILE}:/env" \
+    "${IMAGE}" bash -c "${CMDLINE}"
 else
   # In this case, we need to create the container, then make new layers on top of it, since we
   # can't mount everything into it.
