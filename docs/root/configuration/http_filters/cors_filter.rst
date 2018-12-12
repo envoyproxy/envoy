@@ -29,12 +29,12 @@ cors.{runtime_key}.shadow_enabled
   but will not enforce any policies.
 
   To determine if shadow mode is enabled you can check the runtime
-  values via the admin panel at ``/runtime``.
+  values via the admin panel at :http:get:`/runtime`.
 
 .. note::
 
-  If both ``filter_enabled`` and ``shadow_enabled`` are on ``filter_enabled``
-  will take precedence and policies will be enforced.
+  If both ``filter_enabled`` and ``shadow_enabled`` are on, the ``filter_enabled``
+  will take precedence.
 
 .. _cors-statistics:
 
