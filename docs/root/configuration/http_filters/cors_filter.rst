@@ -20,7 +20,7 @@ The CORS filter supports the following runtime settings:
 
 cors.{runtime_key}.filter_enabled
   The % of requests for which the filter is enabled. Default is 0.
-  If present, this will override the :ref: `enabled <envoy_api_msg_route.CorsPolicy>`
+  If present, this will override the :ref: `enabled <envoy_api_msg_route.CorsPolicy.enabled>`
   field of the configuration.
 
 cors.{runtime_key}.shadow_enabled
