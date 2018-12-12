@@ -492,8 +492,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   request_encoder_ = &client_->newStream(*this);
   request_encoder_->getStream().addCallbacks(*this);
 
-  const std::string& authority =
-      parent_.authority_value_ ? parent_.authority_value_.value() : parent_.cluster_.info()->name();
+  const std::string& authority = parent_.authority_value_.has_value()
+                                     ? parent_.authority_value_.value()
+                                     : parent_.cluster_.info()->name();
   auto headers_message =
       Grpc::Common::prepareHeaders(authority, parent_.service_method_.service()->full_name(),
                                    parent_.service_method_.name(), absl::nullopt);
@@ -504,7 +505,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   request_encoder_->encodeHeaders(headers_message->headers(), false);
 
   grpc::health::v1::HealthCheckRequest request;
-  if (parent_.service_name_) {
+  if (parent_.service_name_.has_value()) {
     request.set_service(parent_.service_name_.value());
   }
 
