@@ -13,8 +13,8 @@ GOOGLEAPIS_SHA = "16f5b2e8bf1e747a32f9a62e211f8f33c94645492e9bbd72458061d9a9de1f
 PROMETHEUS_GIT_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
 PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf3911b"
 
-OPENCENSUS_GIT_SHA = "ab82e5fdec8267dc2a726544b10af97675970847"  # May 23, 2018
-OPENCENSUS_SHA = "1950f844d9f338ba731897a9bb526f9074c0487b3f274ce2ec3b4feaf0bef7e2"
+OPENCENSUS_GIT_SHA = "7f2434bc10da710debe5c4315ed6d4df454b4024"  # Nov 3, 2018 (tag v0.1.0)
+OPENCENSUS_SHA = "6f67ee4d5f4208f9711573423ae30860d6a7e66e9e150f97dda9d0e0665a34df"
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
@@ -286,7 +286,7 @@ go_proto_library(
 
     http_archive(
         name = "io_opencensus_trace",
-        strip_prefix = "opencensus-proto-" + OPENCENSUS_GIT_SHA + "/opencensus/proto/trace",
+        strip_prefix = "opencensus-proto-" + OPENCENSUS_GIT_SHA + "/src/opencensus/proto/trace/v1",
         url = "https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_GIT_SHA + ".tar.gz",
         sha256 = OPENCENSUS_SHA,
         build_file_content = """
