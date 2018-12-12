@@ -61,4 +61,9 @@ message GrpcJsonTranscoder {
   // the match the upstream gRPC service. Note: This means that routes for gRPC services that are
   // not transcoded cannot be used in combination with *match_incoming_request_route*.
   bool match_incoming_request_route = 5;
+
+  // A list of query parameters to ignore. For example, if `key` exists in the
+  // ignored_query_parameter then query paramemter`key` will not be used for transcoding:
+  //     book.id=42&book.author=Mark%20Twain&key=API_KEY
+  repeated string ignored_query_parameters = 6;
 }
