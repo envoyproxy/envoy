@@ -12,14 +12,13 @@ namespace Thread {
 
 namespace {
 
-// TODO(sesmith177): use pid_t as type on Linux and upcast to uint64_t
-int32_t getCurrentThreadId() {
+int64_t getCurrentThreadId() {
 #ifdef __linux__
-  return syscall(SYS_gettid);
+  return static_cast<int64_t>(syscall(SYS_gettid));
 #elif defined(__APPLE__)
   uint64_t tid;
   pthread_threadid_np(NULL, &tid);
-  return static_cast<int32_t>(tid);
+  return tid;
 #else
 #error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
 #endif
@@ -27,7 +26,7 @@ int32_t getCurrentThreadId() {
 
 } // namespace
 
-ThreadIdImplPosix::ThreadIdImplPosix(int32_t id) : id_(id) {}
+ThreadIdImplPosix::ThreadIdImplPosix(int64_t id) : id_(id) {}
 
 std::string ThreadIdImplPosix::debugString() const { return std::to_string(id_); }
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/common/assert.h"
+#include "common/common/macros.h"
 #include "common/common/thread_impl.h"
 
 #include "absl/debugging/symbolize.h"
@@ -14,6 +14,8 @@ public:
     // absl::Symbolize mostly works without this, but this improves corner case
     // handling, such as running in a chroot jail.
     absl::InitializeSymbolizer(argv[0]);
+#else
+    UNREFERENCED_PARAMETER(argv);
 #endif
   }
 

@@ -9,14 +9,14 @@ namespace Thread {
 
 class ThreadIdImplPosix : public ThreadId {
 public:
-  ThreadIdImplPosix(int32_t id);
+  ThreadIdImplPosix(int64_t id);
 
   // Thread::ThreadId
   std::string debugString() const override;
   bool isCurrentThreadId() const override;
 
 private:
-  int32_t id_;
+  int64_t id_;
 };
 
 /**
