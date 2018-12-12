@@ -5,12 +5,12 @@
 #include <string>
 #include <unordered_map>
 
-#include "absl/types/optional.h"
-
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/network/dubbo_proxy/protocol.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
