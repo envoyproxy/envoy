@@ -20,12 +20,21 @@ The CORS filter supports the following runtime settings:
 
 cors.{runtime_key}.filter_enabled
   The % of requests for which the filter is enabled. Default is 0.
-  If present, this will override the `enabled` field of the configuration.
+  If present, this will override the :ref: `enabled <envoy_api_msg_route.CorsPolicy>`
+  field of the configuration.
 
 cors.{runtime_key}.shadow_enabled
   The % of requests for which the filter is enabled in shadow only mode. Default is 0.
-  If present, this will evaluate a requests Origin to determine if it's valid
+  If present, this will evaluate a requests *Origin* to determine if it's valid
   but will not enforce any policies.
+
+  To determine if shadow mode is enabled you can check the runtime
+  values via the admin panel at ``/runtime``.
+
+.. note::
+
+  If both ``filter_enabled`` and ``shadow_enabled`` are on ``filter_enabled``
+  will take precedence and policies will be enforced.
 
 .. _cors-statistics:
 
