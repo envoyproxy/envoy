@@ -1,10 +1,8 @@
 #include "common/common/assert.h"
 #include "common/common/thread_impl.h"
 
-#ifdef __linux__
+#if defined(__linux__)
 #include <sys/syscall.h>
-#elif defined(__APPLE__)
-#include <pthread.h>
 #endif
 
 namespace Envoy {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <pthread.h>
+
 #include <functional>
 
 #include "envoy/thread/thread.h"
