@@ -126,7 +126,6 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":protocol_interface",
-        "//source/common/common:macros",
         "//source/common/http:header_map_lib",
     ],
 )

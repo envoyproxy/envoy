@@ -1,9 +1,13 @@
 
 #pragma once
 
-#include <map>
+#include <memory>
 #include <string>
+#include <unordered_map>
 
+#include "absl/types/optional.h"
+
+#include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/network/dubbo_proxy/protocol.h"
@@ -15,6 +19,7 @@ namespace DubboProxy {
 
 class MessageMetadata {
 public:
+  // TODO(leilei.gll) Add parameter data types and implement Dubbo data type mapping.
   struct ParameterValue {
     ParameterValue(uint32_t index, const std::string& value) : index_(index), value_(value) {}
 
@@ -72,13 +77,13 @@ public:
   }
   bool hasParameters() const { return parameter_map_ != nullptr; }
   const ParameterValueMap& parameters() {
-    assignParameterIfNeed();
+    ASSERT(hasParameters());
     return *parameter_map_;
   }
 
   bool hasHeaders() const { return headers_ != nullptr; }
-  const Http::HeaderMap& headers() {
-    assignHeaderIfNeed();
+  const Http::HeaderMap& headers() const {
+    ASSERT(hasHeaders());
     return *headers_;
   }
   void addHeader(const std::string& key, const std::string& value) {
