@@ -2444,10 +2444,12 @@ public:
         });
   }
 
-  void setupServiceNameHC(const std::string& authority = "") {
+  void setupServiceNameHC(const absl::optional<std::string>& authority) {
     auto config = createGrpcHealthCheckConfig();
     config.mutable_grpc_health_check()->set_service_name("service");
-    config.mutable_grpc_health_check()->set_authority(authority);
+    if (authority.has_value()) {
+      config.mutable_grpc_health_check()->set_authority(authority.value());
+    }
     health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_,
                                                         random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
@@ -2630,10 +2632,10 @@ public:
     }
   }
 
-  void testSingleHostSuccess(const std::string& authority) {
-    std::string expected_host = authority;
-    if (expected_host.empty()) {
-      expected_host = cluster_->info_->name();
+  void testSingleHostSuccess(const absl::optional<std::string>& authority) {
+    std::string expected_host = cluster_->info_->name();
+    if (authority.has_value()) {
+      expected_host = authority.value();
     }
 
     setupServiceNameHC(authority);
@@ -2696,20 +2698,17 @@ public:
 class GrpcHealthCheckerImplTest : public GrpcHealthCheckerImplTestBase, public testing::Test {};
 
 // Test single host check success.
-TEST_F(GrpcHealthCheckerImplTest, Success) {
-  std::string authority;
-  testSingleHostSuccess(authority);
-}
+TEST_F(GrpcHealthCheckerImplTest, Success) { testSingleHostSuccess(absl::nullopt); }
 
 // Test single host check success with custom authority.
 TEST_F(GrpcHealthCheckerImplTest, SuccessWithCustomAuthority) {
-  std::string authority = "www.envoyproxy.io";
+  const std::string authority = "www.envoyproxy.io";
   testSingleHostSuccess(authority);
 }
 
 // Test host check success when gRPC response payload is split between several incoming data chunks.
 TEST_F(GrpcHealthCheckerImplTest, SuccessResponseSplitBetweenChunks) {
-  setupServiceNameHC();
+  setupServiceNameHC(absl::nullopt);
   expectSingleHealthcheck(HealthTransition::Unchanged);
 
   auto response_headers = std::make_unique<Http::TestHeaderMapImpl>(
