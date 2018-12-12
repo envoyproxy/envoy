@@ -1,6 +1,6 @@
 .. _common_configuration_rolling_upgrades:
 
-How do I handle Rolling Upgrades and transient failures?
+How do I handle rolling upgrades and transient failures?
 ========================================================
 
 One of the biggest advantages of using Envoy in a service mesh is that it frees up services 
@@ -44,9 +44,9 @@ The following application status codes in gRPC are considered safe for automatic
 The HTTP Status codes *502 (Bad Gateway)*, *503 (Service Unavailable)* and *504 (Gateway Timeout)* are all mapped to gRPC status code *UNAVAILABLE*. 
 This can also be considered safe for automatic retry.
 
-The idempotency of a request is an important consideration when configuration retries.
+The idempotency of a request is an important consideration when configuring retries.
 
-Envoy also support extensions to its retry policies. The :ref:`retry plugins <arch_overview_http_retry_plugins>` 
+Envoy also supports extensions to its retry policies. The :ref:`retry plugins <arch_overview_http_retry_plugins>` 
 allow you to customize the Envoy retry implementation to your application.
 
 Outlier Detection
@@ -98,9 +98,9 @@ If the value configured is too high, the service can be overwhelmed with retry r
   }
 
 This setting enables outlier detection if there are 5 consecutive *5xx* or *gateway failures* 
-and limit the number of hosts that are ejected to 50% of the upstream cluster size. This configuration 
-places a safe limit on the number of hosts removed. Please note that once a host a ejected, it would be brought back 
-in to the pool after an ejection time is elapsed (which is equal to the *base_ejection_time* multiplied by the number
+and limits the number of hosts that are ejected to 50% of the upstream cluster size. This configuration 
+places a safe limit on the number of hosts removed. Please note that once a host a ejected, it will be returned 
+to the pool after an ejection time is elapsed (which is equal to the *base_ejection_time* multiplied by the number
 of times the host has been ejected).
 
 *Request Retry*
