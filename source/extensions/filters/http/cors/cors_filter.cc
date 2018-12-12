@@ -218,24 +218,24 @@ std::string CorsFilter::runtimeKey(const std::string& key) {
 }
 
 bool CorsFilter::shadowEnabled() {
-  const auto shadowMode = runtimeKey("shadow_enabled");
-  if (shadowMode == EMPTY_STRING) {
+  const auto shadow_mode = runtimeKey("shadow_enabled");
+  if (shadow_mode == EMPTY_STRING) {
     return false;
   }
-  return config_->runtime().snapshot().featureEnabled(shadowMode, 0);
+  return config_->runtime().snapshot().featureEnabled(shadow_mode, 0);
 }
 
 bool CorsFilter::enabled() {
-  const auto filterEnabled = runtimeKey("filter_enabled");
+  const auto filter_enabled = runtimeKey("filter_enabled");
   for (const auto policy : policies_) {
     if (!policy) {
       continue;
     }
-    bool policyEnabled = policy->enabled();
-    if (filterEnabled == EMPTY_STRING) {
-      return policyEnabled;
+    bool policy_enabled = policy->enabled();
+    if (filter_enabled == EMPTY_STRING) {
+      return policy_enabled;
     }
-    return config_->runtime().snapshot().featureEnabled(filterEnabled, int(policyEnabled) * 100);
+    return config_->runtime().snapshot().featureEnabled(filter_enabled, int(policy_enabled) * 100);
   }
   return false;
 }
