@@ -207,10 +207,7 @@ bool CorsFilter::allowCredentials() {
 
 std::string CorsFilter::runtimeKey(const std::string& key) {
   for (const auto policy : policies_) {
-    if (!policy) {
-      continue;
-    }
-    if (!policy->runtimeKey().empty()) {
+    if (policy && !policy->runtimeKey().empty()) {
       return fmt::format("cors.{}.{}", policy->runtimeKey(), key);
     }
   }

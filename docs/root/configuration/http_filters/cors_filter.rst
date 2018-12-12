@@ -25,7 +25,7 @@ cors.{runtime_key}.filter_enabled
 
 cors.{runtime_key}.shadow_enabled
   The % of requests for which the filter is enabled in shadow only mode. Default is 0.
-  If present, this will evaluate a requests *Origin* to determine if it's valid
+  If present, this will evaluate a request's *Origin* to determine if it's valid
   but will not enforce any policies.
 
   To determine if shadow mode is enabled you can check the runtime
@@ -34,7 +34,7 @@ cors.{runtime_key}.shadow_enabled
 .. note::
 
   If both ``filter_enabled`` and ``shadow_enabled`` are on, the ``filter_enabled``
-  will take precedence.
+  flag will take precedence.
 
 .. _cors-statistics:
 
