@@ -2,14 +2,11 @@
 
 #include "envoy/http/conn_pool.h"
 
+#include "test/mocks/upstream/host.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
-
-namespace Upstream {
-class MockHostDescription;
-} // namespace Upstream
-
 namespace Http {
 
 namespace ConnectionPool {
