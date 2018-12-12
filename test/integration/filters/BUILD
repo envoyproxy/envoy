@@ -102,9 +102,7 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "sleeping_filter_lib",
-    srcs = [
-        "sleeping_filter.cc",
-    ],
+    srcs = ["sleeping_filter.cc"],
     deps = [
         ":sleeping_filter_proto_cc",
         "//include/envoy/registry",

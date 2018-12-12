@@ -317,7 +317,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsNotDisarmedByEncode100Continu
   EXPECT_EQ("request timeout", response->body());
 }
 
-TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsNotDisarmedByASlowFilter) {
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnASlowFilter) {
   enable_request_timeout_ = true;
   enable_sleeping_filter_ = true;
 
