@@ -122,3 +122,12 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "isfips_lib",
+    srcs = ["isfips.cc"],
+    hdrs = ["isfips.h"],
+    external_deps = [
+        "ssl",
+    ],
+)

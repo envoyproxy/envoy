@@ -314,6 +314,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/singleton:manager_impl_lib",
+        "//source/common/ssl:isfips_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/common/upstream:health_discovery_service_lib",

@@ -37,7 +37,8 @@ sudo apt-get install \
    clang-format-7 \
    automake \
    ninja-build \
-   curl
+   curl \
+   unzip
 ```
 
 On Fedora (maybe also other red hat distros), run the following:

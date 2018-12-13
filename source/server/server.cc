@@ -34,6 +34,7 @@
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/singleton/manager_impl.h"
+#include "common/ssl/isfips.h"
 #include "common/stats/thread_local_store.h"
 #include "common/upstream/cluster_manager_impl.h"
 
@@ -252,6 +253,8 @@ void InstanceImpl::initialize(Options& options,
 
   server_stats_->version_.set(version_int);
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
+
+  server_stats_->fips_.set(Ssl::isFIPS());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),

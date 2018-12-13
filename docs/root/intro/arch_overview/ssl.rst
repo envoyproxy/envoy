@@ -30,6 +30,23 @@ Underlying implementation
 Currently Envoy is written to use `BoringSSL <https://boringssl.googlesource.com/boringssl>`_ as the
 TLS provider.
 
+.. _arch_overview_ssl_fips:
+
+FIPS
+----
+
+BoringSSL can be built in a
+`FIPS-compliant mode <https://boringssl.googlesource.com/boringssl/+/master/crypto/fipsmodule/FIPS.md>`_,
+following the build instructions from the `Security Policy for BoringCrypto module
+<https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp3318.pdf>`_,
+using ``--define boringssl=fips`` Bazel option. This option is only available on Linux-x86_64.
+
+The correctness of the FIPS build can be verified by checking the value of the ``server.fips``
+field in :ref:`stats admin endpoint <operations_admin_interface_stats>`.
+
+Please note that the FIPS-compliant build is based on a slightly older version of BoringSSL
+than the non-FIPS build, and it predates the final version of TLS 1.3.
+
 .. _arch_overview_ssl_enabling_verification:
 
 Enabling certificate verification

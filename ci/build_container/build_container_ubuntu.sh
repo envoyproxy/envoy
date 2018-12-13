@@ -5,7 +5,7 @@ set -e
 # Setup basic requirements and install them.
 apt-get update
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y wget software-properties-common make cmake git python python-pip \
+apt-get install -y wget software-properties-common make cmake git python python-pip unzip \
   bc libtool ninja-build automake zip time golang g++ gdb strace wireshark tshark tcpdump
 # clang 7.
 wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -

@@ -565,9 +565,11 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
   }
 
   if (!config.signingAlgorithmsForTest().empty()) {
+    const uint16_t sigalgs = parseSigningAlgorithmsForTest(config.signingAlgorithmsForTest());
+    RELEASE_ASSERT(sigalgs != 0, "");
+
     for (auto& ctx : tls_contexts_) {
-      int rc =
-          SSL_CTX_set1_sigalgs_list(ctx.ssl_ctx_.get(), config.signingAlgorithmsForTest().c_str());
+      int rc = SSL_CTX_set_verify_algorithm_prefs(ctx.ssl_ctx_.get(), &sigalgs, 1);
       RELEASE_ASSERT(rc == 1, "");
     }
   }
@@ -643,6 +645,17 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
   // Add new session key at the front of the queue, so that it's used first.
   session_keys_.push_front(bssl::UniquePtr<SSL_SESSION>(session));
   return 1; // Tell BoringSSL that we took ownership of the session.
+}
+
+uint16_t ClientContextImpl::parseSigningAlgorithmsForTest(const std::string& sigalgs) {
+  // This is used only when testing RSA/ECDSA certificate selection, so only the signing algorithms
+  // used in tests are supported here.
+  if (sigalgs.compare("rsa_pss_rsae_sha256") == 0) {
+    return SSL_SIGN_RSA_PSS_RSAE_SHA256;
+  } else if (sigalgs.compare("ecdsa_secp256r1_sha256") == 0) {
+    return SSL_SIGN_ECDSA_SECP256R1_SHA256;
+  }
+  return 0;
 }
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,

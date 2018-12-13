@@ -28,6 +28,7 @@ Server related statistics are rooted at *server.* with following statistics:
   parent_connections, Gauge, Total connections of the old Envoy process on hot restart
   total_connections, Gauge, Total connections of both new and old Envoy processes
   version, Gauge, Integer represented version number based on SCM revision
+  fips, Gauge, "1 if the server was built in a FIPS-compliant mode, 0 otherwise"
   days_until_first_cert_expiring, Gauge, Number of days until the next certificate being managed will expire
   hot_restart_epoch, Gauge, Current hot restart epoch
 
