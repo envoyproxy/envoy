@@ -27,7 +27,8 @@ Every listener has a statistics tree rooted at *listener.<address>.* with the fo
    ssl.fail_verify_error, Counter, Total TLS connections that failed CA verification
    ssl.fail_verify_san, Counter, Total TLS connections that failed SAN verification
    ssl.fail_verify_cert_hash, Counter, Total TLS connections that failed certificate pinning verification
-   ssl.cipher.<cipher>, Counter, Total TLS connections that used <cipher>
+   ssl.ciphers.<cipher>, Counter, Total TLS connections that used <cipher>
+   ssl.versions.<version>, Counter, Total successful handshakes that used protocol <version>
 
 Listener manager
 ----------------

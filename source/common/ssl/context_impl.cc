@@ -393,6 +393,9 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   const char* cipher = SSL_get_cipher_name(ssl);
   scope_.counter(fmt::format("ssl.ciphers.{}", std::string{cipher})).inc();
 
+  std::string protocol_version = std::string{SSL_get_version(ssl)};
+  scope_.counter(fmt::format("ssl.versions.{}", protocol_version)).inc();
+
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
   if (!cert.get()) {
     stats_.no_certificate_.inc();
