@@ -63,6 +63,13 @@ void FakeStream::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   decoder_event_.notifyOne();
 }
 
+void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
+  for (const auto& metadata : *metadata_map_ptr) {
+    duplicated_metadata_key_count_[metadata.first]++;
+    metadata_map_.insert(metadata);
+  }
+}
+
 void FakeStream::encode100ContinueHeaders(const Http::HeaderMapImpl& headers) {
   std::shared_ptr<Http::HeaderMapImpl> headers_copy(
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));

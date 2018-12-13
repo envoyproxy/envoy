@@ -280,6 +280,7 @@ private:
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
+    void decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map);
     void disarmRequestTimeout();
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
@@ -306,7 +307,7 @@ private:
     void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(HeaderMapPtr&& trailers) override;
-    void decodeMetadata(MetadataMapPtr&&) override { NOT_REACHED_GCOVR_EXCL_LINE; }
+    void decodeMetadata(MetadataMapPtr&&) override;
 
     // Http::FilterChainFactoryCallbacks
     void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {

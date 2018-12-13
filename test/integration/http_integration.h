@@ -32,11 +32,14 @@ public:
   void sendData(Http::StreamEncoder& encoder, uint64_t size, bool end_stream);
   void sendTrailers(Http::StreamEncoder& encoder, const Http::HeaderMap& trailers);
   void sendReset(Http::StreamEncoder& encoder);
+  // Intentionally makes a copy of metadata_map.
+  void sendMetadata(Http::StreamEncoder& encoder, Http::MetadataMap metadata_map);
   std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr>
   startRequest(const Http::HeaderMap& headers);
   bool waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::milliseconds(0));
   Network::ClientConnection* connection() const { return connection_.get(); }
   Network::ConnectionEvent last_connection_event() const { return last_connection_event_; }
+  bool disconnected() { return disconnected_; }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -190,6 +193,9 @@ protected:
                                     const std::string& via = "");
   void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,
                                     bool with_encoder_filter = false);
+  void testEnvoyProxySmallMetadataInRequest();
+  void testEnvoyProxyLargeMetadataInRequest();
+  void testEnvoyRequestMetadataReachSizeLimit();
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();

@@ -150,7 +150,7 @@ public:
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
-  void decodeMetadata(Http::MetadataMapPtr&&) override {}
+  void decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) override;
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason) override;
@@ -160,6 +160,11 @@ public:
   virtual void setEndStream(bool end) { end_stream_ = end; }
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
+
+  Http::MetadataMap& metadata_map() { return metadata_map_; }
+  std::unordered_map<std::string, uint64_t>& duplicated_metadata_key_count() {
+    return duplicated_metadata_key_count_;
+  }
 
 protected:
   Http::HeaderMapPtr headers_;
@@ -177,6 +182,8 @@ private:
   std::vector<Grpc::Frame> decoded_grpc_frames_;
   bool add_served_by_header_{};
   Event::TestTimeSystem& time_system_;
+  Http::MetadataMap metadata_map_;
+  std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
 };
 
 typedef std::unique_ptr<FakeStream> FakeStreamPtr;

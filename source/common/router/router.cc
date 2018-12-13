@@ -391,6 +391,11 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
   return Http::FilterTrailersStatus::StopIteration;
 }
 
+Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_map) {
+  upstream_request_->encodeMetadata(metadata_map);
+  return Http::FilterMetadataStatus::Continue;;
+}
+
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
   // As the decoder filter only pushes back via watermarks once data has reached
@@ -937,6 +942,25 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
   }
 }
 
+void Filter::UpstreamRequest::encodeMetadata(const Http::MetadataMap& metadata_map) {
+  Http::MetadataMap metadata_map_local;
+  metadata_map_local.insert(metadata_map.begin(), metadata_map.end());
+  Http::MetadataMapPtr metadata_map_local_ptr = std::make_unique<Http::MetadataMap>(metadata_map_local);
+  // should we change MetadataMapVector to pointer instead of
+  // unique_ptr?????+++++++++++++++++ We can avoid the copy in case
+  // request_encoder_ is ready. Is that necessary?
+  if (!request_encoder_) {
+    ENVOY_STREAM_LOG(trace, "Store metadata_map to encode later: {}", *parent_.callbacks_,
+                     metadata_map);
+    parent_.downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_local_ptr));
+  } else {
+    ENVOY_STREAM_LOG(trace, "Encode metadata: {}", *parent_.callbacks_, metadata_map);
+    Http::MetadataMapVector metadata_map_vector;
+    metadata_map_vector.emplace_back(std::move(metadata_map_local_ptr));
+    request_encoder_->encodeMetadata(metadata_map_vector);
+  }
+}
+
 void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason) {
   clearRequestEncoder();
   if (!calling_encode_headers_) {
@@ -1031,10 +1055,16 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
     span_->injectContext(*parent_.downstream_headers_);
   }
 
+  // If end_stream in headers is set and we still have metadata to encode, unset
+  // end_stream in headers, and send an empty data frame after metadata to indicate end_stream.
+  bool delay_end_for_metadata = !buffered_request_body_ && encode_complete_ && !encode_trailers_ &&
+      !parent_.downstream_metadata_map_vector_.empty();
+
   stream_info_.onFirstUpstreamTxByteSent();
   parent_.callbacks_->streamInfo().onFirstUpstreamTxByteSent();
   request_encoder.encodeHeaders(*parent_.downstream_headers_,
-                                !buffered_request_body_ && encode_complete_ && !encode_trailers_);
+                                !buffered_request_body_ && encode_complete_ && !encode_trailers_
+                                && parent_.downstream_metadata_map_vector_.empty());
   calling_encode_headers_ = false;
 
   // It is possible to get reset in the middle of an encodeHeaders() call. This happens for example
@@ -1045,6 +1075,16 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   if (deferred_reset_reason_) {
     onResetStream(deferred_reset_reason_.value());
   } else {
+    // Encode metadata before any other frame type.
+    if (!parent_.downstream_metadata_map_vector_.empty()) {
+      request_encoder.encodeMetadata(parent_.downstream_metadata_map_vector_);
+      parent_.downstream_metadata_map_vector_.clear();
+      if (delay_end_for_metadata) {
+        Buffer::OwnedImpl data("");
+        request_encoder.encodeData(data, true);
+      }
+    }
+
     if (buffered_request_body_) {
       stream_info_.addBytesSent(buffered_request_body_->length());
       request_encoder.encodeData(*buffered_request_body_, encode_complete_ && !encode_trailers_);

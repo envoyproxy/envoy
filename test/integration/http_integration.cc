@@ -143,6 +143,15 @@ void IntegrationCodecClient::sendReset(Http::StreamEncoder& encoder) {
   flushWrite();
 }
 
+void IntegrationCodecClient::sendMetadata(Http::StreamEncoder& encoder,
+                                          Http::MetadataMap metadata_map) {
+  Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  encoder.encodeMetadata(metadata_map_vector);
+  flushWrite();
+}
+
 std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr>
 IntegrationCodecClient::startRequest(const Http::HeaderMap& headers) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
@@ -280,6 +289,7 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
   uint64_t upstream_with_request;
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
+
     AssertionResult result = AssertionFailure();
     for (auto upstream_index : upstream_indices) {
       result = fake_upstreams_[upstream_index]->waitForHttpConnection(*dispatcher_,
@@ -2099,6 +2109,91 @@ std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name
     return "listener.127.0.0.1_0." + stat_name;
   }
   return "listener.[__1]_0." + stat_name;
+}
+
+// Verifies small metadata can be sent at different locations of the responses.
+void HttpIntegrationTest::testEnvoyProxySmallMetadataInRequest() {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  Http::MetadataMap metadata_map = {{"key", "value"}};
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  Http::TestHeaderMapImpl request_trailers{{"request", "trailer"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  waitForNextUpstreamRequest();
+
+  // Verifies metadata is received by the client.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  EXPECT_EQ(upstream_request_->metadata_map().find("key")->second, "value");
+  EXPECT_EQ(upstream_request_->metadata_map().size(), 1);
+  EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("key")->second, 3);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+}
+
+// Verifies large metadata can be sent at different locations of the responses.
+void HttpIntegrationTest::testEnvoyProxyLargeMetadataInRequest() {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  std::string value = std::string(80 * 1024, '1');
+  Http::MetadataMap metadata_map = {{"key", value}};
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  Http::TestHeaderMapImpl request_trailers{{"request", "trailer"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  waitForNextUpstreamRequest();
+
+  // Verifies metadata is received by the client.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  EXPECT_EQ(upstream_request_->metadata_map().find("key")->second, value);
+  EXPECT_EQ(upstream_request_->metadata_map().size(), 1);
+  EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("key")->second, 3);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+}
+
+void HttpIntegrationTest::testEnvoyRequestMetadataReachSizeLimit() {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  std::string value = std::string(10 * 1024, '1');
+  Http::MetadataMap metadata_map = {{"key", value}};
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  for (int i = 0; i < 200; i++) {
+    codec_client_->sendMetadata(*request_encoder_, metadata_map);
+    if (codec_client_->disconnected()) {
+      break;
+    }
+  }
+
+  // Verifies client connection will be closed.
+  codec_client_->waitForDisconnect();
+  ASSERT_FALSE(response->complete());
 }
 
 } // namespace Envoy

@@ -937,6 +937,34 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
   disarmRequestTimeout();
 }
 
+void ConnectionManagerImpl::ActiveStream::decodeMetadata(MetadataMapPtr&& metadata_map) {
+  resetIdleTimer();
+  // Add check if header has not received, bail out!!! ++++++++++++++++++
+  // Maybe no need to check because if nghttp2 allows it, why we kill it?
+  // change doc++++++++++++++=
+  // After going through filters, the ownership of metadata_map will be passed to router filter.
+  // Router filter may encode metadata_map to the next hop immediately or store metadata_map and
+  // encode later when connection pool is ready.
+  decodeMetadata(nullptr, *metadata_map);
+}
+
+void ConnectionManagerImpl::ActiveStream::decodeMetadata(ActiveStreamDecoderFilter* filter,
+                                                         MetadataMap& metadata_map) {
+  std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
+  if (!filter) {
+    entry = decoder_filters_.begin();
+  } else {
+    entry = std::next(filter->entry());
+  }
+
+  for (; entry != decoder_filters_.end(); entry++) {
+    FilterMetadataStatus status = (*entry)->handle_->decodeMetadata(metadata_map);
+    ENVOY_STREAM_LOG(trace, "decode metadata called: filter={} status={}, metadata: {}", *this,
+                     static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status),
+                     metadata_map);
+  }
+}
+
 void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
   ASSERT(!state_.remote_complete_);
   state_.remote_complete_ = end_stream;

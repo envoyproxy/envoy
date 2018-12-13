@@ -107,6 +107,18 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
   testEnvoyMultipleMetadataReachSizeLimit();
 }
 
+TEST_P(Http2MetadataIntegrationTest, ProxySmallMetadataInRequest) {
+  testEnvoyProxySmallMetadataInRequest();
+}
+
+TEST_P(Http2MetadataIntegrationTest, ProxyLargeMetadataInRequest) {
+  testEnvoyProxyLargeMetadataInRequest();
+}
+
+TEST_P(Http2MetadataIntegrationTest, RequestMetadataReachSizeLimit) {
+  testEnvoyRequestMetadataReachSizeLimit();
+}
+
 TEST_P(Http2IntegrationTest, EnvoyHandlingDuplicate100Continue) {
   testEnvoyHandling100Continue(true);
 }

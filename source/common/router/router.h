@@ -159,6 +159,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap& metadata_map) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Upstream::LoadBalancerContext
@@ -272,6 +273,7 @@ private:
     void encodeHeaders(bool end_stream);
     void encodeData(Buffer::Instance& data, bool end_stream);
     void encodeTrailers(const Http::HeaderMap& trailers);
+    void encodeMetadata(const Http::MetadataMap& metadata_map);
 
     void resetStream();
     void setupPerTryTimeout();
@@ -399,6 +401,7 @@ private:
   bool grpc_request_{};
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
+  Http::MetadataMapVector downstream_metadata_map_vector_;
   MonotonicTime downstream_request_complete_time_;
   uint32_t buffer_limit_{0};
   MetadataMatchCriteriaConstPtr metadata_match_;
