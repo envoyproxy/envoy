@@ -224,7 +224,7 @@ public:
   FakeRawConnectionPtr host_fake_raw_connection_;
 
   static constexpr int MaxTimeout = 100;
-  envoy::service::discovery::v2::HealthCheckRequest envoy_msg_;
+  envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse envoy_msg_;
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse response_;
   envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier_;
 };
@@ -241,7 +241,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttp) {
   // Server <--> Envoy
   waitForHdsStream();
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
-  EXPECT_EQ(envoy_msg_.capability().health_check_protocols(0),
+  EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(0),
             envoy::service::discovery::v2::Capability::HTTP);
 
   // Server asks for health checking
@@ -346,7 +346,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   // Server <--> Envoy
   waitForHdsStream();
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
-  EXPECT_EQ(envoy_msg_.capability().health_check_protocols(1),
+  EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(1),
             envoy::service::discovery::v2::Capability::TCP);
 
   // Server asks for health checking
