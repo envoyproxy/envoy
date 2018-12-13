@@ -4,6 +4,11 @@
 namespace Envoy {
 namespace {
 
+static const char* const RequestTimeoutCode =
+    std::to_string(enumToInt(Http::Code::RequestTimeout)).c_str();
+static const char* const ContinueCode = std::to_string(enumToInt(Http::Code::Continue)).c_str();
+static const char* const OKCode = std::to_string(enumToInt(Http::Code::OK)).c_str();
+
 class IdleTimeoutIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
@@ -25,13 +30,10 @@ public:
             hcm.mutable_request_timeout()->set_seconds(0);
             hcm.mutable_request_timeout()->set_nanos(RequestTimeoutMs * 1000 * 1000);
           }
-          if (enable_sleeping_filter_) {
-            config_helper_.addFilter(fmt::format(R"EOF(
-name: sleeping-filter
-config:
-  sleep_duration: {}ms
-)EOF",
-                                                 RequestTimeoutMs * 2));
+          if (enable_hanging_filter_) {
+            config_helper_.addFilter(R"EOF(
+name: hanging-filter
+)EOF");
           }
           // For validating encode100ContinueHeaders() timer kick.
           hcm.set_proxy_100_continue(true);
@@ -82,7 +84,7 @@ config:
   bool enable_global_idle_timeout_{false};
   bool enable_per_stream_idle_timeout_{false};
   bool enable_request_timeout_{false};
-  bool enable_sleeping_filter_{false};
+  bool enable_hanging_filter_{false};
   DangerousDeprecatedTestTime test_time_;
 };
 
@@ -99,8 +101,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ(std::to_string(enumToInt(Http::Code::RequestTimeout)).c_str(),
-               response->headers().Status()->value().c_str());
+  EXPECT_STREQ(RequestTimeoutCode, response->headers().Status()->value().c_str());
   EXPECT_EQ("stream timeout", response->body());
 }
 
@@ -113,8 +114,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutHeadRequestAfterDownstrea
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ(std::to_string(enumToInt(Http::Code::RequestTimeout)).c_str(),
-               response->headers().Status()->value().c_str());
+  EXPECT_STREQ(RequestTimeoutCode, response->headers().Status()->value().c_str());
   EXPECT_STREQ(fmt::format("{}", strlen("stream timeout")).c_str(),
                response->headers().ContentLength()->value().c_str());
   EXPECT_EQ("", response->body());
@@ -131,8 +131,7 @@ TEST_P(IdleTimeoutIntegrationTest, GlobalPerStreamIdleTimeoutAfterDownstreamHead
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ(std::to_string(enumToInt(Http::Code::RequestTimeout)).c_str(),
-               response->headers().Status()->value().c_str());
+  EXPECT_STREQ(RequestTimeoutCode, response->headers().Status()->value().c_str());
   EXPECT_EQ("stream timeout", response->body());
 }
 
@@ -149,8 +148,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeadersAnd
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(1U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ(std::to_string(enumToInt(Http::Code::RequestTimeout)).c_str(),
-               response->headers().Status()->value().c_str());
+  EXPECT_STREQ(RequestTimeoutCode, response->headers().Status()->value().c_str());
   EXPECT_EQ("stream timeout", response->body());
 }
 
@@ -159,16 +157,14 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterUpstreamHeaders) {
   enable_per_stream_idle_timeout_ = true;
   auto response = setupPerStreamIdleTimeoutTest();
 
-  upstream_request_->encodeHeaders(
-      Http::TestHeaderMapImpl{{":status", std::to_string(enumToInt(Http::Code::OK))}}, false);
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", OKCode}}, false);
 
   waitForTimeout(*response, "downstream_rq_idle_timeout");
 
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_FALSE(response->complete());
-  EXPECT_STREQ(std::to_string(enumToInt(Http::Code::OK)).c_str(),
-               response->headers().Status()->value().c_str());
+  EXPECT_STREQ(OKCode.c_str(), response->headers().Status()->value().c_str());
   EXPECT_EQ("", response->body());
 }
 
@@ -178,12 +174,10 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterBidiData) {
   auto response = setupPerStreamIdleTimeoutTest();
 
   sleep();
-  upstream_request_->encode100ContinueHeaders(
-      Http::TestHeaderMapImpl{{":status", std::to_string(enumToInt(Http::Code::Continue))}});
+  upstream_request_->encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", ContinueCode}});
 
   sleep();
-  upstream_request_->encodeHeaders(
-      Http::TestHeaderMapImpl{{":status", std::to_string(enumToInt(Http::Code::OK))}}, false);
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", OKCode}}, false);
 
   sleep();
   upstream_request_->encodeData(1, false);
@@ -203,8 +197,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterBidiData) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1U, upstream_request_->bodyLength());
   EXPECT_FALSE(response->complete());
-  EXPECT_STREQ(std::to_string(enumToInt(Http::Code::OK)).c_str(),
-               response->headers().Status()->value().c_str());
+  EXPECT_STREQ(OKCode.c_str(), response->headers().Status()->value().c_str());
   EXPECT_EQ("aa", response->body());
 }
 
@@ -234,8 +227,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnBodilessPost) {
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ(std::to_string(enumToInt(Http::Code::RequestTimeout)).c_str(),
-               response->headers().Status()->value().c_str());
+  EXPECT_STREQ(RequestTimeoutCode, response->headers().Status()->value().c_str());
   EXPECT_EQ("request timeout", response->body());
 }
 
@@ -251,8 +243,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTriggerOnBod
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ(std::to_string(enumToInt(Http::Code::RequestTimeout)).c_str(),
-               response->headers().Status()->value().c_str());
+  EXPECT_STREQ(RequestTimeoutCode, response->headers().Status()->value().c_str());
   EXPECT_NE("request timeout", response->body());
 }
 
@@ -290,8 +281,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsDisarmedByPrematureEncodeHead
   enable_per_stream_idle_timeout_ = true;
 
   auto response = setupPerStreamIdleTimeoutTest("POST");
-  upstream_request_->encodeHeaders(
-      Http::TestHeaderMapImpl{{":status", std::to_string(enumToInt(Http::Code::OK))}}, false);
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", OKCode}}, false);
 
   waitForTimeout(*response);
 
@@ -304,22 +294,20 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsNotDisarmedByEncode100Continu
   enable_request_timeout_ = true;
 
   auto response = setupPerStreamIdleTimeoutTest("POST");
-  upstream_request_->encode100ContinueHeaders(
-      Http::TestHeaderMapImpl{{":status", std::to_string(enumToInt(Http::Code::Continue))}});
+  upstream_request_->encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", ContinueCode}});
 
   waitForTimeout(*response, "downstream_rq_timeout");
 
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ(std::to_string(enumToInt(Http::Code::RequestTimeout)).c_str(),
-               response->headers().Status()->value().c_str());
+  EXPECT_STREQ(RequestTimeoutCode, response->headers().Status()->value().c_str());
   EXPECT_EQ("request timeout", response->body());
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnASlowFilter) {
   enable_request_timeout_ = true;
-  enable_sleeping_filter_ = true;
+  enable_hanging_filter_ = true;
 
   auto response = setupPerStreamIdleTimeoutTest("POST");
 
@@ -328,8 +316,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnASlowFilter) {
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ(std::to_string(enumToInt(Http::Code::RequestTimeout)).c_str(),
-               response->headers().Status()->value().c_str());
+  EXPECT_STREQ(RequestTimeoutCode, response->headers().Status()->value().c_str());
   EXPECT_EQ("request timeout", response->body());
 }
 
