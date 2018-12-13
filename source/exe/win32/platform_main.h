@@ -11,9 +11,9 @@
 
 namespace Envoy {
 
-class PlatformSetup {
+class PlatformMain {
 public:
-  PlatformSetup(int, const char* const* argv) {
+  PlatformMain(int, const char* const* argv) {
     // absl::Symbolize mostly works without this, but this improves corner case
     // handling
     absl::InitializeSymbolizer(argv[0]);
@@ -24,7 +24,7 @@ public:
     RELEASE_ASSERT(rc == 0, "WSAStartup failed with error");
   }
 
-  ~PlatformSetup() { ::WSACleanup(); }
+  ~PlatformMain() { ::WSACleanup(); }
 
   Thread::ThreadFactory& threadFactory() { return thread_factory_; }
 

@@ -7,9 +7,9 @@
 
 namespace Envoy {
 
-class PlatformSetup {
+class PlatformMain {
 public:
-  PlatformSetup(int, const char* const* argv) {
+  PlatformMain(int, const char* const* argv) {
 #ifndef __APPLE__
     // absl::Symbolize mostly works without this, but this improves corner case
     // handling, such as running in a chroot jail.

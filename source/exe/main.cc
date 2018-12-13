@@ -1,5 +1,5 @@
 #include "exe/main_common.h"
-#include "exe/platform_setup.h"
+#include "exe/platform_main.h"
 
 // NOLINT(namespace-envoy)
 
@@ -11,14 +11,14 @@
  * after setting up command line options.
  */
 int main(int argc, char** argv) {
-  Envoy::PlatformSetup setup(argc, argv);
+  Envoy::PlatformMain platform_main(argc, argv);
   std::unique_ptr<Envoy::MainCommon> main_common;
 
   // Initialize the server's main context under a try/catch loop and simply return EXIT_FAILURE
   // as needed. Whatever code in the initialization path that fails is expected to log an error
   // message so the user can diagnose.
   try {
-    main_common = std::make_unique<Envoy::MainCommon>(argc, argv, setup);
+    main_common = std::make_unique<Envoy::MainCommon>(argc, argv, platform_main);
   } catch (const Envoy::NoServingException& e) {
     return EXIT_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {

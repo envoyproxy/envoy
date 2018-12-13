@@ -57,7 +57,7 @@ envoy_cc_library(
     ],
     deps = [
         ":envoy_main_common_lib",
-    ] + envoy_cc_platform_dep("platform_setup_lib"),
+    ] + envoy_cc_platform_dep("platform_main_lib"),
 )
 
 envoy_cc_posix_library(
@@ -91,19 +91,19 @@ envoy_cc_library(
             ":sigaction_lib",
             ":terminate_handler_lib",
         ],
-    }) + envoy_cc_platform_dep("platform_setup_lib"),
+    }) + envoy_cc_platform_dep("platform_main_lib"),
 )
 
 envoy_cc_posix_library(
-    name = "platform_setup_lib",
-    hdrs = ["posix/platform_setup.h"],
+    name = "platform_main_lib",
+    hdrs = ["posix/platform_main.h"],
     strip_include_prefix = "posix",
     deps = ["//source/common/common:thread_lib"],
 )
 
 envoy_cc_win32_library(
-    name = "platform_setup_lib",
-    hdrs = ["win32/platform_setup.h"],
+    name = "platform_main_lib",
+    hdrs = ["win32/platform_main.h"],
     strip_include_prefix = "win32",
     deps = [
         "//source/common/common:assert_lib",

@@ -8,7 +8,7 @@
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 
-#include "exe/platform_setup.h"
+#include "exe/platform_main.h"
 
 #include "server/options_impl.h"
 #include "server/server.h"
@@ -82,7 +82,7 @@ private:
 // go through MainCommonBase directly.
 class MainCommon {
 public:
-  MainCommon(int argc, const char* const* argv, PlatformSetup& setup);
+  MainCommon(int argc, const char* const* argv, PlatformMain& platform_main);
   bool run() { return base_.run(); }
 
   // Makes an admin-console request by path, calling handler() when complete.
