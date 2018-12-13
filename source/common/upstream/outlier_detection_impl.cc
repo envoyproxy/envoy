@@ -43,11 +43,12 @@ void DetectorHostMonitorImpl::uneject(MonotonicTime unejection_time) {
 }
 
 void DetectorHostMonitorImpl::updateCurrentSuccessRateBucket() {
-  success_rate_accumulator_bucket_.store(success_rate_accumulator_.updateCurrentWriter());
+  getSRMonitor<externalOrigin>()->updateCurrentSuccessRateBucket();
+  getSRMonitor<localOrigin>()->updateCurrentSuccessRateBucket();
 }
 
 void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
-  success_rate_accumulator_bucket_.load()->total_request_counter_++;
+  getSRMonitor<externalOrigin>()->incTotalReqCounter();
   if (Http::CodeUtility::is5xx(response_code)) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (!detector) {
@@ -70,55 +71,66 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
       detector->onConsecutive5xx(host_.lock());
     }
   } else {
-    success_rate_accumulator_bucket_.load()->success_request_counter_++;
+    getSRMonitor<externalOrigin>()->incSuccessReqCounter();
     consecutive_5xx_ = 0;
     consecutive_gateway_failure_ = 0;
   }
 }
 
+/* putResult is used to report events via enums, not http codes.
+ */
 void DetectorHostMonitorImpl::putResult(Result result) {
   switch (result) {
-  case Result::CONNECT_SUCCESS:
-    return connectSuccess();
-    break;
+  // SUCCESS is used to report success for connection level. Server may still respond with
+  // error, but connection to server was OK.
+  case Result::SUCCESS:
+    return localOriginNoFailure();
+  // Connectivity releated errors.
   case Result::TIMEOUT:
   case Result::CONNECT_FAILED:
-    return connectFailure();
+    return localOriginFailure();
+  // REQUEST_FAILED is used when connection to server was successful, but transaction on server
+  // level failed. Since it it similar to HTTP 5xx, map it to 5xx handler.
   case Result::REQUEST_FAILED:
-    return serverRequestFailure();
+    // map it to http code and call http handler.
+    return putHttpResponseCode(500);
     break;
+  // REQUEST_SUCCESS is used to report that transaction with non-http server was completed
+  // successfully. This means that connection and server level transactions were successfull. Map it
+  // to http code 200 OK and indicate that there was no errors on connection level.
   case Result::REQUEST_SUCCESS:
-    return serverRequestSuccess();
+    putHttpResponseCode(200);
+    localOriginNoFailure();
     break;
-  case Result::SERVER_FAILURE:
-    return; // not used at the moment
-  }
-}
-void DetectorHostMonitorImpl::connectFailure() {
-  std::shared_ptr<DetectorImpl> detector = detector_.lock();
-  if (!detector) {
-    // It's possible for the cluster/detector to go away while we still have a host in use.
-    return;
-  }
-  if (++consecutive_connect_failure_ ==
-      detector->runtime().snapshot().getInteger("outlier_detection.consecutive_connect_failure",
-                                                detector->config().consecutiveConnectFailure())) {
-    detector->onConsecutiveConnectFailure(host_.lock());
   }
 }
 
-void DetectorHostMonitorImpl::serverRequestFailure() {
+void DetectorHostMonitorImpl::localOriginFailure() {
   std::shared_ptr<DetectorImpl> detector = detector_.lock();
   if (!detector) {
     // It's possible for the cluster/detector to go away while we still have a host in use.
     return;
   }
-  if (++consecutive_server_request_failure_ ==
+  getSRMonitor<localOrigin>()->incTotalReqCounter();
+  if (++consecutive_local_origin_failure_ ==
       detector->runtime().snapshot().getInteger(
-          "outlier_detection.consecutive_server_request_failure",
-          detector->config().consecutiveServerRequestFailure())) {
-    detector->onConsecutiveServerRequestFailure(host_.lock());
+          "outlier_detection.consecutive_local_origin_failure",
+          detector->config().consecutiveLocalOriginFailure())) {
+    detector->onConsecutiveLocalOriginFailure(host_.lock());
   }
+}
+
+void DetectorHostMonitorImpl::localOriginNoFailure() {
+  std::shared_ptr<DetectorImpl> detector = detector_.lock();
+  if (!detector) {
+    // It's possible for the cluster/detector to go away while we still have a host in use.
+    return;
+  }
+
+  getSRMonitor<localOrigin>()->incTotalReqCounter();
+  getSRMonitor<localOrigin>()->incSuccessReqCounter();
+
+  resetConsecutiveLocalOriginFailure();
 }
 
 DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& config)
@@ -143,15 +155,13 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& 
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_consecutive_gateway_failure, 0))),
       enforcing_success_rate_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_success_rate, 100))),
-      consecutive_connect_failure_(static_cast<uint64_t>(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_connect_failure, 5))),
-      enforcing_consecutive_connect_failure_(static_cast<uint64_t>(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_consecutive_connect_failure, 100))),
-      consecutive_server_request_failure_(static_cast<uint64_t>(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_server_request_failure, 5))),
-      enforcing_consecutive_server_request_failure_(
+      consecutive_local_origin_failure_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_local_origin_failure, 5))),
+      enforcing_consecutive_local_origin_failure_(
           static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-              config, enforcing_consecutive_server_request_failure, 100))) {}
+              config, enforcing_consecutive_local_origin_failure, 100))),
+      enforcing_local_origin_success_rate_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_local_origin_success_rate, 100))) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::api::v2::cluster::OutlierDetection& config,
@@ -160,7 +170,10 @@ DetectorImpl::DetectorImpl(const Cluster& cluster,
     : config_(config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
       stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
-      event_logger_(event_logger), success_rate_average_(-1), success_rate_ejection_threshold_(-1) {
+      event_logger_(event_logger) {
+  // Insert success rate initial numbers for each type of SR detector
+  success_rate_nums_[DetectorHostMonitor::externalOrigin] = std::make_tuple(-1, -1);
+  success_rate_nums_[DetectorHostMonitor::localOrigin] = std::make_tuple(-1, -1);
 }
 
 DetectorImpl::~DetectorImpl() {
@@ -180,6 +193,7 @@ DetectorImpl::create(const Cluster& cluster,
   std::shared_ptr<DetectorImpl> detector(
       new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger));
   detector->initialize(cluster);
+
   return detector;
 }
 
@@ -256,17 +270,17 @@ bool DetectorImpl::enforceEjection(EjectionType type) {
     return runtime_.snapshot().featureEnabled(
         "outlier_detection.enforcing_consecutive_gateway_failure",
         config_.enforcingConsecutiveGatewayFailure());
-  case EjectionType::SuccessRate:
+  case EjectionType::SuccessRateExternalOrigin:
     return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_success_rate",
                                               config_.enforcingSuccessRate());
-  case EjectionType::ConsecutiveConnectFailure:
+  case EjectionType::ConsecutiveLocalOriginFailure:
     return runtime_.snapshot().featureEnabled(
-        "outlier_detection.enforcing_consecutive_connect_failure",
-        config_.enforcingConsecutiveConnectFailure());
-  case EjectionType::ConsecutiveServerRequestFailure:
+        "outlier_detection.enforcing_consecutive_local_origin_failure",
+        config_.enforcingConsecutiveLocalOriginFailure());
+  case EjectionType::SuccessRateLocalOrigin:
     return runtime_.snapshot().featureEnabled(
-        "outlier_detection.enforcing_consecutive_server_request_failure",
-        config_.enforcingServerRequestFailure());
+        "outlier_detection.enforcing_local_origin_success_rate",
+        config_.enforcingLocalOriginSuccessRate());
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -275,7 +289,7 @@ bool DetectorImpl::enforceEjection(EjectionType type) {
 void DetectorImpl::updateEnforcedEjectionStats(EjectionType type) {
   stats_.ejections_enforced_total_.inc();
   switch (type) {
-  case EjectionType::SuccessRate:
+  case EjectionType::SuccessRateExternalOrigin:
     stats_.ejections_enforced_success_rate_.inc();
     break;
   case EjectionType::Consecutive5xx:
@@ -284,11 +298,31 @@ void DetectorImpl::updateEnforcedEjectionStats(EjectionType type) {
   case EjectionType::ConsecutiveGatewayFailure:
     stats_.ejections_enforced_consecutive_gateway_failure_.inc();
     break;
-  case EjectionType::ConsecutiveConnectFailure:
-    stats_.ejections_enforced_consecutive_connect_failure_.inc();
+  case EjectionType::ConsecutiveLocalOriginFailure:
+    stats_.ejections_enforced_consecutive_local_origin_failure_.inc();
     break;
-  case EjectionType::ConsecutiveServerRequestFailure:
-    stats_.ejections_enforced_consecutive_server_request_failure_.inc();
+  case EjectionType::SuccessRateLocalOrigin:
+    stats_.ejections_enforced_local_origin_success_rate_.inc();
+    break;
+  }
+}
+
+void DetectorImpl::updateDetectedEjectionStats(EjectionType type) {
+  switch (type) {
+  case EjectionType::SuccessRateExternalOrigin:
+    stats_.ejections_detected_success_rate_.inc();
+    break;
+  case EjectionType::Consecutive5xx:
+    stats_.ejections_detected_consecutive_5xx_.inc();
+    break;
+  case EjectionType::ConsecutiveGatewayFailure:
+    stats_.ejections_detected_consecutive_gateway_failure_.inc();
+    break;
+  case EjectionType::ConsecutiveLocalOriginFailure:
+    stats_.ejections_detected_consecutive_local_origin_failure_.inc();
+    break;
+  case EjectionType::SuccessRateLocalOrigin:
+    stats_.ejections_detected_local_origin_success_rate_.inc();
     break;
   }
 }
@@ -301,7 +335,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
   // Note this is not currently checked per-priority level, so it is possible
   // for outlier detection to eject all hosts at any given priority level.
   if (ejected_percent < max_ejection_percent) {
-    if (type == EjectionType::Consecutive5xx || type == EjectionType::SuccessRate) {
+    if (type == EjectionType::Consecutive5xx || type == EjectionType::SuccessRateExternalOrigin) {
       // Deprecated counter, preserving old behaviour until it's removed.
       stats_.ejections_total_.inc();
     }
@@ -358,12 +392,8 @@ void DetectorImpl::onConsecutiveGatewayFailure(HostSharedPtr host) {
   notifyMainThreadConsecutiveError(host, EjectionType::ConsecutiveGatewayFailure);
 }
 
-void DetectorImpl::onConsecutiveConnectFailure(HostSharedPtr host) {
-  notifyMainThreadConsecutiveError(host, EjectionType::ConsecutiveConnectFailure);
-}
-
-void DetectorImpl::onConsecutiveServerRequestFailure(HostSharedPtr host) {
-  notifyMainThreadConsecutiveError(host, EjectionType::ConsecutiveServerRequestFailure);
+void DetectorImpl::onConsecutiveLocalOriginFailure(HostSharedPtr host) {
+  notifyMainThreadConsecutiveError(host, EjectionType::ConsecutiveLocalOriginFailure);
 }
 
 void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host, EjectionType type) {
@@ -378,34 +408,28 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host, EjectionType typ
 
   // We also reset the appropriate counter here to allow the monitor to detect a bout of consecutive
   // error responses even if the monitor is not charged with an interleaved non-error code.
+  updateDetectedEjectionStats(type);
+  ejectHost(host, type);
+
+  // reset counters
   switch (type) {
   case EjectionType::Consecutive5xx:
     stats_.ejections_consecutive_5xx_.inc(); // Deprecated
-    stats_.ejections_detected_consecutive_5xx_.inc();
-    ejectHost(host, EjectionType::Consecutive5xx);
     host_monitors_[host]->resetConsecutive5xx();
     break;
   case EjectionType::ConsecutiveGatewayFailure:
-    stats_.ejections_detected_consecutive_gateway_failure_.inc();
-    ejectHost(host, EjectionType::ConsecutiveGatewayFailure);
     host_monitors_[host]->resetConsecutiveGatewayFailure();
     break;
-  case EjectionType::ConsecutiveConnectFailure:
-    stats_.ejections_detected_consecutive_connect_failure_.inc();
-    ejectHost(host, EjectionType::ConsecutiveConnectFailure);
-    host_monitors_[host]->resetConsecutiveConnectFailure();
+  case EjectionType::ConsecutiveLocalOriginFailure:
+    host_monitors_[host]->resetConsecutiveLocalOriginFailure();
     break;
-  case EjectionType::ConsecutiveServerRequestFailure:
-    stats_.ejections_detected_consecutive_server_request_failure_.inc();
-    ejectHost(host, EjectionType::ConsecutiveServerRequestFailure);
-    host_monitors_[host]->resetConsecutiveServerRequestFailure();
-    break;
-  case EjectionType::SuccessRate:
+  case EjectionType::SuccessRateExternalOrigin:
+  case EjectionType::SuccessRateLocalOrigin:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
-Utility::EjectionPair Utility::successRateEjectionThreshold(
+std::tuple<double, double> DetectorImpl::successRateEjectionThreshold(
     double success_rate_sum, const std::vector<HostSuccessRatePair>& valid_success_rate_hosts,
     double success_rate_stdev_factor) {
   // This function is using mean and standard deviation as statistical measures for outlier
@@ -432,10 +456,11 @@ Utility::EjectionPair Utility::successRateEjectionThreshold(
   variance /= valid_success_rate_hosts.size();
   double stdev = std::sqrt(variance);
 
-  return {mean, (mean - (success_rate_stdev_factor * stdev))};
+  return std::make_tuple(mean, (mean - (success_rate_stdev_factor * stdev)));
 }
 
-void DetectorImpl::processSuccessRateEjections() {
+void DetectorImpl::processSuccessRateEjections(
+    DetectorHostMonitor::SuccessRateMonitorType monitor_type) {
   uint64_t success_rate_minimum_hosts = runtime_.snapshot().getInteger(
       "outlier_detection.success_rate_minimum_hosts", config_.successRateMinimumHosts());
   uint64_t success_rate_request_volume = runtime_.snapshot().getInteger(
@@ -444,8 +469,7 @@ void DetectorImpl::processSuccessRateEjections() {
   double success_rate_sum = 0;
 
   // Reset the Detector's success rate mean and stdev.
-  success_rate_average_ = -1;
-  success_rate_ejection_threshold_ = -1;
+  success_rate_nums_[monitor_type] = std::move(std::make_tuple(-1, -1));
 
   // Exit early if there are not enough hosts.
   if (host_monitors_.size() < success_rate_minimum_hosts) {
@@ -458,14 +482,15 @@ void DetectorImpl::processSuccessRateEjections() {
   for (const auto& host : host_monitors_) {
     // Don't do work if the host is already ejected.
     if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-      absl::optional<double> host_success_rate =
-          host.second->successRateAccumulator().getSuccessRate(success_rate_request_volume);
+      absl::optional<double> host_success_rate = host.second->getSRMonitor(monitor_type)
+                                                     ->successRateAccumulator()
+                                                     .getSuccessRate(success_rate_request_volume);
 
       if (host_success_rate) {
         valid_success_rate_hosts.emplace_back(
             HostSuccessRatePair(host.first, host_success_rate.value()));
         success_rate_sum += host_success_rate.value();
-        host.second->successRate(host_success_rate.value());
+        host.second->successRate(monitor_type, host_success_rate.value());
       }
     }
   }
@@ -476,15 +501,17 @@ void DetectorImpl::processSuccessRateEjections() {
         runtime_.snapshot().getInteger("outlier_detection.success_rate_stdev_factor",
                                        config_.successRateStdevFactor()) /
         1000.0;
-    Utility::EjectionPair ejection_pair = Utility::successRateEjectionThreshold(
+    success_rate_nums_[monitor_type] = successRateEjectionThreshold(
         success_rate_sum, valid_success_rate_hosts, success_rate_stdev_factor);
-    success_rate_average_ = ejection_pair.success_rate_average_;
-    success_rate_ejection_threshold_ = ejection_pair.ejection_threshold_;
+    double success_rate_ejection_threshold = std::get<1>(success_rate_nums_[monitor_type]);
     for (const auto& host_success_rate_pair : valid_success_rate_hosts) {
-      if (host_success_rate_pair.success_rate_ < success_rate_ejection_threshold_) {
+      if (host_success_rate_pair.success_rate_ < success_rate_ejection_threshold) {
         stats_.ejections_success_rate_.inc(); // Deprecated.
-        stats_.ejections_detected_success_rate_.inc();
-        ejectHost(host_success_rate_pair.host_, EjectionType::SuccessRate);
+        EjectionType type = host_monitors_[host_success_rate_pair.host_]
+                                ->getSRMonitor(monitor_type)
+                                ->getEjectionType();
+        updateDetectedEjectionStats(type);
+        ejectHost(host_success_rate_pair.host_, type);
       }
     }
   }
@@ -500,10 +527,12 @@ void DetectorImpl::onIntervalTimer() {
     host.second->updateCurrentSuccessRateBucket();
     // Refresh host success rate stat for the /clusters endpoint. If there is a new valid value, it
     // will get updated in processSuccessRateEjections().
-    host.second->successRate(-1);
+    host.second->successRate(DetectorHostMonitor::localOrigin, -1);
+    host.second->successRate(DetectorHostMonitor::externalOrigin, -1);
   }
 
-  processSuccessRateEjections();
+  processSuccessRateEjections(DetectorHostMonitor::externalOrigin);
+  processSuccessRateEjections(DetectorHostMonitor::localOrigin);
 
   armIntervalTimer();
 }
@@ -551,21 +580,23 @@ void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, Detector& det
   switch (type) {
   case EjectionType::Consecutive5xx:
   case EjectionType::ConsecutiveGatewayFailure:
-  case EjectionType::ConsecutiveConnectFailure:
-  case EjectionType::ConsecutiveServerRequestFailure:
+  case EjectionType::ConsecutiveLocalOriginFailure:
     file_->write(fmt::format(
         json_5xx, AccessLogDateTimeFormatter::fromTime(now),
         secsSinceLastAction(host->outlierDetector().lastUnejectionTime(), monotonic_now),
         host->cluster().name(), host->address()->asString(), typeToString(type),
         host->outlierDetector().numEjections(), enforced));
     break;
-  case EjectionType::SuccessRate:
+  case EjectionType::SuccessRateExternalOrigin:
+  case EjectionType::SuccessRateLocalOrigin:
     file_->write(fmt::format(
         json_success_rate, AccessLogDateTimeFormatter::fromTime(now),
         secsSinceLastAction(host->outlierDetector().lastUnejectionTime(), monotonic_now),
         host->cluster().name(), host->address()->asString(), typeToString(type),
-        host->outlierDetector().numEjections(), enforced, host->outlierDetector().successRate(),
-        detector.successRateAverage(), detector.successRateEjectionThreshold()));
+        host->outlierDetector().numEjections(), enforced,
+        host->outlierDetector().successRate(DetectorHostMonitor::externalOrigin),
+        detector.successRateAverage(DetectorHostMonitor::externalOrigin),
+        detector.successRateEjectionThreshold(DetectorHostMonitor::externalOrigin)));
     break;
   }
 }
@@ -597,12 +628,12 @@ std::string EventLoggerImpl::typeToString(EjectionType type) {
     return "5xx";
   case EjectionType::ConsecutiveGatewayFailure:
     return "GatewayFailure";
-  case EjectionType::SuccessRate:
-    return "SuccessRate";
-  case EjectionType::ConsecutiveConnectFailure:
-    return "ConnectFailure";
-  case EjectionType::ConsecutiveServerRequestFailure:
-    return "ServerRequestFailure";
+  case EjectionType::SuccessRateExternalOrigin:
+    return "SuccessRate-ExternalOrigin";
+  case EjectionType::SuccessRateLocalOrigin:
+    return "SuccessRate-LocalOrigin";
+  case EjectionType::ConsecutiveLocalOriginFailure:
+    return "LocalOriginFailure";
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

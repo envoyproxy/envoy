@@ -818,13 +818,16 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
   EXPECT_CALL(encoder, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
-        EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-                    putResult(Upstream::Outlier::Result::CONNECT_FAILED));
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
       }));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
+  // First connection is successfull and reset happens later on.
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::SUCCESS));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::CONNECT_FAILED));
   router_.decodeHeaders(headers, true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -1265,7 +1268,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-                    putResult(Upstream::Outlier::Result::CONNECT_SUCCESS));
+                    putResult(Upstream::Outlier::Result::SUCCESS));
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
       }));
@@ -1312,7 +1315,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-                    putResult(Upstream::Outlier::Result::CONNECT_SUCCESS));
+                    putResult(Upstream::Outlier::Result::SUCCESS));
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
       }));

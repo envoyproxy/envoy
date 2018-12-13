@@ -25,16 +25,15 @@ namespace Outlier {
  * Non-HTTP result of requests/operations.
  */
 enum class Result {
-  CONNECT_SUCCESS, // Successfully established a connection or completed a request.
-  TIMEOUT,         // Timed out while connecting or executing a request.
-  CONNECT_FAILED,  // Remote host rejected the connection.
+  SUCCESS,        // Successfully established a connection or completed a request.
+  TIMEOUT,        // Timed out while connecting or executing a request.
+  CONNECT_FAILED, // Remote host rejected the connection.
 
   // The entries below only make sense when Envoy understands requests/responses for the
   // protocol being proxied. They do not make sense for TcpProxy, for example.
 
-  REQUEST_FAILED,  // Request was not completed successfully.
-  REQUEST_SUCCESS, // Received response from server was correct
-  SERVER_FAILURE,  // The server indicated it cannot process a request.
+  REQUEST_FAILED, // The server indicated it cannot process a request
+  REQUEST_SUCCESS // Request was completed successfully.
 };
 
 /**
@@ -42,6 +41,9 @@ enum class Result {
  */
 class DetectorHostMonitor {
 public:
+  // Types of Success Rate monitors.
+  using SuccessRateMonitorType = enum { externalOrigin, localOrigin };
+
   virtual ~DetectorHostMonitor() {}
 
   /**
@@ -82,7 +84,7 @@ public:
    *         -1 means that the host did not have enough request volume to calculate success rate
    *         or the cluster did not have enough hosts to run through success rate outlier ejection.
    */
-  virtual double successRate() const PURE;
+  virtual double successRate(SuccessRateMonitorType) const PURE;
 };
 
 typedef std::unique_ptr<DetectorHostMonitor> DetectorHostMonitorPtr;
@@ -112,7 +114,7 @@ public:
    * @return the average success rate, or -1 if there were not enough hosts with enough request
    *         volume to proceed with success rate based outlier ejection.
    */
-  virtual double successRateAverage() const PURE;
+  virtual double successRateAverage(DetectorHostMonitor::SuccessRateMonitorType) const PURE;
 
   /**
    * Returns the success rate threshold used in the last interval. The threshold is used to eject
@@ -120,17 +122,18 @@ public:
    * @return the threshold, or -1 if there were not enough hosts with enough request volume to
    *         proceed with success rate based outlier ejection.
    */
-  virtual double successRateEjectionThreshold() const PURE;
+  virtual double
+      successRateEjectionThreshold(DetectorHostMonitor::SuccessRateMonitorType) const PURE;
 };
 
 typedef std::shared_ptr<Detector> DetectorSharedPtr;
 
 enum class EjectionType {
   Consecutive5xx,
-  SuccessRate,
+  SuccessRateExternalOrigin,
   ConsecutiveGatewayFailure,
-  ConsecutiveConnectFailure,
-  ConsecutiveServerRequestFailure
+  ConsecutiveLocalOriginFailure,
+  SuccessRateLocalOrigin
 };
 
 /**

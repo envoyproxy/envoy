@@ -39,6 +39,19 @@ message ClusterStatus {
 
   // Mapping from host address to the host's current status.
   repeated HostStatus host_statuses = 4;
+
+  // The success rate threshold used in the last interval. The threshold is used to eject hosts
+  // based on their success rate. See
+  // :ref:`Cluster outlier detection <arch_overview_outlier_detection>` statistics
+  //
+  // Note: this field may be omitted in any of the three following cases:
+  //
+  // 1. There were not enough hosts with enough request volume to proceed with success rate based
+  //    outlier ejection.
+  // 2. The threshold is computed to be < 0 because a negative value implies that there was no
+  //    threshold for that interval.
+  // 3. Outlier detection is not enabled for this cluster.
+  envoy.type.Percent local_origin_success_rate_ejection_threshold = 5;
 }
 
 // Current state of a particular host.
@@ -58,6 +71,14 @@ message HostStatus {
   // success rate or the cluster did not have enough hosts to run through success rate outlier
   // ejection.
   envoy.type.Percent success_rate = 4;
+
+  // Request success rate for local origin failures for this host over the last calculated
+  // interval.
+  //
+  // Note: the message will not be present if host did not have enough request volume to calculate
+  // success rate or the cluster did not have enough hosts to run through success rate outlier
+  // ejection.
+  envoy.type.Percent local_origin_success_rate = 5;
 }
 
 // Health status for a host.

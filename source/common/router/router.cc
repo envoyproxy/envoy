@@ -997,7 +997,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host) {
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
 
-  host->outlierDetector().putResult(Upstream::Outlier::Result::CONNECT_SUCCESS);
+  host->outlierDetector().putResult(Upstream::Outlier::Result::SUCCESS);
 
   // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);

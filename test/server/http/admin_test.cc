@@ -971,7 +971,12 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 
   NiceMock<Upstream::Outlier::MockDetector> outlier_detector;
   ON_CALL(Const(cluster), outlierDetector()).WillByDefault(Return(&outlier_detector));
-  ON_CALL(outlier_detector, successRateEjectionThreshold()).WillByDefault(Return(6.0));
+  ON_CALL(outlier_detector,
+          successRateEjectionThreshold(Upstream::Outlier::DetectorHostMonitor::externalOrigin))
+      .WillByDefault(Return(6.0));
+  ON_CALL(outlier_detector,
+          successRateEjectionThreshold(Upstream::Outlier::DetectorHostMonitor::localOrigin))
+      .WillByDefault(Return(9.0));
 
   ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(true));
 
@@ -1006,7 +1011,11 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH))
       .WillByDefault(Return(false));
 
-  ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
+  ON_CALL(host->outlier_detector_,
+          successRate(Upstream::Outlier::DetectorHostMonitor::externalOrigin))
+      .WillByDefault(Return(43.2));
+  ON_CALL(host->outlier_detector_, successRate(Upstream::Outlier::DetectorHostMonitor::localOrigin))
+      .WillByDefault(Return(93.2));
 
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
@@ -1021,6 +1030,9 @@ TEST_P(AdminInstanceTest, ClustersJson) {
    "name": "fake_cluster",
    "success_rate_ejection_threshold": {
     "value": 6
+   },
+   "local_origin_success_rate_ejection_threshold": {
+    "value": 9
    },
    "added_via_api": true,
    "host_statuses": [
@@ -1066,6 +1078,9 @@ TEST_P(AdminInstanceTest, ClustersJson) {
      },
      "success_rate": {
       "value": 43.2
+     },
+     "local_origin_success_rate": {
+      "value": 93.2
      }
     }
    ]

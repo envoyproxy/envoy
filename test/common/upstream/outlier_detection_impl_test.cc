@@ -63,6 +63,12 @@ public:
         .WillByDefault(Return(true));
     ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_success_rate", 100))
         .WillByDefault(Return(true));
+    ON_CALL(runtime_.snapshot_,
+            featureEnabled("outlier_detection.enforcing_consecutive_local_origin_failure_", 100))
+        .WillByDefault(Return(true));
+    ON_CALL(runtime_.snapshot_,
+            featureEnabled("outlier_detection.enforcing_local_origin_success_rate", 100))
+        .WillByDefault(Return(true));
   }
 
   void addHosts(std::vector<std::string> urls, bool primary = true) {
@@ -72,9 +78,9 @@ public:
     }
   }
 
-  void loadRq(HostVector& hosts, int num_rq, int http_code) {
+  template <typename T> void loadRq(HostVector& hosts, int num_rq, T code) {
     for (uint64_t i = 0; i < hosts.size(); i++) {
-      loadRq(hosts[i], num_rq, http_code);
+      loadRq(hosts[i], num_rq, code);
     }
   }
 
@@ -113,7 +119,10 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
     "enforcing_success_rate": 20,
     "success_rate_minimum_hosts": 50,
     "success_rate_request_volume": 200,
-    "success_rate_stdev_factor": 3000
+    "success_rate_stdev_factor": 3000,
+    "consecutive_local_origin_failure": 15,
+    "enforcing_consecutive_local_origin_failure": 40,
+    "enforcing_local_origin_success_rate": 53 
   }
   )EOF";
 
@@ -135,6 +144,9 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
   EXPECT_EQ(50UL, detector->config().successRateMinimumHosts());
   EXPECT_EQ(200UL, detector->config().successRateRequestVolume());
   EXPECT_EQ(3000UL, detector->config().successRateStdevFactor());
+  EXPECT_EQ(15UL, detector->config().consecutiveLocalOriginFailure());
+  EXPECT_EQ(40UL, detector->config().enforcingConsecutiveLocalOriginFailure());
+  EXPECT_EQ(53UL, detector->config().enforcingLocalOriginSuccessRate());
 }
 
 TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
@@ -343,9 +355,9 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
 }
 
 /**
- * Set of tests to verify ejecting and unejecting nodes when connect failures are reported.
+ * Set of tests to verify ejecting and unejecting nodes when local/connect failures are reported.
  */
-TEST_F(OutlierDetectorImplTest, BasicFlowConnectFailure) {
+TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"}, true);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
@@ -353,7 +365,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowConnectFailure) {
       cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
 
   ON_CALL(runtime_.snapshot_,
-          featureEnabled("outlier_detection.enforcing_consecutive_connect_failure", 100))
+          featureEnabled("outlier_detection.enforcing_consecutive_local_origin_failure", 100))
       .WillByDefault(Return(true));
 
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
@@ -361,12 +373,12 @@ TEST_F(OutlierDetectorImplTest, BasicFlowConnectFailure) {
   // When connect failure is detected the following methods should be called.
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
-                                       _, EjectionType::ConsecutiveConnectFailure, true));
+                                       _, EjectionType::ConsecutiveLocalOriginFailure, true));
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
   // Get the configured number of failures and simulate than number of connect failures.
-  uint32_t n = runtime_.snapshot_.getInteger("outlier_detection.consecutive_connect_failure",
-                                             detector->config().consecutiveConnectFailure());
+  uint32_t n = runtime_.snapshot_.getInteger("outlier_detection.consecutive_local_origin_failure",
+                                             detector->config().consecutiveLocalOriginFailure());
   while (n--) {
     hosts_[0]->outlierDetector().putResult(Result::CONNECT_FAILED);
   }
@@ -392,14 +404,14 @@ TEST_F(OutlierDetectorImplTest, BasicFlowConnectFailure) {
 
   // Simulate few connect failures, not enough for ejection and then simulate connect success
   // and again few failures not enough for ejection.
-  n = runtime_.snapshot_.getInteger("outlier_detection.consecutive_connect_failure",
-                                    detector->config().consecutiveConnectFailure());
+  n = runtime_.snapshot_.getInteger("outlier_detection.consecutive_local_origin_failure",
+                                    detector->config().consecutiveLocalOriginFailure());
   n--; // make sure that this is not enough for ejection.
   while (n--) {
     hosts_[0]->outlierDetector().putResult(Result::CONNECT_FAILED);
   }
   // now success and few failures
-  hosts_[0]->outlierDetector().putResult(Result::CONNECT_SUCCESS);
+  hosts_[0]->outlierDetector().putResult(Result::SUCCESS);
   hosts_[0]->outlierDetector().putResult(Result::CONNECT_FAILED);
   hosts_[0]->outlierDetector().putResult(Result::CONNECT_FAILED);
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
@@ -409,12 +421,14 @@ TEST_F(OutlierDetectorImplTest, BasicFlowConnectFailure) {
   EXPECT_EQ(
       1UL,
       cluster_.info_->stats_store_.counter("outlier_detection.ejections_enforced_total").value());
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_
-                     .counter("outlier_detection.ejections_detected_consecutive_connect_failure")
-                     .value());
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_
-                     .counter("outlier_detection.ejections_enforced_consecutive_connect_failure")
-                     .value());
+  EXPECT_EQ(1UL,
+            cluster_.info_->stats_store_
+                .counter("outlier_detection.ejections_detected_consecutive_local_origin_failure")
+                .value());
+  EXPECT_EQ(1UL,
+            cluster_.info_->stats_store_
+                .counter("outlier_detection.ejections_enforced_consecutive_local_origin_failure")
+                .value());
 }
 
 /**
@@ -511,7 +525,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
                      .value());
 }
 
-TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
+TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({
       "tcp://127.0.0.1:80",
@@ -548,14 +562,18 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
   EXPECT_CALL(checker_, check(hosts_[4]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]),
-                                       _, EjectionType::SuccessRate, true));
+                                       _, EjectionType::SuccessRateExternalOrigin, true));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.success_rate_stdev_factor", 1900))
       .WillByDefault(Return(1900));
   interval_timer_->callback_();
-  EXPECT_EQ(50, hosts_[4]->outlierDetector().successRate());
-  EXPECT_EQ(90, detector->successRateAverage());
-  EXPECT_EQ(52, detector->successRateEjectionThreshold());
+  EXPECT_EQ(50, hosts_[4]->outlierDetector().successRate(DetectorHostMonitor::externalOrigin));
+  EXPECT_EQ(90, detector->successRateAverage(DetectorHostMonitor::externalOrigin));
+  EXPECT_EQ(52, detector->successRateEjectionThreshold(DetectorHostMonitor::externalOrigin));
+  // Make sure that local origin success rate monitor is not affected
+  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(DetectorHostMonitor::localOrigin));
+  EXPECT_EQ(-1, detector->successRateAverage(DetectorHostMonitor::localOrigin));
+  EXPECT_EQ(-1, detector->successRateEjectionThreshold(DetectorHostMonitor::localOrigin));
   EXPECT_TRUE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
@@ -593,9 +611,91 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
-  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate());
-  EXPECT_EQ(-1, detector->successRateAverage());
-  EXPECT_EQ(-1, detector->successRateEjectionThreshold());
+  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(DetectorHostMonitor::externalOrigin));
+  EXPECT_EQ(-1, detector->successRateAverage(DetectorHostMonitor::externalOrigin));
+  EXPECT_EQ(-1, detector->successRateEjectionThreshold(DetectorHostMonitor::externalOrigin));
+}
+
+TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({
+      "tcp://127.0.0.1:80",
+      "tcp://127.0.0.1:81",
+      "tcp://127.0.0.1:82",
+      "tcp://127.0.0.1:83",
+      "tcp://127.0.0.1:84",
+  });
+
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // Turn off detecting consecutive local origin failures.
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("outlier_detection.enforcing_consecutive_local_origin_failure", 100))
+      .WillByDefault(Return(false));
+  // Expect non-enforcing logging to happen every time the consecutive_ counter
+  // gets saturated (every 5 times).
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]),
+                                       _, EjectionType::ConsecutiveLocalOriginFailure, false))
+      .Times(40);
+  // Cause a SR error on one host. First have 4 of the hosts have perfect SR.
+  loadRq(hosts_, 200, Result::SUCCESS);
+  loadRq(hosts_[4], 200, Result::CONNECT_FAILED);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
+  EXPECT_CALL(checker_, check(hosts_[4]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]),
+                                       _, EjectionType::SuccessRateLocalOrigin, true));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.success_rate_stdev_factor", 1900))
+      .WillByDefault(Return(1900));
+  interval_timer_->callback_();
+  EXPECT_EQ(50, hosts_[4]->outlierDetector().successRate(DetectorHostMonitor::localOrigin));
+  EXPECT_EQ(90, detector->successRateAverage(DetectorHostMonitor::localOrigin));
+  EXPECT_EQ(52, detector->successRateEjectionThreshold(DetectorHostMonitor::localOrigin));
+  // Make sure that external origin success rate monitor is not affected
+  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(DetectorHostMonitor::externalOrigin));
+  EXPECT_EQ(-1, detector->successRateAverage(DetectorHostMonitor::externalOrigin));
+  EXPECT_EQ(-1, detector->successRateEjectionThreshold(DetectorHostMonitor::externalOrigin));
+  EXPECT_TRUE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+
+  // Interval that doesn't bring the host back in.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(19999));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  interval_timer_->callback_();
+  EXPECT_TRUE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+
+  // Interval that does bring the host back in.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(50001));
+  EXPECT_CALL(checker_, check(hosts_[4]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[4])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  interval_timer_->callback_();
+  EXPECT_FALSE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+
+  // Expect non-enforcing logging to happen every time the consecutive_ counter
+  // gets saturated (every 5 times).
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]),
+                                       _, EjectionType::ConsecutiveLocalOriginFailure, false))
+      .Times(5);
+
+  // Give 4 hosts enough request volume but not to the 5th. Should not cause an ejection.
+  loadRq(hosts_, 25, Result::SUCCESS);
+  loadRq(hosts_[4], 25, Result::CONNECT_FAILED);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(60001));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  interval_timer_->callback_();
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(DetectorHostMonitor::localOrigin));
+  EXPECT_EQ(-1, detector->successRateAverage(DetectorHostMonitor::localOrigin));
+  EXPECT_EQ(-1, detector->successRateEjectionThreshold(DetectorHostMonitor::localOrigin));
 }
 
 // Validate that empty hosts doesn't crash success rate handling when success_rate_minimum_hosts is
@@ -857,20 +957,24 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
 
   StringViewSaver log3;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
-  EXPECT_CALL(host->outlier_detector_, successRate()).WillOnce(Return(-1));
-  EXPECT_CALL(detector, successRateAverage()).WillOnce(Return(-1));
-  EXPECT_CALL(detector, successRateEjectionThreshold()).WillOnce(Return(-1));
-  EXPECT_CALL(*file, write(absl::string_view(
-                         "{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
-                         "\"30\", \"cluster\": "
-                         "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
-                         "\"eject\", \"type\": \"SuccessRate\", \"num_ejections\": 0, "
-                         "\"enforced\": \"false\", "
-                         "\"host_success_rate\": \"-1\", \"cluster_average_success_rate\": "
-                         "\"-1\", \"cluster_success_rate_ejection_threshold\": \"-1\""
-                         "}\n")))
+  EXPECT_CALL(host->outlier_detector_, successRate(DetectorHostMonitor::externalOrigin))
+      .WillOnce(Return(-1));
+  EXPECT_CALL(detector, successRateAverage(DetectorHostMonitor::externalOrigin))
+      .WillOnce(Return(-1));
+  EXPECT_CALL(detector, successRateEjectionThreshold(DetectorHostMonitor::externalOrigin))
+      .WillOnce(Return(-1));
+  EXPECT_CALL(*file,
+              write(absl::string_view(
+                  "{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
+                  "\"30\", \"cluster\": "
+                  "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
+                  "\"eject\", \"type\": \"SuccessRate-ExternalOrigin\", \"num_ejections\": 0, "
+                  "\"enforced\": \"false\", "
+                  "\"host_success_rate\": \"-1\", \"cluster_average_success_rate\": "
+                  "\"-1\", \"cluster_success_rate_ejection_threshold\": \"-1\""
+                  "}\n")))
       .WillOnce(SaveArg<0>(&log3));
-  event_logger.logEject(host, detector, EjectionType::SuccessRate, false);
+  event_logger.logEject(host, detector, EjectionType::SuccessRateExternalOrigin, false);
   Json::Factory::loadFromString(log3);
 
   StringViewSaver log4;
@@ -893,9 +997,10 @@ TEST(OutlierUtility, SRThreshold) {
   };
   double sum = 450;
 
-  Utility::EjectionPair ejection_pair = Utility::successRateEjectionThreshold(sum, data, 1.9);
-  EXPECT_EQ(52.0, ejection_pair.ejection_threshold_);
-  EXPECT_EQ(90.0, ejection_pair.success_rate_average_);
+  std::tuple<double, double> success_rate_nums =
+      DetectorImpl::successRateEjectionThreshold(sum, data, 1.9);
+  EXPECT_EQ(90.0, std::get<0>(success_rate_nums)); // average success rate
+  EXPECT_EQ(52.0, std::get<1>(success_rate_nums)); // ejection threshold
 }
 
 } // namespace Outlier

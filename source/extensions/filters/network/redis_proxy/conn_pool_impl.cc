@@ -88,7 +88,6 @@ void ClientImpl::onConnectOrOpTimeout() {
 void ClientImpl::onData(Buffer::Instance& data) {
   try {
     decoder_->decode(data);
-    putOutlierEvent(Upstream::Outlier::Result::REQUEST_SUCCESS);
   } catch (ProtocolError&) {
     putOutlierEvent(Upstream::Outlier::Result::REQUEST_FAILED);
     host_->cluster().stats().upstream_cx_protocol_error_.inc();
@@ -158,7 +157,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
-  putOutlierEvent(Upstream::Outlier::Result::CONNECT_SUCCESS);
+  putOutlierEvent(Upstream::Outlier::Result::REQUEST_SUCCESS);
 }
 
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)
