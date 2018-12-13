@@ -43,7 +43,7 @@ public:
    * @return absl::optional<ConfigInfo<P>> an optional ConfigInfo; the value is set when a config is
    *         available.
    */
-  template <typename P> absl::optional<ConfigInfo<P>> configInfo() {
+  template <typename P> absl::optional<ConfigInfo<P>> configInfo() const {
     static_assert(std::is_base_of<Protobuf::Message, P>::value,
                   "Proto type must derive from Protobuf::Message");
 
@@ -58,7 +58,7 @@ public:
    * Returns the Config corresponding to the provider.
    * @return std::shared_ptr<const C> a shared pointer to the Config.
    */
-  template <typename C> std::shared_ptr<const C> config() {
+  template <typename C> std::shared_ptr<const C> config() const {
     static_assert(std::is_base_of<Config, C>::value,
                   "Config type must derive from ConfigProvider::Config");
 
