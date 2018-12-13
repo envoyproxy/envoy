@@ -53,6 +53,7 @@ public:
   // Network::ConnectionHandler
   uint64_t numConnections() override { return num_connections_; }
   void addListener(Network::ListenerConfig& config) override;
+  void addUdpListener(Network::ListenerConfig& config) override;
   void removeListeners(uint64_t listener_tag) override;
   void stopListeners(uint64_t listener_tag) override;
   void stopListeners() override;
@@ -119,13 +120,11 @@ private:
     ~ActiveUdpListener();
 
     // Network::UdpListenerCallbacks
-    void onNewConnection(Network::ConnectionPtr&& new_connection) override;
+    void onNewConnection(const Network::Socket& server_socket, const Network::Socket& client_socket,
+                         Buffer::Instance&& data) override;
 
-    /**
-     * Create a new connection from a socket accepted by the listener.
-     */
-    void newConnection(Network::ConnectionSocketPtr&& socket);
-
+    // TODO(conqerAtapple): Refactor common data in TCP/UDP active listeners to
+    // a common base class.
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;
     ListenerStats stats_;
@@ -133,6 +132,8 @@ private:
     const uint64_t listener_tag_;
     Network::ListenerConfig& config_;
   };
+
+  typedef std::unique_ptr<ActiveUdpListener> ActiveUdpListenerPtr;
 
   /**
    * Wrapper for an active connection owned by this handler.
@@ -206,7 +207,8 @@ private:
   spdlog::logger& logger_;
   Event::Dispatcher& dispatcher_;
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>> listeners_;
-  // TODO(conqerAtapple): Add container that manages UDP listeners.
+  std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveUdpListenerPtr>>
+      udp_listeners_;
   std::atomic<uint64_t> num_connections_{};
   bool disable_listeners_;
 };

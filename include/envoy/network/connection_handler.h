@@ -31,6 +31,12 @@ public:
   virtual void addListener(ListenerConfig& config) PURE;
 
   /**
+   *  Adds UDP listener to the handler.
+   *  @param config listener configuration options.
+   */
+  virtual void addUdpListener(ListenerConfig& config) PURE;
+
+  /**
    * Find a listener based on the provided listener address value.
    * @param address supplies the address value.
    * @return a pointer to the listener or nullptr if not found.

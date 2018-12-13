@@ -22,5 +22,13 @@ UdpListenerImpl::UdpListenerImpl(const Event::DispatcherImpl& dispatcher, Socket
   (void)bind_to_port;
 }
 
+void UdpListenerImpl::disable() {
+  // TODO(conqerAtApple): Add implementation
+}
+
+void UdpListenerImpl::enable() {
+  // TODO(conqerAtApple): Add implementation
+}
+
 } // namespace Network
 } // namespace Envoy

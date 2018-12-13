@@ -65,6 +65,11 @@ public:
         createListener_(socket, cb, bind_to_port, hand_off_restored_destination_connections)};
   }
 
+  Network::ListenerPtr createUdpListener(Network::Socket& socket, Network::UdpListenerCallbacks& cb,
+                                         bool bind_to_port) override {
+    return Network::ListenerPtr{createUdpListener_(socket, cb, bind_to_port)};
+  }
+
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
     return Event::TimerPtr{createTimer_(cb)};
   }
@@ -101,6 +106,9 @@ public:
                Network::Listener*(Network::Socket& socket, Network::ListenerCallbacks& cb,
                                   bool bind_to_port,
                                   bool hand_off_restored_destination_connections));
+  MOCK_METHOD3(createUdpListener_,
+               Network::Listener*(Network::Socket& socket, Network::UdpListenerCallbacks& cb,
+                                  bool bind_to_port));
   MOCK_METHOD1(createTimer_, Timer*(Event::TimerCb cb));
   MOCK_METHOD1(deferredDelete_, void(DeferredDeletable* to_delete));
   MOCK_METHOD0(exit, void());

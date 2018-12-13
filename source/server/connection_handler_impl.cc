@@ -17,6 +17,9 @@ namespace Server {
 ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Event::Dispatcher& dispatcher)
     : logger_(logger), dispatcher_(dispatcher), disable_listeners_(false) {}
 
+// TODO(conqerAtapple): We could have one function for TCP and UDP and do the
+// dispatch for each type based on a input parameter or maybe tag dispatch based
+// on `SocketType`.
 void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   ActiveListenerPtr l(new ActiveListener(*this, config));
   if (disable_listeners_) {
@@ -25,6 +28,15 @@ void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   listeners_.emplace_back(config.socket().localAddress(), std::move(l));
 }
 
+void ConnectionHandlerImpl::addUdpListener(Network::ListenerConfig& config) {
+  ActiveUdpListenerPtr l(new ActiveUdpListener(*this, config));
+  if (disable_listeners_) {
+    l->listener_->disable();
+  }
+  udp_listeners_.emplace_back(config.socket().localAddress(), std::move(l));
+}
+
+// TODO(conqerAtapple): Add corresponding methods(remove, stop, disable, enable, find) for Udp.
 void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
   for (auto listener = listeners_.begin(); listener != listeners_.end();) {
     if (listener->second->listener_tag_ == listener_tag) {
@@ -101,6 +113,37 @@ ConnectionHandlerImpl::ActiveListener::~ActiveListener() {
   }
 
   parent_.dispatcher_.clearDeferredDeleteList();
+}
+
+ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImpl& parent,
+                                                            Network::ListenerConfig& config)
+    : ActiveUdpListener(
+          parent, parent.dispatcher_.createUdpListener(config.socket(), *this, config.bindToPort()),
+          config) {}
+
+ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImpl& parent,
+                                                            Network::ListenerPtr&& listener,
+                                                            Network::ListenerConfig& config)
+    : parent_(parent), listener_(std::move(listener)),
+      stats_(generateStats(config.listenerScope())),
+      listener_filters_timeout_(config.listenerFiltersTimeout()),
+      listener_tag_(config.listenerTag()), config_(config) {}
+
+ConnectionHandlerImpl::ActiveUdpListener::~ActiveUdpListener() {
+  // TODO(conqerAtapple): Add implementation.
+}
+
+void ConnectionHandlerImpl::ActiveUdpListener::onNewConnection(const Network::Socket& server_socket,
+                                                               const Network::Socket& client_socket,
+                                                               Buffer::Instance&& data) {
+  (void)server_socket;
+  (void)client_socket;
+  (void)data;
+
+  // TODO(conqerAtapple): Add implementation.
+  // Likely steps:
+  //  1. Create filter chain and pass in the connection information
+  //  2. Add the listener to a container to keep it alive.
 }
 
 Network::Listener*

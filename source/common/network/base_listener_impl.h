@@ -18,9 +18,6 @@ class BaseListenerImpl : public Listener {
 public:
   BaseListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket);
 
-  virtual void disable() PURE;
-  virtual void enable() PURE;
-
 protected:
   virtual Address::InstanceConstSharedPtr getLocalAddress(int fd);
 

@@ -13,6 +13,9 @@ public:
   UdpListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket, UdpListenerCallbacks& cb,
                   bool bind_to_port);
 
+  virtual void disable() override;
+  virtual void enable() override;
+
 protected:
   UdpListenerCallbacks& cb_;
 };
