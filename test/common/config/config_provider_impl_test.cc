@@ -358,6 +358,23 @@ dynamic_dummy_configs:
   EXPECT_EQ(expected_config_dump.DebugString(), dummy_config_dump3.DebugString());
 }
 
+// Tests that dynamic config providers enforce that the context's localInfo is
+// set, since it is used to obtain the node/cluster attributes required for
+// subscriptions.
+TEST_F(ConfigProviderImplTest, LocalInfoNotDefined) {
+  factory_context_.local_info_.node_.set_cluster("");
+  factory_context_.local_info_.node_.set_id("");
+
+  envoy::api::v2::core::ApiConfigSource config_source_proto;
+  config_source_proto.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+  EXPECT_THROW_WITH_MESSAGE(
+      provider_manager_->createXdsConfigProvider(config_source_proto, factory_context_,
+                                                 "dummy_prefix"),
+      EnvoyException,
+      "DummyDS: node 'id' and 'cluster' are required. Set it either in 'node' config or "
+      "via --service-node and --service-cluster options.");
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy
