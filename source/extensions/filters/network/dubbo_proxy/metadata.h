@@ -20,13 +20,7 @@ namespace DubboProxy {
 class MessageMetadata {
 public:
   // TODO(leilei.gll) Add parameter data types and implement Dubbo data type mapping.
-  struct ParameterValue {
-    ParameterValue(uint32_t index, const std::string& value) : index_(index), value_(value) {}
-
-    uint32_t index_;
-    std::string value_;
-  };
-  typedef std::unordered_map<uint32_t, ParameterValue> ParameterValueMap;
+  typedef std::unordered_map<uint32_t, std::string> ParameterValueMap;
   typedef std::unique_ptr<ParameterValueMap> ParameterValueMapPtr;
 
   typedef std::unique_ptr<Http::HeaderMapImpl> HeaderMapPtr;
@@ -63,17 +57,17 @@ public:
 
   void addParameterValue(uint32_t index, const std::string& value) {
     assignParameterIfNeed();
-    parameter_map_->emplace(index, ParameterValue(index, value));
+    parameter_map_->emplace(index, value);
   }
-  const ParameterValue* getParameterValue(uint32_t index) const {
+  const std::string getParameterValue(uint32_t index) const {
     if (parameter_map_) {
       auto itor = parameter_map_->find(index);
       if (itor != parameter_map_->end()) {
-        return &itor->second;
+        return itor->second;
       }
     }
 
-    return nullptr;
+    return "";
   }
   bool hasParameters() const { return parameter_map_ != nullptr; }
   const ParameterValueMap& parameters() {

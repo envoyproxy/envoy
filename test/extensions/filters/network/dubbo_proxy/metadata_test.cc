@@ -44,9 +44,8 @@ TEST(MessageMetadataTest, Parameters) {
   metadata.addParameterValue(0, "test");
   EXPECT_TRUE(metadata.hasParameters());
   EXPECT_EQ(metadata.parameters().size(), 1);
-  auto parameter = metadata.getParameterValue(0);
-  EXPECT_EQ(parameter->value_, "test");
-  EXPECT_EQ(metadata.getParameterValue(1), nullptr);
+  EXPECT_EQ(metadata.getParameterValue(0), "test");
+  EXPECT_EQ(metadata.getParameterValue(1), "");
 }
 
 } // namespace DubboProxy
