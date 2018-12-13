@@ -21,17 +21,19 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
       store_stats(stats), ssl_context_manager_(ssl_context_manager), random_(random),
       info_factory_(info_factory), access_log_manager_(access_log_manager), cm_(cm),
       local_info_(local_info) {
-  health_check_request_.mutable_node()->MergeFrom(node);
+  health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(node);
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMilliseconds,
                                                                 RetryMaxDelayMilliseconds, random_);
   hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
 
   // TODO(lilika): Add support for other types of healthchecks
-  health_check_request_.mutable_capability()->add_health_check_protocols(
-      envoy::service::discovery::v2::Capability::HTTP);
-  health_check_request_.mutable_capability()->add_health_check_protocols(
-      envoy::service::discovery::v2::Capability::TCP);
+  health_check_request_.mutable_health_check_request()
+      ->mutable_capability()
+      ->add_health_check_protocols(envoy::service::discovery::v2::Capability::HTTP);
+  health_check_request_.mutable_health_check_request()
+      ->mutable_capability()
+      ->add_health_check_protocols(envoy::service::discovery::v2::Capability::TCP);
 
   establishNewStream();
 }

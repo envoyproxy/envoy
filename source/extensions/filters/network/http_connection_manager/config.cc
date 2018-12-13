@@ -96,7 +96,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   return [route_config_provider_manager, filter_config, &context,
           date_provider](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-        *filter_config, context.drainDecision(), context.random(), context.httpTracer(),
+        *filter_config, context.drainDecision(), context.random(), context.httpContext(),
         context.runtime(), context.localInfo(), context.clusterManager(),
         &context.overloadManager(), context.dispatcher().timeSystem())});
   };

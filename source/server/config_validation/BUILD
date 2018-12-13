@@ -47,6 +47,7 @@ envoy_cc_library(
         ":async_client_lib",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:utility_lib",
+        "//source/common/http:context_lib",
         "//source/common/upstream:cluster_manager_lib",
     ],
 )

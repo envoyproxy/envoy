@@ -10,6 +10,7 @@
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
 
+#include "test/extensions/filters/common/ratelimit/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
@@ -57,8 +58,8 @@ public:
 
     request_metadata_.reset(new ThriftProxy::MessageMetadata());
 
-    client_ = new RateLimit::MockClient();
-    filter_ = std::make_unique<Filter>(config_, RateLimit::ClientPtr{client_});
+    client_ = new Filters::Common::RateLimit::MockClient();
+    filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.emplace_back(
@@ -75,10 +76,10 @@ public:
   )EOF";
 
   ConfigSharedPtr config_;
-  RateLimit::MockClient* client_;
+  Filters::Common::RateLimit::MockClient* client_;
   std::unique_ptr<Filter> filter_;
   NiceMock<ThriftProxy::ThriftFilters::MockDecoderFilterCallbacks> filter_callbacks_;
-  RateLimit::RequestCallbacks* request_callbacks_{};
+  Filters::Common::RateLimit::RequestCallbacks* request_callbacks_{};
   ThriftProxy::MessageMetadataSharedPtr request_metadata_;
   Http::TestHeaderMapImpl response_headers_;
   Buffer::OwnedImpl data_;
@@ -211,9 +212,10 @@ TEST_F(ThriftRateLimitFilterTest, OkResponse) {
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
                                   {{{"descriptor_key", "descriptor_value"}}}}),
                               _))
-      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
-        request_callbacks_ = &callbacks;
-      })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   request_metadata_->headers().addCopy(ThriftProxy::Headers::get().ClientId, "clientid");
 
@@ -223,7 +225,7 @@ TEST_F(ThriftRateLimitFilterTest, OkResponse) {
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited))
       .Times(0);
-  request_callbacks_->complete(RateLimit::LimitStatus::OK, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr);
 
   EXPECT_EQ(1U,
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
@@ -240,9 +242,10 @@ TEST_F(ThriftRateLimitFilterTest, ImmediateOkResponse) {
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
                                   {{{"descriptor_key", "descriptor_value"}}}}),
                               _))
-      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
-        callbacks.complete(RateLimit::LimitStatus::OK, nullptr);
-      })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr);
+          })));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(request_metadata_));
@@ -262,9 +265,10 @@ TEST_F(ThriftRateLimitFilterTest, ImmediateErrorResponse) {
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
                                   {{{"descriptor_key", "descriptor_value"}}}}),
                               _))
-      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
-        callbacks.complete(RateLimit::LimitStatus::Error, nullptr);
-      })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr);
+          })));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(request_metadata_));
@@ -284,14 +288,15 @@ TEST_F(ThriftRateLimitFilterTest, ErrorResponse) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
   EXPECT_CALL(*client_, limit(_, _, _, _))
-      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
-        request_callbacks_ = &callbacks;
-      })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   EXPECT_EQ(ThriftProxy::FilterStatus::StopIteration, filter_->messageBegin(request_metadata_));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-  request_callbacks_->complete(RateLimit::LimitStatus::Error, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr);
 
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageEnd());
   EXPECT_CALL(filter_callbacks_.stream_info_,
@@ -313,9 +318,10 @@ TEST_F(ThriftRateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
   EXPECT_CALL(*client_, limit(_, _, _, _))
-      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
-        request_callbacks_ = &callbacks;
-      })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   EXPECT_EQ(ThriftProxy::FilterStatus::StopIteration, filter_->messageBegin(request_metadata_));
 
@@ -327,7 +333,7 @@ TEST_F(ThriftRateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
       }));
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError));
-  request_callbacks_->complete(RateLimit::LimitStatus::Error, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr);
 
   EXPECT_EQ(
       1U,
@@ -344,9 +350,10 @@ TEST_F(ThriftRateLimitFilterTest, LimitResponse) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
   EXPECT_CALL(*client_, limit(_, _, _, _))
-      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
-        request_callbacks_ = &callbacks;
-      })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   EXPECT_EQ(ThriftProxy::FilterStatus::StopIteration, filter_->messageBegin(request_metadata_));
 
@@ -359,7 +366,7 @@ TEST_F(ThriftRateLimitFilterTest, LimitResponse) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
-  request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr);
 
   EXPECT_EQ(1U,
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.over_limit")
@@ -373,9 +380,10 @@ TEST_F(ThriftRateLimitFilterTest, LimitResponseWithHeaders) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
   EXPECT_CALL(*client_, limit(_, _, _, _))
-      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
-        request_callbacks_ = &callbacks;
-      })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   EXPECT_EQ(ThriftProxy::FilterStatus::StopIteration, filter_->messageBegin(request_metadata_));
 
@@ -390,7 +398,7 @@ TEST_F(ThriftRateLimitFilterTest, LimitResponseWithHeaders) {
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
 
   Http::HeaderMapPtr h{new Http::TestHeaderMapImpl(*rl_headers)};
-  request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, std::move(h));
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h));
 
   EXPECT_EQ(1U,
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.over_limit")
@@ -404,16 +412,17 @@ TEST_F(ThriftRateLimitFilterTest, LimitResponseRuntimeDisabled) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
   EXPECT_CALL(*client_, limit(_, _, _, _))
-      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
-        request_callbacks_ = &callbacks;
-      })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   EXPECT_EQ(ThriftProxy::FilterStatus::StopIteration, filter_->messageBegin(request_metadata_));
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("ratelimit.thrift_filter_enforcing", 100))
       .WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-  request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr);
 
   EXPECT_EQ(1U,
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.over_limit")
@@ -427,9 +436,10 @@ TEST_F(ThriftRateLimitFilterTest, ResetDuringCall) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
   EXPECT_CALL(*client_, limit(_, _, _, _))
-      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
-        request_callbacks_ = &callbacks;
-      })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   EXPECT_EQ(ThriftProxy::FilterStatus::StopIteration, filter_->messageBegin(request_metadata_));
 

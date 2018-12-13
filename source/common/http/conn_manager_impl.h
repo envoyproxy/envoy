@@ -11,6 +11,8 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/context.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
@@ -21,7 +23,6 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
-#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/buffer/watermark_buffer.h"
@@ -47,7 +48,7 @@ class ConnectionManagerImpl : Logger::Loggable<Logger::Id::http>,
                               public Network::ConnectionCallbacks {
 public:
   ConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
-                        Runtime::RandomGenerator& random_generator, Tracing::HttpTracer& tracer,
+                        Runtime::RandomGenerator& random_generator, Http::Context& http_context,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
                         Server::OverloadManager* overload_manager, Event::TimeSystem& time_system);
@@ -450,6 +451,7 @@ private:
   void onIdleTimeout();
   void onDrainTimeout();
   void startDrainSequence();
+  Tracing::HttpTracer& tracer() { return http_context_.tracer(); }
 
   enum class DrainState { NotDraining, Draining, Closing };
 
@@ -468,7 +470,7 @@ private:
   Event::TimerPtr connection_idle_timer_;
   Event::TimerPtr drain_timer_;
   Runtime::RandomGenerator& random_generator_;
-  Tracing::HttpTracer& tracer_;
+  Http::Context& http_context_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cluster_manager_;

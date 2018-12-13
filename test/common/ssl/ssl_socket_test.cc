@@ -1198,6 +1198,51 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongCA) {
            false, GetParam());
 }
 
+TEST_P(SslSocketTest, CertificatesWithPassword) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/password_protected_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/password_protected_key.pem"));
+  server_cert->mutable_password()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/password.txt"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+  server_validation_ctx->add_verify_certificate_hash(
+      "ceefb953bb940c94e2e88f82e2af3ee43611bdad522bf4595e8d1acff3b500fc");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/password_protected_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/password_protected_key.pem"));
+  client_cert->mutable_password()->set_inline_string(TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/password.txt")));
+
+  testUtilV2(listener, client, "", true, "",
+             "ceefb953bb940c94e2e88f82e2af3ee43611bdad522bf4595e8d1acff3b500fc",
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
+
+  // Works even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "",
+             "ceefb953bb940c94e2e88f82e2af3ee43611bdad522bf4595e8d1acff3b500fc",
+             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
+             nullptr);
+}
+
 TEST_P(SslSocketTest, ClientCertificateSpkiVerification) {
   envoy::api::v2::Listener listener;
   envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
@@ -2859,6 +2904,19 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client, "", true, "TLSv1.3", "", "", "", "", "ssl.handshake",
              "ssl.handshake", GetParam(), nullptr);
+
+  // Protocol version logged correctly when connecting using TLSv1.0-TLSv1.3
+  // for the client and TLSv1.3 for the server.
+  testUtilV2(listener, client, "", true, "TLSv1.3", "", "", "", "", "ssl.versions.TLSv1.3",
+             "ssl.versions.TLSv1.3", GetParam(), nullptr);
+
+  // Protocol version logged correctly when connecting using TLSv1.0 for both.
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  testUtilV2(listener, client, "", true, "TLSv1", "", "", "", "", "ssl.versions.TLSv1",
+             "ssl.versions.TLSv1", GetParam(), nullptr);
 }
 
 TEST_P(SslSocketTest, ALPN) {

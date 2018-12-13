@@ -31,6 +31,7 @@ envoy_cc_test(
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/http:context_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
@@ -202,6 +203,7 @@ envoy_cc_test(
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",
         ":node_bootstrap_without_access_log.yaml",
+        ":zipkin_tracing.yaml",
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",
     ],
@@ -217,6 +219,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/stat_sinks/statsd:config",
+        "//source/extensions/tracers/zipkin:config",
         "//source/server:server_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",

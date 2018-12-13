@@ -374,6 +374,7 @@ public:
   MOCK_METHOD0(socket, Socket&());
   MOCK_CONST_METHOD0(handOffRestoredDestinationConnections, bool());
   MOCK_METHOD0(perConnectionBufferLimitBytes, uint32_t());
+  MOCK_CONST_METHOD0(listenerFiltersTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(listenerTag, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());

@@ -917,20 +917,15 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
 }
 
 class TruncatingAllocTest : public HeapStatsThreadLocalStoreTest {
-  class TruncatingHeapAlloc : public HeapStatDataAllocator {
-  public:
-    bool requiresBoundedStatNameSize() const override { return true; }
-  };
-
 protected:
-  TruncatingAllocTest() : long_name_(options_.maxNameLength() + 1, 'A') {}
+  TruncatingAllocTest() : test_alloc_(options_), long_name_(options_.maxNameLength() + 1, 'A') {}
 
   void SetUp() override {
-    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, truncating_heap_alloc_);
+    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, test_alloc_);
     // Do not call superclass SetUp.
   }
 
-  TruncatingHeapAlloc truncating_heap_alloc_;
+  TestAllocator test_alloc_;
   std::string long_name_;
 };
 
