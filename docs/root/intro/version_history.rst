@@ -6,6 +6,7 @@ Version history
 * access log: added a :ref:`JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format.
 * access log: added dynamic metadata to access log messages streamed over gRPC.
 * access log: added DOWNSTREAM_CONNECTION_TERMINATION.
+* admin: :http:post:`/logging` now responds with 200 while there are no params.
 * admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * admin: added host weight to the :http:get:`/clusters?format=json` end point response.
 * admin: :http:get:`/server_info` now responds with a JSON object instead of a single string.
