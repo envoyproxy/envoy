@@ -24,6 +24,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -153,20 +154,6 @@ public:
   std::function<void()> initialize_callback_;
   Network::Address::InstanceConstSharedPtr source_address_;
   NiceMock<MockPrioritySet> priority_set_;
-};
-
-class MockLoadBalancerContext : public LoadBalancerContext {
-public:
-  MockLoadBalancerContext();
-  ~MockLoadBalancerContext();
-
-  MOCK_METHOD0(computeHashKey, absl::optional<uint64_t>());
-  MOCK_METHOD0(metadataMatchCriteria, Router::MetadataMatchCriteria*());
-  MOCK_CONST_METHOD0(downstreamConnection, const Network::Connection*());
-  MOCK_CONST_METHOD0(downstreamHeaders, const Http::HeaderMap*());
-  MOCK_METHOD2(determinePriorityLoad, const PriorityLoad&(const PrioritySet&, const PriorityLoad&));
-  MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host&));
-  MOCK_CONST_METHOD0(hostSelectionRetryCount, uint32_t());
 };
 
 class MockLoadBalancer : public LoadBalancer {
