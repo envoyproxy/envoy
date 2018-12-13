@@ -688,6 +688,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   decodeHeaders(nullptr, *request_headers_, end_stream);
 
+  if (Grpc::Common::hasGrpcContentType(*request_headers_) && stream_idle_timer_ != nullptr) {
+    // gRPC timeouts are controlled by the 'grpc-timeout' in the request headers, as bounded by
+    // 'max-grpc-timout' config option (see FilterUtility::finalTimeout()). Disable the idle
+    // timer to not time out gRPC requests before the gRPC (request) timeout in effect.
+    stream_idle_timer_->disableTimer();
+    stream_idle_timer_ = nullptr;
+  }
+
   // Reset it here for both global and overridden cases.
   resetIdleTimer();
 }
