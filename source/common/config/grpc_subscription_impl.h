@@ -5,8 +5,9 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/async_client.h"
 
+#include "common/config/grpc_managed_mux_subscription_impl.h"
 #include "common/config/grpc_mux_impl.h"
-#include "common/config/grpc_mux_subscription_impl.h"
+#include "common/config/utility.h"
 
 namespace Envoy {
 namespace Config {
@@ -17,27 +18,26 @@ public:
   GrpcSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                        const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats,
-                       Stats::Scope& scope)
-      : grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random, scope),
-        grpc_mux_subscription_(grpc_mux_, stats) {}
+                       Stats::Scope& scope, const RateLimitSettings& rate_limit_settings)
+      : grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random, scope,
+                  rate_limit_settings),
+        grpc_managed_mux_subscription_(grpc_mux_, stats) {}
 
   // Config::Subscription
   void start(const std::vector<std::string>& resources,
              Config::SubscriptionCallbacks<ResourceType>& callbacks) override {
-    // Subscribe first, so we get failure callbacks if grpc_mux_.start() fails.
-    grpc_mux_subscription_.start(resources, callbacks);
-    grpc_mux_.start();
+    grpc_managed_mux_subscription_.start(resources, callbacks);
   }
 
   void updateResources(const std::vector<std::string>& resources) override {
-    grpc_mux_subscription_.updateResources(resources);
+    grpc_managed_mux_subscription_.updateResources(resources);
   }
 
   GrpcMuxImpl& grpcMux() { return grpc_mux_; }
 
 private:
   GrpcMuxImpl grpc_mux_;
-  GrpcMuxSubscriptionImpl<ResourceType> grpc_mux_subscription_;
+  GrpcManagedMuxSubscriptionImpl<ResourceType> grpc_managed_mux_subscription_;
 };
 
 } // namespace Config

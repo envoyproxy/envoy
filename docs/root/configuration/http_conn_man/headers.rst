@@ -169,9 +169,9 @@ address of the nearest client to the XFF list before proxying the request. Some 
 
 Envoy will only append to XFF if the :ref:`use_remote_address
 <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.use_remote_address>`
-HTTP connection manager option is set to true and the `skip_xff_append
+HTTP connection manager option is set to true and the :ref:`skip_xff_append
 <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.skip_xff_append>`
-is set false: This means that if *use_remote_address* is false (which is the default) or
+is set false. This means that if *use_remote_address* is false (which is the default) or
 *skip_xff_append* is true, the connection manager operates in a transparent mode where it does not
 modify XFF.
 
@@ -427,6 +427,43 @@ The *x-b3-flags* HTTP header is used by the Zipkin tracer in Envoy.
 The encode one or more options. For example, Debug is encoded as
 ``X-B3-Flags: 1``. See more on zipkin tracing
 `here <https://github.com/openzipkin/b3-propagation>`.
+
+.. _config_http_conn_man_headers_b3:
+
+b3
+----------
+
+The *b3* HTTP header is used by the Zipkin tracer in Envoy.
+Is a more compressed header format. See more on zipkin tracing
+`here <https://github.com/openzipkin/b3-propagation#single-header>`.
+
+.. _config_http_conn_man_headers_x-datadog-trace-id:
+
+x-datadog-trace-id
+------------------
+
+The *x-datadog-trace-id* HTTP header is used by the Datadog tracer in Envoy.
+The 64-bit value represents the ID of the overall trace, and is used to correlate
+the spans.
+
+.. _config_http_conn_man_headers_x-datadog-parent-id:
+
+x-datadog-parent-id
+-------------------
+
+The *x-datadog-parent-id* HTTP header is used by the Datadog tracer in Envoy.
+The 64-bit value uniquely identifies the span within the trace, and is used to
+create parent-child relationships between spans.
+
+.. _config_http_conn_man_headers_x-datadog-sampling-priority:
+
+x-datadog-sampling-priority
+---------------------------
+
+The *x-datadog-sampling-priority* HTTP header is used by the Datadog tracer in Envoy.
+The integer value indicates the sampling decision that has been made for this trace.
+A value of 0 indicates that the trace should not be collected, and a value of 1
+requests that spans are sampled and reported.
 
 .. _config_http_conn_man_headers_custom_request_headers:
 

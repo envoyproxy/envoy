@@ -159,7 +159,6 @@ void FilterJson::translateHttpConnectionManager(
     // Translate v1 name to v2 name.
     filter->set_name(Extensions::HttpFilters::HttpFilterNames::get().v1_converter_.getV2Name(
         json_filter->getString("name")));
-    JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
     const std::string deprecated_config =
         "{\"deprecated_v1\": true, \"value\": " + json_filter->getObject("config")->asJsonString() +

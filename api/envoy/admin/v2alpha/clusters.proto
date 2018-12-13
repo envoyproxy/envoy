@@ -72,13 +72,16 @@ message HostStatus {
   // ejection.
   envoy.type.Percent success_rate = 4;
 
+  // The host's weight. If not configured, the value defaults to 1.
+  uint32 weight = 5;
+
   // Request success rate for local origin failures for this host over the last calculated
   // interval.
   //
   // Note: the message will not be present if host did not have enough request volume to calculate
   // success rate or the cluster did not have enough hosts to run through success rate outlier
   // ejection.
-  envoy.type.Percent local_origin_success_rate = 5;
+  envoy.type.Percent local_origin_success_rate = 6;
 }
 
 // Health status for a host.

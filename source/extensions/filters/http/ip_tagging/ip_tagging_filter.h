@@ -67,7 +67,7 @@ public:
       ip_tag_pair.second = cidr_set;
       tag_data.emplace_back(ip_tag_pair);
     }
-    trie_.reset(new Network::LcTrie::LcTrie<std::string>(tag_data));
+    trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
   }
 
   Runtime::Loader& runtime() { return runtime_; }

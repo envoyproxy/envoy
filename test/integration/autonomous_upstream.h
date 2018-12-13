@@ -1,3 +1,5 @@
+#pragma once
+
 #include "test/integration/fake_upstream.h"
 
 namespace Envoy {

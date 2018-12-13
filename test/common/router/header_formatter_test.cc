@@ -27,14 +27,6 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Router {
-
-static envoy::api::v2::route::Route parseRouteFromJson(const std::string& json_string) {
-  envoy::api::v2::route::Route route;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Envoy::Config::RdsJson::translateRoute(*json_object_ptr, route);
-  return route;
-}
-
 static envoy::api::v2::route::Route parseRouteFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::route::Route route;
   MessageUtil::loadFromYaml(yaml, route);
@@ -199,8 +191,9 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMiss
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
   Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  EXPECT_EQ("test_value", filter_state.getData<StringAccessor>("testing").asString());
+  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_EQ("test_value", filter_state.getDataReadOnly<StringAccessor>("testing").asString());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
@@ -208,13 +201,14 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
 
   testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "test_value");
   testFormatting(stream_info, "PER_REQUEST_STATE(testing2)", "");
-  EXPECT_EQ("test_value", filter_state.getData<StringAccessor>("testing").asString());
+  EXPECT_EQ("test_value", filter_state.getDataReadOnly<StringAccessor>("testing").asString());
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
   Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1));
-  EXPECT_EQ(1, filter_state.getData<StreamInfo::TestIntAccessor>("testing").access());
+  filter_state.setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_EQ(1, filter_state.getDataReadOnly<StreamInfo::TestIntAccessor>("testing").access());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
@@ -426,7 +420,8 @@ TEST(HeaderParserTest, TestParseInternal) {
   ON_CALL(stream_info, startTime()).WillByDefault(Return(start_time));
 
   Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                       StreamInfo::FilterState::StateType::ReadOnly);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 
@@ -457,21 +452,20 @@ TEST(HeaderParserTest, TestParseInternal) {
 }
 
 TEST(HeaderParserTest, EvaluateHeaders) {
-  const std::string json = R"EOF(
-  {
-    "prefix": "/new_endpoint",
-    "prefix_rewrite": "/api/new_endpoint",
-    "cluster": "www2",
-    "request_headers_to_add": [
-      {
-        "key": "x-client-ip",
-        "value": "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-      }
-    ]
-  }
-  )EOF";
+  const std::string ymal = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "x-client-ip"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    append: true
+)EOF";
+
   HeaderParserPtr req_header_parser =
-      HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add());
+      HeaderParser::configure(parseRouteFromV2Yaml(ymal).request_headers_to_add());
   Http::TestHeaderMapImpl header_map{{":method", "POST"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   req_header_parser->evaluateHeaders(header_map, stream_info);
@@ -479,21 +473,20 @@ TEST(HeaderParserTest, EvaluateHeaders) {
 }
 
 TEST(HeaderParserTest, EvaluateEmptyHeaders) {
-  const std::string json = R"EOF(
-  {
-    "prefix": "/new_endpoint",
-    "prefix_rewrite": "/api/new_endpoint",
-    "cluster": "www2",
-    "request_headers_to_add": [
-      {
-        "key": "x-key",
-        "value": "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
-      }
-    ]
-  }
-  )EOF";
+  const std::string ymal = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "x-key"
+      value: "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
+    append: true
+)EOF";
+
   HeaderParserPtr req_header_parser =
-      HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add());
+      HeaderParser::configure(parseRouteFromV2Yaml(ymal).request_headers_to_add());
   Http::TestHeaderMapImpl header_map{{":method", "POST"}};
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
@@ -506,21 +499,20 @@ TEST(HeaderParserTest, EvaluateEmptyHeaders) {
 }
 
 TEST(HeaderParserTest, EvaluateStaticHeaders) {
-  const std::string json = R"EOF(
-  {
-    "prefix": "/new_endpoint",
-    "prefix_rewrite": "/api/new_endpoint",
-    "cluster": "www2",
-    "request_headers_to_add": [
-      {
-        "key": "static-header",
-        "value": "static-value"
-      }
-    ]
-  }
-  )EOF";
+  const std::string ymal = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "static-header"
+      value: "static-value"
+    append: true
+)EOF";
+
   HeaderParserPtr req_header_parser =
-      HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add());
+      HeaderParser::configure(parseRouteFromV2Yaml(ymal).request_headers_to_add());
   Http::TestHeaderMapImpl header_map{{":method", "POST"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   req_header_parser->evaluateHeaders(header_map, stream_info);
@@ -587,7 +579,8 @@ request_headers_to_remove: ["x-nope"]
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
   Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                       StreamInfo::FilterState::StateType::ReadOnly);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 
@@ -625,44 +618,42 @@ request_headers_to_remove: ["x-nope"]
 }
 
 TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
-  const std::string json = R"EOF(
-  {
-    "prefix": "/new_endpoint",
-    "prefix_rewrite": "/api/new_endpoint",
-    "cluster": "www2",
-    "request_headers_to_add": [
-      {
-        "key": "static-header",
-        "value": "static-value"
-      },
-      {
-        "key": "x-client-ip",
-        "value": "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-      },
-      {
-        "key": "x-request-start",
-        "value": "%START_TIME(%s%3f)%"
-      },
-      {
-        "key": "x-request-start-default",
-        "value": "%START_TIME%"
-      },
-      {
-        "key": "x-request-start-range",
-        "value": "%START_TIME(%f, %1f, %2f, %3f, %4f, %5f, %6f, %7f, %8f, %9f)%"
-      }
-    ]
-  }
-  )EOF";
+  const std::string ymal = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "static-header"
+      value: "static-value"
+    append: true
+  - header:
+      key: "x-client-ip"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    append: true
+  - header:
+      key: "x-request-start"
+      value: "%START_TIME(%s%3f)%"
+    append: true
+  - header:
+      key: "x-request-start-default"
+      value: "%START_TIME%"
+    append: true
+  - header:
+      key: "x-request-start-range"
+      value: "%START_TIME(%f, %1f, %2f, %3f, %4f, %5f, %6f, %7f, %8f, %9f)%"
+    append: true
+)EOF";
 
   // Disable append mode.
-  envoy::api::v2::route::RouteAction route_action = parseRouteFromJson(json).route();
-  route_action.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
-  route_action.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
-  route_action.mutable_request_headers_to_add(2)->mutable_append()->set_value(false);
+  envoy::api::v2::route::Route route = parseRouteFromV2Yaml(ymal);
+  route.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
+  route.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
+  route.mutable_request_headers_to_add(2)->mutable_append()->set_value(false);
 
   HeaderParserPtr req_header_parser =
-      Router::HeaderParser::configure(route_action.request_headers_to_add());
+      Router::HeaderParser::configure(route.request_headers_to_add());
   Http::TestHeaderMapImpl header_map{
       {":method", "POST"}, {"static-header", "old-value"}, {"x-client-ip", "0.0.0.0"}};
 
@@ -708,36 +699,36 @@ TEST(HeaderParserTest, EvaluateResponseHeaders) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
-  cluster: www2
-  response_headers_to_add:
-    - header:
-        key: "x-client-ip"
-        value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-      append: true
-    - header:
-        key: "x-request-start"
-        value: "%START_TIME(%s.%3f)%"
-      append: true
-    - header:
-        key: "x-request-start-multiple"
-        value: "%START_TIME(%s.%3f)% %START_TIME% %START_TIME(%s)%"
-      append: true
-    - header:
-        key: "x-request-start-f"
-        value: "%START_TIME(f)%"
-      append: true
-    - header:
-        key: "x-request-start-range"
-        value: "%START_TIME(%f, %1f, %2f, %3f, %4f, %5f, %6f, %7f, %8f, %9f)%"
-      append: true
-    - header:
-        key: "x-request-start-default"
-        value: "%START_TIME%"
-      append: true
-  response_headers_to_remove: ["x-nope"]
+  cluster: "www2"
+response_headers_to_add:
+  - header:
+      key: "x-client-ip"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    append: true
+  - header:
+      key: "x-request-start"
+      value: "%START_TIME(%s.%3f)%"
+    append: true
+  - header:
+      key: "x-request-start-multiple"
+      value: "%START_TIME(%s.%3f)% %START_TIME% %START_TIME(%s)%"
+    append: true
+  - header:
+      key: "x-request-start-f"
+      value: "%START_TIME(f)%"
+    append: true
+  - header:
+      key: "x-request-start-range"
+      value: "%START_TIME(%f, %1f, %2f, %3f, %4f, %5f, %6f, %7f, %8f, %9f)%"
+    append: true
+  - header:
+      key: "x-request-start-default"
+      value: "%START_TIME%"
+    append: true
+response_headers_to_remove: ["x-nope"]
 )EOF";
 
-  const auto route = parseRouteFromV2Yaml(yaml).route();
+  const auto route = parseRouteFromV2Yaml(yaml);
   HeaderParserPtr resp_header_parser =
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
   Http::TestHeaderMapImpl header_map{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
@@ -763,6 +754,50 @@ route:
   EXPECT_TRUE(header_map.has("x-request-start-range"));
   EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
             header_map.get_("x-request-start-range"));
+}
+
+TEST(HeaderParserTest, EvaluateRequestHeadersRemoveBeforeAdd) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+request_headers_to_add:
+  - header:
+      key: "x-foo-header"
+      value: "bar"
+request_headers_to_remove: ["x-foo-header"]
+)EOF";
+
+  const auto route = parseRouteFromV2Yaml(yaml);
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
+  Http::TestHeaderMapImpl header_map{{"x-foo-header", "foo"}};
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  req_header_parser->evaluateHeaders(header_map, stream_info);
+  EXPECT_EQ("bar", header_map.get_("x-foo-header"));
+}
+
+TEST(HeaderParserTest, EvaluateResponseHeadersRemoveBeforeAdd) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+response_headers_to_add:
+  - header:
+      key: "x-foo-header"
+      value: "bar"
+response_headers_to_remove: ["x-foo-header"]
+)EOF";
+
+  const auto route = parseRouteFromV2Yaml(yaml);
+  HeaderParserPtr resp_header_parser =
+      HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
+  Http::TestHeaderMapImpl header_map{{"x-foo-header", "foo"}};
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  resp_header_parser->evaluateHeaders(header_map, stream_info);
+  EXPECT_EQ("bar", header_map.get_("x-foo-header"));
 }
 
 } // namespace Router

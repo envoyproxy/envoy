@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.dubbo_proxy.v2alpha1;
+option go_package = "v2";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Extensions Thrift Proxy]
+// Thrift Proxy filter configuration.
+message DubboProxy {
+  // The human readable prefix to use when emitting statistics.
+  string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
+
+  // Configure the protocol used.
+  enum ProtocolType {
+    Dubbo = 0; // the default protocol.
+  }
+  ProtocolType protocol_type = 2 [(validate.rules).enum.defined_only = true];
+
+  // Configure the serialization protocol used.
+  enum SerializationType {
+    Hessian2 = 0; // the default serialization protocol.
+  }
+  SerializationType serialization_type = 3 [(validate.rules).enum.defined_only = true];
+}

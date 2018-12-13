@@ -37,7 +37,7 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime, Upstream::ClusterManager& cm)
+               Runtime::Loader& runtime, Upstream::ClusterManager& cm, Http::Context& http_context)
       : local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm),
         cluster_name_(config.grpc_service().envoy_grpc().cluster_name()),
         allowed_authorization_headers_(
@@ -45,7 +45,8 @@ public:
         allowed_request_headers_(toRequestHeaders(config.http_service().allowed_request_headers())),
         failure_mode_allow_(config.failure_mode_allow()),
         authorization_headers_to_add_(
-            toAuthorizationHeadersToAdd(config.http_service().authorization_headers_to_add())) {}
+            toAuthorizationHeadersToAdd(config.http_service().authorization_headers_to_add())),
+        http_context_(http_context) {}
 
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
@@ -62,6 +63,8 @@ public:
   const Filters::Common::ExtAuthz::HeaderKeyValueVector& authorizationHeadersToAdd() const {
     return authorization_headers_to_add_;
   }
+
+  Http::Context& httpContext() { return http_context_; }
 
 private:
   static Http::LowerCaseStrUnorderedSet toRequestHeaders(
@@ -107,9 +110,43 @@ private:
   Http::LowerCaseStrUnorderedSet allowed_request_headers_;
   bool failure_mode_allow_;
   const Filters::Common::ExtAuthz::HeaderKeyValueVector authorization_headers_to_add_;
+  Http::Context& http_context_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
+
+/**
+ * Per route settings for ExtAuth. Allows customizing the CheckRequest on a
+ * virtualhost\route\weighted cluster level.
+ */
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  using ContextExtensionsMap = Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>;
+
+  FilterConfigPerRoute(
+      const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute& config)
+      : context_extensions_(config.has_check_settings()
+                                ? config.check_settings().context_extensions()
+                                : ContextExtensionsMap()),
+        disabled_(config.disabled()) {}
+
+  void merge(const FilterConfigPerRoute& other);
+
+  /**
+   * @return Context extensions to add to the CheckRequest.
+   */
+  const ContextExtensionsMap& contextExtensions() const { return context_extensions_; }
+  // Allow moving the context extensions out of this object.
+  ContextExtensionsMap&& takeContextExtensions() { return std::move(context_extensions_); }
+
+  bool disabled() const { return disabled_; }
+
+private:
+  // We save the context extensions as a protobuf map instead of an std::map as this allows us to
+  // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
+  ContextExtensionsMap context_extensions_;
+  bool disabled_;
+};
 
 /**
  * HTTP ext_authz filter. Depending on the route configuration, this filter calls the global

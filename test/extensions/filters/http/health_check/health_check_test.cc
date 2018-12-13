@@ -50,8 +50,8 @@ public:
     matcher.set_name(":path");
     matcher.set_exact_match("/healthcheck");
     header_data_->emplace_back(matcher);
-    filter_.reset(new HealthCheckFilter(context_, pass_through, cache_manager_, header_data_,
-                                        cluster_min_healthy_percentages));
+    filter_ = std::make_unique<HealthCheckFilter>(context_, pass_through, cache_manager_,
+                                                  header_data_, cluster_min_healthy_percentages);
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 

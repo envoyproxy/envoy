@@ -39,7 +39,7 @@ message Bootstrap {
     // <envoy_api_field_config.bootstrap.v2.Bootstrap.DynamicResources.cds_config>`, it's necessary
     // to have some initial cluster definitions available to allow Envoy to know
     // how to speak to the management server. These cluster definitions may not
-    // use :ref:`EDS <arch_overview_dynamic_config_sds>` (i.e. they should be static
+    // use :ref:`EDS <arch_overview_dynamic_config_eds>` (i.e. they should be static
     // IP or DNS-based).
     repeated envoy.api.v2.Cluster clusters = 2 [(gogoproto.nullable) = false];
 
@@ -71,10 +71,7 @@ message Bootstrap {
 
     // [#not-implemented-hide:] Hide from docs.
     message DeprecatedV1 {
-      // This is the global :ref:`SDS <arch_overview_dynamic_config_sds>` config
-      // when using v1 REST for :ref:`CDS
-      // <arch_overview_dynamic_config_cds>`/:ref:`EDS
-      // <arch_overview_dynamic_config_sds>`.
+      // Deprecated service discovery service config for when using API v1 REST.
       envoy.api.v2.core.ConfigSource sds_config = 1;
     }
 

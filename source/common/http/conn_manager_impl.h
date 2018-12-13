@@ -11,8 +11,9 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/context.h"
 #include "envoy/http/filter.h"
-#include "envoy/http/websocket.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -22,7 +23,6 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
-#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/buffer/watermark_buffer.h"
@@ -48,7 +48,7 @@ class ConnectionManagerImpl : Logger::Loggable<Logger::Id::http>,
                               public Network::ConnectionCallbacks {
 public:
   ConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
-                        Runtime::RandomGenerator& random_generator, Tracing::HttpTracer& tracer,
+                        Runtime::RandomGenerator& random_generator, Http::Context& http_context,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
                         Server::OverloadManager* overload_manager, Event::TimeSystem& time_system);
@@ -98,7 +98,7 @@ private:
           stopped_(false), dual_filter_(dual_filter) {}
 
     bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
-    bool commonHandleAfterHeadersCallback(FilterHeadersStatus status);
+    bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& headers_only);
     void commonHandleBufferData(Buffer::Instance& provided_data);
     bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
                                        bool& buffer_was_streaming);
@@ -173,15 +173,17 @@ private:
     const Buffer::Instance* decodingBuffer() override {
       return parent_.buffered_request_data_.get();
     }
-    void sendLocalReply(Code code, const std::string& body,
-                        std::function<void(HeaderMap& headers)> modify_headers) override {
-      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers,
-                             parent_.is_head_request_);
+    void sendLocalReply(Code code, absl::string_view body,
+                        std::function<void(HeaderMap& headers)> modify_headers,
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
+      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, parent_.is_head_request_,
+                             grpc_status);
     }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(HeaderMapPtr&& trailers) override;
+    void encodeMetadata(MetadataMapPtr&& metadata_map) override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void
@@ -264,7 +266,6 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
-                        public WebSocketProxyCallbacks,
                         public Tracing::Config {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
@@ -280,16 +281,19 @@ private:
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
+    void disarmRequestTimeout();
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addEncodedTrailers();
-    void sendLocalReply(bool is_grpc_request, Code code, const std::string& body,
-                        std::function<void(HeaderMap& headers)> modify_headers,
-                        bool is_head_request);
+    void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
+                        const std::function<void(HeaderMap& headers)>& modify_headers,
+                        bool is_head_request,
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
+    void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map);
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
 
@@ -303,6 +307,7 @@ private:
     void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(HeaderMapPtr&& trailers) override;
+    void decodeMetadata(MetadataMapPtr&&) override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
     // Http::FilterChainFactoryCallbacks
     void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
@@ -316,11 +321,6 @@ private:
       addStreamEncoderFilterWorker(filter, true);
     }
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
-
-    // Http::WebSocketProxyCallbacks
-    void sendHeadersOnlyResponse(HeaderMap& headers) override {
-      encodeHeaders(nullptr, headers, true);
-    }
 
     // Tracing::TracingConfig
     virtual Tracing::OperationName operationName() const override;
@@ -359,7 +359,9 @@ private:
 
     // All state for the stream. Put here for readability.
     struct State {
-      State() : remote_complete_(false), local_complete_(false), saw_connection_close_(false) {}
+      State()
+          : remote_complete_(false), local_complete_(false), saw_connection_close_(false),
+            successful_upgrade_(false), created_filter_chain_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -371,6 +373,8 @@ private:
       bool remote_complete_ : 1;
       bool local_complete_ : 1;
       bool saw_connection_close_ : 1;
+      bool successful_upgrade_ : 1;
+      bool created_filter_chain_ : 1;
     };
 
     // Possibly increases buffer_limit_ to the value of limit.
@@ -381,6 +385,8 @@ private:
     void onIdleTimeout();
     // Reset per-stream idle timer.
     void resetIdleTimer();
+    // Per-stream request timeout callback
+    void onRequestTimeout();
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
@@ -397,9 +403,11 @@ private:
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
-    Stats::TimespanPtr request_timer_;
+    Stats::TimespanPtr request_response_timespan_;
     // Per-stream idle timeout.
-    Event::TimerPtr idle_timer_;
+    Event::TimerPtr stream_idle_timer_;
+    // Per-stream request timeout.
+    Event::TimerPtr request_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
     StreamInfo::StreamInfoImpl stream_info_;
@@ -412,7 +420,12 @@ private:
     // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
     bool has_continue_headers_{};
-    bool is_head_request_{false};
+    bool is_head_request_{};
+    // Whether a filter has indicated that the request should be treated as a headers only request.
+    bool decoding_headers_only_{};
+    // Whether a filter has indicated that the response should be treated as a headers only
+    // response.
+    bool encoding_headers_only_{};
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
@@ -438,8 +451,7 @@ private:
   void onIdleTimeout();
   void onDrainTimeout();
   void startDrainSequence();
-
-  bool isOldStyleWebSocketConnection() const { return ws_connection_ != nullptr; }
+  Tracing::HttpTracer& tracer() { return http_context_.tracer(); }
 
   enum class DrainState { NotDraining, Draining, Closing };
 
@@ -452,14 +464,16 @@ private:
   const Network::DrainDecision& drain_close_;
   DrainState drain_state_{DrainState::NotDraining};
   UserAgent user_agent_;
-  Event::TimerPtr idle_timer_;
+  // An idle timer for the connection. This is only armed when there are no streams on the
+  // connection. When there are active streams it is disarmed in favor of each stream's
+  // stream_idle_timer_.
+  Event::TimerPtr connection_idle_timer_;
   Event::TimerPtr drain_timer_;
   Runtime::RandomGenerator& random_generator_;
-  Tracing::HttpTracer& tracer_;
+  Http::Context& http_context_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cluster_manager_;
-  WebSocketProxyPtr ws_connection_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
   // References into the overload manager thread local state map. Using these lets us avoid a map

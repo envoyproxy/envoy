@@ -836,10 +836,21 @@ TEST(DateFormatter, FromTime) {
   EXPECT_EQ("2018-04-03T23:06:09.000Z", DateFormatter("%Y-%m-%dT%H:%M:%S.000Z").fromTime(time1));
   EXPECT_EQ("aaa23", DateFormatter(std::string(3, 'a') + "%H").fromTime(time1));
   EXPECT_EQ("", DateFormatter(std::string(1022, 'a') + "%H").fromTime(time1));
-  const time_t time2 = 0;
+  const SystemTime time2(std::chrono::seconds(0));
   EXPECT_EQ("1970-01-01T00:00:00.000Z", DateFormatter("%Y-%m-%dT%H:%M:%S.000Z").fromTime(time2));
   EXPECT_EQ("aaa00", DateFormatter(std::string(3, 'a') + "%H").fromTime(time2));
   EXPECT_EQ("", DateFormatter(std::string(1022, 'a') + "%H").fromTime(time2));
+}
+
+// Verify that two DateFormatter patterns with the same ??? patterns but
+// different format strings don't false share cache entries. This is a
+// regression test for when they did.
+TEST(DateFormatter, FromTimeSameWildcard) {
+  const SystemTime time1(std::chrono::seconds(1522796769) + std::chrono::milliseconds(142));
+  EXPECT_EQ("2018-04-03T23:06:09.000Z142",
+            DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%3f").fromTime(time1));
+  EXPECT_EQ("2018-04-03T23:06:09.000Z114",
+            DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%1f%2f").fromTime(time1));
 }
 
 } // namespace Envoy

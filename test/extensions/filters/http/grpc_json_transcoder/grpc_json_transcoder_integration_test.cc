@@ -72,8 +72,8 @@ protected:
     }
 
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
     if (!grpc_request_messages.empty()) {
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
       ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
       Grpc::Decoder grpc_decoder;
@@ -96,8 +96,9 @@ protected:
       response_headers.insertStatus().value(200);
       response_headers.insertContentType().value(std::string("application/grpc"));
       if (grpc_response_messages.empty()) {
-        response_headers.insertGrpcStatus().value(grpc_status.error_code());
-        response_headers.insertGrpcMessage().value(grpc_status.error_message());
+        response_headers.insertGrpcStatus().value(static_cast<uint64_t>(grpc_status.error_code()));
+        response_headers.insertGrpcMessage().value(absl::string_view(
+            grpc_status.error_message().data(), grpc_status.error_message().size()));
         upstream_request_->encodeHeaders(response_headers, true);
       } else {
         response_headers.addCopy(Http::LowerCaseString("trailer"), "Grpc-Status");
@@ -110,13 +111,12 @@ protected:
           upstream_request_->encodeData(*buffer, false);
         }
         Http::TestHeaderMapImpl response_trailers;
-        response_trailers.insertGrpcStatus().value(grpc_status.error_code());
-        response_trailers.insertGrpcMessage().value(grpc_status.error_message());
+        response_trailers.insertGrpcStatus().value(static_cast<uint64_t>(grpc_status.error_code()));
+        response_trailers.insertGrpcMessage().value(absl::string_view(
+            grpc_status.error_message().data(), grpc_status.error_message().size()));
         upstream_request_->encodeTrailers(response_trailers);
       }
       EXPECT_TRUE(upstream_request_->complete());
-    } else {
-      ASSERT_TRUE(upstream_request_->waitForReset());
     }
 
     response->waitForEndStream();

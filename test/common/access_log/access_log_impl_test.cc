@@ -11,7 +11,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 
-#include "test/common/access_log/test_util.h"
+#include "test/common/stream_info/test_util.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -91,6 +91,27 @@ TEST_F(AccessLogImplTest, LogMoreData) {
             output_);
 }
 
+TEST_F(AccessLogImplTest, DownstreamDisconnect) {
+  const std::string json = R"EOF(
+      {
+        "path": "/dev/null"
+      }
+      )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
+
+  EXPECT_CALL(*file_, write(_));
+
+  std::shared_ptr<Upstream::MockClusterInfo> cluster{new Upstream::MockClusterInfo()};
+  stream_info_.upstream_host_ = Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234");
+  stream_info_.response_flags_ = StreamInfo::ResponseFlag::DownstreamConnectionTermination;
+
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 DC 1 2 3 - \"-\" \"-\" \"-\" \"-\" "
+            "\"10.0.0.5:1234\"\n",
+            output_);
+}
+
 TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
   const std::string json = R"EOF(
   {
@@ -104,9 +125,9 @@ TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
   response_headers_.addCopy(Http::Headers::get().EnvoyUpstreamServiceTime, "999");
 
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-  EXPECT_EQ(
-      "[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 - 1 2 3 999 \"-\" \"-\" \"-\" \"-\" \"-\"\n",
-      output_);
+  EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 - 1 2 3 999 \"-\" \"-\" \"-\" \"-\" "
+            "\"-\"\n",
+            output_);
 }
 
 TEST_F(AccessLogImplTest, NoFilter) {
@@ -814,11 +835,12 @@ filter:
       - RL
       - UAEX
       - RLSE
+      - DC
 config:
   path: /dev/null
   )EOF";
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x2000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x4000,
                 "A flag has been added. Fix this code.");
 
   std::vector<StreamInfo::ResponseFlag> all_response_flags = {
@@ -836,6 +858,7 @@ config:
       StreamInfo::ResponseFlag::RateLimited,
       StreamInfo::ResponseFlag::UnauthorizedExternalService,
       StreamInfo::ResponseFlag::RateLimitServiceError,
+      StreamInfo::ResponseFlag::DownstreamConnectionTermination,
   };
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
@@ -865,7 +888,8 @@ config:
       "Proto constraint validation failed (AccessLogFilterValidationError.ResponseFlagFilter: "
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
-      "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\"]]): "
+      "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
+      "\"DC\"]]): "
       "response_flag_filter {\n  flags: \"UnsupportedFlag\"\n}\n");
 }
 

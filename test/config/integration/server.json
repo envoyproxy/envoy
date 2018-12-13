@@ -4,7 +4,6 @@
     "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
     {
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http1",
@@ -77,15 +76,14 @@
                 {
                   "prefix": "/websocket/test",
                   "prefix_rewrite": "/websocket",
-                  "cluster": "cluster_1",
-                  "use_websocket" : true
+                  "cluster": "cluster_1"
                 }
               ]
             }
           ]
         },
         "filters": [
-          { "type": "both", "name": "health_check",
+          { "name": "health_check",
             "config": {
               "pass_through_mode": false, "endpoint": "/healthcheck"
             }
@@ -104,7 +102,6 @@
     "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
     {
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http1",
@@ -191,15 +188,14 @@
                 {
                   "prefix": "/websocket/test",
                   "prefix_rewrite": "/websocket",
-                  "cluster": "cluster_1",
-                  "use_websocket" : true
+                  "cluster": "cluster_1"
                 }
               ]
             }
           ]
         },
         "filters": [
-          { "type": "both", "name": "health_check",
+          { "name": "health_check",
             "config": {
               "pass_through_mode": false, "endpoint": "/healthcheck"
             }
@@ -219,7 +215,6 @@
     "per_connection_buffer_limit_bytes": 1024,
     "filters": [
     {
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http1",
@@ -250,7 +245,6 @@
     "per_connection_buffer_limit_bytes": 1024,
     "filters": [
     {
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http1",
@@ -271,7 +265,7 @@
           ]
         },
         "filters": [
-          { "type": "both", "name": "http_dynamo_filter", "config": {} },
+          { "name": "http_dynamo_filter", "config": {} },
           { "type": "decoder", "name": "router", "config": {} }
         ]
       }
@@ -282,7 +276,6 @@
     "per_connection_buffer_limit_bytes": 1024,
     "filters": [
     {
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http1",
@@ -313,7 +306,6 @@
     "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
     {
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http1",
@@ -386,15 +378,14 @@
                 {
                   "prefix": "/websocket/test",
                   "prefix_rewrite": "/websocket",
-                  "cluster": "cluster_1",
-                  "use_websocket" : true
+                  "cluster": "cluster_1"
                 }
               ]
             }
           ]
         },
         "filters": [
-          { "type": "both", "name": "health_check",
+          { "name": "health_check",
             "config": {
               "pass_through_mode": false, "endpoint": "/healthcheck"
             }
@@ -419,7 +410,6 @@
     "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
     {
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http1",
@@ -438,7 +428,6 @@
     "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
     {
-      "type": "read",
       "name": "redis_proxy",
       "config": {
         "cluster_name": "redis",

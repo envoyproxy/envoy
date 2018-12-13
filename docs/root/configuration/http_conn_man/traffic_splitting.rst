@@ -58,11 +58,11 @@ envoy configuration file.
 
 
 Envoy matches routes with a :ref:`first match <config_http_conn_man_route_table_route_matching>` policy.
-If the route has a runtime object, the request will be additionally matched based on the runtime
-:ref:`value <envoy_api_field_route.RouteMatch.runtime>`
+If the route has a runtime_fraction object, the request will be additionally matched based on the runtime_fraction
+:ref:`value <envoy_api_field_route.RouteMatch.runtime_fraction>`
 (or the default, if no value is specified). Thus, by placing routes
-back-to-back in the above example and specifying a runtime object in the
-first route, traffic shifting can be accomplished by changing the runtime
+back-to-back in the above example and specifying a runtime_fraction object in the
+first route, traffic shifting can be accomplished by changing the runtime_fraction
 value. The following are the approximate sequence of actions required to
 accomplish the task.
 

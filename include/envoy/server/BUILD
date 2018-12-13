@@ -24,7 +24,6 @@ envoy_cc_library(
     deps = [
         ":config_tracker_interface",
         "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:query_params_interface",
@@ -37,6 +36,7 @@ envoy_cc_library(
     hdrs = ["configuration.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        "//include/envoy/http:context_interface",
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -93,11 +93,12 @@ envoy_cc_library(
         ":options_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
+        "//include/envoy/common:mutex_tracer",
         "//include/envoy/event:timer_interface",
+        "//include/envoy/http:context_interface",
         "//include/envoy/http:query_params_interface",
         "//include/envoy/init:init_interface",
         "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/server:overload_manager_interface",
@@ -114,6 +115,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/network:address_interface",
         "//include/envoy/stats:stats_interface",
+        "@envoy_api//envoy/admin/v2alpha:server_info_cc",
     ],
 )
 
@@ -121,6 +123,7 @@ envoy_cc_library(
     name = "worker_interface",
     hdrs = ["worker.h"],
     deps = [
+        ":overload_manager_interface",
         "//include/envoy/server:guarddog_interface",
     ],
 )
@@ -140,12 +143,13 @@ envoy_cc_library(
     deps = [
         ":admin_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/http:context_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/init:init_interface",
         "//include/envoy/json:json_object_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:drain_decision_interface",
-        "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:overload_manager_interface",
         "//include/envoy/singleton:manager_interface",
@@ -212,5 +216,17 @@ envoy_cc_library(
     name = "overload_manager_interface",
     hdrs = ["overload_manager.h"],
     deps = [
+        "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "tracer_config_interface",
+    hdrs = ["tracer_config.h"],
+    deps = [
+        ":instance_interface",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/config/trace/v2:trace_cc",
     ],
 )

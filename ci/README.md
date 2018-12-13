@@ -3,7 +3,7 @@
 Two flavors of Envoy Docker images, based on Ubuntu and Alpine Linux, are built.
 
 ## Ubuntu envoy image
-The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for Travis CI checks,
+The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CircleCI checks,
 where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/master/ci/envoy_build_sha.sh). Developers
 may work with `envoyproxy/envoy-build:latest` to provide a self-contained environment for building Envoy binaries and
 running tests that reflects the latest built Ubuntu Envoy image. Moreover, the Docker image
@@ -76,13 +76,14 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang.
 * `bazel.debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `bazel.debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
-* `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with gcc.
+* `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with clang.
 * `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt` with gcc.
 * `bazel.release <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt` with gcc.
 * `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with gcc.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `bazel.coverity` &mdash; build Envoy static binary and run Coverity Scan static analysis.
-* `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang-6.0.
+* `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
+* `bazel.clang_tidy` &mdash; build and run clang-tidy over all source files.
 * `check_format`&mdash; run `clang-format-6.0` and `buildifier` on entire source tree.
 * `fix_format`&mdash; run and enforce `clang-format-6.0` and `buildifier` on entire source tree.
 * `check_spelling`&mdash; run `misspell` on entire project.

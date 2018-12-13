@@ -23,7 +23,7 @@ maximize the chances of your PR being merged.
 
 * As of the 1.3.0 release, the Envoy user-facing configuration and APIs are
   locked and we will not make breaking changes between official numbered
-  releases. This includes bootstrap configuration, REST/gRPC APIs (SDS, CDS, RDS,
+  releases. This includes bootstrap configuration, REST/gRPC APIs (EDS, CDS, RDS,
   etc.), and CLI switches. We will also try to not change behavioral semantics
   (e.g., HTTP header processing order), though this is harder to outright
   guarantee.
@@ -106,8 +106,8 @@ maximize the chances of your PR being merged.
   * "http conn man: add new feature"
 * Your PR description should have details on what the PR does. If it fixes an existing issue it
   should end with "Fixes #XXX".
-* When all of the tests are passing and all other conditions described herein are satisfied, tag
-  @lyft/network-team and we will review it and merge.
+* When all of the tests are passing and all other conditions described herein are satisfied, a
+  maintainer will be assigned to review and merge the PR.
 * Once you submit a PR, *please do not rebase it*. It's much easier to review if subsequent commits
   are new commits and/or merges. We squash rebase the final merged commit so the number of commits
   you have in the PR don't matter.

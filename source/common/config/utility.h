@@ -36,6 +36,20 @@ public:
   const std::string Grpc{"GRPC"};
 };
 
+/**
+ * RateLimitSettings for discovery requests.
+ */
+struct RateLimitSettings {
+  // Default Max Tokens.
+  static const uint32_t DefaultMaxTokens = 100;
+  // Default Fill Rate.
+  static constexpr double DefaultFillRate = 10;
+
+  uint32_t max_tokens_{DefaultMaxTokens};
+  double fill_rate_{DefaultFillRate};
+  bool enabled_{false};
+};
+
 typedef ConstSingleton<ApiTypeValues> ApiType;
 
 /**
@@ -198,6 +212,14 @@ public:
    */
   static void translateLdsConfig(const Json::Object& json_lds,
                                  envoy::api::v2::core::ConfigSource& lds_config);
+
+  /**
+   * Parses RateLimit configuration from envoy::api::v2::core::ApiConfigSource to RateLimitSettings.
+   * @param api_config_source ApiConfigSource.
+   * @return RateLimitSettings.
+   */
+  static RateLimitSettings
+  parseRateLimitSettings(const envoy::api::v2::core::ApiConfigSource& api_config_source);
 
   /**
    * Generate a SubscriptionStats object from stats scope.

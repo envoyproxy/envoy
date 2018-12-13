@@ -107,6 +107,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "mutex_tracer_test",
+    srcs = ["mutex_tracer_test.cc"],
+    deps = [
+        "//source/common/common:mutex_tracer_lib",
+        "//test/test_common:contention_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     external_deps = [
@@ -132,6 +141,14 @@ envoy_cc_test(
     srcs = ["perf_annotation_disabled_test.cc"],
     deps = [
         "//source/common/common:perf_annotation_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "stack_array_test",
+    srcs = ["stack_array_test.cc"],
+    deps = [
+        "//source/common/common:stack_array",
     ],
 )
 

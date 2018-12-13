@@ -29,6 +29,7 @@ envoy_cc_library(
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/network:listener_interface",
         "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/thread:thread_interface",
     ],
 )
 
@@ -46,6 +47,7 @@ envoy_cc_library(
     name = "timer_interface",
     hdrs = ["timer.h"],
     deps = [
+        "//include/envoy/common:time_interface",
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
     ],

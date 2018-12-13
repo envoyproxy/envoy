@@ -44,11 +44,18 @@ affected files manually or run the provided formatting script.
 To run the format fix script directly:
 
 ```
-./tools/check_format.py fix
+./tools/check_format.py fix && ./tools/format_python_tools.sh fix
 ```
 
 To run the format fix script under Docker:
 
 ```
 ./ci/run_envoy_docker.sh './ci/do_ci.sh fix_format'
+```
+
+To run clang-tidy under Docker, run the following (this creates a full
+compilation db and takes a long time):
+
+```
+./ci/run_envoy_docker.sh ci/do_ci.sh bazel.clang_tidy
 ```

@@ -1,7 +1,9 @@
 #include "extensions/filters/http/jwt_authn/filter.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -75,6 +77,31 @@ TEST_F(FilterTest, InlineOK) {
   EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
     context->callback()->onComplete(Status::Ok);
   }));
+
+  auto headers = Http::TestHeaderMapImpl{};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
+
+  Buffer::OwnedImpl data("");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+}
+
+// This test verifies the setPayload call is handled correctly
+TEST_F(FilterTest, TestSetPayloadCall) {
+  setupMockConfig();
+  ProtobufWkt::Struct payload;
+  // A successful authentication completed inline: callback is called inside verify().
+  EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([&payload](ContextSharedPtr context) {
+    context->callback()->setPayload(payload);
+    context->callback()->onComplete(Status::Ok);
+  }));
+
+  EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([&payload](const std::string& ns, const ProtobufWkt::Struct& out_payload) {
+        EXPECT_EQ(ns, HttpFilterNames::get().JwtAuthn);
+        EXPECT_TRUE(TestUtility::protoEqual(out_payload, payload));
+      }));
 
   auto headers = Http::TestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));

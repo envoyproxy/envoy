@@ -32,6 +32,13 @@ from the result Envoy assumes it no longer exists and will drain traffic from an
 connection pools. Note that Envoy never synchronously resolves DNS in the forwarding path. At the
 expense of eventual consistency, there is never a worry of blocking on a long running DNS query.
 
+If a single DNS name resolves to the same IP multiple times, these IPs will be de-duplicated.
+
+If multiple DNS names resolve to the same IP, health checking will *not* be shared.
+This means that care should be taken if active health checking is used with DNS names that resolve
+to the same IPs: if an IP is repeated many times between DNS names it might cause undue load on the
+upstream host.
+
 .. _arch_overview_service_discovery_types_logical_dns:
 
 Logical DNS
@@ -62,7 +69,7 @@ to an original destination cluster are forwarded to upstream hosts as addressed 
 metadata, without any explicit host configuration or upstream host discovery. 
 Connections to upstream hosts are pooled and unused hosts are flushed out when they have been idle longer than
 :ref:`cleanup_interval <envoy_api_field_Cluster.cleanup_interval>`, which defaults to
-5000ms. If the original destination address is is not available, no upstream connection is opened.
+5000ms. If the original destination address is not available, no upstream connection is opened.
 Envoy can also pickup the original destination from a :ref:`HTTP header 
 <arch_overview_load_balancing_types_original_destination_request_header>`.
 Original destination service discovery must be used with the original destination :ref:`load
@@ -84,28 +91,14 @@ preferred service discovery mechanism for a few reasons:
   load balancing weight, canary status, zone, etc. These additional attributes are used globally
   by the Envoy mesh during load balancing, statistic gathering, etc.
 
+The Envoy project provides reference gRPC implementations of EDS and
+:ref:`other discovery services <arch_overview_dynamic_config>`
+in both `Java <https://github.com/envoyproxy/java-control-plane>`_
+and `Go <https://github.com/envoyproxy/go-control-plane>`_.
+
 Generally active health checking is used in conjunction with the eventually consistent service
 discovery service data to making load balancing and routing decisions. This is discussed further in
 the following section.
-
-.. _arch_overview_service_discovery_types_sds:
-
-Service discovery service (v1 SDS)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-*(deprecated)* This discovery service was replaced to endpoint discovery service in :ref:`v2 xDS
-API<config_overview_v2>`.
-
-The *service discovery service* is a generic :ref:`REST based API <config_cluster_manager_sds_api>`
-used by Envoy to fetch cluster members. Lyft provides a reference implementation via the Python
-`discovery service <https://github.com/lyft/discovery>`_. That implementation uses AWS DynamoDB as
-the backing store, however the API is simple enough that it could easily be implemented on top of a
-variety of different backing stores.
-
-.. attention::
-
-  In the current xDS API, the word "SDS" is used as an acronym for :ref:`Secret Discovery Service
-  <config_secret_discovery_service>`.
 
 .. _arch_overview_service_discovery_eventually_consistent:
 

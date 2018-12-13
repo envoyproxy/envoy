@@ -87,8 +87,10 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
                                      const Config& tracing_config) {
   // Pre response data.
   if (request_headers) {
-    span.setTag(Tracing::Tags::get().GUID_X_REQUEST_ID,
-                std::string(request_headers->RequestId()->value().c_str()));
+    if (request_headers->RequestId()) {
+      span.setTag(Tracing::Tags::get().GUID_X_REQUEST_ID,
+                  std::string(request_headers->RequestId()->value().c_str()));
+    }
     span.setTag(Tracing::Tags::get().HTTP_URL, buildUrl(*request_headers));
     span.setTag(Tracing::Tags::get().HTTP_METHOD, request_headers->Method()->value().c_str());
     span.setTag(Tracing::Tags::get().DOWNSTREAM_CLUSTER,

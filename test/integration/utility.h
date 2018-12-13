@@ -13,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/http/codec_client.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
@@ -34,6 +35,7 @@ public:
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance&, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
+  void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason) override;
@@ -98,6 +100,7 @@ private:
   };
 
   Api::ApiPtr api_;
+  Stats::IsolatedStoreImpl stats_store_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;

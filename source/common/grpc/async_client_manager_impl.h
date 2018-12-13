@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
@@ -41,7 +42,7 @@ private:
 class AsyncClientManagerImpl : public AsyncClientManager {
 public:
   AsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
-                         TimeSource& time_source);
+                         TimeSource& time_source, Api::Api& api);
 
   // Grpc::AsyncClientManager
   AsyncClientFactoryPtr factoryForGrpcService(const envoy::api::v2::core::GrpcService& config,

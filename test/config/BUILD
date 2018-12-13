@@ -24,6 +24,7 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//test/config/integration/certs:hashes",
         "//test/integration:server_stats_interface",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",

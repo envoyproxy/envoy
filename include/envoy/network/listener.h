@@ -7,8 +7,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
-#include "envoy/network/transport_socket.h"
-#include "envoy/ssl/context.h"
 #include "envoy/stats/scope.h"
 
 namespace Envoy {
@@ -61,6 +59,13 @@ public:
   virtual uint32_t perConnectionBufferLimitBytes() PURE;
 
   /**
+   * @return std::chrono::milliseconds the time to wait for all listener filters to complete
+   *         operation. If the timeout is reached, the accepted socket is closed without a
+   *         connection being created. 0 specifies a disabled timeout.
+   */
+  virtual std::chrono::milliseconds listenerFiltersTimeout() const PURE;
+
+  /**
    * @return Stats::Scope& the stats scope to use for all listener specific stats.
    */
   virtual Stats::Scope& listenerScope() PURE;
@@ -74,6 +79,14 @@ public:
    * @return const std::string& the listener's name.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return bool indicates whether write filters should be in the reversed order of the filter
+   *         chain config.
+   */
+  // TODO(qiannawang): this method is deprecated and to be moved soon. See
+  // https://github.com/envoyproxy/envoy/pull/4889 for more details.
+  virtual bool reverseWriteFilterOrder() const PURE;
 };
 
 /**

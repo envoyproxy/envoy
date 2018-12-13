@@ -30,14 +30,13 @@ request. The router filter supports the following features:
 * :ref:`Automatic host rewriting <envoy_api_field_route.RouteAction.auto_host_rewrite>` based on
   the DNS name of the selected upstream host.
 * :ref:`Prefix rewriting <envoy_api_field_route.RedirectAction.prefix_rewrite>`.
-* :ref:`Websocket upgrades <envoy_api_field_route.RouteAction.use_websocket>` at route level.
 * :ref:`Request retries <arch_overview_http_routing_retry>` specified either via HTTP header or via
   route configuration.
 * Request timeout specified either via :ref:`HTTP
   header <config_http_filters_router_headers_consumed>` or via :ref:`route configuration
   <envoy_api_field_route.RouteAction.timeout>`.
 * Traffic shifting from one upstream cluster to another via :ref:`runtime values
-  <envoy_api_field_route.RouteMatch.runtime>` (see :ref:`traffic shifting/splitting
+  <envoy_api_field_route.RouteMatch.runtime_fraction>` (see :ref:`traffic shifting/splitting
   <config_http_conn_man_route_table_traffic_splitting>`).
 * Traffic splitting across multiple upstream clusters using :ref:`weight/percentage-based routing
   <envoy_api_field_route.RouteAction.weighted_clusters>` (see :ref:`traffic shifting/splitting

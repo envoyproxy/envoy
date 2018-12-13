@@ -45,6 +45,7 @@ public:
   const LowerCaseString EnvoyOriginalDstHost{"x-envoy-original-dst-host"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
   const LowerCaseString EnvoyOverloaded{"x-envoy-overloaded"};
+  const LowerCaseString EnvoyRateLimited{"x-envoy-ratelimited"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
   const LowerCaseString EnvoyRetryGrpcOn{"x-envoy-retry-grpc-on"};
   const LowerCaseString EnvoyRetriableStatusCodes{"x-envoy-retriable-status-codes"};
@@ -92,11 +93,6 @@ public:
   const LowerCaseString UserAgent{"user-agent"};
   const LowerCaseString Vary{"vary"};
   const LowerCaseString Via{"via"};
-  const LowerCaseString XB3TraceId{"x-b3-traceid"};
-  const LowerCaseString XB3SpanId{"x-b3-spanid"};
-  const LowerCaseString XB3ParentSpanId{"x-b3-parentspanid"};
-  const LowerCaseString XB3Sampled{"x-b3-sampled"};
-  const LowerCaseString XB3Flags{"x-b3-flags"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
   const LowerCaseString XSquashDebug{"x-squash-debug"};
 
@@ -140,6 +136,10 @@ public:
   struct {
     const std::string True{"true"};
   } EnvoyOverloadedValues;
+
+  struct {
+    const std::string True{"true"};
+  } EnvoyRateLimitedValues;
 
   struct {
     const std::string _5xx{"5xx"};

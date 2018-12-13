@@ -102,8 +102,6 @@ followed.
 Stat names are replicated in several places in various forms.
 
  * Held fully elaborated next to the values, in `RawStatData` and `HeapStatData`
- * As keys of multiple maps in `ThreadLocalStore` for capturing all stats in a scope,
-   and each per-thread caches.
  * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/metric_impl.h)
    in a transformed state, with tags extracted into vectors of name/value strings.
  * In static strings across the codebase where stats are referenced
@@ -111,9 +109,17 @@ Stat names are replicated in several places in various forms.
    regexes](https://github.com/envoyproxy/envoy/blob/master/source/common/config/well_known_names.cc)
    used to perform tag extraction.
 
-These copies -- particularly the keys in thread-local storage -- multiply the
-stat name storage, making stat names dominate memory usage, particularly for
-deployments with large numbers of clusters and threads.
+There are stat maps in `ThreadLocalStore` for capturing all stats in a scope,
+and each per-thread caches. However, they don't duplicate the stat
+names. Instead, they reference the `char*` held in the `RawStatData` or
+`HeapStatData itself, and thus are relatively cheap; effectively those maps are
+all pointer-to-pointer.
+
+For this to be safe, cache lookups from locally scoped strings must use `.find`
+rather than `operator[]`, as the latter would insert a pointer to a temporary as
+the key. If the `.find` fails, the actual stat must be constructed first, and
+then inserted into the map using its key storage. This strategy saves
+duplication of the keys, but costs an extra map lookup on each miss.
 
 ## Tags and Tag Extraction
 

@@ -1,5 +1,7 @@
 #include "common/upstream/thread_aware_lb_impl.h"
 
+#include <memory>
+
 namespace Envoy {
 namespace Upstream {
 
@@ -23,7 +25,7 @@ void ThreadAwareLoadBalancerBase::refresh() {
 
   for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
     const uint32_t priority = host_set->priority();
-    (*per_priority_state_vector)[priority].reset(new PerPriorityState);
+    (*per_priority_state_vector)[priority] = std::make_unique<PerPriorityState>();
     const auto& per_priority_state = (*per_priority_state_vector)[priority];
     // Copy panic flag from LoadBalancerBase. It is calculated when there is a change
     // in hosts set or hosts' health.

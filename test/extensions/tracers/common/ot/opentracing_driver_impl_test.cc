@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "extensions/tracers/common/ot/opentracing_driver_impl.h"
 
 #include "test/mocks/http/mocks.h"
@@ -8,8 +10,6 @@
 #include "gtest/gtest.h"
 #include "opentracing/mocktracer/in_memory_recorder.h"
 #include "opentracing/mocktracer/tracer.h"
-
-using testing::Test;
 
 namespace Envoy {
 namespace Extensions {
@@ -44,13 +44,13 @@ private:
   std::shared_ptr<opentracing::mocktracer::MockTracer> tracer_;
 };
 
-class OpenTracingDriverTest : public Test {
+class OpenTracingDriverTest : public testing::Test {
 public:
   void
   setupValidDriver(OpenTracingDriver::PropagationMode propagation_mode =
                        OpenTracingDriver::PropagationMode::SingleHeader,
                    const opentracing::mocktracer::PropagationOptions& propagation_options = {}) {
-    driver_.reset(new TestDriver{propagation_mode, propagation_options, stats_});
+    driver_ = std::make_unique<TestDriver>(propagation_mode, propagation_options, stats_);
   }
 
   const std::string operation_name_{"test"};

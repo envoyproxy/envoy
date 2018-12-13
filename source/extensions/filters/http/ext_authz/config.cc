@@ -21,9 +21,9 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
 
-  const auto filter_config =
-      std::make_shared<FilterConfig>(proto_config, context.localInfo(), context.scope(),
-                                     context.runtime(), context.clusterManager());
+  const auto filter_config = std::make_shared<FilterConfig>(
+      proto_config, context.localInfo(), context.scope(), context.runtime(),
+      context.clusterManager(), context.httpContext());
 
   if (proto_config.has_http_service()) {
     const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.http_service().server_uri(),
@@ -55,6 +55,13 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
         std::make_shared<Filter>(filter_config, std::move(client))});
   };
 };
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute& proto_config,
+    Server::Configuration::FactoryContext&) {
+  return std::make_shared<FilterConfigPerRoute>(proto_config);
+}
 
 /**
  * Static registration for the external authorization filter. @see RegisterFactory.

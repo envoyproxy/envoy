@@ -110,7 +110,8 @@ BufferFilterStats BufferFilter::generateStats(const std::string& prefix, Stats::
 void BufferFilter::onDestroy() { resetInternalState(); }
 
 void BufferFilter::onRequestTimeout() {
-  callbacks_->sendLocalReply(Http::Code::RequestTimeout, "buffer request timeout", nullptr);
+  callbacks_->sendLocalReply(Http::Code::RequestTimeout, "buffer request timeout", nullptr,
+                             absl::nullopt);
   config_->stats().rq_timeout_.inc();
 }
 

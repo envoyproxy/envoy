@@ -1,6 +1,7 @@
 #include <unistd.h>
 
 #include "common/common/lock_guard.h"
+#include "common/common/mutex_tracer_impl.h"
 #include "common/common/thread.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -8,6 +9,7 @@
 
 #include "server/options_impl.h"
 
+#include "test/test_common/contention.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -72,7 +74,7 @@ protected:
     argv_.push_back(nullptr);
   }
 
-  // Adds options to make Envoy exit immediately after initializtion.
+  // Adds options to make Envoy exit immediately after initialization.
   void initOnly() {
     addArg("--mode");
     addArg("init_only");
@@ -102,7 +104,7 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   EXPECT_TRUE(main_common.run());
 }
 
-// Ensurees that existing users of main_common() can link.
+// Ensure that existing users of main_common() can link.
 TEST_P(MainCommonTest, LegacyMain) {
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
@@ -155,8 +157,8 @@ protected:
 
   // Initiates Envoy running in its own thread.
   void startEnvoy() {
-    envoy_thread_ = std::make_unique<Thread::Thread>([this]() {
-      // Note: main_common_ is accesesed in the testing thread, but
+    envoy_thread_ = Thread::threadFactoryForTest().createThread([this]() {
+      // Note: main_common_ is accessed in the testing thread, but
       // is race-free, as MainCommon::run() does not return until
       // triggered with an adminRequest POST to /quitquitquit, which
       // is done in the testing thread.
@@ -190,6 +192,7 @@ protected:
     return envoy_return_;
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Thread::Thread> envoy_thread_;
   std::unique_ptr<MainCommon> main_common_;
   absl::Notification started_;
@@ -217,6 +220,31 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
   startEnvoy();
   started_.WaitForNotification();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  kill(getpid(), SIGTERM);
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_P(AdminRequestTest, AdminRequestContentionDisabled) {
+  startEnvoy();
+  started_.WaitForNotification();
+  EXPECT_THAT(adminRequest("/contention", "GET"), HasSubstr("not enabled"));
+  kill(getpid(), SIGTERM);
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_P(AdminRequestTest, AdminRequestContentionEnabled) {
+  addArg("--enable-mutex-tracing");
+  startEnvoy();
+  started_.WaitForNotification();
+
+  // Induce contention to guarantee a non-zero num_contentions count.
+  Thread::TestUtil::ContentionGenerator::generateContention(MutexTracerImpl::getOrCreateTracer());
+
+  std::string response = adminRequest("/contention", "GET");
+  EXPECT_THAT(response, Not(HasSubstr("not enabled")));
+  EXPECT_THAT(response, HasSubstr("\"num_contentions\":"));
+  EXPECT_THAT(response, Not(HasSubstr("\"num_contentions\": \"0\"")));
+
   kill(getpid(), SIGTERM);
   EXPECT_TRUE(waitForEnvoyToExit());
 }
@@ -310,10 +338,7 @@ TEST_P(MainCommonTest, ConstructDestructLogger) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 
   const std::string logger_name = "logger";
-  spdlog::details::log_msg log_msg;
-  log_msg.logger_name = &logger_name;
-  log_msg.level = spdlog::level::level_enum::err;
-
+  spdlog::details::log_msg log_msg(&logger_name, spdlog::level::level_enum::err);
   Logger::Registry::getSink()->log(log_msg);
 }
 

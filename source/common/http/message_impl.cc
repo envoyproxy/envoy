@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/common/platform.h"
+#include "common/common/stack_array.h"
 
 namespace Envoy {
 namespace Http {
@@ -12,10 +12,9 @@ std::string MessageImpl::bodyAsString() const {
   std::string ret;
   if (body_) {
     uint64_t num_slices = body_->getRawSlices(nullptr, 0);
-    STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
-    body_->getRawSlices(slices, num_slices);
-    for (uint64_t i = 0; i < num_slices; i++) {
-      Buffer::RawSlice& slice = slices[i];
+    STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+    body_->getRawSlices(slices.begin(), num_slices);
+    for (const Buffer::RawSlice& slice : slices) {
       ret.append(reinterpret_cast<const char*>(slice.mem_), slice.len_);
     }
   }

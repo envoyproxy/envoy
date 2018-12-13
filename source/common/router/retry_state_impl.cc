@@ -267,6 +267,11 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
       return false;
     }
 
+    // We never retry if the request is rate limited.
+    if (response_headers->EnvoyRateLimited() != nullptr) {
+      return false;
+    }
+
     if (wouldRetryFromHeaders(*response_headers)) {
       return true;
     }

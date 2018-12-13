@@ -32,10 +32,12 @@ envoy_cc_test(
         ":utility_lib",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/api:api_lib",
         "//source/common/config:bootstrap_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:socket_option_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
         "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",
@@ -79,6 +81,19 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
+    ],
+)
+
+envoy_cc_test(
+    name = "eds_subscription_factory_test",
+    srcs = ["eds_subscription_factory_test.cc"],
+    deps = [
+        "//source/common/upstream:eds_subscription_factory_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/upstream:upstream_mocks",
     ],
 )
 
@@ -178,6 +193,7 @@ envoy_cc_test(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2/endpoint:load_report_cc",
         "@envoy_api//envoy/service/discovery/v2:hds_cc",
@@ -250,8 +266,10 @@ envoy_cc_test(
     name = "resource_manager_impl_test",
     srcs = ["resource_manager_impl_test.cc"],
     deps = [
+        "//include/envoy/upstream:upstream_interface",
         "//source/common/upstream:resource_manager_lib",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
     ],
 )
 

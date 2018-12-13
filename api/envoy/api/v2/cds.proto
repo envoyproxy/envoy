@@ -17,6 +17,7 @@ import "envoy/api/v2/eds.proto";
 import "envoy/type/percent.proto";
 
 import "google/api/annotations.proto";
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
@@ -46,7 +47,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 36]
+// [#comment:next free field: 38]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -81,7 +82,7 @@ message Cluster {
     // for an explanation.
     LOGICAL_DNS = 2;
 
-    // Refer to the :ref:`service discovery type<arch_overview_service_discovery_types_sds>`
+    // Refer to the :ref:`service discovery type<arch_overview_service_discovery_types_eds>`
     // for an explanation.
     EDS = 3;
 
@@ -232,13 +233,20 @@ message Cluster {
   // specific options.
   map<string, google.protobuf.Struct> extension_protocol_options = 35;
 
+  // [#not-implemented-hide:]
+  // The extension_protocol_options field is used to provide extension-specific protocol options
+  // for upstream connections. The key should match the extension filter name, such as
+  // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on
+  // specific options.
+  map<string, google.protobuf.Any> typed_extension_protocol_options = 36;
+
   reserved 15;
 
   // If the DNS refresh rate is specified and the cluster type is either
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`,
   // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
   // this value is used as the cluster’s DNS refresh
-  // rate. If this setting is not specified, the value defaults to 5000. For
+  // rate. If this setting is not specified, the value defaults to 5000ms. For
   // cluster types other than
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
@@ -368,10 +376,23 @@ message Cluster {
     // host selected but Y having 100, then a lot more load is being dumped on the single host in X
     // than originally anticipated in the load balancing assignment delivered via EDS.
     bool locality_weight_aware = 4;
+
+    // When used with locality_weight_aware, scales the weight of each locality by the ratio
+    // of hosts in the subset vs hosts in the original subset. This aims to even out the load
+    // going to an individual locality if said locality is disproportionally affected by the
+    // subset predicate.
+    bool scale_locality_weight = 5;
   }
 
   // Configuration for load balancing subsetting.
   LbSubsetConfig lb_subset_config = 22;
+
+  // Specific configuration for the LeastRequest load balancing policy.
+  message LeastRequestLbConfig {
+    // The number of random healthy hosts from which the host with the fewest active requests will
+    // be chosen. Defaults to 2 so that we perform two-choice selection if the field is not set.
+    google.protobuf.UInt32Value choice_count = 1 [(validate.rules).uint32.gte = 2];
+  }
 
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
   // load balancing policy.
@@ -386,12 +407,8 @@ message Cluster {
 
     // [#not-implemented-hide:] Hide from docs.
     message DeprecatedV1 {
-      // Defaults to true, meaning that std::hash is used to hash hosts onto
-      // the ketama ring. std::hash can vary by platform. For this reason,
-      // Envoy will eventually use `xxHash <https://github.com/Cyan4973/xxHash>`_
-      // by default. This field exists for
-      // migration purposes and will eventually be deprecated. Set it to false
-      // to use `xxHash <https://github.com/Cyan4973/xxHash>`_ now.
+      // Defaults to false, meaning that `xxHash <https://github.com/Cyan4973/xxHash>`_
+      // is to hash hosts onto the ketama ring.
       google.protobuf.BoolValue use_std_hash = 1;
     }
 
@@ -418,16 +435,18 @@ message Cluster {
 
   // Optional configuration for the load balancing algorithm selected by
   // LbPolicy. Currently only
-  // :ref:`RING_HASH<envoy_api_enum_value_Cluster.LbPolicy.RING_HASH>`
+  // :ref:`RING_HASH<envoy_api_enum_value_Cluster.LbPolicy.RING_HASH>` and
+  // :ref:`LEAST_REQUEST<envoy_api_enum_value_Cluster.LbPolicy.LEAST_REQUEST>`
   // has additional configuration options.
-  // Specifying ring_hash_lb_config without setting the LbPolicy to
-  // :ref:`RING_HASH<envoy_api_enum_value_Cluster.LbPolicy.RING_HASH>`
-  // will generate an error at runtime.
+  // Specifying ring_hash_lb_config or least_request_lb_config without setting the corresponding
+  // LbPolicy will generate an error at runtime.
   oneof lb_config {
     // Optional configuration for the Ring Hash load balancing policy.
     RingHashLbConfig ring_hash_lb_config = 23;
     // Optional configuration for the Original Destination load balancing policy.
     OriginalDstLbConfig original_dst_lb_config = 34;
+    // Optional configuration for the LeastRequest load balancing policy.
+    LeastRequestLbConfig least_request_lb_config = 37;
   }
 
   // Common configuration for all load balancer implementations.
@@ -465,8 +484,11 @@ message Cluster {
     // merged and delivered in one shot when the duration expires. The start of the duration is when
     // the first update happens. This is useful for big clusters, with potentially noisy deploys
     // that might trigger excessive CPU usage due to a constant stream of healthcheck state changes
-    // or metadata updates. By default, this is not configured and updates apply immediately. Also,
-    // the first set of updates to be seen apply immediately as well (e.g.: a new cluster).
+    // or metadata updates. The first set of updates to be seen apply immediately (e.g.: a new
+    // cluster).
+    //
+    // If this is not set, we default to a merge window of 1000ms. To disable it, set the merge
+    // window to 0.
     //
     // Note: merging does not apply to cluster membership changes (e.g.: adds/removes); this is
     // because merging those updates isn't currently safe. See

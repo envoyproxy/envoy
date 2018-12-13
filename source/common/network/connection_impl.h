@@ -95,6 +95,8 @@ public:
   absl::string_view requestedServerName() const override { return socket_->requestedServerName(); }
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
+  void setWriteFilterOrder(bool reversed) override { reverse_write_filter_order_ = reversed; }
+  bool reverseWriteFilterOrder() const override { return reverse_write_filter_order_; }
 
   // Network::BufferSource
   BufferSource::StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
@@ -150,8 +152,8 @@ protected:
   Event::FileEventPtr file_event_;
 
 private:
-  friend class ::Envoy::RandomPauseFilter;
-  friend class ::Envoy::TestPauseFilter;
+  friend class Envoy::RandomPauseFilter;
+  friend class Envoy::TestPauseFilter;
 
   void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);
@@ -191,6 +193,7 @@ private:
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.
   uint32_t read_disable_count_{0};
+  bool reverse_write_filter_order_{false};
 };
 
 /**

@@ -2,6 +2,8 @@
 
 #include "common/http/utility.h"
 
+#include "extensions/filters/http/well_known_names.h"
+
 using ::google::jwt_verify::Status;
 
 namespace Envoy {
@@ -40,6 +42,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   return Http::FilterHeadersStatus::StopIteration;
 }
 
+void Filter::setPayload(const ProtobufWkt::Struct& payload) {
+  decoder_callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().JwtAuthn, payload);
+}
+
 void Filter::onComplete(const Status& status) {
   ENVOY_LOG(debug, "Called Filter : check complete {}", int(status));
   // This stream has been reset, abort the callback.
@@ -52,8 +58,8 @@ void Filter::onComplete(const Status& status) {
     // verification failed
     Http::Code code = Http::Code::Unauthorized;
     // return failure reason as message body
-    decoder_callbacks_->sendLocalReply(code, ::google::jwt_verify::getStatusString(status),
-                                       nullptr);
+    decoder_callbacks_->sendLocalReply(code, ::google::jwt_verify::getStatusString(status), nullptr,
+                                       absl::nullopt);
     return;
   }
   stats_.allowed_.inc();

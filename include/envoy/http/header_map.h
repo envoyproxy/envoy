@@ -187,14 +187,16 @@ public:
   virtual const HeaderString& key() const PURE;
 
   /**
-   * Set the header value by copying data into it.
+   * Set the header value by copying data into it (deprecated, use absl::string_view variant
+   * instead).
+   * TODO(htuch): Cleanup deprecated call sites.
    */
   virtual void value(const char* value, uint32_t size) PURE;
 
   /**
    * Set the header value by copying data into it.
    */
-  virtual void value(const std::string& value) PURE;
+  virtual void value(absl::string_view value) PURE;
 
   /**
    * Set the header value by copying an integer into it.
@@ -226,6 +228,7 @@ private:
  * O(1) access to these headers without even a hash lookup.
  */
 #define ALL_INLINE_HEADERS(HEADER_FUNC)                                                            \
+  HEADER_FUNC(Accept)                                                                              \
   HEADER_FUNC(AcceptEncoding)                                                                      \
   HEADER_FUNC(AccessControlRequestHeaders)                                                         \
   HEADER_FUNC(AccessControlRequestMethod)                                                          \
@@ -256,6 +259,7 @@ private:
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
   HEADER_FUNC(EnvoyOverloaded)                                                                     \
+  HEADER_FUNC(EnvoyRateLimited)                                                                    \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
   HEADER_FUNC(EnvoyRetriableStatusCodes)                                                           \
@@ -295,12 +299,7 @@ private:
   HEADER_FUNC(Upgrade)                                                                             \
   HEADER_FUNC(UserAgent)                                                                           \
   HEADER_FUNC(Vary)                                                                                \
-  HEADER_FUNC(Via)                                                                                 \
-  HEADER_FUNC(XB3TraceId)                                                                          \
-  HEADER_FUNC(XB3SpanId)                                                                           \
-  HEADER_FUNC(XB3ParentSpanId)                                                                     \
-  HEADER_FUNC(XB3Sampled)                                                                          \
-  HEADER_FUNC(XB3Flags)
+  HEADER_FUNC(Via)
 
 /**
  * The following functions are defined for each inline header above. E.g., for ContentLength we

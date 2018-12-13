@@ -1,3 +1,11 @@
+# Choosing tarballs
+
+Where the dependency maintainer provides a tarball, prefer that over the
+automatically generated Github tarball. Github generated tarball SHA256
+values can change when Github change their tar/gzip libraries breaking
+builds. Maintainer provided tarballs are more stable and the maintainer
+can provide the SHA256.
+
 # Adding external dependencies to Envoy (native Bazel)
 
 This is the preferred style of adding dependencies that use Bazel for their

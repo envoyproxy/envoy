@@ -9,6 +9,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
 
 namespace Envoy {
@@ -59,9 +60,9 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  * returned. By default, errors allow the request to continue.
  */
 class Filter : public ThriftProxy::ThriftFilters::DecoderFilter,
-               public RateLimit::RequestCallbacks {
+               public Filters::Common::RateLimit::RequestCallbacks {
 public:
-  Filter(ConfigSharedPtr config, RateLimit::ClientPtr&& client)
+  Filter(ConfigSharedPtr config, Filters::Common::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
   virtual ~Filter() {}
 
@@ -137,7 +138,8 @@ public:
   }
 
   // RateLimit::RequestCallbacks
-  void complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& headers) override;
+  void complete(Filters::Common::RateLimit::LimitStatus status,
+                Http::HeaderMapPtr&& headers) override;
 
 private:
   void initiateCall(const ThriftProxy::MessageMetadata& metadata);
@@ -149,7 +151,7 @@ private:
   enum class State { NotStarted, Calling, Complete, Responded };
 
   ConfigSharedPtr config_;
-  RateLimit::ClientPtr client_;
+  Filters::Common::RateLimit::ClientPtr client_;
   ThriftProxy::ThriftFilters::DecoderFilterCallbacks* callbacks_{};
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;

@@ -13,29 +13,19 @@ namespace Thread {
 typedef int32_t ThreadId;
 
 /**
- * Wrapper for a pthread thread. We don't use std::thread because it eats exceptions and leads to
- * unusable stack traces.
+ * Get current thread id.
  */
-class Thread {
+ThreadId currentThreadId();
+
+/**
+ * Implementation of ThreadFactory
+ */
+class ThreadFactoryImpl : public ThreadFactory {
 public:
-  Thread(std::function<void()> thread_routine);
+  ThreadFactoryImpl() {}
 
-  /**
-   * Get current thread id.
-   */
-  static ThreadId currentThreadId();
-
-  /**
-   * Join on thread exit.
-   */
-  void join();
-
-private:
-  std::function<void()> thread_routine_;
-  pthread_t thread_id_;
+  ThreadPtr createThread(std::function<void()> thread_routine) override;
 };
-
-typedef std::unique_ptr<Thread> ThreadPtr;
 
 /**
  * Implementation of BasicLockable

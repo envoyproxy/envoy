@@ -62,16 +62,20 @@ public:
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
-  // Listener
+  // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::Socket& socket() override { return socket_; }
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() override { return 0; }
+  std::chrono::milliseconds listenerFiltersTimeout() const override {
+    return std::chrono::milliseconds();
+  }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
+  bool reverseWriteFilterOrder() const override { return true; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -455,8 +459,9 @@ TEST_P(ProxyProtocolTest, v1TooLong) {
   constexpr uint8_t buffer[] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
   connect(false);
   write("PROXY TCP4 1.2.3.4 2.3.4.5 100 100");
-  for (size_t i = 0; i < 256; i += sizeof(buffer))
+  for (size_t i = 0; i < 256; i += sizeof(buffer)) {
     write(buffer, sizeof(buffer));
+  }
   expectProxyProtoError();
 }
 
@@ -735,8 +740,9 @@ TEST_P(ProxyProtocolTest, v2PartialRead) {
 
   for (size_t i = 0; i < sizeof(buffer); i += 9) {
     write(&buffer[i], 9);
-    if (i == 0)
+    if (i == 0) {
       dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+    }
   }
 
   expectData("moredata");
@@ -891,9 +897,13 @@ public:
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() override { return 0; }
+  std::chrono::milliseconds listenerFiltersTimeout() const override {
+    return std::chrono::milliseconds();
+  }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
+  bool reverseWriteFilterOrder() const override { return true; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {

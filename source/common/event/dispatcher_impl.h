@@ -64,9 +64,7 @@ private:
   // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
   // dispatcher run loop is executing on. We allow run_tid_ == 0 for tests where we don't invoke
   // run().
-  bool isThreadSafe() const {
-    return run_tid_ == 0 || run_tid_ == Thread::Thread::currentThreadId();
-  }
+  bool isThreadSafe() const { return run_tid_ == 0 || run_tid_ == Thread::currentThreadId(); }
 
   TimeSystem& time_system_;
   Thread::ThreadId run_tid_{};

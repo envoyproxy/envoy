@@ -5,11 +5,10 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/platform.h"
-
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/stack_array.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/utility.h"
@@ -138,19 +137,17 @@ std::string DynamoFilter::buildBody(const Buffer::Instance* buffered,
   std::string body;
   if (buffered) {
     uint64_t num_slices = buffered->getRawSlices(nullptr, 0);
-    STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
-    buffered->getRawSlices(slices, num_slices);
-    for (uint64_t i = 0; i < num_slices; i++) {
-      Buffer::RawSlice& slice = slices[i];
+    STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+    buffered->getRawSlices(slices.begin(), num_slices);
+    for (const Buffer::RawSlice& slice : slices) {
       body.append(static_cast<const char*>(slice.mem_), slice.len_);
     }
   }
 
   uint64_t num_slices = last.getRawSlices(nullptr, 0);
-  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
-  last.getRawSlices(slices, num_slices);
-  for (uint64_t i = 0; i < num_slices; i++) {
-    Buffer::RawSlice& slice = slices[i];
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  last.getRawSlices(slices.begin(), num_slices);
+  for (const Buffer::RawSlice& slice : slices) {
     body.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 

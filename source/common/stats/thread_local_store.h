@@ -5,16 +5,17 @@
 #include <cstdint>
 #include <list>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "envoy/thread_local/thread_local.h"
 
+#include "common/common/hash.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/source_impl.h"
 #include "common/stats/utility.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "circllhist.h"
 
 namespace Envoy {
@@ -48,7 +49,8 @@ public:
   bool used() const override { return flags_ & Flags::Used; }
 
   // Stats::Metric
-  const std::string name() const override { return name_; }
+  std::string name() const override { return name_; }
+  const char* nameCStr() const override { return name_.c_str(); }
 
 private:
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
@@ -91,7 +93,8 @@ public:
   const std::string summary() const override;
 
   // Stats::Metric
-  const std::string name() const override { return name_; }
+  std::string name() const override { return name_; }
+  const char* nameCStr() const override { return name_.c_str(); }
 
 private:
   bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
@@ -155,9 +158,7 @@ public:
   void setTagProducer(TagProducerPtr&& tag_producer) override {
     tag_producer_ = std::move(tag_producer);
   }
-  void setStatsMatcher(StatsMatcherPtr&& stats_matcher) override {
-    stats_matcher_ = std::move(stats_matcher);
-  }
+  void setStatsMatcher(StatsMatcherPtr&& stats_matcher) override;
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
@@ -169,17 +170,19 @@ public:
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
 
 private:
+  template <class Stat> using StatMap = CharStarHashMap<Stat>;
+
   struct TlsCacheEntry {
-    std::unordered_map<std::string, CounterSharedPtr> counters_;
-    std::unordered_map<std::string, GaugeSharedPtr> gauges_;
-    std::unordered_map<std::string, TlsHistogramSharedPtr> histograms_;
-    std::unordered_map<std::string, ParentHistogramSharedPtr> parent_histograms_;
+    StatMap<CounterSharedPtr> counters_;
+    StatMap<GaugeSharedPtr> gauges_;
+    StatMap<TlsHistogramSharedPtr> histograms_;
+    StatMap<ParentHistogramSharedPtr> parent_histograms_;
   };
 
   struct CentralCacheEntry {
-    std::unordered_map<std::string, CounterSharedPtr> counters_;
-    std::unordered_map<std::string, GaugeSharedPtr> gauges_;
-    std::unordered_map<std::string, ParentHistogramImplSharedPtr> histograms_;
+    StatMap<CounterSharedPtr> counters_;
+    StatMap<GaugeSharedPtr> gauges_;
+    StatMap<ParentHistogramImplSharedPtr> histograms_;
   };
 
   struct ScopeImpl : public TlsScope {
@@ -218,9 +221,8 @@ private:
      */
     template <class StatType>
     StatType&
-    safeMakeStat(const std::string& name,
-                 std::unordered_map<std::string, std::shared_ptr<StatType>>& central_cache_map,
-                 MakeStatFn<StatType> make_stat, std::shared_ptr<StatType>* tls_ref);
+    safeMakeStat(const std::string& name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
+                 MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache);
 
     static std::atomic<uint64_t> next_scope_id_;
 
@@ -242,7 +244,7 @@ private:
     // to reference the cache, and then subsequently cache flushed, leaving nothing in the central
     // store. See the overview for more information. This complexity is required for lockless
     // operation in the fast path.
-    std::unordered_map<uint64_t, TlsCacheEntry> scope_cache_;
+    absl::flat_hash_map<uint64_t, TlsCacheEntry> scope_cache_;
   };
 
   std::string getTagsForName(const std::string& name, std::vector<Tag>& tags) const;
@@ -250,13 +252,16 @@ private:
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
   absl::string_view truncateStatNameIfNeeded(absl::string_view name);
+  bool rejects(const std::string& name) const;
+  template <class StatMapClass, class StatListClass>
+  void removeRejectedStats(StatMapClass& map, StatListClass& list);
 
   const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
   mutable Thread::MutexBasicLockable lock_;
-  std::unordered_set<ScopeImpl*> scopes_ GUARDED_BY(lock_);
+  absl::flat_hash_set<ScopeImpl*> scopes_ GUARDED_BY(lock_);
   ScopePtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
@@ -266,6 +271,18 @@ private:
   Counter& num_last_resort_stats_;
   HeapStatDataAllocator heap_allocator_;
   SourceImpl source_;
+
+  // Retain storage for deleted stats; these are no longer in maps because the
+  // matcher-pattern was established after they were created. Since the stats
+  // are held by reference in code that expects them to be there, we can't
+  // actually delete the stats.
+  //
+  // It seems like it would be better to have each client that expects a stat
+  // to exist to hold it as (e.g.) a CounterSharedPtr rather than a Counter&
+  // but that would be fairly complex to change.
+  std::vector<CounterSharedPtr> deleted_counters_;
+  std::vector<GaugeSharedPtr> deleted_gauges_;
+  std::vector<HistogramSharedPtr> deleted_histograms_;
 };
 
 } // namespace Stats

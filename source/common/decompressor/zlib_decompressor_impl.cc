@@ -1,9 +1,11 @@
 #include "common/decompressor/zlib_decompressor_impl.h"
 
+#include <memory>
+
 #include "envoy/common/exception.h"
-#include "envoy/common/platform.h"
 
 #include "common/common/assert.h"
+#include "common/common/stack_array.h"
 
 namespace Envoy {
 namespace Decompressor {
@@ -35,18 +37,17 @@ uint64_t ZlibDecompressorImpl::checksum() { return zstream_ptr_->adler; }
 void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                       Buffer::Instance& output_buffer) {
   const uint64_t num_slices = input_buffer.getRawSlices(nullptr, 0);
-  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
-  input_buffer.getRawSlices(slices, num_slices);
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  input_buffer.getRawSlices(slices.begin(), num_slices);
 
-  for (uint64_t i = 0; i < num_slices; i++) {
-    Buffer::RawSlice& input_slice = slices[i];
+  for (const Buffer::RawSlice& input_slice : slices) {
     zstream_ptr_->avail_in = input_slice.len_;
     zstream_ptr_->next_in = static_cast<Bytef*>(input_slice.mem_);
     while (inflateNext()) {
       if (zstream_ptr_->avail_out == 0) {
         output_buffer.add(static_cast<void*>(chunk_char_ptr_.get()),
                           chunk_size_ - zstream_ptr_->avail_out);
-        chunk_char_ptr_.reset(new unsigned char[chunk_size_]);
+        chunk_char_ptr_ = std::make_unique<unsigned char[]>(chunk_size_);
         zstream_ptr_->avail_out = chunk_size_;
         zstream_ptr_->next_out = chunk_char_ptr_.get();
       }

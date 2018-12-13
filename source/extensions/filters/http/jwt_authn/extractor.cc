@@ -1,5 +1,7 @@
 #include "extensions/filters/http/jwt_authn/extractor.h"
 
+#include <memory>
+
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -8,7 +10,7 @@
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtHeader;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
-using ::Envoy::Http::LowerCaseString;
+using Envoy::Http::LowerCaseString;
 
 namespace Envoy {
 namespace Extensions {
@@ -157,7 +159,7 @@ void ExtractorImpl::addHeaderConfig(const std::string& issuer, const LowerCaseSt
   const std::string map_key = header_name.get() + value_prefix;
   auto& header_location_spec = header_locations_[map_key];
   if (!header_location_spec) {
-    header_location_spec.reset(new HeaderLocationSpec(header_name, value_prefix));
+    header_location_spec = std::make_unique<HeaderLocationSpec>(header_name, value_prefix);
   }
   header_location_spec->specified_issuers_.insert(issuer);
 }

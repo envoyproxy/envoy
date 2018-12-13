@@ -70,6 +70,7 @@ private:
       }
     }
     void decodeTrailers(Http::HeaderMapPtr&&) override { onResponseComplete(); }
+    void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;
@@ -280,6 +281,7 @@ private:
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance&, bool end_stream) override;
     void decodeTrailers(Http::HeaderMapPtr&&) override;
+    void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;

@@ -114,6 +114,13 @@ void FakeStream::encodeResetStream() {
       [this]() -> void { encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset); });
 }
 
+void FakeStream::encodeMetadata(const Http::MetadataMap& metadata_map) {
+  std::shared_ptr<Http::MetadataMap> metadata_map_copy(
+      new Http::MetadataMap(static_cast<const Http::MetadataMap&>(metadata_map)));
+  parent_.connection().dispatcher().post(
+      [this, metadata_map_copy]() -> void { encoder_.encodeMetadata(*metadata_map_copy); });
+}
+
 void FakeStream::onResetStream(Http::StreamResetReason) {
   Thread::LockGuard lock(lock_);
   saw_reset_ = true;
@@ -205,13 +212,14 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
                                        Event::TestTimeSystem& time_system)
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
-    codec_.reset(new Http::Http1::ServerConnectionImpl(shared_connection_.connection(), *this,
-                                                       Http::Http1Settings()));
+    codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(shared_connection_.connection(),
+                                                                 *this, Http::Http1Settings());
   } else {
     auto settings = Http::Http2Settings();
     settings.allow_connect_ = true;
-    codec_.reset(new Http::Http2::ServerConnectionImpl(shared_connection_.connection(), *this,
-                                                       store, settings));
+    settings.allow_metadata_ = true;
+    codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(shared_connection_.connection(),
+                                                                 *this, store, settings);
     ASSERT(type == Type::HTTP2);
   }
 
@@ -364,12 +372,13 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type,
                            Event::TestTimeSystem& time_system, bool enable_half_close)
-    : http_type_(type), socket_(std::move(listen_socket)), api_(new Api::Impl(milliseconds(10000))),
-      time_system_(time_system), dispatcher_(api_->allocateDispatcher(time_system_)),
+    : http_type_(type), socket_(std::move(listen_socket)),
+      api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
+      dispatcher_(api_->allocateDispatcher(time_system_)),
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close), listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
-  thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
+  thread_ = api_->createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
 }
 

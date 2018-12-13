@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_directory_genrule",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -93,10 +94,36 @@ envoy_proto_library(
     ],
 )
 
+sh_binary(
+    name = "corpus_from_config_impl_sh",
+    srcs = ["corpus_from_config_impl.sh"],
+)
+
+envoy_directory_genrule(
+    name = "corpus_from_config_impl",
+    testonly = 1,
+    srcs = [
+        # This is deliberately in srcs, since we run into host/target confusion
+        # otherwise in oss-fuzz builds.
+        ":config_impl_test",
+    ],
+    cmd = " ".join([
+        "$(location corpus_from_config_impl_sh)",
+        "$(location //test/common/router:config_impl_test)",
+    ]),
+    tools = [":corpus_from_config_impl_sh"],
+)
+
+filegroup(
+    name = "route_corpus",
+    testonly = 1,
+    srcs = [":corpus_from_config_impl"] + native.glob(["route_corpus/**"]),
+)
+
 envoy_cc_fuzz_test(
     name = "route_fuzz_test",
     srcs = ["route_fuzz_test.cc"],
-    corpus = "route_corpus",
+    corpus = ":route_corpus",
     deps = [
         ":route_fuzz_proto_cc",
         "//source/common/router:config_lib",
@@ -127,6 +154,7 @@ envoy_cc_test(
     srcs = ["router_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/http:context_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:router_lib",
         "//source/common/upstream:upstream_includes",

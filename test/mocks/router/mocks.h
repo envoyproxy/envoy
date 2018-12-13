@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
@@ -250,20 +251,15 @@ public:
   MOCK_CONST_METHOD0(virtualHostName, const std::string&());
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
   MOCK_CONST_METHOD0(autoHostRewrite, bool());
-  MOCK_CONST_METHOD0(useOldStyleWebSocket, bool());
-  MOCK_CONST_METHOD5(createWebSocketProxy,
-                     Http::WebSocketProxyPtr(Http::HeaderMap& request_headers,
-                                             StreamInfo::StreamInfo& stream_info,
-                                             Http::WebSocketProxyCallbacks& callbacks,
-                                             Upstream::ClusterManager& cluster_manager,
-                                             Network::ReadFilterCallbacks* read_callbacks));
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
+  MOCK_CONST_METHOD0(typedMetadata, const Envoy::Config::TypedMetadata&());
   MOCK_CONST_METHOD0(pathMatchCriterion, const PathMatchCriterion&());
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
   MOCK_CONST_METHOD0(includeAttemptCount, bool());
+  MOCK_CONST_METHOD0(upgradeMap, const UpgradeMap&());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
@@ -277,6 +273,7 @@ public:
   TestCorsPolicy cors_policy_;
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   envoy::api::v2::core::Metadata metadata_;
+  UpgradeMap upgrade_map_;
 };
 
 class MockDecorator : public Decorator {

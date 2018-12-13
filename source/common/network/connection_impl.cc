@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <memory>
 
 #include "envoy/common/exception.h"
 #include "envoy/event/timer.h"
@@ -556,7 +557,7 @@ void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
   ASSERT(!connection_stats_,
          "Two network filters are attempting to set connection stats. This indicates an issue "
          "with the configured filter chain.");
-  connection_stats_.reset(new ConnectionStats(stats));
+  connection_stats_ = std::make_unique<ConnectionStats>(stats);
 }
 
 void ConnectionImpl::updateReadBufferStats(uint64_t num_read, uint64_t new_size) {

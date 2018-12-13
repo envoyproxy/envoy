@@ -9,13 +9,13 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/platform.h"
 #include "envoy/http/header_map.h"
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/stack_array.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
 #include "common/network/connection_impl.h"
@@ -92,10 +92,9 @@ void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool 
 void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream) {
   saw_end_stream_ = end_stream;
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  STACK_ALLOC_ARRAY(slices, Buffer::RawSlice, num_slices);
-  data.getRawSlices(slices, num_slices);
-  for (uint64_t i = 0; i < num_slices; i++) {
-    Buffer::RawSlice& slice = slices[i];
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  data.getRawSlices(slices.begin(), num_slices);
+  for (const Buffer::RawSlice& slice : slices) {
     body_.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 
@@ -114,6 +113,13 @@ void IntegrationStreamDecoder::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   trailers_ = std::move(trailers);
   if (waiting_for_end_stream_) {
     dispatcher_.exit();
+  }
+}
+
+void IntegrationStreamDecoder::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
+  // Combines newly received metadata with the existing metadata.
+  for (const auto metadata : *metadata_map) {
+    metadata_map_->insert(metadata);
   }
 }
 
@@ -214,7 +220,7 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
                                          TestTimeSystemPtr time_system, const std::string& config)
-    : api_(new Api::Impl(std::chrono::milliseconds(10000))),
+    : api_(Api::createApiForTest(stats_store_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>), time_system_(std::move(time_system)),
       dispatcher_(new Event::DispatcherImpl(*time_system_,
                                             Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
@@ -303,8 +309,8 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
 }
 
 IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
-  return IntegrationTcpClientPtr{new IntegrationTcpClient(*dispatcher_, *mock_buffer_factory_, port,
-                                                          version_, enable_half_close_)};
+  return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
+                                                enable_half_close_);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -345,7 +351,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(
-      bootstrap_path, version_, pre_worker_start_test_steps_, deterministic_, *time_system_);
+      bootstrap_path, version_, pre_worker_start_test_steps_, deterministic_, *time_system_, *api_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0) {
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.
@@ -373,9 +379,9 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
 
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
-  test_server_ = IntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_, nullptr,
-      deterministic_, *time_system_);
+  test_server_ = createIntegrationTestServer(
+      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), nullptr,
+      *time_system_);
   registerTestServerPorts(port_names);
 }
 
@@ -394,6 +400,14 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
       version_);
 
   connection.run();
+}
+
+IntegrationTestServerPtr
+BaseIntegrationTest::createIntegrationTestServer(const std::string& bootstrap_path,
+                                                 std::function<void()> pre_worker_start_test_steps,
+                                                 Event::TestTimeSystem& time_system) {
+  return IntegrationTestServer::create(bootstrap_path, version_, pre_worker_start_test_steps,
+                                       deterministic_, time_system, *api_);
 }
 
 } // namespace Envoy

@@ -10,6 +10,7 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/protobuf/utility.h"
 #include "common/upstream/edf_scheduler.h"
 
 namespace Envoy {
@@ -347,10 +348,10 @@ private:
 /**
  * Weighted Least Request load balancer.
  *
- * In a normal setup when all hosts have the same weight of 1 it randomly picks up two healthy hosts
- * and compares number of active requests. Technique is based on
- * http://www.eecs.harvard.edu/~michaelm/postscripts/mythesis.pdf and is known as P2C (power of
- * two choices).
+ * In a normal setup when all hosts have the same weight of 1 it randomly picks up N healthy hosts
+ * (where N is specified in the LB configuration) and compares number of active requests. Technique
+ * is based on http://www.eecs.harvard.edu/~michaelm/postscripts/mythesis.pdf and is known as P2C
+ * (power of two choices).
  *
  * When any hosts have a weight that is not 1, an RR EDF schedule is used. Host weight is scaled
  * by the number of active requests at pick/insert time. Thus, hosts will never fully drain as
@@ -363,12 +364,17 @@ private:
  */
 class LeastRequestLoadBalancer : public EdfLoadBalancerBase {
 public:
-  LeastRequestLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                           ClusterStats& stats, Runtime::Loader& runtime,
-                           Runtime::RandomGenerator& random,
-                           const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+  LeastRequestLoadBalancer(
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      const envoy::api::v2::Cluster::CommonLbConfig& common_config,
+      const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig> least_request_config)
       : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                            common_config) {
+                            common_config),
+        choice_count_(
+            least_request_config.has_value()
+                ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.value(), choice_count, 2)
+                : 2) {
     initialize();
   }
 
@@ -389,6 +395,7 @@ private:
   }
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
+  const uint32_t choice_count_;
 };
 
 /**
@@ -416,7 +423,8 @@ public:
       : enabled_(!subset_config.subset_selectors().empty()),
         fallback_policy_(subset_config.fallback_policy()),
         default_subset_(subset_config.default_subset()),
-        locality_weight_aware_(subset_config.locality_weight_aware()) {
+        locality_weight_aware_(subset_config.locality_weight_aware()),
+        scale_locality_weight_(subset_config.scale_locality_weight()) {
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
         subset_keys_.emplace_back(
@@ -433,6 +441,7 @@ public:
   const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
   const std::vector<std::set<std::string>>& subsetKeys() const override { return subset_keys_; }
   bool localityWeightAware() const override { return locality_weight_aware_; }
+  bool scaleLocalityWeight() const override { return scale_locality_weight_; }
 
 private:
   const bool enabled_;
@@ -440,6 +449,7 @@ private:
   const ProtobufWkt::Struct default_subset_;
   std::vector<std::set<std::string>> subset_keys_;
   const bool locality_weight_aware_;
+  const bool scale_locality_weight_;
 };
 
 } // namespace Upstream

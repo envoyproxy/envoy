@@ -9,12 +9,13 @@ namespace Config {
 class BaseJson {
 public:
   /**
-   * Translate a v1 JSON integer runtime object to v2 envoy::api::v2::core::RuntimeUInt32.
+   * Translate a v1 JSON integer runtime object to v2
+   * envoy::api::v2::core::RuntimeFractionalPercent.
    * @param json_runtime source v1 JSON integer runtime object.
-   * @param runtime destination v2 envoy::api::v2::core::RuntimeUInt32.
+   * @param runtime destination v2 envoy::api::v2::core::RuntimeFractionalPercent.
    */
-  static void translateRuntimeUInt32(const Json::Object& json_runtime,
-                                     envoy::api::v2::core::RuntimeUInt32& runtime);
+  static void translateRuntimeFraction(const Json::Object& json_runtime,
+                                       envoy::api::v2::core::RuntimeFractionalPercent& runtime);
 
   /**
    * Translate a v1 JSON header-value object to v2 envoy::api::v2::core::HeaderValueOption.

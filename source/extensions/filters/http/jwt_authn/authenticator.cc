@@ -7,6 +7,7 @@
 #include "common/common/logger.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/protobuf/protobuf.h"
 
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
@@ -41,7 +42,7 @@ public:
   void onJwksError(Failure reason) override;
   // Following functions are for Authenticator interface
   void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
-              AuthenticatorCallback callback) override;
+              SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) override;
   void onDestroy() override;
 
   TimeSource& timeSource() { return time_source_; }
@@ -78,6 +79,8 @@ private:
 
   // The HTTP request headers
   Http::HeaderMap* headers_{};
+  // the callback function to set payload
+  SetPayloadCallback set_payload_cb_;
   // The on_done function.
   AuthenticatorCallback callback_;
   // check audience object.
@@ -89,10 +92,11 @@ private:
 };
 
 void AuthenticatorImpl::verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
-                               AuthenticatorCallback callback) {
+                               SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
   ASSERT(!callback_);
   headers_ = &headers;
   tokens_ = std::move(tokens);
+  set_payload_cb_ = std::move(set_payload_cb);
   callback_ = std::move(callback);
 
   ENVOY_LOG(debug, "Jwt authentication starts");
@@ -127,7 +131,7 @@ void AuthenticatorImpl::startVerify() {
   // the abseil time functionality instead or use the jwt_verify_lib to check
   // the validity of a JWT.
   // Check "exp" claim.
-  const auto unix_timestamp =
+  const uint64_t unix_timestamp =
       std::chrono::duration_cast<std::chrono::seconds>(timeSource().systemTime().time_since_epoch())
           .count();
   // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
@@ -223,6 +227,9 @@ void AuthenticatorImpl::verifyKey() {
     // TODO(potatop) remove JWT from queries.
     // Remove JWT from headers.
     curr_token_->removeJwt(*headers_);
+  }
+  if (set_payload_cb_ && !provider.payload_in_metadata().empty()) {
+    set_payload_cb_(provider.payload_in_metadata(), jwt_->payload_pb_);
   }
 
   doneWithStatus(Status::Ok);

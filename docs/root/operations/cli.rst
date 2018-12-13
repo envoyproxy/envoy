@@ -22,10 +22,12 @@ following are the command line options that Envoy supports.
 .. option:: --config-yaml <yaml string>
 
   *(optional)* The YAML string for a v2 bootstrap configuration. If :option:`--config-path` is also set,
-   the values in this YAML string will override and merge with the bootstrap loaded from :option:`--config-path`.
-   Because YAML is a superset of JSON, a JSON string may also be passed to :option:`--config-yaml`.
+  the values in this YAML string will override and merge with the bootstrap loaded from :option:`--config-path`.
+  Because YAML is a superset of JSON, a JSON string may also be passed to :option:`--config-yaml`.
 
-   Example overriding the node id on the command line:
+  Example overriding the node id on the command line:
+
+    .. code-block:: console
 
       ./envoy -c bootstrap.yaml --config-yaml "node: {id: 'node1'}"
 
@@ -231,6 +233,13 @@ following are the command line options that Envoy supports.
 
   *(optional)* This flag disables Envoy hot restart for builds that have it enabled. By default, hot
   restart is enabled.
+
+.. option:: --enable-mutex-tracing
+
+  *(optional)* This flag enables the collection of mutex contention statistics
+  (:ref:`MutexStats <envoy_api_msg_admin.v2alpha.MutexStats>`) as well as a contention endpoint
+  (:http:get:`/contention`). Mutex tracing is not enabled by default, since it incurs a slight performance
+  penalty for those Envoys which already experience mutex contention.
 
 .. option:: --allow-unknown-fields
 

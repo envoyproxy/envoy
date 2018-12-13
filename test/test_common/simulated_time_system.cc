@@ -128,7 +128,8 @@ static int instance_count = 0;
 SimulatedTimeSystem::SimulatedTimeSystem()
     : monotonic_time_(MonotonicTime(std::chrono::seconds(0))),
       system_time_(real_time_source_.systemTime()), index_(0), pending_alarms_(0) {
-  ASSERT(++instance_count <= 1);
+  ++instance_count;
+  ASSERT(instance_count <= 1);
 }
 
 SimulatedTimeSystem::~SimulatedTimeSystem() { --instance_count; }

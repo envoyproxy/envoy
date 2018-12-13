@@ -17,6 +17,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Const;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -385,6 +386,13 @@ TEST(AccessLogFormatterTest, startTimeFormatter) {
 void verifyJsonOutput(std::string json_string,
                       std::unordered_map<std::string, std::string> expected_map) {
   const auto parsed = Json::Factory::loadFromString(json_string);
+
+  // Every json log line should have only one newline character, and it should be the last character
+  // in the string
+  const auto newline_pos = json_string.find('\n');
+  EXPECT_NE(newline_pos, std::string::npos);
+  EXPECT_EQ(newline_pos, json_string.length() - 1);
+
   for (const auto& pair : expected_map) {
     EXPECT_EQ(parsed->getString(pair.first), pair.second);
   }
@@ -411,6 +419,7 @@ TEST(AccessLogFormatterTest, JsonFormatterPlainStringTest) {
   verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
                    expected_json_map);
 }
+
 TEST(AccessLogFormatterTest, JsonFormatterSingleOperatorTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestHeaderMapImpl request_header;
@@ -496,6 +505,7 @@ TEST(AccessLogFormatterTest, JsonFormatterDynamicMetadataTest) {
   envoy::api::v2::core::Metadata metadata;
   populateMetadataTestData(metadata);
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   std::unordered_map<std::string, std::string> expected_json_map = {
       {"test_key", "\"test_value\""},
@@ -614,6 +624,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     envoy::api::v2::core::Metadata metadata;
     populateMetadataTestData(metadata);
     EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
     const std::string format = "%DYNAMIC_METADATA(com.test:test_key)%|%DYNAMIC_METADATA(com.test:"
                                "test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%";
     FormatterImpl formatter(format);

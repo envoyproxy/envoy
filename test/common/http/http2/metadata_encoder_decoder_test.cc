@@ -37,15 +37,14 @@ typedef struct {
 static ssize_t pack_extension_callback(nghttp2_session* session, uint8_t* buf, size_t len,
                                        const nghttp2_frame* frame, void* user_data) {
   EXPECT_NE(nullptr, session);
-  EXPECT_EQ(STREAM_ID, frame->hd.stream_id);
 
   // Computes the size to pack.
   MetadataEncoder* encoder = reinterpret_cast<UserData*>(user_data)->encoder;
   const uint64_t size_from_encoder =
-      std::min(encoder->getMaxMetadataSize(), encoder->payload().length());
+      std::min(METADATA_MAX_PAYLOAD_SIZE, encoder->payload().length());
   const uint64_t size_to_copy = std::min(static_cast<uint64_t>(len), size_from_encoder);
 
-  Buffer::OwnedImpl& p = reinterpret_cast<Buffer::OwnedImpl&>(encoder->payload());
+  Buffer::OwnedImpl& p = encoder->payload();
   p.copyOut(0, size_to_copy, buf);
 
   // Releases the payload that has been copied to nghttp2.
@@ -54,7 +53,7 @@ static ssize_t pack_extension_callback(nghttp2_session* session, uint8_t* buf, s
   // Keep submitting extension frames if there is payload left in the encoder.
   if (encoder->hasNextFrame()) {
     const uint8_t flag =
-        (encoder->payload().length() > encoder->getMaxMetadataSize()) ? 0 : END_METADATA_FLAG;
+        (encoder->payload().length() > METADATA_MAX_PAYLOAD_SIZE) ? 0 : END_METADATA_FLAG;
     int result =
         nghttp2_submit_extension(session, METADATA_FRAME_TYPE, flag, frame->hd.stream_id, nullptr);
     EXPECT_EQ(0, result);
@@ -82,8 +81,7 @@ static int unpack_extension_callback(nghttp2_session* session, void** payload,
   EXPECT_NE(nullptr, payload);
 
   MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
-  EXPECT_EQ(hd->stream_id, decoder->getStreamId());
-  bool result = decoder->onMetadataFrameComplete((hd->flags == END_METADATA_FLAG) ? 1 : 0);
+  bool result = decoder->onMetadataFrameComplete((hd->flags == END_METADATA_FLAG) ? true : false);
   return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 
@@ -102,10 +100,8 @@ static ssize_t send_callback(nghttp2_session* session, const uint8_t* buf, size_
 
 class MetadataEncoderDecoderTest : public ::testing::Test {
 public:
-  MetadataEncoderDecoderTest() : encoder_(STREAM_ID) {}
-
   void initialize(MetadataCallback cb) {
-    decoder_ = std::make_unique<MetadataDecoder>(STREAM_ID, cb);
+    decoder_ = std::make_unique<MetadataDecoder>(cb);
 
     // Enables extension frame.
     nghttp2_option_new(&option_);
@@ -136,10 +132,10 @@ public:
     nghttp2_option_del(option_);
   }
 
-  void verifyMetadata(MetadataMap* expect, const MetadataMap& metadata_map) {
-    EXPECT_EQ(metadata_map.size(), expect->size());
-    for (const auto& metadata : metadata_map) {
-      EXPECT_EQ(expect->find(metadata.first)->second, metadata.second);
+  void verifyMetadata(MetadataMap& expect, std::unique_ptr<MetadataMap> metadata_map) {
+    EXPECT_EQ(metadata_map->size(), expect.size());
+    for (const auto& metadata : *metadata_map) {
+      EXPECT_EQ(expect.find(metadata.first)->second, metadata.second);
     }
   }
 
@@ -168,7 +164,7 @@ TEST_F(MetadataEncoderDecoderTest, EncodeDecodeSmallHeaderBlock) {
   };
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map,
                                   std::placeholders::_1);
   initialize(cb);
 
@@ -199,7 +195,7 @@ TEST_F(MetadataEncoderDecoderTest, EncodeLargeHeaderBlock) {
   };
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map,
                                   std::placeholders::_1);
   initialize(cb);
 
@@ -208,7 +204,7 @@ TEST_F(MetadataEncoderDecoderTest, EncodeLargeHeaderBlock) {
 
   // Submits METADATA to nghttp2.
   const uint8_t flag =
-      (encoder_.payload().length() > encoder_.getMaxMetadataSize()) ? 0 : END_METADATA_FLAG;
+      (encoder_.payload().length() > METADATA_MAX_PAYLOAD_SIZE) ? 0 : END_METADATA_FLAG;
   // The payload can't be submitted within one frame. Callback function will keep submitting until
   // all the payload has been submitted.
   int result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, flag, STREAM_ID, nullptr);
@@ -237,7 +233,7 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
   };
 
   // Encode and decode the first MetadataMap.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map,
                                   std::placeholders::_1);
   initialize(cb);
 
@@ -259,7 +255,7 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
 
   // Encode and decode the second MetadataMap.
   MetadataCallback cb2 = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this,
-                                   &metadata_map_2, std::placeholders::_1);
+                                   metadata_map_2, std::placeholders::_1);
   decoder_->callback_ = cb2;
   encoder_.createPayload(metadata_map_2);
   nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID, nullptr);
@@ -275,7 +271,7 @@ TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
   };
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map,
                                   std::placeholders::_1);
   initialize(cb);
 
@@ -295,7 +291,7 @@ TEST_F(MetadataEncoderDecoderTest, TestDecodeBadData) {
   };
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map,
                                   std::placeholders::_1);
   initialize(cb);
 
@@ -308,6 +304,45 @@ TEST_F(MetadataEncoderDecoderTest, TestDecodeBadData) {
   output_buffer_.buf[10] |= 0xff;
   decoder_->receiveMetadata(output_buffer_.buf, output_buffer_.length);
   EXPECT_FALSE(decoder_->onMetadataFrameComplete(true));
+
+  cleanUp();
+}
+
+// Checks if accumulated metadata size reaches size limit, returns failure.
+TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderMultipleMetadataReachSizeLimit) {
+  MetadataMap metadata_map = {};
+  MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, metadata_map,
+                                  std::placeholders::_1);
+  initialize(cb);
+
+  int result = 0;
+
+  for (int i = 0; i < 100; i++) {
+    // Cleans up the output buffer.
+    memset(output_buffer_.buf, 0, output_buffer_.length);
+    output_buffer_.length = 0;
+
+    MetadataMap metadata_map_2 = {
+        {"header_key1", std::string(10000, 'a')},
+        {"header_key2", std::string(10000, 'b')},
+    };
+
+    // Encode and decode the second MetadataMap.
+    MetadataCallback cb2 = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this,
+                                     metadata_map_2, std::placeholders::_1);
+    decoder_->callback_ = cb2;
+    encoder_.createPayload(metadata_map_2);
+    nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID, nullptr);
+    nghttp2_session_send(session_);
+    result = nghttp2_session_mem_recv(session_, output_buffer_.buf, output_buffer_.length);
+    if (result < 0) {
+      break;
+    }
+  }
+
+  // Verifies max matadata limit reached.
+  EXPECT_LT(result, 0);
+  EXPECT_LE(decoder_->max_payload_size_bound_, decoder_->total_payload_size_);
 
   cleanUp();
 }

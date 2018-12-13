@@ -9,6 +9,7 @@ import "envoy/api/v2/rds.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
 import "envoy/type/percent.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
@@ -19,7 +20,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 28]
+// [#comment:next free field: 29]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -163,6 +164,12 @@ message HttpConnectionManager {
   // A value of 0 will completely disable the connection manager stream idle
   // timeout, although per-route idle timeout overrides will continue to apply.
   google.protobuf.Duration stream_idle_timeout = 24 [(gogoproto.stdduration) = true];
+
+  // A timeout for idle requests managed by the connection manager.
+  // The timer is activated when the request is initiated, and is disarmed when the last byte of the
+  // request is sent upstream (i.e. all decoding filters have processed the request), OR when the
+  // response is initiated. If not specified or set to 0, this timeout is disabled.
+  google.protobuf.Duration request_timeout = 28 [(gogoproto.stdduration) = true];
 
   // The time that Envoy will wait between sending an HTTP/2 “shutdown
   // notification” (GOAWAY frame with max stream ID) and a final GOAWAY frame.
@@ -346,6 +353,11 @@ message HttpConnectionManager {
     // this type of upgrade. If no filters are present, the filter chain for
     // HTTP connections will be used for this upgrade type.
     repeated HttpFilter filters = 2;
+    // Determines if upgrades are enabled or disabled by default. Defaults to true.
+    // This can be overriden on a per-route basis with :ref:`cluster
+    // <envoy_api_field_route.RouteAction.upgrade_configs>` as documented in the
+    // :ref:`upgrade documentation <arch_overview_websocket>`.
+    google.protobuf.BoolValue enabled = 3;
   };
   repeated UpgradeConfig upgrade_configs = 23;
 
@@ -393,17 +405,14 @@ message HttpFilter {
   // * :ref:`envoy.squash <config_http_filters_squash>`
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
-  // Filter specific configuration which depends on the filter being
-  // instantiated. See the supported filters for further documentation.
-  google.protobuf.Struct config = 2;
+  // Filter specific configuration which depends on the filter being instantiated. See the supported
+  // filters for further documentation.
+  oneof config_type {
+    google.protobuf.Struct config = 2;
 
-  // [#not-implemented-hide:]
-  // This is hidden as type has been deprecated and is no longer required.
-  message DeprecatedV1 {
-    string type = 1;
+    // [#not-implemented-hide:]
+    google.protobuf.Any typed_config = 4;
   }
 
-  // [#not-implemented-hide:]
-  // This is hidden as type has been deprecated and is no longer required.
-  DeprecatedV1 deprecated_v1 = 3 [deprecated = true];
+  reserved 3;
 }

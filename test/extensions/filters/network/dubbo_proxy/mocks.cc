@@ -14,7 +14,6 @@ MockProtocolCallbacks::~MockProtocolCallbacks() {}
 
 MockProtocol::MockProtocol() { ON_CALL(*this, name()).WillByDefault(ReturnRef(name_)); }
 MockProtocol::~MockProtocol() {}
-
 } // namespace DubboProxy
 } // namespace NetworkFilters
 } // namespace Extensions

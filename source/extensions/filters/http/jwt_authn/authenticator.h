@@ -19,6 +19,8 @@ typedef std::unique_ptr<Authenticator> AuthenticatorPtr;
 
 typedef std::function<void(const ::google::jwt_verify::Status& status)> AuthenticatorCallback;
 
+typedef std::function<void(const std::string&, const ProtobufWkt::Struct&)> SetPayloadCallback;
+
 /**
  *  CreateJwksFetcherCb is a callback interface for creating a JwksFetcher instance.
  */
@@ -34,7 +36,7 @@ public:
   // Verify if headers satisfyies the JWT requirements. Can be limited to single provider with
   // extract_param.
   virtual void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
-                      AuthenticatorCallback callback) PURE;
+                      SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) PURE;
 
   // Called when the object is about to be destroyed.
   virtual void onDestroy() PURE;

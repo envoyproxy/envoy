@@ -1,8 +1,10 @@
+#include <algorithm>
 #include <fstream>
 #include <regex>
 #include <unordered_map>
 
 #include "envoy/admin/v2alpha/memory.pb.h"
+#include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -114,7 +116,11 @@ TEST_P(AdminStatsTest, StatsAsJson) {
 
   std::map<std::string, uint64_t> all_stats;
 
-  std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), false);
+  std::vector<Stats::ParentHistogramSharedPtr> histograms = store_->histograms();
+  std::sort(histograms.begin(), histograms.end(),
+            [](const Stats::ParentHistogramSharedPtr& a,
+               const Stats::ParentHistogramSharedPtr& b) -> bool { return a->name() < b->name(); });
+  std::string actual_json = statsAsJsonHandler(all_stats, histograms, false);
 
   const std::string expected_json = R"EOF({
     "stats": [
@@ -133,51 +139,6 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                     100.0
                 ],
                 "computed_quantiles": [
-                    {
-                        "name": "h2",
-                        "values": [
-                            {
-                                "interval": null,
-                                "cumulative": 100.0
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 102.5
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 105.0
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 107.5
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.0
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.5
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.9
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.95
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.99
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 110.0
-                            }
-                        ]
-                    },
                     {
                         "name": "h1",
                         "values": [
@@ -220,6 +181,51 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                             {
                                 "interval": 110.0,
                                 "cumulative": 210.0
+                            }
+                        ]
+                    },
+                    {
+                        "name": "h2",
+                        "values": [
+                            {
+                                "interval": null,
+                                "cumulative": 100.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 102.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 105.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 107.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.9
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.95
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.99
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 110.0
                             }
                         ]
                     }
@@ -831,8 +837,12 @@ TEST_P(AdminInstanceTest, Memory) {
   const std::string output_json = response.toString();
   envoy::admin::v2alpha::Memory output_proto;
   MessageUtil::loadFromJson(output_json, output_proto);
-  EXPECT_THAT(output_proto, AllOf(Property(&envoy::admin::v2alpha::Memory::allocated, Ge(0)),
-                                  Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0))));
+  EXPECT_THAT(output_proto,
+              AllOf(Property(&envoy::admin::v2alpha::Memory::allocated, Ge(0)),
+                    Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0)),
+                    Property(&envoy::admin::v2alpha::Memory::pageheap_unmapped, Ge(0)),
+                    Property(&envoy::admin::v2alpha::Memory::pageheap_free, Ge(0)),
+                    Property(&envoy::admin::v2alpha::Memory::total_thread_cache, Ge(0))));
 }
 
 TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
@@ -859,7 +869,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
 
   // Validate that cert details are null and /certs handles it correctly.
   EXPECT_EQ(nullptr, client_ctx->getCaCertInformation());
-  EXPECT_EQ(nullptr, client_ctx->getCertChainInformation());
+  EXPECT_TRUE(client_ctx->getCertChainInformation().empty());
   EXPECT_EQ(Http::Code::OK, getCallback("/certs", header_map, response));
   EXPECT_EQ(expected_empty_json, response.toString());
 }
@@ -1010,10 +1020,10 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       .WillByDefault(Return(true));
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH))
       .WillByDefault(Return(false));
-
   ON_CALL(host->outlier_detector_,
           successRate(Upstream::Outlier::DetectorHostMonitor::externalOrigin))
       .WillByDefault(Return(43.2));
+  ON_CALL(*host, weight()).WillByDefault(Return(5));
   ON_CALL(host->outlier_detector_, successRate(Upstream::Outlier::DetectorHostMonitor::localOrigin))
       .WillByDefault(Return(93.2));
 
@@ -1079,6 +1089,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
      "success_rate": {
       "value": 43.2
      },
+     "weight": 5,
      "local_origin_success_rate": {
       "value": 93.2
      }
@@ -1103,12 +1114,67 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 }
 
 TEST_P(AdminInstanceTest, GetRequest) {
+  EXPECT_CALL(server_.options_, toCommandLineOptions()).WillRepeatedly(Invoke([] {
+    Server::CommandLineOptionsPtr command_line_options =
+        std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
+    command_line_options->set_restart_epoch(2);
+    command_line_options->set_service_cluster("cluster");
+    return command_line_options;
+  }));
+  NiceMock<Init::MockManager> initManager;
+  ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
+
+  {
+    Http::HeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
+    envoy::admin::v2alpha::ServerInfo server_info_proto;
+    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+                HasSubstr("application/json"));
+
+    // We only test that it parses as the proto and that some fields are correct, since
+    // values such as timestamps + Envoy version are tricky to test for.
+    MessageUtil::loadFromJson(body, server_info_proto);
+    EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::LIVE);
+    EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
+    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
+  }
+
+  {
+    Http::HeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::NotInitialized));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
+    envoy::admin::v2alpha::ServerInfo server_info_proto;
+    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+                HasSubstr("application/json"));
+
+    // We only test that it parses as the proto and that some fields are correct, since
+    // values such as timestamps + Envoy version are tricky to test for.
+    MessageUtil::loadFromJson(body, server_info_proto);
+    EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING);
+    EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
+    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
+  }
+
   Http::HeaderMapImpl response_headers;
   std::string body;
+
+  ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
   EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
-  EXPECT_TRUE(absl::StartsWith(body, "envoy ")) << body;
+  envoy::admin::v2alpha::ServerInfo server_info_proto;
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("text/plain"));
+              HasSubstr("application/json"));
+
+  // We only test that it parses as the proto and that some fields are correct, since
+  // values such as timestamps + Envoy version are tricky to test for.
+  MessageUtil::loadFromJson(body, server_info_proto);
+  EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::INITIALIZING);
+  EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
+  EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
 }
 
 TEST_P(AdminInstanceTest, GetRequestJson) {
@@ -1152,6 +1218,20 @@ protected:
 TEST_F(PrometheusStatsFormatterTest, MetricName) {
   std::string raw = "vulture.eats-liver";
   std::string expected = "envoy_vulture_eats_liver";
+  auto actual = PrometheusStatsFormatter::metricName(raw);
+  EXPECT_EQ(expected, actual);
+}
+
+TEST_F(PrometheusStatsFormatterTest, SanitizeMetricName) {
+  std::string raw = "An.artist.plays-violin@019street";
+  std::string expected = "envoy_An_artist_plays_violin_019street";
+  auto actual = PrometheusStatsFormatter::metricName(raw);
+  EXPECT_EQ(expected, actual);
+}
+
+TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
+  std::string raw = "3.artists.play-violin@019street";
+  std::string expected = "envoy_3_artists_play_violin_019street";
   auto actual = PrometheusStatsFormatter::metricName(raw);
   EXPECT_EQ(expected, actual);
 }

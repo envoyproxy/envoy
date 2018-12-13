@@ -9,14 +9,15 @@
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
 #include "test/mocks/init/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -56,9 +57,7 @@ public:
       auto* validation_context = secret->mutable_validation_context();
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-      validation_context->add_verify_certificate_hash(
-          "E0:F3:C8:CE:5E:2E:A3:05:F0:70:1F:F5:12:E3:6E:2E:"
-          "97:92:82:84:A2:28:BC:F7:73:32:D3:39:30:A1:B6:FD");
+      validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
 
       secret = bootstrap.mutable_static_resources()->add_secrets();
       secret->set_name("server_cert");
@@ -73,7 +72,7 @@ public:
 
     registerTestServerPorts({"http"});
 
-    client_ssl_ctx_ = createClientSslTransportSocketFactory(false, false, context_manager_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_);
   }
 
   void TearDown() override {
@@ -86,12 +85,12 @@ public:
   Network::ClientConnectionPtr makeSslClientConnection() {
     Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               client_ssl_ctx_->createTransportSocket(), nullptr);
+                                               client_ssl_ctx_->createTransportSocket(nullptr),
+                                               nullptr);
   }
 
 private:
-  Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl context_manager_{runtime_};
+  Ssl::ContextManagerImpl context_manager_{timeSystem()};
 
   Network::TransportSocketFactoryPtr client_ssl_ctx_;
 };
@@ -153,8 +152,7 @@ public:
   }
 
 private:
-  Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl context_manager_{runtime_};
+  Ssl::ContextManagerImpl context_manager_{timeSystem()};
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SdsStaticUpstreamIntegrationTest,
