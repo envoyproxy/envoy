@@ -216,6 +216,7 @@ TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         auto* route = virtual_host->mutable_routes(0);
         route->mutable_route()->mutable_max_grpc_timeout()->set_seconds(60 * 60);
+        route->mutable_route()->mutable_idle_timeout()->set_seconds(1);
       });
   initialize();
 
@@ -231,12 +232,13 @@ TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
                               {":scheme", "http"},
                               {":authority", "host"},
                               {"te", "trailers"},
-                              {"grpc-timeout", "1S"}, // 1 Second
+                              {"grpc-timeout", "3S"}, // 3 Seconds
                               {"content-type", "application/grpc"}});
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_NE(response->headers().GrpcStatus(), nullptr);
+  // "2" (Unknown) is seen if idle timeout fires before the gRPC request timeout
   EXPECT_STREQ("14", response->headers().GrpcStatus()->value().c_str()); // Service Unavailable
   EXPECT_LT(0, test_server_->counter("cluster.cluster_0.upstream_rq_timeout")->value());
 }
