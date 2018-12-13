@@ -86,6 +86,8 @@ message Listener {
   // Listener metadata.
   core.Metadata metadata = 6;
 
+  reserved 7;
+
   enum DrainType {
     // Drain in response to calling /healthcheck/fail admin endpoint (along with the health check
     // filter), listener removal/modification, and hot restart.
