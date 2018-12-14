@@ -2347,6 +2347,19 @@ TEST(RouterFilterUtilityTest, ShouldShadow) {
     EXPECT_CALL(runtime.snapshot_, featureEnabled("foo", 0, 5, 10000)).WillOnce(Return(true));
     EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 5));
   }
+  // Use default value instead of runtime key.
+  {
+    TestShadowPolicy policy;
+    envoy::type::FractionalPercent fractional_percent;
+    fractional_percent.set_numerator(5);
+    fractional_percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+    policy.cluster_ = "cluster";
+    policy.runtime_key_ = "foo";
+    policy.default_value_ = fractional_percent;
+    NiceMock<Runtime::MockLoader> runtime;
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("foo", _, 3)).WillOnce(Return(true));
+    EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 3));
+  }
 }
 
 TEST_F(RouterTest, CanaryStatusTrue) {
