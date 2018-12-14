@@ -24,8 +24,8 @@ message ClusterStatus {
   // Denotes whether this cluster was added via API or configured statically.
   bool added_via_api = 2;
 
-  // The success rate threshold used in the last interval. The threshold is used to eject hosts
-  // based on their success rate. See
+  // The success rate threshold used in the last interval for externally generated failures.
+  // The threshold is used to eject hosts based on their success rate. See
   // :ref:`Cluster outlier detection <arch_overview_outlier_detection>` statistics
   //
   // Note: this field may be omitted in any of the three following cases:
@@ -40,8 +40,8 @@ message ClusterStatus {
   // Mapping from host address to the host's current status.
   repeated HostStatus host_statuses = 4;
 
-  // The success rate threshold used in the last interval. The threshold is used to eject hosts
-  // based on their success rate. See
+  // The success rate threshold used in the last interval for locally originated failures.
+  // The threshold is used to eject hosts based on their success rate. See
   // :ref:`Cluster outlier detection <arch_overview_outlier_detection>` statistics
   //
   // Note: this field may be omitted in any of the three following cases:
@@ -65,7 +65,8 @@ message HostStatus {
   // The host's current health status.
   HostHealthStatus health_status = 3;
 
-  // Request success rate for this host over the last calculated interval.
+  // Request success rate for externally originated failures for this host over the last calculated
+  // interval.
   //
   // Note: the message will not be present if host did not have enough request volume to calculate
   // success rate or the cluster did not have enough hosts to run through success rate outlier
@@ -75,7 +76,7 @@ message HostStatus {
   // The host's weight. If not configured, the value defaults to 1.
   uint32 weight = 5;
 
-  // Request success rate for local origin failures for this host over the last calculated
+  // Request success rate for locally originated failures for this host over the last calculated
   // interval.
   //
   // Note: the message will not be present if host did not have enough request volume to calculate
