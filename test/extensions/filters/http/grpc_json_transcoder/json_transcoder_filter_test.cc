@@ -65,8 +65,8 @@ public:
   const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
   getProtoConfig(const std::string& descriptor_path, const std::string& service_name,
                  bool match_incoming_request_route = false) {
-    std::vector<std::string> emtpy_ignored_query_parameters;
-    return getProtoConfig(descriptor_path, service_name, emtpy_ignored_query_parameters,
+    std::vector<std::string> empty_ignored_query_parameters;
+    return getProtoConfig(descriptor_path, service_name, empty_ignored_query_parameters,
                           match_incoming_request_route);
   }
 
