@@ -226,14 +226,12 @@ public:
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
-  const absl::optional<envoy::type::FractionalPercent>& defaultValue() const override {
-    return default_value_;
-  }
+  const envoy::type::FractionalPercent& defaultValue() const override { return default_value_; }
 
 private:
   std::string cluster_;
   std::string runtime_key_;
-  absl::optional<envoy::type::FractionalPercent> default_value_;
+  envoy::type::FractionalPercent default_value_;
 };
 
 /**

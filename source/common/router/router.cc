@@ -49,8 +49,8 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
     return false;
   }
 
-  if (policy.defaultValue()) {
-    return runtime.snapshot().featureEnabled(policy.runtimeKey(), policy.defaultValue().value(),
+  if (policy.defaultValue().numerator() > 0) {
+    return runtime.snapshot().featureEnabled(policy.runtimeKey(), policy.defaultValue(),
                                              stable_random);
   }
 

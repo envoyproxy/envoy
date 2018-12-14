@@ -289,7 +289,7 @@ public:
    * @return the default fraction of traffic the should be shadowed, if the runtime key is not
    *         present.
    */
-  virtual const absl::optional<envoy::type::FractionalPercent>& defaultValue() const PURE;
+  virtual const envoy::type::FractionalPercent& defaultValue() const PURE;
 };
 
 /**
