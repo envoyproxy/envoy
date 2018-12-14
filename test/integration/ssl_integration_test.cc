@@ -27,7 +27,11 @@ namespace Envoy {
 namespace Ssl {
 
 void SslIntegrationTestBase::initialize() {
-  config_helper_.addSslConfig(server_ecdsa_cert_, server_tlsv1_3_);
+  config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
+                                  .setRsaCert(server_rsa_cert_)
+                                  .setEcdsaCert(server_ecdsa_cert_)
+                                  .setTlsV13(server_tlsv1_3_)
+                                  .setExpectClientEcdsaCert(client_ecdsa_cert_));
   HttpIntegrationTest::initialize();
 
   context_manager_ = std::make_unique<ContextManagerImpl>(timeSystem());
@@ -195,10 +199,11 @@ public:
   }
 
   ClientSslTransportOptions ecdsaOnlyClientOptions() {
+    auto options = ClientSslTransportOptions().setClientEcdsaCert(true);
     if (tls_version_ == envoy::api::v2::auth::TlsParameters::TLSv1_3) {
-      return ClientSslTransportOptions().setSigningAlgorithmsForTest("ecdsa_secp256r1_sha256");
+      return options.setSigningAlgorithmsForTest("ecdsa_secp256r1_sha256");
     } else {
-      return ClientSslTransportOptions().setCipherSuites({"ECDHE-ECDSA-AES128-GCM-SHA256"});
+      return options.setCipherSuites({"ECDHE-ECDSA-AES128-GCM-SHA256"});
     }
   }
 
@@ -224,6 +229,7 @@ INSTANTIATE_TEST_CASE_P(
 
 // Server with an RSA certificate and a client with RSA/ECDSA cipher suites works.
 TEST_P(SslCertficateIntegrationTest, ServerRsa) {
+  server_rsa_cert_ = true;
   server_ecdsa_cert_ = false;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
@@ -234,6 +240,18 @@ TEST_P(SslCertficateIntegrationTest, ServerRsa) {
 
 // Server with an ECDSA certificate and a client with RSA/ECDSA cipher suites works.
 TEST_P(SslCertficateIntegrationTest, ServerEcdsa) {
+  server_rsa_cert_ = false;
+  server_ecdsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  checkStats();
+}
+
+// Server with RSA/ECDSAs certificates and a client with RSA/ECDSA cipher suites works.
+TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsa) {
+  server_rsa_cert_ = true;
   server_ecdsa_cert_ = true;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
@@ -244,6 +262,7 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsa) {
 
 // Server with an RSA certificate and a client with only RSA cipher suites works.
 TEST_P(SslCertficateIntegrationTest, ClientRsaOnly) {
+  server_rsa_cert_ = true;
   server_ecdsa_cert_ = false;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(rsaOnlyClientOptions());
@@ -254,6 +273,7 @@ TEST_P(SslCertficateIntegrationTest, ClientRsaOnly) {
 
 // Server has only an ECDSA certificate, client is only RSA capable, leads to a connection fail.
 TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
+  server_rsa_cert_ = false;
   server_ecdsa_cert_ = true;
   initialize();
   auto codec_client = makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()));
@@ -264,9 +284,22 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
   counter->reset();
 }
 
+// Server with RSA/ECDSA certificates and a client with only RSA cipher suites works.
+TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsaClientRsaOnly) {
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(rsaOnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  checkStats();
+}
+
 // Server has only an RSA certificate, client is only ECDSA capable, leads to connection fail.
-TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientEcdsaOnly) {
+TEST_P(SslCertficateIntegrationTest, ServerRsaClientEcdsaOnly) {
+  server_rsa_cert_ = true;
   server_ecdsa_cert_ = false;
+  client_ecdsa_cert_ = true;
   initialize();
   EXPECT_FALSE(
       makeRawHttpConnection(makeSslClientConnection(ecdsaOnlyClientOptions()))->connected());
@@ -274,6 +307,30 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientEcdsaOnly) {
       test_server_->counter(listenerStatPrefix("ssl.connection_error"));
   EXPECT_EQ(1U, counter->value());
   counter->reset();
+}
+
+// Server has only an ECDSA certificate, client is only ECDSA capable works.
+TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientEcdsaOnly) {
+  server_rsa_cert_ = false;
+  server_ecdsa_cert_ = true;
+  client_ecdsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaOnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  checkStats();
+}
+
+// Server has RSA/ECDSA certificates, client is only ECDSA capable works.
+TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsaClientEcdsaOnly) {
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = true;
+  client_ecdsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaOnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  checkStats();
 }
 
 class SslCaptureIntegrationTest : public SslIntegrationTest {

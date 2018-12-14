@@ -656,6 +656,116 @@ TEST_P(SslSocketTest, NoCert) {
            GetParam());
 }
 
+// The first RSA certificate is picked when multiple RSA certificates are
+// present. We validate TLSv1.2 only here, since we validate the e2e behavior on
+// TLSv1.2/1.3 in ssl_integration_test.
+TEST_P(SslSocketTest, MultiCertFirstRsa) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash:
+          AB:6A:9F:1A:F4:C8:9E:81:A2:06:E9:E1:05:7E:BD:63:3E:8D:54:4A:E8:F0:50:5A:A3:58:63:25:17:B6:23:12
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p256.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p256.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert2.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+)EOF";
+
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.no_certificate", true,
+           GetParam());
+}
+
+// The first ECDSA certificate is picked when multiple ECDSA certificates are
+// present. We validate TLSv1.2 only here, since we validate the e2e behavior on
+// TLSv1.2/1.3 in ssl_integration_test.
+TEST_P(SslSocketTest, MultiCertFirstEcdsa) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites: ECDHE-ECDSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash:
+          49:D0:E5:82:F1:0F:29:D8:C5:64:33:8F:14:2A:3E:53:87:CD:E2:E6:0E:8B:C7:83:CF:6F:88:BD:50:4E:11:E2
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p256.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p256.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert2_ecdsa_p256.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p256.pem"
+)EOF";
+
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.no_certificate", true,
+           GetParam());
+}
+
+// Prefer ECDSA certificate when multiple RSA certificates are present and the
+// client is RSA/ECDSA capable. We validate TLSv1.2 only here, since we validate
+// the e2e behavior on TLSv1.2/1.3 in ssl_integration_test.
+TEST_P(SslSocketTest, MultiCertPreferEcdsa) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-ECDSA-AES128-GCM-SHA256
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash:
+          49:D0:E5:82:F1:0F:29:D8:C5:64:33:8F:14:2A:3E:53:87:CD:E2:E6:0E:8B:C7:83:CF:6F:88:BD:50:4E:11:E2
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p256.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p256.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert2.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+)EOF";
+
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.no_certificate", true,
+           GetParam());
+}
+
 TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:

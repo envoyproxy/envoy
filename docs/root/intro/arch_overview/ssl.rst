@@ -85,6 +85,29 @@ standard Debian installations. Common paths for system CA bundles on Linux and B
 See the reference for :ref:`UpstreamTlsContexts <envoy_api_msg_auth.UpstreamTlsContext>` and
 :ref:`DownstreamTlsContexts <envoy_api_msg_auth.DownstreamTlsContext>` for other TLS options.
 
+.. _arch_overview_ssl_multi_cert: 
+
+Multiple certificates
+---------------------
+
+:ref:`UpstreamTlsContexts <envoy_api_msg_auth.UpstreamTlsContext>` support multiple TLS
+certificates. These may be a mix of RSA and P-256 ECDSA certificates. The following rules apply:
+
+* Only the first certificate of a particular type (RSA or ECDSA) is considered.
+* Non-P256 server ECDSA certificates are rejected.
+* The client must indicate P-256 support to be considered ECDSA capable.
+* If the client supports P-256 ECDSA, a P-256 ECDSA certificate will be selected if present in the
+  :ref:`UpstreamTlsContext <envoy_api_msg_auth.UpstreamTlsContext>`.
+* If the client only supports RSA certificate, an RSA certificate will be selected if present in the
+  :ref:`UpstreamTlsContext <envoy_api_msg_auth.UpstreamTlsContext>`.
+* Otherwise, the first certificate listed is used. This will result in a failed handshake if the
+  client only supports RSA certificates and the server only has ECDSA certificates.
+* Static and SDS certificates may not be mixed in a given :ref:`UpstreamTlsContext
+  <envoy_api_msg_auth.UpstreamTlsContext>`.
+
+Only a single TLS certificate is supported today for :ref:`DownstreamTlsContexts
+<envoy_api_msg_auth.DownstreamTlsContext>`.
+
 Secret discovery service (SDS)
 ------------------------------
 

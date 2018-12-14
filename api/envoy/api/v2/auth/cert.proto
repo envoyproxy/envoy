@@ -227,8 +227,9 @@ message CommonTlsContext {
   // TLS protocol versions, cipher suites etc.
   TlsParameters tls_params = 1;
 
-  // Multiple TLS certificates can be associated with the same context.
-  // E.g. to allow both RSA and ECDSA certificates, two TLS certificates can be configured.
+  // :ref:`Multiple TLS certificates <arch_overview_ssl_multi_cert>` can be associated with the same
+  // context.B E.g. to allow both RSA and ECDSA certificates, two TLS certificates can be
+  // configured.
   //
   // Only a single TLS certificate is supported in client contexts. In server contexts, the first
   // RSA certificate is used for clients that only support RSA and the first ECDSA certificate is

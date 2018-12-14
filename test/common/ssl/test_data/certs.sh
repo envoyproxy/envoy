@@ -69,11 +69,13 @@ openssl x509 -req -days 730 -in san_only_dns_cert.csr -sha256 -CA ca_cert.pem -C
 openssl req -new -key san_uri_key.pem -out san_uri_cert.csr -config san_uri_cert.cfg -batch -sha256
 openssl x509 -req -days 730 -in san_uri_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_uri_cert.pem -extensions v3_ca -extfile san_uri_cert.cfg
 
-# Generate selfsigned_cert.pem.
+# Generate selfsigned_cert*.pem.
 openssl req -new -x509 -days 730 -key selfsigned_key.pem -out selfsigned_cert.pem -config selfsigned_cert.cfg -batch -sha256
+openssl req -new -x509 -days 730 -key selfsigned_key.pem -out selfsigned_cert2.pem -config selfsigned_cert.cfg -batch -sha256
 
-# Generate selfsigned_cert_ecdsa_p256.pem.
+# Generate selfsigned_cert*_ecdsa_p256.pem.
 openssl req -new -x509 -days 730 -key selfsigned_key_ecdsa_p256.pem -out selfsigned_cert_ecdsa_p256.pem -config selfsigned_cert.cfg -batch -sha256
+openssl req -new -x509 -days 730 -key selfsigned_key_ecdsa_p256.pem -out selfsigned_cert2_ecdsa_p256.pem -config selfsigned_cert.cfg -batch -sha256
 
 # Generate selfsigned_cert_ecdsa_p384.pem.
 openssl req -new -x509 -days 730 -key selfsigned_key_ecdsa_p384.pem -out selfsigned_cert_ecdsa_p384.pem -config selfsigned_cert.cfg -batch -sha256

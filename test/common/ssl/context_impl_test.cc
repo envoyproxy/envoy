@@ -20,6 +20,7 @@
 #include "openssl/x509v3.h"
 
 using Envoy::Protobuf::util::MessageDifferencer;
+using testing::EndsWith;
 using testing::NiceMock;
 using testing::ReturnRef;
 
@@ -881,28 +882,37 @@ TEST(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
       "Unknown static certificate validation context: missing");
 }
 
-// Multiple TLS certificates are not yet supported, but one is expected for
-// server.
-// TODO(PiotrSikora): Support multiple TLS certificates.
+// Multiple TLS certificates are supported.
 TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl client_context_config(tls_context, factory_context), EnvoyException,
       "No TLS certificates found for server context");
-  const std::string tls_certificate_yaml = R"EOF(
+  const std::string rsa_tls_certificate_yaml = R"EOF(
   certificate_chain:
     filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
   private_key:
     filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
   )EOF";
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+  const std::string ecdsa_tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p256.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p256.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(rsa_tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(ecdsa_tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
-  EXPECT_THROW_WITH_MESSAGE(
-      ServerContextConfigImpl client_context_config(tls_context, factory_context), EnvoyException,
-      "A single TLS certificate is required for server contexts");
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(rsa_tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ServerContextConfigImpl server_context_config(tls_context, factory_context);
+  auto tls_certs = server_context_config.tlsCertificates();
+  ASSERT_EQ(3, tls_certs.size());
+  EXPECT_THAT(tls_certs[0].get().privateKeyPath(), EndsWith("selfsigned_key.pem"));
+  EXPECT_THAT(tls_certs[1].get().privateKeyPath(), EndsWith("selfsigned_key_ecdsa_p256.pem"));
+  EXPECT_THAT(tls_certs[2].get().privateKeyPath(), EndsWith("selfsigned_key.pem"));
 }
 
 TEST(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
@@ -922,7 +932,7 @@ TEST(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
   tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl server_context_config(tls_context, factory_context), EnvoyException,
-      "A single TLS certificate is required for server contexts");
+      "Static and dynamic TLS certificates may not be mixed in server contexts");
 }
 
 TEST(ServerContextConfigImplTest, SecretNotReady) {
