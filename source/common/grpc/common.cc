@@ -99,7 +99,7 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
     return absl::optional<Status::GrpcStatus>();
   }
   if (!StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code) ||
-      grpc_status_code > Status::GrpcStatus::Unauthenticated) {
+      grpc_status_code > Status::GrpcStatus::MaximumValid) {
     return absl::optional<Status::GrpcStatus>(Status::GrpcStatus::InvalidCode);
   }
   return absl::optional<Status::GrpcStatus>(static_cast<Status::GrpcStatus>(grpc_status_code));
