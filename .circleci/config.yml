@@ -98,7 +98,10 @@ jobs:
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
-       - run: ci/do_circle_ci.sh bazel.clang_tidy
+       - run:
+           command:
+             ci/do_circle_ci.sh bazel.clang_tidy
+           no_output_timeout: 60m
 
    format:
      executor: ubuntu-build
