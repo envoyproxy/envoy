@@ -56,7 +56,7 @@ protected:
   ListenSocketImpl(int fd, const Address::InstanceConstSharedPtr& local_address)
       : SocketImpl(fd, local_address) {}
 
-  void setupSocket(const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
+  void setupSocket(const Network::Socket::OptionsSharedPtr& options);
   void doBind();
   void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options);
 };
@@ -77,13 +77,13 @@ template <> struct NetworkSocketTrait<Address::SocketType::Datagram> {
 template <typename T> class NetworkListenSocket : public ListenSocketImpl {
 public:
   NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
-                      const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
+                      const Network::Socket::OptionsSharedPtr& options)
       : ListenSocketImpl(address->socket(T::type), address) {
     RELEASE_ASSERT(fd_ != -1, "");
 
     setPrebindSocketOptions();
 
-    setupSocket(options, bind_to_port);
+    setupSocket(options);
   }
 
   NetworkListenSocket(int fd, const Address::InstanceConstSharedPtr& address,

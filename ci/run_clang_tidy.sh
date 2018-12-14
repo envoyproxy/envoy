@@ -33,3 +33,6 @@ else
   git diff $(git merge-base HEAD FETCH_HEAD)..HEAD | exclude_testdata | \
     clang-tidy-diff-7.py -p 1
 fi
+
+echo "clang-tidy ran successfully"
+set -x

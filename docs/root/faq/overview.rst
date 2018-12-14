@@ -14,3 +14,4 @@ FAQ
   lb_panic_threshold
   concurrency_lb
   disable_circuit_breaking
+  rolling_upgrades

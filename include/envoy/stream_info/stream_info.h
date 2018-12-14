@@ -52,8 +52,10 @@ enum ResponseFlag {
   UnauthorizedExternalService = 0x1000,
   // Unable to call Ratelimit service.
   RateLimitServiceError = 0x2000,
+  // If the stream was reset due to a downstream connection termination.
+  DownstreamConnectionTermination = 0x4000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = RateLimitServiceError
+  LastFlag = DownstreamConnectionTermination
 };
 
 /**

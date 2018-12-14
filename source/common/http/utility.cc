@@ -192,7 +192,6 @@ uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   if (!header || !StringUtil::atoul(headers.Status()->value().c_str(), response_code)) {
     throw CodecClientException(":status must be specified and a valid unsigned long");
   }
-
   return response_code;
 }
 

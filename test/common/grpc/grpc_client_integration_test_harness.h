@@ -5,7 +5,11 @@
 #include "common/api/api_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/async_client_impl.h"
+
+#ifdef ENVOY_GOOGLE_GRPC
 #include "common/grpc/google_async_client_impl.h"
+#endif
+
 #include "common/http/async_client_impl.h"
 #include "common/http/codes.h"
 #include "common/http/http2/conn_pool.h"
@@ -141,6 +145,8 @@ public:
   void expectGrpcStatus(Status::GrpcStatus grpc_status) {
     if (grpc_status == Status::GrpcStatus::InvalidCode) {
       EXPECT_CALL(*this, onRemoteClose(_, _)).WillExitIfNeeded();
+    } else if (grpc_status > Status::GrpcStatus::MaximumValid) {
+      EXPECT_CALL(*this, onRemoteClose(Status::GrpcStatus::InvalidCode, _)).WillExitIfNeeded();
     } else {
       EXPECT_CALL(*this, onRemoteClose(grpc_status, _)).WillExitIfNeeded();
     }
