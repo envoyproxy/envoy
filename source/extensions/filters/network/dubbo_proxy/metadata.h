@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/network/dubbo_proxy/protocol.h"
@@ -59,7 +60,7 @@ public:
     assignParameterIfNeed();
     parameter_map_->emplace(index, value);
   }
-  const std::string getParameterValue(uint32_t index) const {
+  const std::string& getParameterValue(uint32_t index) const {
     if (parameter_map_) {
       auto itor = parameter_map_->find(index);
       if (itor != parameter_map_->end()) {
@@ -67,7 +68,7 @@ public:
       }
     }
 
-    return "";
+    return EMPTY_STRING;
   }
   bool hasParameters() const { return parameter_map_ != nullptr; }
   const ParameterValueMap& parameters() {
