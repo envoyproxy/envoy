@@ -29,6 +29,7 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::DoAll;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -93,7 +94,8 @@ public:
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, false);
 
     client_connection_ = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
+        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
+        socket_options_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;
@@ -211,6 +213,7 @@ protected:
   std::shared_ptr<MockReadFilter> read_filter_;
   MockWatermarkBuffer* client_write_buffer_ = nullptr;
   Address::InstanceConstSharedPtr source_address_;
+  Socket::OptionsSharedPtr socket_options_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplTest,
@@ -838,6 +841,34 @@ TEST_P(ConnectionImplTest, BindTest) {
   disconnect(true);
 }
 
+TEST_P(ConnectionImplTest, BindFromSocketTest) {
+  std::string address_string = TestUtility::getIpv4Loopback();
+  Address::InstanceConstSharedPtr new_source_address;
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    new_source_address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance(address_string, 0)};
+  } else {
+    address_string = "::1";
+    new_source_address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv6Instance(address_string, 0)};
+  }
+  auto option = std::make_shared<NiceMock<MockSocketOption>>();
+  EXPECT_CALL(*option, setOption(Matcher<ConnectionSocket&>(_),
+                                 Eq(envoy::api::v2::core::SocketOption::STATE_PREBIND)))
+      .WillOnce(
+          Invoke([&](ConnectionSocket& socket, envoy::api::v2::core::SocketOption::SocketState) {
+            socket.setLocalAddress(new_source_address, false);
+            return true;
+          }));
+
+  socket_options_ = std::make_shared<Socket::Options>();
+  socket_options_->emplace_back(std::move(option));
+  setUpBasicConnection();
+  connect();
+  EXPECT_EQ(address_string, server_connection_->remoteAddress()->ip()->addressAsString());
+
+  disconnect(true);
+}
 TEST_P(ConnectionImplTest, BindFailureTest) {
   // Swap the constraints from BindTest to create an address family mismatch.
   if (GetParam() == Network::Address::IpVersion::v6) {
