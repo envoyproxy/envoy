@@ -38,13 +38,6 @@ public:
   virtual Socket& socket() PURE;
 
   /**
-   * @return bool specifies whether the listener should actually listen on the port.
-   *         A listener that doesn't listen on a port can only receive connections
-   *         redirected from other listeners.
-   */
-  virtual bool bindToPort() PURE;
-
-  /**
    * @return bool if a connection should be handed off to another Listener after the original
    *         destination address has been restored. 'true' when 'use_original_dst' flag in listener
    *         configuration is set, false otherwise. Note that this flag is deprecated and will be
@@ -57,6 +50,13 @@ public:
    *         buffers.
    */
   virtual uint32_t perConnectionBufferLimitBytes() PURE;
+
+  /**
+   * @return std::chrono::milliseconds the time to wait for all listener filters to complete
+   *         operation. If the timeout is reached, the accepted socket is closed without a
+   *         connection being created. 0 specifies a disabled timeout.
+   */
+  virtual std::chrono::milliseconds listenerFiltersTimeout() const PURE;
 
   /**
    * @return Stats::Scope& the stats scope to use for all listener specific stats.

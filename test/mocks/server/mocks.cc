@@ -83,16 +83,16 @@ MockOverloadManager::~MockOverloadManager() {}
 
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
-  ON_CALL(*this, createListenSocket(_, _, _))
-      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr,
-                                const Network::Socket::OptionsSharedPtr& options,
-                                bool) -> Network::SocketSharedPtr {
-        if (!Network::Socket::applyOptions(options, *socket_,
-                                           envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
-          throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
-        }
-        return socket_;
-      }));
+  ON_CALL(*this, createListenSocket(_, _))
+      .WillByDefault(
+          Invoke([&](Network::Address::InstanceConstSharedPtr,
+                     const Network::Socket::OptionsSharedPtr& options) -> Network::SocketSharedPtr {
+            if (!Network::Socket::applyOptions(options, *socket_,
+                                               envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
+              throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
+            }
+            return socket_;
+          }));
 }
 MockListenerComponentFactory::~MockListenerComponentFactory() {}
 
@@ -124,7 +124,7 @@ MockInstance::MockInstance()
       ssl_context_manager_(timeSystem()), singleton_manager_(new Singleton::ManagerImpl()) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
-  ON_CALL(*this, httpTracer()).WillByDefault(ReturnRef(http_tracer_));
+  ON_CALL(*this, httpContext()).WillByDefault(ReturnRef(http_context_));
   ON_CALL(*this, dnsResolver()).WillByDefault(Return(dns_resolver_));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
@@ -165,7 +165,6 @@ MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::Man
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
-  ON_CALL(*this, httpTracer()).WillByDefault(ReturnRef(http_tracer_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
   ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));

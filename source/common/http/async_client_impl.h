@@ -13,6 +13,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/context.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 #include "envoy/router/router.h"
@@ -42,8 +43,9 @@ public:
   AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster, Stats::Store& stats_store,
                   Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info,
                   Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-                  Runtime::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer);
-  ~AsyncClientImpl();
+                  Runtime::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer,
+                  Http::Context& http_context);
+  ~AsyncClientImpl() override;
 
   // Http::AsyncClient
   Request* send(MessagePtr&& request, Callbacks& callbacks,

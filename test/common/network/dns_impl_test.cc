@@ -410,8 +410,8 @@ public:
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
     server_ = std::make_unique<TestDnsServer>(dispatcher_);
     socket_ = std::make_unique<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ = dispatcher_.createListener(*socket_, *server_, true, false);
+        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr);
+    listener_ = dispatcher_.createListener(*socket_, *server_, false);
 
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));

@@ -347,6 +347,7 @@ void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
   // The following allows us to test shutting down the server with active connection pool
   // connections.
   if (!close_upstream) {
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     test_server_.reset();
   }
 
@@ -1418,7 +1419,17 @@ void HttpIntegrationTest::testIdleTimeoutWithTwoRequests() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
 }
 
+// This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
+// pending request is not sent on a connection that has been half-closed.
 void HttpIntegrationTest::testUpstreamDisconnectWithTwoRequests() {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    // Ensure we only have one connection upstream, one request active at a time.
+    cluster->mutable_max_requests_per_connection()->set_value(1);
+    auto* circuit_breakers = cluster->mutable_circuit_breakers();
+    circuit_breakers->add_thresholds()->mutable_max_connections()->set_value(1);
+  });
   initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
@@ -1431,6 +1442,10 @@ void HttpIntegrationTest::testUpstreamDisconnectWithTwoRequests() {
   // Request 2.
   IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
   auto response2 = codec_client2->makeRequestWithBody(default_request_headers_, 512);
+
+  // Validate one request active, the other pending.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 1);
 
   // Response 1.
   upstream_request_->encodeHeaders(default_response_headers_, false);

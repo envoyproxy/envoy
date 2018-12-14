@@ -24,8 +24,27 @@
 namespace Envoy {
 namespace Ssl {
 
+namespace {
+
+bool cbsContainsU16(CBS& cbs, uint16_t n) {
+  while (CBS_len(&cbs) > 0) {
+    uint16_t v;
+    if (!CBS_get_u16(&cbs, &v)) {
+      return false;
+    }
+    if (v == n) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+} // namespace
+
 ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source)
-    : scope_(scope), stats_(generateStats(scope)), time_source_(time_source) {
+    : scope_(scope), stats_(generateStats(scope)), time_source_(time_source),
+      tls_max_version_(config.maxProtocolVersion()) {
   const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(1UL, tls_certificates.size()));
 
@@ -229,12 +248,27 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
 
     bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
     ctx.is_ecdsa_ = EVP_PKEY_id(public_key.get()) == EVP_PKEY_EC;
+    if (ctx.is_ecdsa_) {
+      // We only support P-256 ECDSA today.
+      EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
+      // Since we checked the key type above, this should be valid.
+      ASSERT(ecdsa_public_key != nullptr);
+      const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
+      if (ecdsa_group == nullptr || EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
+        throw EnvoyException(fmt::format("Failed to load certificate from chain {}, only P-256 "
+                                         "ECDSA certificates are supported",
+                                         ctx.cert_chain_file_path_));
+      }
+    }
 
     // Load private key.
     bio.reset(BIO_new_mem_buf(const_cast<char*>(tls_certificate.privateKey().data()),
                               tls_certificate.privateKey().size()));
     RELEASE_ASSERT(bio != nullptr, "");
-    bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+    bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(
+        bio.get(), nullptr, nullptr,
+        !tls_certificate.password().empty() ? const_cast<char*>(tls_certificate.password().c_str())
+                                            : nullptr));
     if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ctx.ssl_ctx_.get(), pkey.get())) {
       throw EnvoyException(
           fmt::format("Failed to load private key from {}", tls_certificate.privateKeyPath()));
@@ -358,6 +392,9 @@ void ContextImpl::logHandshake(SSL* ssl) const {
 
   const char* cipher = SSL_get_cipher_name(ssl);
   scope_.counter(fmt::format("ssl.ciphers.{}", std::string{cipher})).inc();
+
+  std::string protocol_version = std::string{SSL_get_version(ssl)};
+  scope_.counter(fmt::format("ssl.versions.{}", protocol_version)).inc();
 
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
   if (!cert.get()) {
@@ -524,6 +561,14 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
       int rc = SSL_CTX_set_alpn_protos(ctx.ssl_ctx_.get(), &parsed_alpn_protocols_[0],
                                        parsed_alpn_protocols_.size());
       RELEASE_ASSERT(rc == 0, "");
+    }
+  }
+
+  if (!config.signingAlgorithmsForTest().empty()) {
+    for (auto& ctx : tls_contexts_) {
+      int rc =
+          SSL_CTX_set1_sigalgs_list(ctx.ssl_ctx_.get(), config.signingAlgorithmsForTest().c_str());
+      RELEASE_ASSERT(rc == 1, "");
     }
   }
 
@@ -812,11 +857,88 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
   }
 }
 
+bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  CBS client_hello;
+  CBS_init(&client_hello, ssl_client_hello->client_hello, ssl_client_hello->client_hello_len);
+
+  // This is the TLSv1.3 case (TLSv1.2 on the wire and the supported_versions extensions present).
+  // We just need to loook at signature algorithms.
+  const uint16_t client_version = ssl_client_hello->version;
+  if (client_version == TLS1_2_VERSION && tls_max_version_ == TLS1_3_VERSION) {
+    // If the supported_versions extension is found then we assume that the client is competent
+    // enough that just checking the signature_algorithms is sufficient.
+    const uint8_t* supported_versions_data;
+    size_t supported_versions_len;
+    if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_versions,
+                                             &supported_versions_data, &supported_versions_len)) {
+      const uint8_t* signature_algorithms_data;
+      size_t signature_algorithms_len;
+      if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_signature_algorithms,
+                                               &signature_algorithms_data,
+                                               &signature_algorithms_len)) {
+        CBS signature_algorithms_ext, signature_algorithms;
+        CBS_init(&signature_algorithms_ext, signature_algorithms_data, signature_algorithms_len);
+        if (!CBS_get_u16_length_prefixed(&signature_algorithms_ext, &signature_algorithms) ||
+            CBS_len(&signature_algorithms_ext) != 0) {
+          return false;
+        }
+        if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP256R1_SHA256)) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+  }
+
+  // Otherwise we are < TLSv1.3 and need to look at both the curves in the supported_groups for
+  // ECDSA and also for a compatible cipher suite. https://tools.ietf.org/html/rfc4492#section-5.1.1
+  const uint8_t* curvelist_data;
+  size_t curvelist_len;
+  if (!SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_groups,
+                                            &curvelist_data, &curvelist_len)) {
+    return false;
+  }
+
+  CBS curvelist;
+  CBS_init(&curvelist, curvelist_data, curvelist_len);
+
+  // We only support P256 ECDSA curves today.
+  if (!cbsContainsU16(curvelist, SSL_CURVE_SECP256R1)) {
+    return false;
+  }
+
+  // The client must have offered an ECDSA ciphersuite that we like.
+  CBS cipher_suites;
+  CBS_init(&cipher_suites, ssl_client_hello->cipher_suites, ssl_client_hello->cipher_suites_len);
+
+  while (CBS_len(&cipher_suites) > 0) {
+    uint16_t cipher_id;
+    if (!CBS_get_u16(&cipher_suites, &cipher_id)) {
+      return false;
+    }
+    // All tls_context_ share the same set of enabled ciphers, so we can just look at the base
+    // context.
+    if (tls_contexts_[0].isCipherEnabled(cipher_id, client_version)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 enum ssl_select_cert_result_t
 ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
-  // This is currently a nop, since we only have a single cert, but this is where we will implement
-  // the certificate selection logic in #1319.
-  RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, tls_contexts_[0].ssl_ctx_.get()) != nullptr,
+  const bool client_ecdsa_capable = isClientEcdsaCapable(ssl_client_hello);
+  // Fallback on first certificate.
+  const TlsContext* selected_ctx = &tls_contexts_[0];
+  for (const auto& ctx : tls_contexts_) {
+    if (client_ecdsa_capable == ctx.is_ecdsa_) {
+      selected_ctx = &ctx;
+      break;
+    }
+  }
+  RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, selected_ctx->ssl_ctx_.get()) != nullptr,
                  "");
   return ssl_select_cert_success;
 }
@@ -864,6 +986,26 @@ void ServerContextImpl::TlsContext::addClientValidationContext(
   if (require_client_cert) {
     SSL_CTX_set_verify(ssl_ctx_.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
+}
+
+bool ServerContextImpl::TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) {
+  const SSL_CIPHER* c = SSL_get_cipher_by_value(cipher_id);
+  if (c == nullptr) {
+    return false;
+  }
+  // Skip TLS 1.2 only ciphersuites unless the client supports it.
+  if (SSL_CIPHER_get_min_version(c) > client_version) {
+    return false;
+  }
+  if (SSL_CIPHER_get_auth_nid(c) != NID_auth_ecdsa) {
+    return false;
+  }
+  for (const SSL_CIPHER* our_c : SSL_CTX_get_ciphers(ssl_ctx_.get())) {
+    if (SSL_CIPHER_get_id(our_c) == SSL_CIPHER_get_id(c)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 } // namespace Ssl

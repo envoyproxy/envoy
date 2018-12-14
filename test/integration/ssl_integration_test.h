@@ -16,21 +16,22 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Ssl {
 
-class SslIntegrationTest : public HttpIntegrationTest,
-                           public testing::TestWithParam<Network::Address::IpVersion> {
+class SslIntegrationTestBase : public HttpIntegrationTest {
 public:
-  SslIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+  SslIntegrationTestBase(Network::Address::IpVersion ip_version)
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ip_version, realTime()) {}
 
   void initialize() override;
 
-  void TearDown() override;
+  void TearDown();
 
   Network::ClientConnectionPtr makeSslConn() { return makeSslClientConnection({}); }
-  Network::ClientConnectionPtr makeSslClientConnection(const ClientSslTransportOptions& options);
+  virtual Network::ClientConnectionPtr
+  makeSslClientConnection(const ClientSslTransportOptions& options);
   void checkStats();
 
 protected:
+  bool server_tlsv1_3_{false};
   bool server_ecdsa_cert_{false};
   // Set this true to debug SSL handshake issues with openssl s_client. The
   // verbose trace will be in the logs, openssl must be installed separately.
@@ -38,6 +39,13 @@ protected:
 
 private:
   std::unique_ptr<ContextManager> context_manager_;
+};
+
+class SslIntegrationTest : public SslIntegrationTestBase,
+                           public testing::TestWithParam<Network::Address::IpVersion> {
+public:
+  SslIntegrationTest() : SslIntegrationTestBase(GetParam()) {}
+  void TearDown() override { SslIntegrationTestBase::TearDown(); };
 };
 
 } // namespace Ssl
