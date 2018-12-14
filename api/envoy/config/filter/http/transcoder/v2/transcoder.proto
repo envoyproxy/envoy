@@ -67,7 +67,7 @@ message GrpcJsonTranscoder {
   // unknown/invalid query parameters. For example, for the `Bookstore API
   // <https://github.com/envoyproxy/envoy/blob/master/test/proto/bookstore.proto>` the request
   // ``shelves/100?key=API_KEY`` will not be mapped to ``GetShelf``` because variable binding for
-  // key is not defined. Adding ``key`` to ``ignored_query_parameters``, will allow the same request
-  // to be mapped to ``GetShelf```.
+  // ``key`` is not defined. Adding ``key`` to ``ignored_query_parameters`` will allow the same
+  // request to be mapped to ``GetShelf```.
   repeated string ignored_query_parameters = 6;
 }
