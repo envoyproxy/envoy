@@ -96,7 +96,7 @@ void DetectorHostMonitorImpl::putResult(Result result) {
     return putHttpResponseCode(500);
     break;
   // REQUEST_SUCCESS is used to report that transaction with non-http server was completed
-  // successfully. This means that connection and server level transactions were successfull. Map it
+  // successfully. This means that connection and server level transactions were successful. Map it
   // to http code 200 OK and indicate that there was no errors on connection level.
   case Result::REQUEST_SUCCESS:
     putHttpResponseCode(200);
@@ -469,7 +469,7 @@ void DetectorImpl::processSuccessRateEjections(
   double success_rate_sum = 0;
 
   // Reset the Detector's success rate mean and stdev.
-  success_rate_nums_[monitor_type] = std::move(std::make_tuple(-1, -1));
+  success_rate_nums_[monitor_type] = std::make_tuple(-1, -1);
 
   // Exit early if there are not enough hosts.
   if (host_monitors_.size() < success_rate_minimum_hosts) {

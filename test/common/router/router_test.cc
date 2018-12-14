@@ -826,7 +826,7 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  // First connection is successfull and reset happens later on.
+  // First connection is successful and reset happens later on.
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::SUCCESS));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
