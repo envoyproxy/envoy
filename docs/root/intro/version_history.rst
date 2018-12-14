@@ -19,6 +19,8 @@ Version history
 * cors: added :ref: `invalid/valid stats <cors-statistics>` to filter.
 * ext-authz: added support for providing per route config - optionally disable the filter and provide context extensions.
 * fault: removed integer percentage support.
+* grpc-json: added support for :ref:`inline descriptors
+  <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.ignored_query_parameters>`.
 * health check: Added :ref: 'logging health check failure events <envoy_api_field_core.HealthCheck.always_log_health_check_failures>'.
 * http: Added HTTP/2 WebSocket proxying via :ref:`extended CONNECT <envoy_api_field_core.Http2ProtocolOptions.allow_connect>`
 * http: added limits to the number and length of header modifications in all fields request_headers_to_add and response_headers_to_add. These limits are very high and should only be used as a last-resort safeguard.
