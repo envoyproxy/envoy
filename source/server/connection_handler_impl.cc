@@ -207,7 +207,6 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
 
 void ConnectionHandlerImpl::ActiveListener::onAccept(
     Network::ConnectionSocketPtr&& socket, bool hand_off_restored_destination_connections) {
-  Network::Address::InstanceConstSharedPtr local_address = socket->localAddress();
   auto active_socket = std::make_unique<ActiveSocket>(*this, std::move(socket),
                                                       hand_off_restored_destination_connections);
 
