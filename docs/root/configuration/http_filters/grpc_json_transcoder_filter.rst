@@ -127,7 +127,6 @@ gRPC or RESTful JSON requests to localhost:51051.
                   always_print_primitive_fields: true
                   always_print_enums_as_ints: false
                   preserve_proto_field_names: false
-                ignored_query_parameters: ["key"]
             - name: envoy.router
 
     clusters:

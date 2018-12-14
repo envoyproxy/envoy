@@ -62,8 +62,11 @@ message GrpcJsonTranscoder {
   // not transcoded cannot be used in combination with *match_incoming_request_route*.
   bool match_incoming_request_route = 5;
 
-  // A list of query parameters to ignore. For example, if `key` exists in the
-  // ignored_query_parameter then query paramemter`key` will not be used for transcoding:
-  // book.id=42&book.author=Mark%20Twain&key=API_KEY
+  // A list of query parameters to be ignored for transcoding method mapping.
+  // By default, the transcoder filter will not transcode a request if there is any
+  // unknown/invalid query parameters. For example, the request shelves/100?key=API_KEY will not be
+  // will not be mapped to GetShelf because variable binding for key is not
+  // defined. Adding ``key`` to ``ignored_query_parameters``, will allow the same request to be
+  // mapped to GetShelf.
   repeated string ignored_query_parameters = 6;
 }
