@@ -36,7 +36,7 @@ Network::FilterStatus OriginalSrcFilter::onNewConnection() {
       std::make_shared<Network::OriginalSrcSocketOption>(std::move(address));
   // note: we don't expect this to change the behaviour of the socket. We expect it to be copied
   // into the upstream connection later.
-  read_callbacks_->connection().socketOptions()->emplace_back(std::move(new_option));
+  read_callbacks_->connection().addSocketOption(std::move(new_option));
   return Network::FilterStatus::Continue;
 }
 

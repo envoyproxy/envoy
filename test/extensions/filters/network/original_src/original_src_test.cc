@@ -10,7 +10,7 @@
 #include "gtest/gtest.h"
 
 using testing::Exactly;
-using testing::ReturnRef;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -56,25 +56,26 @@ TEST_F(OriginalSrcTest, onNewConnectionUnixSocketSkips) {
 TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressAddsOption) {
   auto filter = makeDefaultFilter();
   filter->initializeReadFilterCallbacks(callbacks_);
+
+  Network::Socket::OptionConstSharedPtr option;
   setAddressToReturn("tcp://1.2.3.4:0");
-  Network::Socket::OptionsSharedPtr options{std::make_shared<Network::Socket::Options>()};
-  EXPECT_CALL(callbacks_.connection_, socketOptions()).WillOnce(ReturnRef(options));
+  // Network::Socket::OptionsSharedPtr options{std::make_shared<Network::Socket::Options>()};
+  EXPECT_CALL(callbacks_.connection_, addSocketOption(_)).WillOnce(SaveArg<0>(&option));
 
   EXPECT_EQ(filter->onNewConnection(), Network::FilterStatus::Continue);
-  ASSERT_GE(options->size(), 1);
-  auto option = (*options)[0];
+  ASSERT_NE(option, nullptr);
   EXPECT_NE(dynamic_cast<const Network::OriginalSrcSocketOption*>(option.get()), nullptr);
 }
 
 TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressUsesCorrectAddress) {
   auto filter = makeDefaultFilter();
   filter->initializeReadFilterCallbacks(callbacks_);
+  Network::Socket::OptionConstSharedPtr option;
   setAddressToReturn("tcp://1.2.3.4:0");
   Network::Socket::OptionsSharedPtr options{std::make_shared<Network::Socket::Options>()};
-  EXPECT_CALL(callbacks_.connection_, socketOptions()).WillOnce(ReturnRef(options));
+  EXPECT_CALL(callbacks_.connection_, addSocketOption(_)).WillOnce(SaveArg<0>(&option));
 
   filter->onNewConnection();
-  auto option = (*options)[0];
   std::vector<uint8_t> key;
   option->hashKey(key);
   std::vector<uint8_t> expected_key = {Network::OriginalSrcSocketOption::IPV4_KEY};
