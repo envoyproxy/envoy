@@ -53,6 +53,7 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) 
   auto address = Network::Utility::resolveUrl("tcp://10.0.0.1:443");
   test_stream_info.upstream_local_address_ = address;
   test_stream_info.downstream_local_address_ = address;
+  test_stream_info.downstream_direct_remote_address_ = address;
   test_stream_info.downstream_remote_address_ = address;
   return test_stream_info;
 }

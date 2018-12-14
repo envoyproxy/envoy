@@ -70,6 +70,7 @@ Version history
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
 * stream: renamed `perRequestState` to `filterState` in `StreamInfo`.
+* stream: added `downstreamDirectRemoteAddress` to `StreamInfo`.
 * thrift_proxy: introduced thrift rate limiter filter
 * tls: added support for :ref:`client-side session resumption <envoy_api_field_auth.UpstreamTlsContext.max_session_keys>`.
 * tls: added support for CRLs in :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.

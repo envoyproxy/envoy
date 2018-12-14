@@ -936,6 +936,12 @@ TEST_F(HttpConnectionManagerImplTest,
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
+  static constexpr char local_address[] = "0.0.0.0";
+  static constexpr char xff_address[] = "1.2.3.4";
+
+  // stream_info.downstreamRemoteAddress will infer the address from request
+  // headers instead of the physical connection
+  use_remote_address_ = false;
   setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -954,7 +960,12 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
         EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
         EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
         EXPECT_NE(nullptr, stream_info.routeEntry());
+
+        EXPECT_EQ(stream_info.downstreamRemoteAddress()->ip()->addressAsString(), xff_address);
+        EXPECT_EQ(stream_info.downstreamDirectRemoteAddress()->ip()->addressAsString(),
+                  local_address);
       }));
 
   StreamDecoder* decoder = nullptr;
@@ -966,6 +977,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
         new TestHeaderMapImpl{{":method", "GET"},
                               {":authority", "host"},
                               {":path", "/"},
+                              {"x-forwarded-for", xff_address},
                               {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
     decoder->decodeHeaders(std::move(headers), true);
 
@@ -1035,6 +1047,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
         EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
         EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
         EXPECT_NE(nullptr, stream_info.routeEntry());
       }));
 
@@ -1082,6 +1095,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(400));
         EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
         EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
         EXPECT_EQ(nullptr, stream_info.routeEntry());
       }));
 
