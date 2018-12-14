@@ -650,9 +650,9 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
 uint16_t ClientContextImpl::parseSigningAlgorithmsForTest(const std::string& sigalgs) {
   // This is used only when testing RSA/ECDSA certificate selection, so only the signing algorithms
   // used in tests are supported here.
-  if (sigalgs.compare("rsa_pss_rsae_sha256") == 0) {
+  if (sigalgs == "rsa_pss_rsae_sha256") {
     return SSL_SIGN_RSA_PSS_RSAE_SHA256;
-  } else if (sigalgs.compare("ecdsa_secp256r1_sha256") == 0) {
+  } else if (sigalgs == "ecdsa_secp256r1_sha256") {
     return SSL_SIGN_ECDSA_SECP256R1_SHA256;
   }
   return 0;
