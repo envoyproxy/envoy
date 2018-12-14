@@ -1,7 +1,7 @@
 #pragma once
 
 // NOLINT(namespace-envoy)
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
 #include <malloc.h>
 
 #define PACKED_STRUCT(definition, ...)                                                             \

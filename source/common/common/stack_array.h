@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(WIN32)
+#ifdef WIN32
 #include <malloc.h>
 
 #else

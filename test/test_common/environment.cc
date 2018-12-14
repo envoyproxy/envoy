@@ -33,7 +33,7 @@ namespace Envoy {
 namespace {
 
 std::string makeTempDir(char* name_template) {
-#if defined(WIN32)
+#ifdef WIN32
   char* dirname = ::_mktemp(name_template);
   RELEASE_ASSERT(dirname != nullptr,
                  fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
@@ -305,7 +305,7 @@ std::string TestEnvironment::writeStringToFileForTest(const std::string& filenam
 }
 
 void TestEnvironment::setEnvVar(const std::string& name, const std::string& value, int overwrite) {
-#if defined(WIN32)
+#ifdef WIN32
   if (!overwrite) {
     size_t requiredSize;
     const int rc = ::getenv_s(&requiredSize, NULL, 0, name.c_str());

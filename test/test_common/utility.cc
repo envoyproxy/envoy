@@ -1,6 +1,6 @@
 #include "utility.h"
 
-#if defined(WIN32)
+#ifdef WIN32
 #include <windows.h>
 // <windows.h> uses macros to #define a ton of symbols, two of which (DELETE and GetMessage)
 // interfere with our code. DELETE shows up in the base.pb.h header generated from
@@ -187,7 +187,7 @@ std::vector<std::string> TestUtility::split(const std::string& source, const std
 }
 
 void TestUtility::renameFile(const std::string& old_name, const std::string& new_name) {
-#if defined(WIN32)
+#ifdef WIN32
   // use MoveFileEx, since ::rename will not overwrite an existing file. See
   // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/rename-wrename?view=vs-2017
   const BOOL rc = ::MoveFileEx(old_name.c_str(), new_name.c_str(), MOVEFILE_REPLACE_EXISTING);
@@ -199,7 +199,7 @@ void TestUtility::renameFile(const std::string& old_name, const std::string& new
 };
 
 void TestUtility::createDirectory(const std::string& name) {
-#if defined(WIN32)
+#ifdef WIN32
   ::_mkdir(name.c_str());
 #else
   ::mkdir(name.c_str(), S_IRWXU);
@@ -207,7 +207,7 @@ void TestUtility::createDirectory(const std::string& name) {
 }
 
 void TestUtility::createSymlink(const std::string& target, const std::string& link) {
-#if defined(WIN32)
+#ifdef WIN32
   const DWORD attributes = ::GetFileAttributes(target.c_str());
   ASSERT_NE(attributes, INVALID_FILE_ATTRIBUTES);
   int flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
@@ -347,7 +347,7 @@ MockedTestAllocator::~MockedTestAllocator() {}
 namespace Thread {
 
 ThreadFactory& threadFactoryForTest() {
-#if defined(WIN32)
+#ifdef WIN32
   static ThreadFactoryImplWin32* thread_factory = new ThreadFactoryImplWin32();
 #else
   static ThreadFactoryImplPosix* thread_factory = new ThreadFactoryImplPosix();
