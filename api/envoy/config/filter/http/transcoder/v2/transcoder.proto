@@ -64,10 +64,25 @@ message GrpcJsonTranscoder {
 
   // A list of query parameters to be ignored for transcoding method mapping.
   // By default, the transcoder filter will not transcode a request if there are any
-  // unknown/invalid query parameters. For example, for the `Bookstore API
-  // <https://github.com/envoyproxy/envoy/blob/master/test/proto/bookstore.proto>` the request
-  // ``shelves/100?key=API_KEY`` will not be mapped to ``GetShelf``` because variable binding for
-  // ``key`` is not defined. Adding ``key`` to ``ignored_query_parameters`` will allow the same
-  // request to be mapped to ``GetShelf```.
+  // unknown/invalid query parameters.
+  //
+  // Example :
+  //
+  // .. code-block:: proto
+  //
+  //     service Bookstore {
+  //       rpc GetShelf(GetShelfRequest) returns (Shelf) {
+  //         option (google.api.http) = {
+  //           get: "/shelves/{shelf}"
+  //         };
+  //       }
+  //     }
+  //     message GetShelfRequest {
+  //       int64 shelf = 1;
+  //     }
+  //
+  // The request ``shelves/100?key=API_KEY`` will not be mapped to ``GetShelf``` because variable
+  // binding for ``key`` is not defined. Adding ``key`` to ``ignored_query_parameters`` will allow
+  // the same request to be mapped to ``GetShelf``.
   repeated string ignored_query_parameters = 6;
 }
