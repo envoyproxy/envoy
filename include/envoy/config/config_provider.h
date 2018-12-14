@@ -13,6 +13,10 @@ namespace Config {
 
 /**
  * A provider for configuration obtained ether statically or dynamically via xDS APIs.
+ *
+ * Use config() to obtain a shared_ptr to the implementation of the config, and configProtoInfo() to
+ * obtain a reference to the underlying config proto and version (applicable only to dynamic config
+ * providers).
  */
 class ConfigProvider {
 public:
@@ -30,28 +34,29 @@ public:
   /**
    * Stores the config proto as well as the associated version.
    */
-  template <typename P> struct ConfigInfo {
-    const P& config_;
+  template <typename P> struct ConfigProtoInfo {
+    const P& config_proto_;
 
+    // Only populated by dynamic config providers.
     std::string version_;
   };
 
   virtual ~ConfigProvider() {}
 
   /**
-   * Returns a ConfigInfo associated with the provider.
-   * @return absl::optional<ConfigInfo<P>> an optional ConfigInfo; the value is set when a config is
-   *         available.
+   * Returns a ConfigProtoInfo associated with the provider.
+   * @return absl::optional<ConfigProtoInfo<P>> an optional ConfigProtoInfo; the value is set when a
+   * config is available.
    */
-  template <typename P> absl::optional<ConfigInfo<P>> configInfo() const {
+  template <typename P> absl::optional<ConfigProtoInfo<P>> configProtoInfo() const {
     static_assert(std::is_base_of<Protobuf::Message, P>::value,
                   "Proto type must derive from Protobuf::Message");
 
     const auto* config_proto = dynamic_cast<const P*>(getConfigProto());
-    if (!config_proto) {
+    if (config_proto == nullptr) {
       return {};
     }
-    return ConfigInfo<P>{*config_proto, getConfigVersion()};
+    return ConfigProtoInfo<P>{*config_proto, getConfigVersion()};
   }
 
   /**

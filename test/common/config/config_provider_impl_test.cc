@@ -143,10 +143,10 @@ public:
     }
 
     for (const auto& provider : static_config_providers()) {
-      ASSERT(provider->configInfo<test::common::config::DummyConfig>());
+      ASSERT(provider->configProtoInfo<test::common::config::DummyConfig>());
       auto* static_config = config_dump->mutable_static_dummy_configs()->Add();
       static_config->mutable_dummy_config()->MergeFrom(
-          provider->configInfo<test::common::config::DummyConfig>().value().config_);
+          provider->configProtoInfo<test::common::config::DummyConfig>().value().config_proto_);
       TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                             *static_config->mutable_last_updated());
     }
@@ -232,7 +232,7 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
       config_source_proto, factory_context_, "dummy_prefix");
 
   // No config protos have been received via the subscription yet.
-  EXPECT_FALSE(provider1->configInfo<test::common::config::DummyConfig>().has_value());
+  EXPECT_FALSE(provider1->configProtoInfo<test::common::config::DummyConfig>().has_value());
 
   Protobuf::RepeatedPtrField<test::common::config::DummyConfig> dummy_configs;
   dummy_configs.Add()->MergeFrom(parseDummyConfigFromYaml("a: a dummy config"));
@@ -246,11 +246,11 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
   ConfigProviderPtr provider2 = provider_manager_->createXdsConfigProvider(
       config_source_proto, factory_context_, "dummy_prefix");
 
-  EXPECT_TRUE(provider2->configInfo<test::common::config::DummyConfig>().has_value());
+  EXPECT_TRUE(provider2->configProtoInfo<test::common::config::DummyConfig>().has_value());
   EXPECT_EQ(&dynamic_cast<DummyDynamicConfigProvider&>(*provider1).subscription(),
             &dynamic_cast<DummyDynamicConfigProvider&>(*provider2).subscription());
-  EXPECT_EQ(&provider1->configInfo<test::common::config::DummyConfig>().value().config_,
-            &provider2->configInfo<test::common::config::DummyConfig>().value().config_);
+  EXPECT_EQ(&provider1->configProtoInfo<test::common::config::DummyConfig>().value().config_proto_,
+            &provider2->configProtoInfo<test::common::config::DummyConfig>().value().config_proto_);
   EXPECT_EQ(provider1->config<const DummyConfig>().get(),
             provider2->config<const DummyConfig>().get());
 

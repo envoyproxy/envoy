@@ -167,9 +167,7 @@ protected:
 private:
   void registerInitTarget(Init::Manager& init_manager) { init_manager.registerTarget(*this); }
 
-  void bindConfigProvider(DynamicConfigProviderImpl* provider) {
-    dynamic_config_providers_.insert(provider);
-  }
+  void bindConfigProvider(DynamicConfigProviderImpl* provider);
 
   void unbindConfigProvider(DynamicConfigProviderImpl* provider) {
     dynamic_config_providers_.erase(provider);
@@ -288,7 +286,7 @@ protected:
 
   ConfigProviderManagerImpl(Server::Admin& admin, const std::string& config_name);
 
-  const ConfigProviderSet static_config_providers() const { return static_config_providers_; }
+  const ConfigProviderSet& static_config_providers() const { return static_config_providers_; }
 
   const ConfigSubscriptionMap& config_subscriptions() const { return config_subscriptions_; }
 

@@ -42,6 +42,10 @@ bool ConfigSubscriptionInstance::checkAndApplyConfig(const Protobuf::Message& co
   ASSERT(!dynamic_config_providers_.empty());
   ConfigProvider::ConfigConstSharedPtr new_config;
   for (auto* provider : dynamic_config_providers_) {
+    // All bound dynamic config providers must be of the same type (see the ASSERT... in
+    // bindConfigProvider()).
+    // This makes it safe to call any of the provider's onConfigProtoUpdate() to get a new config
+    // impl, which can then be passed to all providers.
     if (new_config == nullptr) {
       new_config = provider->onConfigProtoUpdate(config_proto);
     }
@@ -49,6 +53,14 @@ bool ConfigSubscriptionInstance::checkAndApplyConfig(const Protobuf::Message& co
   }
 
   return true;
+}
+
+void ConfigSubscriptionInstance::bindConfigProvider(DynamicConfigProviderImpl* provider) {
+  // All config providers bound to a ConfigSubscriptionInstance must be of the same concrete type;
+  // this is assumed by checkAndApplyConfig() and is verified by the assertion below.
+  ASSERT_WITH_PRECOND(dynamic_config_providers_.empty() == false,
+                      typeid(*provider) == typeid(**dynamic_config_providers_.begin()));
+  dynamic_config_providers_.insert(provider);
 }
 
 ConfigProviderManagerImpl::ConfigProviderManagerImpl(Server::Admin& admin,

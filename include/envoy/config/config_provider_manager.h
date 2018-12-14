@@ -16,6 +16,12 @@ namespace Config {
  * ConfigProvider objects are owned by the caller of the
  * createXdsConfigProvider()/createStaticConfigProvider() functions. The ConfigProviderManager holds
  * raw pointers to those objects.
+ *
+ * Configuration implementations returned by ConfigProvider::config() are immutable, which allows
+ * them to share the underlying objects such as config protos and subscriptions (for dynamic
+ * providers) without synchronization related performance penalties. This enables linear memory
+ * growth based on the size of the configuration set, regardless of the number of threads/objects
+ * that must hold a reference/pointer to them.
  */
 class ConfigProviderManager {
 public:
