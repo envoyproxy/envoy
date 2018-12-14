@@ -76,7 +76,7 @@ the :ref:`outlier_detection.consecutive_gateway_failure
 This detection type is supported only by :ref: `http router <config_http_filters_router>`.
 
 Consecutive Local Origin Failure
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 If Envoy repeatedly cannot connect to an upstream host because of a network problem, it will be ejected.
 Various locally originated problems are detected: timeout, TCP reset, ICMP errors, etc. The number of consecutive
