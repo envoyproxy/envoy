@@ -20,12 +20,11 @@ public:
 
   // Network::Socket
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
-  IoHandlePtr& ioHandle() override { return ioHandle_; }
-  const IoHandleConstPtr& ioHandle() const override { return ioHandle_; }
+  IoHandlePtr& ioHandle() override { return io_handle_; }
   void close() override {
-    if (ioHandle_->fd() != -1) {
-      ::close(ioHandle_->fd());
-      *ioHandle_ = -1;
+    if (io_handle_->fd() != -1) {
+      ::close(io_handle_->fd());
+      *io_handle_ = -1;
     }
   }
   void ensureOptions() {
@@ -44,19 +43,18 @@ public:
   const OptionsSharedPtr& options() const override { return options_; }
 
 protected:
-  SocketImpl(const IoHandlePtr& io_handle, const Address::InstanceConstSharedPtr& local_address)
-      : ioHandle_(io_handle), local_address_(local_address) {}
+  SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address)
+      : io_handle_(std::move(io_handle)), local_address_(local_address) {}
 
-  IoHandlePtr ioHandle_;
+  IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
 };
 
 class ListenSocketImpl : public SocketImpl {
 protected:
-  ListenSocketImpl(const IoHandlePtr& io_handle,
-                   const Address::InstanceConstSharedPtr& local_address)
-      : SocketImpl(io_handle, local_address) {}
+  ListenSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address)
+      : SocketImpl(std::move(io_handle), local_address) {}
 
   void setupSocket(const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
   void doBind();
@@ -80,17 +78,17 @@ template <typename T> class NetworkListenSocket : public ListenSocketImpl {
 public:
   NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
-      : ListenSocketImpl(address->socket(T::type), address) {
-    RELEASE_ASSERT(ioHandle_->fd() != -1, "");
+      : ListenSocketImpl(std::move(address->socket(T::type)), address) {
+    RELEASE_ASSERT(io_handle_->fd() != -1, "");
 
     setPrebindSocketOptions();
 
     setupSocket(options, bind_to_port);
   }
 
-  NetworkListenSocket(const IoHandlePtr& io_handle, const Address::InstanceConstSharedPtr& address,
+  NetworkListenSocket(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options)
-      : ListenSocketImpl(io_handle, address) {
+      : ListenSocketImpl(std::move(io_handle), address) {
     setListenSocketOptions(options);
   }
 
@@ -107,15 +105,15 @@ typedef std::unique_ptr<UdpListenSocket> UdpListenSocketPtr;
 class UdsListenSocket : public ListenSocketImpl {
 public:
   UdsListenSocket(const Address::InstanceConstSharedPtr& address);
-  UdsListenSocket(const IoHandlePtr& io_handle, const Address::InstanceConstSharedPtr& address);
+  UdsListenSocket(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address);
 };
 
 class ConnectionSocketImpl : public SocketImpl, public ConnectionSocket {
 public:
-  ConnectionSocketImpl(const IoHandlePtr& io_handle,
+  ConnectionSocketImpl(IoHandlePtr&& io_handle,
                        const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
-      : SocketImpl(io_handle, local_address), remote_address_(remote_address) {}
+      : SocketImpl(std::move(io_handle), local_address), remote_address_(remote_address) {}
 
   // Network::ConnectionSocket
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
@@ -160,10 +158,9 @@ protected:
 // ConnectionSocket used with server connections.
 class AcceptedSocketImpl : public ConnectionSocketImpl {
 public:
-  AcceptedSocketImpl(const IoHandlePtr& io_handle,
-                     const Address::InstanceConstSharedPtr& local_address,
+  AcceptedSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address,
                      const Address::InstanceConstSharedPtr& remote_address)
-      : ConnectionSocketImpl(io_handle, local_address, remote_address) {}
+      : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address) {}
 };
 
 // ConnectionSocket used with client connections.

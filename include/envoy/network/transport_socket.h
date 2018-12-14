@@ -54,11 +54,6 @@ public:
   virtual IoHandlePtr& ioHandle() PURE;
 
   /**
-   * @return const address the I/O handle associated with the connection.
-   */
-  virtual const IoHandleConstPtr& ioHandle() const PURE;
-
-  /**
    * @return Network::Connection& the connection interface.
    */
   virtual Network::Connection& connection() PURE;

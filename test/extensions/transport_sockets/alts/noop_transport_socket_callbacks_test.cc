@@ -17,10 +17,9 @@ namespace {
 class TestTransportSocketCallbacks : public Network::TransportSocketCallbacks {
 public:
   explicit TestTransportSocketCallbacks(Network::Connection& connection)
-      : ioHandle_(std::make_unique<Network::IoSocketHandle>(1)), connection_(connection) {}
+      : io_handle_(std::make_unique<Network::IoSocketHandle>(1)), connection_(connection) {}
 
-  Network::IoHandlePtr& ioHandle() override { return ioHandle_; }
-  const Network::IoHandleConstPtr& ioHandle() const override { return ioHandle_; }
+  Network::IoHandlePtr& ioHandle() override { return io_handle_; }
   Network::Connection& connection() override { return connection_; }
   bool shouldDrainReadBuffer() override { return false; }
   void setReadBufferReady() override { set_read_buffer_ready_ = true; }
@@ -32,7 +31,7 @@ public:
 private:
   bool event_raised_{false};
   bool set_read_buffer_ready_{false};
-  Network::IoHandlePtr ioHandle_;
+  Network::IoHandlePtr io_handle_;
   Network::Connection& connection_;
 };
 

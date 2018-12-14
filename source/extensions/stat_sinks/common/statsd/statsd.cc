@@ -20,8 +20,8 @@ namespace StatSinks {
 namespace Common {
 namespace Statsd {
 
-Writer::Writer(Network::Address::InstanceConstSharedPtr address) {
-  io_handle_ = address->socket(Network::Address::SocketType::Datagram);
+Writer::Writer(Network::Address::InstanceConstSharedPtr address)
+    : io_handle_(address->socket(Network::Address::SocketType::Datagram)) {
   ASSERT(io_handle_->fd() != -1);
 
   const Api::SysCallIntResult result = address->connect(io_handle_->fd());

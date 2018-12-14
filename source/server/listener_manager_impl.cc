@@ -97,7 +97,7 @@ ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConst
     Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(fd);
     if (io_handle->fd() != -1) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-      return std::make_shared<Network::UdsListenSocket>(io_handle, address);
+      return std::make_shared<Network::UdsListenSocket>(std::move(io_handle), address);
     }
     return std::make_shared<Network::UdsListenSocket>(address);
   }
@@ -107,7 +107,7 @@ ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConst
   Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(fd);
   if (io_handle->fd() != -1) {
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-    return std::make_shared<Network::TcpListenSocket>(io_handle, address, options);
+    return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
   }
   return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
 }

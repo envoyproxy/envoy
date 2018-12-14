@@ -28,8 +28,7 @@ public:
    */
   virtual void operator=(int fd) PURE;
 };
-typedef std::shared_ptr<IoHandle> IoHandlePtr;
-typedef std::shared_ptr<IoHandle> IoHandleConstPtr;
+typedef std::unique_ptr<IoHandle> IoHandlePtr;
 
 } // namespace Network
 } // namespace Envoy

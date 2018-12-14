@@ -73,7 +73,7 @@ protected:
 
     // Test the case of a socket with fd and given address and port.
     IoHandlePtr dup_handle = std::make_unique<IoSocketHandle>(dup(socket1->ioHandle()->fd()));
-    auto socket3 = createListenSocketPtr(dup_handle, addr, nullptr);
+    auto socket3 = createListenSocketPtr(std::move(dup_handle), addr, nullptr);
     EXPECT_EQ(addr->asString(), socket3->localAddress()->asString());
   }
 

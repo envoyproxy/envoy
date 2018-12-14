@@ -160,7 +160,11 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 }
 
 Connection::State ConnectionImpl::state() const {
-  if (ioHandle()->fd() == -1) {
+  // TODO(sbelair2): get rid of this const_cast. It was added
+  // to demonstrate whether IoHandlePtr could be a unique_ptr rather
+  // than shared. How to get around the issue of IoHandlePtr being a
+  // non-const unique_ptr, when it is called from const methods?
+  if (const_cast<ConnectionImpl*>(this)->ioHandle()->fd() == -1) {
     return State::Closed;
   } else if (delayed_close_) {
     return State::Closing;

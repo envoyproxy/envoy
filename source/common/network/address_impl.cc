@@ -223,10 +223,7 @@ Api::SysCallIntResult Ipv4Instance::connect(int fd) const {
   return {rc, errno};
 }
 
-IoHandlePtr Ipv4Instance::socket(SocketType type) const {
-  IoHandlePtr io_handle = socketFromSocketType(type);
-  return io_handle;
-}
+IoHandlePtr Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
@@ -363,10 +360,7 @@ Api::SysCallIntResult PipeInstance::connect(int fd) const {
   return {rc, errno};
 }
 
-IoHandlePtr PipeInstance::socket(SocketType type) const {
-  IoHandlePtr io_handle = socketFromSocketType(type);
-  return io_handle;
-}
+IoHandlePtr PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
 
 } // namespace Address
 } // namespace Network

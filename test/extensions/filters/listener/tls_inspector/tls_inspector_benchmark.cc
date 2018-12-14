@@ -79,7 +79,7 @@ static void BM_TlsInspector(benchmark::State& state) {
   NiceMock<Stats::MockStore> store;
   ConfigSharedPtr cfg(std::make_shared<Config>(store));
   Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>();
-  Network::ConnectionSocketImpl socket(io_handle, nullptr, nullptr);
+  Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr);
   NiceMock<FastMockDispatcher> dispatcher;
   FastMockListenerFilterCallbacks cb(socket, dispatcher);
 

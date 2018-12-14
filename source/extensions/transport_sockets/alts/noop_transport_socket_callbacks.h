@@ -21,7 +21,6 @@ public:
       : parent_(parent) {}
 
   Network::IoHandlePtr& ioHandle() override { return parent_.ioHandle(); }
-  const Network::IoHandleConstPtr& ioHandle() const override { return parent_.ioHandle(); }
   Network::Connection& connection() override { return parent_.connection(); }
   bool shouldDrainReadBuffer() override { return false; }
   /*

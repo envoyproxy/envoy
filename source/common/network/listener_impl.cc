@@ -46,7 +46,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
                                          remote_addr_len,
                                          local_address->ip()->version() == Address::IpVersion::v6);
   listener->cb_.onAccept(
-      std::make_unique<AcceptedSocketImpl>(io_handle, local_address, remote_address),
+      std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address),
       listener->hand_off_restored_destination_connections_);
 }
 

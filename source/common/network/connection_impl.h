@@ -106,7 +106,6 @@ public:
 
   // Network::TransportSocketCallbacks
   IoHandlePtr& ioHandle() override { return socket_->ioHandle(); }
-  const IoHandleConstPtr& ioHandle() const override { return socket_->ioHandle(); }
   Connection& connection() override { return *this; }
   void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?

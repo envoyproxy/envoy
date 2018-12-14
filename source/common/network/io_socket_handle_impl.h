@@ -10,15 +10,11 @@ namespace Network {
  */
 class IoSocketHandle : public IoHandle {
 public:
-  /**
-   * Construct from an existing Socket fd or without with default of -1.
-   */
   IoSocketHandle(int fd = -1) : fd_(fd) {}
-
-  /**
-   * Copy Constructor from an existing IoSocketHandle.
-   */
-  IoSocketHandle(const IoSocketHandle& io_handle) : fd_(io_handle.fd()) {}
+  IoSocketHandle(IoHandlePtr&& io_handle) {
+    fd_ = io_handle->fd();
+    io_handle.release();
+  }
 
   ~IoSocketHandle() {}
 
@@ -42,8 +38,7 @@ public:
 private:
   int fd_;
 };
-typedef std::unique_ptr<IoSocketHandle>* IoSocketHandlePtr;
-typedef std::unique_ptr<const IoSocketHandle>* IoSocketHandleConstPtr;
+typedef std::unique_ptr<IoSocketHandle> IoSocketHandlePtr;
 
 } // namespace Network
 } // namespace Envoy

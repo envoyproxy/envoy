@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Network {
 
 void ListenSocketImpl::doBind() {
-  const Api::SysCallIntResult result = local_address_->bind(ioHandle_->fd());
+  const Api::SysCallIntResult result = local_address_->bind(io_handle_->fd());
   if (result.rc_ == -1) {
     close();
     throw EnvoyException(
@@ -25,7 +25,7 @@ void ListenSocketImpl::doBind() {
   if (local_address_->type() == Address::Type::Ip && local_address_->ip()->port() == 0) {
     // If the port we bind is zero, then the OS will pick a free port for us (assuming there are
     // any), and we need to find out the port number that the OS picked.
-    local_address_ = Address::addressFromFd(ioHandle_->fd());
+    local_address_ = Address::addressFromFd(io_handle_->fd());
   }
 }
 
@@ -50,7 +50,7 @@ void NetworkListenSocket<
     NetworkSocketTrait<Address::SocketType::Stream>>::setPrebindSocketOptions() {
   // TODO(htuch): This might benefit from moving to SocketOptionImpl.
   int on = 1;
-  int rc = setsockopt(ioHandle_->fd(), SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+  int rc = setsockopt(io_handle_->fd(), SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
   RELEASE_ASSERT(rc != -1, "");
 }
 
@@ -60,13 +60,13 @@ void NetworkListenSocket<
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
     : ListenSocketImpl(address->socket(Address::SocketType::Stream), address) {
-  RELEASE_ASSERT(ioHandle_->fd() != -1, "");
+  RELEASE_ASSERT(io_handle_->fd() != -1, "");
   doBind();
 }
 
-UdsListenSocket::UdsListenSocket(const IoHandlePtr& io_handle,
+UdsListenSocket::UdsListenSocket(IoHandlePtr&& io_handle,
                                  const Address::InstanceConstSharedPtr& address)
-    : ListenSocketImpl(io_handle, address) {}
+    : ListenSocketImpl(std::move(io_handle), address) {}
 
 } // namespace Network
 } // namespace Envoy

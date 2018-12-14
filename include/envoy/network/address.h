@@ -152,7 +152,7 @@ public:
   /**
    * Create a socket for this address.
    * @param type supplies the socket type to create.
-   * @return the fd naming the socket. In case of a failure, the program would be
+   * @return the IoHandlePtr naming the socket. In case of a failure, the program would be
    *   aborted.
    */
   virtual IoHandlePtr socket(SocketType type) const PURE;
