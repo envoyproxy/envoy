@@ -48,15 +48,14 @@ namespace Envoy {
   } while (false)
 #endif
 
-// clang-format off
-
 #ifndef NDEBUG
 #if __clang__
-#define __CLANG_PRAGMA(X) \
-  _Pragma(X)
+#define __CLANG_PRAGMA(X) _Pragma(X)
 #else
 #define __CLANG_PRAGMA(X)
 #endif
+
+// clang-format off
 
 // The clang specific pragmas below are required to suppress errors due to
 // -Wpotentially-evaluated-expression, which can be ignored in the context of assertions since
