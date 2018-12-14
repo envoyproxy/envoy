@@ -78,23 +78,16 @@ if [[ `ninja --version` != "$VERSION" ]]; then
 fi
 
 # Build BoringSSL.
-mkdir boringssl/build
-cd boringssl/build
-
-cmake -G "Ninja" \
-  -DCMAKE_TOOLCHAIN_FILE=${HOME}/toolchain \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DFIPS=1 \
-  ..
+cd boringssl
+mkdir build && cd build && cmake -GNinja -DCMAKE_TOOLCHAIN_FILE=${HOME}/toolchain -DFIPS=1 -DCMAKE_BUILD_TYPE=Release ..
 ninja
+ninja run_tests
 
 # Verify correctness of the FIPS build.
 if [[ `tool/bssl isfips` != "1" ]]; then
   echo "ERROR: BoringSSL tool didn't report FIPS build."
   exit 1
 fi
-
-ninja run_tests
 
 # Install to $THIRDPARTY_BUILD.
 cp -pR ../include/openssl "$THIRDPARTY_BUILD"/include/
