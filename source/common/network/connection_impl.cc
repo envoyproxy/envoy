@@ -44,6 +44,16 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 
 std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
+std::unique_ptr<ConnectionImpl>
+ConnectionImpl::createServerConnection(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
+                                       TransportSocketPtr&& transport_socket) {
+  // make_shared<> requires a public constructor so we can't use it here.
+  std::unique_ptr<Network::ConnectionImpl> conn(new Network::ConnectionImpl(
+      dispatcher, std::move(socket), std::move(transport_socket), true));
+  conn->transport_socket_->setTransportSocketCallbacks(*conn);
+  return conn;
+}
+
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                TransportSocketPtr&& transport_socket, bool connected)
     : transport_socket_(std::move(transport_socket)), filter_manager_(*this, *this),
@@ -65,8 +75,6 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
   file_event_ = dispatcher_.createFileEvent(
       fd(), [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge,
       Event::FileReadyType::Read | Event::FileReadyType::Write);
-
-  transport_socket_->setTransportSocketCallbacks(*this);
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -591,6 +599,18 @@ void ConnectionImpl::onDelayedCloseTimeout() {
     connection_stats_->delayed_close_timeouts_->inc();
   }
   closeSocket(ConnectionEvent::LocalClose);
+}
+
+std::unique_ptr<ClientConnectionImpl> ClientConnectionImpl::createClientConnection(
+    Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
+    const Address::InstanceConstSharedPtr& source_address,
+    Network::TransportSocketPtr&& transport_socket,
+    const Network::ConnectionSocket::OptionsSharedPtr& options) {
+  // make_shared<> requires a public constructor so we can't use it here.
+  std::unique_ptr<Network::ClientConnectionImpl> conn(new Network::ClientConnectionImpl(
+      dispatcher, remote_address, source_address, std::move(transport_socket), options));
+  conn->transport_socket_->setTransportSocketCallbacks(*conn);
+  return conn;
 }
 
 ClientConnectionImpl::ClientConnectionImpl(

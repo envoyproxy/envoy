@@ -51,10 +51,14 @@ class ConnectionImpl : public virtual Connection,
                        public BufferSource,
                        public TransportSocketCallbacks,
                        protected Logger::Loggable<Logger::Id::connection> {
-public:
+protected:
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                  TransportSocketPtr&& transport_socket, bool connected);
 
+public:
+  static std::unique_ptr<ConnectionImpl>
+  createServerConnection(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
+                         TransportSocketPtr&& transport_socket);
   ~ConnectionImpl();
 
   // Network::FilterManager
@@ -200,12 +204,20 @@ private:
  * libevent implementation of Network::ClientConnection.
  */
 class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnection {
-public:
+private:
   ClientConnectionImpl(Event::Dispatcher& dispatcher,
                        const Address::InstanceConstSharedPtr& remote_address,
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
+
+public:
+  static std::unique_ptr<ClientConnectionImpl>
+  createClientConnection(Event::Dispatcher& dispatcher,
+                         const Address::InstanceConstSharedPtr& remote_address,
+                         const Address::InstanceConstSharedPtr& source_address,
+                         Network::TransportSocketPtr&& transport_socket,
+                         const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   // Network::ClientConnection
   void connect() override;
