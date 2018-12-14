@@ -82,7 +82,7 @@ private:
 // go through MainCommonBase directly.
 class MainCommon {
 public:
-  MainCommon(int argc, const char* const* argv, PlatformMain& platform_main);
+  MainCommon(int argc, const char* const* argv);
   bool run() { return base_.run(); }
 
   // Makes an admin-console request by path, calling handler() when complete.
@@ -108,6 +108,7 @@ private:
   Envoy::TerminateHandler log_on_terminate;
 #endif
 
+  PlatformMain platform_main_;
   Envoy::OptionsImpl options_;
   Event::RealTimeSystem real_time_system_;
   DefaultTestHooks default_test_hooks_;

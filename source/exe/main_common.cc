@@ -125,10 +125,11 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
   });
 }
 
-MainCommon::MainCommon(int argc, const char* const* argv, PlatformMain& platform_main)
-    : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
+MainCommon::MainCommon(int argc, const char* const* argv)
+    : platform_main_(argc, argv),
+      options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_test_hooks_, prod_component_factory_,
-            std::make_unique<Runtime::RandomGeneratorImpl>(), platform_main.threadFactory()) {}
+            std::make_unique<Runtime::RandomGeneratorImpl>(), platform_main_.threadFactory()) {}
 
 std::string MainCommon::hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
                                           bool hot_restart_enabled) {
