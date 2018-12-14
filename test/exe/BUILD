@@ -2,7 +2,6 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_platform_dep",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -33,7 +32,7 @@ envoy_cc_test(
         "//source/exe:envoy_main_common_lib",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
-    ] + envoy_cc_platform_dep("//source/exe:legacy_main_lib"),
+    ],
 )
 
 envoy_cc_test(

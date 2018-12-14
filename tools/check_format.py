@@ -30,7 +30,7 @@ REPOSITORIES_BZL = "bazel/repositories.bzl"
 REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
                        './source/common/event/real_time_system.cc',
                        './source/common/event/real_time_system.h', './source/exe/main_common.cc',
-                       './source/exe/posix/legacy_main.cc', './source/exe/main_common.h',
+                       './source/exe/main_common.h',
                        './source/server/config_validation/server.cc',
                        './source/common/common/perf_annotation.h',
                        './test/test_common/simulated_time_system.cc',

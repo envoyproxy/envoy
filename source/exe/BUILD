@@ -60,18 +60,6 @@ envoy_cc_library(
     ] + envoy_cc_platform_dep("platform_main_lib"),
 )
 
-envoy_cc_posix_library(
-    name = "legacy_main_lib",
-    srcs = ["posix/legacy_main.cc"],
-    hdrs = ["posix/legacy_main.h"],
-    strip_include_prefix = "posix",
-    deps = [":envoy_main_common_lib"],
-)
-
-envoy_cc_win32_library(
-    name = "legacy_main_lib",
-)
-
 envoy_cc_library(
     name = "envoy_main_common_lib",
     srcs = ["main_common.cc"],
