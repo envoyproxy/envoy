@@ -1411,7 +1411,7 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
   state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
     const Router::RouteEntry::UpgradeMap* upgrade_map = nullptr;
-    if (cached_route_.value() && cached_route_.value()->routeEntry()) {
+    if (cached_route_.has_value() && cached_route_.value() && cached_route_.value()->routeEntry()) {
       upgrade_map = &cached_route_.value()->routeEntry()->upgradeMap();
     }
     if (connection_manager_.config_.filterFactory().createUpgradeFilterChain(
