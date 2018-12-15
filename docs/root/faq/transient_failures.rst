@@ -1,7 +1,7 @@
-.. _common_configuration_rolling_upgrades:
+.. _common_configuration_transient_failures:
 
-How do I handle rolling upgrades and transient failures?
-========================================================
+How do I handle transient failures?
+===================================
 
 One of the biggest advantages of using Envoy in a service mesh is that it frees up services 
 from implementing complex resiliency features like circuit breaking, outlier detection and retries 
