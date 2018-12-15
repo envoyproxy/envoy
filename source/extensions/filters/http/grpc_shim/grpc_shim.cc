@@ -18,7 +18,7 @@ namespace {
 Envoy::Grpc::Status::GrpcStatus grpcStatusFromHeaders(Envoy::Http::HeaderMap& headers) {
   const auto http_response_status = Envoy::Http::Utility::getResponseStatus(headers);
 
-  // Notably, we treat an upstream 200 as a sucessful response. This differs
+  // Notably, we treat an upstream 200 as a successful response. This differs
   // from the standard but is key in being able to transform a successful
   // upstream HTTP response into a gRPC response.
   if (http_response_status == 200) {
@@ -49,7 +49,7 @@ Http::FilterHeadersStatus GrpcShim::decodeHeaders(Http::HeaderMap& headers, bool
     enabled_ = true;
 
     // We keep track of the original content-type to ensure that we handle
-    // gRPC content type varations such as application/grpc+proto.
+    // gRPC content type variations such as application/grpc+proto.
     content_type_ = headers.ContentType()->value().c_str();
     headers.ContentType()->value(upstream_content_type_);
     headers.insertAccept().value(upstream_content_type_);
@@ -117,7 +117,7 @@ Http::FilterDataStatus GrpcShim::encodeData(Buffer::Instance& buffer, bool end_s
     //
     // We do this even if the upstream failed: If the response returned non-200,
     // we'll respond with a grpc-status with an error, so clients will know that the request
-    // was unsucessful. Since we're guaranteed at this point to have a valid response
+    // was unsuccessful. Since we're guaranteed at this point to have a valid response
     // (unless upstream lied in content-type) we attempt to return a well-formed gRPC
     // response body.
     const auto length = htonl(buffer.length() + buffer_.length());
