@@ -635,7 +635,7 @@ message RouteAction {
     // .. note::
     //
     //   Parsing this field is implemented such that the runtime key's data may be represented
-    //   as a :ref:`FractionalPercent <envoy_type_msg_percent.FractionalPercent>` proto represented
+    //   as a :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` proto represented
     //   as JSON/YAML and may also be represented as an integer with the assumption that the value
     //   is an integral percentage out of 100. For instance, a runtime key lookup returning the
     //   value "42" would parse as a `FractionalPercent` whose numerator is 42 and denominator is
