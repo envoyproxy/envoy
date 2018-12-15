@@ -617,11 +617,11 @@ message RouteAction {
     // requests will be mirrored.
     //
     // **This field is deprecated**. Set the
-    // :ref:`runtime_fraction <envoy_api_msg_route.RouteAction.RequestMirrorPolicy.runtime_fraction>`
+    // :ref:`runtime_fraction <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_fraction>`
     // field instead.
     string runtime_key = 2 [deprecated = true];
 
-    // If both :ref:`runtime_key <envoy_api_msg_route.RouteAction.RequestMirrorPolicy.runtime_key>`
+    // If both :ref:`runtime_key <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_key>`
     // and this field are not specified, all requests to the target cluster will be mirrored.
     //
     // If specified, this field takes precedence over the `runtime_key` field and requests must also
