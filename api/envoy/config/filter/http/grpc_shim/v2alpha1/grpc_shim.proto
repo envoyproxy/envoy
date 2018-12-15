@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package envoy.extensions.filter.http.grpc_shim.v2alpha1;
+option go_package = "v2";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Extensions gRPC Shim]
+// gRPC shim filter configuration
+message GrpcShim {
+  // The content-type to pass to the upstream when the gRPC shim filter is applied.
+  // The filter will also validate that the upstream responds with the same content type.
+  string content_type = 1 [(validate.rules).string.min_bytes = 1];
+}
