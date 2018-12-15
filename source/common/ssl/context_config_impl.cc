@@ -118,7 +118,11 @@ const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
     "AES256-GCM-SHA384:"
     "AES256-SHA";
 
-const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES = "X25519:P-256";
+const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES =
+#ifndef BORINGSSL_FIPS
+    "X25519:"
+#endif
+    "P-256";
 
 ContextConfigImpl::ContextConfigImpl(
     const envoy::api::v2::auth::CommonTlsContext& config,

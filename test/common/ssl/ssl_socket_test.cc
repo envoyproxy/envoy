@@ -2949,6 +2949,19 @@ TEST_P(SslSocketTest, EcdhCurves) {
   client_params->clear_ecdh_curves();
   server_params->clear_ecdh_curves();
   server_params->clear_cipher_suites();
+
+  // Verify that X25519 is not offered by default in FIPS builds.
+  client_params->add_ecdh_curves("X25519");
+  server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+#ifdef BORINGSSL_FIPS
+  testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.connection_error",
+             "ssl.connection_error", GetParam(), nullptr);
+#else
+  testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
+             GetParam(), nullptr);
+#endif
+  client_params->clear_ecdh_curves();
+  server_params->clear_cipher_suites();
 }
 
 TEST_P(SslSocketTest, RevokedCertificate) {
