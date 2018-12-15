@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     srcs = ["original_src_test.cc"],
     extension_name = "envoy.filters.network.original_src",
     deps = [
-        "//source/extensions/filters/network/original_src",
+        "//source/extensions/filters/network/original_src:original_src_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
     ],

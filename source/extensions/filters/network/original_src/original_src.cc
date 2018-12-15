@@ -12,6 +12,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace OriginalSrc {
 
+OriginalSrcFilter::OriginalSrcFilter(const Config& config): config_(config) {}
 Network::FilterStatus OriginalSrcFilter::onData(Buffer::Instance&, bool) {
   return Network::FilterStatus::Continue;
 }

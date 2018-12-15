@@ -1,8 +1,12 @@
 #pragma once
 
+#include "envoy/network/address.h"
 #include "envoy/network/filter.h"
 
 #include "common/common/logger.h"
+
+#include "extensions/filters/network/original_src/config.h"
+#include "extensions/filters/network/original_src/original_src_socket_option.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,6 +20,7 @@ namespace OriginalSrc {
  */
 class OriginalSrcFilter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
+  OriginalSrcFilter(const Config& config);
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
@@ -25,6 +30,7 @@ public:
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
+  Config config_;
 };
 
 } // namespace OriginalSrc

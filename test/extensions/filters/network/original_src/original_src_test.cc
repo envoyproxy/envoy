@@ -20,7 +20,8 @@ namespace OriginalSrc {
 class OriginalSrcTest : public testing::Test {
 public:
   std::unique_ptr<OriginalSrcFilter> makeDefaultFilter() {
-    return std::make_unique<OriginalSrcFilter>();
+    Config default_config;
+    return std::make_unique<OriginalSrcFilter>(default_config);
   }
 
   void setAddressToReturn(const std::string& address) {
