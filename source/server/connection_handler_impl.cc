@@ -74,11 +74,10 @@ void ConnectionHandlerImpl::ActiveListener::removeConnection(ActiveConnection& c
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
                                                       Network::ListenerConfig& config)
-    : ActiveListener(
-          parent,
-          parent.dispatcher_.createListener(config.socket(), *this, config.bindToPort(),
-                                            config.handOffRestoredDestinationConnections()),
-          config) {}
+    : ActiveListener(parent,
+                     parent.dispatcher_.createListener(
+                         config.socket(), *this, config.handOffRestoredDestinationConnections()),
+                     config) {}
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
                                                       Network::ListenerPtr&& listener,
@@ -208,7 +207,6 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
 
 void ConnectionHandlerImpl::ActiveListener::onAccept(
     Network::ConnectionSocketPtr&& socket, bool hand_off_restored_destination_connections) {
-  Network::Address::InstanceConstSharedPtr local_address = socket->localAddress();
   auto active_socket = std::make_unique<ActiveSocket>(*this, std::move(socket),
                                                       hand_off_restored_destination_connections);
 

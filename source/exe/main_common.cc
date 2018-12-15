@@ -144,23 +144,4 @@ std::string MainCommon::hotRestartVersion(uint64_t max_num_stats, uint64_t max_s
   return "disabled";
 }
 
-// Legacy implementation of main_common.
-//
-// TODO(jmarantz): Remove this when all callers are removed. At that time, MainCommonBase
-// and MainCommon can be merged. The current theory is that only Google calls this.
-int main_common(OptionsImpl& options) {
-  try {
-    Event::RealTimeSystem real_time_system_;
-    DefaultTestHooks default_test_hooks_;
-    ProdComponentFactory prod_component_factory_;
-    Thread::ThreadFactoryImpl thread_factory_;
-    MainCommonBase main_common(options, real_time_system_, default_test_hooks_,
-                               prod_component_factory_,
-                               std::make_unique<Runtime::RandomGeneratorImpl>(), thread_factory_);
-    return main_common.run() ? EXIT_SUCCESS : EXIT_FAILURE;
-  } catch (EnvoyException& e) {
-    return EXIT_FAILURE;
-  }
-}
-
 } // namespace Envoy

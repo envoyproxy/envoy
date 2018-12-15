@@ -57,7 +57,7 @@ protected:
       options->emplace_back(std::move(option));
       std::unique_ptr<ListenSocketImpl> socket1;
       try {
-        socket1 = createListenSocketPtr(addr, options, true);
+        socket1 = createListenSocketPtr(addr, options);
       } catch (SocketBindException& e) {
         if (e.errorNumber() != EADDRINUSE) {
           ADD_FAILURE() << "Unexpected failure (" << e.errorNumber()
@@ -85,7 +85,7 @@ protected:
           .WillOnce(Return(true));
       options2->emplace_back(std::move(option2));
       // The address and port are bound already, should throw exception.
-      EXPECT_THROW(createListenSocketPtr(addr, options2, true), SocketBindException);
+      EXPECT_THROW(createListenSocketPtr(addr, options2), SocketBindException);
 
       // Test the case of a socket with fd and given address and port.
       auto socket3 = createListenSocketPtr(dup(socket1->fd()), addr, nullptr);
@@ -98,7 +98,7 @@ protected:
 
   void testBindPortZero() {
     auto loopback = Network::Test::getCanonicalLoopbackAddress(version_);
-    auto socket = createListenSocketPtr(loopback, nullptr, true);
+    auto socket = createListenSocketPtr(loopback, nullptr);
     EXPECT_EQ(Address::Type::Ip, socket->localAddress()->type());
     EXPECT_EQ(version_, socket->localAddress()->ip()->version());
     EXPECT_EQ(loopback->ip()->addressAsString(), socket->localAddress()->ip()->addressAsString());

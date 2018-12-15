@@ -24,6 +24,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -153,20 +154,6 @@ public:
   std::function<void()> initialize_callback_;
   Network::Address::InstanceConstSharedPtr source_address_;
   NiceMock<MockPrioritySet> priority_set_;
-};
-
-class MockLoadBalancerContext : public LoadBalancerContext {
-public:
-  MockLoadBalancerContext();
-  ~MockLoadBalancerContext();
-
-  MOCK_METHOD0(computeHashKey, absl::optional<uint64_t>());
-  MOCK_METHOD0(metadataMatchCriteria, Router::MetadataMatchCriteria*());
-  MOCK_CONST_METHOD0(downstreamConnection, const Network::Connection*());
-  MOCK_CONST_METHOD0(downstreamHeaders, const Http::HeaderMap*());
-  MOCK_METHOD2(determinePriorityLoad, const PriorityLoad&(const PrioritySet&, const PriorityLoad&));
-  MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host&));
-  MOCK_CONST_METHOD0(hostSelectionRetryCount, uint32_t());
 };
 
 class MockLoadBalancer : public LoadBalancer {
@@ -370,27 +357,6 @@ public:
 
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host& candidate_host));
   MOCK_METHOD1(onHostAttempted, void(HostDescriptionConstSharedPtr));
-};
-
-class MockEdsSubscriptionFactory : public EdsSubscriptionFactory {
-  MOCK_METHOD8(getOrCreateMux,
-               Config::GrpcMux&(const LocalInfo::LocalInfo& local_info,
-                                Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
-                                const Protobuf::MethodDescriptor& service_method,
-                                Runtime::RandomGenerator& random,
-                                const ::envoy::api::v2::core::ApiConfigSource& config_source,
-                                Stats::Scope& scope,
-                                const Config::RateLimitSettings& rate_limit_settings));
-
-  MOCK_METHOD9(subscriptionFromConfigSource,
-               std::unique_ptr<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>>(
-                   const envoy::api::v2::core::ConfigSource& config,
-                   const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                   Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
-                   Stats::Scope& scope,
-                   std::function<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>*()>
-                       rest_legacy_constructor,
-                   const std::string& rest_method, const std::string& grpc_method));
 };
 
 class TestRetryHostPredicateFactory : public RetryHostPredicateFactory {

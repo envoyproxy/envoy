@@ -64,6 +64,13 @@ public:
   const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const override {
     return downstream_local_address_;
   }
+  void setDownstreamDirectRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_direct_remote_address) override {
+    downstream_direct_remote_address_ = downstream_direct_remote_address;
+  }
+  const Network::Address::InstanceConstSharedPtr& downstreamDirectRemoteAddress() const override {
+    return downstream_direct_remote_address_;
+  }
   void setDownstreamRemoteAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_remote_address) override {
     downstream_remote_address_ = downstream_remote_address;
@@ -190,6 +197,7 @@ public:
   bool hc_request_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
