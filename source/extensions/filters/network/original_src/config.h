@@ -18,7 +18,7 @@ private:
   bool use_port_ = false;
   uint32_t mark_ = 0;
 };
-}
-}
-}
-}
+} // namespace OriginalSrc
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

@@ -12,9 +12,10 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace OriginalSrc {
 
-class ConfigTest: public testing::Test {
+class ConfigTest : public testing::Test {
 public:
-  Config makeConfigFromProto(const envoy::config::filter::network::original_src::v2alpha1::OriginalSrc& proto_config) {
+  Config makeConfigFromProto(
+      const envoy::config::filter::network::original_src::v2alpha1::OriginalSrc& proto_config) {
     return Config(proto_config);
   }
 };
@@ -58,4 +59,7 @@ TEST_F(ConfigTest, TestUseMarkMax) {
 
   EXPECT_EQ(config.mark(), std::numeric_limits<uint32_t>::max());
 }
-}}}}
+} // namespace OriginalSrc
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

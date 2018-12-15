@@ -48,15 +48,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "config", # The extension build system requires a library named config
+    name = "config",  # The extension build system requires a library named config
     srcs = ["original_src_config_factory.cc"],
     hdrs = ["original_src_config_factory.h"],
     deps = [
         ":config_lib",
         ":original_src_lib",
         "//include/envoy/registry",
-        "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network:well_known_names",
+        "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/config/filter/network/original_src/v2alpha1:original_src_cc",
     ],
 )

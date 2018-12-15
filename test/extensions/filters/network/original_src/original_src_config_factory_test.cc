@@ -39,4 +39,7 @@ TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
   EXPECT_NE(dynamic_cast<OriginalSrcFilter*>(added_filter.get()), nullptr);
 }
 
-}}}}
+} // namespace OriginalSrc
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

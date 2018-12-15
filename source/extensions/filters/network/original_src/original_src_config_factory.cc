@@ -8,17 +8,18 @@
 #include "extensions/filters/network/original_src/config.h"
 #include "extensions/filters/network/original_src/original_src.h"
 #include "extensions/filters/network/well_known_names.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace OriginalSrc {
 
-OriginalSrcConfigFactory::OriginalSrcConfigFactory(): FactoryBase(NetworkFilterNames::get().OriginalSrc) {}
+OriginalSrcConfigFactory::OriginalSrcConfigFactory()
+    : FactoryBase(NetworkFilterNames::get().OriginalSrc) {}
 
-Network::FilterFactoryCb
-OriginalSrcConfigFactory::createFilterFactoryFromProtoTyped(
-  const envoy::config::filter::network::original_src::v2alpha1::OriginalSrc& proto_config,
-                               Server::Configuration::FactoryContext&) {
+Network::FilterFactoryCb OriginalSrcConfigFactory::createFilterFactoryFromProtoTyped(
+    const envoy::config::filter::network::original_src::v2alpha1::OriginalSrc& proto_config,
+    Server::Configuration::FactoryContext&) {
   Config config(proto_config);
   return [config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<OriginalSrcFilter>(config));
