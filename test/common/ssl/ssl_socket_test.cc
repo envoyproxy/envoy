@@ -2901,6 +2901,17 @@ TEST_P(SslSocketTest, CipherSuites) {
              "ssl.connection_error", GetParam(), nullptr);
   client_params->clear_cipher_suites();
   server_params->clear_cipher_suites();
+
+  // Verify that ECDHE-RSA-CHACHA20-POLY1305 is not offered by default in FIPS builds.
+  client_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
+#ifdef BORINGSSL_FIPS
+  testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.connection_error",
+             "ssl.connection_error", GetParam(), nullptr);
+#else
+  testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
+             GetParam(), nullptr);
+#endif
+  client_params->clear_cipher_suites();
 }
 
 TEST_P(SslSocketTest, EcdhCurves) {
