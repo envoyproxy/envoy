@@ -11,6 +11,15 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "config_lib",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        "@envoy_api//envoy/config/filter/network/original_src/v2alpha1:original_src_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "original_src_socket_option_lib",
     srcs = ["original_src_socket_option.cc"],
     hdrs = ["original_src_socket_option.h"],
@@ -23,12 +32,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "original_src",
+    name = "original_src_lib",
     srcs = ["original_src.cc"],
     hdrs = ["original_src.h"],
     deps = [
+        ":config_lib",
         ":original_src_socket_option_lib",
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/network:address_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
         "//source/common/common:assert_lib",
@@ -37,12 +48,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "config",
-    srcs = ["config.cc"],
+    name = "config", # The extension build system requires a library named config
+    srcs = ["original_src_config_factory.cc"],
     deps = [
-        ":original_src",
+        ":config_lib",
+        ":original_src_lib",
         "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network:well_known_names",
+        "@envoy_api//envoy/config/filter/network/original_src/v2alpha1:original_src_cc",
     ],
 )
