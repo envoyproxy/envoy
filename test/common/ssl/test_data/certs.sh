@@ -31,7 +31,7 @@ generate_x509_cert() {
   openssl x509 -req -days $DAYS -in $1_cert.csr -sha256 -CA $2_cert.pem -CAkey \
     $2_key.pem -CAcreateserial -out $1_cert.pem -extensions v3_ca -extfile $1_cert.cfg $EXTRA_ARGS
   echo "// NOLINT(namespace-envoy)" > $1_cert_info.h
-  echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_HASH[] = \"$(openssl x509 -in $1_cert.pem -outform DER | openssl dgst -sha256 | cut -d" " -f2)\";" >> $1_cert_info.h
+  echo -e "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_HASH[] =\n    \"$(openssl x509 -in $1_cert.pem -outform DER | openssl dgst -sha256 | cut -d" " -f2)\";" >> $1_cert_info.h
   echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_SPKI[] = \"$(openssl x509 -in $1_cert.pem -noout -pubkey | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | openssl enc -base64)\";" >> $1_cert_info.h
   echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_SERIAL[] = \"$(openssl x509 -in $1_cert.pem -noout -serial | cut -d"=" -f2 | awk '{print tolower($0)}')\";" >> $1_cert_info.h
   echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_NOT_BEFORE[] = \"$(openssl x509 -in $1_cert.pem -noout -startdate | cut -d"=" -f2)\";" >> $1_cert_info.h
