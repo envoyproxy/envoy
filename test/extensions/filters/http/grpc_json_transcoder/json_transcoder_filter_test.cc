@@ -47,8 +47,8 @@ class GrpcJsonTranscoderConfigTest : public testing::Test {
 public:
   const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
   getProtoConfig(const std::string& descriptor_path, const std::string& service_name,
-                 const std::vector<std::string>& ignored_query_parameters,
-                 bool match_incoming_request_route = false) {
+                 bool match_incoming_request_route = false,
+                 const std::vector<std::string>& ignored_query_parameters = {}) {
     std::string json_string = "{\"proto_descriptor\": \"" + descriptor_path +
                               "\",\"services\": [\"" + service_name + "\"]}";
     auto json_config = Json::Factory::loadFromString(json_string);
@@ -60,12 +60,6 @@ public:
     }
 
     return proto_config;
-  }
-
-  const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
-  getProtoConfig(const std::string& descriptor_path, const std::string& service_name,
-                 bool match_incoming_request_route = false) {
-    return getProtoConfig(descriptor_path, service_name, {}, match_incoming_request_route);
   }
 
   std::string makeProtoDescriptor(std::function<void(FileDescriptorSet&)> process) {
@@ -218,7 +212,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, IgnoredQueryParameter) {
   std::vector<std::string> ignored_query_parameters = {"key"};
   JsonTranscoderConfig config(
       getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
-                     "bookstore.Bookstore", ignored_query_parameters));
+                     "bookstore.Bookstore", false, ignored_query_parameters));
 
   Http::TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/shelves?key=API_KEY"}};
 
