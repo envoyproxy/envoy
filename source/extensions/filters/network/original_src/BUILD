@@ -50,6 +50,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "config", # The extension build system requires a library named config
     srcs = ["original_src_config_factory.cc"],
+    hdrs = ["original_src_config_factory.h"],
     deps = [
         ":config_lib",
         ":original_src_lib",

@@ -1,3 +1,5 @@
+#include "extensions/filters/network/original_src/original_src_config_factory.h"
+
 #include "envoy/config/filter/network/original_src/v2alpha1/original_src.pb.h"
 #include "envoy/config/filter/network/original_src/v2alpha1/original_src.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -11,25 +13,17 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace OriginalSrc {
 
-/**
- * Config registration for the original_src filter. @see NamedNetworkFilterConfigFactory.
- */
-class OriginalSrcConfigFactory
- : public Common::FactoryBase<envoy::config::filter::network::original_src::v2alpha1::OriginalSrc>  {
-public:
-  OriginalSrcConfigFactory(): FactoryBase(NetworkFilterNames::get().OriginalSrc) {}
-  // NamedNetworkFilterConfigFactory
+OriginalSrcConfigFactory::OriginalSrcConfigFactory(): FactoryBase(NetworkFilterNames::get().OriginalSrc) {}
 
-  Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::network::original_src::v2alpha1::OriginalSrc& proto_config,
-                               Server::Configuration::FactoryContext&) override {
-    Config config(proto_config);
-    return [config](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<OriginalSrcFilter>(config));
-    };
-  }
-};
+Network::FilterFactoryCb
+OriginalSrcConfigFactory::createFilterFactoryFromProtoTyped(
+  const envoy::config::filter::network::original_src::v2alpha1::OriginalSrc& proto_config,
+                               Server::Configuration::FactoryContext&) {
+  Config config(proto_config);
+  return [config](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(std::make_shared<OriginalSrcFilter>(config));
+  };
+}
 
 /**
  * Static registration for the original_src filter. @see RegisterFactory.

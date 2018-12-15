@@ -3,8 +3,6 @@ syntax = "proto3";
 package envoy.config.filter.network.original_src.v2alpha1;
 option go_package = "v2alpha1";
 
-import "envoy/api/v2/core/grpc_service.proto";
-
 import "validate/validate.proto";
 
 // [#protodoc-title: Original Src Filter]

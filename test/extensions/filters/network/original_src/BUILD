@@ -13,6 +13,29 @@ load(
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_name = "envoy.filters.network.original_src",
+    deps = [
+        "//source/extensions/filters/network/original_src:config_lib",
+        "@envoy_api//envoy/config/filter/network/original_src/v2alpha1:original_src_cc",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "original_src_config_factory_test",
+    srcs = ["original_src_config_factory_test.cc"],
+    extension_name = "envoy.filters.network.original_src",
+    deps = [
+        "//source/extensions/filters/network/original_src:config",
+        "//source/extensions/filters/network/original_src:config_lib",
+        "//source/extensions/filters/network/original_src:original_src_lib",
+        "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/filter/network/original_src/v2alpha1:original_src_cc",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "original_src_test",
     srcs = ["original_src_test.cc"],
     extension_name = "envoy.filters.network.original_src",
