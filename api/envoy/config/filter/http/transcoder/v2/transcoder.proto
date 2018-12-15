@@ -77,12 +77,15 @@ message GrpcJsonTranscoder {
   //         };
   //       }
   //     }
+  //
   //     message GetShelfRequest {
   //       int64 shelf = 1;
   //     }
   //
-  // The request ``shelves/100?key=API_KEY`` will not be mapped to ``GetShelf``` because variable
-  // binding for ``key`` is not defined. Adding ``key`` to ``ignored_query_parameters`` will allow
+  //     message Shelf {}
+  //
+  // The request ``shelves/100?foo=bar`` will not be mapped to ``GetShelf``` because variable
+  // binding for ``foo`` is not defined. Adding ``foo`` to ``ignored_query_parameters`` will allow
   // the same request to be mapped to ``GetShelf``.
   repeated string ignored_query_parameters = 6;
 }
