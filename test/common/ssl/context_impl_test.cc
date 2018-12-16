@@ -907,14 +907,11 @@ TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   MessageUtil::loadFromYaml(TestEnvironment::substitute(ecdsa_tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(rsa_tls_certificate_yaml),
-                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
   ServerContextConfigImpl server_context_config(tls_context, factory_context);
   auto tls_certs = server_context_config.tlsCertificates();
-  ASSERT_EQ(3, tls_certs.size());
+  ASSERT_EQ(2, tls_certs.size());
   EXPECT_THAT(tls_certs[0].get().privateKeyPath(), EndsWith("selfsigned_key.pem"));
   EXPECT_THAT(tls_certs[1].get().privateKeyPath(), EndsWith("selfsigned_key_ecdsa_p256.pem"));
-  EXPECT_THAT(tls_certs[2].get().privateKeyPath(), EndsWith("selfsigned_key.pem"));
 }
 
 TEST(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
