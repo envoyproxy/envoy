@@ -85,28 +85,27 @@ standard Debian installations. Common paths for system CA bundles on Linux and B
 See the reference for :ref:`UpstreamTlsContexts <envoy_api_msg_auth.UpstreamTlsContext>` and
 :ref:`DownstreamTlsContexts <envoy_api_msg_auth.DownstreamTlsContext>` for other TLS options.
 
-.. _arch_overview_ssl_multi_cert: 
+.. _arch_overview_ssl_cert_select:
 
-Multiple certificates
+Certificate selection
 ---------------------
 
-:ref:`UpstreamTlsContexts <envoy_api_msg_auth.UpstreamTlsContext>` support multiple TLS
+:ref:`DownstreamTlsContexts <envoy_api_msg_auth.DownstreamTlsContext>` support multiple TLS
 certificates. These may be a mix of RSA and P-256 ECDSA certificates. The following rules apply:
 
-* Only the first certificate of a particular type (RSA or ECDSA) is considered.
-* Non-P256 server ECDSA certificates are rejected.
-* The client must indicate P-256 support to be considered ECDSA capable.
+* Only one certificate of a particular type (RSA or ECDSA) may be specified.
+* Non-P-256 server ECDSA certificates are rejected.
 * If the client supports P-256 ECDSA, a P-256 ECDSA certificate will be selected if present in the
-  :ref:`UpstreamTlsContext <envoy_api_msg_auth.UpstreamTlsContext>`.
-* If the client only supports RSA certificate, an RSA certificate will be selected if present in the
-  :ref:`UpstreamTlsContext <envoy_api_msg_auth.UpstreamTlsContext>`.
+  :ref:`DownstreamTlsContext <envoy_api_msg_auth.DownstreamTlsContext>`.
+* If the client only supports RSA certificates, a RSA certificate will be selected if present in the
+  :ref:`DownstreamTlsContext <envoy_api_msg_auth.DownstreamTlsContext>`.
 * Otherwise, the first certificate listed is used. This will result in a failed handshake if the
   client only supports RSA certificates and the server only has ECDSA certificates.
-* Static and SDS certificates may not be mixed in a given :ref:`UpstreamTlsContext
-  <envoy_api_msg_auth.UpstreamTlsContext>`.
+* Static and SDS certificates may not be mixed in a given :ref:`DownstreamTlsContext
+  <envoy_api_msg_auth.DownstreamTlsContext>`.
 
-Only a single TLS certificate is supported today for :ref:`DownstreamTlsContexts
-<envoy_api_msg_auth.DownstreamTlsContext>`.
+Only a single TLS certificate is supported today for :ref:`UpstreamTlsContexts
+<envoy_api_msg_auth.UpstreamTlsContext>`.
 
 Secret discovery service (SDS)
 ------------------------------
