@@ -150,6 +150,11 @@ public:
   virtual void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) PURE;
 
   virtual void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) PURE;
+
+  /**
+   * Give access to the listener configuration
+   */
+  virtual const Network::ListenerConfig& listenerConfig() const PURE;
 };
 
 /**
