@@ -2,89 +2,127 @@
 
 set -e
 
-# Uncomment the following lines if you want to regenerate the private keys.
-# openssl genrsa -out ca_key.pem 1024
-# openssl genrsa -out intermediate_ca_key.pem 1024
-# openssl genrsa -out fake_ca_key.pem 1024
-# openssl genrsa -out no_san_key.pem 1024
-# openssl genrsa -aes128 -passout file:password.txt -out password_protected_key.pem 1024
-# openssl genrsa -out san_dns_key.pem 1024
-# openssl genrsa -out san_dns_key2.pem 1024
-# openssl genrsa -out san_dns_key3.pem 1024
-# openssl genrsa -out san_multiple_dns_key.pem 1024
-# openssl genrsa -out san_uri_key.pem 1024
-# openssl genrsa -out selfsigned_key.pem 1024
-# openssl ecparam -name secp256r1 -genkey -out selfsigned_key_ecdsa_p256.pem
-# openssl ecparam -name secp384r1 -genkey -out selfsigned_key_ecdsa_p384.pem
-# openssl genrsa -out expired_key.pem 1024
-# openssl genrsa -out expired_san_uri_key.pem 1024
+# $1=<CA name> $2=[issuer name]
+generate_ca() {
+  if [[ "$2" != "" ]]; then local EXTRA_ARGS="-CA $2_cert.pem -CAkey $2_key.pem -CAcreateserial"; fi
+  openssl genrsa -out $1_key.pem 1024
+  openssl req -new -key $1_key.pem -out $1_cert.csr -config $1_cert.cfg -batch -sha256
+  openssl x509 -req -days 730 -in $1_cert.csr -signkey $1_key.pem -out $1_cert.pem \
+    -extensions v3_ca -extfile $1_cert.cfg $EXTRA_ARGS
+}
+
+# $1=<certificate name> $2=[password]
+generate_rsa_key() {
+  if [[ "$2" != "" ]]; then echo -n "$2" > $1_password.txt; local EXTRA_ARGS="-aes128 -passout file:$1_password.txt"; fi
+  openssl genrsa -out $1_key.pem $EXTRA_ARGS 1024
+}
+
+# $1=<certificate name> $2=[curve]
+generate_ecdsa_key() {
+  if [[ "$2" != "" ]]; then local CURVE=$2; else local CURVE="secp256r1"; fi
+  openssl ecparam -name $CURVE -genkey -out $1_key.pem
+}
+
+# $1=<certificate name> $2=<CA name> $3=[days]
+generate_x509_cert() {
+  if [[ "$3" != "" ]]; then local DAYS=$3; else local DAYS="730"; fi
+  if [[ -f $1_password.txt ]]; then local EXTRA_ARGS="-passin file:$1_password.txt"; fi
+  openssl req -new -key $1_key.pem -out $1_cert.csr -config $1_cert.cfg -batch -sha256 $EXTRA_ARGS
+  openssl x509 -req -days $DAYS -in $1_cert.csr -sha256 -CA $2_cert.pem -CAkey \
+    $2_key.pem -CAcreateserial -out $1_cert.pem -extensions v3_ca -extfile $1_cert.cfg $EXTRA_ARGS
+  echo "// NOLINT(namespace-envoy)" > $1_cert_info.h
+  echo -e "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_HASH[] =\n    \"$(openssl x509 -in $1_cert.pem -outform DER | openssl dgst -sha256 | cut -d" " -f2)\";" >> $1_cert_info.h
+  echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_SPKI[] = \"$(openssl x509 -in $1_cert.pem -noout -pubkey | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | openssl enc -base64)\";" >> $1_cert_info.h
+  echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_SERIAL[] = \"$(openssl x509 -in $1_cert.pem -noout -serial | cut -d"=" -f2 | awk '{print tolower($0)}')\";" >> $1_cert_info.h
+  echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_NOT_BEFORE[] = \"$(openssl x509 -in $1_cert.pem -noout -startdate | cut -d"=" -f2)\";" >> $1_cert_info.h
+  echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_NOT_AFTER[] = \"$(openssl x509 -in $1_cert.pem -noout -enddate | cut -d"=" -f2)\";" >> $1_cert_info.h
+}
+
+# $1=<certificate name>
+generate_selfsigned_x509_cert() {
+  openssl req -new -x509 -days 730 -key $1_key.pem -out $1_cert.pem -config $1_cert.cfg -batch -sha256
+}
 
 # Generate ca_cert.pem.
-openssl req -new -key ca_key.pem -out ca_cert.csr -config ca_cert.cfg -batch -sha256
-openssl x509 -req -days 3650 -in ca_cert.csr -signkey ca_key.pem -out ca_cert.pem -extensions v3_ca -extfile ca_cert.cfg
+generate_ca ca
 
 # Generate intermediate_ca_cert.pem.
-openssl req -new -key intermediate_ca_key.pem -out intermediate_ca_cert.csr -config intermediate_ca_cert.cfg -batch -sha256
-openssl x509 -req -days 3650 -in intermediate_ca_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out intermediate_ca_cert.pem -extensions v3_ca -extfile intermediate_ca_cert.cfg
+generate_ca intermediate_ca ca
 
 # Generate fake_ca_cert.pem.
-openssl req -new -key fake_ca_key.pem -out fake_ca_cert.csr -config fake_ca_cert.cfg -batch -sha256
-openssl x509 -req -days 3650 -in fake_ca_cert.csr -signkey fake_ca_key.pem -out fake_ca_cert.pem -extensions v3_ca -extfile fake_ca_cert.cfg
+generate_ca fake_ca
 
 # Concatenate Fake CA (fake_ca_cert.pem) and Test CA (ca_cert.pem) to create CA file with multiple entries.
 cat fake_ca_cert.pem ca_cert.pem > ca_certificates.pem
 
 # Generate no_san_cert.pem.
-openssl req -new -key no_san_key.pem -out no_san_cert.csr -config no_san_cert.cfg -batch -sha256
-openssl x509 -req -days 730 -in no_san_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out no_san_cert.pem -extensions v3_ca -extfile no_san_cert.cfg
-
-# Generate password_protected_cert.pem.
-openssl req -new -key password_protected_key.pem -out password_protected_cert.csr -config san_uri_cert.cfg -batch -sha256 -passin file:password.txt
-openssl x509 -req -days 730 -in password_protected_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out password_protected_cert.pem -extensions v3_ca -extfile san_uri_cert.cfg -passin file:password.txt
+generate_rsa_key no_san
+generate_x509_cert no_san ca
 
 # Generate san_dns_cert.pem.
-openssl req -new -key san_dns_key.pem -out san_dns_cert.csr -config san_dns_cert.cfg -batch -sha256
-openssl x509 -req -days 730 -in san_dns_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_dns_cert.pem -extensions v3_ca -extfile san_dns_cert.cfg
+generate_rsa_key san_dns
+generate_x509_cert san_dns ca
 
-# Generate san_dns_cert2.pem (duplicate of san_dns_cert.pem, but with a different private key).
-openssl req -new -key san_dns_key2.pem -out san_dns_cert2.csr -config san_dns_cert.cfg -batch -sha256
-openssl x509 -req -days 730 -in san_dns_cert2.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_dns_cert2.pem -extensions v3_ca -extfile san_dns_cert.cfg
+# Generate san_dns2_cert.pem (duplicate of san_dns_cert.pem, but with a different private key).
+cp -f san_dns_cert.cfg san_dns2_cert.cfg
+generate_rsa_key san_dns2
+generate_x509_cert san_dns2 ca
+rm -f san_dns2_cert.cfg
 
-# Generate san_dns_cert3.pem (signed by intermediate_ca_cert.pem).
-openssl req -new -key san_dns_key3.pem -out san_dns_cert3.csr -config san_dns_cert.cfg -batch -sha256
-openssl x509 -req -days 730 -in san_dns_cert3.csr -sha256 -CA intermediate_ca_cert.pem -CAkey intermediate_ca_key.pem -CAcreateserial -out san_dns_cert3.pem -extensions v3_ca -extfile san_dns_cert.cfg
+# Generate san_dns3_cert.pm (signed by intermediate_ca_cert.pem).
+cp -f san_dns_cert.cfg san_dns3_cert.cfg
+generate_rsa_key san_dns3
+generate_x509_cert san_dns3 intermediate_ca
+rm -f san_dns3_cert.cfg
 
-# Concatenate san_dns_cert3.pem and Test Intermediate CA (intermediate_ca_cert.pem) to create valid certificate chain.
-cat san_dns_cert3.pem intermediate_ca_cert.pem > san_dns_chain3.pem
+# Concatenate san_dns3_cert.pem and Test Intermediate CA (intermediate_ca_cert.pem) to create valid certificate chain.
+cat san_dns3_cert.pem intermediate_ca_cert.pem > san_dns3_chain.pem
 
 # Generate san_multiple_dns_cert.pem.
-openssl req -new -key san_multiple_dns_key.pem -out san_multiple_dns_cert.csr -config san_multiple_dns_cert.cfg -batch -sha256
-openssl x509 -req -days 730 -in san_multiple_dns_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_multiple_dns_cert.pem -extensions v3_ca -extfile san_multiple_dns_cert.cfg
+generate_rsa_key san_multiple_dns
+generate_x509_cert san_multiple_dns ca
 
 # Generate san_only_dns_cert.pem.
-openssl req -new -key san_only_dns_key.pem -out san_only_dns_cert.csr -config san_only_dns_cert.cfg -batch -sha256
-openssl x509 -req -days 730 -in san_only_dns_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_only_dns_cert.pem -extensions v3_ca -extfile san_only_dns_cert.cfg
+generate_rsa_key san_only_dns
+generate_x509_cert san_only_dns ca
 
 # Generate san_uri_cert.pem.
-openssl req -new -key san_uri_key.pem -out san_uri_cert.csr -config san_uri_cert.cfg -batch -sha256
-openssl x509 -req -days 730 -in san_uri_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_uri_cert.pem -extensions v3_ca -extfile san_uri_cert.cfg
+generate_rsa_key san_uri
+generate_x509_cert san_uri ca
+
+# Generate password_protected_cert.pem.
+cp -f san_uri_cert.cfg password_protected_cert.cfg
+generate_rsa_key password_protected "p4ssw0rd"
+generate_x509_cert password_protected ca
+rm -f password_protected_cert.cfg
 
 # Generate selfsigned_cert.pem.
-openssl req -new -x509 -days 730 -key selfsigned_key.pem -out selfsigned_cert.pem -config selfsigned_cert.cfg -batch -sha256
+generate_rsa_key selfsigned
+generate_selfsigned_x509_cert selfsigned
 
-# Generate selfsigned_cert_ecdsa_p256.pem.
-openssl req -new -x509 -days 730 -key selfsigned_key_ecdsa_p256.pem -out selfsigned_cert_ecdsa_p256.pem -config selfsigned_cert.cfg -batch -sha256
+# Generate selfsigned_ecdsa_p256_cert.pem.
+cp -f selfsigned_cert.cfg selfsigned_ecdsa_p256_cert.cfg
+generate_ecdsa_key selfsigned_ecdsa_p256
+generate_selfsigned_x509_cert selfsigned_ecdsa_p256
+rm -f selfsigned_ecdsa_p256_cert.cfg
 
-# Generate selfsigned_cert_ecdsa_p384.pem.
-openssl req -new -x509 -days 730 -key selfsigned_key_ecdsa_p384.pem -out selfsigned_cert_ecdsa_p384.pem -config selfsigned_cert.cfg -batch -sha256
+# Generate selfsigned_ecdsa_p384_cert.pem.
+cp -f selfsigned_cert.cfg selfsigned_ecdsa_p384_cert.cfg
+generate_ecdsa_key selfsigned_ecdsa_p384 secp384r1
+generate_selfsigned_x509_cert selfsigned_ecdsa_p384
+rm -f selfsigned_ecdsa_p384_cert.cfg
 
 # Generate expired_cert.pem as a self-signed, expired cert (will fail on Mac OS 10.13+ because of negative days value).
-openssl req -new -key expired_key.pem -out expired_cert.csr -config selfsigned_cert.cfg -batch -sha256
-openssl x509 -req -days -365 -in expired_cert.csr -signkey expired_key.pem -out expired_cert.pem
+cp -f selfsigned_cert.cfg expired_cert.cfg
+generate_rsa_key expired
+generate_x509_cert expired ca -365
+rm -f expired_cert.cfg
 
 # Generate expired_san_uri_cert.pem as a CA signed, expired cert (will fail on Mac OS 10.13+ because of negative days value).
-openssl req -new -key expired_san_uri_key.pem -out expired_san_uri_cert.csr -config san_uri_cert.cfg -batch -sha256
-openssl x509 -req -days -365 -in expired_san_uri_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out expired_san_uri_cert.pem -extensions v3_ca -extfile san_uri_cert.cfg
+cp -f san_uri_cert.cfg expired_san_uri_cert.cfg
+generate_rsa_key expired_san_uri
+generate_x509_cert expired_san_uri ca -365
+rm -f expired_san_uri_cert.cfg
 
 # Initialize information for CRL process
 touch crl_index.txt crl_index.txt.attr
