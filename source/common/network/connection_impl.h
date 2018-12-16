@@ -204,7 +204,7 @@ private:
  * libevent implementation of Network::ClientConnection.
  */
 class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnection {
-private:
+protected:
   ClientConnectionImpl(Event::Dispatcher& dispatcher,
                        const Address::InstanceConstSharedPtr& remote_address,
                        const Address::InstanceConstSharedPtr& source_address,

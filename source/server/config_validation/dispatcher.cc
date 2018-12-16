@@ -12,8 +12,8 @@ Network::ClientConnectionPtr ValidationDispatcher::createClientConnection(
     Network::Address::InstanceConstSharedPtr source_address,
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options) {
-  return std::make_unique<Network::ConfigValidateConnection>(*this, remote_address, source_address,
-                                                             std::move(transport_socket), options);
+  return Network::ConfigValidateConnection::create(*this, remote_address, source_address,
+                                                   std::move(transport_socket), options);
 }
 
 Network::DnsResolverSharedPtr ValidationDispatcher::createDnsResolver(

@@ -54,7 +54,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "dispatcher_lib",
-    srcs = ["dispatcher.cc"],
+    srcs = [
+        "connection.cc",
+        "dispatcher.cc",
+    ],
     hdrs = [
         "connection.h",
         "dispatcher.h",

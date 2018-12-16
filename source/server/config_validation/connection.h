@@ -13,7 +13,7 @@ namespace Network {
   overridden with no-op implementations.
 */
 class ConfigValidateConnection : public Network::ClientConnectionImpl {
-public:
+private:
   ConfigValidateConnection(Event::ValidationDispatcher& dispatcher,
                            Network::Address::InstanceConstSharedPtr remote_address,
                            Network::Address::InstanceConstSharedPtr source_address,
@@ -21,6 +21,14 @@ public:
                            const Network::ConnectionSocket::OptionsSharedPtr& options)
       : Network::ClientConnectionImpl(dispatcher, remote_address, source_address,
                                       std::move(transport_socket), options) {}
+
+public:
+  static std::unique_ptr<ConfigValidateConnection>
+  create(Event::ValidationDispatcher& dispatcher,
+         const Address::InstanceConstSharedPtr& remote_address,
+         const Address::InstanceConstSharedPtr& source_address,
+         Network::TransportSocketPtr&& transport_socket,
+         const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   // Unit tests may instantiate it without proper event machine and leave opened sockets.
   // Do some cleanup before invoking base class's destructor.
