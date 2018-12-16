@@ -1,5 +1,5 @@
 # What are the identities, certificates and keys
-There are 11 identities:
+There are 14 identities:
 - **CA**: Certificate Authority for **No SAN**, **SAN With URI** and **SAN With
   DNS**. It has the self-signed certificate *ca_cert.pem*. *ca_key.pem* is its
   private key. Additionally, we create a CRL for this CA (*ca_cert.crl*) that
@@ -12,28 +12,37 @@ There are 11 identities:
   its private key.
 - **No SAN**: It has the certificate *no_san_cert.pem*, signed by the **CA**.
   The certificate does not have SAN field. *no_san_key.pem* is its private key.
-- **Password-protected**: The password-protected certificate *password_protected_cert.pem*,
-  using the config *san_uri_cert.cfg*. *password_protected_key.pem* is
-  its private key encrypted using the password supplied in *password.txt*.
-- **SAN With URI**: It has the certificate *san_uri_cert.pem*, which is signed
-  by the **CA** using the config *san_uri_cert.cfg*. The certificate has SAN
-  field of URI type. *san_uri_key.pem* is its private key.
 - **SAN With DNS**: It has the certificate *san_dns_cert.pem*, which is signed
   by the **CA** using the config *san_dns_cert.cfg*. The certificate has SAN
   field of DNS type. *san_dns_key.pem* is its private key. A second certificate
-  and key, using the same config, is *san_dns_cert2*. A third certificate and key,
-  using the same config, but signed by the **Intermediate CA** is *san_dns_cert3*,
-  its certificate chain is *san_dns_chain3.pem*.
+  and key, using the same config, is *san_dns2_cert*. A third certificate and key,
+  using the same config, but signed by the **Intermediate CA** is *san_dns3_cert*,
+  its certificate chain is *san_dns3_chain.pem*.
 - **SAN With Multiple DNS**: Same as *SAN With DNS* except there are multiple
   SANs (including wildcard domain). It has certificate *san_multiple_dns_cert.pem*,
   *san_multiple_dns_key.pem* is its private key.
 - **SAN only**: Same as *SAN With DNS* except that the certificate doesn't have the
   CommonName set. It has certificate *san_only_dns_cert.pem*, *san_only_dns_key.pem*
   is its private key.
+- **SAN With URI**: It has the certificate *san_uri_cert.pem*, which is signed
+  by the **CA** using the config *san_uri_cert.cfg*. The certificate has SAN
+  field of URI type. *san_uri_key.pem* is its private key.
+- **Password-protected**: The password-protected certificate *password_protected_cert.pem*,
+  using the config *san_uri_cert.cfg*. *password_protected_key.pem* is
+  its private key encrypted using the password supplied in *password_protectted_password.txt*.
 - **Self-signed**: The self-signed certificate *selfsigned_cert.pem*, using the
   config *selfsigned_cert.cfg*. *selfsigned_key.pem* is its private key.
+- **Self-signed ECDSA P-256**: The self-signed certificate *selfsigned_ecdsa_p256_cert.pem*,
+  using the config *selfsigned_cert.cfg*. *selfsigned_ecdsa_p256_key.pem* is
+  its private key.
+- **Self-signed ECDSA P-384**: The self-signed certificate *selfsigned_ecdsa_p384_cert.pem*,
+  using the config *selfsigned_cert.cfg*. *selfsigned_ecdsa_p256_key.pem* is
+  its private key.
 - **Expired**: A self-signed, expired certificate *expired_cert.pem*,
   using the config *selfsigned_cert.cfg*. *expired_key.pem* is its private
+  key.
+- **Expired With URI**: A self-signed, expired certificate *expired_san_uri_cert.pem*,
+  using the config *san_uri_cert.cfg*. *expired_san_uri_key.pem* is its private
   key.
 
 # How to update certificates
