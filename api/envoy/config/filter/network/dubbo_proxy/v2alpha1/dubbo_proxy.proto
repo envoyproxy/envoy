@@ -5,8 +5,9 @@ option go_package = "v2";
 
 import "validate/validate.proto";
 
-// [#protodoc-title: Extensions Thrift Proxy]
-// Thrift Proxy filter configuration.
+// [#protodoc-title: Dubbo Proxy]
+// Dubbo Proxy filter configuration.
+
 message DubboProxy {
   // The human readable prefix to use when emitting statistics.
   string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
