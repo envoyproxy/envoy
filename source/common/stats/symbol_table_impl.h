@@ -284,6 +284,48 @@ private:
 };
 
 /**
+ * Holds backing storage for a StatName. Usage of this is not required, as some
+ * applications may want to hold multiple StatName objects in one contiguous
+ * uint8_t array, or embed the characters directly in another structure.
+ *
+ * This is intended for embedding in other data structures that have access
+ * to a SymbolTable. StatNameStorage::free(symbol_table) must be called prior
+ * to allowing the StatNameStorage object to be destructed, otherwise an assert
+ * will fire to guard against symbol-table leaks.
+ *
+ * Thus this class is inconvenient to directly use as temp storage for building
+ * a StatName from a string. Instead it should be used via StatNameTempStorage.
+ */
+class StatNameStorage {
+public:
+  StatNameStorage(absl::string_view name, SymbolTable& table);
+  StatNameStorage(StatNameStorage&& src) : bytes_(std::move(src.bytes_)) {}
+  StatNameStorage(StatName src, SymbolTable& table);
+
+  /**
+   * Before allowing a StatNameStorage to be destroyed, you must call free()
+   * on it, to drop the references to the symbols, allowing the SymbolTable
+   * to shrink.
+   */
+  ~StatNameStorage();
+
+  /**
+   * Decrements the reference counts in the SymbolTable.
+   *
+   * @param table the symbol table.
+   */
+  void free(SymbolTable& table);
+
+  /**
+   * @return StatName a reference to the owned storage.
+   */
+  inline StatName statName() const;
+
+private:
+  std::unique_ptr<SymbolStorage> bytes_;
+};
+
+/**
  * Efficiently represents a stat name using a variable-length array of uint8_t.
  * This class does not own the backing store for this array; the backing-store
  * can be held in StatNameStorage, or it can be packed more tightly into another
@@ -360,6 +402,8 @@ private:
   const uint8_t* symbol_array_;
 };
 
+StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
+
 /**
  * Joins two or more StatNames. For example if we have StatNames for {"a.b",
  * "c.d", "e.f"} then the joined stat-name matches "a.b.c.d.e.f". The advantage
@@ -388,55 +432,6 @@ public:
 private:
   uint8_t* alloc(uint64_t num_bytes);
 
-  std::unique_ptr<SymbolStorage> bytes_;
-};
-
-/**
- * Holds backing storage for a StatName. Usage of this is not required, as some
- * applications may want to hold multiple StatName objects in one contiguous
- * uint8_t array, or embed the characters directly in another structure.
- *
- * This is intended for embedding in other data structures that have access
- * to a SymbolTable. StatNameStorage::free(symbol_table) must be called prior
- * to allowing the StatNameStorage object to be destructed, otherwise an assert
- * will fire to guard against symbol-table leaks.
- *
- * Thus this class is inconvenient to directly use as temp storage for building
- * a StatName from a string. Instead it should be used via StatNameTempStorage.
- */
-class StatNameStorage {
-public:
-  StatNameStorage(absl::string_view name, SymbolTable& table);
-  StatNameStorage(StatNameStorage&& src) : bytes_(std::move(src.bytes_)) {}
-  StatNameStorage(StatName src, SymbolTable& table);
-
-  /**
-   * Before allowing a StatNameStorage to be destroyed, you must call free()
-   * on it, to drop the references to the symbols, allowing the SymbolTable
-   * to shrink.
-   */
-  ~StatNameStorage();
-
-  /**
-   * Decrements the reference counts in the SymbolTable.
-   *
-   * @param table the symbol table.
-   */
-  void free(SymbolTable& table);
-
-  /**
-   * @return StatName a reference to the owned storage.
-   */
-  StatName statName() const { return StatName(bytes_.get()); }
-
-  /*
-  template<class T> T append(StatName suffix, std::function<T(StatName)> f) {
-    StatNameStorage joiner(statName(), suffix);
-    f(joiner.statName());
-  }
-  */
-
-private:
   std::unique_ptr<SymbolStorage> bytes_;
 };
 
