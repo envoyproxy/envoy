@@ -250,7 +250,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     switch (EVP_PKEY_id(public_key.get())) {
     case EVP_PKEY_EC: {
       // We only support P-256 ECDSA today.
-      EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
+      const EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
       // Since we checked the key type above, this should be valid.
       ASSERT(ecdsa_public_key != nullptr);
       const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
@@ -263,10 +263,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     } break;
     case EVP_PKEY_RSA: {
       // We require RSA certificates with 2048-bit or larger keys.
-      RSA* rsa_public_key = EVP_PKEY_get0_RSA(public_key.get());
+      const RSA* rsa_public_key = EVP_PKEY_get0_RSA(public_key.get());
       // Since we checked the key type above, this should be valid.
       ASSERT(rsa_public_key != nullptr);
-      int rsa_key_length = RSA_size(rsa_public_key);
+      const unsigned rsa_key_length = RSA_size(rsa_public_key);
       if (rsa_key_length < 2048 / 8) {
         throw EnvoyException(fmt::format("Failed to load certificate from chain {}, only RSA "
                                          "certificates with 2048-bit or larger keys are supported",
