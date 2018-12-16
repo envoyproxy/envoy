@@ -108,7 +108,7 @@ SymbolTable::SymbolTable()
     : next_symbol_(0), monotonic_counter_(0) {}
 
 SymbolTable::~SymbolTable() {
-  // to avoid leaks into the symbol table, we expect all StatNames to be freed.
+  // To avoid leaks into the symbol table, we expect all StatNames to be freed.
   // Note: this could potentially be short-circuited if we decide a fast exit
   // is needed in production. But it would be good to ensure clean up during
   // tests.
@@ -161,11 +161,11 @@ std::string SymbolTable::decodeSymbolVec(const SymbolVec& symbols) const {
   return absl::StrJoin(name_tokens, ".");
 }
 
-void SymbolTable::adjustRefCount(const StatName& stat_name, int adjustment) {
+void SymbolTable::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolStorage.
   SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.numBytes());
 
-  absl::MutexLock lock(&lock_);
+  absl::ReaderMutexLock lock(&lock_);
   for (Symbol symbol : symbols) {
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
@@ -173,7 +173,23 @@ void SymbolTable::adjustRefCount(const StatName& stat_name, int adjustment) {
     auto encode_search = encode_map_.find(decode_search->second.get());
     ASSERT(encode_search != encode_map_.end());
 
-    encode_search->second->ref_count_ += adjustment;
+    ++encode_search->second->ref_count_;
+  }
+}
+
+void SymbolTable::free(const StatName& stat_name) {
+  // Before taking the lock, decode the array of symbols from the SymbolStorage.
+  SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.numBytes());
+
+  absl::MutexLock lock(&lock_); // Takes write-lock as we may mutate decode_map_ and encode_map_.
+  for (Symbol symbol : symbols) {
+    auto decode_search = decode_map_.find(symbol);
+    ASSERT(decode_search != decode_map_.end());
+
+    auto encode_search = encode_map_.find(decode_search->second.get());
+    ASSERT(encode_search != encode_map_.end());
+
+    --encode_search->second->ref_count_;
 
     // If that was the last remaining client usage of the symbol, erase the the current
     // mappings and add the now-unused symbol to the reuse pool.

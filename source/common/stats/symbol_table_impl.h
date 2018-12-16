@@ -187,7 +187,7 @@ public:
    *
    * @param symbol_vec the vector of symbols to be freed.
    */
-  void free(const StatName& stat_name) { adjustRefCount(stat_name, -1); }
+  void free(const StatName& stat_name);
 
   /**
    * StatName backing-store can be managed by callers in a variety of ways
@@ -198,7 +198,7 @@ public:
    *
    * @param symbol_vec the vector of symbols to be freed.
    */
-  void incRefCount(const StatName& stat_name) { adjustRefCount(stat_name, 1); };
+  void incRefCount(const StatName& stat_name);
 
 #ifndef ENVOY_CONFIG_COVERAGE
   // It is convenient when debugging to be able to print the state of the table,
@@ -234,8 +234,6 @@ private:
   mutable absl::Mutex lock_;
 
   std::string decodeSymbolVec(const SymbolVec& symbols) const;
-
-  void adjustRefCount(const StatName& stat_name, int adjustment);
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
