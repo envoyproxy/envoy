@@ -1,6 +1,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/auth/cert.pb.validate.h"
+
 #include "common/json/json_loader.h"
 #include "common/secret/sds_api.h"
 #include "common/ssl/context_config_impl.h"
@@ -933,6 +935,16 @@ TEST(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl server_context_config(tls_context, factory_context), EnvoyException,
       "Static and dynamic TLS certificates may not be mixed in server contexts");
+}
+
+TEST(ServerContextConfigImplTest, MultiSdsConfig) {
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
+  tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::validate<envoy::api::v2::auth::DownstreamTlsContext>(tls_context),
+      EnvoyException,
+      "Proto constraint validation failed");
 }
 
 TEST(ServerContextConfigImplTest, SecretNotReady) {

@@ -236,7 +236,8 @@ message CommonTlsContext {
   repeated TlsCertificate tls_certificates = 2;
 
   // Configs for fetching TLS certificates via SDS API.
-  repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6;
+  repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
+      [(validate.rules).repeated .max_items = 1];
 
   message CombinedCertificateValidationContext {
     // How to validate peer certificates.
