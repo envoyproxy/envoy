@@ -94,7 +94,7 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitSe
                                  Stats::Scope& scope)
     : config_(config) {
   envoy::api::v2::core::GrpcService grpc_service;
-  grpc_service.MergeFrom(config_.grpc_service());
+  grpc_service.MergeFrom(config_->grpc_service());
   async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }
 

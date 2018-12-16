@@ -80,14 +80,14 @@ public:
   // Filters::Common::RateLimit::ClientFactory
   ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout) override;
 
-  const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig>
+  const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig>&
   rateLimitConfig() const override {
     return config_;
   }
 
 private:
   Grpc::AsyncClientFactoryPtr async_client_factory_;
-  const envoy::config::ratelimit::v2::RateLimitServiceConfig& config_;
+  const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig> config_;
 };
 
 // TODO(ramaraochavali): NullClientImpl and NullFactoryImpl should be removed when we remove rate
@@ -109,10 +109,13 @@ public:
     return ClientPtr{new NullClientImpl()};
   }
 
-  const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig>
+  const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig>&
   rateLimitConfig() const override {
-    return absl::nullopt;
+    return config_;
   }
+
+private:
+  const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig> config_;
 };
 
 } // namespace RateLimit

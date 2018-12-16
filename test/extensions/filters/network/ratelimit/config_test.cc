@@ -47,9 +47,6 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectJson) {
           instance, instance.clusterManager().grpcAsyncClientManager(),
           envoy::config::bootstrap::v2::Bootstrap());
 
-  EXPECT_CALL(context, clusterManager());
-  EXPECT_CALL(context, runtime()).Times(1);
-  EXPECT_CALL(context, scope()).Times(2);
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
       .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
@@ -87,9 +84,6 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
           instance, instance.clusterManager().grpcAsyncClientManager(),
           envoy::config::bootstrap::v2::Bootstrap());
 
-  EXPECT_CALL(context, clusterManager());
-  EXPECT_CALL(context, runtime()).Times(1);
-  EXPECT_CALL(context, scope()).Times(2);
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
       .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
@@ -126,9 +120,6 @@ TEST(RateLimitFilterConfigTest, RatelimitEmptyProto) {
           instance, instance.clusterManager().grpcAsyncClientManager(),
           envoy::config::bootstrap::v2::Bootstrap());
 
-  EXPECT_CALL(context, clusterManager());
-  EXPECT_CALL(context, runtime()).Times(1);
-  EXPECT_CALL(context, scope()).Times(2);
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
       .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();

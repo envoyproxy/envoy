@@ -91,7 +91,7 @@ public:
   /**
    * Returns configuration with which the factory has been built.
    */
-  virtual const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig>
+  virtual const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig>&
   rateLimitConfig() const PURE;
 };
 

@@ -27,25 +27,23 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
   ASSERT(proto_config.descriptors_size() > 0);
 
   ConfigSharedPtr filter_config(new Config(proto_config, context.scope(), context.runtime()));
-  const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
+  const std::chrono::milliseconds timeout =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
   Filters::Common::RateLimit::ClientFactoryPtr client_factory =
       Filters::Common::RateLimit::rateLimitClientFactory(context);
-  // if ratelimit service config is provided in both bootstrap and filter, we should validate that
+  // If ratelimit service config is provided in both bootstrap and filter, we should validate that
   // they are same.
-  if (proto_config.has_rate_limit_service() && client_factory->rateLimitConfig().has_value() &&
-      !Envoy::Protobuf::util::MessageDifferencer::Equals(*client_factory->rateLimitConfig(),
-                                                         proto_config.rate_limit_service())) {
-    throw EnvoyException("rate limit service config in filter does not match with bootstrap");
-  }
+  Filters::Common::RateLimit::validateRateLimitConfig<
+      const envoy::config::filter::network::rate_limit::v2::RateLimit&>(proto_config,
+                                                                        client_factory);
 
-  return [client_factory, proto_config, &context, timeout_ms,
+  return [client_factory, proto_config, &context, timeout,
           filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<Filter>(
         filter_config,
 
         Filters::Common::RateLimit::rateLimitClient(
-            client_factory, context, proto_config.rate_limit_service().grpc_service(),
-            timeout_ms)));
+            client_factory, context, proto_config.rate_limit_service().grpc_service(), timeout)));
   };
 }
 
