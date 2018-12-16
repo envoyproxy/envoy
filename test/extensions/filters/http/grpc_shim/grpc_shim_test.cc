@@ -31,7 +31,7 @@ namespace GrpcShim {
 class GrpcShimTest : public testing::Test {
 protected:
   void initialize() {
-    filter_.reset(new GrpcShim("application/x-protobuf"));
+    filter_ = std::make_shared<GrpcShim>("application/x-protobuf");
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -219,7 +219,7 @@ TEST_F(GrpcShimTest, GrpcRequestInternalError) {
     buffer.copyOut(0, 1, &null);
     EXPECT_EQ('\0', null);
     uint32_t length;
-    buffer.copyOut(1, 5, &length);
+    buffer.copyOut(1, sizeof(length), &length);
 
     EXPECT_EQ(12, ntohl(length));
   }
