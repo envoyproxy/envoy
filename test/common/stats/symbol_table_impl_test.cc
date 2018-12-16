@@ -27,7 +27,9 @@ protected:
   SymbolVec getSymbols(StatName stat_name) {
     return SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.numBytes());
   }
-  std::string decodeSymbolVec(const SymbolVec& symbol_vec) { return table_.decode(symbol_vec); }
+  std::string decodeSymbolVec(const SymbolVec& symbol_vec) {
+    return table_.decodeSymbolVec(symbol_vec);
+  }
   Symbol monotonicCounter() { return table_.monotonicCounter(); }
   std::string encodeDecode(absl::string_view stat_name) {
     return makeStat(stat_name).toString(table_);
@@ -54,8 +56,8 @@ TEST_F(StatNameTest, TestArbitrarySymbolRoundtrip) {
   }
 }
 
-TEST_F(StatNameTest, TestMillionSymbolsRoundtrip) {
-  for (int i = 0; i < 1 * 1000 * 1000; ++i) {
+TEST_F(StatNameTest, Test100kSymbolsRoundtrip) {
+  for (int i = 0; i < 100 * 1000; ++i) {
     const std::string stat_name = absl::StrCat("symbol_", i);
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
@@ -354,12 +356,8 @@ TEST(SymbolTableTest, Memory) {
     std::cerr << "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0."
               << std::endl;
   } else {
-    // In manual tests, string memory used 7759488 in this example, and
-    // symbol-table mem used 1739672. Setting the benchmark at 7759488/4 =
-    // 1939872, which should allow for some slop and platform dependence
-    // in the allocation library.
-
     EXPECT_LT(symbol_table_mem_used, string_mem_used / 4);
+    EXPECT_LT(symbol_table_mem_used, 1740000); // Dec 16, 2018: 1734552 bytes.
   }
 }
 
