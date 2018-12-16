@@ -119,6 +119,10 @@ TEST_P(Http2MetadataIntegrationTest, RequestMetadataReachSizeLimit) {
   testEnvoyRequestMetadataReachSizeLimit();
 }
 
+TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
+  testConsumeAndInsertRequestMetadata();
+}
+
 TEST_P(Http2IntegrationTest, EnvoyHandlingDuplicate100Continue) {
   testEnvoyHandling100Continue(true);
 }

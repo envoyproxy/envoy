@@ -226,6 +226,13 @@ public:
   virtual HeaderMap& addDecodedTrailers() PURE;
 
   /**
+   * Adds decoded metadata.
+   *
+   * @return a reference to metadata map vector, where new metadata map can be added.
+   */
+  virtual MetadataMapVector& addDecodedMetadata() PURE;
+
+  /**
    * Create a locally generated response using the provided response_code and body_text parameters.
    * If the request was a gRPC request the local reply will be encoded as a gRPC response with a 200
    * HTTP response code and grpc-status and grpc-message headers mapped from the provided

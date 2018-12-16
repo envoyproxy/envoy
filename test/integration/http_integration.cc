@@ -2196,4 +2196,120 @@ void HttpIntegrationTest::testEnvoyRequestMetadataReachSizeLimit() {
   ASSERT_FALSE(response->complete());
 }
 
+void HttpIntegrationTest::testConsumeAndInsertRequestMetadata() {
+  config_helper_.addFilter(R"EOF(
+name: request-metadata-filter
+config: {}
+)EOF");
+   config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.set_proxy_100_continue(true); });
+   initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Sends a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  // Verifies a headers metadata added.
+  EXPECT_EQ(upstream_request_->metadata_map().find("headers")->second, "headers");
+  // Envoy adds an empty data frame to inidicate end_stream. Verifies data metadata is also added.
+  EXPECT_EQ(upstream_request_->metadata_map().find("data")->second, "data");
+  EXPECT_EQ(upstream_request_->metadata_map().find("metadata")->second, "metadata");
+  EXPECT_EQ(upstream_request_->metadata_map().size(), 3);
+  EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 2);
+
+  // Sends a headers only request with metadata. An empty data frame carries end_stream.
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response = std::move(encoder_decoder.second);
+  Http::MetadataMap metadata_map = {{"consume", "consume"}};
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  codec_client_->sendData(*request_encoder_, 0, true);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(upstream_request_->metadata_map().find("headers")->second, "headers");
+  EXPECT_EQ(upstream_request_->metadata_map().find("data")->second, "data");
+  EXPECT_EQ(upstream_request_->metadata_map().find("metadata")->second, "metadata");
+  EXPECT_EQ(upstream_request_->metadata_map().find("replace")->second, "replace");
+  EXPECT_EQ(upstream_request_->metadata_map().size(), 4);
+  EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 3);
+
+  // Sends headers, data, metadata and trailer.
+  encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 10, false);
+  metadata_map = {{"consume", "consume"}};
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  Http::TestHeaderMapImpl request_trailers{{"trailer", "trailer"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(upstream_request_->metadata_map().find("headers")->second, "headers");
+  EXPECT_EQ(upstream_request_->metadata_map().find("data")->second, "data");
+  EXPECT_EQ(upstream_request_->metadata_map().find("metadata")->second, "metadata");
+  EXPECT_EQ(upstream_request_->metadata_map().find("replace")->second, "replace");
+  EXPECT_EQ(upstream_request_->metadata_map().find("trailers")->second, "trailers");
+  EXPECT_EQ(upstream_request_->metadata_map().size(), 5);
+  EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 4);
+
+  // Sends headers, large data, metadata. Large data triggers decodeData() multiple times, and each
+  // time, a "data" metadata is added.
+  encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 100000, false);
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  codec_client_->sendData(*request_encoder_, 100000, true);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(upstream_request_->metadata_map().find("headers")->second, "headers");
+  EXPECT_EQ(upstream_request_->metadata_map().find("data")->second, "data");
+  EXPECT_EQ(upstream_request_->metadata_map().find("metadata")->second, "metadata");
+  EXPECT_EQ(upstream_request_->metadata_map().find("replace")->second, "replace");
+  EXPECT_EQ(upstream_request_->metadata_map().size(), 4);
+  EXPECT_GE(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 3);
+  EXPECT_GE(upstream_request_->duplicated_metadata_key_count().find("data")->second, 2);
+
+  // Sends multiple metadata.
+  encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response = std::move(encoder_decoder.second);
+  metadata_map = {{"metadata1", "value"}};
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  codec_client_->sendData(*request_encoder_, 10, false);
+  metadata_map = {{"metadata2", "value"}};
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  metadata_map = {{"consume", "consume"}};
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(upstream_request_->metadata_map().find("headers")->second, "headers");
+  EXPECT_EQ(upstream_request_->metadata_map().find("data")->second, "data");
+  EXPECT_EQ(upstream_request_->metadata_map().find("metadata")->second, "metadata");
+  EXPECT_EQ(upstream_request_->metadata_map().find("replace")->second, "replace");
+  EXPECT_EQ(upstream_request_->metadata_map().find("metadata1")->second, "value");
+  EXPECT_EQ(upstream_request_->metadata_map().find("metadata2")->second, "value");
+  EXPECT_EQ(upstream_request_->metadata_map().find("trailers")->second, "trailers");
+  EXPECT_EQ(upstream_request_->metadata_map().size(), 7);
+  EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 6);
+}
+
 } // namespace Envoy

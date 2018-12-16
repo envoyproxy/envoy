@@ -283,6 +283,7 @@ private:
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   HeaderMap& addDecodedTrailers() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  MetadataMapVector& addDecodedMetadata() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(HeaderMap& headers)> modify_headers,

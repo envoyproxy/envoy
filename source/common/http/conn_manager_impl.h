@@ -168,6 +168,7 @@ private:
     // Http::StreamDecoderFilterCallbacks
     void addDecodedData(Buffer::Instance& data, bool streaming) override;
     HeaderMap& addDecodedTrailers() override;
+    MetadataMapVector& addDecodedMetadata() override;
     void continueDecoding() override;
     const Buffer::Instance* decodingBuffer() override {
       return parent_.buffered_request_data_.get();
@@ -277,6 +278,7 @@ private:
     const Network::Connection* connection();
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addDecodedTrailers();
+    MetadataMapVector& addDecodedMetadata();
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
@@ -414,6 +416,9 @@ private:
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
+    // +++++++++++++++move this to a better location. And lazy creation.
+    // ++++++++++ does it need to be a vector?
+    MetadataMapVector request_metadata_map_vector_;
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
     const std::string* decorated_operation_{nullptr};

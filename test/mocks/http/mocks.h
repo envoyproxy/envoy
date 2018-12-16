@@ -239,6 +239,7 @@ public:
   MOCK_METHOD0(continueDecoding, void());
   MOCK_METHOD2(addDecodedData, void(Buffer::Instance& data, bool streaming));
   MOCK_METHOD0(addDecodedTrailers, HeaderMap&());
+  MOCK_METHOD0(addDecodedMetadata, MetadataMapVector&());
   MOCK_METHOD0(decodingBuffer, const Buffer::Instance*());
   MOCK_METHOD1(encode100ContinueHeaders_, void(HeaderMap& headers));
   MOCK_METHOD2(encodeHeaders_, void(HeaderMap& headers, bool end_stream));

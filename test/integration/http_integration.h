@@ -196,6 +196,7 @@ protected:
   void testEnvoyProxySmallMetadataInRequest();
   void testEnvoyProxyLargeMetadataInRequest();
   void testEnvoyRequestMetadataReachSizeLimit();
+  void testConsumeAndInsertRequestMetadata();
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();
