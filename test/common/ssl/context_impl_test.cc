@@ -919,9 +919,9 @@ TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
   )EOF";
   const std::string ecdsa_tls_certificate_yaml = R"EOF(
   certificate_chain:
-    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p256.pem"
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_cert.pem"
   private_key:
-    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p256.pem"
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
   )EOF";
   MessageUtil::loadFromYaml(TestEnvironment::substitute(rsa_tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
@@ -931,7 +931,7 @@ TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
   auto tls_certs = server_context_config.tlsCertificates();
   ASSERT_EQ(2, tls_certs.size());
   EXPECT_THAT(tls_certs[0].get().privateKeyPath(), EndsWith("selfsigned_key.pem"));
-  EXPECT_THAT(tls_certs[1].get().privateKeyPath(), EndsWith("selfsigned_key_ecdsa_p256.pem"));
+  EXPECT_THAT(tls_certs[1].get().privateKeyPath(), EndsWith("selfsigned_ecdsa_p256_key.pem"));
 }
 
 TEST(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {

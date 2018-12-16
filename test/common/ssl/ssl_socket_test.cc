@@ -24,6 +24,7 @@
 #include "test/common/ssl/test_data/san_dns2_cert_info.h"
 #include "test/common/ssl/test_data/san_dns_cert_info.h"
 #include "test/common/ssl/test_data/san_uri_cert_info.h"
+#include "test/common/ssl/test_data/selfsigned_ecdsa_p256_cert_info.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/secret/mocks.h"
@@ -577,7 +578,7 @@ TEST_P(SslSocketTest, AtMostOneRsaCert) {
       private_key:
         filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
     - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert2.pem"
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned2_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
 )EOF";
@@ -597,13 +598,13 @@ TEST_P(SslSocketTest, AtMostOneEcdsaCert) {
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p256.pem"
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p256.pem"
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
     - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert2_ecdsa_p256.pem"
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned2_ecdsa_p256_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p256.pem"
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
 )EOF";
 
   EXPECT_THROW_WITH_REGEX(testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "",
@@ -615,7 +616,7 @@ TEST_P(SslSocketTest, AtMostOneEcdsaCert) {
 // client is RSA/ECDSA capable. We validate TLSv1.2 only here, since we validate
 // the e2e behavior on TLSv1.2/1.3 in ssl_integration_test.
 TEST_P(SslSocketTest, MultiCertPreferEcdsa) {
-  const std::string client_ctx_yaml = R"EOF(
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     common_tls_context:
       tls_params:
         tls_minimum_protocol_version: TLSv1_2
@@ -624,9 +625,8 @@ TEST_P(SslSocketTest, MultiCertPreferEcdsa) {
         - ECDHE-ECDSA-AES128-GCM-SHA256
         - ECDHE-RSA-AES128-GCM-SHA256
       validation_context:
-        verify_certificate_hash:
-          49:D0:E5:82:F1:0F:29:D8:C5:64:33:8F:14:2A:3E:53:87:CD:E2:E6:0E:8B:C7:83:CF:6F:88:BD:50:4E:11:E2
-  )EOF";
+        verify_certificate_hash: )EOF",
+                                                   TEST_SELFSIGNED_ECDSA_P256_CERT_HASH);
 
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
@@ -636,9 +636,9 @@ TEST_P(SslSocketTest, MultiCertPreferEcdsa) {
       private_key:
         filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
     - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p256.pem"
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p256.pem"
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
 )EOF";
 
   testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.no_certificate", true,
