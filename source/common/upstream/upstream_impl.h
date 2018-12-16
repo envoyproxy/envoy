@@ -545,10 +545,8 @@ public:
   const Network::Address::InstanceConstSharedPtr
   resolveProtoAddress(const envoy::api::v2::core::Address& address);
 
-  static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
-  static HostVectorConstSharedPtr createDegradedHostList(const HostVector& hosts);
-  static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
-  static HostsPerLocalityConstSharedPtr createDegradedHostLists(const HostsPerLocality& hosts);
+  static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts, Host::Health health);
+  static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts, Host::Health);
 
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }

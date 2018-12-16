@@ -305,10 +305,10 @@ HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
 HostSetImpl::UpdateHostsParams
 HostSetImpl::partitionHosts(HostVectorConstSharedPtr hosts,
                             HostsPerLocalityConstSharedPtr hosts_per_locality) {
-  auto healthy_hosts = ClusterImplBase::createHealthyHostList(*hosts);
-  auto degraded_hosts = ClusterImplBase::createDegradedHostList(*hosts);
-  auto healthy_hosts_per_locality = ClusterImplBase::createHealthyHostLists(*hosts_per_locality);
-  auto degraded_hosts_per_locality = ClusterImplBase::createDegradedHostLists(*hosts_per_locality);
+  auto healthy_hosts = ClusterImplBase::createHealthyHostList(*hosts, Host::Health::Healthy);
+  auto degraded_hosts = ClusterImplBase::createHealthyHostList(*hosts, Host::Health::Degraded);
+  auto healthy_hosts_per_locality = ClusterImplBase::createHealthyHostLists(*hosts_per_locality, Host::Health::Healthy);
+  auto degraded_hosts_per_locality = ClusterImplBase::createHealthyHostLists(*hosts_per_locality, Host::Health::Degraded);
 
   return updateHostsParams(std::move(hosts), std::move(hosts_per_locality),
                            std::move(healthy_hosts), std::move(healthy_hosts_per_locality),
@@ -591,10 +591,10 @@ ClusterImplBase::ClusterImplBase(
       });
 }
 
-HostVectorConstSharedPtr ClusterImplBase::createHealthyHostList(const HostVector& hosts) {
+HostVectorConstSharedPtr ClusterImplBase::createHealthyHostList(const HostVector& hosts, Host::Health health) {
   HostVectorSharedPtr healthy_list(new HostVector());
   for (const auto& host : hosts) {
-    if (host->health() == Host::Health::Healthy) {
+    if (host->health() == health) {
       healthy_list->emplace_back(host);
     }
   }
@@ -602,25 +602,9 @@ HostVectorConstSharedPtr ClusterImplBase::createHealthyHostList(const HostVector
   return healthy_list;
 }
 
-HostVectorConstSharedPtr ClusterImplBase::createDegradedHostList(const HostVector& hosts) {
-  HostVectorSharedPtr degraded_list(new HostVector());
-  for (const auto& host : hosts) {
-    if (host->health() == Host::Health::Degraded) {
-      degraded_list->emplace_back(host);
-    }
-  }
-
-  return degraded_list;
-}
-
 HostsPerLocalityConstSharedPtr
-ClusterImplBase::createHealthyHostLists(const HostsPerLocality& hosts) {
-  return hosts.filter([](const Host& host) { return host.health() == Host::Health::Healthy; });
-}
-
-HostsPerLocalityConstSharedPtr
-ClusterImplBase::createDegradedHostLists(const HostsPerLocality& hosts) {
-  return hosts.filter([](const Host& host) { return host.health() == Host::Health::Degraded; });
+ClusterImplBase::createHealthyHostLists(const HostsPerLocality& hosts, Host::Health health) {
+  return hosts.filter([&health](const Host& host) { return host.health() == health; });
 }
 
 bool ClusterInfoImpl::maintenanceMode() const {

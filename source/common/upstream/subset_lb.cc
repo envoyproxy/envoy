@@ -515,11 +515,17 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     bool host_seen = predicate_added.count(host) == 1;
     if (host_seen || predicate(*host)) {
       hosts->emplace_back(host);
-      if (host->health() == Host::Health::Healthy) {
-        healthy_hosts->emplace_back(host);
-      }
-      if (host->health() == Host::Health::Degraded) {
-        degraded_hosts->emplace_back(host);
+      switch (host->health()) {
+        case Host::Health::Healthy:
+          healthy_hosts->emplace_back(host);
+          break;
+        case Host::Health::Degraded:
+          degraded_hosts->emplace_back(host);
+          break;
+        case Host::Health::Unhealthy:
+          break;
+        default:
+          NOT_REACHED_GCOVR_EXCL_LINE;
       }
     }
   }
