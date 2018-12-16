@@ -91,7 +91,7 @@ message ClusterLoadAssignment {
     // or a locality unhealthy until their percentage of healthy hosts drops
     // below 72%. For example:
     //
-    // .. code-blocK:: json
+    // .. code-block:: json
     //
     //  { "overprovisioning_factor": 100 }
     //
