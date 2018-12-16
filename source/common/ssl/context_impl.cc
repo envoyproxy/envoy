@@ -252,9 +252,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     ctx.is_ecdsa_ = EVP_PKEY_id(public_key.get()) == EVP_PKEY_EC;
     if (ctx.is_ecdsa_) {
       if (have_ecdsa_cert) {
-        throw EnvoyException(fmt::format(
-            "Failed to load certificate from chain {}, at most one RSA certificate may be specified",
-            ctx.cert_chain_file_path_));
+        throw EnvoyException(fmt::format("Failed to load certificate from chain {}, at most one "
+                                         "ECDSA certificate may be specified",
+                                         ctx.cert_chain_file_path_));
       }
       have_ecdsa_cert = true;
       // We only support P-256 ECDSA today.
