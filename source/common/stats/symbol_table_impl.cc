@@ -188,7 +188,7 @@ void SymbolTable::adjustRefCount(const StatName& stat_name, int adjustment) {
 Symbol SymbolTable::toSymbol(absl::string_view sv) {
   {
     // First try to find the symbol with just a read-lock, so concurrent
-    // lookups for an already-allocated symbol do not conflict.
+    // lookups for an already-allocated symbol do not contend.
     absl::ReaderMutexLock lock(&lock_);
     auto encode_find = encode_map_.find(sv);
     if (encode_find != encode_map_.end()) {
@@ -231,13 +231,21 @@ Symbol SymbolTable::toSymbol(absl::string_view sv) {
     // insert the same symbmol after we drop the read-lock above -- we can
     // return the shared symbol, but we must bump the refcount.
     ++(shared_symbol.ref_count_);
+
+    // Note: this condition is hard to hit in tests as it requires a tight race
+    // between multiple threads concurrently creaeting the same symbol.
+    // Uncommenting this line can help rapidly determine coverage during
+    // development. StatNameTest.RacingSymbolCreation hits this occasionally
+    // when testing with optimization, and frequently with fastbuild and debug.
+    //
+    // std::cerr << "Covered insertion race" << std::endl;
   }
   return shared_symbol.symbol_;
 }
 
 absl::string_view SymbolTable::fromSymbol(const Symbol symbol) const SHARED_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
-  ASSERT(search != decode_map_.end());
+  RELEASE_ASSERT(search != decode_map_.end(), "no such symbol");
   return absl::string_view(search->second.get());
 }
 

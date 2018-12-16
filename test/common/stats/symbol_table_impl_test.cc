@@ -1,5 +1,6 @@
 #include <string>
 
+#include "common/common/mutex_tracer_impl.h"
 #include "common/memory/stats.h"
 #include "common/stats/symbol_table_impl.h"
 
@@ -7,6 +8,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/blocking_counter.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -312,6 +314,92 @@ TEST_F(StatNameTest, Join3ThirdEmpty) {
 TEST_F(StatNameTest, JoinAllEmpty) {
   StatNameJoiner joiner({makeStat(""), makeStat(""), makeStat("")});
   EXPECT_EQ("", joiner.statName().toString(table_));
+}
+
+namespace {
+
+// This class functions like absl::Notification except the usage of SignalAll()
+// appears to trigger tighter simultaneous wakeups in multiple threads. Note
+// that the synchroniziation mechanism in
+//     https://github.com/abseil/abseil-cpp/blob/master/absl/synchronization/notification.h
+// is quite different, and though functionally similar, has timing properties
+// that do not seem to trigger the race condition in SymbolTable::toSymbol()
+// where the find() under read-lock fails, but by the time the insert() under
+// write-lock occurs, the symbol has been added by another thread.
+class Notifier {
+public:
+  Notifier() : cond_(false) {}
+
+  void notify() {
+    absl::MutexLock lock(&mutex_);
+    cond_ = true;
+    cond_var_.SignalAll();
+  }
+
+  void wait() {
+    absl::MutexLock lock(&mutex_);
+    while (!cond_) {
+      cond_var_.Wait(&mutex_);
+    }
+  }
+
+private:
+  absl::Mutex mutex_;
+  bool cond_ GUARDED_BY(mutex_);
+  absl::CondVar cond_var_;
+};
+
+} // namespace
+
+TEST_F(StatNameTest, RacingSymbolCreation) {
+  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+  MutexTracerImpl& mutex_tracer = MutexTracerImpl::getOrCreateTracer();
+
+  // Make 100 threads, each of which will race to encode an overlapping set of
+  // symbols, triggering corner-cases in SymbolTable::toSymbol.
+  constexpr int num_threads = 100;
+  std::vector<Thread::ThreadPtr> threads;
+  threads.reserve(num_threads);
+  Notifier creation, access, wait;
+  absl::BlockingCounter creates(num_threads), accesses(num_threads);
+  for (int i = 0; i < num_threads; ++i) {
+    threads.push_back(
+        thread_factory.createThread([this, i, &creation, &access, &wait, &creates, &accesses]() {
+          // Rotate between 20 different symbols to try to get some
+          // contention. Based on a logging print statement in
+          // SymbolTable::toSymbol(), this appears to trigger creation-races,
+          // even when compiled with optimization.
+          std::string stat_name_string = absl::StrCat("symbol", i % 20);
+
+          // Block each thread on waking up a common condition variable,
+          // so we make it likely to race on creation.
+          creation.wait();
+          StatNameTempStorage initial(stat_name_string, table_);
+          creates.DecrementCount();
+
+          access.wait();
+          StatNameTempStorage second(stat_name_string, table_);
+          accesses.DecrementCount();
+
+          wait.wait();
+        }));
+  }
+  creation.notify();
+  creates.Wait();
+
+  int64_t create_contentions = mutex_tracer.numContentions();
+  std::cerr << "Number of contentions: " << create_contentions << std::endl;
+
+  // But when we access the already-existing symbols, we guarantee that no
+  // further mutex contentions occur.
+  access.notify();
+  accesses.Wait();
+  EXPECT_EQ(create_contentions, mutex_tracer.numContentions());
+
+  wait.notify();
+  for (auto& thread : threads) {
+    thread->join();
+  }
 }
 
 // Tests the memory savings realized from using symbol tables with 1k clusters. This
