@@ -145,7 +145,7 @@ TEST_F(GrpcShimTest, GrpcRequest) {
     buffer.copyOut(0, 1, &null);
     EXPECT_EQ('\0', null);
     uint32_t length;
-    buffer.copyOut(1, 5, &length);
+    buffer.copyOut(1, 4, &length);
 
     EXPECT_EQ(12, ntohl(length));
   }

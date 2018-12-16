@@ -17,8 +17,8 @@ namespace GrpcShim {
 // When enabled, will downgrade an incoming gRPC http request into a h/1.1 request.
 class GrpcShim : public Envoy::Http::PassThroughFilter {
 public:
-  explicit GrpcShim(const std::string& upstream_content_type)
-      : upstream_content_type_(upstream_content_type) {}
+  explicit GrpcShim(std::string upstream_content_type)
+      : upstream_content_type_(std::move(upstream_content_type)) {}
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& buffer, bool end_stream) override;

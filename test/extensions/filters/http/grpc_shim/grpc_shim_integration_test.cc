@@ -96,8 +96,14 @@ TEST_P(GrpcShimIntegrationTest, EnabledRoute) {
   // Ensure that we restored the content-type and that we added the length prefix.
   EXPECT_EQ(response_data.length() + 5, response->body().size());
   EXPECT_TRUE(StringUtil::endsWith(response->body(), response_data.toString()));
+
+  // Comparing strings embedded zero literals is hard. Use string literal and std::equal to avoid
+  // truncating the string when it's converted to const char *.
+  using namespace std::string_literals;
+
+  const auto expected_prefix = "\0\0\0\0\4"s;
   EXPECT_TRUE(
-      StringUtil::startsWith(response_data.toString().c_str(), std::string("\x0\x0\x0\x0\x4")));
+      std::equal(response->body().begin(), response->body().begin() + 4, expected_prefix.begin()));
   EXPECT_THAT(response->headers(),
               HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
 
