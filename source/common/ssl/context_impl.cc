@@ -204,6 +204,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     }
   }
 
+  bool have_rsa_cert = false;
+  bool have_ecdsa_cert = false;
   for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
     auto& ctx = tls_contexts_[i];
     // Load certificate chain.
@@ -249,6 +251,12 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
     ctx.is_ecdsa_ = EVP_PKEY_id(public_key.get()) == EVP_PKEY_EC;
     if (ctx.is_ecdsa_) {
+      if (have_ecdsa_cert) {
+        throw EnvoyException(fmt::format(
+            "Failed to load certificate from chain {}, at most one RSA certificate may be specified",
+            ctx.cert_chain_file_path_));
+      }
+      have_ecdsa_cert = true;
       // We only support P-256 ECDSA today.
       EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
       // Since we checked the key type above, this should be valid.
@@ -259,6 +267,12 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
                                          "ECDSA certificates are supported",
                                          ctx.cert_chain_file_path_));
       }
+    } else if (have_rsa_cert) {
+      throw EnvoyException(fmt::format(
+          "Failed to load certificate from chain {}, at most one RSA certificate may be specified",
+          ctx.cert_chain_file_path_));
+    } else {
+      have_rsa_cert = true;
     }
 
     // Load private key.
