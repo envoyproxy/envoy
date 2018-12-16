@@ -262,7 +262,7 @@ public:
   // Create a Grpc::AsyncClientImpl instance backed by enough fake/mock
   // infrastructure to initiate a loopback TCP connection to fake_upstream_.
   AsyncClientPtr createAsyncClientImpl() {
-    client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
+    client_connection_ = Network::ClientConnectionImpl::createClientConnection(
         dispatcher_, fake_upstream_->localAddress(), nullptr,
         std::move(async_client_transport_socket_), nullptr);
     ON_CALL(*mock_cluster_info_, connectTimeout())
