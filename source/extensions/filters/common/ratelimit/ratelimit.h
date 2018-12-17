@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/ratelimit/v2/rls.pb.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/tracing/http_tracer.h"
@@ -86,6 +87,12 @@ public:
    * Returns rate limit client from singleton manager.
    */
   virtual ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout) PURE;
+
+  /**
+   * Returns configuration with which the factory has been built.
+   */
+  virtual const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig>&
+  rateLimitConfig() const PURE;
 };
 
 typedef std::shared_ptr<ClientFactory> ClientFactoryPtr;
