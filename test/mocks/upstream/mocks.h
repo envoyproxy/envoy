@@ -51,14 +51,13 @@ public:
   // Upstream::HostSet
   MOCK_CONST_METHOD0(hosts, const HostVector&());
   MOCK_CONST_METHOD0(healthyHosts, const HostVector&());
+  MOCK_CONST_METHOD0(degradedHosts, const HostVector&());
   MOCK_CONST_METHOD0(hostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(healthyHostsPerLocality, const HostsPerLocality&());
+  MOCK_CONST_METHOD0(degradedHostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(localityWeights, LocalityWeightsConstSharedPtr());
   MOCK_METHOD0(chooseLocality, absl::optional<uint32_t>());
-  MOCK_METHOD8(updateHosts, void(std::shared_ptr<const HostVector> hosts,
-                                 std::shared_ptr<const HostVector> healthy_hosts,
-                                 HostsPerLocalityConstSharedPtr hosts_per_locality,
-                                 HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+  MOCK_METHOD5(updateHosts, void(HostSet::UpdateHostsParams&& update_hosts_params,
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
                                  absl::optional<uint32_t> overprovisioning_factor));
@@ -70,8 +69,10 @@ public:
 
   HostVector hosts_;
   HostVector healthy_hosts_;
+  HostVector degraded_hosts_;
   HostsPerLocalitySharedPtr hosts_per_locality_{new HostsPerLocalityImpl()};
   HostsPerLocalitySharedPtr healthy_hosts_per_locality_{new HostsPerLocalityImpl()};
+  HostsPerLocalitySharedPtr degraded_hosts_per_locality_{new HostsPerLocalityImpl()};
   LocalityWeightsConstSharedPtr locality_weights_{{}};
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
   uint32_t priority_{};
