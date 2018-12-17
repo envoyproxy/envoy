@@ -124,7 +124,6 @@ TEST_P(CdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")}, "1");
-  std::cerr << "finished CDS req/resp!!!!!!" << std::endl;
   // Adapted from HttpIntegrationTest::testRouterRequestAndResponseWithBody(1024, 512, false).
   int request_size = 1024;
   int response_size = 512;
