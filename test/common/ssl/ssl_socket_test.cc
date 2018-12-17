@@ -24,6 +24,7 @@
 #include "test/common/ssl/test_data/san_dns2_cert_info.h"
 #include "test/common/ssl/test_data/san_dns_cert_info.h"
 #include "test/common/ssl/test_data/san_uri_cert_info.h"
+#include "test/common/ssl/test_data/selfsigned_ecdsa_p256_cert_info.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/secret/mocks.h"
@@ -560,6 +561,39 @@ TEST_P(SslSocketTest, NoCert) {
 )EOF";
 
   testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.no_certificate", true,
+           GetParam());
+}
+
+// Prefer ECDSA certificate when multiple RSA certificates are present and the
+// client is RSA/ECDSA capable. We validate TLSv1.2 only here, since we validate
+// the e2e behavior on TLSv1.2/1.3 in ssl_integration_test.
+TEST_P(SslSocketTest, MultiCertPreferEcdsa) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-ECDSA-AES128-GCM-SHA256
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SELFSIGNED_ECDSA_P256_CERT_HASH);
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
+)EOF";
+
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.handshake", true,
            GetParam());
 }
 
