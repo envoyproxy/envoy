@@ -104,11 +104,28 @@ public:
    */
   virtual void healthFlagSet(HealthFlag flag) PURE;
 
+  enum class Health {
+    /**
+     * Host is unhealthy and is not able to serve traffic. A host may be marked as unhealthy either
+     * through EDS or through active health checking.
+     */
+    Unhealthy,
+    /**
+     * Host is healthy, but degraded. It is able to serve traffic, but hosts that aren't degraded
+     * should be preferred. A host may be marked as degraded either through EDS or through active
+     * health checking.
+     */
+    Degraded,
+    /**
+     * Host is healthy and is able to serve traffic.
+     */
+    Healthy,
+  };
+
   /**
-   * @return whether in aggregate a host is healthy and routable. Multiple health flags and other
-   *         information may be considered.
+   * @return the health of the host.
    */
-  virtual bool healthy() const PURE;
+  virtual Health health() const PURE;
 
   /**
    * Returns the host's ActiveHealthFailureType. Types are specified in ActiveHealthFailureType.
@@ -237,6 +254,14 @@ public:
   virtual const HostVector& healthyHosts() const PURE;
 
   /**
+   * @return all degraded hosts contained in the set at the current time. NOTE: This set is
+   *         eventually consistent. There is a time window where a host in this set may become
+   *         undegraded and calling degraded() on it will return false. Code should be written to
+   *         deal with this case if it matters.
+   */
+  virtual const HostVector& degradedHosts() const PURE;
+
+  /**
    * @return hosts per locality.
    */
   virtual const HostsPerLocality& hostsPerLocality() const PURE;
@@ -245,6 +270,11 @@ public:
    * @return same as hostsPerLocality but only contains healthy hosts.
    */
   virtual const HostsPerLocality& healthyHostsPerLocality() const PURE;
+
+  /**
+   * @return same as hostsPerLocality but only contains degraded hosts.
+   */
+  virtual const HostsPerLocality& degradedHostsPerLocality() const PURE;
 
   /**
    * @return weights for each locality in the host set.
@@ -257,20 +287,27 @@ public:
   virtual absl::optional<uint32_t> chooseLocality() PURE;
 
   /**
+   * Parameter class for updateHosts.
+   */
+  struct UpdateHostsParams {
+    HostVectorConstSharedPtr hosts;
+    HostVectorConstSharedPtr healthy_hosts;
+    HostVectorConstSharedPtr degraded_hosts;
+    HostsPerLocalityConstSharedPtr hosts_per_locality;
+    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
+    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
+  };
+
+  /**
    * Updates the hosts in a given host set.
    *
-   * @param hosts supplies the (usually new) list of hosts in the host set.
-   * @param healthy hosts supplies the subset of hosts which are healthy.
-   * @param hosts_per_locality supplies the hosts subdivided by locality.
-   * @param hosts_per_locality supplies the healthy hosts subdivided by locality.
+   * @param update_hosts_param supplies the list of hosts and hosts per localitiy.
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
    * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
    */
-  virtual void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
-                           HostsPerLocalityConstSharedPtr hosts_per_locality,
-                           HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+  virtual void updateHosts(UpdateHostsParams&& update_host_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
                            absl::optional<uint32_t> overprovisioning_factor) PURE;

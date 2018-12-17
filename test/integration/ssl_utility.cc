@@ -18,17 +18,29 @@ namespace Ssl {
 Network::TransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
                                       ContextManager& context_manager) {
-  const std::string yaml_plain = R"EOF(
+  std::string yaml_plain = R"EOF(
   common_tls_context:
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
+)EOF";
+  if (options.client_ecdsa_cert_) {
+    yaml_plain += R"EOF(
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/config/integration/certs/client_ecdsacert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/config/integration/certs/client_ecdsakey.pem"
+)EOF";
+  } else {
+    yaml_plain += R"EOF(
     tls_certificates:
       certificate_chain:
         filename: "{{ test_rundir }}/test/config/integration/certs/clientcert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/config/integration/certs/clientkey.pem"
-    validation_context:
-      trusted_ca:
-        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
 )EOF";
+  }
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml_plain), tls_context);
@@ -59,7 +71,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 
 Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
-  ConfigHelper::initializeTls(false, false, *tls_context.mutable_common_tls_context());
+  ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, mock_factory_ctx);

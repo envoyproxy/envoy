@@ -506,6 +506,7 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
 
   HostVectorSharedPtr hosts(new HostVector());
   HostVectorSharedPtr healthy_hosts(new HostVector());
+  HostVectorSharedPtr degraded_hosts(new HostVector());
 
   // It's possible that hosts_added == original_host_set_.hosts(), e.g.: when
   // calling refreshSubsets() if only metadata change. If so, we can avoid the
@@ -514,8 +515,15 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     bool host_seen = predicate_added.count(host) == 1;
     if (host_seen || predicate(*host)) {
       hosts->emplace_back(host);
-      if (host->healthy()) {
+      switch (host->health()) {
+      case Host::Health::Healthy:
         healthy_hosts->emplace_back(host);
+        break;
+      case Host::Health::Degraded:
+        degraded_hosts->emplace_back(host);
+        break;
+      case Host::Health::Unhealthy:
+        break;
       }
     }
   }
@@ -537,10 +545,15 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     hosts_per_locality = original_host_set_.hostsPerLocality().filter(predicate);
   }
 
-  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
-      hosts_per_locality->filter([](const Host& host) { return host.healthy(); });
+  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality = hosts_per_locality->filter(
+      [](const Host& host) { return host.health() == Host::Health::Healthy; });
+  HostsPerLocalityConstSharedPtr degraded_hosts_per_locality = hosts_per_locality->filter(
+      [](const Host& host) { return host.health() == Host::Health::Degraded; });
 
-  HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
+  // TODO(snowp): Use partitionHosts here.
+  HostSetImpl::updateHosts(HostSetImpl::updateHostsParams(
+                               hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality,
+                               degraded_hosts, degraded_hosts_per_locality),
                            determineLocalityWeights(*hosts_per_locality), filtered_added,
                            filtered_removed);
 }
