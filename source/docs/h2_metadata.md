@@ -80,7 +80,7 @@ Envoy filters can be used to add new metadata to a stream.
 
 If users need to add new metadata for a request from downstream to upstream, a
 StreamDecoderFilter should be created. The StreamDecoderFilterCallbacks object that Envoy passes to the
-StreamDecoderFilter has an interface MetadataMap&
+StreamDecoderFilter has an interface MetadataMapVector&
 StreamDecoderFilterCallbacks::addDecodedMetadata(). By calling the interface,
 users get a reference to the metadata map associated with the request stream. Users can
 insert new metadata to the metadata map, and Envoy will proxy the new metadata
@@ -88,7 +88,7 @@ map to the upstream.
 
 If users need to add new metadata for a response proxied to downstream, a
 StreamEncoderFilter should be created. The StreamEncoderFilterCallbacks object that Envoy passes to the
-StreamEncoderFilter has an interface MetadataMap&
+StreamEncoderFilter has an interface MetadataMapVector&
 StreamEncoderFilterCallbacks::addEncodedMetadata(). By calling the interface,
 users get a reference to the metadata map associated with the response stream. Users can
 insert new metadata to the metadata map, and Envoy will proxy the new metadata
@@ -120,4 +120,64 @@ payload.
 The METADATA frame payload is not subject to HTTP/2 flow control, but the size
 of the payload is bounded by the maximum frame size negotiated in SETTINGS.
 There are no restrictions on the set of octets that may be used in keys or values.
-TODO(soya3129): decide if we allow METADATA frame to terminate a stream.
+
+We do not allow METADATA frame to terminate a stream. DATA, HEADERS or RST\_STREAM must
+be used for that purpose.
+
+## Response metadata handling.
+
+We call metadata that need to be forwarded to downstream the response metadata.
+Response metadata can be received from upstream or generated locally.
+
+Response metadata is generally a hop by hop message, so envoy doesn't
+need to hold response metadata locally to wait for some events or data. As a result,
+filters handling response metadata don't need to stop the filter iteration and wait, instead response
+metadata can be forwarded through codec as soon as they are
+available, no matter if they are locally generated or received from
+upstream. The same statement is also true for metadata from downstream to upstream (request metadata). However,
+request metadata may need to wait for the upstream connection to be ready before calling
+codec. In this section, we focus on response metadata handling.
+
+We first explain how response metadata get consumed or proxied.
+In function EnvoyConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilter\* filter,
+MetadataMapPtr&& metadata\_map\_ptr), envoy passes response metadata received from upstream to filters by
+calling the following filter interface:
+
+FilterMetadatasStatus StreamEncoderFilter::encodeMetadata(MetadataMapVector& metadata\_map).
+
+Filters, by implementing the interface, can consume response metadata. After going through
+the filter chain, function EnvoyConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilter\* filter,
+MetadataMapPtr&& metadata\_map\_ptr) immediately forwards the updated or remaining response metadata to the next hop by
+calling the metadata encoding function in codec:
+
+ConnectionManagerImpl::ActiveStream::response\_encoder\_-\>encodeMetadata(MetadataMapVector& metadata\_map\_vector).
+
+If no filter consumes the response metadata, the response metadata is proxied to
+the downstream untouched.
+
+Envoy can also add new response metadata through filters. Envoy stores added response metadata in a vector of
+metadata maps: ConnectionManagerImpl::ActiveStream::response\_metadata\_map\_vector\_.
+Filter interface StreamEncoderFilterCallbacks::addEncodedMetadata() returns a
+reference to the vector, and the new response metadata maps can be added to the vector.
+Similarly as the consuming response metadata case, after
+going through the filter chain, the metadata stored in
+ConnectionManagerImpl::ActiveStream::response\_metadata\_map\_vector\_ is forwarded
+to the next hop immediately through codec, and the vector is cleared. For
+example, a user can add new response metadata by calling
+StreamEncoderFilterCallbacks::addEncodedMetadata() in filter
+interface FilterHeadersStatus encodeHeaders(HeaderMap& headers, bool end\_stream).
+Function ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter\*filter,
+HeaderMap& headers, bool end\_stream) goes through the filter chain, and the newly added response
+metadata is stored in ConnectionManagerImpl::ActiveStream::response\_metadata\_map\_vector\_.
+ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter\*filter,
+HeaderMap& headers, bool end\_stream) calls
+ConnectionManagerImpl::ActiveStream::response\_encoder\_-\>encodeMetadata(response\_metadata\_map\_vector\_) to forward
+new metadata through codec at the end. If another new response metadata is added in a different filter interface,
+for example, FilterDataStatus
+encodeData(Buffer::Instance& data, bool end\_stream), the newly added response metadata
+will be passed to codec at the end of function
+ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter\*filter, Buffer::Instance&
+data, bool end\_stream) following a similar procedure as in
+ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter\*filter, HeaderMap&
+headers, bool end\_stream).
+
