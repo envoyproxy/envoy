@@ -46,7 +46,7 @@ ClientFactoryPtr rateLimitClientFactory(Server::Configuration::FactoryContext& c
 ClientPtr rateLimitClient(ClientFactoryPtr client_factory,
                           Server::Configuration::FactoryContext& context,
                           const envoy::api::v2::core::GrpcService& grpc_service,
-                          const std::chrono::milliseconds& timeout) {
+                          const std::chrono::milliseconds timeout) {
   Filters::Common::RateLimit::ClientPtr ratelimit_client;
   // If ratelimit service is defined in bootstrap, just use the factory registered to singleton,
   // otherwise create it based on the filter config.

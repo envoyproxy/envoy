@@ -31,7 +31,7 @@ ClientFactoryPtr rateLimitClientFactory(Server::Configuration::FactoryContext& c
 ClientPtr rateLimitClient(ClientFactoryPtr ratelimit_factory,
                           Server::Configuration::FactoryContext& context,
                           const envoy::api::v2::core::GrpcService& grpc_service,
-                          const std::chrono::milliseconds& timeout);
+                          const std::chrono::milliseconds timeout);
 
 /**
  * Validates the supplied filter config against the bootstrap config.
