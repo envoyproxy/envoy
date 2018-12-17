@@ -18,8 +18,8 @@ namespace Upstream {
 
 TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<Stats::MockStore> store;
   NiceMock<Stats::MockGauge> gauge;
+  NiceMock<Stats::MockStore> store;
 
   ON_CALL(store, gauge(_)).WillByDefault(ReturnRef(gauge));
 
