@@ -284,7 +284,7 @@ double HostSetImpl::effectiveLocalityWeight(uint32_t index) const {
   // Health ranges from 0-1.0, and is the ratio of healthy hosts to total hosts, modified by the
   // overprovisioning factor.
   const double effective_locality_health_ratio =
-      std::min(1.0, (overprovisioning_factor() / 100.0) * locality_healthy_ratio);
+      std::min(1.0, (overprovisioningFactor() / 100.0) * locality_healthy_ratio);
   return weight * effective_locality_health_ratio;
 }
 
@@ -877,6 +877,9 @@ StaticClusterImpl::StaticClusterImpl(
       cluster.has_load_assignment() ? cluster.load_assignment()
                                     : Config::Utility::translateClusterHosts(cluster.hosts()));
 
+  overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
+
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -898,7 +901,8 @@ void StaticClusterImpl::startPreInit() {
   auto& priority_state = priority_state_manager_->priorityState();
   for (size_t i = 0; i < priority_state.size(); ++i) {
     priority_state_manager_->updateClusterPrioritySet(
-        i, std::move(priority_state[i].first), absl::nullopt, absl::nullopt, health_checker_flag);
+        i, std::move(priority_state[i].first), absl::nullopt, absl::nullopt, health_checker_flag,
+        overprovisioning_factor_);
   }
   priority_state_manager_.reset();
 
@@ -1130,6 +1134,9 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
                                                       locality_lb_endpoint, lb_endpoint));
     }
   }
+
+  overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 }
 
 void StrictDnsClusterImpl::startPreInit() {
@@ -1161,7 +1168,7 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
   // TODO(dio): Add assertion in here.
   priority_state_manager.updateClusterPrioritySet(
       current_priority, std::move(priority_state_manager.priorityState()[current_priority].first),
-      hosts_added, hosts_removed, absl::nullopt);
+      hosts_added, hosts_removed, absl::nullopt, overprovisioning_factor_);
 }
 
 StrictDnsClusterImpl::ResolveTarget::ResolveTarget(

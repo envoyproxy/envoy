@@ -283,7 +283,7 @@ public:
   LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
   absl::optional<uint32_t> chooseLocality() override;
   uint32_t priority() const override { return priority_; }
-  uint32_t overprovisioning_factor() const override { return overprovisioning_factor_; }
+  uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
@@ -641,6 +641,7 @@ private:
   void startPreInit() override;
 
   PriorityStateManagerPtr priority_state_manager_;
+  uint32_t overprovisioning_factor_;
 };
 
 /**
@@ -718,6 +719,7 @@ private:
   std::list<ResolveTargetPtr> resolve_targets_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
   Network::DnsLookupFamily dns_lookup_family_;
+  uint32_t overprovisioning_factor_;
 };
 
 } // namespace Upstream

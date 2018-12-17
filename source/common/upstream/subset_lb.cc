@@ -582,7 +582,7 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
   const HostSetPtr& host_set = original_priority_set_.hostSetsPerPriority()[priority];
 
   ASSERT(!overprovisioning_factor.has_value() ||
-         overprovisioning_factor.value() == host_set->overprovisioning_factor());
+         overprovisioning_factor.value() == host_set->overprovisioningFactor());
   return HostSetImplPtr{
       new HostSubsetImpl(*host_set, locality_weight_aware_, scale_locality_weight_)};
 }
