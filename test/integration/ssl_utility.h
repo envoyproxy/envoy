@@ -24,9 +24,23 @@ struct ClientSslTransportOptions {
     return *this;
   }
 
+  ClientSslTransportOptions&
+  setTlsVersion(envoy::api::v2::auth::TlsParameters_TlsProtocol tls_version) {
+    tls_version_ = tls_version;
+    return *this;
+  }
+
+  ClientSslTransportOptions& setSigningAlgorithmsForTest(const std::string& sigalgs) {
+    sigalgs_ = sigalgs;
+    return *this;
+  }
+
   bool alpn_{};
   bool san_{};
   std::vector<std::string> cipher_suites_{};
+  envoy::api::v2::auth::TlsParameters_TlsProtocol tls_version_{
+      envoy::api::v2::auth::TlsParameters::TLS_AUTO};
+  std::string sigalgs_;
 };
 
 Network::TransportSocketFactoryPtr

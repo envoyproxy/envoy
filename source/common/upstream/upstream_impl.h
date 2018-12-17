@@ -36,7 +36,6 @@
 #include "common/config/well_known_names.h"
 #include "common/network/utility.h"
 #include "common/stats/isolated_store_impl.h"
-#include "common/upstream/eds_subscription_factory.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
@@ -284,7 +283,7 @@ public:
   LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
   absl::optional<uint32_t> chooseLocality() override;
   uint32_t priority() const override { return priority_; }
-  uint32_t overprovisioning_factor() const override { return overprovisioning_factor_; }
+  uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
@@ -491,8 +490,7 @@ public:
          Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
          Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
-         Upstream::EdsSubscriptionFactory& eds_subscription_factory);
+         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api);
   // From Upstream::Cluster
   virtual PrioritySet& prioritySet() override { return priority_set_; }
   virtual const PrioritySet& prioritySet() const override { return priority_set_; }
@@ -643,6 +641,7 @@ private:
   void startPreInit() override;
 
   PriorityStateManagerPtr priority_state_manager_;
+  uint32_t overprovisioning_factor_;
 };
 
 /**
@@ -720,6 +719,7 @@ private:
   std::list<ResolveTargetPtr> resolve_targets_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
   Network::DnsLookupFamily dns_lookup_family_;
+  uint32_t overprovisioning_factor_;
 };
 
 } // namespace Upstream

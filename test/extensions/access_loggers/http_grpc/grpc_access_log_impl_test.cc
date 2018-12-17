@@ -441,6 +441,7 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
       envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
           ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
   common_access_log_expected.mutable_response_flags()->set_rate_limit_service_error(true);
+  common_access_log_expected.mutable_response_flags()->set_downstream_connection_termination(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }

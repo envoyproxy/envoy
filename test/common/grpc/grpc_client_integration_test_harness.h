@@ -5,8 +5,13 @@
 #include "common/api/api_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/async_client_impl.h"
+
+#ifdef ENVOY_GOOGLE_GRPC
 #include "common/grpc/google_async_client_impl.h"
+#endif
+
 #include "common/http/async_client_impl.h"
+#include "common/http/codes.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/network/connection_impl.h"
 #include "common/network/raw_buffer_socket.h"
@@ -140,6 +145,8 @@ public:
   void expectGrpcStatus(Status::GrpcStatus grpc_status) {
     if (grpc_status == Status::GrpcStatus::InvalidCode) {
       EXPECT_CALL(*this, onRemoteClose(_, _)).WillExitIfNeeded();
+    } else if (grpc_status > Status::GrpcStatus::MaximumValid) {
+      EXPECT_CALL(*this, onRemoteClose(Status::GrpcStatus::InvalidCode, _)).WillExitIfNeeded();
     } else {
       EXPECT_CALL(*this, onRemoteClose(grpc_status, _)).WillExitIfNeeded();
     }
@@ -274,7 +281,7 @@ public:
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
         cluster_info_ptr_, *stats_store_, dispatcher_, local_info_, cm_, runtime_, random_,
-        std::move(shadow_writer_ptr_));
+        std::move(shadow_writer_ptr_), http_context_);
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
     EXPECT_CALL(cm_, get(fake_cluster_name_)).WillRepeatedly(Return(&thread_local_cluster_));
@@ -427,6 +434,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
+  Http::ContextImpl http_context_;
   envoy::api::v2::core::Locality host_locality_;
   Upstream::MockHost* mock_host_ = new NiceMock<Upstream::MockHost>();
   Upstream::MockHostDescription* mock_host_description_ =

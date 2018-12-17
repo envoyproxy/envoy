@@ -110,17 +110,17 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
   case CheckStatus::Denied:
     cluster_->statsScope().counter("ext_authz.denied").inc();
-    Http::CodeUtility::ResponseStatInfo info{config_->scope(),
-                                             cluster_->statsScope(),
-                                             EMPTY_STRING,
-                                             enumToInt(response->status_code),
-                                             true,
-                                             EMPTY_STRING,
-                                             EMPTY_STRING,
-                                             EMPTY_STRING,
-                                             EMPTY_STRING,
-                                             false};
-    Http::CodeUtility::chargeResponseStat(info);
+    Http::CodeStats::ResponseStatInfo info{config_->scope(),
+                                           cluster_->statsScope(),
+                                           EMPTY_STRING,
+                                           enumToInt(response->status_code),
+                                           true,
+                                           EMPTY_STRING,
+                                           EMPTY_STRING,
+                                           EMPTY_STRING,
+                                           EMPTY_STRING,
+                                           false};
+    config_->httpContext().codeStats().chargeResponseStat(info);
     break;
   }
 
