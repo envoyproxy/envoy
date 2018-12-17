@@ -36,7 +36,7 @@ private:
   Network::Socket::Options options_to_apply_;
 };
 
-}
-}
-} 
+} // namespace OriginalSrc
+} // namespace ListenerFilters
+} // namespace Extensions
 } // namespace Envoy

@@ -29,10 +29,14 @@ TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
 
   Server::Configuration::MockListenerFactoryContext context;
 
-  Network::ListenerFilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, context);
+  Network::ListenerFilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, context);
   Network::MockListenerFilterManager manager;
   Network::ListenerFilterPtr added_filter;
-  EXPECT_CALL(manager, addAcceptFilter_(_)).WillOnce(Invoke([&added_filter](Network::ListenerFilterPtr& filter){added_filter = std::move(filter);}));
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&added_filter](Network::ListenerFilterPtr& filter) {
+        added_filter = std::move(filter);
+      }));
   cb(manager);
 
   // Make sure we actually create the correct type!

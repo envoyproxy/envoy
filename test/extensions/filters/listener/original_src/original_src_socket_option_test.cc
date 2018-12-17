@@ -99,7 +99,7 @@ TEST_F(OriginalSrcSocketOptionTest, TestIpv6HashKeyOther) {
   EXPECT_EQ(key_, expected_key);
 }
 
-}
-}
-}
+} // namespace OriginalSrc
+} // namespace ListenerFilters
+} // namespace Extensions
 } // namespace Envoy

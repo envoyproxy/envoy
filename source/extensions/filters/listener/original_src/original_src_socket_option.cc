@@ -12,7 +12,8 @@ namespace OriginalSrc {
 constexpr uint8_t OriginalSrcSocketOption::IPV4_KEY;
 constexpr uint8_t OriginalSrcSocketOption::IPV6_KEY;
 
-OriginalSrcSocketOption::OriginalSrcSocketOption(Network::Address::InstanceConstSharedPtr src_address)
+OriginalSrcSocketOption::OriginalSrcSocketOption(
+    Network::Address::InstanceConstSharedPtr src_address)
     : src_address_(std::move(src_address)) {
   // Source transparency only works on IP connections.
   ASSERT(src_address_->type() == Network::Address::Type::Ip);
@@ -63,7 +64,7 @@ void OriginalSrcSocketOption::hashKey(std::vector<uint8_t>& key) const {
   }
 }
 
-}
-}
-}
+} // namespace OriginalSrc
+} // namespace ListenerFilters
+} // namespace Extensions
 } // namespace Envoy
