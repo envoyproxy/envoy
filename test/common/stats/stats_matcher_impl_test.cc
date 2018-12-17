@@ -35,15 +35,18 @@ protected:
     }
   }
 
+  std::unique_ptr<StatsMatcherImpl> stats_matcher_impl_;
+
 private:
   envoy::config::metrics::v2::StatsConfig stats_config_;
-  std::unique_ptr<StatsMatcherImpl> stats_matcher_impl_;
 };
 
 TEST_F(StatsMatcherTest, CheckDefault) {
   // With no set fields, everything should be allowed through.
   initMatcher();
   expectAccepted({"foo", "bar", "foo.bar", "foo.bar.baz", "foobarbaz"});
+  EXPECT_TRUE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 // Across-the-board matchers.
@@ -53,6 +56,8 @@ TEST_F(StatsMatcherTest, CheckRejectAll) {
   rejectAll(true);
   initMatcher();
   expectDenied({"foo", "bar", "foo.bar", "foo.bar.baz", "foobarbaz"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_TRUE(stats_matcher_impl_->rejectsAll());
 }
 
 TEST_F(StatsMatcherTest, CheckNotRejectAll) {
@@ -60,18 +65,26 @@ TEST_F(StatsMatcherTest, CheckNotRejectAll) {
   rejectAll(false);
   initMatcher();
   expectAccepted({"foo", "bar", "foo.bar", "foo.bar.baz", "foobarbaz"});
+  EXPECT_TRUE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 TEST_F(StatsMatcherTest, CheckIncludeAll) {
   inclusionList()->set_regex(".*");
   initMatcher();
   expectAccepted({"foo", "bar", "foo.bar", "foo.bar.baz"});
+  // It really does accept all, but we impl doesn't know it.
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  // Really does reject all, but we can't tell from API.
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 TEST_F(StatsMatcherTest, CheckExcludeAll) {
   exclusionList()->set_regex(".*");
   initMatcher();
   expectDenied({"foo", "bar", "foo.bar", "foo.bar.baz"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 // Single exact matchers.
@@ -82,6 +95,8 @@ TEST_F(StatsMatcherTest, CheckIncludeExact) {
   expectAccepted({"abc"});
   expectDenied({"abcd", "abc.d", "d.abc", "dabc", "ab", "ac", "abcc", "Abc", "aBc", "abC", "abc.",
                 ".abc", "ABC"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 TEST_F(StatsMatcherTest, CheckExcludeExact) {
@@ -90,6 +105,8 @@ TEST_F(StatsMatcherTest, CheckExcludeExact) {
   expectAccepted({"abcd", "abc.d", "d.abc", "dabc", "ab", "ac", "abcc", "Abc", "aBc", "abC", "abc.",
                   ".abc", "ABC"});
   expectDenied({"abc"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 // Single prefix matchers.
@@ -99,6 +116,8 @@ TEST_F(StatsMatcherTest, CheckIncludePrefix) {
   initMatcher();
   expectAccepted({"abc", "abc.foo", "abcfoo"});
   expectDenied({"ABC", "ABC.foo", "ABCfoo", "foo", "abb", "a.b.c", "_abc", "foo.abc", "fooabc"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 TEST_F(StatsMatcherTest, CheckExcludePrefix) {
@@ -106,6 +125,8 @@ TEST_F(StatsMatcherTest, CheckExcludePrefix) {
   initMatcher();
   expectAccepted({"ABC", "ABC.foo", "ABCfoo", "foo", "abb", "a.b.c", "_abc", "foo.abc", "fooabc"});
   expectDenied({"abc", "abc.foo", "abcfoo"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 // Single suffix matchers.
@@ -115,6 +136,8 @@ TEST_F(StatsMatcherTest, CheckIncludeSuffix) {
   initMatcher();
   expectAccepted({"abc", "foo.abc", "fooabc"});
   expectDenied({"ABC", "foo.ABC", "fooABC", "foo", "abb", "a.b.c", "abc_", "abc.foo", "abcfoo"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 TEST_F(StatsMatcherTest, CheckExcludeSuffix) {
@@ -122,6 +145,8 @@ TEST_F(StatsMatcherTest, CheckExcludeSuffix) {
   initMatcher();
   expectAccepted({"ABC", "foo.ABC", "fooABC", "foo", "abb", "a.b.c", "abc_", "abc.foo", "abcfoo"});
   expectDenied({"abc", "foo.abc", "fooabc"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 // Single regex matchers.
@@ -131,6 +156,8 @@ TEST_F(StatsMatcherTest, CheckIncludeRegex) {
   initMatcher();
   expectAccepted({"envoy.matchers.requests", "stats.envoy.2xx", "regex.envoy.matchers"});
   expectDenied({"foo", "Envoy", "EnvoyProxy"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 TEST_F(StatsMatcherTest, CheckExcludeRegex) {
@@ -138,6 +165,8 @@ TEST_F(StatsMatcherTest, CheckExcludeRegex) {
   initMatcher();
   expectAccepted({"foo", "Envoy", "EnvoyProxy"});
   expectDenied({"envoy.matchers.requests", "stats.envoy.2xx", "regex.envoy.matchers"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 // Multiple exact matchers.
@@ -148,6 +177,8 @@ TEST_F(StatsMatcherTest, CheckMultipleIncludeExact) {
   initMatcher();
   expectAccepted({"foo", "bar"});
   expectDenied({"foobar", "barfoo", "fo", "ba", "foo.bar"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 TEST_F(StatsMatcherTest, CheckMultipleExcludeExact) {
@@ -156,6 +187,8 @@ TEST_F(StatsMatcherTest, CheckMultipleExcludeExact) {
   initMatcher();
   expectAccepted({"foobar", "barfoo", "fo", "ba", "foo.bar"});
   expectDenied({"foo", "bar"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 // Multiple prefix matchers.
@@ -166,6 +199,8 @@ TEST_F(StatsMatcherTest, CheckMultipleIncludePrefix) {
   initMatcher();
   expectAccepted({"foo", "foo.abc", "bar", "bar.abc"});
   expectDenied({".foo", "abc.foo", "BAR", "_bar"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 TEST_F(StatsMatcherTest, CheckMultipleExcludePrefix) {
@@ -174,6 +209,8 @@ TEST_F(StatsMatcherTest, CheckMultipleExcludePrefix) {
   initMatcher();
   expectAccepted({".foo", "abc.foo", "BAR", "_bar"});
   expectDenied({"foo", "foo.abc", "bar", "bar.abc"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 // Multiple suffix matchers.
@@ -185,6 +222,8 @@ TEST_F(StatsMatcherTest, CheckMultipleIncludeSuffix) {
   expectAccepted(
       {"requests.for.spam", "requests.for.eggs", "spam", "eggs", "cannedspam", "fresheggs"});
   expectDenied({"Spam", "EGGS", "spam_", "eggs_"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 TEST_F(StatsMatcherTest, CheckMultipleExcludeSuffix) {
@@ -194,6 +233,8 @@ TEST_F(StatsMatcherTest, CheckMultipleExcludeSuffix) {
   expectAccepted({"Spam", "EGGS", "spam_", "eggs_"});
   expectDenied(
       {"requests.for.spam", "requests.for.eggs", "spam", "eggs", "cannedspam", "fresheggs"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 // Multiple regex matchers.
@@ -204,6 +245,8 @@ TEST_F(StatsMatcherTest, CheckMultipleIncludeRegex) {
   initMatcher();
   expectAccepted({"envoy.matchers.requests", "stats.absl.2xx", "absl.envoy.matchers"});
   expectDenied({"Abseil", "EnvoyProxy"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 TEST_F(StatsMatcherTest, CheckMultipleExcludeRegex) {
@@ -212,6 +255,8 @@ TEST_F(StatsMatcherTest, CheckMultipleExcludeRegex) {
   initMatcher();
   expectAccepted({"Abseil", "EnvoyProxy"});
   expectDenied({"envoy.matchers.requests", "stats.absl.2xx", "absl.envoy.matchers"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 // Multiple prefix/suffix/regex matchers.
@@ -226,6 +271,8 @@ TEST_F(StatsMatcherTest, CheckMultipleAssortedInclusionMatchers) {
   initMatcher();
   expectAccepted({"envoy.matchers.requests", "requests.for.envoy", "envoyrequests", "regex"});
   expectDenied({"requestsEnvoy", "EnvoyProxy", "foo", "regex_etc"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 TEST_F(StatsMatcherTest, CheckMultipleAssortedExclusionMatchers) {
@@ -235,6 +282,8 @@ TEST_F(StatsMatcherTest, CheckMultipleAssortedExclusionMatchers) {
   initMatcher();
   expectAccepted({"requestsEnvoy", "EnvoyProxy", "foo", "regex_etc"});
   expectDenied({"envoy.matchers.requests", "requests.for.envoy", "envoyrequests", "regex"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
 } // namespace Stats
