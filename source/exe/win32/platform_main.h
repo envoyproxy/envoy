@@ -3,8 +3,6 @@
 #include "common/common/assert.h"
 #include "common/common/thread_impl.h"
 
-#include "absl/debugging/symbolize.h"
-
 // clang-format off
 #include <winsock2.h>
 // clang-format on
@@ -13,11 +11,7 @@ namespace Envoy {
 
 class PlatformMain {
 public:
-  PlatformMain(int, const char* const* argv) {
-    // absl::Symbolize mostly works without this, but this improves corner case
-    // handling
-    absl::InitializeSymbolizer(argv[0]);
-
+  PlatformMain() {
     const WORD wVersionRequested = MAKEWORD(2, 2);
     WSADATA wsaData;
     const int rc = ::WSAStartup(wVersionRequested, &wsaData);

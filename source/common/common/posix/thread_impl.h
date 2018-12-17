@@ -42,8 +42,6 @@ private:
  */
 class ThreadFactoryImplPosix : public ThreadFactory {
 public:
-  ThreadFactoryImplPosix() {}
-
   // Thread::ThreadFactory
   ThreadPtr createThread(std::function<void()> thread_routine) override;
   ThreadIdPtr currentThreadId() override;
