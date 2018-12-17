@@ -10,8 +10,7 @@ namespace {
 class XdsIntegrationTest : public XdsIntegrationTestBase,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  XdsIntegrationTest()
-      : XdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, GetParam()) {
+  XdsIntegrationTest() : XdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, GetParam()) {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   }
 

@@ -30,8 +30,7 @@ public:
                          Network::Address::IpVersion version)
       : HttpIntegrationTest(downstream_protocol, version, realTime()) {}
   XdsIntegrationTestBase(Http::CodecClient::Type downstream_protocol,
-                         Network::Address::IpVersion version,
-                         const std::string& config)
+                         Network::Address::IpVersion version, const std::string& config)
       : HttpIntegrationTest(downstream_protocol, version, realTime(), config) {}
 
   void createXdsConnection(FakeUpstream& upstream);

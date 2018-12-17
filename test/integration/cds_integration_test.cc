@@ -122,15 +122,14 @@ TEST_P(CdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   initializeCds();
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
-    sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
-                                                   {buildCluster("cluster_0")}, "1");
-std::cerr<<"finished CDS req/resp!!!!!!"<<std::endl;
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+  std::cerr << "finished CDS req/resp!!!!!!" << std::endl;
   // Adapted from HttpIntegrationTest::testRouterRequestAndResponseWithBody(1024, 512, false).
   int request_size = 1024;
   int response_size = 512;
   codec_client_ =
-      makeHttpConnection(makeClientConnection(
-                      fake_upstreams_[0]->localAddress()->ip()->port()));
+      makeHttpConnection(makeClientConnection(fake_upstreams_[0]->localAddress()->ip()->port()));
   Http::TestHeaderMapImpl request_headers{
       {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
       {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
@@ -142,7 +141,7 @@ std::cerr<<"finished CDS req/resp!!!!!!"<<std::endl;
   ASSERT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_EQ(response_size, response->body().size());
-  
+
   cleanupUpstreamAndDownstream();
   fake_upstream_connection_ = nullptr;
 }
