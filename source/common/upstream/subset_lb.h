@@ -41,7 +41,7 @@ private:
   public:
     HostSubsetImpl(const HostSet& original_host_set, bool locality_weight_aware,
                    bool scale_locality_weight)
-        : HostSetImpl(original_host_set.priority(), original_host_set.overprovisioning_factor()),
+        : HostSetImpl(original_host_set.priority(), original_host_set.overprovisioningFactor()),
           original_host_set_(original_host_set), locality_weight_aware_(locality_weight_aware),
           scale_locality_weight_(scale_locality_weight) {}
 

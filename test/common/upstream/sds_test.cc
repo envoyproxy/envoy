@@ -95,7 +95,7 @@ protected:
   uint64_t numHealthy() {
     uint64_t healthy = 0;
     for (const HostSharedPtr& host : cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()) {
-      if (host->healthy()) {
+      if (host->health() == Host::Health::Healthy) {
         healthy++;
       }
     }

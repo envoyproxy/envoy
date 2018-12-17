@@ -241,10 +241,13 @@ public:
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::Socket& socket() override { return *socket_; }
+  const Network::Socket& socket() const override { return *socket_; }
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;
   }
-  uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
+  uint32_t perConnectionBufferLimitBytes() const override {
+    return per_connection_buffer_limit_bytes_;
+  }
   std::chrono::milliseconds listenerFiltersTimeout() const override {
     return listener_filters_timeout_;
   }
@@ -290,6 +293,7 @@ public:
     ensureSocketOptions();
     Network::Socket::appendOptions(listen_socket_options_, options);
   }
+  const Network::ListenerConfig& listenerConfig() const override { return *this; }
 
   // Network::DrainDecision
   bool drainClose() const override;
