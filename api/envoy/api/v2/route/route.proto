@@ -616,6 +616,8 @@ message RouteAction {
     // configuration but not present in runtime, 0 is the default and thus 0% of
     // requests will be mirrored.
     //
+    // .. attention::
+    //
     // **This field is deprecated**. Set the
     // :ref:`runtime_fraction
     // <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_fraction>` field instead.
