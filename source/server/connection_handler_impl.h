@@ -110,7 +110,6 @@ private:
 
   typedef std::unique_ptr<ActiveListener> ActiveListenerPtr;
 
-  // TODO(conqerAtapple): Add implementation.
   struct ActiveUdpListener : public Network::UdpListenerCallbacks {
     ActiveUdpListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config);
 
@@ -120,7 +119,8 @@ private:
     ~ActiveUdpListener();
 
     // Network::UdpListenerCallbacks
-    void onNewConnection(const Network::Socket& server_socket, const Network::Socket& client_socket,
+    void onNewConnection(Network::Address::InstanceConstSharedPtr local_address,
+                         Network::Address::InstanceConstSharedPtr remote_address,
                          Buffer::Instance&& data) override;
 
     // TODO(conqerAtapple): Refactor common data in TCP/UDP active listeners to
