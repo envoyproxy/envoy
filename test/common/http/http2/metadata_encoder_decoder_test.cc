@@ -114,7 +114,7 @@ public:
     nghttp2_option_del(option_);
   }
 
-  void verifyMetadataMapVector(MetadataMapVector& expect, MetadataMapPtr metadata_map_ptr) {
+  void verifyMetadataMapVector(MetadataMapVector& expect, MetadataMapPtr&& metadata_map_ptr) {
     for (const auto& metadata : *metadata_map_ptr) {
       EXPECT_EQ(expect.front()->find(metadata.first)->second, metadata.second);
     }
@@ -159,7 +159,7 @@ TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
   metadata_map_vector.push_back(std::move(metadata_map_ptr));
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  initialize([this, &metadata_map_vector](MetadataMapPtr metadata_map_ptr) -> void {
+  initialize([this, &metadata_map_vector](MetadataMapPtr&& metadata_map_ptr) -> void {
     this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
   });
 
@@ -182,7 +182,7 @@ TEST_F(MetadataEncoderDecoderTest, TestDecodeBadData) {
   metadata_map_vector.push_back(std::move(metadata_map_ptr));
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  initialize([this, &metadata_map_vector](MetadataMapPtr metadata_map_ptr) -> void {
+  initialize([this, &metadata_map_vector](MetadataMapPtr&& metadata_map_ptr) -> void {
     this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
   });
   submitMetadata(metadata_map_vector);
@@ -217,7 +217,7 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderMultipleMetadataReachSize
     metadata_map_vector.push_back(std::move(metadata_map_ptr));
 
     // Encode and decode the second MetadataMap.
-    decoder_->callback_ = [this, &metadata_map_vector](MetadataMapPtr metadata_map_ptr) -> void {
+    decoder_->callback_ = [this, &metadata_map_vector](MetadataMapPtr&& metadata_map_ptr) -> void {
       this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
     };
     submitMetadata(metadata_map_vector);
@@ -258,7 +258,7 @@ TEST_F(MetadataEncoderDecoderTest, EncodeMetadataMapVectorSmall) {
   metadata_map_vector.push_back(std::move(metadata_map_ptr_3));
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  initialize([this, &metadata_map_vector](MetadataMapPtr metadata_map_ptr) -> void {
+  initialize([this, &metadata_map_vector](MetadataMapPtr&& metadata_map_ptr) -> void {
     this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
   });
   submitMetadata(metadata_map_vector);
@@ -284,7 +284,7 @@ TEST_F(MetadataEncoderDecoderTest, EncodeMetadataMapVectorLarge) {
     metadata_map_vector.push_back(std::move(metadata_map_ptr));
   }
   // Verifies the encoding/decoding result in decoder's callback functions.
-  initialize([this, &metadata_map_vector](MetadataMapPtr metadata_map_ptr) -> void {
+  initialize([this, &metadata_map_vector](MetadataMapPtr&& metadata_map_ptr) -> void {
     this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
   });
   submitMetadata(metadata_map_vector);
@@ -312,7 +312,7 @@ TEST_F(MetadataEncoderDecoderTest, EncodeFuzzedMetadata) {
   }
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  initialize([this, &metadata_map_vector](MetadataMapPtr metadata_map_ptr) -> void {
+  initialize([this, &metadata_map_vector](MetadataMapPtr&& metadata_map_ptr) -> void {
     this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
   });
   submitMetadata(metadata_map_vector);
@@ -336,7 +336,7 @@ TEST_F(MetadataEncoderDecoderTest, TestFrameCountUpperBound) {
   }
 
   // Verifies the encoding/decoding result in decoder's callback functions.
-  initialize([this, &metadata_map_vector](MetadataMapPtr metadata_map_ptr) -> void {
+  initialize([this, &metadata_map_vector](MetadataMapPtr&& metadata_map_ptr) -> void {
     this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
   });
 

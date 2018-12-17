@@ -52,7 +52,7 @@ public:
   }
 };
 
-using MetadataCallback = std::function<void(MetadataMapPtr)>;
+using MetadataCallback = std::function<void(MetadataMapPtr&&)>;
 
 } // namespace Http
 } // namespace Envoy

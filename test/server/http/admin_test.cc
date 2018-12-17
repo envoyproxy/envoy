@@ -869,7 +869,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
 
   // Validate that cert details are null and /certs handles it correctly.
   EXPECT_EQ(nullptr, client_ctx->getCaCertInformation());
-  EXPECT_EQ(nullptr, client_ctx->getCertChainInformation());
+  EXPECT_TRUE(client_ctx->getCertChainInformation().empty());
   EXPECT_EQ(Http::Code::OK, getCallback("/certs", header_map, response));
   EXPECT_EQ(expected_empty_json, response.toString());
 }
@@ -1017,6 +1017,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       .WillByDefault(Return(false));
 
   ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
+  ON_CALL(*host, weight()).WillByDefault(Return(5));
 
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
@@ -1076,7 +1077,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
      },
      "success_rate": {
       "value": 43.2
-     }
+     },
+     "weight": 5
     }
    ]
   }

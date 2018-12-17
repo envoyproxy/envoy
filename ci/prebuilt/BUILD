@@ -43,9 +43,9 @@ cc_library(
         ":windows_x86_64": ["thirdparty_build/lib/luajit.lib"],
         "//conditions:default": ["thirdparty_build/lib/libluajit-5.1.a"],
     }),
-    hdrs = glob(["thirdparty_build/include/luajit-2.0/*"]),
+    hdrs = glob(["thirdparty_build/include/luajit-2.1/*"]),
     includes = ["thirdparty_build/include"],
-    # TODO(mattklein123): We should strip luajit-2.0 here for consumers. However, if we do that
+    # TODO(mattklein123): We should strip luajit-2.1 here for consumers. However, if we do that
     # the headers get included using -I vs. -isystem which then causes old-style-cast warnings.
 )
 

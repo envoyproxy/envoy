@@ -57,14 +57,14 @@ ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::S
 ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              const Network::DrainDecision& drain_close,
                                              Runtime::RandomGenerator& random_generator,
-                                             Tracing::HttpTracer& tracer, Runtime::Loader& runtime,
+                                             Http::Context& http_context, Runtime::Loader& runtime,
                                              const LocalInfo::LocalInfo& local_info,
                                              Upstream::ClusterManager& cluster_manager,
                                              Server::OverloadManager* overload_manager,
                                              Event::TimeSystem& time_system)
     : config_(config), stats_(config_.stats()),
       conn_length_(new Stats::Timespan(stats_.named_.downstream_cx_length_ms_, time_system)),
-      drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
+      drain_close_(drain_close), random_generator_(random_generator), http_context_(http_context),
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
       overload_stop_accepting_requests_ref_(
@@ -369,6 +369,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   }
   stream_info_.setDownstreamLocalAddress(
       connection_manager_.read_callbacks_->connection().localAddress());
+  stream_info_.setDownstreamDirectRemoteAddress(
+      connection_manager_.read_callbacks_->connection().remoteAddress());
   // Initially, the downstream remote address is the source address of the
   // downstream connection. That can change later in the request's lifecycle,
   // based on XFF processing, but setting the downstream remote address here
@@ -396,6 +398,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   stream_info_.onRequestComplete();
+
+  // A downstream disconnect can be identified for HTTP requests when the upstream returns with a 0
+  // response code and when no other response flags are set.
+  if (!stream_info_.hasAnyResponseFlag() && !stream_info_.responseCode()) {
+    stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination);
+  }
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
@@ -692,8 +700,8 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
   ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
                                             connection_manager_.config_.tracingStats());
 
-  active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, stream_info_,
-                                                       tracing_decision);
+  active_span_ = connection_manager_.tracer().startSpan(*this, *request_headers_, stream_info_,
+                                                        tracing_decision);
 
   if (!active_span_) {
     return;

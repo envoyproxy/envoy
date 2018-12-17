@@ -46,8 +46,12 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
     common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
   }
 
+  common_context->mutable_tls_params()->set_tls_minimum_protocol_version(options.tls_version_);
+  common_context->mutable_tls_params()->set_tls_maximum_protocol_version(options.tls_version_);
+
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
-  auto cfg = std::make_unique<ClientContextConfigImpl>(tls_context, mock_factory_ctx);
+  auto cfg =
+      std::make_unique<ClientContextConfigImpl>(tls_context, options.sigalgs_, mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::TransportSocketFactoryPtr{
       new Ssl::ClientSslSocketFactory(std::move(cfg), context_manager, *client_stats_store)};
@@ -55,7 +59,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 
 Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
-  ConfigHelper::initializeTls(false, *tls_context.mutable_common_tls_context());
+  ConfigHelper::initializeTls(false, false, *tls_context.mutable_common_tls_context());
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, mock_factory_ctx);

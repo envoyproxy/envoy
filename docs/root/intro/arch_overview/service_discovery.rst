@@ -69,7 +69,7 @@ to an original destination cluster are forwarded to upstream hosts as addressed 
 metadata, without any explicit host configuration or upstream host discovery. 
 Connections to upstream hosts are pooled and unused hosts are flushed out when they have been idle longer than
 :ref:`cleanup_interval <envoy_api_field_Cluster.cleanup_interval>`, which defaults to
-5000ms. If the original destination address is is not available, no upstream connection is opened.
+5000ms. If the original destination address is not available, no upstream connection is opened.
 Envoy can also pickup the original destination from a :ref:`HTTP header 
 <arch_overview_load_balancing_types_original_destination_request_header>`.
 Original destination service discovery must be used with the original destination :ref:`load

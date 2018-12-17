@@ -201,7 +201,7 @@ protected:
     // Get MetadataDecoder for this stream.
     MetadataDecoder& getMetadataDecoder();
     // Callback function for MetadataDecoder.
-    void onMetadataDecoded(MetadataMapPtr metadata_map_ptr);
+    void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
 
     virtual void transformUpgradeFromH1toH2(HeaderMap& headers) PURE;
     virtual void maybeTransformUpgradeFromH2ToH1() PURE;

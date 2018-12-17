@@ -1,6 +1,7 @@
 #include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
 #include <memory>
+#include <set>
 
 #include "envoy/common/exception.h"
 #include "envoy/http/filter.h"
@@ -104,6 +105,10 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   }
 
   PathMatcherBuilder<const Protobuf::MethodDescriptor*> pmb;
+  std::set<std::string> ignored_query_parameters;
+  for (const auto& query_param : proto_config.ignored_query_parameters()) {
+    ignored_query_parameters.insert(query_param);
+  }
 
   for (const auto& service_name : proto_config.services()) {
     auto service = descriptor_pool_.FindServiceByName(service_name);
@@ -113,8 +118,9 @@ JsonTranscoderConfig::JsonTranscoderConfig(
     }
     for (int i = 0; i < service->method_count(); ++i) {
       auto method = service->method(i);
-      if (!PathMatcherUtility::RegisterByHttpRule(
-              pmb, method->options().GetExtension(google::api::http), method)) {
+      if (!PathMatcherUtility::RegisterByHttpRule(pmb,
+                                                  method->options().GetExtension(google::api::http),
+                                                  ignored_query_parameters, method)) {
         throw EnvoyException("transcoding_filter: Cannot register '" + method->full_name() +
                              "' to path matcher");
       }

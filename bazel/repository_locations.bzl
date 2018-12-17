@@ -5,10 +5,10 @@ REPOSITORY_LOCATIONS = dict(
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        sha256 = "d1700e0455f5f918f8a85ff3ce6cd684d05c766200ba6bdb18c77d5dcadc05a1",
-        strip_prefix = "boringssl-060e9a583976e73d1ea8b2bfe8b9cab33c62fa17",
-        # chromium-70.0.3538.67
-        urls = ["https://github.com/google/boringssl/archive/060e9a583976e73d1ea8b2bfe8b9cab33c62fa17.tar.gz"],
+        sha256 = "a4a71d97b90825f509c472cc9ad2404d4100f6cce042fc159388956bc5c616fb",
+        strip_prefix = "boringssl-77e47de9e16ec8865d1bc6d614dd918141f094d2",
+        # chromium-71.0.3578.80
+        urls = ["https://github.com/google/boringssl/archive/77e47de9e16ec8865d1bc6d614dd918141f094d2.tar.gz"],
     ),
     com_google_absl = dict(
         sha256 = "e35082e88b9da04f4d68094c05ba112502a5063712f3021adfa465306d238c76",
@@ -101,10 +101,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/msgpack/msgpack-c/archive/cpp-3.1.1.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "9c3a50eac39ae450d09fa69f6802df4099ab619ff93746c4f8ecfc5104463cdb",
-        strip_prefix = "jwt_verify_lib-ce0ca6865bb07631dcdf711ee96fc727e7ac7176",
-        # 2018-08-16
-        urls = ["https://github.com/google/jwt_verify_lib/archive/ce0ca6865bb07631dcdf711ee96fc727e7ac7176.tar.gz"],
+        sha256 = "700be26170c1917e83d1319b88a2112dccd1179cd78c5672940483e7c45ca6ae",
+        strip_prefix = "jwt_verify_lib-85cf0edf1f1bc507ff7d96a8d6a9bc20307b0fcf",
+        # 2018-12-01
+        urls = ["https://github.com/google/jwt_verify_lib/archive/85cf0edf1f1bc507ff7d96a8d6a9bc20307b0fcf.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
         sha256 = "f742dc5a206958c4d0a6b2c35e3e102afb5683f55f7a7cb1eae024a03f081347",

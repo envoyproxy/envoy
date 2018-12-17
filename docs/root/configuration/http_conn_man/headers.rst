@@ -169,9 +169,9 @@ address of the nearest client to the XFF list before proxying the request. Some 
 
 Envoy will only append to XFF if the :ref:`use_remote_address
 <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.use_remote_address>`
-HTTP connection manager option is set to true and the `skip_xff_append
+HTTP connection manager option is set to true and the :ref:`skip_xff_append
 <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.skip_xff_append>`
-is set false: This means that if *use_remote_address* is false (which is the default) or
+is set false. This means that if *use_remote_address* is false (which is the default) or
 *skip_xff_append* is true, the connection manager operates in a transparent mode where it does not
 modify XFF.
 

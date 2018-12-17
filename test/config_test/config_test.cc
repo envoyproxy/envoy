@@ -58,7 +58,7 @@ public:
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
-        server_.secretManager(), *api_);
+        server_.secretManager(), *api_, server_.httpContext());
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
