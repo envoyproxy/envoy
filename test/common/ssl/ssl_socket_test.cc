@@ -564,54 +564,6 @@ TEST_P(SslSocketTest, NoCert) {
            GetParam());
 }
 
-// Multiple RSA certificates are rejected.
-TEST_P(SslSocketTest, AtMostOneRsaCert) {
-  const std::string client_ctx_yaml = R"EOF(
-    common_tls_context:
-  )EOF";
-
-  const std::string server_ctx_yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned2_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
-)EOF";
-
-  EXPECT_THROW_WITH_REGEX(testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "",
-                                   "ssl.no_certificate", true, GetParam()),
-                          EnvoyException, "at most one RSA certificate may be specified");
-}
-
-// Multiple ECDSA certificates are rejected.
-TEST_P(SslSocketTest, AtMostOneEcdsaCert) {
-  const std::string client_ctx_yaml = R"EOF(
-    common_tls_context:
-  )EOF";
-
-  const std::string server_ctx_yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned2_ecdsa_p256_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
-)EOF";
-
-  EXPECT_THROW_WITH_REGEX(testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "",
-                                   "ssl.no_certificate", true, GetParam()),
-                          EnvoyException, "at most one ECDSA certificate may be specified");
-}
-
 // Prefer ECDSA certificate when multiple RSA certificates are present and the
 // client is RSA/ECDSA capable. We validate TLSv1.2 only here, since we validate
 // the e2e behavior on TLSv1.2/1.3 in ssl_integration_test.

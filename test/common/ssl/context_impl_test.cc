@@ -298,6 +298,50 @@ TEST_F(SslContextImplTest, TestNoCert) {
   EXPECT_TRUE(context->getCertChainInformation().empty());
 }
 
+// Multiple RSA certificates are rejected.
+TEST_F(SslContextImplTest, AtMostOneRsaCert) {
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned2_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  ServerContextConfigImpl server_context_config(tls_context, factory_context);
+  EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
+                          EnvoyException, "at most one RSA certificate may be specified");
+}
+
+// Multiple ECDSA certificates are rejected.
+TEST_F(SslContextImplTest, AtMostOneEcdsaCert) {
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned2_ecdsa_p256_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  ServerContextConfigImpl server_context_config(tls_context, factory_context);
+  EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
+                          EnvoyException, "at most one ECDSA certificate may be specified");
+}
+
 class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
   void loadConfig(ServerContextConfigImpl& cfg) {
