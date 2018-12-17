@@ -14,45 +14,45 @@ using testing::_;
 using testing::Eq;
 
 namespace Envoy {
-namespace Network {
-
-// TODO(klarose): fix namespace
+namespace Extensions {
+namespace ListenerFilters {
+namespace OriginalSrc {
 
 class OriginalSrcSocketOptionTest : public testing::Test {
 public:
   std::unique_ptr<OriginalSrcSocketOption>
-  makeOptionByAddress(const Address::InstanceConstSharedPtr& address) {
+  makeOptionByAddress(const Network::Address::InstanceConstSharedPtr& address) {
     return std::make_unique<OriginalSrcSocketOption>(address);
   }
 
 protected:
-  NiceMock<MockConnectionSocket> socket_;
+  NiceMock<Network::MockConnectionSocket> socket_;
   std::vector<uint8_t> key_;
 };
 
 TEST_F(OriginalSrcSocketOptionTest, TestSetOptionPreBindSetsAddress) {
-  const auto address = Utility::parseInternetAddress("127.0.0.2");
+  const auto address = Network::Utility::parseInternetAddress("127.0.0.2");
   auto option = makeOptionByAddress(address);
   EXPECT_CALL(socket_, setLocalAddress(PointeesEq(address), Eq(false)));
   EXPECT_EQ(option->setOption(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND), true);
 }
 
 TEST_F(OriginalSrcSocketOptionTest, TestSetOptionPreBindSetsAddressSecond) {
-  const auto address = Utility::parseInternetAddress("1.2.3.4");
+  const auto address = Network::Utility::parseInternetAddress("1.2.3.4");
   auto option = makeOptionByAddress(address);
   EXPECT_CALL(socket_, setLocalAddress(PointeesEq(address), Eq(false)));
   EXPECT_EQ(option->setOption(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND), true);
 }
 
 TEST_F(OriginalSrcSocketOptionTest, TestSetOptionNotPrebindDoesNotSetAddress) {
-  const auto address = Utility::parseInternetAddress("1.2.3.4");
+  const auto address = Network::Utility::parseInternetAddress("1.2.3.4");
   auto option = makeOptionByAddress(address);
   EXPECT_CALL(socket_, setLocalAddress(_, _)).Times(0);
   EXPECT_EQ(option->setOption(socket_, envoy::api::v2::core::SocketOption::STATE_LISTENING), true);
 }
 
 TEST_F(OriginalSrcSocketOptionTest, TestIpv4HashKey) {
-  const auto address = Utility::parseInternetAddress("1.2.3.4");
+  const auto address = Network::Utility::parseInternetAddress("1.2.3.4");
   auto option = makeOptionByAddress(address);
   option->hashKey(key_);
 
@@ -65,7 +65,7 @@ TEST_F(OriginalSrcSocketOptionTest, TestIpv4HashKey) {
 }
 
 TEST_F(OriginalSrcSocketOptionTest, TestIpv4HashKeyOther) {
-  const auto address = Utility::parseInternetAddress("255.254.253.0");
+  const auto address = Network::Utility::parseInternetAddress("255.254.253.0");
   auto option = makeOptionByAddress(address);
   option->hashKey(key_);
 
@@ -78,7 +78,7 @@ TEST_F(OriginalSrcSocketOptionTest, TestIpv4HashKeyOther) {
 }
 
 TEST_F(OriginalSrcSocketOptionTest, TestIpv6HashKey) {
-  const auto address = Utility::parseInternetAddress("102:304:506:708:90a:b0c:d0e:f00");
+  const auto address = Network::Utility::parseInternetAddress("102:304:506:708:90a:b0c:d0e:f00");
   auto option = makeOptionByAddress(address);
   option->hashKey(key_);
 
@@ -89,7 +89,7 @@ TEST_F(OriginalSrcSocketOptionTest, TestIpv6HashKey) {
 }
 
 TEST_F(OriginalSrcSocketOptionTest, TestIpv6HashKeyOther) {
-  const auto address = Utility::parseInternetAddress("F02:304:519:708:90a:b0e:FFFF:0000");
+  const auto address = Network::Utility::parseInternetAddress("F02:304:519:708:90a:b0e:FFFF:0000");
   auto option = makeOptionByAddress(address);
   option->hashKey(key_);
 
@@ -99,5 +99,7 @@ TEST_F(OriginalSrcSocketOptionTest, TestIpv6HashKeyOther) {
   EXPECT_EQ(key_, expected_key);
 }
 
-} // namespace Network
+}
+}
+}
 } // namespace Envoy

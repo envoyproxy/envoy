@@ -28,7 +28,7 @@ Network::FilterStatus OriginalSrcFilter::onAccept(Network::ListenerFilterCallbac
   }
 
   Network::Socket::OptionConstSharedPtr new_option =
-      std::make_shared<Network::OriginalSrcSocketOption>(std::move(address));
+      std::make_shared<OriginalSrcSocketOption>(std::move(address));
   // note: we don't expect this to change the behaviour of the socket. We expect it to be copied
   // into the upstream connection later.
   socket.addOption(new_option);

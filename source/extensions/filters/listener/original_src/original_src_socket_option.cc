@@ -5,19 +5,21 @@
 #include "common/common/assert.h"
 
 namespace Envoy {
-namespace Network {
+namespace Extensions {
+namespace ListenerFilters {
+namespace OriginalSrc {
 
 constexpr uint8_t OriginalSrcSocketOption::IPV4_KEY;
 constexpr uint8_t OriginalSrcSocketOption::IPV6_KEY;
 
-OriginalSrcSocketOption::OriginalSrcSocketOption(Address::InstanceConstSharedPtr src_address)
+OriginalSrcSocketOption::OriginalSrcSocketOption(Network::Address::InstanceConstSharedPtr src_address)
     : src_address_(std::move(src_address)) {
   // Source transparency only works on IP connections.
   ASSERT(src_address_->type() == Network::Address::Type::Ip);
 }
 
 bool OriginalSrcSocketOption::setOption(
-    Socket& socket, envoy::api::v2::core::SocketOption::SocketState state) const {
+    Network::Socket& socket, envoy::api::v2::core::SocketOption::SocketState state) const {
 
   if (state == envoy::api::v2::core::SocketOption::STATE_PREBIND) {
     socket.setLocalAddress(src_address_, false);
@@ -25,7 +27,7 @@ bool OriginalSrcSocketOption::setOption(
 
   bool result = true;
   std::for_each(options_to_apply_.begin(), options_to_apply_.end(),
-                [&socket, state](const Socket::OptionConstSharedPtr& option) {
+                [&socket, state](const Network::Socket::OptionConstSharedPtr& option) {
                   option->setOption(socket, state);
                 });
   return result;
@@ -46,14 +48,14 @@ void OriginalSrcSocketOption::hashKey(std::vector<uint8_t>& key) const {
    * 2. Enusre that Ipv6 addresses cannot collide with padded v4 addresses by placing a unique value
    *    before the address.
    */
-  if (src_address_->ip()->version() == Address::IpVersion::v4) {
+  if (src_address_->ip()->version() == Network::Address::IpVersion::v4) {
     key.push_back(IPV4_KEY);
     // padding
     key.insert(key.end(), 12, 0);
     // note raw_address is already in network order
     uint32_t raw_address = src_address_->ip()->ipv4()->address();
     addressIntoVector(key, raw_address);
-  } else if (src_address_->ip()->version() == Address::IpVersion::v6) {
+  } else if (src_address_->ip()->version() == Network::Address::IpVersion::v6) {
     key.push_back(IPV6_KEY);
     // note raw_address is already in network order
     absl::uint128 raw_address = src_address_->ip()->ipv6()->address();
@@ -61,5 +63,7 @@ void OriginalSrcSocketOption::hashKey(std::vector<uint8_t>& key) const {
   }
 }
 
-} // namespace Network
+}
+}
+}
 } // namespace Envoy

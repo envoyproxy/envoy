@@ -4,21 +4,23 @@
 #include "envoy/network/listen_socket.h"
 
 namespace Envoy {
-namespace Network {
+namespace Extensions {
+namespace ListenerFilters {
+namespace OriginalSrc {
 /**
  * A socket option implementation which allows a connection to spoof its source IP/port using
  * a provided IP address (and maybe port).
  */
-class OriginalSrcSocketOption : public Socket::Option {
+class OriginalSrcSocketOption : public Network::Socket::Option {
 public:
-  OriginalSrcSocketOption(Address::InstanceConstSharedPtr src_address);
+  OriginalSrcSocketOption(Network::Address::InstanceConstSharedPtr src_address);
   ~OriginalSrcSocketOption() {}
 
   /**
    * Updates the source address of the socket to match @c src_address_.
    * Adds socket options to the socket to allow this to work.
    */
-  bool setOption(Socket& socket,
+  bool setOption(Network::Socket& socket,
                  envoy::api::v2::core::SocketOption::SocketState state) const override;
 
   /**
@@ -30,9 +32,11 @@ public:
   static constexpr uint8_t IPV6_KEY = 1;
 
 private:
-  Address::InstanceConstSharedPtr src_address_;
-  Socket::Options options_to_apply_;
+  Network::Address::InstanceConstSharedPtr src_address_;
+  Network::Socket::Options options_to_apply_;
 };
 
-} // namespace Network
+}
+}
+} 
 } // namespace Envoy
