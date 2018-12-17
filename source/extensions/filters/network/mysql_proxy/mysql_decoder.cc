@@ -96,7 +96,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
 
   case MySQLSession::State::MYSQL_RESYNC: {
     // re-sync to MYSQL_REQ state
-    // expected seq check succeded, no need to verify
+    // expected seq check succeeded, no need to verify
     session_.setState(MySQLSession::State::MYSQL_REQ);
     goto mysql_request_state;
   }
