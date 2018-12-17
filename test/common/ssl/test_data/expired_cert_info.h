@@ -1,7 +1,7 @@
 // NOLINT(namespace-envoy)
 constexpr char TEST_EXPIRED_CERT_HASH[] =
-    "6da568b4e8d42035fa558e02317b7453a02326af75f42d721e49c983b876daa8";
-constexpr char TEST_EXPIRED_CERT_SPKI[] = "eXA+BamThBVXvEOdST5MB//tUw9MdwyRulaxTPVrCUc=";
-constexpr char TEST_EXPIRED_CERT_SERIAL[] = "c3c3ab4dea0e48d7";
-constexpr char TEST_EXPIRED_CERT_NOT_BEFORE[] = "Dec 16 07:46:32 2018 GMT";
-constexpr char TEST_EXPIRED_CERT_NOT_AFTER[] = "Dec 16 07:46:32 2017 GMT";
+    "49c25726f5ca0bf5d25a3be48aa8b13a8a1050a7953a6e6aade880674acb2a16";
+constexpr char TEST_EXPIRED_CERT_SPKI[] = "DEkrKuMqQEqg2yPB/Dpqc/ZxFW80lTkz4AnPUxFgqMs=";
+constexpr char TEST_EXPIRED_CERT_SERIAL[] = "8a80523e06a5756c";
+constexpr char TEST_EXPIRED_CERT_NOT_BEFORE[] = "Dec 17 20:17:27 2018 GMT";
+constexpr char TEST_EXPIRED_CERT_NOT_AFTER[] = "Dec 17 20:17:27 2017 GMT";

@@ -1,7 +1,7 @@
 // NOLINT(namespace-envoy)
 constexpr char TEST_SELFSIGNED_CERT_HASH[] =
-    "e516386fa3dab13557371d009dcc0e21c3ac39b7d03942be4c55b19c54487e41";
-constexpr char TEST_SELFSIGNED_CERT_SPKI[] = "bSq+xruwkfD8BJgfpro/Tbmuigoec2KxjKV69WSzFCU=";
-constexpr char TEST_SELFSIGNED_CERT_SERIAL[] = "a23f98a6beea8c18";
-constexpr char TEST_SELFSIGNED_CERT_NOT_BEFORE[] = "Dec 16 07:46:32 2018 GMT";
-constexpr char TEST_SELFSIGNED_CERT_NOT_AFTER[] = "Dec 15 07:46:32 2020 GMT";
+    "cc6d1a59df41c9f5614e9f3f37c4c080fa850145b2956f350b727e233e334564";
+constexpr char TEST_SELFSIGNED_CERT_SPKI[] = "eblRP7DRqMf+7yaQ92gg9+fJPFn7o8aZwFaYwe9k9LQ=";
+constexpr char TEST_SELFSIGNED_CERT_SERIAL[] = "c8350603031b6ccc";
+constexpr char TEST_SELFSIGNED_CERT_NOT_BEFORE[] = "Dec 17 20:17:26 2018 GMT";
+constexpr char TEST_SELFSIGNED_CERT_NOT_AFTER[] = "Dec 16 20:17:26 2020 GMT";

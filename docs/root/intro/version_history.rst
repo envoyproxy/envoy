@@ -21,6 +21,8 @@ Version history
 * cors: added :ref: `invalid/valid stats <cors-statistics>` to filter.
 * ext-authz: added support for providing per route config - optionally disable the filter and provide context extensions.
 * fault: removed integer percentage support.
+* grpc-json: added support for :ref:`ignoring query parameters
+  <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.ignored_query_parameters>`.
 * health check: Added :ref: 'logging health check failure events <envoy_api_field_core.HealthCheck.always_log_health_check_failures>'.
 * health check: added ability to set :ref:`authority header value
   <envoy_api_field_core.HealthCheck.GrpcHealthCheck.authority>` for gRPC health check.
@@ -49,6 +51,7 @@ Version history
 * rate-limit: removed support for the legacy ratelimit service and made the data-plane-api
   :ref:`rls.proto <envoy_api_file_envoy/service/ratelimit/v2/rls.proto>` based implementation default.
 * rate-limit: removed the deprecated cluster_name attribute in :ref:`rate limit service configuration <envoy_api_file_envoy/config/ratelimit/v2/rls.proto>`.
+* rate-limit: added :ref:`rate_limit_service <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` configuration to filters.
 * rbac: added dynamic metadata to the network level filter.
 * rbac: added support for permission matching by :ref:`requested server name <envoy_api_field_config.rbac.v2alpha.Permission.requested_server_name>`.
 * redis: static cluster configuration is no longer required. Redis proxy will work with clusters
@@ -79,6 +82,8 @@ Version history
 * tls: added support for CRLs in :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
 * tls: added support for :ref:`multiple server TLS certificates <arch_overview_ssl_cert_select>`.
 * tls: added support for :ref:`password encrypted private keys <envoy_api_field_auth.TlsCertificate.password>`.
+* tls: removed support for ECDSA certificates with curves other than P-256.
+* tls: removed support for RSA certificates with keys smaller than 2048-bits.
 * tracing: added support to the Zipkin tracer for the :ref:`b3 <config_http_conn_man_headers_b3>` single header format.
 * tracing: added support for :ref:`Datadog <arch_overview_tracing>` tracer.
 * upstream: added :ref:`scale_locality_weight<envoy_api_field_Cluster.LbSubsetConfig.scale_locality_weight>` to enable
