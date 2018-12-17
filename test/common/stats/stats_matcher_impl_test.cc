@@ -75,7 +75,6 @@ TEST_F(StatsMatcherTest, CheckIncludeAll) {
   expectAccepted({"foo", "bar", "foo.bar", "foo.bar.baz"});
   // It really does accept all, but we impl doesn't know it.
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
-  // Really does reject all, but we can't tell from API.
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
