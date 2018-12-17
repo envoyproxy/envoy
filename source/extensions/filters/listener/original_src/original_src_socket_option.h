@@ -15,27 +15,14 @@ public:
   ~OriginalSrcSocketOption() {}
 
   /**
-   * @param socket the socket on which to apply options.
-   * @param state the current state of the socket. Significant for options that can only be
-   *        set for some particular state of the socket.
-   * @return true if succeeded, false otherwise.
+   * Updates the source address of the socket to match @c src_address_.
+   * Adds socket options to the socket to allow this to work.
    */
   bool setOption(Socket& socket,
                  envoy::api::v2::core::SocketOption::SocketState state) const override;
 
   /**
-   * A specialization of setOption targeting ConnectionSockets.
-   * @param socket the connection socket on which to apply options.
-   * @param state the current state of the socket. Significant for options that can only be
-   *        set for some particular state of the socket.
-   * @return true if succeeded, false otherwise.
-   */
-  bool setOption(ConnectionSocket& socket,
-                 envoy::api::v2::core::SocketOption::SocketState state) const override;
-  /**
-   * @param vector of bytes to which the option should append hash key data that will be used
-   *        to separate connections based on the option. Any data already in the key vector must
-   *        not be modified.
+   * Appends a key which uniquely identifies the address being tracked.
    */
   void hashKey(std::vector<uint8_t>& key) const override;
 

@@ -1,20 +1,20 @@
-#include "envoy/config/filter/network/original_src/v2alpha1/original_src.pb.h"
-#include "envoy/config/filter/network/original_src/v2alpha1/original_src.pb.validate.h"
+#include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.h"
+#include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.validate.h"
 
-#include "extensions/filters/network/original_src/config.h"
-#include "extensions/filters/network/original_src/original_src.h"
-#include "extensions/filters/network/original_src/original_src_config_factory.h"
+#include "extensions/filters/listener/original_src/config.h"
+#include "extensions/filters/listener/original_src/original_src.h"
+#include "extensions/filters/listener/original_src/original_src_config_factory.h"
 
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::SaveArg;
+using testing::Invoke;
 
 namespace Envoy {
 namespace Extensions {
-namespace NetworkFilters {
+namespace ListenerFilters {
 namespace OriginalSrc {
 
 TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
@@ -27,19 +27,19 @@ TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   MessageUtil::loadFromYaml(yaml, *proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  Server::Configuration::MockListenerFactoryContext context;
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, context);
-  Network::MockConnection connection;
-  Network::ReadFilterSharedPtr added_filter;
-  EXPECT_CALL(connection, addReadFilter(_)).WillOnce(SaveArg<0>(&added_filter));
-  cb(connection);
+  Network::ListenerFilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, context);
+  Network::MockListenerFilterManager manager;
+  Network::ListenerFilterPtr added_filter;
+  EXPECT_CALL(manager, addAcceptFilter_(_)).WillOnce(Invoke([&added_filter](Network::ListenerFilterPtr& filter){added_filter = std::move(filter);}));
+  cb(manager);
 
   // Make sure we actually create the correct type!
   EXPECT_NE(dynamic_cast<OriginalSrcFilter*>(added_filter.get()), nullptr);
 }
 
 } // namespace OriginalSrc
-} // namespace NetworkFilters
+} // namespace ListenerFilters
 } // namespace Extensions
 } // namespace Envoy

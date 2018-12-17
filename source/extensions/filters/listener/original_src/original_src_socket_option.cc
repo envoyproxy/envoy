@@ -1,4 +1,4 @@
-#include "extensions/filters/network/original_src/original_src_socket_option.h"
+#include "extensions/filters/listener/original_src/original_src_socket_option.h"
 
 #include <arpa/inet.h>
 
@@ -18,22 +18,17 @@ OriginalSrcSocketOption::OriginalSrcSocketOption(Address::InstanceConstSharedPtr
 
 bool OriginalSrcSocketOption::setOption(
     Socket& socket, envoy::api::v2::core::SocketOption::SocketState state) const {
+
+  if (state == envoy::api::v2::core::SocketOption::STATE_PREBIND) {
+    socket.setLocalAddress(src_address_, false);
+  }
+
   bool result = true;
   std::for_each(options_to_apply_.begin(), options_to_apply_.end(),
                 [&socket, state](const Socket::OptionConstSharedPtr& option) {
                   option->setOption(socket, state);
                 });
   return result;
-}
-
-bool OriginalSrcSocketOption::setOption(
-    ConnectionSocket& socket, envoy::api::v2::core::SocketOption::SocketState state) const {
-
-  if (state == envoy::api::v2::core::SocketOption::STATE_PREBIND) {
-    socket.setLocalAddress(src_address_, false);
-  }
-
-  return setOption(static_cast<Socket&>(socket), state);
 }
 
 /**

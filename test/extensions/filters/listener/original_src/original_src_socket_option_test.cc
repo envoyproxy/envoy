@@ -2,7 +2,7 @@
 
 #include "common/network/utility.h"
 
-#include "extensions/filters/network/original_src/original_src_socket_option.h"
+#include "extensions/filters/listener/original_src/original_src_socket_option.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"

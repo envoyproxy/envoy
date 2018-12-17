@@ -1,28 +1,30 @@
 #pragma once
-#include "envoy/config/filter/network/original_src/v2alpha1/original_src.pb.h"
 
-#include "extensions/filters/network/common/factory_base.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
+#include "extensions/filters/listener/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace NetworkFilters {
+namespace ListenerFilters {
 namespace OriginalSrc {
 /**
  * Config registration for the original_src filter.
  */
 class OriginalSrcConfigFactory
-    : public Common::FactoryBase<
-          envoy::config::filter::network::original_src::v2alpha1::OriginalSrc> {
+    : public Server::Configuration::NamedListenerFilterConfigFactory {
 public:
-  OriginalSrcConfigFactory();
+  // NamedListenerFilterConfigFactory
+  Network::ListenerFilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& message,
+                               Server::Configuration::ListenerFactoryContext& context) override;
 
-  // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::network::original_src::v2alpha1::OriginalSrc& proto_config,
-      Server::Configuration::FactoryContext&) override;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+
+  std::string name() override { return ListenerFilterNames::get().OriginalSrc; }
 };
 
 } // namespace OriginalSrc
-} // namespace NetworkFilters
+} // namespace ListenerFilters
 } // namespace Extensions
 } // namespace Envoy

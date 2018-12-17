@@ -1,15 +1,15 @@
 #pragma once
 
-#include "envoy/config/filter/network/original_src/v2alpha1/original_src.pb.h"
+#include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace NetworkFilters {
+namespace ListenerFilters {
 namespace OriginalSrc {
 class Config {
 public:
   Config() = default;
-  Config(const envoy::config::filter::network::original_src::v2alpha1::OriginalSrc& config);
+  Config(const envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc& config);
 
   bool usePort() const { return use_port_; }
   uint32_t mark() const { return mark_; }
@@ -19,6 +19,6 @@ private:
   uint32_t mark_ = 0;
 };
 } // namespace OriginalSrc
-} // namespace NetworkFilters
+} // namespace ListenerFilters
 } // namespace Extensions
 } // namespace Envoy

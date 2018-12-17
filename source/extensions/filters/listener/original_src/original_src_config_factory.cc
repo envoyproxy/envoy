@@ -1,39 +1,40 @@
-#include "extensions/filters/network/original_src/original_src_config_factory.h"
+#include "extensions/filters/listener/original_src/original_src_config_factory.h"
 
-#include "envoy/config/filter/network/original_src/v2alpha1/original_src.pb.h"
-#include "envoy/config/filter/network/original_src/v2alpha1/original_src.pb.validate.h"
+#include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.h"
+#include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/network/common/factory_base.h"
-#include "extensions/filters/network/original_src/config.h"
-#include "extensions/filters/network/original_src/original_src.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "extensions/filters/listener/original_src/config.h"
+#include "extensions/filters/listener/original_src/original_src.h"
+#include "extensions/filters/listener/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace NetworkFilters {
+namespace ListenerFilters {
 namespace OriginalSrc {
 
-OriginalSrcConfigFactory::OriginalSrcConfigFactory()
-    : FactoryBase(NetworkFilterNames::get().OriginalSrc) {}
-
-Network::FilterFactoryCb OriginalSrcConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::network::original_src::v2alpha1::OriginalSrc& proto_config,
-    Server::Configuration::FactoryContext&) {
+Network::ListenerFilterFactoryCb
+OriginalSrcConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& message,
+                              Server::Configuration::ListenerFactoryContext&) {
+  auto proto_config =
+    MessageUtil::downcastAndValidate<const envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc&>(message);
   Config config(proto_config);
-  return [config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<OriginalSrcFilter>(config));
+  return [config](Network::ListenerFilterManager& filter_manager) -> void {
+    filter_manager.addAcceptFilter(std::make_unique<OriginalSrcFilter>(config));
   };
 }
 
+ProtobufTypes::MessagePtr OriginalSrcConfigFactory::createEmptyConfigProto() {
+  return std::make_unique<envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc>();
+}
 /**
  * Static registration for the original_src filter. @see RegisterFactory.
  */
 static Registry::RegisterFactory<OriginalSrcConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
+                                 Server::Configuration::NamedListenerFilterConfigFactory>
     registered_;
 
 } // namespace OriginalSrc
-} // namespace NetworkFilters
+} // namespace ListenerFilters
 } // namespace Extensions
 } // namespace Envoy
