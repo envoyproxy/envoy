@@ -459,8 +459,7 @@ public:
   std::unique_ptr<Secret::SecretManager> secret_manager_;
 };
 
-class MockListenerFactoryContext : public virtual MockFactoryContext,
-                                   public virtual ListenerFactoryContext {
+class MockListenerFactoryContext : public ListenerFactoryContext {
 public:
   MockListenerFactoryContext();
   ~MockListenerFactoryContext();
@@ -476,6 +475,46 @@ public:
   const Network::ListenerConfig& listenerConfig() const override { return _listenerConfig_; }
   MOCK_CONST_METHOD0(listenerConfig_, const Network::ListenerConfig&());
 
+  MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
+  MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
+  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
+  MOCK_METHOD0(drainDecision, const Network::DrainDecision&());
+  MOCK_METHOD0(healthCheckFailed, bool());
+  MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
+  MOCK_METHOD0(initManager, Init::Manager&());
+  MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
+  MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
+  MOCK_METHOD0(scope, Stats::Scope&());
+  MOCK_METHOD0(singletonManager, Singleton::Manager&());
+  MOCK_METHOD0(overloadManager, OverloadManager&());
+  MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
+  MOCK_METHOD0(admin, Server::Admin&());
+  MOCK_METHOD0(listenerScope, Stats::Scope&());
+  MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
+  MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
+  MOCK_METHOD0(timeSource, TimeSource&());
+  Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
+
+  Http::Context& httpContext() override { return http_context_; }
+
+  testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
+  testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
+  testing::NiceMock<MockDrainManager> drain_manager_;
+  testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
+  testing::NiceMock<Init::MockManager> init_manager_;
+  testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
+  testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
+  Stats::IsolatedStoreImpl scope_;
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
+  Singleton::ManagerPtr singleton_manager_;
+  testing::NiceMock<MockAdmin> admin_;
+  Stats::IsolatedStoreImpl listener_scope_;
+  Event::SimulatedTimeSystem time_system_;
+  testing::NiceMock<MockOverloadManager> overload_manager_;
+  Tracing::HttpNullTracer null_tracer_;
+  Http::ContextImpl http_context_;
   Network::MockListenerConfig _listenerConfig_;
 };
 
