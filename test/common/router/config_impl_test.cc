@@ -2265,7 +2265,7 @@ virtual_hosts:
                               ->shadowPolicy()
                               .cluster());
 
-  // `runtime_fraction` takes precedence over the deprecated runtime_key field.
+  // `runtime_fraction` takes precedence over the deprecated `runtime_key` field.
   EXPECT_EQ("mirror_key", config.route(genHeaders("mirror.lyft.com", "/foo", "GET"), 0)
                               ->routeEntry()
                               ->shadowPolicy()
