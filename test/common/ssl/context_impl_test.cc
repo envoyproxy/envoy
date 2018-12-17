@@ -538,6 +538,47 @@ TEST(ClientContextConfigImplTest, InvalidCertificateSpki) {
                           EnvoyException, "Invalid base64-encoded SHA-256 .*");
 }
 
+// Validate that 2048-bit RSA ceritificates load successfully.
+TEST(ClientContextConfigImplTest, RSA2048Cert) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  manager.createSslClientContext(store, client_context_config);
+}
+
+// Validate that 1024-bit RSA certificates are rejected.
+TEST(ClientContextConfigImplTest, RSA1024Cert) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_rsa_1024_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_rsa_1024_key.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+                          EnvoyException,
+                          "Failed to load certificate from chain .*selfsigned_rsa_1024_cert.pem, "
+                          "only RSA certificates with 2048-bit or larger keys are supported");
+}
+
 // Validate that P256 ECDSA certs load.
 TEST(ClientContextConfigImplTest, P256EcdsaCert) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
