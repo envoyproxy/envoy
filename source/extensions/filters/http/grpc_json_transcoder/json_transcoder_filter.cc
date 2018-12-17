@@ -105,7 +105,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   }
 
   PathMatcherBuilder<const Protobuf::MethodDescriptor*> pmb;
-  std::set<std::string> ignored_query_parameters;
+  std::set<ProtobufTypes::String> ignored_query_parameters;
   for (const auto& query_param : proto_config.ignored_query_parameters()) {
     ignored_query_parameters.insert(query_param);
   }
