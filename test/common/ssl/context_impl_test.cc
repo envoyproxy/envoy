@@ -624,7 +624,7 @@ TEST(ClientContextConfigImplTest, RSA1024Cert) {
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
                           EnvoyException,
-                          "Failed to load certificate from chain .*selfsigned_rsa_1024_cert.pem, "
+                          "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, "
                           "only RSA certificates with 2048-bit or larger keys are supported");
 }
 
@@ -665,7 +665,7 @@ TEST(ClientContextConfigImplTest, NonP256EcdsaCert) {
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
                           EnvoyException,
-                          "Failed to load certificate from chain .*selfsigned_ecdsa_p384_cert.pem, "
+                          "Failed to load certificate chain from .*selfsigned_ecdsa_p384_cert.pem, "
                           "only P-256 ECDSA certificates are supported");
 }
 
