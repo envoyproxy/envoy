@@ -25,9 +25,6 @@ void ServerGreeting::setServerStatus(int server_status) { server_status_ = serve
 void ServerGreeting::setExtServerCap(int ext_server_cap) { ext_server_cap_ = ext_server_cap; }
 
 int ServerGreeting::parseMessage(Buffer::Instance& buffer, uint64_t& offset, int) {
-  if (seq_ != GREETING_SEQ_NUM) {
-    return MYSQL_FAILURE;
-  }
   uint8_t protocol = 0;
   if (BufferHelper::peekUint8(buffer, offset, protocol) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing protocol in mysql Greeting msg");
@@ -74,7 +71,7 @@ int ServerGreeting::parseMessage(Buffer::Instance& buffer, uint64_t& offset, int
   setServerLanguage(server_language);
   uint16_t server_status = 0;
   if (BufferHelper::peekUint16(buffer, offset, server_status) != MYSQL_SUCCESS) {
-    ENVOY_LOG(info, "error parsing server_language in mysql Greeting msg");
+    ENVOY_LOG(info, "error parsing server_status in mysql Greeting msg");
     return MYSQL_FAILURE;
   }
   setServerStatus(server_status);

@@ -111,7 +111,7 @@ TEST_P(MySQLIntegrationTest, MysqLoginTest) {
   tcp_client->waitForData(str);
 
   // Client username/password and capabilities
-  std::string login = encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, user);
+  std::string login = encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, user, CHALLENGE_SEQ_NUM);
   tcp_client->write(login);
   ASSERT_TRUE(fake_upstream_connection->waitForData(login.length(), &rcvd_data));
   EXPECT_EQ(login, rcvd_data);
@@ -166,7 +166,7 @@ TEST_P(MySQLIntegrationTest, MySQLUnitTestMultiClientsLoop) {
     tcp_client->waitForData(str);
 
     // Client username/password and capabilities
-    std::string login = encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, user);
+    std::string login = encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, user, CHALLENGE_SEQ_NUM);
     tcp_client->write(login);
     ASSERT_TRUE(fake_upstream_connection->waitForData(login.length(), &rcvd_data));
     EXPECT_EQ(login, rcvd_data);

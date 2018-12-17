@@ -29,7 +29,7 @@ std::string MySQLTestUtils::encodeServerGreeting(int protocol) {
   return mysql_msg;
 }
 
-std::string MySQLTestUtils::encodeClientLogin(uint16_t client_cap, std::string user) {
+std::string MySQLTestUtils::encodeClientLogin(uint16_t client_cap, std::string user, uint8_t seq) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(client_cap);
   mysql_clogin_encode.setExtendedClientCap(MYSQL_EXT_CLIENT_CAPAB);
@@ -39,11 +39,11 @@ std::string MySQLTestUtils::encodeClientLogin(uint16_t client_cap, std::string u
   std::string auth_resp(getAuthResp());
   mysql_clogin_encode.setAuthResp(auth_resp);
   std::string data = mysql_clogin_encode.encode();
-  std::string mysql_msg = BufferHelper::encodeHdr(data, CHALLENGE_SEQ_NUM);
+  std::string mysql_msg = BufferHelper::encodeHdr(data, seq);
   return mysql_msg;
 }
 
-std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, int it) {
+std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, int it, int seq_force) {
   ClientLoginResponse mysql_loginok_encode{};
   mysql_loginok_encode.setRespCode(srv_resp);
   mysql_loginok_encode.setAffectedRows(MYSQL_SM_AFFECTED_ROWS);
@@ -52,6 +52,9 @@ std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, int it) {
   mysql_loginok_encode.setWarnings(MYSQL_SM_SERVER_WARNINGS);
   std::string data = mysql_loginok_encode.encode();
   int seq = CHALLENGE_RESP_SEQ_NUM + 2 * it;
+  if (seq_force > 0) {
+    seq = seq_force;
+  }
   std::string mysql_msg = BufferHelper::encodeHdr(data, seq);
   return mysql_msg;
 }

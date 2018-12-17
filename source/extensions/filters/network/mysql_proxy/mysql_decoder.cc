@@ -95,12 +95,10 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
   }
 
   case MySQLSession::State::MYSQL_RESYNC: {
-    if (seq == MYSQL_REQUEST_PKT_NUM) {
-      // re-sync to MYSQL_REQ state if seq# is 0
-      session_.setState(MySQLSession::State::MYSQL_REQ);
-      goto mysql_request_state;
-    }
-    break;
+    // re-sync to MYSQL_REQ state
+    // expected seq check succeded, no need to verify
+    session_.setState(MySQLSession::State::MYSQL_REQ);
+    goto mysql_request_state;
   }
 
   // Process Command
