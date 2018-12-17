@@ -322,7 +322,7 @@ MetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
 
 MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
   if (metadata_decoder_ == nullptr) {
-    auto cb = [this](MetadataMapPtr metadata_map_ptr) {
+    auto cb = [this](MetadataMapPtr&& metadata_map_ptr) {
       this->onMetadataDecoded(std::move(metadata_map_ptr));
     };
     metadata_decoder_ = std::make_unique<MetadataDecoder>(cb);
@@ -330,7 +330,7 @@ MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
   return *metadata_decoder_;
 }
 
-void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr metadata_map_ptr) {
+void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr) {
   decoder_->decodeMetadata(std::move(metadata_map_ptr));
 }
 
