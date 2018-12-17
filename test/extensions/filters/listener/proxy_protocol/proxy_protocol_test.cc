@@ -51,7 +51,7 @@ class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVers
 public:
   ProxyProtocolTest()
       : dispatcher_(test_time_.timeSystem()),
-        socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true),
+        socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr),
         connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
 
@@ -66,9 +66,9 @@ public:
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::Socket& socket() override { return socket_; }
-  bool bindToPort() override { return true; }
+  const Network::Socket& socket() const override { return socket_; }
   bool handOffRestoredDestinationConnections() const override { return false; }
-  uint32_t perConnectionBufferLimitBytes() override { return 0; }
+  uint32_t perConnectionBufferLimitBytes() const override { return 0; }
   std::chrono::milliseconds listenerFiltersTimeout() const override {
     return std::chrono::milliseconds();
   }
@@ -870,7 +870,7 @@ class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address
 public:
   WildcardProxyProtocolTest()
       : dispatcher_(test_time_.timeSystem()),
-        socket_(Network::Test::getAnyAddress(GetParam()), nullptr, true),
+        socket_(Network::Test::getAnyAddress(GetParam()), nullptr),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_.localAddress()->ip()->port())),
@@ -894,9 +894,9 @@ public:
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::Socket& socket() override { return socket_; }
-  bool bindToPort() override { return true; }
+  const Network::Socket& socket() const override { return socket_; }
   bool handOffRestoredDestinationConnections() const override { return false; }
-  uint32_t perConnectionBufferLimitBytes() override { return 0; }
+  uint32_t perConnectionBufferLimitBytes() const override { return 0; }
   std::chrono::milliseconds listenerFiltersTimeout() const override {
     return std::chrono::milliseconds();
   }

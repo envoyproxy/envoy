@@ -114,13 +114,4 @@ private:
   MainCommonBase base_;
 };
 
-/**
- * This is the real main body that executes after site-specific
- * main() runs.
- *
- * @param options Options object initialized by site-specific code
- * @return int Return code that should be returned from the actual main()
- */
-int main_common(OptionsImpl& options);
-
 } // namespace Envoy

@@ -37,6 +37,7 @@ envoy_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
+        "//test/common/ssl/test_data:cert_infos",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -66,6 +67,7 @@ envoy_cc_test(
         "//source/common/ssl:context_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
+        "//test/common/ssl/test_data:cert_infos",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:server_mocks",
@@ -87,6 +89,7 @@ envoy_cc_test(
     deps = [
         ":ssl_test_utils",
         "//source/common/ssl:utility_lib",
+        "//test/common/ssl/test_data:cert_infos",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
