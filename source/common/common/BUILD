@@ -72,7 +72,7 @@ envoy_cc_library(
 envoy_basic_cc_library(
     name = "fmt_lib",
     hdrs = ["fmt.h"],
-    include_prefix = envoy_include_prefix(PACKAGE_NAME),
+    include_prefix = envoy_include_prefix(package_name()),
 )
 
 envoy_cc_library(
