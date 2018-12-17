@@ -524,8 +524,6 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
         break;
       case Host::Health::Unhealthy:
         break;
-      default:
-        NOT_REACHED_GCOVR_EXCL_LINE;
       }
     }
   }

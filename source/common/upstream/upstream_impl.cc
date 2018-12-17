@@ -305,12 +305,12 @@ HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
 HostSetImpl::UpdateHostsParams
 HostSetImpl::partitionHosts(HostVectorConstSharedPtr hosts,
                             HostsPerLocalityConstSharedPtr hosts_per_locality) {
-  auto healthy_hosts = ClusterImplBase::createHealthyHostList(*hosts, Host::Health::Healthy);
-  auto degraded_hosts = ClusterImplBase::createHealthyHostList(*hosts, Host::Health::Degraded);
+  auto healthy_hosts = ClusterImplBase::createHostList(*hosts, Host::Health::Healthy);
+  auto degraded_hosts = ClusterImplBase::createHostList(*hosts, Host::Health::Degraded);
   auto healthy_hosts_per_locality =
-      ClusterImplBase::createHealthyHostLists(*hosts_per_locality, Host::Health::Healthy);
+      ClusterImplBase::createHostLists(*hosts_per_locality, Host::Health::Healthy);
   auto degraded_hosts_per_locality =
-      ClusterImplBase::createHealthyHostLists(*hosts_per_locality, Host::Health::Degraded);
+      ClusterImplBase::createHostLists(*hosts_per_locality, Host::Health::Degraded);
 
   return updateHostsParams(std::move(hosts), std::move(hosts_per_locality),
                            std::move(healthy_hosts), std::move(healthy_hosts_per_locality),
@@ -593,8 +593,8 @@ ClusterImplBase::ClusterImplBase(
       });
 }
 
-HostVectorConstSharedPtr ClusterImplBase::createHealthyHostList(const HostVector& hosts,
-                                                                Host::Health health) {
+HostVectorConstSharedPtr ClusterImplBase::createHostList(const HostVector& hosts,
+                                                         Host::Health health) {
   HostVectorSharedPtr healthy_list(new HostVector());
   for (const auto& host : hosts) {
     if (host->health() == health) {
@@ -605,8 +605,8 @@ HostVectorConstSharedPtr ClusterImplBase::createHealthyHostList(const HostVector
   return healthy_list;
 }
 
-HostsPerLocalityConstSharedPtr
-ClusterImplBase::createHealthyHostLists(const HostsPerLocality& hosts, Host::Health health) {
+HostsPerLocalityConstSharedPtr ClusterImplBase::createHostLists(const HostsPerLocality& hosts,
+                                                                Host::Health health) {
   return hosts.filter([&health](const Host& host) { return host.health() == health; });
 }
 
