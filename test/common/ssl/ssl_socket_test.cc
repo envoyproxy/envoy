@@ -593,7 +593,7 @@ TEST_P(SslSocketTest, MultiCertPreferEcdsa) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
 )EOF";
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.no_certificate", true,
+  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.handshake", true,
            GetParam());
 }
 

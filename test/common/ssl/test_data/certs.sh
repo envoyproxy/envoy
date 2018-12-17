@@ -43,7 +43,7 @@ generate_x509_cert() {
   generate_info_header $1
 }
 
-# $1=<certificate name>
+# $1=<certificate name> $2=[certificate file name]
 generate_selfsigned_x509_cert() {
   if [[ "$2" != "" ]]; then local OUTPUT_PREFIX=$2; else local OUTPUT_PREFIX=$1; fi
   openssl req -new -x509 -days 730 -key $1_key.pem -out ${OUTPUT_PREFIX}_cert.pem -config $1_cert.cfg -batch -sha256
