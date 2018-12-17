@@ -247,10 +247,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     }
 
     bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
-    ctx.is_ecdsa_ = EVP_PKEY_id(public_key.get()) == EVP_PKEY_EC;
-    if (ctx.is_ecdsa_) {
+    switch (EVP_PKEY_id(public_key.get())) {
+    case EVP_PKEY_EC: {
       // We only support P-256 ECDSA today.
-      EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
+      const EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
       // Since we checked the key type above, this should be valid.
       ASSERT(ecdsa_public_key != nullptr);
       const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
@@ -259,6 +259,20 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
                                          "ECDSA certificates are supported",
                                          ctx.cert_chain_file_path_));
       }
+      ctx.is_ecdsa_ = true;
+    } break;
+    case EVP_PKEY_RSA: {
+      // We require RSA certificates with 2048-bit or larger keys.
+      const RSA* rsa_public_key = EVP_PKEY_get0_RSA(public_key.get());
+      // Since we checked the key type above, this should be valid.
+      ASSERT(rsa_public_key != nullptr);
+      const unsigned rsa_key_length = RSA_size(rsa_public_key);
+      if (rsa_key_length < 2048 / 8) {
+        throw EnvoyException(fmt::format("Failed to load certificate from chain {}, only RSA "
+                                         "certificates with 2048-bit or larger keys are supported",
+                                         ctx.cert_chain_file_path_));
+      }
+    } break;
     }
 
     // Load private key.
