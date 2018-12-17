@@ -853,10 +853,9 @@ TEST_P(ConnectionImplTest, BindFromSocketTest) {
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
   auto option = std::make_shared<NiceMock<MockSocketOption>>();
-  EXPECT_CALL(*option, setOption(Matcher<ConnectionSocket&>(_),
-                                 Eq(envoy::api::v2::core::SocketOption::STATE_PREBIND)))
+  EXPECT_CALL(*option, setOption(_, Eq(envoy::api::v2::core::SocketOption::STATE_PREBIND)))
       .WillOnce(
-          Invoke([&](ConnectionSocket& socket, envoy::api::v2::core::SocketOption::SocketState) {
+          Invoke([&](Socket& socket, envoy::api::v2::core::SocketOption::SocketState) {
             socket.setLocalAddress(new_source_address, false);
             return true;
           }));

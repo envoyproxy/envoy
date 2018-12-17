@@ -20,6 +20,11 @@ public:
 
   // Network::Socket
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
+  void setLocalAddress(const Address::InstanceConstSharedPtr& local_address,
+                       bool restored) override {
+    local_address_ = local_address;
+    local_address_restored_ = restored;
+  }
   int fd() const override { return fd_; }
   void close() override {
     if (fd_ != -1) {
@@ -48,6 +53,7 @@ protected:
 
   int fd_;
   Address::InstanceConstSharedPtr local_address_;
+  bool local_address_restored_{false};
   OptionsSharedPtr options_;
 };
 
@@ -116,11 +122,6 @@ public:
 
   // Network::ConnectionSocket
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
-  void setLocalAddress(const Address::InstanceConstSharedPtr& local_address,
-                       bool restored) override {
-    local_address_ = local_address;
-    local_address_restored_ = restored;
-  }
   void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
     remote_address_ = remote_address;
   }
@@ -148,7 +149,6 @@ public:
 
 protected:
   Address::InstanceConstSharedPtr remote_address_;
-  bool local_address_restored_{false};
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
   std::string server_name_;
