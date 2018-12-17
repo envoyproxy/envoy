@@ -5,22 +5,33 @@ set -e
 # $1=<CA name> $2=[issuer name]
 generate_ca() {
   if [[ "$2" != "" ]]; then local EXTRA_ARGS="-CA $2_cert.pem -CAkey $2_key.pem -CAcreateserial"; fi
-  openssl genrsa -out $1_key.pem 1024
+  openssl genrsa -out $1_key.pem 2048
   openssl req -new -key $1_key.pem -out $1_cert.csr -config $1_cert.cfg -batch -sha256
   openssl x509 -req -days 730 -in $1_cert.csr -signkey $1_key.pem -out $1_cert.pem \
     -extensions v3_ca -extfile $1_cert.cfg $EXTRA_ARGS
 }
 
-# $1=<certificate name> $2=[password]
+# $1=<certificate name> $2=[key size] $3=[password]
 generate_rsa_key() {
-  if [[ "$2" != "" ]]; then echo -n "$2" > $1_password.txt; local EXTRA_ARGS="-aes128 -passout file:$1_password.txt"; fi
-  openssl genrsa -out $1_key.pem $EXTRA_ARGS 1024
+  if [[ "$2" != "" ]]; then local KEYSIZE=$2; else local KEYSIZE="2048"; fi
+  if [[ "$3" != "" ]]; then echo -n "$3" > $1_password.txt; local EXTRA_ARGS="-aes128 -passout file:$1_password.txt"; fi
+  openssl genrsa -out $1_key.pem $EXTRA_ARGS $KEYSIZE
 }
 
 # $1=<certificate name> $2=[curve]
 generate_ecdsa_key() {
   if [[ "$2" != "" ]]; then local CURVE=$2; else local CURVE="secp256r1"; fi
   openssl ecparam -name $CURVE -genkey -out $1_key.pem
+}
+
+# $1=<certificate name>
+generate_info_header() {
+  echo "// NOLINT(namespace-envoy)" > $1_cert_info.h
+  echo -e "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_HASH[] =\n    \"$(openssl x509 -in $1_cert.pem -outform DER | openssl dgst -sha256 | cut -d" " -f2)\";" >> $1_cert_info.h
+  echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_SPKI[] = \"$(openssl x509 -in $1_cert.pem -noout -pubkey | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | openssl enc -base64)\";" >> $1_cert_info.h
+  echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_SERIAL[] = \"$(openssl x509 -in $1_cert.pem -noout -serial | cut -d"=" -f2 | awk '{print tolower($0)}')\";" >> $1_cert_info.h
+  echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_NOT_BEFORE[] = \"$(openssl x509 -in $1_cert.pem -noout -startdate | cut -d"=" -f2)\";" >> $1_cert_info.h
+  echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_NOT_AFTER[] = \"$(openssl x509 -in $1_cert.pem -noout -enddate | cut -d"=" -f2)\";" >> $1_cert_info.h
 }
 
 # $1=<certificate name> $2=<CA name> $3=[days]
@@ -30,17 +41,14 @@ generate_x509_cert() {
   openssl req -new -key $1_key.pem -out $1_cert.csr -config $1_cert.cfg -batch -sha256 $EXTRA_ARGS
   openssl x509 -req -days $DAYS -in $1_cert.csr -sha256 -CA $2_cert.pem -CAkey \
     $2_key.pem -CAcreateserial -out $1_cert.pem -extensions v3_ca -extfile $1_cert.cfg $EXTRA_ARGS
-  echo "// NOLINT(namespace-envoy)" > $1_cert_info.h
-  echo -e "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_HASH[] =\n    \"$(openssl x509 -in $1_cert.pem -outform DER | openssl dgst -sha256 | cut -d" " -f2)\";" >> $1_cert_info.h
-  echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_SPKI[] = \"$(openssl x509 -in $1_cert.pem -noout -pubkey | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | openssl enc -base64)\";" >> $1_cert_info.h
-  echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_SERIAL[] = \"$(openssl x509 -in $1_cert.pem -noout -serial | cut -d"=" -f2 | awk '{print tolower($0)}')\";" >> $1_cert_info.h
-  echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_NOT_BEFORE[] = \"$(openssl x509 -in $1_cert.pem -noout -startdate | cut -d"=" -f2)\";" >> $1_cert_info.h
-  echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_NOT_AFTER[] = \"$(openssl x509 -in $1_cert.pem -noout -enddate | cut -d"=" -f2)\";" >> $1_cert_info.h
+  generate_info_header $1
 }
 
-# $1=<certificate name>
+# $1=<certificate name> $2=[certificate file name]
 generate_selfsigned_x509_cert() {
-  openssl req -new -x509 -days 730 -key $1_key.pem -out $1_cert.pem -config $1_cert.cfg -batch -sha256
+  if [[ "$2" != "" ]]; then local OUTPUT_PREFIX=$2; else local OUTPUT_PREFIX=$1; fi
+  openssl req -new -x509 -days 730 -key $1_key.pem -out ${OUTPUT_PREFIX}_cert.pem -config $1_cert.cfg -batch -sha256
+  generate_info_header $OUTPUT_PREFIX
 }
 
 # Generate ca_cert.pem.
@@ -92,18 +100,26 @@ generate_x509_cert san_uri ca
 
 # Generate password_protected_cert.pem.
 cp -f san_uri_cert.cfg password_protected_cert.cfg
-generate_rsa_key password_protected "p4ssw0rd"
+generate_rsa_key password_protected "" "p4ssw0rd"
 generate_x509_cert password_protected ca
 rm -f password_protected_cert.cfg
 
-# Generate selfsigned_cert.pem.
+# Generate selfsigned*_cert.pem.
 generate_rsa_key selfsigned
 generate_selfsigned_x509_cert selfsigned
+generate_selfsigned_x509_cert selfsigned selfsigned2
+
+# Generate selfsigned_rsa_1024.pem
+cp -f selfsigned_cert.cfg selfsigned_rsa_1024_cert.cfg
+generate_rsa_key selfsigned_rsa_1024 1024
+generate_selfsigned_x509_cert selfsigned_rsa_1024
+rm -f selfsigned_rsa_1024_cert.cfg
 
 # Generate selfsigned_ecdsa_p256_cert.pem.
 cp -f selfsigned_cert.cfg selfsigned_ecdsa_p256_cert.cfg
 generate_ecdsa_key selfsigned_ecdsa_p256
 generate_selfsigned_x509_cert selfsigned_ecdsa_p256
+generate_selfsigned_x509_cert selfsigned_ecdsa_p256 selfsigned2_ecdsa_p256
 rm -f selfsigned_ecdsa_p256_cert.cfg
 
 # Generate selfsigned_ecdsa_p384_cert.pem.

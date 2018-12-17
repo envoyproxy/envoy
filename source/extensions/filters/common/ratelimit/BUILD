@@ -53,5 +53,6 @@ envoy_cc_library(
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/tracing:http_tracer_interface",
+        "@envoy_api//envoy/config/ratelimit/v2:rls_cc",
     ],
 )
