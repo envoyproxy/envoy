@@ -44,15 +44,47 @@ protected:
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
 };
 
+// Verifies that an incoming request with too small a request body will immediately fail.
+TEST_F(GrpcShimTest, InvalidGrcpRequest) {
+  initialize();
+  decoder_callbacks_.is_grpc_request_ = true;
+
+  {
+    EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+    Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
+                                     {"content-length", "25"},
+                                     {":path", "/testing.ExampleService/SendData"}});
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+  }
+
+  {
+    // We should remove the first five bytes.
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abc", 3);
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).WillOnce(Invoke([](auto& headers, auto) {
+      EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Status, "200"));
+      EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
+      EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcMessage, "invalid request body"));
+    }));
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, false));
+  }
+}
+
 // Tests that the filter passes a non-GRPC request through without modification.
 TEST_F(GrpcShimTest, NoGrpcRequest) {
   initialize();
 
   {
-    Http::TestHeaderMapImpl headers({{"content-type", "application/json"}});
+    Http::TestHeaderMapImpl headers(
+        {{"content-type", "application/json"}, {"content-length", "10"}});
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-    // Ensure we didn't mutate content type.
+    // Ensure we didn't mutate content type or length.
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/json"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "10"));
   }
 
   {
@@ -65,10 +97,11 @@ TEST_F(GrpcShimTest, NoGrpcRequest) {
   Http::TestHeaderMapImpl trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
 
-  Http::TestHeaderMapImpl headers({{"content-type", "application/json"}});
+  Http::TestHeaderMapImpl headers({{"content-type", "application/json"}, {"content-length", "20"}});
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
-  // Ensure we didn't mutate content type.
+  // Ensure we didn't mutate content type or length.
   EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/json"));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
 
   Envoy::Buffer::OwnedImpl buffer;
   buffer.add("test", 4);
@@ -84,11 +117,13 @@ TEST_F(GrpcShimTest, GrpcRequest) {
 
   {
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
-    Http::TestHeaderMapImpl headers(
-        {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
+    Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
+                                     {"content-length", "25"},
+                                     {":path", "/testing.ExampleService/SendData"}});
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
   }
 
@@ -113,9 +148,11 @@ TEST_F(GrpcShimTest, GrpcRequest) {
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
   }
 
-  Http::TestHeaderMapImpl headers({{":status", "200"}, {"content-type", "application/x-protobuf"}});
+  Http::TestHeaderMapImpl headers(
+      {{":status", "200"}, {"content-length", "30"}, {"content-type", "application/x-protobuf"}});
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "35"));
 
   {
     // First few calls should drain the buffer
@@ -151,6 +188,85 @@ TEST_F(GrpcShimTest, GrpcRequest) {
   }
 }
 
+// Tests that a gRPC is downgraded to application/x-protobuf and upgraded back
+// to gRPC and that content length headers are not required.
+// Same as GrpcShimTest.GrpcRequest except no content-length header is passed.
+TEST_F(GrpcShimTest, GrpcRequestNoContentLength) {
+  initialize();
+  decoder_callbacks_.is_grpc_request_ = true;
+
+  {
+    EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+    Http::TestHeaderMapImpl headers(
+        {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    // Ensure that we don't insert a content-length header.
+    EXPECT_EQ(nullptr, headers.ContentLength());
+  }
+
+  {
+    // We should remove the first five bytes.
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abcdefgh", 8);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
+    EXPECT_EQ("fgh", buffer.toString());
+  }
+
+  {
+    // Subsequent calls to decodeData should do nothing.
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abcdefgh", 8);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
+    EXPECT_EQ("abcdefgh", buffer.toString());
+  }
+
+  {
+    Http::TestHeaderMapImpl trailers;
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
+  }
+
+  Http::TestHeaderMapImpl headers({{":status", "200"}, {"content-type", "application/x-protobuf"}});
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  // Ensure that we don't insert a content-length header.
+  EXPECT_EQ(nullptr, headers.ContentLength());
+
+  {
+    // First few calls should drain the buffer
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abc", 4);
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(buffer, false));
+    EXPECT_EQ(0, buffer.length());
+  }
+  {
+    // First few calls should drain the buffer
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("def", 4);
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(buffer, false));
+    EXPECT_EQ(0, buffer.length());
+  }
+  {
+    // Last call should prefix the buffer with the size and insert the gRPC status into trailers.
+    Http::TestHeaderMapImpl trailers;
+    EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
+
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("ghj", 4);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, true));
+    EXPECT_EQ(17, buffer.length());
+    EXPECT_THAT(trailers, HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
+
+    Grpc::Decoder decoder;
+    std::vector<Grpc::Frame> frames;
+    decoder.decode(buffer, frames);
+
+    EXPECT_EQ(1, frames.size());
+    EXPECT_EQ(12, frames[0].length_);
+  }
+}
 // Tests that a gRPC is downgraded to application/x-protobuf and upgraded back
 // to gRPC, and that the upstream 400 is converted into an internal (13)
 // grpc-status.

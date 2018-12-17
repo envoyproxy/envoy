@@ -28,6 +28,17 @@ Envoy::Grpc::Status::GrpcStatus grpcStatusFromHeaders(Envoy::Http::HeaderMap& he
     return Envoy::Grpc::Utility::httpToGrpcStatus(http_response_status);
   }
 }
+
+void adjustContentLength(Envoy::Http::HeaderMap& headers,
+                         std::function<uint64_t(uint64_t value)> adjustment) {
+  auto length_header = headers.ContentLength();
+  if (length_header != nullptr) {
+    uint64_t length;
+    if (Envoy::StringUtil::atoul(length_header->value().c_str(), length)) {
+      length_header->value(adjustment(length));
+    }
+  }
+}
 } // namespace
 
 namespace Envoy {
@@ -55,6 +66,9 @@ Http::FilterHeadersStatus GrpcShim::decodeHeaders(Http::HeaderMap& headers, bool
     headers.ContentType()->value(upstream_content_type_);
     headers.insertAccept().value(upstream_content_type_);
 
+    // Adjust the content-length header to account for us removing the gRPC frame header.
+    adjustContentLength(headers, [](auto size) { return size - Grpc::GRPC_FRAME_HEADER_SIZE; });
+
     // Clear the route cache to recompute the cache. This provides additional
     // flexibility around request modification through the route table.
     decoder_callbacks_->clearRouteCache();
@@ -64,10 +78,16 @@ Http::FilterHeadersStatus GrpcShim::decodeHeaders(Http::HeaderMap& headers, bool
 }
 
 Http::FilterDataStatus GrpcShim::decodeData(Buffer::Instance& buffer, bool) {
-  // If this is a gRPC request and this is the start of DATA, remove the first 5
-  // bytes. These correspond to the gRPC data header.
   if (enabled_ && !prefix_stripped_) {
-    buffer.drain(5);
+    // Fail the request if the body is too small to possibly contain a gRPC frame.
+    if (buffer.length() < Grpc::GRPC_FRAME_HEADER_SIZE) {
+      decoder_callbacks_->sendLocalReply(Http::Code::OK, "invalid request body", nullptr,
+                                         Grpc::Status::GrpcStatus::Unknown);
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+
+    // Remove the gRPC frame header.
+    buffer.drain(Grpc::GRPC_FRAME_HEADER_SIZE);
     prefix_stripped_ = true;
   }
 
@@ -96,6 +116,8 @@ Http::FilterHeadersStatus GrpcShim::encodeHeaders(Http::HeaderMap& headers, bool
     // Restore the content-type to match what the downstream sent.
     content_type->value(content_type_);
 
+    // Adjust content-length to account for the frame header that's added.
+    adjustContentLength(headers, [](auto length) { return length + Grpc::GRPC_FRAME_HEADER_SIZE; });
     // We can only insert trailers at the end of data, so keep track of this value
     // until then.
     grpc_status_ = grpcStatusFromHeaders(headers);
@@ -123,11 +145,11 @@ Http::FilterDataStatus GrpcShim::encodeData(Buffer::Instance& buffer, bool end_s
     // response body.
     const auto length = htonl(buffer.length() + buffer_.length());
 
-    std::array<uint8_t, 5> frame;
+    std::array<uint8_t, Grpc::GRPC_FRAME_HEADER_SIZE> frame;
     Grpc::Encoder().newFrame(Grpc::GRPC_FH_DEFAULT, htonl(length), frame);
 
     Buffer::OwnedImpl prefix_buffer;
-    prefix_buffer.add(frame.data(), 5);
+    prefix_buffer.add(frame.data(), frame.size());
     prefix_buffer.move(buffer_);
     prefix_buffer.move(buffer);
 
