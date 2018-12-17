@@ -283,7 +283,7 @@ public:
   /**
    * @return uint32_t the overprovisioning factor of this host set.
    */
-  virtual uint32_t overprovisioning_factor() const PURE;
+  virtual uint32_t overprovisioningFactor() const PURE;
 };
 
 typedef std::unique_ptr<HostSet> HostSetPtr;

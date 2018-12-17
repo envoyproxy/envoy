@@ -63,8 +63,8 @@ public:
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
                                  absl::optional<uint32_t> overprovisioning_factor));
   MOCK_CONST_METHOD0(priority, uint32_t());
-  uint32_t overprovisioning_factor() const override { return overprovisioning_factor_; }
-  void set_overprovisioning_factor(const uint32_t overprovisioning_factor) {
+  uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
+  void setOverprovisioningFactor(const uint32_t overprovisioning_factor) {
     overprovisioning_factor_ = overprovisioning_factor;
   }
 
