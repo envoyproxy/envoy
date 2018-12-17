@@ -313,7 +313,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
     throw EnvoyException("No TLS certificates found for server context");
   } else if (!config.common_tls_context().tls_certificates().empty() &&
              !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {
-    throw EnvoyException("Static and dynamic TLS certificates may not be mixed in server contexts");
+    throw EnvoyException("SDS and non-SDS TLS certificates may not be mixed in server contexts");
   }
 }
 

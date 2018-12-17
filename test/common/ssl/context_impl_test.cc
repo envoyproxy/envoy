@@ -995,7 +995,7 @@ TEST(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
   tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl server_context_config(tls_context, factory_context), EnvoyException,
-      "Static and dynamic TLS certificates may not be mixed in server contexts");
+      "SDS and non-SDS TLS certificates may not be mixed in server contexts");
 }
 
 TEST(ServerContextConfigImplTest, MultiSdsConfig) {
