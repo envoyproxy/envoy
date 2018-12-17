@@ -130,7 +130,7 @@ config_setting(
 )
 
 config_setting(
-    name = "use_boringssl_fips",
+    name = "boringssl_fips",
     constraint_values = [
         "@bazel_tools//platforms:linux",
         "@bazel_tools//platforms:x86_64",
@@ -144,7 +144,7 @@ config_setting(
 alias(
     name = "boringssl",
     actual = select({
-        "//bazel:use_boringssl_fips": "@envoy_deps//:boringssl_fips",
+        "//bazel:boringssl_fips": "@envoy_deps//:boringssl_fips",
         "//conditions:default": "@boringssl//:ssl",
     }),
 )

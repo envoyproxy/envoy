@@ -563,8 +563,8 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
         "//conditions:default": default or [],
     })
 
-def envoy_select_boringssl(default, if_fips):
+def envoy_select_boringssl(if_fips, default = None):
     return select({
-        "@envoy//bazel:use_boringssl_fips": if_fips,
-        "//conditions:default": default,
+        "@envoy//bazel:boringssl_fips": if_fips,
+        "//conditions:default": default or [],
     })
