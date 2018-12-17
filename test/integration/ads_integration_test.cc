@@ -597,8 +597,6 @@ public:
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     XdsIntegrationTestBase::initialize();
   }
-
-  FakeStreamPtr xds_stream_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsFailIntegrationTest,
@@ -651,8 +649,6 @@ public:
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     XdsIntegrationTestBase::initialize();
   }
-
-  FakeStreamPtr xds_stream_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsConfigIntegrationTest,
