@@ -33,6 +33,7 @@ cc_library(
         "thirdparty_build/lib/libcrypto.a",
     ],
     hdrs = glob(["thirdparty_build/include/openssl/**/*.h"]),
+    defines = ["BORINGSSL_FIPS"],
     includes = ["thirdparty_build/include"],
 )
 
