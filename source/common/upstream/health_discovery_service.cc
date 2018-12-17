@@ -80,7 +80,7 @@ HdsDelegate::sendResponse() {
         Network::Utility::addressToProtobufAddress(
             *host->address(), *endpoint->mutable_endpoint()->mutable_address());
         // TODO(lilika): Add support for more granular options of envoy::api::v2::core::HealthStatus
-        if (host->healthy()) {
+        if (host->health() == Host::Health::Healthy) {
           endpoint->set_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
         } else {
           if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::TIMEOUT) {
@@ -210,16 +210,6 @@ HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& 
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-HostVectorConstSharedPtr HdsCluster::createHealthyHostList(const HostVector& hosts) {
-  HostVectorSharedPtr healthy_list(new HostVector());
-  for (const auto& host : hosts) {
-    if (host->healthy()) {
-      healthy_list->emplace_back(host);
-    }
-  }
-  return healthy_list;
-}
-
 ClusterInfoConstSharedPtr ProdClusterInfoFactory::createClusterInfo(
     Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
     const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
@@ -258,10 +248,10 @@ void HdsCluster::initialize(std::function<void()> callback) {
   }
 
   auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-  auto healthy = createHealthyHostList(*initial_hosts_);
 
-  first_host_set.updateHosts(initial_hosts_, healthy, HostsPerLocalityImpl::empty(),
-                             HostsPerLocalityImpl::empty(), {}, *initial_hosts_, {}, absl::nullopt);
+  first_host_set.updateHosts(
+      HostSetImpl::partitionHosts(initial_hosts_, HostsPerLocalityImpl::empty()), {},
+      *initial_hosts_, {}, absl::nullopt);
 }
 
 void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {

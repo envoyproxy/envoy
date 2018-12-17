@@ -21,12 +21,22 @@ public:
   virtual bool rejects(const std::string& name) const PURE;
 
   /**
-   * @return bool whether StatsMatcher trivially accepts all stats.
+   * Helps determine whether the matcher needs to be called. This can be used
+   * to short-circuit elaboration of stats names.
+   *
+   * @return bool whether StatsMatcher can be statically determined to accept
+   *              all stats. It's possible to construct a matcher where
+   *              acceptsAll() returns false, but rejects() is always false.
    */
   virtual bool acceptsAll() const PURE;
 
   /**
-   * @return bool whether StatsMatcher trivially rejects all stats.
+   * Helps determine whether the matcher needs to be called. This can be used
+   * to short-circuit elaboration of stats names.
+   *
+   * @return bool whether StatsMatcher can be statically determined to reject
+   *              all stats. It's possible to construct a matcher where
+   *              rejectsAll() returns false, but rejects() is always true.
    */
   virtual bool rejectsAll() const PURE;
 };

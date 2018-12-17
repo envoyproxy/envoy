@@ -1,5 +1,5 @@
 # What are the identities, certificates and keys
-There are 14 identities:
+There are 15 identities:
 - **CA**: Certificate Authority for **No SAN**, **SAN With URI** and **SAN With
   DNS**. It has the self-signed certificate *ca_cert.pem*. *ca_key.pem* is its
   private key. Additionally, we create a CRL for this CA (*ca_cert.crl*) that
@@ -32,6 +32,9 @@ There are 14 identities:
   its private key encrypted using the password supplied in *password_protectted_password.txt*.
 - **Self-signed**: The self-signed certificate *selfsigned_cert.pem*, using the
   config *selfsigned_cert.cfg*. *selfsigned_key.pem* is its private key.
+- **Self-signed RSA 1024**: The self-signed certificate *selfsigned_rsa_1024_cert.pem*,
+  using the config *selfsigned_cert.cfg*. *selfsigned_rsa_1024_key.pem* is
+  its private key.
 - **Self-signed ECDSA P-256**: The self-signed certificate *selfsigned_ecdsa_p256_cert.pem*,
   using the config *selfsigned_cert.cfg*. *selfsigned_ecdsa_p256_key.pem* is
   its private key.

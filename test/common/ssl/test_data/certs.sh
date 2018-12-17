@@ -5,16 +5,17 @@ set -e
 # $1=<CA name> $2=[issuer name]
 generate_ca() {
   if [[ "$2" != "" ]]; then local EXTRA_ARGS="-CA $2_cert.pem -CAkey $2_key.pem -CAcreateserial"; fi
-  openssl genrsa -out $1_key.pem 1024
+  openssl genrsa -out $1_key.pem 2048
   openssl req -new -key $1_key.pem -out $1_cert.csr -config $1_cert.cfg -batch -sha256
   openssl x509 -req -days 730 -in $1_cert.csr -signkey $1_key.pem -out $1_cert.pem \
     -extensions v3_ca -extfile $1_cert.cfg $EXTRA_ARGS
 }
 
-# $1=<certificate name> $2=[password]
+# $1=<certificate name> $2=[key size] $3=[password]
 generate_rsa_key() {
-  if [[ "$2" != "" ]]; then echo -n "$2" > $1_password.txt; local EXTRA_ARGS="-aes128 -passout file:$1_password.txt"; fi
-  openssl genrsa -out $1_key.pem $EXTRA_ARGS 1024
+  if [[ "$2" != "" ]]; then local KEYSIZE=$2; else local KEYSIZE="2048"; fi
+  if [[ "$3" != "" ]]; then echo -n "$3" > $1_password.txt; local EXTRA_ARGS="-aes128 -passout file:$1_password.txt"; fi
+  openssl genrsa -out $1_key.pem $EXTRA_ARGS $KEYSIZE
 }
 
 # $1=<certificate name> $2=[curve]
@@ -92,13 +93,19 @@ generate_x509_cert san_uri ca
 
 # Generate password_protected_cert.pem.
 cp -f san_uri_cert.cfg password_protected_cert.cfg
-generate_rsa_key password_protected "p4ssw0rd"
+generate_rsa_key password_protected "" "p4ssw0rd"
 generate_x509_cert password_protected ca
 rm -f password_protected_cert.cfg
 
 # Generate selfsigned_cert.pem.
 generate_rsa_key selfsigned
 generate_selfsigned_x509_cert selfsigned
+
+# Generate selfsigned_rsa_1024.pem
+cp -f selfsigned_cert.cfg selfsigned_rsa_1024_cert.cfg
+generate_rsa_key selfsigned_rsa_1024 1024
+generate_selfsigned_x509_cert selfsigned_rsa_1024
+rm -f selfsigned_rsa_1024_cert.cfg
 
 # Generate selfsigned_ecdsa_p256_cert.pem.
 cp -f selfsigned_cert.cfg selfsigned_ecdsa_p256_cert.cfg

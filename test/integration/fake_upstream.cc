@@ -114,11 +114,9 @@ void FakeStream::encodeResetStream() {
       [this]() -> void { encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset); });
 }
 
-void FakeStream::encodeMetadata(const Http::MetadataMap& metadata_map) {
-  std::shared_ptr<Http::MetadataMap> metadata_map_copy(
-      new Http::MetadataMap(static_cast<const Http::MetadataMap&>(metadata_map)));
+void FakeStream::encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) {
   parent_.connection().dispatcher().post(
-      [this, metadata_map_copy]() -> void { encoder_.encodeMetadata(*metadata_map_copy); });
+      [this, &metadata_map_vector]() -> void { encoder_.encodeMetadata(metadata_map_vector); });
 }
 
 void FakeStream::onResetStream(Http::StreamResetReason) {

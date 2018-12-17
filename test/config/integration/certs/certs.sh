@@ -4,7 +4,7 @@ set -e
 
 # $1=<CA name>
 generate_ca() {
-  openssl genrsa -out $1key.pem 1024
+  openssl genrsa -out $1key.pem 2048
   openssl req -new -key $1key.pem -out $1cert.csr -config $1cert.cfg -batch -sha256
   openssl x509 -req -days 730 -in $1cert.csr -signkey $1key.pem -out $1cert.pem \
     -extensions v3_ca -extfile $1cert.cfg
@@ -12,7 +12,7 @@ generate_ca() {
 
 # $1=<certificate name>
 generate_rsa_key() {
-  openssl genrsa -out $1key.pem 1024
+  openssl genrsa -out $1key.pem 2048
 }
 
 # $1=<certificate name>
