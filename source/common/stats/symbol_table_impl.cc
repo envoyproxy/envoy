@@ -13,26 +13,25 @@ namespace Stats {
 static const uint32_t SpilloverMask = 0x80;
 static const uint32_t Low7Bits = 0x7f;
 
-StatName::StatName(const StatName& src, SymbolStorage memory) : symbol_array_(memory) {
-  memcpy(memory, src.symbolArray(), src.numBytesIncludingLength());
-  // src.symbol_array_ = nullptr;  // transfers ownership.
+StatName::StatName(const StatName& src, SymbolStorage memory) : size_and_data_(memory) {
+  memcpy(memory, src.size_and_data_, src.size());
 }
 
 std::string StatName::toString(const SymbolTable& table) const {
-  return table.decode(data(), numBytes());
+  return table.decode(data(), dataSize());
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
-  if (symbol_array_ == nullptr) {
+  if (size_and_data_ == nullptr) {
     std::cout << "Null StatName" << std::endl << std::flush;
   } else {
-    uint64_t nbytes = numBytes();
-    std::cout << "numBytes=" << nbytes << ":";
+    uint64_t nbytes = dataSize();
+    std::cout << "dataSize=" << nbytes << ":";
     for (uint64_t i = 0; i < nbytes; ++i) {
       std::cout << " " << static_cast<uint64_t>(data()[i]);
     }
-    SymbolVec encoding = SymbolEncoding::decodeSymbols(data(), numBytes());
+    SymbolVec encoding = SymbolEncoding::decodeSymbols(data(), dataSize());
     std::cout << ", numSymbols=" << encoding.size() << ":";
     for (Symbol symbol : encoding) {
       std::cout << " " << symbol;
@@ -163,7 +162,7 @@ std::string SymbolTable::decodeSymbolVec(const SymbolVec& symbols) const {
 
 void SymbolTable::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolStorage.
-  SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.numBytes());
+  SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
   absl::ReaderMutexLock lock(&lock_);
   for (Symbol symbol : symbols) {
@@ -179,7 +178,7 @@ void SymbolTable::incRefCount(const StatName& stat_name) {
 
 void SymbolTable::free(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolStorage.
-  SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.numBytes());
+  SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
   absl::MutexLock lock(&lock_); // Takes write-lock as we may mutate decode_map_ and encode_map_.
   for (Symbol symbol : symbols) {
@@ -249,7 +248,7 @@ Symbol SymbolTable::toSymbol(absl::string_view sv) {
     ++(shared_symbol.ref_count_);
 
     // Note: this condition is hard to hit in tests as it requires a tight race
-    // between multiple threads concurrently creaeting the same symbol.
+    // between multiple threads concurrently creating the same symbol.
     // Uncommenting this line can help rapidly determine coverage during
     // development. StatNameTest.RacingSymbolCreation hits this occasionally
     // when testing with optimization, and frequently with fastbuild and debug.
@@ -281,8 +280,8 @@ bool SymbolTable::lessThan(const StatName& a, const StatName& b) const {
   // If this becomes a performance bottleneck (e.g. during sorting), we could
   // provide an iterator-like interface for incrementally decoding the symbols
   // without allocating memory.
-  SymbolVec av = SymbolEncoding::decodeSymbols(a.data(), a.numBytes());
-  SymbolVec bv = SymbolEncoding::decodeSymbols(b.data(), b.numBytes());
+  SymbolVec av = SymbolEncoding::decodeSymbols(a.data(), a.dataSize());
+  SymbolVec bv = SymbolEncoding::decodeSymbols(b.data(), b.dataSize());
   for (uint64_t i = 0, n = std::min(av.size(), bv.size()); i < n; ++i) {
     if (av[i] != bv[i]) {
       absl::ReaderMutexLock lock(&lock_);
@@ -316,7 +315,7 @@ StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table) {
 }
 
 StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
-  uint64_t size = src.numBytesIncludingLength();
+  uint64_t size = src.size();
   bytes_ = std::make_unique<uint8_t[]>(size);
   src.copyToStorage(bytes_.get());
   table.incRefCount(statName());
@@ -336,8 +335,8 @@ void StatNameStorage::free(SymbolTable& table) {
 }
 
 StatNameJoiner::StatNameJoiner(StatName a, StatName b) {
-  const uint64_t a_size = a.numBytes();
-  const uint64_t b_size = b.numBytes();
+  const uint64_t a_size = a.dataSize();
+  const uint64_t b_size = b.dataSize();
   uint8_t* const p = alloc(a_size + b_size);
   memcpy(p, a.data(), a_size);
   memcpy(p + a_size, b.data(), b_size);
@@ -346,11 +345,11 @@ StatNameJoiner::StatNameJoiner(StatName a, StatName b) {
 StatNameJoiner::StatNameJoiner(const std::vector<StatName>& stat_names) {
   uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
-    num_bytes += stat_name.numBytes();
+    num_bytes += stat_name.dataSize();
   }
   uint8_t* p = alloc(num_bytes);
   for (StatName stat_name : stat_names) {
-    num_bytes = stat_name.numBytes();
+    num_bytes = stat_name.dataSize();
     memcpy(p, stat_name.data(), num_bytes);
     p += num_bytes;
   }

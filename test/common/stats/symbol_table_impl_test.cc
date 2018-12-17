@@ -27,7 +27,7 @@ protected:
   }
 
   SymbolVec getSymbols(StatName stat_name) {
-    return SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.numBytes());
+    return SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
   }
   std::string decodeSymbolVec(const SymbolVec& symbol_vec) {
     return table_.decodeSymbolVec(symbol_vec);
@@ -320,12 +320,12 @@ namespace {
 
 // This class functions like absl::Notification except the usage of SignalAll()
 // appears to trigger tighter simultaneous wakeups in multiple threads. Note
-// that the synchroniziation mechanism in
+// that the synchronization mechanism in
 //     https://github.com/abseil/abseil-cpp/blob/master/absl/synchronization/notification.h
-// is quite different, and though functionally similar, has timing properties
-// that do not seem to trigger the race condition in SymbolTable::toSymbol()
-// where the find() under read-lock fails, but by the time the insert() under
-// write-lock occurs, the symbol has been added by another thread.
+// has timing properties that do not seem to trigger the race condition in
+// SymbolTable::toSymbol() where the find() under read-lock fails, but by the
+// time the insert() under write-lock occurs, the symbol has been added by
+// another thread.
 class Notifier {
 public:
   Notifier() : cond_(false) {}

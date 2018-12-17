@@ -41,7 +41,7 @@ using SymbolStorage = uint8_t[];
  * We encode the byte-size of a StatName as its first two bytes.
  */
 constexpr uint64_t StatNameSizeEncodingBytes = 2;
-constexpr uint64_t StatNameMaxSize = 65536;
+constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65536
 
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
@@ -95,7 +95,7 @@ public:
    */
   uint64_t moveToStorage(SymbolStorage array);
 
-  void swap(SymbolEncoding& src) { vec_.swap(src.vec_); }
+  // void swap(SymbolEncoding& src) { vec_.swap(src.vec_); }
 
 private:
   std::vector<uint8_t> vec_;
@@ -229,8 +229,7 @@ private:
     std::atomic<uint32_t> ref_count_;
   };
 
-  // This must be called during both encode() and free().
-  // mutable Thread::MutexBasicLockable lock_;]
+  // This must be held during both encode() and free().
   mutable absl::Mutex lock_;
 
   std::string decodeSymbolVec(const SymbolVec& symbols) const;
@@ -337,15 +336,14 @@ class StatName {
 public:
   // Constructs a StatName object directly referencing the storage of another
   // StatName.
-  explicit StatName(const SymbolStorage symbol_array) : symbol_array_(symbol_array) {}
+  explicit StatName(const SymbolStorage symbol_array) : size_and_data_(symbol_array) {}
 
   // Constructs an empty StatName object.
-  StatName() : symbol_array_(nullptr) {}
+  StatName() : size_and_data_(nullptr) {}
 
   // Constructs a StatName object with new storage, which must be of size
-  // src.numBytesIncludingLenggth(). This is used in the a flow where we first
-  // construct a StatName for lookup in a cache, and then on a miss need/ to
-  // store the data directly.
+  // src.size(). This is used in the a flow where we first construct a StatName
+  // for lookup in a cache, and then on a miss need to store the data directly.
   StatName(const StatName& src, SymbolStorage memory);
 
   std::string toString(const SymbolTable& table) const;
@@ -358,12 +356,12 @@ public:
    */
   uint64_t hash() const {
     const char* cdata = reinterpret_cast<const char*>(data());
-    return HashUtil::xxHash64(absl::string_view(cdata, numBytes()));
+    return HashUtil::xxHash64(absl::string_view(cdata, dataSize()));
   }
 
   bool operator==(const StatName& rhs) const {
-    const uint64_t sz = numBytes();
-    return sz == rhs.numBytes() && memcmp(data(), rhs.data(), sz * sizeof(uint8_t)) == 0;
+    const uint64_t sz = dataSize();
+    return sz == rhs.dataSize() && memcmp(data(), rhs.data(), sz * sizeof(uint8_t)) == 0;
   }
   bool operator!=(const StatName& rhs) const { return !(*this == rhs); }
 
@@ -371,21 +369,17 @@ public:
    * @return uint64_t the number of bytes in the symbol array, excluding the two-byte
    *                  overhead for the size itself.
    */
-  uint64_t numBytes() const {
-    return symbol_array_[0] | (static_cast<uint64_t>(symbol_array_[1]) << 8);
+  uint64_t dataSize() const {
+    return size_and_data_[0] | (static_cast<uint64_t>(size_and_data_[1]) << 8);
   }
-
-  const uint8_t* symbolArray() const { return symbol_array_; }
 
   /**
    * @return uint64_t the number of bytes in the symbol array, including the two-byte
    *                  overhead for the size itself.
    */
-  uint64_t numBytesIncludingLength() const { return numBytes() + StatNameSizeEncodingBytes; }
+  uint64_t size() const { return dataSize() + StatNameSizeEncodingBytes; }
 
-  void copyToStorage(SymbolStorage storage) {
-    memcpy(storage, symbol_array_, numBytesIncludingLength());
-  }
+  void copyToStorage(SymbolStorage storage) { memcpy(storage, size_and_data_, size()); }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
@@ -394,10 +388,10 @@ public:
   /**
    * @return uint8_t* A pointer to the first byte of data (skipping over size bytes).
    */
-  const uint8_t* data() const { return symbol_array_ + StatNameSizeEncodingBytes; }
+  const uint8_t* data() const { return size_and_data_ + StatNameSizeEncodingBytes; }
 
 private:
-  const uint8_t* symbol_array_;
+  const uint8_t* size_and_data_;
 };
 
 StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
