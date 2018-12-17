@@ -317,7 +317,8 @@ TEST_F(SslContextImplTest, AtMostOneRsaCert) {
   MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context);
   EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
-                          EnvoyException, "at most one RSA certificate may be specified");
+                          EnvoyException,
+                          "at most one certificate of a given type may be specified");
 }
 
 // Multiple ECDSA certificates are rejected.
@@ -339,7 +340,8 @@ TEST_F(SslContextImplTest, AtMostOneEcdsaCert) {
   MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context);
   EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
-                          EnvoyException, "at most one ECDSA certificate may be specified");
+                          EnvoyException,
+                          "at most one certificate of a given type may be specified");
 }
 
 class SslServerContextImplTicketTest : public SslContextImplTest {
