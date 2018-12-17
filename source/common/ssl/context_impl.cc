@@ -204,6 +204,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     }
   }
 
+  std::unordered_set<int> cert_pkey_ids;
   for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
     auto& ctx = tls_contexts_[i];
     // Load certificate chain.
@@ -247,7 +248,14 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     }
 
     bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
-    switch (EVP_PKEY_id(public_key.get())) {
+    const int pkey_id = EVP_PKEY_id(public_key.get());
+    if (!cert_pkey_ids.insert(pkey_id).second) {
+      throw EnvoyException(fmt::format("Failed to load certificate chain from {}, at most one "
+                                       "certificate of a given type may be specified",
+                                       ctx.cert_chain_file_path_));
+    }
+    ctx.is_ecdsa_ = pkey_id == EVP_PKEY_EC;
+    switch (pkey_id) {
     case EVP_PKEY_EC: {
       // We only support P-256 ECDSA today.
       const EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
@@ -255,7 +263,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
       ASSERT(ecdsa_public_key != nullptr);
       const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
       if (ecdsa_group == nullptr || EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
-        throw EnvoyException(fmt::format("Failed to load certificate from chain {}, only P-256 "
+        throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only P-256 "
                                          "ECDSA certificates are supported",
                                          ctx.cert_chain_file_path_));
       }
@@ -268,7 +276,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
       ASSERT(rsa_public_key != nullptr);
       const unsigned rsa_key_length = RSA_size(rsa_public_key);
       if (rsa_key_length < 2048 / 8) {
-        throw EnvoyException(fmt::format("Failed to load certificate from chain {}, only RSA "
+        throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only RSA "
                                          "certificates with 2048-bit or larger keys are supported",
                                          ctx.cert_chain_file_path_));
       }

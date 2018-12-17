@@ -24,13 +24,8 @@ generate_ecdsa_key() {
   openssl ecparam -name $CURVE -genkey -out $1_key.pem
 }
 
-# $1=<certificate name> $2=<CA name> $3=[days]
-generate_x509_cert() {
-  if [[ "$3" != "" ]]; then local DAYS=$3; else local DAYS="730"; fi
-  if [[ -f $1_password.txt ]]; then local EXTRA_ARGS="-passin file:$1_password.txt"; fi
-  openssl req -new -key $1_key.pem -out $1_cert.csr -config $1_cert.cfg -batch -sha256 $EXTRA_ARGS
-  openssl x509 -req -days $DAYS -in $1_cert.csr -sha256 -CA $2_cert.pem -CAkey \
-    $2_key.pem -CAcreateserial -out $1_cert.pem -extensions v3_ca -extfile $1_cert.cfg $EXTRA_ARGS
+# $1=<certificate name>
+generate_info_header() {
   echo "// NOLINT(namespace-envoy)" > $1_cert_info.h
   echo -e "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_HASH[] =\n    \"$(openssl x509 -in $1_cert.pem -outform DER | openssl dgst -sha256 | cut -d" " -f2)\";" >> $1_cert_info.h
   echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_SPKI[] = \"$(openssl x509 -in $1_cert.pem -noout -pubkey | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | openssl enc -base64)\";" >> $1_cert_info.h
@@ -39,9 +34,21 @@ generate_x509_cert() {
   echo "constexpr char TEST_$(echo $1 | tr a-z A-Z)_CERT_NOT_AFTER[] = \"$(openssl x509 -in $1_cert.pem -noout -enddate | cut -d"=" -f2)\";" >> $1_cert_info.h
 }
 
-# $1=<certificate name>
+# $1=<certificate name> $2=<CA name> $3=[days]
+generate_x509_cert() {
+  if [[ "$3" != "" ]]; then local DAYS=$3; else local DAYS="730"; fi
+  if [[ -f $1_password.txt ]]; then local EXTRA_ARGS="-passin file:$1_password.txt"; fi
+  openssl req -new -key $1_key.pem -out $1_cert.csr -config $1_cert.cfg -batch -sha256 $EXTRA_ARGS
+  openssl x509 -req -days $DAYS -in $1_cert.csr -sha256 -CA $2_cert.pem -CAkey \
+    $2_key.pem -CAcreateserial -out $1_cert.pem -extensions v3_ca -extfile $1_cert.cfg $EXTRA_ARGS
+  generate_info_header $1
+}
+
+# $1=<certificate name> $2=[certificate file name]
 generate_selfsigned_x509_cert() {
-  openssl req -new -x509 -days 730 -key $1_key.pem -out $1_cert.pem -config $1_cert.cfg -batch -sha256
+  if [[ "$2" != "" ]]; then local OUTPUT_PREFIX=$2; else local OUTPUT_PREFIX=$1; fi
+  openssl req -new -x509 -days 730 -key $1_key.pem -out ${OUTPUT_PREFIX}_cert.pem -config $1_cert.cfg -batch -sha256
+  generate_info_header $OUTPUT_PREFIX
 }
 
 # Generate ca_cert.pem.
@@ -97,9 +104,10 @@ generate_rsa_key password_protected "" "p4ssw0rd"
 generate_x509_cert password_protected ca
 rm -f password_protected_cert.cfg
 
-# Generate selfsigned_cert.pem.
+# Generate selfsigned*_cert.pem.
 generate_rsa_key selfsigned
 generate_selfsigned_x509_cert selfsigned
+generate_selfsigned_x509_cert selfsigned selfsigned2
 
 # Generate selfsigned_rsa_1024.pem
 cp -f selfsigned_cert.cfg selfsigned_rsa_1024_cert.cfg
@@ -111,6 +119,7 @@ rm -f selfsigned_rsa_1024_cert.cfg
 cp -f selfsigned_cert.cfg selfsigned_ecdsa_p256_cert.cfg
 generate_ecdsa_key selfsigned_ecdsa_p256
 generate_selfsigned_x509_cert selfsigned_ecdsa_p256
+generate_selfsigned_x509_cert selfsigned_ecdsa_p256 selfsigned2_ecdsa_p256
 rm -f selfsigned_ecdsa_p256_cert.cfg
 
 # Generate selfsigned_ecdsa_p384_cert.pem.

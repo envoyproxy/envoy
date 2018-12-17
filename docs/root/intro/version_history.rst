@@ -80,6 +80,7 @@ Version history
 * tls: added ssl.versions.<version> to :ref:`listener metrics <config_listener_stats>` to track TLS versions in use.
 * tls: added support for :ref:`client-side session resumption <envoy_api_field_auth.UpstreamTlsContext.max_session_keys>`.
 * tls: added support for CRLs in :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
+* tls: added support for :ref:`multiple server TLS certificates <arch_overview_ssl_cert_select>`.
 * tls: added support for :ref:`password encrypted private keys <envoy_api_field_auth.TlsCertificate.password>`.
 * tls: removed support for ECDSA certificates with curves other than P-256.
 * tls: removed support for RSA certificates with keys smaller than 2048-bits.
