@@ -6,6 +6,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/grpc/common.h"
+#include "common/grpc/codec.h"
 #include "common/grpc/status.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -121,10 +122,12 @@ Http::FilterDataStatus GrpcShim::encodeData(Buffer::Instance& buffer, bool end_s
     // (unless upstream lied in content-type) we attempt to return a well-formed gRPC
     // response body.
     const auto length = htonl(buffer.length() + buffer_.length());
-    Envoy::Buffer::OwnedImpl prefix_buffer;
-    const char null = '\0';
-    prefix_buffer.add(&null, 1);
-    prefix_buffer.add(&length, 4);
+
+    std::array<uint8_t, 5> frame;
+    Grpc::Encoder().newFrame(Grpc::GRPC_FH_DEFAULT, htonl(length), frame);
+
+    Buffer::OwnedImpl prefix_buffer;
+    prefix_buffer.add(frame.data(), 5);
     prefix_buffer.move(buffer_);
     prefix_buffer.move(buffer);
 

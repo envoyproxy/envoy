@@ -4,6 +4,7 @@
 #include <string>
 
 #include "common/buffer/buffer_impl.h"
+#include "common/grpc/codec.h"
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/http/grpc_shim/grpc_shim.h"
@@ -141,13 +142,12 @@ TEST_F(GrpcShimTest, GrpcRequest) {
     EXPECT_EQ(17, buffer.length());
     EXPECT_THAT(trailers, HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
 
-    char null;
-    buffer.copyOut(0, 1, &null);
-    EXPECT_EQ('\0', null);
-    uint32_t length;
-    buffer.copyOut(1, 4, &length);
+    Grpc::Decoder decoder;
+    std::vector<Grpc::Frame> frames;
+    decoder.decode(buffer, frames);
 
-    EXPECT_EQ(12, ntohl(length));
+    EXPECT_EQ(1, frames.size());
+    EXPECT_EQ(12, frames[0].length_);
   }
 }
 
@@ -215,13 +215,13 @@ TEST_F(GrpcShimTest, GrpcRequestInternalError) {
     buffer.add("ghj", 4);
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, true));
     EXPECT_THAT(trailers, HeaderValueOf(Http::Headers::get().GrpcStatus, "13"));
-    char null;
-    buffer.copyOut(0, 1, &null);
-    EXPECT_EQ('\0', null);
-    uint32_t length;
-    buffer.copyOut(1, sizeof(length), &length);
 
-    EXPECT_EQ(12, ntohl(length));
+    Grpc::Decoder decoder;
+    std::vector<Grpc::Frame> frames;
+    decoder.decode(buffer, frames);
+
+    EXPECT_EQ(1, frames.size());
+    EXPECT_EQ(12, frames[0].length_);
   }
 }
 
