@@ -46,8 +46,6 @@ constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
 
-class StatName;
-
 /**
  * Represents an 8-bit encoding of a vector of symbols, used as a transient
  * representation during encoding and prior to retained allocation.
@@ -95,7 +93,7 @@ public:
    */
   uint64_t moveToStorage(SymbolStorage array);
 
-  // void swap(SymbolEncoding& src) { vec_.swap(src.vec_); }
+  void swap(SymbolEncoding& src) { vec_.swap(src.vec_); }
 
 private:
   std::vector<uint8_t> vec_;
@@ -336,7 +334,7 @@ class StatName {
 public:
   // Constructs a StatName object directly referencing the storage of another
   // StatName.
-  explicit StatName(const SymbolStorage symbol_array) : size_and_data_(symbol_array) {}
+  explicit StatName(const SymbolStorage size_and_data) : size_and_data_(size_and_data) {}
 
   // Constructs an empty StatName object.
   StatName() : size_and_data_(nullptr) {}
