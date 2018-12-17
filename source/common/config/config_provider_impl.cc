@@ -58,8 +58,11 @@ bool ConfigSubscriptionInstance::checkAndApplyConfig(const Protobuf::Message& co
 void ConfigSubscriptionInstance::bindConfigProvider(DynamicConfigProviderImpl* provider) {
   // All config providers bound to a ConfigSubscriptionInstance must be of the same concrete type;
   // this is assumed by checkAndApplyConfig() and is verified by the assertion below.
-  ASSERT_WITH_PRECOND(dynamic_config_providers_.empty() == false,
-                      typeid(*provider) == typeid(**dynamic_config_providers_.begin()));
+  // NOTE: a regular ASSERT() triggers a potentially evaluated expression warning from clang due to
+  // the args passed to the second typeid() call.
+  ASSERT_IGNORE_POTENTIALLY_EVALUATED(dynamic_config_providers_.empty() ||
+                                      typeid(*provider) ==
+                                          typeid(**dynamic_config_providers_.begin()));
   dynamic_config_providers_.insert(provider);
 }
 

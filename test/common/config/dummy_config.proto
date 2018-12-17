@@ -13,19 +13,15 @@ message DummyConfig {
 message DummyConfigsDump {
   message StaticConfigs {
     DummyConfig dummy_config = 1;
-
     google.protobuf.Timestamp last_updated = 2;
   }
 
   message DynamicConfigs {
     string version_info = 1;
-
     DummyConfig dummy_config = 2;
-
     google.protobuf.Timestamp last_updated = 3;
   }
 
   repeated StaticConfigs static_dummy_configs = 1;
-
   repeated DynamicConfigs dynamic_dummy_configs = 2;
 }

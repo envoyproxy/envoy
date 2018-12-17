@@ -86,6 +86,11 @@ class DynamicConfigProviderImpl;
  * Provides generic functionality required by all dynamic ConfigProvider subscriptions, including
  * shared lifetime management via shared_ptr.
  *
+ * To do so, this class keeps track of a set of dynamic config providers associated with an
+ * underlying subscription; providers are bound/unbound as needed as they are created and destroyed.
+ * This is done to avoid exposing shared ownership semantics to the external API (see
+ * ConfigProvider).
+ *
  * This class can not be instantiated directly; instead, it provides the foundation for
  * dynamic config subscription implementations which derive from it.
  */

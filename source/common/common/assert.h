@@ -57,20 +57,15 @@ namespace Envoy {
 
 // clang-format off
 
-// The clang specific pragmas below are required to suppress errors due to
-// -Wpotentially-evaluated-expression, which can be ignored in the context of assertions since
-// type checks using typeid can trigger it.
-#define ASSERT_WITH_PRECOND(PRECOND, COND)                                                         \
+#define ASSERT_IGNORE_POTENTIALLY_EVALUATED(COND)                                                  \
   do {                                                                                             \
-    if (PRECOND) {                                                                                 \
-      __CLANG_PRAGMA("clang diagnostic push")                                                      \
-      __CLANG_PRAGMA("clang diagnostic ignored \"-Wpotentially-evaluated-expression\"")            \
-      ASSERT(COND);                                                                                \
-      __CLANG_PRAGMA("clang diagnostic pop")                                                       \
-    }                                                                                              \
+    __CLANG_PRAGMA("clang diagnostic push")                                                        \
+    __CLANG_PRAGMA("clang diagnostic ignored \"-Wpotentially-evaluated-expression\"")              \
+    ASSERT(COND);                                                                                  \
+    __CLANG_PRAGMA("clang diagnostic pop")                                                         \
   } while (0)
 #else // NDEBUG
-#define ASSERT_WITH_PRECOND(PRECOND, COND)
+#define ASSERT_IGNORE_POTENTIALLY_EVALUATED(COND)
 #endif
 
 // clang-format on
