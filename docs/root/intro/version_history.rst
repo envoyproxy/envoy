@@ -71,6 +71,7 @@ Version history
   header so the rate limited requests that may have been retried earlier will not be retried with this change.
 * router: added support for enabling upgrades on a :ref:`per-route <envoy_api_field_route.RouteAction.upgrade_configs>` basis.
 * sandbox: added :ref:`cors sandbox <install_sandboxes_cors>`.
+* server: added `SIGINT` (Ctrl-C) handler to gracefully shutdown Envoy like `SIGTERM`.
 * stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
