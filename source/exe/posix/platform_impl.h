@@ -5,7 +5,7 @@
 
 namespace Envoy {
 
-class PlatformMain {
+class PlatformImpl {
 public:
   Thread::ThreadFactory& threadFactory() { return thread_factory_; }
 

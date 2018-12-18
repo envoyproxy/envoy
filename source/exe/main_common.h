@@ -8,7 +8,7 @@
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 
-#include "exe/platform_main.h"
+#include "exe/platform_impl.h"
 
 #include "server/options_impl.h"
 #include "server/server.h"
@@ -108,7 +108,7 @@ private:
   Envoy::TerminateHandler log_on_terminate;
 #endif
 
-  PlatformMain platform_main_;
+  PlatformImpl platform_impl_;
   Envoy::OptionsImpl options_;
   Event::RealTimeSystem real_time_system_;
   DefaultTestHooks default_test_hooks_;

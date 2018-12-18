@@ -9,16 +9,16 @@
 
 namespace Envoy {
 
-class PlatformMain {
+class PlatformImpl {
 public:
-  PlatformMain() {
+  PlatformImpl() {
     const WORD wVersionRequested = MAKEWORD(2, 2);
     WSADATA wsaData;
     const int rc = ::WSAStartup(wVersionRequested, &wsaData);
     RELEASE_ASSERT(rc == 0, "WSAStartup failed with error");
   }
 
-  ~PlatformMain() { ::WSACleanup(); }
+  ~PlatformImpl() { ::WSACleanup(); }
 
   Thread::ThreadFactory& threadFactory() { return thread_factory_; }
 
