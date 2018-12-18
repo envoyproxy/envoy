@@ -369,6 +369,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   }
   stream_info_.setDownstreamLocalAddress(
       connection_manager_.read_callbacks_->connection().localAddress());
+  stream_info_.setDownstreamDirectRemoteAddress(
+      connection_manager_.read_callbacks_->connection().remoteAddress());
   // Initially, the downstream remote address is the source address of the
   // downstream connection. That can change later in the request's lifecycle,
   // based on XFF processing, but setting the downstream remote address here
@@ -1217,7 +1219,9 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
 
   // Now encode metadata via the codec.
   if (!metadata_map->empty()) {
-    response_encoder_->encodeMetadata(*metadata_map);
+    MetadataMapVector metadata_map_vector;
+    metadata_map_vector.push_back(std::move(metadata_map));
+    response_encoder_->encodeMetadata(metadata_map_vector);
   }
   // metadata_map destroyed when function returns.
 }

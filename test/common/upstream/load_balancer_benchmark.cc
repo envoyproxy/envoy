@@ -32,8 +32,9 @@ public:
                                    should_weight ? weight : 1));
     }
     HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
-    host_set.updateHosts(updated_hosts, updated_hosts, nullptr, nullptr, {}, hosts, {},
-                         absl::nullopt);
+    host_set.updateHosts(
+        HostSetImpl::updateHostsParams(updated_hosts, nullptr, updated_hosts, nullptr), {}, hosts,
+        {}, absl::nullopt);
   }
 
   PrioritySetImpl priority_set_;

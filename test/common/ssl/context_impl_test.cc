@@ -1,6 +1,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/auth/cert.pb.validate.h"
+
 #include "common/json/json_loader.h"
 #include "common/secret/sds_api.h"
 #include "common/ssl/context_config_impl.h"
@@ -10,6 +12,8 @@
 
 #include "test/common/ssl/ssl_certs_test.h"
 #include "test/common/ssl/ssl_test_utility.h"
+#include "test/common/ssl/test_data/no_san_cert_info.h"
+#include "test/common/ssl/test_data/san_dns3_cert_info.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
@@ -20,6 +24,7 @@
 #include "openssl/x509v3.h"
 
 using Envoy::Protobuf::util::MessageDifferencer;
+using testing::EndsWith;
 using testing::NiceMock;
 using testing::ReturnRef;
 
@@ -136,7 +141,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
         filename: "{{ test_tmpdir }}/unittestkey.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"
 )EOF";
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
@@ -150,12 +155,13 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   // For the cert_chain, it is dynamically created when we run_envoy_test.sh which changes the
   // serial number with
   // every build. For cert_chain output, we check only for the certificate path.
-  std::string ca_cert_json = R"EOF({
- "path": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
- "serial_number": "eaf3b0ea1d0e579a",
+  std::string ca_cert_json = absl::StrCat(R"EOF({
+ "path": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+ "serial_number": ")EOF",
+                                          TEST_NO_SAN_CERT_SERIAL, R"EOF(",
  "subject_alt_names": [],
  }
-)EOF";
+)EOF");
 
   std::string cert_chain_json = R"EOF({
  "path": "{{ test_tmpdir }}/unittestcert.pem",
@@ -180,12 +186,12 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem"
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_chain.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem"
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem"
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_cert.pem"
 )EOF";
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
@@ -193,19 +199,20 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   ClientContextConfigImpl cfg(tls_context, factory_context_);
 
   ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
-  std::string ca_cert_json = R"EOF({
- "path": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem",
- "serial_number": "b13ff63f2dbc118d",
+  std::string ca_cert_json = absl::StrCat(R"EOF({
+ "path": "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_cert.pem",
+ "serial_number": ")EOF",
+                                          TEST_SAN_DNS3_CERT_SERIAL, R"EOF(",
  "subject_alt_names": [
   {
    "dns": "server1.example.com"
   }
  ]
  }
-)EOF";
+)EOF");
 
   std::string cert_chain_json = R"EOF({
- "path": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem",
+ "path": "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_chain.pem",
  }
 )EOF";
 
@@ -228,17 +235,25 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
       message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
 
+std::string convertTimeCertInfoToCertDetails(std::string cert_info_time) {
+  std::tm expiration = TestUtility::parseTimestamp("%b %e %H:%M:%S %Y GMT", cert_info_time);
+  char buffer[21];
+  size_t len = strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%SZ", &expiration);
+  ASSERT(len == sizeof(buffer) - 1);
+  return std::string(buffer);
+}
+
 TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
   const std::string yaml = R"EOF(
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem"
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_chain.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem"
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem"
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_cert.pem"
 )EOF";
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
@@ -246,18 +261,22 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
   ClientContextConfigImpl cfg(tls_context, factory_context_);
 
   ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
-  std::string ca_cert_json = R"EOF({
- "path": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem",
- "serial_number": "b13ff63f2dbc118d",
+  std::string ca_cert_json =
+      absl::StrCat(R"EOF({
+ "path": "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_cert.pem",
+ "serial_number": ")EOF",
+                   TEST_SAN_DNS3_CERT_SERIAL, R"EOF(",
  "subject_alt_names": [
   {
    "dns": "server1.example.com"
   }
  ],
- "valid_from": "2018-01-15T22:40:27Z",
- "expiration_time": "2020-01-15T22:40:27Z"
+ "valid_from": ")EOF",
+                   convertTimeCertInfoToCertDetails(TEST_SAN_DNS3_CERT_NOT_BEFORE), R"EOF(",
+ "expiration_time": ")EOF",
+                   convertTimeCertInfoToCertDetails(TEST_SAN_DNS3_CERT_NOT_AFTER), R"EOF("
  }
-)EOF";
+)EOF");
 
   const std::string ca_cert_partial_output(TestEnvironment::substitute(ca_cert_json));
   envoy::admin::v2alpha::CertificateDetails certificate_details;
@@ -274,6 +293,52 @@ TEST_F(SslContextImplTest, TestNoCert) {
   ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
   EXPECT_EQ(nullptr, context->getCaCertInformation());
   EXPECT_TRUE(context->getCertChainInformation().empty());
+}
+
+// Multiple RSA certificates are rejected.
+TEST_F(SslContextImplTest, AtMostOneRsaCert) {
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned2_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  ServerContextConfigImpl server_context_config(tls_context, factory_context);
+  EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
+                          EnvoyException,
+                          "at most one certificate of a given type may be specified");
+}
+
+// Multiple ECDSA certificates are rejected.
+TEST_F(SslContextImplTest, AtMostOneEcdsaCert) {
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned2_ecdsa_p256_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  ServerContextConfigImpl server_context_config(tls_context, factory_context);
+  EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
+                          EnvoyException,
+                          "at most one certificate of a given type may be specified");
 }
 
 class SslServerContextImplTicketTest : public SslContextImplTest {
@@ -519,15 +584,56 @@ TEST(ClientContextConfigImplTest, InvalidCertificateSpki) {
                           EnvoyException, "Invalid base64-encoded SHA-256 .*");
 }
 
+// Validate that 2048-bit RSA ceritificates load successfully.
+TEST(ClientContextConfigImplTest, RSA2048Cert) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  manager.createSslClientContext(store, client_context_config);
+}
+
+// Validate that 1024-bit RSA certificates are rejected.
+TEST(ClientContextConfigImplTest, RSA1024Cert) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_rsa_1024_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_rsa_1024_key.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+                          EnvoyException,
+                          "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, "
+                          "only RSA certificates with 2048-bit or larger keys are supported");
+}
+
 // Validate that P256 ECDSA certs load.
 TEST(ClientContextConfigImplTest, P256EcdsaCert) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   const std::string tls_certificate_yaml = R"EOF(
   certificate_chain:
-    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p256.pem"
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_cert.pem"
   private_key:
-    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p256.pem"
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
   )EOF";
   MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
@@ -544,9 +650,9 @@ TEST(ClientContextConfigImplTest, NonP256EcdsaCert) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   const std::string tls_certificate_yaml = R"EOF(
   certificate_chain:
-    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert_ecdsa_p384.pem"
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p384_cert.pem"
   private_key:
-    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key_ecdsa_p384.pem"
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p384_key.pem"
   )EOF";
   MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
@@ -556,7 +662,7 @@ TEST(ClientContextConfigImplTest, NonP256EcdsaCert) {
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
                           EnvoyException,
-                          "Failed to load certificate from chain .*selfsigned_cert_ecdsa_p384.pem, "
+                          "Failed to load certificate chain from .*selfsigned_ecdsa_p384_cert.pem, "
                           "only P-256 ECDSA certificates are supported");
 }
 
@@ -711,8 +817,8 @@ TEST(ClientContextConfigImplTest, PasswordProtectedTlsCertificates) {
       "{{ test_rundir }}/test/common/ssl/test_data/password_protected_cert.pem"));
   tls_certificate->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/password_protected_key.pem"));
-  tls_certificate->mutable_password()->set_filename(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/password.txt"));
+  tls_certificate->mutable_password()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/password_protected_password.txt"));
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
@@ -732,7 +838,8 @@ TEST(ClientContextConfigImplTest, PasswordProtectedTlsCertificates) {
       "{{ test_rundir }}/test/common/ssl/test_data/password_protected_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             client_context_config.tlsCertificates()[0].get().privateKey());
-  const std::string password_file = "{{ test_rundir }}/test/common/ssl/test_data/password.txt";
+  const std::string password_file =
+      "{{ test_rundir }}/test/common/ssl/test_data/password_protected_password.txt";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(password_file)),
             client_context_config.tlsCertificates()[0].get().password());
 }
@@ -881,28 +988,34 @@ TEST(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
       "Unknown static certificate validation context: missing");
 }
 
-// Multiple TLS certificates are not yet supported, but one is expected for
-// server.
-// TODO(PiotrSikora): Support multiple TLS certificates.
+// Multiple TLS certificates are supported.
 TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl client_context_config(tls_context, factory_context), EnvoyException,
       "No TLS certificates found for server context");
-  const std::string tls_certificate_yaml = R"EOF(
+  const std::string rsa_tls_certificate_yaml = R"EOF(
   certificate_chain:
     filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
   private_key:
     filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
   )EOF";
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+  const std::string ecdsa_tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(rsa_tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(ecdsa_tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
-  EXPECT_THROW_WITH_MESSAGE(
-      ServerContextConfigImpl client_context_config(tls_context, factory_context), EnvoyException,
-      "A single TLS certificate is required for server contexts");
+  ServerContextConfigImpl server_context_config(tls_context, factory_context);
+  auto tls_certs = server_context_config.tlsCertificates();
+  ASSERT_EQ(2, tls_certs.size());
+  EXPECT_THAT(tls_certs[0].get().privateKeyPath(), EndsWith("selfsigned_key.pem"));
+  EXPECT_THAT(tls_certs[1].get().privateKeyPath(), EndsWith("selfsigned_ecdsa_p256_key.pem"));
 }
 
 TEST(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
@@ -922,7 +1035,16 @@ TEST(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
   tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl server_context_config(tls_context, factory_context), EnvoyException,
-      "A single TLS certificate is required for server contexts");
+      "SDS and non-SDS TLS certificates may not be mixed in server contexts");
+}
+
+TEST(ServerContextConfigImplTest, MultiSdsConfig) {
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
+  tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::validate<envoy::api::v2::auth::DownstreamTlsContext>(tls_context),
+      EnvoyException, "Proto constraint validation failed");
 }
 
 TEST(ServerContextConfigImplTest, SecretNotReady) {

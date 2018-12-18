@@ -255,7 +255,7 @@ def envoy_cc_library(
             envoy_external_dep_path("spdlog"),
             envoy_external_dep_path("fmtlib"),
         ],
-        include_prefix = envoy_include_prefix(PACKAGE_NAME),
+        include_prefix = envoy_include_prefix(native.package_name()),
         alwayslink = 1,
         linkstatic = 1,
         linkstamp = select({
@@ -359,6 +359,7 @@ def envoy_cc_test(
         deps = [],
         tags = [],
         args = [],
+        shard_count = None,
         coverage = True,
         local = False):
     test_lib_tags = []
@@ -388,6 +389,7 @@ def envoy_cc_test(
         args = args + ["--gmock_default_mock_behavior=2"],
         tags = tags + ["coverage_test"],
         local = local,
+        shard_count = shard_count,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified
@@ -500,7 +502,7 @@ def envoy_proto_library(name, external_deps = [], **kwargs):
 # This is used for testing only.
 def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
     input_files = ["$(location " + src + ")" for src in srcs]
-    include_paths = [".", PACKAGE_NAME]
+    include_paths = [".", native.package_name()]
 
     if "api_httpbody_protos" in external_deps:
         srcs.append("@googleapis//:api_httpbody_protos_src")

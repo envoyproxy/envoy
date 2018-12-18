@@ -8,6 +8,7 @@
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
+#include "test/config/integration/certs/client_ecdsacert_hash.h"
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -382,16 +383,15 @@ void ConfigHelper::setClientCodec(
   }
 }
 
-void ConfigHelper::addSslConfig(bool ecdsa_cert, bool tlsv1_3) {
+void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   RELEASE_ASSERT(!finalized_, "");
 
   auto* filter_chain =
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-  initializeTls(ecdsa_cert, tlsv1_3,
-                *filter_chain->mutable_tls_context()->mutable_common_tls_context());
+  initializeTls(options, *filter_chain->mutable_tls_context()->mutable_common_tls_context());
 }
 
-void ConfigHelper::initializeTls(bool ecdsa_cert, bool tlsv1_3,
+void ConfigHelper::initializeTls(const ServerSslOptions& options,
                                  envoy::api::v2::auth::CommonTlsContext& common_tls_context) {
   common_tls_context.add_alpn_protocols("h2");
   common_tls_context.add_alpn_protocols("http/1.1");
@@ -399,26 +399,28 @@ void ConfigHelper::initializeTls(bool ecdsa_cert, bool tlsv1_3,
   auto* validation_context = common_tls_context.mutable_validation_context();
   validation_context->mutable_trusted_ca()->set_filename(
       TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-  validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
+  validation_context->add_verify_certificate_hash(
+      options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
 
   // We'll negotiate up to TLSv1.3 for the tests that care, but it really
   // depends on what the client sets.
-  if (tlsv1_3) {
+  if (options.tlsv1_3_) {
     common_tls_context.mutable_tls_params()->set_tls_maximum_protocol_version(
         envoy::api::v2::auth::TlsParameters::TLSv1_3);
   }
-
-  auto* tls_certificate = common_tls_context.add_tls_certificates();
-  if (ecdsa_cert) {
-    tls_certificate->mutable_certificate_chain()->set_filename(
-        TestEnvironment::runfilesPath("/test/config/integration/certs/server_ecdsacert.pem"));
-    tls_certificate->mutable_private_key()->set_filename(
-        TestEnvironment::runfilesPath("/test/config/integration/certs/server_ecdsakey.pem"));
-  } else {
+  if (options.rsa_cert_) {
+    auto* tls_certificate = common_tls_context.add_tls_certificates();
     tls_certificate->mutable_certificate_chain()->set_filename(
         TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"));
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+  }
+  if (options.ecdsa_cert_) {
+    auto* tls_certificate = common_tls_context.add_tls_certificates();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("/test/config/integration/certs/server_ecdsacert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("/test/config/integration/certs/server_ecdsakey.pem"));
   }
 }
 
