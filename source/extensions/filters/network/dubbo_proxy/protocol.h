@@ -39,8 +39,9 @@ public:
 
   const std::string& fromType(ProtocolType type) const {
     const auto& itor = protocolTypeNameMap.find(type);
-    if (itor != protocolTypeNameMap.end())
+    if (itor != protocolTypeNameMap.end()) {
       return itor->second;
+    }
 
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
