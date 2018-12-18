@@ -149,10 +149,10 @@ Http::FilterDataStatus GrpcShim::encodeData(Buffer::Instance& buffer, bool end_s
       // was unsuccessful. Since we're guaranteed at this point to have a valid response
       // (unless upstream lied in content-type) we attempt to return a well-formed gRPC
       // response body.
-      const auto length = htonl(buffer.length() + buffer_.length());
+      const auto length = buffer.length() + buffer_.length();
 
       std::array<uint8_t, Grpc::GRPC_FRAME_HEADER_SIZE> frame;
-      Grpc::Encoder().newFrame(Grpc::GRPC_FH_DEFAULT, htonl(length), frame);
+      Grpc::Encoder().newFrame(Grpc::GRPC_FH_DEFAULT, length, frame);
 
       Buffer::OwnedImpl prefix_buffer;
       prefix_buffer.add(frame.data(), frame.size());

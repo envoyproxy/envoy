@@ -13,7 +13,7 @@ const uint8_t GRPC_FH_DEFAULT = 0b0u;
 // Last bit for a compressed message.
 const uint8_t GRPC_FH_COMPRESSED = 0b1u;
 
-const uint64_t GRPC_FRAME_HEADER_SIZE = sizeof(uint8_t) + sizeof(uint32_t);
+const constexpr uint64_t GRPC_FRAME_HEADER_SIZE = sizeof(uint8_t) + sizeof(uint32_t);
 
 enum class CompressionAlgorithm { None, Gzip };
 
