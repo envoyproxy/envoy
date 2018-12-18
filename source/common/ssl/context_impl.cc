@@ -275,12 +275,27 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
       // Since we checked the key type above, this should be valid.
       ASSERT(rsa_public_key != nullptr);
       const unsigned rsa_key_length = RSA_size(rsa_public_key);
+#ifdef BORINGSSL_FIPS
+      if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8) {
+        throw EnvoyException(
+            fmt::format("Failed to load certificate chain from {}, only RSA certificates with "
+                        "2048-bit or 3072-bit keys are supported in FIPS mode",
+                        ctx.cert_chain_file_path_));
+      }
+#else
       if (rsa_key_length < 2048 / 8) {
         throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only RSA "
                                          "certificates with 2048-bit or larger keys are supported",
                                          ctx.cert_chain_file_path_));
       }
+#endif
     } break;
+#ifdef BORINGSSL_FIPS
+    default:
+      throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only RSA and "
+                                       "ECDSA certificates are supported in FIPS mode",
+                                       ctx.cert_chain_file_path_));
+#endif
     }
 
     // Load private key.
@@ -295,6 +310,28 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
       throw EnvoyException(
           fmt::format("Failed to load private key from {}", tls_certificate.privateKeyPath()));
     }
+
+#ifdef BORINGSSL_FIPS
+    // Verify that private keys are passing FIPS pairwise consistency tests.
+    switch (pkey_id) {
+    case EVP_PKEY_EC: {
+      const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
+      if (!EC_KEY_check_fips(ecdsa_private_key)) {
+        throw EnvoyException(fmt::format("Failed to load private key from {}, ECDSA key failed "
+                                         "pairwise consistency test required in FIPS mode",
+                                         tls_certificate.privateKeyPath()));
+      }
+    } break;
+    case EVP_PKEY_RSA: {
+      RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey.get());
+      if (!RSA_check_fips(rsa_private_key)) {
+        throw EnvoyException(fmt::format("Failed to load private key from {}, RSA key failed "
+                                         "pairwise consistency test required in FIPS mode",
+                                         tls_certificate.privateKeyPath()));
+      }
+    } break;
+    }
+#endif
   }
 
   // use the server's cipher list preferences
