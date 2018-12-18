@@ -375,7 +375,7 @@ message RouteMatch {
   GrpcRouteMatchOptions grpc = 8;
 }
 
-// [#comment:next free field: 10]
+// [#comment:next free field: 11]
 message CorsPolicy {
   // Specifies the origins that will be allowed to do CORS requests.
   //
@@ -402,11 +402,23 @@ message CorsPolicy {
   // Specifies whether the resource allows credentials.
   google.protobuf.BoolValue allow_credentials = 6;
 
-  // Specifies if CORS is enabled. Defaults to true. Only effective on route.
-  google.protobuf.BoolValue enabled = 7;
+  oneof enabled_specifier {
+    // Specifies if CORS is enabled. Defaults to true. Only effective on route.
+    //
+    // .. attention::
+    //
+    //   **This field is deprecated**. Set the
+    //   :ref:`runtime_fraction<envoy_api_field_route.CorsPolicy.filter_enabled>` field instead.
+    google.protobuf.BoolValue enabled = 7 [deprecated = true];
 
-  // Specifies the root runtime key for flags related to this policy. Defaults to "".
-  string runtime_key = 9;
+    // Specifies if CORS is enabled.
+    core.RuntimeFractionalPercent filter_enabled = 9;
+  }
+
+  // Specifies if CORS policies are evaluated and tracked when filter is off.
+  //
+  // This will not enforce any policies.
+  core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
 // [#comment:next free field: 26]

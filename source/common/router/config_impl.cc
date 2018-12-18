@@ -115,8 +115,10 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) 
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
   }
+  has_filter_enabled_ = config.has_filter_enabled();
   enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
-  runtime_key_ = config.runtime_key();
+  filter_enabled_ = config.filter_enabled();
+  shadow_enabled_ = config.shadow_enabled();
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config) {

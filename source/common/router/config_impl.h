@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/router/router.h"
@@ -104,8 +105,14 @@ public:
   const std::string& exposeHeaders() const override { return expose_headers_; };
   const std::string& maxAge() const override { return max_age_; };
   const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
+  bool hasFilterEnabled() const override { return has_filter_enabled_; };
   bool enabled() const override { return enabled_; };
-  const std::string& runtimeKey() const override { return runtime_key_; };
+  envoy::api::v2::core::RuntimeFractionalPercent filterEnabled() const override {
+    return filter_enabled_;
+  }
+  envoy::api::v2::core::RuntimeFractionalPercent shadowEnabled() const override {
+    return shadow_enabled_;
+  }
 
 private:
   std::list<std::string> allow_origin_;
@@ -115,8 +122,10 @@ private:
   std::string expose_headers_;
   std::string max_age_{};
   absl::optional<bool> allow_credentials_{};
+  bool has_filter_enabled_;
   bool enabled_;
-  std::string runtime_key_;
+  envoy::api::v2::core::RuntimeFractionalPercent filter_enabled_;
+  envoy::api::v2::core::RuntimeFractionalPercent shadow_enabled_;
 };
 
 class ConfigImpl;

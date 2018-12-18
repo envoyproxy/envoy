@@ -1,5 +1,6 @@
 #include "extensions/filters/http/cors/cors_filter.h"
 
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/stats/scope.h"
 
@@ -205,34 +206,31 @@ bool CorsFilter::allowCredentials() {
   return false;
 }
 
-std::string CorsFilter::runtimeKey(const std::string& key) {
-  for (const auto policy : policies_) {
-    if (policy && !policy->runtimeKey().empty()) {
-      return fmt::format("cors.{}.{}", policy->runtimeKey(), key);
-    }
-  }
-  return EMPTY_STRING;
-}
-
 bool CorsFilter::shadowEnabled() {
-  const auto shadow_mode = runtimeKey("shadow_enabled");
-  if (shadow_mode == EMPTY_STRING) {
-    return false;
-  }
-  return config_->runtime().snapshot().featureEnabled(shadow_mode, 0);
-}
-
-bool CorsFilter::enabled() {
-  const auto filter_enabled = runtimeKey("filter_enabled");
   for (const auto policy : policies_) {
     if (!policy) {
       continue;
     }
-    bool policy_enabled = policy->enabled();
-    if (filter_enabled == EMPTY_STRING) {
-      return policy_enabled;
+
+    const std::string key = policy->shadowEnabled().runtime_key();
+    return config_->runtime().snapshot().featureEnabled(key,
+                                                        policy->shadowEnabled().default_value());
+  }
+  return false;
+}
+
+bool CorsFilter::enabled() {
+  for (const auto policy : policies_) {
+    if (!policy) {
+      continue;
     }
-    return config_->runtime().snapshot().featureEnabled(filter_enabled, int(policy_enabled) * 100);
+
+    if (!policy->hasFilterEnabled()) {
+      return policy->enabled();
+    }
+    const std::string key = policy->filterEnabled().runtime_key();
+    return config_->runtime().snapshot().featureEnabled(key,
+                                                        policy->filterEnabled().default_value());
   }
   return false;
 }
