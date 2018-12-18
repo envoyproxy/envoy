@@ -15,8 +15,8 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:filter_interface",
         "//source/common/common:enum_to_int",
-        "//source/common/grpc:common_lib",
         "//source/common/grpc:codec_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/grpc:status_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http:well_known_names",
