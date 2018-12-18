@@ -220,10 +220,9 @@ public:
                std::vector<Network::ListenerFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
                    Configuration::ListenerFactoryContext& context));
-  MOCK_METHOD3(createListenSocket,
+  MOCK_METHOD2(createListenSocket,
                Network::SocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
-                                        const Network::Socket::OptionsSharedPtr& options,
-                                        bool bind_to_port));
+                                        const Network::Socket::OptionsSharedPtr& options));
   MOCK_METHOD1(createDrainManager_, DrainManager*(envoy::api::v2::Listener::DrainType drain_type));
   MOCK_METHOD0(nextListenerTag, uint64_t());
 
@@ -474,6 +473,10 @@ public:
     addListenSocketOptions_(options);
   }
   MOCK_METHOD1(addListenSocketOptions_, void(const Network::Socket::OptionsSharedPtr&));
+  const Network::ListenerConfig& listenerConfig() const override { return _listenerConfig_; }
+  MOCK_CONST_METHOD0(listenerConfig_, const Network::ListenerConfig&());
+
+  Network::MockListenerConfig _listenerConfig_;
 };
 
 class MockHealthCheckerFactoryContext : public virtual HealthCheckerFactoryContext {

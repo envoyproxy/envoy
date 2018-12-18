@@ -304,6 +304,8 @@ public:
     return result;
   }
 
+  static std::tm parseTimestamp(const std::string& format, const std::string& time_str);
+
   static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
 
   static void renameFile(const std::string& old_name, const std::string& new_name);

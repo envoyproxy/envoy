@@ -59,6 +59,7 @@ public:
     InSequence s;
 
     sigterm_ = new Event::MockSignalEvent(&dispatcher_);
+    sigint_ = new Event::MockSignalEvent(&dispatcher_);
     sigusr1_ = new Event::MockSignalEvent(&dispatcher_);
     sighup_ = new Event::MockSignalEvent(&dispatcher_);
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
@@ -81,6 +82,7 @@ public:
   std::unique_ptr<RunHelper> helper_;
   std::function<void()> cm_init_callback_;
   Event::MockSignalEvent* sigterm_;
+  Event::MockSignalEvent* sigint_;
   Event::MockSignalEvent* sigusr1_;
   Event::MockSignalEvent* sighup_;
   bool shutdown_ = false;

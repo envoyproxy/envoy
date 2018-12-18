@@ -125,6 +125,7 @@ public:
 
 private:
   Event::SignalEventPtr sigterm_;
+  Event::SignalEventPtr sigint_;
   Event::SignalEventPtr sig_usr_1_;
   Event::SignalEventPtr sig_hup_;
 };

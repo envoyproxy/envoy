@@ -71,9 +71,6 @@ protected:
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
 
-  // Creates a vector containing any healthy hosts
-  static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
-
 private:
   std::function<void()> initialization_complete_callback_;
 

@@ -36,10 +36,20 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "load_balancer_context_mock",
+    srcs = ["load_balancer_context.cc"],
+    hdrs = ["load_balancer_context.h"],
+    deps = [
+        "//include/envoy/upstream:load_balancer_interface",
+    ],
+)
+
+envoy_cc_mock(
     name = "upstream_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        ":load_balancer_context_mock",
         "//include/envoy/http:async_client_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:health_checker_interface",

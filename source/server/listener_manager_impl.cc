@@ -84,8 +84,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
 
 Network::SocketSharedPtr
 ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConstSharedPtr address,
-                                                 const Network::Socket::OptionsSharedPtr& options,
-                                                 bool bind_to_port) {
+                                                 const Network::Socket::OptionsSharedPtr& options) {
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
 
@@ -107,7 +106,7 @@ ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConst
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
     return std::make_shared<Network::TcpListenSocket>(fd, address, options);
   }
-  return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
+  return std::make_shared<Network::TcpListenSocket>(address, options);
 }
 
 DrainManagerPtr
@@ -122,7 +121,6 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
-      bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
@@ -741,21 +739,6 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
       *existing_active_listener = std::move(new_listener);
     }
   } else {
-    // Typically we catch address issues when we try to bind to the same address multiple times.
-    // However, for listeners that do not bind we must check to make sure we are not duplicating.
-    // This is an edge case and nothing will explicitly break, but there is no possibility that
-    // two listeners that do not bind will ever be used. Only the first one will be used when
-    // searched for by address. Thus we block it.
-    if (!new_listener->bindToPort() &&
-        (hasListenerWithAddress(warming_listeners_, *new_listener->address()) ||
-         hasListenerWithAddress(active_listeners_, *new_listener->address()))) {
-      const std::string message =
-          fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
-                      name, new_listener->address()->asString());
-      ENVOY_LOG(warn, "{}", message);
-      throw EnvoyException(message);
-    }
-
     // We have no warming or active listener so we need to make a new one. What we do depends on
     // whether workers have been started or not. Additionally, search through draining listeners
     // to see if there is a listener that has a socket bound to the address we are configured for.
@@ -774,8 +757,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
     new_listener->setSocket(draining_listener_socket
                                 ? draining_listener_socket
                                 : factory_.createListenSocket(new_listener->address(),
-                                                              new_listener->listenSocketOptions(),
-                                                              new_listener->bindToPort()));
+                                                              new_listener->listenSocketOptions()));
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));

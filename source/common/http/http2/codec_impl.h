@@ -164,7 +164,7 @@ protected:
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(const HeaderMap& trailers) override;
     Stream& getStream() override { return *this; }
-    void encodeMetadata(const MetadataMap& metadata_map) override;
+    void encodeMetadata(const MetadataMapVector& metadata_map_vector) override;
 
     // Http::Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
@@ -201,7 +201,7 @@ protected:
     // Get MetadataDecoder for this stream.
     MetadataDecoder& getMetadataDecoder();
     // Callback function for MetadataDecoder.
-    void onMetadataDecoded(std::unique_ptr<MetadataMap> metadata_map);
+    void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
 
     virtual void transformUpgradeFromH1toH2(HeaderMap& headers) PURE;
     virtual void maybeTransformUpgradeFromH2ToH1() PURE;
