@@ -53,8 +53,7 @@ Stats::StatName CodeStatsImpl::makeStatName(absl::string_view name) {
 
 void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
                                             Code response_code) const {
-  ASSERT(scope.symbolTable().interoperable(symbol_table_));
-  ASSERT(symbol_table_.interoperable(scope.symbolTable()));
+  ASSERT(&symbol_table_ == &scope.symbolTable());
 
   // Build a dynamic stat for the response code and increment it.
   scope.counterx(Join(prefix, upstream_rq_completed_).statName()).inc();
@@ -67,9 +66,7 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
   Stats::StatName prefix = prefix_storage.statName();
   Code code = static_cast<Code>(info.response_status_code_);
 
-  ASSERT(info.cluster_scope_.symbolTable().interoperable(symbol_table_));
-  ASSERT(symbol_table_.interoperable(info.cluster_scope_.symbolTable()));
-
+  ASSERT(&info.cluster_scope_.symbolTable() == &symbol_table_);
   chargeBasicResponseStat(info.cluster_scope_, prefix, code);
 
   Stats::StatName rq_group = upstreamRqGroup(code);

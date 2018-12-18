@@ -12,7 +12,7 @@ namespace Stats {
 HeapStatDataAllocator::~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 
 HeapStatData* HeapStatData::alloc(StatName stat_name, SymbolTable& symbol_table) {
-  void* memory = ::malloc(sizeof(HeapStatData) + stat_name.numBytesIncludingLength());
+  void* memory = ::malloc(sizeof(HeapStatData) + stat_name.size());
   ASSERT(memory);
   symbol_table.incRefCount(stat_name);
   return new (memory) HeapStatData(stat_name);

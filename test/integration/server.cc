@@ -138,7 +138,7 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   // real symbol table through the mocking hierarchy -- which generally
   // constructs hierarchies of objects with no context, is too daunting. I think
   // the right thing to do is to avoid mocks in integration tests.
-  Test::Global<Stats::SymbolTableImpl> symbol_table;
+  Test::Global<Stats::SymbolTable> symbol_table;
   Server::HotRestartNopImpl restarter(*symbol_table);
   Thread::MutexBasicLockable lock;
 
@@ -165,7 +165,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
-  Stats::SymbolTableImpl symbol_table;
+  Stats::SymbolTable symbol_table;
   Server::HotRestartNopImpl restarter(symbol_table);
   ThreadLocal::InstanceImpl tls;
   Stats::HeapStatDataAllocator stats_allocator(symbol_table);

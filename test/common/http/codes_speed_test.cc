@@ -54,7 +54,7 @@ public:
     code_stats_.chargeResponseTiming(info);
   }
 
-  Stats::SymbolTableImpl symbol_table_;
+  Stats::SymbolTable symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;

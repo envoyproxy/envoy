@@ -39,7 +39,7 @@ public:
     code_stats_.chargeResponseStat(info);
   }
 
-  Stats::SymbolTableImpl symbol_table_;
+  Stats::SymbolTable symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
@@ -257,7 +257,7 @@ protected:
     return CodeStatsImpl::Join(stat_name_vec).statName().toString(symbol_table_);
   }
 
-  Stats::SymbolTableImpl symbol_table_;
+  Stats::SymbolTable symbol_table_;
   CodeStatsImpl code_stats_;
 };
 

@@ -434,7 +434,7 @@ public:
   ~TestAllocator() { EXPECT_EQ(0, hash_set_.size()); }
 
 private:
-  SymbolTableImpl symbol_table_;
+  SymbolTable symbol_table_;
   Thread::MutexBasicLockable mutex_;
   TestBlockMemoryHashSetOptions block_hash_options_;
   std::unique_ptr<uint8_t[]> block_memory_;

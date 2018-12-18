@@ -13,7 +13,7 @@
 namespace Envoy {
 namespace Stats {
 
-IsolatedStoreImpl::IsolatedStoreImpl() : IsolatedStoreImpl(std::make_unique<SymbolTableImpl>()) {}
+IsolatedStoreImpl::IsolatedStoreImpl() : IsolatedStoreImpl(std::make_unique<SymbolTable>()) {}
 
 IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable> symbol_table)
     : IsolatedStoreImpl(*symbol_table) {

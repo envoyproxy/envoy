@@ -28,13 +28,23 @@ namespace Stats {
 /** A Symbol represents a string-token with a small index. */
 using Symbol = uint32_t;
 
-/** Efficient byte-encoded storage an array of tokens, which are typically < 127 */
+/**
+ * Efficient byte-encoded storage of an array of tokens. The most common tokens
+ * are typically < 127, and are represented directly. tokens >= 128 spill into
+ * the next byte, allowing for tokens of arbitrary numeric value to be stored.
+ * As long as the most common tokens are low-valued, the representation is
+ * space-efficient. This scheme is similar to UTF-8.
+ */
 using SymbolStorage = uint8_t[];
+
+/**
+ * We encode the byte-size of a StatName as its first two bytes.
+ */
+constexpr uint64_t StatNameSizeEncodingBytes = 2;
+constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65536
 
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
-
-class StatName;
 
 /**
  * Represents an 8-bit encoding of a vector of symbols, used as a transient
@@ -67,7 +77,7 @@ public:
    * Returns the number of bytes required to represent StatName as a uint8_t
    * array, including the encoded size.
    */
-  uint64_t bytesRequired() const { return size() + 2 /* size encoded as 2 bytes */; }
+  uint64_t bytesRequired() const { return size() + StatNameSizeEncodingBytes; }
 
   /**
    * Returns the number of uint8_t entries we collected while adding symbols.
@@ -118,10 +128,10 @@ private:
  * same string is re-encoded, it may or may not encode to the same underlying
  * symbol.
  */
-class SymbolTableImpl : public SymbolTable {
+class SymbolTable {
 public:
-  SymbolTableImpl();
-  ~SymbolTableImpl() override;
+  SymbolTable();
+  ~SymbolTable();
 
   /**
    * Encodes a stat name using the symbol table, returning a SymbolEncoding. The
@@ -138,12 +148,12 @@ public:
    * @param name The name to encode.
    * @return SymbolEncoding the encoded symbols.
    */
-  SymbolEncoding encode(absl::string_view name) override;
+  SymbolEncoding encode(absl::string_view name);
 
   /**
    * @return uint64_t the number of symbols in the symbol table.
    */
-  uint64_t numSymbols() const override {
+  uint64_t numSymbols() const {
     absl::ReaderMutexLock lock(&lock_);
     ASSERT(encode_map_.size() == decode_map_.size());
     return encode_map_.size();
@@ -165,7 +175,7 @@ public:
    * @param b the second stat name
    * @return bool true if a lexically precedes b.
    */
-  bool lessThan(const StatName& a, const StatName& b) const override;
+  bool lessThan(const StatName& a, const StatName& b) const;
 
   /**
    * Since SymbolTable does manual reference counting, a client of SymbolTable
@@ -175,7 +185,7 @@ public:
    *
    * @param symbol_vec the vector of symbols to be freed.
    */
-  void free(StatName stat_name) override { adjustRefCount(stat_name, -1); }
+  void free(const StatName& stat_name);
 
   /**
    * StatName backing-store can be managed by callers in a variety of ways
@@ -186,23 +196,25 @@ public:
    *
    * @param symbol_vec the vector of symbols to be freed.
    */
-  void incRefCount(StatName stat_name) override { adjustRefCount(stat_name, 1); };
+  void incRefCount(const StatName& stat_name);
 
 #ifndef ENVOY_CONFIG_COVERAGE
-  void debugPrint() const override;
+  // It is convenient when debugging to be able to print the state of the table,
+  // but this code is not hit during tests ordinarily, and is not needed in
+  // production code.
+  void debugPrint() const;
 #endif
 
   /**
-   * Decodes a vector of symbols back into its period-delimited stat name.
-   * If decoding fails on any part of the symbol_vec, we release_assert and crash hard, since this
-   * should never happen, and we don't want to continue running with a corrupt stats set.
+   * Decodes a vector of symbols back into its period-delimited stat name. If
+   * decoding fails on any part of the symbol_vec, we release_assert, since this
+   * should never happen, and we don't want to continue running with a corrupt
+   * stats set.
    *
    * @param symbol_vec the vector of symbols to decode.
    * @return std::string the retrieved stat name.
    */
-  std::string decode(const SymbolStorage symbol_vec, uint64_t size) const override;
-
-  bool interoperable(const SymbolTable& other) const override { return &other == this; }
+  std::string decode(const SymbolStorage symbol_vec, uint64_t size) const;
 
 private:
   friend class StatName;
@@ -210,32 +222,15 @@ private:
 
   struct SharedSymbol {
     SharedSymbol(Symbol symbol) : symbol_(symbol), ref_count_(1) {}
-    /*
-    SharedSymbol(const SharedSymbol& src) : symbol_(src.symbol_), ref_count_(1) {
-      ASSERT(src.ref_count_ == 1);
-    }
-    SharedSymbol& operator=(const SharedSymbol& src) {
-      if (&src != this) {
-        ASSERT(src.ref_count_ == 1);
-        symbol_ = src.symbol_;
-        ref_count_ = 1;
-      }
-      return *this;
-    }
-    */
 
     Symbol symbol_;
     std::atomic<uint32_t> ref_count_;
-    // uint32_t ref_count_;
   };
 
-  // This must be called during both encode() and free().
-  // mutable Thread::MutexBasicLockable lock_;]
+  // This must be held during both encode() and free().
   mutable absl::Mutex lock_;
 
   std::string decodeSymbolVec(const SymbolVec& symbols) const;
-
-  void adjustRefCount(StatName stat_name, int adjustment);
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
@@ -281,43 +276,6 @@ private:
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
-
-  //#define TRACK_ENCODES
-#ifdef TRACK_ENCODES
-  using Histogram = absl::flat_hash_map<std::string, uint64_t>;
-  Histogram histogram_;
-#endif
-};
-
-/**
- * Joins two or more StatNames. For example if we have StatNames for {"a.b",
- * "c.d", "e.f"} then the joined stat-name matches "a.b.c.d.e.f". The advantage
- * of using this representation is that it avoids having to decode/encode
- * into the elaborted form, and does not require locking the SymbolTable.
- *
- * The caveat is that this representation does not bump reference counts on
- * for the referenced Symbols in the SymbolTable, so it's only valid as long
- * for the lifetime of the joined StatNames.
- *
- * This is intended for use doing cached name lookups of scoped stats, where
- * the scope prefix and the names to combine it with are already in StatName
- * form. Using this class, they can be combined without acessingm the
- * SymbolTable or, in particular, taking its lock.
- */
-class StatNameJoiner {
-public:
-  StatNameJoiner(StatName a, StatName b);
-  StatNameJoiner(const std::vector<StatName>& stat_names);
-
-  /**
-   * @return StatName a reference to the joined StatName.
-   */
-  StatName statName() const { return StatName(bytes_.get()); }
-
-private:
-  uint8_t* alloc(uint64_t num_bytes);
-
-  std::unique_ptr<SymbolStorage> bytes_;
 };
 
 /**
@@ -356,16 +314,114 @@ public:
   /**
    * @return StatName a reference to the owned storage.
    */
-  StatName statName() const { return StatName(bytes_.get()); }
-
-  /*
-  template<class T> T append(StatName suffix, std::function<T(StatName)> f) {
-    StatNameStorage joiner(statName(), suffix);
-    f(joiner.statName());
-  }
-  */
+  inline StatName statName() const;
 
 private:
+  std::unique_ptr<SymbolStorage> bytes_;
+};
+
+/**
+ * Efficiently represents a stat name using a variable-length array of uint8_t.
+ * This class does not own the backing store for this array; the backing-store
+ * can be held in StatNameStorage, or it can be packed more tightly into another
+ * object.
+ *
+ * When Envoy is configured with a large numbers of clusters, there are a huge
+ * number of StatNames, so avoiding extra per-stat pointers has a significant
+ * memory impact.
+ */
+class StatName {
+public:
+  // Constructs a StatName object directly referencing the storage of another
+  // StatName.
+  explicit StatName(const SymbolStorage size_and_data) : size_and_data_(size_and_data) {}
+
+  // Constructs an empty StatName object.
+  StatName() : size_and_data_(nullptr) {}
+
+  // Constructs a StatName object with new storage, which must be of size
+  // src.size(). This is used in the a flow where we first construct a StatName
+  // for lookup in a cache, and then on a miss need to store the data directly.
+  StatName(const StatName& src, SymbolStorage memory);
+
+  std::string toString(const SymbolTable& table) const;
+
+  /**
+   * Note that this hash function will return a different hash than that of
+   * the elaborated string.
+   *
+   * @return uint64_t a hash of the underlying representation.
+   */
+  uint64_t hash() const {
+    const char* cdata = reinterpret_cast<const char*>(data());
+    return HashUtil::xxHash64(absl::string_view(cdata, dataSize()));
+  }
+
+  bool operator==(const StatName& rhs) const {
+    const uint64_t sz = dataSize();
+    return sz == rhs.dataSize() && memcmp(data(), rhs.data(), sz * sizeof(uint8_t)) == 0;
+  }
+  bool operator!=(const StatName& rhs) const { return !(*this == rhs); }
+
+  /**
+   * @return uint64_t the number of bytes in the symbol array, excluding the two-byte
+   *                  overhead for the size itself.
+   */
+  uint64_t dataSize() const {
+    return size_and_data_[0] | (static_cast<uint64_t>(size_and_data_[1]) << 8);
+  }
+
+  /**
+   * @return uint64_t the number of bytes in the symbol array, including the two-byte
+   *                  overhead for the size itself.
+   */
+  uint64_t size() const { return dataSize() + StatNameSizeEncodingBytes; }
+
+  void copyToStorage(SymbolStorage storage) { memcpy(storage, size_and_data_, size()); }
+
+#ifndef ENVOY_CONFIG_COVERAGE
+  void debugPrint();
+#endif
+
+  /**
+   * @return uint8_t* A pointer to the first byte of data (skipping over size bytes).
+   */
+  const uint8_t* data() const { return size_and_data_ + StatNameSizeEncodingBytes; }
+
+private:
+  const uint8_t* size_and_data_;
+};
+
+StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
+
+/**
+ * Joins two or more StatNames. For example if we have StatNames for {"a.b",
+ * "c.d", "e.f"} then the joined stat-name matches "a.b.c.d.e.f". The advantage
+ * of using this representation is that it avoids having to decode/encode
+ * into the elaborted form, and does not require locking the SymbolTable.
+ *
+ * The caveat is that this representation does not bump reference counts on
+ * for the referenced Symbols in the SymbolTable, so it's only valid as long
+ * for the lifetime of the joined StatNames.
+ *
+ * This is intended for use doing cached name lookups of scoped stats, where
+ * the scope prefix and the names to combine it with are already in StatName
+ * form. Using this class, they can be combined without acessingm the
+ * SymbolTable or, in particular, taking its lock.
+ */
+class StatNameJoiner {
+public:
+  StatNameJoiner(StatName a, StatName b);
+  StatNameJoiner(const std::vector<StatName>& stat_names);
+
+  /**
+   * @return StatName a reference to the joined StatName.
+   */
+  StatName statName() const { return StatName(bytes_.get()); }
+
+private:
+  uint8_t* alloc(uint64_t num_bytes);
+
   std::unique_ptr<SymbolStorage> bytes_;
 };
 

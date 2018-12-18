@@ -62,7 +62,7 @@ public:
 
 protected:
   Envoy::OptionsImpl& options_;
-  Stats::SymbolTableImpl symbol_table_;
+  Stats::SymbolTable symbol_table_;
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
 

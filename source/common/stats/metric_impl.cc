@@ -41,15 +41,15 @@ void MetricImpl::clear() {
   SymbolTable& symbol_table = symbolTable();
   uint8_t* p = &storage_[0];
   uint32_t num_tags = *p++;
-  p += tagExtractedStatName().numBytesIncludingLength();
+  p += tagExtractedStatName().size();
   symbol_table.free(tagExtractedStatName());
   for (size_t i = 0; i < num_tags; ++i) {
     Tag tag;
     StatName name(p);
-    p += name.numBytesIncludingLength();
+    p += name.size();
     symbol_table.free(name);
     StatName value(p);
-    p += value.numBytesIncludingLength();
+    p += value.size();
     symbol_table.free(value);
   }
   storage_.reset();
@@ -71,7 +71,7 @@ StatName MetricImpl::tagExtractedStatName() const { return StatName(&storage_[1]
 std::vector<Tag> MetricImpl::tags() const {
   uint8_t* p = &storage_[0];
   uint32_t num_tags = *p++;
-  p += tagExtractedStatName().numBytesIncludingLength();
+  p += tagExtractedStatName().size();
 
   std::vector<Tag> tags;
   tags.reserve(num_tags);
@@ -81,10 +81,10 @@ std::vector<Tag> MetricImpl::tags() const {
     Tag tag;
     StatName name(p);
     tag.name_ = name.toString(symbol_table);
-    p += name.numBytesIncludingLength();
+    p += name.size();
     StatName value(p);
     tag.value_ = value.toString(symbol_table);
-    p += value.numBytesIncludingLength();
+    p += value.size();
     tags.emplace_back(tag);
   }
   return tags;

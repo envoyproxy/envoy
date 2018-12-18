@@ -45,7 +45,7 @@ public:
     store_->addSink(sink_);
   }
 
-  Stats::SymbolTableImpl symbol_table_;
+  Stats::SymbolTable symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatsOptionsImpl options_;
@@ -161,7 +161,7 @@ public:
   MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
   MOCK_METHOD1(free, void(RawStatData& data));
 
-  SymbolTableImpl symbol_table_;
+  SymbolTable symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatsOptionsImpl options_;
@@ -932,7 +932,7 @@ protected:
     // Do not call superclass SetUp.
   }
 
-  SymbolTableImpl symbol_table_;
+  SymbolTable symbol_table_;
   TestAllocator test_alloc_;
   std::string long_name_;
 };

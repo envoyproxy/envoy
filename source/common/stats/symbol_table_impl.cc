@@ -13,26 +13,25 @@ namespace Stats {
 static const uint32_t SpilloverMask = 0x80;
 static const uint32_t Low7Bits = 0x7f;
 
-StatName::StatName(const StatName& src, SymbolStorage memory) : symbol_array_(memory) {
-  memcpy(memory, src.symbolArray(), src.numBytesIncludingLength());
-  // src.symbol_array_ = nullptr;  // transfers ownership.
+StatName::StatName(const StatName& src, SymbolStorage memory) : size_and_data_(memory) {
+  memcpy(memory, src.size_and_data_, src.size());
 }
 
 std::string StatName::toString(const SymbolTable& table) const {
-  return table.decode(data(), numBytes());
+  return table.decode(data(), dataSize());
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
-  if (symbol_array_ == nullptr) {
+  if (size_and_data_ == nullptr) {
     std::cout << "Null StatName" << std::endl << std::flush;
   } else {
-    uint64_t nbytes = numBytes();
-    std::cout << "numBytes=" << nbytes << ":";
+    uint64_t nbytes = dataSize();
+    std::cout << "dataSize=" << nbytes << ":";
     for (uint64_t i = 0; i < nbytes; ++i) {
       std::cout << " " << static_cast<uint64_t>(data()[i]);
     }
-    SymbolVec encoding = SymbolEncoding::decodeSymbols(data(), numBytes());
+    SymbolVec encoding = SymbolEncoding::decodeSymbols(data(), dataSize());
     std::cout << ", numSymbols=" << encoding.size() << ":";
     for (Symbol symbol : encoding) {
       std::cout << " " << symbol;
@@ -87,7 +86,7 @@ SymbolVec SymbolEncoding::decodeSymbols(const SymbolStorage array, uint64_t size
 // There is no guarantee that bytes will be aligned, so we can't cast to a
 // uint16_t* and assign, but must individually copy the bytes.
 static inline uint8_t* saveLengthToBytesReturningNext(uint64_t length, uint8_t* bytes) {
-  ASSERT(length < 65536);
+  ASSERT(length < StatNameMaxSize);
   *bytes++ = length & 0xff;
   *bytes++ = length >> 8;
   return bytes;
@@ -100,38 +99,25 @@ uint64_t SymbolEncoding::moveToStorage(SymbolStorage symbol_array) {
     memcpy(symbol_array, vec_.data(), sz * sizeof(uint8_t));
   }
   vec_.clear(); // Logically transfer ownership, enabling empty assert on destruct.
-  return sz + 2;
+  return sz + StatNameSizeEncodingBytes;
 }
 
-SymbolTableImpl::SymbolTableImpl()
+SymbolTable::SymbolTable()
     // Have to be explicitly initialized, if we want to use the GUARDED_BY macro.
     : next_symbol_(0), monotonic_counter_(0) {}
 
-SymbolTableImpl::~SymbolTableImpl() {
-  // to avoid leaks into the symbol table, we expect all StatNames to be freed.
+SymbolTable::~SymbolTable() {
+  // To avoid leaks into the symbol table, we expect all StatNames to be freed.
   // Note: this could potentially be short-circuited if we decide a fast exit
   // is needed in production. But it would be good to ensure clean up during
   // tests.
   ASSERT(numSymbols() == 0);
-
-#ifdef TRACK_ENCODES
-  using CountNamePair = std::pair<uint64_t, std::string>;
-  std::vector<CountNamePair> hist;
-  for (const auto& p : histogram_) {
-    hist.push_back(CountNamePair(p.second, p.first));
-  }
-  std::sort(hist.begin(), hist.end());
-  for (auto p : hist) {
-    std::cerr << absl::StrCat(p.first, "\t", p.second) << std::endl;
-  }
-  std::cerr << std::flush;
-#endif
 }
 
 // TODO(ambuc): There is a possible performance optimization here for avoiding
 // the encoding of IPs / numbers if they appear in stat names. We don't want to
 // waste time symbolizing an integer as an integer, if we can help it.
-SymbolEncoding SymbolTableImpl::encode(const absl::string_view name) {
+SymbolEncoding SymbolTable::encode(const absl::string_view name) {
   SymbolEncoding encoding;
 
   if (name.empty()) {
@@ -146,9 +132,6 @@ SymbolEncoding SymbolTableImpl::encode(const absl::string_view name) {
 
   // Now take the lock and populate the Symbol objects, which involves bumping
   // ref-counts in this.
-#ifdef TRACK_ENCODES
-  ++histogram_[std::string(name)];
-#endif
   for (absl::string_view token : tokens) {
     symbols.push_back(toSymbol(token));
   }
@@ -160,11 +143,11 @@ SymbolEncoding SymbolTableImpl::encode(const absl::string_view name) {
   return encoding;
 }
 
-std::string SymbolTableImpl::decode(const SymbolStorage symbol_array, uint64_t size) const {
+std::string SymbolTable::decode(const SymbolStorage symbol_array, uint64_t size) const {
   return decodeSymbolVec(SymbolEncoding::decodeSymbols(symbol_array, size));
 }
 
-std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
+std::string SymbolTable::decodeSymbolVec(const SymbolVec& symbols) const {
   std::vector<absl::string_view> name_tokens;
   name_tokens.reserve(symbols.size());
   {
@@ -177,11 +160,11 @@ std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
   return absl::StrJoin(name_tokens, ".");
 }
 
-void SymbolTableImpl::adjustRefCount(StatName stat_name, int adjustment) {
+void SymbolTable::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolStorage.
-  SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.numBytes());
+  SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
-  absl::MutexLock lock(&lock_);
+  absl::ReaderMutexLock lock(&lock_);
   for (Symbol symbol : symbols) {
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
@@ -189,7 +172,23 @@ void SymbolTableImpl::adjustRefCount(StatName stat_name, int adjustment) {
     auto encode_search = encode_map_.find(decode_search->second.get());
     ASSERT(encode_search != encode_map_.end());
 
-    encode_search->second->ref_count_ += adjustment;
+    ++encode_search->second->ref_count_;
+  }
+}
+
+void SymbolTable::free(const StatName& stat_name) {
+  // Before taking the lock, decode the array of symbols from the SymbolStorage.
+  SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
+
+  absl::MutexLock lock(&lock_); // Takes write-lock as we may mutate decode_map_ and encode_map_.
+  for (Symbol symbol : symbols) {
+    auto decode_search = decode_map_.find(symbol);
+    ASSERT(decode_search != decode_map_.end());
+
+    auto encode_search = encode_map_.find(decode_search->second.get());
+    ASSERT(encode_search != encode_map_.end());
+
+    --encode_search->second->ref_count_;
 
     // If that was the last remaining client usage of the symbol, erase the the current
     // mappings and add the now-unused symbol to the reuse pool.
@@ -201,15 +200,15 @@ void SymbolTableImpl::adjustRefCount(StatName stat_name, int adjustment) {
   }
 }
 
-Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
+Symbol SymbolTable::toSymbol(absl::string_view sv) {
   {
     // First try to find the symbol with just a read-lock, so concurrent
-    // lookups for an already-allocated symbol do not conflict.
+    // lookups for an already-allocated symbol do not contend.
     absl::ReaderMutexLock lock(&lock_);
     auto encode_find = encode_map_.find(sv);
     if (encode_find != encode_map_.end()) {
-      // If the insertion didn't take place, return the actual value at that location and up the
-      // refcount at that location
+      // Increment the refcount of the already existing symbol. Note that the
+      // ref_count_ is atomic to allow incrementing it under read-lock.
       SharedSymbol& shared_symbol = *encode_find->second;
       ++(shared_symbol.ref_count_);
       return shared_symbol.symbol_;
@@ -238,24 +237,34 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   SharedSymbol& shared_symbol = *encode_insert.first->second;
 
   if (encode_insert.second) {
+    // The insertion took place.
     auto decode_insert = decode_map_.insert({next_symbol_, std::move(str)});
     ASSERT(decode_insert.second);
     newSymbol();
   } else {
-    // If the insertion didn't take place, return the shared symbol, and bump the refcount.
+    // If the insertion didn't take place -- due to another thread racing to
+    // insert the same symbmol after we drop the read-lock above -- we can
+    // return the shared symbol, but we must bump the refcount.
     ++(shared_symbol.ref_count_);
+
+    // Note: this condition is hard to hit in tests as it requires a tight race
+    // between multiple threads concurrently creating the same symbol.
+    // Uncommenting this line can help rapidly determine coverage during
+    // development. StatNameTest.RacingSymbolCreation hits this occasionally
+    // when testing with optimization, and frequently with fastbuild and debug.
+    //
+    // std::cerr << "Covered insertion race" << std::endl;
   }
   return shared_symbol.symbol_;
 }
 
-absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const
-    SHARED_LOCKS_REQUIRED(lock_) {
+absl::string_view SymbolTable::fromSymbol(const Symbol symbol) const SHARED_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
-  ASSERT(search != decode_map_.end());
+  RELEASE_ASSERT(search != decode_map_.end(), "no such symbol");
   return absl::string_view(search->second.get());
 }
 
-void SymbolTableImpl::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+void SymbolTable::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   if (pool_.empty()) {
     next_symbol_ = ++monotonic_counter_;
   } else {
@@ -266,13 +275,13 @@ void SymbolTableImpl::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   ASSERT(monotonic_counter_ != 0);
 }
 
-bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
+bool SymbolTable::lessThan(const StatName& a, const StatName& b) const {
   // Constructing two temp vectors during lessThan is not strictly necessary.
   // If this becomes a performance bottleneck (e.g. during sorting), we could
   // provide an iterator-like interface for incrementally decoding the symbols
   // without allocating memory.
-  SymbolVec av = SymbolEncoding::decodeSymbols(a.data(), a.numBytes());
-  SymbolVec bv = SymbolEncoding::decodeSymbols(b.data(), b.numBytes());
+  SymbolVec av = SymbolEncoding::decodeSymbols(a.data(), a.dataSize());
+  SymbolVec bv = SymbolEncoding::decodeSymbols(b.data(), b.dataSize());
   for (uint64_t i = 0, n = std::min(av.size(), bv.size()); i < n; ++i) {
     if (av[i] != bv[i]) {
       absl::ReaderMutexLock lock(&lock_);
@@ -283,7 +292,7 @@ bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
-void SymbolTableImpl::debugPrint() const {
+void SymbolTable::debugPrint() const {
   absl::ReaderMutexLock lock(&lock_);
   std::vector<Symbol> symbols;
   for (const auto& p : decode_map_) {
@@ -306,7 +315,7 @@ StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table) {
 }
 
 StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
-  uint64_t size = src.numBytesIncludingLength();
+  uint64_t size = src.size();
   bytes_ = std::make_unique<uint8_t[]>(size);
   src.copyToStorage(bytes_.get());
   table.incRefCount(statName());
@@ -326,8 +335,8 @@ void StatNameStorage::free(SymbolTable& table) {
 }
 
 StatNameJoiner::StatNameJoiner(StatName a, StatName b) {
-  const uint64_t a_size = a.numBytes();
-  const uint64_t b_size = b.numBytes();
+  const uint64_t a_size = a.dataSize();
+  const uint64_t b_size = b.dataSize();
   uint8_t* const p = alloc(a_size + b_size);
   memcpy(p, a.data(), a_size);
   memcpy(p + a_size, b.data(), b_size);
@@ -336,18 +345,18 @@ StatNameJoiner::StatNameJoiner(StatName a, StatName b) {
 StatNameJoiner::StatNameJoiner(const std::vector<StatName>& stat_names) {
   uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
-    num_bytes += stat_name.numBytes();
+    num_bytes += stat_name.dataSize();
   }
   uint8_t* p = alloc(num_bytes);
   for (StatName stat_name : stat_names) {
-    num_bytes = stat_name.numBytes();
+    num_bytes = stat_name.dataSize();
     memcpy(p, stat_name.data(), num_bytes);
     p += num_bytes;
   }
 }
 
 uint8_t* StatNameJoiner::alloc(uint64_t num_bytes) {
-  bytes_ = std::make_unique<uint8_t[]>(num_bytes + 2); // +2 bytes for the length up to 64k.
+  bytes_ = std::make_unique<uint8_t[]>(num_bytes + StatNameSizeEncodingBytes);
   return saveLengthToBytesReturningNext(num_bytes, bytes_.get());
 }
 

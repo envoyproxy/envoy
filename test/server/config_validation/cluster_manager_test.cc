@@ -44,7 +44,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
 
   AccessLog::MockAccessLogManager log_manager;
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  Stats::SymbolTableImpl symbol_table;
+  Stats::SymbolTable symbol_table;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(
       bootstrap, stats_store, tls, runtime, random, local_info, log_manager, admin);
   EXPECT_EQ(nullptr, cluster_manager->httpConnPoolForCluster("cluster", ResourcePriority::Default,
