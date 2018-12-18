@@ -2149,9 +2149,8 @@ TEST_F(HttpConnectionManagerImplTest, ZeroByteDataFiltering) {
   Buffer::OwnedImpl zero;
   decoder->decodeData(zero, true);
 
-  // Continue.
-  EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
-      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+  // The second filter decodeData() is not called with zero byte buffer.
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, true)).Times(0);
   decoder_filters_[0]->callbacks_->continueDecoding();
 }
 
