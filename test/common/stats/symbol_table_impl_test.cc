@@ -44,6 +44,8 @@ protected:
     return stat_name_storage_.back().statName();
   }
 
+  void setWriteLockTestHook(std::function<void()> f) { table_.setWriteLockTestHook(f); }
+
   SymbolTable table_;
 
   std::vector<StatNameStorage> stat_name_storage_;
@@ -351,7 +353,7 @@ private:
 
 } // namespace
 
-TEST_F(StatNameTest, RacingSymbolCreation) {
+TEST_F(StatNameTest, NoMutexContentionOnExistingSymbols) {
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   MutexTracerImpl& mutex_tracer = MutexTracerImpl::getOrCreateTracer();
 
@@ -388,7 +390,7 @@ TEST_F(StatNameTest, RacingSymbolCreation) {
   creates.Wait();
 
   int64_t create_contentions = mutex_tracer.numContentions();
-  std::cerr << "Number of contentions: " << create_contentions << std::endl;
+  ENVOY_LOG_MISC(info, "Number of contentions: {}", create_contentions);
 
   // But when we access the already-existing symbols, we guarantee that no
   // further mutex contentions occur.
@@ -400,6 +402,24 @@ TEST_F(StatNameTest, RacingSymbolCreation) {
   for (auto& thread : threads) {
     thread->join();
   }
+}
+
+TEST_F(StatNameTest, SymbolCreationRace) {
+  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+
+  Notifier wait, wait_reached;
+  setWriteLockTestHook([&wait, &wait_reached]() {
+    wait_reached.notify();
+    wait.wait();
+  });
+  static const char conflicting_name[] = "conflicting";
+  auto thread = thread_factory.createThread(
+      [this]() { StatNameTempStorage stat_name(conflicting_name, table_); });
+  wait_reached.wait();
+  setWriteLockTestHook(nullptr);
+  StatNameTempStorage stat_name(conflicting_name, table_);
+  wait.notify();
+  thread->join();
 }
 
 // Tests the memory savings realized from using symbol tables with 1k clusters. This
@@ -441,8 +461,8 @@ TEST(SymbolTableTest, Memory) {
   // This test only works if Memory::Stats::totalCurrentlyAllocated() works, which
   // appears not to be the case in some tests, including asan, tsan, and mac.
   if (Memory::Stats::totalCurrentlyAllocated() == 0) {
-    std::cerr << "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0."
-              << std::endl;
+    ENVOY_LOG_MISC(info,
+                   "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0.");
   } else {
     EXPECT_LT(symbol_table_mem_used, string_mem_used / 4);
     EXPECT_LT(symbol_table_mem_used, 1740000); // Dec 16, 2018: 1734552 bytes.

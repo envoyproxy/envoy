@@ -1,11 +1,13 @@
 #include "common/stats/symbol_table_impl.h"
 
-#include <iostream>
 #include <memory>
 #include <unordered_map>
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/common/logger.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Stats {
@@ -24,19 +26,19 @@ std::string StatName::toString(const SymbolTable& table) const {
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
   if (size_and_data_ == nullptr) {
-    std::cout << "Null StatName" << std::endl << std::flush;
+    ENVOY_LOG_MISC(info, "Null StatName");
   } else {
     uint64_t nbytes = dataSize();
-    std::cout << "dataSize=" << nbytes << ":";
+    std::string msg = absl::StrCat("dataSize=", nbytes, ":");
     for (uint64_t i = 0; i < nbytes; ++i) {
-      std::cout << " " << static_cast<uint64_t>(data()[i]);
+      absl::StrAppend(&msg, " ", static_cast<uint64_t>(data()[i]));
     }
     SymbolVec encoding = SymbolEncoding::decodeSymbols(data(), dataSize());
-    std::cout << ", numSymbols=" << encoding.size() << ":";
+    absl::StrAppend(&msg, ", numSymbols=", encoding.size(), ":");
     for (Symbol symbol : encoding) {
-      std::cout << " " << symbol;
+      absl::StrAppend(&msg, " ", symbol);
     }
-    std::cout << std::endl << std::flush;
+    ENVOY_LOG_MISC(info, "{}", msg);
   }
 }
 #endif
@@ -130,8 +132,6 @@ SymbolEncoding SymbolTable::encode(const absl::string_view name) {
   std::vector<Symbol> symbols;
   symbols.reserve(tokens.size());
 
-  // Now take the lock and populate the Symbol objects, which involves bumping
-  // ref-counts in this.
   for (absl::string_view token : tokens) {
     symbols.push_back(toSymbol(token));
   }
@@ -215,6 +215,13 @@ Symbol SymbolTable::toSymbol(absl::string_view sv) {
     }
   }
 
+  // TODO(jmarantz): we could use __builtin_expect here to avoid any production
+  // overhead in clang and g++ but should incorporate that into some portability
+  // macros in a separate PR.
+  if (write_lock_test_hook_ != nullptr) {
+    write_lock_test_hook_();
+  }
+
   // If the find() under read-lock failed, we need to release it and take a
   // write-lock. Note that another thread may race to insert the symbol during
   // this window of time with the lock released, so we need to check again
@@ -253,7 +260,7 @@ Symbol SymbolTable::toSymbol(absl::string_view sv) {
     // development. StatNameTest.RacingSymbolCreation hits this occasionally
     // when testing with optimization, and frequently with fastbuild and debug.
     //
-    // std::cerr << "Covered insertion race" << std::endl;
+    // ENVOY_LOG_MISC(info, "Covered insertion race");
   }
   return shared_symbol.symbol_;
 }
@@ -302,9 +309,8 @@ void SymbolTable::debugPrint() const {
   for (Symbol symbol : symbols) {
     const char* token = decode_map_.find(symbol)->second.get();
     const SharedSymbol& shared_symbol = *encode_map_.find(token)->second;
-    std::cout << symbol << ": '" << token << "' (" << shared_symbol.ref_count_ << ")" << std::endl;
+    ENVOY_LOG_MISC(info, "{}: '{}' ({})", symbol, token, shared_symbol.ref_count_);
   }
-  std::cout << std::flush;
 }
 #endif
 

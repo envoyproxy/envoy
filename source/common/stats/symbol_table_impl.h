@@ -256,6 +256,19 @@ private:
     return monotonic_counter_;
   }
 
+  /**
+   * Sets hook to be called on symbol lookup when the symbol needs to be
+   * created, and we are dropping the read-lock on lock_ and have yet to
+   * pick up the write lock. This makes it possible to deterministically
+   * reproduce a write-race to ensure it's handled properly. See test
+   * StatNameTest.SymbolCreationRace.
+   *
+   * Note that the condition is often hit, non-determinstically, by
+   * StatNameTest.NoMutexContentionOnExistingSymbols, depending on
+   * compiler optimization settings and the machine running the tests.
+   */
+  void setWriteLockTestHook(std::function<void()> f) { write_lock_test_hook_ = f; }
+
   // Stores the symbol to be used at next insertion. This should exist ahead of insertion time so
   // that if insertion succeeds, the value written is the correct one.
   Symbol next_symbol_ GUARDED_BY(lock_);
@@ -276,6 +289,8 @@ private:
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
+
+  std::function<void()> write_lock_test_hook_;
 };
 
 /**
