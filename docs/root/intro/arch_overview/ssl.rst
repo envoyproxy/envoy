@@ -41,9 +41,8 @@ following the build instructions from the `Security Policy for BoringCrypto modu
 <https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp3318.pdf>`_,
 using ``--define boringssl=fips`` Bazel option. Currently, this option is only available on Linux-x86_64.
 
-The correctness of the FIPS build can be verified by checking the value of the ``server.fips``
-field in :ref:`stats admin endpoint <operations_admin_interface_stats>` and/or by looking for
-``BoringSSL-FIPS`` in the ``--version`` output.
+The correctness of the FIPS build can be verified by checking the presence of ``BoringSSL-FIPS``
+in the :option:`--version` output.
 
 It's important to note that while using FIPS-compliant module is necessary for FIPS compliance,
 it's not sufficient by itself, and depending on the context, additional steps might be necessary.

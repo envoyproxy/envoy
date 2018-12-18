@@ -309,6 +309,8 @@ The following optional features can be enabled on the Bazel build command-line:
   those installed via luarocks.
 * Perf annotation with `--define perf_annotation=enabled` (see
   source/common/common/perf_annotation.h for details).
+* BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
+  (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/ssl.html#fips-140-2) for details).
 
 ## Disabling extensions
 
