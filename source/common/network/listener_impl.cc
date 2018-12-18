@@ -45,7 +45,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
 }
 
 ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
-                           bool hand_off_restored_destination_connections)
+                           bool bind_to_port, bool hand_off_restored_destination_connections)
     : local_address_(nullptr), cb_(cb),
       hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
       listener_(nullptr) {
@@ -57,20 +57,23 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, Li
     local_address_ = socket.localAddress();
   }
 
-  listener_.reset(evconnlistener_new(&dispatcher.base(), listenCallback, this, 0, -1, socket.fd()));
+  if (bind_to_port) {
+    listener_.reset(
+        evconnlistener_new(&dispatcher.base(), listenCallback, this, 0, -1, socket.fd()));
 
-  if (!listener_) {
-    throw CreateListenerException(
-        fmt::format("cannot listen on socket: {}", socket.localAddress()->asString()));
+    if (!listener_) {
+      throw CreateListenerException(
+          fmt::format("cannot listen on socket: {}", socket.localAddress()->asString()));
+    }
+
+    if (!Network::Socket::applyOptions(socket.options(), socket,
+                                       envoy::api::v2::core::SocketOption::STATE_LISTENING)) {
+      throw CreateListenerException(fmt::format(
+          "cannot set post-listen socket option on socket: {}", socket.localAddress()->asString()));
+    }
+
+    evconnlistener_set_error_cb(listener_.get(), errorCallback);
   }
-
-  if (!Network::Socket::applyOptions(socket.options(), socket,
-                                     envoy::api::v2::core::SocketOption::STATE_LISTENING)) {
-    throw CreateListenerException(fmt::format("cannot set post-listen socket option on socket: {}",
-                                              socket.localAddress()->asString()));
-  }
-
-  evconnlistener_set_error_cb(listener_.get(), errorCallback);
 }
 
 void ListenerImpl::errorCallback(evconnlistener*, void*) {
