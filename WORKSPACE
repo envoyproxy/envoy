@@ -4,7 +4,9 @@ load("//bazel:repositories.bzl", "GO_VERSION", "envoy_dependencies")
 load("//bazel:cc_configure.bzl", "cc_configure")
 
 envoy_dependencies()
+
 load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependencies")
+
 rules_foreign_cc_dependencies()
 
 cc_configure()
