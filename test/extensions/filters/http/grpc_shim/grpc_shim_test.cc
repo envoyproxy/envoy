@@ -32,7 +32,7 @@ namespace GrpcShim {
 class GrpcShimTest : public testing::Test {
 protected:
   void initialize() {
-    filter_ = std::make_unique<GrpcShim>("application/x-protobuf");
+    filter_ = std::make_unique<GrpcShim>("application/x-protobuf", true);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }

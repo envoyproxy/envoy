@@ -13,7 +13,8 @@ Http::FilterFactoryCb GrpcShimConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filter::http::grpc_shim::v2alpha1::GrpcShim& config,
     const std::string&, Server::Configuration::FactoryContext&) {
   return [config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_unique<GrpcShim>(config.content_type()));
+    callbacks.addStreamFilter(
+        std::make_unique<GrpcShim>(config.content_type(), config.use_binary_octet()));
   };
 }
 

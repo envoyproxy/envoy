@@ -30,6 +30,7 @@ public:
 name: envoy.filters.http.grpc_shim
 config:
   content_type: application/x-protobuf
+  use_binary_octet: true
             )EOF";
     config_helper_.addFilter(filter);
 

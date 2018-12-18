@@ -11,4 +11,10 @@ message GrpcShim {
   // The content-type to pass to the upstream when the gRPC shim filter is applied.
   // The filter will also validate that the upstream responds with the same content type.
   string content_type = 1 [(validate.rules).string.min_bytes = 1];
+
+  // If true, Envoy will assume that the upstream doesn't understand gRPC frames and
+  // convert the downstream gRPC request into an upstream binary octet request. This means
+  // that Envoy will manage the gRPC frame header: it will strip it from the request and
+  // inject it on the response.
+  bool use_binary_octet = 2;
 }

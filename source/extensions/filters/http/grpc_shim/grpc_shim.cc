@@ -66,8 +66,10 @@ Http::FilterHeadersStatus GrpcShim::decodeHeaders(Http::HeaderMap& headers, bool
     headers.ContentType()->value(upstream_content_type_);
     headers.insertAccept().value(upstream_content_type_);
 
-    // Adjust the content-length header to account for us removing the gRPC frame header.
-    adjustContentLength(headers, [](auto size) { return size - Grpc::GRPC_FRAME_HEADER_SIZE; });
+    if (use_binary_octet_) {
+      // Adjust the content-length header to account for us removing the gRPC frame header.
+      adjustContentLength(headers, [](auto size) { return size - Grpc::GRPC_FRAME_HEADER_SIZE; });
+    }
 
     // Clear the route cache to recompute the cache. This provides additional
     // flexibility around request modification through the route table.
@@ -78,7 +80,7 @@ Http::FilterHeadersStatus GrpcShim::decodeHeaders(Http::HeaderMap& headers, bool
 }
 
 Http::FilterDataStatus GrpcShim::decodeData(Buffer::Instance& buffer, bool) {
-  if (enabled_ && !prefix_stripped_) {
+  if (enabled_ && use_binary_octet_ && !prefix_stripped_) {
     // Fail the request if the body is too small to possibly contain a gRPC frame.
     if (buffer.length() < Grpc::GRPC_FRAME_HEADER_SIZE) {
       decoder_callbacks_->sendLocalReply(Http::Code::OK, "invalid request body", nullptr,
@@ -116,8 +118,11 @@ Http::FilterHeadersStatus GrpcShim::encodeHeaders(Http::HeaderMap& headers, bool
     // Restore the content-type to match what the downstream sent.
     content_type->value(content_type_);
 
-    // Adjust content-length to account for the frame header that's added.
-    adjustContentLength(headers, [](auto length) { return length + Grpc::GRPC_FRAME_HEADER_SIZE; });
+    if (use_binary_octet_) {
+      // Adjust content-length to account for the frame header that's added.
+      adjustContentLength(headers,
+                          [](auto length) { return length + Grpc::GRPC_FRAME_HEADER_SIZE; });
+    }
     // We can only insert trailers at the end of data, so keep track of this value
     // until then.
     grpc_status_ = grpcStatusFromHeaders(headers);
@@ -136,32 +141,39 @@ Http::FilterDataStatus GrpcShim::encodeData(Buffer::Instance& buffer, bool end_s
     auto& trailers = encoder_callbacks_->addEncodedTrailers();
     trailers.insertGrpcStatus().value(grpc_status_);
 
-    // Compute the size of the payload and construct the length prefix.
-    //
-    // We do this even if the upstream failed: If the response returned non-200,
-    // we'll respond with a grpc-status with an error, so clients will know that the request
-    // was unsuccessful. Since we're guaranteed at this point to have a valid response
-    // (unless upstream lied in content-type) we attempt to return a well-formed gRPC
-    // response body.
-    const auto length = htonl(buffer.length() + buffer_.length());
+    if (use_binary_octet_) {
+      // Compute the size of the payload and construct the length prefix.
+      //
+      // We do this even if the upstream failed: If the response returned non-200,
+      // we'll respond with a grpc-status with an error, so clients will know that the request
+      // was unsuccessful. Since we're guaranteed at this point to have a valid response
+      // (unless upstream lied in content-type) we attempt to return a well-formed gRPC
+      // response body.
+      const auto length = htonl(buffer.length() + buffer_.length());
 
-    std::array<uint8_t, Grpc::GRPC_FRAME_HEADER_SIZE> frame;
-    Grpc::Encoder().newFrame(Grpc::GRPC_FH_DEFAULT, htonl(length), frame);
+      std::array<uint8_t, Grpc::GRPC_FRAME_HEADER_SIZE> frame;
+      Grpc::Encoder().newFrame(Grpc::GRPC_FH_DEFAULT, htonl(length), frame);
 
-    Buffer::OwnedImpl prefix_buffer;
-    prefix_buffer.add(frame.data(), frame.size());
-    prefix_buffer.move(buffer_);
-    prefix_buffer.move(buffer);
+      Buffer::OwnedImpl prefix_buffer;
+      prefix_buffer.add(frame.data(), frame.size());
+      prefix_buffer.move(buffer_);
+      prefix_buffer.move(buffer);
 
-    buffer.move(prefix_buffer);
+      buffer.move(prefix_buffer);
+    }
 
     return Http::FilterDataStatus::Continue;
   }
 
-  // Buffer the response in a mutable buffer: we need to determine the size of the response
-  // and modify it later on.
-  buffer_.move(buffer);
-  return Http::FilterDataStatus::StopIterationAndBuffer;
+  // We only need to buffer if we're responsible for injecting the gRPC frame header.
+  if (use_binary_octet_) {
+    // Buffer the response in a mutable buffer: we need to determine the size of the response
+    // and modify it later on.
+    buffer_.move(buffer);
+    return Http::FilterDataStatus::StopIterationAndBuffer;
+  } else {
+    return Http::FilterDataStatus::Continue;
+  }
 }
 
 } // namespace GrpcShim
