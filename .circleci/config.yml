@@ -39,6 +39,14 @@ jobs:
        - run: ci/do_circle_ci.sh bazel.tsan
        - store_artifacts:
            path: /build/envoy/generated/failed-testlogs
+   compiletimeoptions:
+     executor: ubuntu-build
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: ci/do_circle_ci.sh bazel.compiletimeoptions
+       - store_artifacts:
+           path: /build/envoy/generated/failed-testlogs
    api:
      executor: ubuntu-build
      steps:
@@ -157,6 +165,7 @@ workflows:
               only: /^v.*/
       - asan
       - tsan
+      - compiletimeoptions
       - api
       - filter_example_mirror
       - ipv6_tests
