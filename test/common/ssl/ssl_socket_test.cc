@@ -2896,7 +2896,8 @@ TEST_P(SslSocketTest, CipherSuites) {
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.connection_error",
              "ssl.connection_error", GetParam(), nullptr);
 #else
-  testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
+  testUtilV2(listener, client, "", true, "", "", "", "", "",
+             "ssl.ciphers.ECDHE-RSA-CHACHA20-POLY1305", "ssl.ciphers.ECDHE-RSA-CHACHA20-POLY1305",
              GetParam(), nullptr);
 #endif
   client_params->clear_cipher_suites();
@@ -2956,8 +2957,8 @@ TEST_P(SslSocketTest, EcdhCurves) {
   testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.connection_error",
              "ssl.connection_error", GetParam(), nullptr);
 #else
-  testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam(), nullptr);
+  testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.curves.X25519",
+             "ssl.curves.X25519", GetParam(), nullptr);
 #endif
   client_params->clear_ecdh_curves();
   server_params->clear_cipher_suites();
