@@ -11,6 +11,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalSrc {
+namespace {
 
 class ConfigTest : public testing::Test {
 public:
@@ -59,6 +60,7 @@ TEST_F(ConfigTest, TestUseMarkMax) {
 
   EXPECT_EQ(config.mark(), std::numeric_limits<uint32_t>::max());
 }
+} // namespace
 } // namespace OriginalSrc
 } // namespace ListenerFilters
 } // namespace Extensions

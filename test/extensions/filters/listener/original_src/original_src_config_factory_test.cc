@@ -16,6 +16,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalSrc {
+namespace {
 
 TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
   std::string yaml = R"EOF(
@@ -43,6 +44,7 @@ TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
   EXPECT_NE(dynamic_cast<OriginalSrcFilter*>(added_filter.get()), nullptr);
 }
 
+} // namespace
 } // namespace OriginalSrc
 } // namespace ListenerFilters
 } // namespace Extensions

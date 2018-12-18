@@ -16,6 +16,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalSrc {
+namespace {
 
 class OriginalSrcTest : public testing::Test {
 public:
@@ -70,6 +71,8 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressUsesCorrectAddress) {
 
   EXPECT_EQ(key, expected_key);
 }
+
+} // namespace
 } // namespace OriginalSrc
 } // namespace ListenerFilters
 } // namespace Extensions

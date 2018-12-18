@@ -17,6 +17,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalSrc {
+namespace {
 
 class OriginalSrcSocketOptionTest : public testing::Test {
 public:
@@ -99,6 +100,7 @@ TEST_F(OriginalSrcSocketOptionTest, TestIpv6HashKeyOther) {
   EXPECT_EQ(key_, expected_key);
 }
 
+} // namespace
 } // namespace OriginalSrc
 } // namespace ListenerFilters
 } // namespace Extensions
