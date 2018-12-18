@@ -28,6 +28,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
     ],
 )
 

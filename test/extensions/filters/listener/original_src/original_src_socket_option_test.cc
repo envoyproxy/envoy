@@ -6,6 +6,7 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

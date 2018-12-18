@@ -41,8 +41,10 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.listener.original_src",
     deps = [
         "//source/extensions/filters/listener/original_src:original_src_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:printers_lib",
     ],
 )
 
@@ -55,5 +57,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/listener/original_src:original_src_socket_option_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:printers_lib",
     ],
 )
