@@ -3186,9 +3186,11 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithContinueDecoding) {
 
   EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
-  // This fail, it is called twice.
   EXPECT_CALL(*decoder_filters_[2], decodeData(_, true))
-      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterDataStatus {
+        data.drain(data.length());
+        return FilterDataStatus::StopIterationAndBuffer;
+      }));
 
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, true)).Times(0);
   // This fail, it is called once
