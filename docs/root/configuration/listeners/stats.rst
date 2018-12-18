@@ -22,13 +22,15 @@ Every listener has a statistics tree rooted at *listener.<address>.* with the fo
    ssl.connection_error, Counter, Total TLS connection errors not including failed certificate verifications
    ssl.handshake, Counter, Total successful TLS connection handshakes
    ssl.session_reused, Counter, Total successful TLS session resumptions
-   ssl.no_certificate, Counter, Total successul TLS connections with no client certificate
+   ssl.no_certificate, Counter, Total successful TLS connections with no client certificate
    ssl.fail_verify_no_cert, Counter, Total TLS connections that failed because of missing client certificate
    ssl.fail_verify_error, Counter, Total TLS connections that failed CA verification
    ssl.fail_verify_san, Counter, Total TLS connections that failed SAN verification
    ssl.fail_verify_cert_hash, Counter, Total TLS connections that failed certificate pinning verification
-   ssl.ciphers.<cipher>, Counter, Total TLS connections that used <cipher>
-   ssl.versions.<version>, Counter, Total successful handshakes that used protocol <version>
+   ssl.ciphers.<cipher>, Counter, Total successful TLS connections that used cipher <cipher>
+   ssl.curves.<curve>, Counter, Total successful TLS connections that used ECDHE curve <curve>
+   ssl.sigalgs.<sigalg>, Counter, Total successful TLS connections that used signature algorithm <sigalg>
+   ssl.versions.<version>, Counter, Total successful TLS connections that used protocol version <version>
 
 Listener manager
 ----------------

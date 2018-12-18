@@ -78,7 +78,8 @@ Version history
 * stream: renamed `perRequestState` to `filterState` in `StreamInfo`.
 * stream: added `downstreamDirectRemoteAddress` to `StreamInfo`.
 * thrift_proxy: introduced thrift rate limiter filter
-* tls: added ssl.versions.<version> to :ref:`listener metrics <config_listener_stats>` to track TLS versions in use.
+* tls: added ssl.curves.<curve>, ssl.sigalgs.<sigalg> and ssl.versions.<version> to
+  :ref:`listener metrics <config_listener_stats>` to track TLS algorithms and versions in use.
 * tls: added support for :ref:`client-side session resumption <envoy_api_field_auth.UpstreamTlsContext.max_session_keys>`.
 * tls: added support for CRLs in :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
 * tls: added support for :ref:`multiple server TLS certificates <arch_overview_ssl_cert_select>`.

@@ -359,6 +359,7 @@ def envoy_cc_test(
         deps = [],
         tags = [],
         args = [],
+        shard_count = None,
         coverage = True,
         local = False):
     test_lib_tags = []
@@ -388,6 +389,7 @@ def envoy_cc_test(
         args = args + ["--gmock_default_mock_behavior=2"],
         tags = tags + ["coverage_test"],
         local = local,
+        shard_count = shard_count,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified
