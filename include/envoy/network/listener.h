@@ -127,9 +127,8 @@ public:
    * Called when a new connection is received.
    * @param new_connection supplies the new connection that is moved into the callee.
    */
-  virtual void onNewConnection(Address::InstanceConstSharedPtr local_address,
-                               Address::InstanceConstSharedPtr remote_address,
-                               Buffer::Instance&& data) PURE;
+  virtual void onData(Address::InstanceConstSharedPtr local_address,
+                      Address::InstanceConstSharedPtr peer_address, Buffer::Instance&& data) PURE;
 };
 
 /**

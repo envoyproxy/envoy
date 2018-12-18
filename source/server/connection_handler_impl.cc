@@ -133,12 +133,12 @@ ConnectionHandlerImpl::ActiveUdpListener::~ActiveUdpListener() {
   // TODO(conqerAtapple): Add implementation.
 }
 
-void ConnectionHandlerImpl::ActiveUdpListener::onNewConnection(
+void ConnectionHandlerImpl::ActiveUdpListener::onData(
     Network::Address::InstanceConstSharedPtr local_address,
-    Network::Address::InstanceConstSharedPtr remote_address, Buffer::Instance&& data) {
+    Network::Address::InstanceConstSharedPtr peer_address, Buffer::Instance&& data) {
 
   (void)local_address;
-  (void)remote_address;
+  (void)peer_address;
   (void)data;
 
   // TODO(conqerAtapple): Add implementation.

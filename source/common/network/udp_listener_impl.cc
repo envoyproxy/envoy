@@ -58,13 +58,13 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
   Address::InstanceConstSharedPtr local_address = instance->socket_.localAddress();
   RELEASE_ASSERT(local_address, fmt::format("Unable to get local address for fd: {}", fd));
 
-  Address::InstanceConstSharedPtr remote_address = Address::peerAddressFromFd(fd);
+  Address::InstanceConstSharedPtr peer_address = Address::peerAddressFromFd(fd);
 
-  RELEASE_ASSERT(remote_address,
+  RELEASE_ASSERT(peer_address,
                  fmt::format("Unable to get remote address for fd: {}, local address: {} ", fd,
                              local_address->asString()));
 
-  instance->cb_.onNewConnection(local_address, remote_address, std::move(buffer));
+  instance->cb_.onData(local_address, peer_address, std::move(buffer));
 }
 
 } // namespace Network
