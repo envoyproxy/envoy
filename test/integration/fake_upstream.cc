@@ -346,7 +346,7 @@ static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::I
   return Network::SocketPtr{new Network::TcpListenSocket(
       Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:{}", Network::Test::getAnyAddressUrlString(version), port)),
-      nullptr)};
+      nullptr, true)};
 }
 
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
