@@ -119,7 +119,7 @@ public:
   virtual RawStatData* alloc(absl::string_view name); // Virtual only for mocking.
   void free(Stats::RawStatData& data) override;
   RawStatData* allocStatName(StatName stat_name) {
-    return alloc(stat_name.toString(symbolTable()));
+    return alloc(symbolTable().toString(stat_name));
   }
 
   // StatDataAllocator

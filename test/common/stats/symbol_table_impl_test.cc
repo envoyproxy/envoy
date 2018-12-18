@@ -34,7 +34,7 @@ protected:
   }
   Symbol monotonicCounter() { return table_.monotonicCounter(); }
   std::string encodeDecode(absl::string_view stat_name) {
-    return makeStat(stat_name).toString(table_);
+    return table_.toString(makeStat(stat_name));
   }
 
   StatNameStorage makeStatStorage(absl::string_view name) { return StatNameStorage(name, table_); }
@@ -83,8 +83,8 @@ TEST_F(StatNameTest, TestSuccessfulDecode) {
   std::string stat_name = "foo.bar.baz";
   StatName stat_name_1(makeStat(stat_name));
   StatName stat_name_2(makeStat(stat_name));
-  EXPECT_EQ(stat_name_1.toString(table_), stat_name_2.toString(table_));
-  EXPECT_EQ(stat_name_1.toString(table_), stat_name);
+  EXPECT_EQ(table_.toString(stat_name_1), table_.toString(stat_name_2));
+  EXPECT_EQ(table_.toString(stat_name_1), stat_name);
 }
 
 TEST_F(StatNameTest, TestBadDecodes) {
@@ -108,7 +108,7 @@ TEST_F(StatNameTest, TestBadDecodes) {
 TEST_F(StatNameTest, TestDifferentStats) {
   StatName stat_name_1(makeStat("foo.bar"));
   StatName stat_name_2(makeStat("bar.foo"));
-  EXPECT_NE(stat_name_1.toString(table_), stat_name_2.toString(table_));
+  EXPECT_NE(table_.toString(stat_name_1), table_.toString(stat_name_2));
   EXPECT_NE(stat_name_1, stat_name_2);
 }
 
@@ -234,8 +234,8 @@ TEST_F(StatNameTest, StoringWithoutStatNameStorage) {
   StatName hello(storage.get());
   StatName goodbye(storage.get() + goodbye_offset);
 
-  EXPECT_EQ("hello.world", hello.toString(table_));
-  EXPECT_EQ("goodbye.world", goodbye.toString(table_));
+  EXPECT_EQ("hello.world", table_.toString(hello));
+  EXPECT_EQ("goodbye.world", table_.toString(goodbye));
 
   // If we don't explicitly call free() on the the StatName objects the
   // SymbolTable will assert on destruction.
@@ -273,47 +273,47 @@ TEST_F(StatNameTest, Sort) {
 
 TEST_F(StatNameTest, Concat2) {
   StatNameJoiner joiner(makeStat("a.b"), makeStat("c.d"));
-  EXPECT_EQ("a.b.c.d", joiner.statName().toString(table_));
+  EXPECT_EQ("a.b.c.d", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, ConcatFirstEmpty) {
   StatNameJoiner joiner(makeStat(""), makeStat("c.d"));
-  EXPECT_EQ("c.d", joiner.statName().toString(table_));
+  EXPECT_EQ("c.d", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, ConcatSecondEmpty) {
   StatNameJoiner joiner(makeStat("a.b"), makeStat(""));
-  EXPECT_EQ("a.b", joiner.statName().toString(table_));
+  EXPECT_EQ("a.b", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, ConcatAllEmpty) {
   StatNameJoiner joiner(makeStat(""), makeStat(""));
-  EXPECT_EQ("", joiner.statName().toString(table_));
+  EXPECT_EQ("", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, Join3) {
   StatNameJoiner joiner({makeStat("a.b"), makeStat("c.d"), makeStat("e.f")});
-  EXPECT_EQ("a.b.c.d.e.f", joiner.statName().toString(table_));
+  EXPECT_EQ("a.b.c.d.e.f", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, Join3FirstEmpty) {
   StatNameJoiner joiner({makeStat(""), makeStat("c.d"), makeStat("e.f")});
-  EXPECT_EQ("c.d.e.f", joiner.statName().toString(table_));
+  EXPECT_EQ("c.d.e.f", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, Join3SecondEmpty) {
   StatNameJoiner joiner({makeStat("a.b"), makeStat(""), makeStat("e.f")});
-  EXPECT_EQ("a.b.e.f", joiner.statName().toString(table_));
+  EXPECT_EQ("a.b.e.f", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, Join3ThirdEmpty) {
   StatNameJoiner joiner({makeStat("a.b"), makeStat("c.d"), makeStat("")});
-  EXPECT_EQ("a.b.c.d", joiner.statName().toString(table_));
+  EXPECT_EQ("a.b.c.d", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, JoinAllEmpty) {
   StatNameJoiner joiner({makeStat(""), makeStat(""), makeStat("")});
-  EXPECT_EQ("", joiner.statName().toString(table_));
+  EXPECT_EQ("", table_.toString(joiner.statName()));
 }
 
 namespace {

@@ -87,7 +87,7 @@ bool ThreadLocalStoreImpl::rejects(StatName stat_name) const {
   // Also note that the elaboration of the stat-name into a string is expensive,
   // so I think it might be better to move the matcher test until after caching,
   // unless its acceptsAll/rejectsAll.
-  return stats_matcher_->rejectsAll() || stats_matcher_->rejects(stat_name.toString(symbolTable()));
+  return stats_matcher_->rejectsAll() || stats_matcher_->rejects(symbolTable().toString(stat_name));
 }
 
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
@@ -273,7 +273,7 @@ void ThreadLocalStoreImpl::ScopeImpl::extractTagsAndTruncate(
 class TagExtraction {
 public:
   TagExtraction(ThreadLocalStoreImpl& tls, StatName name) {
-    std::string name_str = name.toString(tls.symbolTable());
+    std::string name_str = tls.symbolTable().toString(name);
     tag_extracted_name_ = tls.tagProducer().produceTags(name_str, tags_);
   }
 
@@ -473,7 +473,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
 
   std::vector<Tag> tags;
   std::string tag_extracted_name =
-      parent_.tagProducer().produceTags(name.toString(symbolTable()), tags);
+      parent_.tagProducer().produceTags(symbolTable().toString(name), tags);
   TlsHistogramSharedPtr hist_tls_ptr =
       std::make_shared<ThreadLocalHistogramImpl>(name, tag_extracted_name, tags, symbolTable());
 

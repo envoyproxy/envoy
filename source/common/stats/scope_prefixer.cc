@@ -30,7 +30,7 @@ ScopePrefixer::~ScopePrefixer() {
 ScopePtr ScopePrefixer::createScope(const std::string& name) {
   // StatNameStorage scope_stat_name(name, symbolTable());  // Takes a lock.
   // StatNameStorage joiner(prefix_.statName(), scope_stat_name.statName());
-  return std::make_unique<ScopePrefixer>(prefix_.statName().toString(symbolTable()) + "." + name,
+  return std::make_unique<ScopePrefixer>(symbolTable().toString(prefix_.statName()) + "." + name,
                                          *scope_);
 }
 

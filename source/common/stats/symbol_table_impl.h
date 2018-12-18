@@ -211,10 +211,10 @@ public:
    * should never happen, and we don't want to continue running with a corrupt
    * stats set.
    *
-   * @param symbol_vec the vector of symbols to decode.
+   * @param stat_name symbol_vec the vector of symbols to decode.
    * @return std::string the retrieved stat name.
    */
-  std::string decode(const SymbolStorage symbol_vec, uint64_t size) const;
+  std::string toString(const StatName& stat_name) const;
 
 private:
   friend class StatName;
@@ -343,8 +343,6 @@ public:
   // src.size(). This is used in the a flow where we first construct a StatName
   // for lookup in a cache, and then on a miss need to store the data directly.
   StatName(const StatName& src, SymbolStorage memory);
-
-  std::string toString(const SymbolTable& table) const;
 
   /**
    * Note that this hash function will return a different hash than that of

@@ -254,7 +254,7 @@ protected:
       storage_vec.emplace_back(std::make_unique<Stats::StatNameTempStorage>(str, symbol_table_));
       stat_name_vec.push_back(storage_vec.back()->statName());
     }
-    return CodeStatsImpl::Join(stat_name_vec).statName().toString(symbol_table_);
+    return symbol_table_.toString(CodeStatsImpl::Join(stat_name_vec).statName());
   }
 
   Stats::SymbolTable symbol_table_;

@@ -63,7 +63,7 @@ MetricImpl::~MetricImpl() {
 }
 
 std::string MetricImpl::tagExtractedName() const {
-  return tagExtractedStatName().toString(symbolTable());
+  return symbolTable().toString(tagExtractedStatName());
 }
 
 StatName MetricImpl::tagExtractedStatName() const { return StatName(&storage_[1]); }
@@ -80,10 +80,10 @@ std::vector<Tag> MetricImpl::tags() const {
   for (size_t i = 0; i < num_tags; ++i) {
     Tag tag;
     StatName name(p);
-    tag.name_ = name.toString(symbol_table);
+    tag.name_ = symbol_table.toString(name);
     p += name.size();
     StatName value(p);
-    tag.value_ = value.toString(symbol_table);
+    tag.value_ = symbol_table.toString(value);
     p += value.size();
     tags.emplace_back(tag);
   }

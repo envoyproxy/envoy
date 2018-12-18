@@ -17,10 +17,6 @@ StatName::StatName(const StatName& src, SymbolStorage memory) : size_and_data_(m
   memcpy(memory, src.size_and_data_, src.size());
 }
 
-std::string StatName::toString(const SymbolTable& table) const {
-  return table.decode(data(), dataSize());
-}
-
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
   if (size_and_data_ == nullptr) {
@@ -143,8 +139,8 @@ SymbolEncoding SymbolTable::encode(const absl::string_view name) {
   return encoding;
 }
 
-std::string SymbolTable::decode(const SymbolStorage symbol_array, uint64_t size) const {
-  return decodeSymbolVec(SymbolEncoding::decodeSymbols(symbol_array, size));
+std::string SymbolTable::toString(const StatName& stat_name) const {
+  return decodeSymbolVec(SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize()));
 }
 
 std::string SymbolTable::decodeSymbolVec(const SymbolVec& symbols) const {

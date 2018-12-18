@@ -23,14 +23,14 @@ IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable> symbol_table)
 IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
     : symbol_table_(symbol_table), alloc_(symbol_table_),
       counters_([this](StatName name) -> CounterSharedPtr {
-        return alloc_.makeCounter(name, name.toString(alloc_.symbolTable()), std::vector<Tag>());
-      }),
+                  return alloc_.makeCounter(name, alloc_.symbolTable().toString(name), std::vector<Tag>());
+                }),
       gauges_([this](StatName name) -> GaugeSharedPtr {
-        return alloc_.makeGauge(name, name.toString(alloc_.symbolTable()), std::vector<Tag>());
-      }),
+        return alloc_.makeGauge(name, alloc_.symbolTable().toString(name), std::vector<Tag>());
+              }),
       histograms_([this](StatName name) -> HistogramSharedPtr {
-        return std::make_shared<HistogramImpl>(name, *this, name.toString(alloc_.symbolTable()),
-                                               std::vector<Tag>());
+                    return std::make_shared<HistogramImpl>(name, *this, alloc_.symbolTable().toString(name),
+                                                           std::vector<Tag>());
       }) {}
 
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {

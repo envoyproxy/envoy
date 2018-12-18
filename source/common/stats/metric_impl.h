@@ -26,7 +26,7 @@ public:
              SymbolTable& symbol_table);
   ~MetricImpl();
 
-  std::string name() const override { return statName().toString(symbolTable()); }
+  std::string name() const override { return symbolTable().toString(statName()); }
   std::string tagExtractedName() const override;
   std::vector<Tag> tags() const override;
 

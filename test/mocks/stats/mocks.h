@@ -179,9 +179,9 @@ public:
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
   MOCK_CONST_METHOD0(statsOptions, const StatsOptions&());
 
-  Counter& counterx(StatName name) override { return counter(name.toString(symbol_table_)); }
-  Gauge& gaugex(StatName name) override { return gauge(name.toString(symbol_table_)); }
-  Histogram& histogramx(StatName name) override { return histogram(name.toString(symbol_table_)); }
+  Counter& counterx(StatName name) override { return counter(symbol_table_.toString(name)); }
+  Gauge& gaugex(StatName name) override { return gauge(symbol_table_.toString(name)); }
+  Histogram& histogramx(StatName name) override { return histogram(symbol_table_.toString(name)); }
 
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& symbolTable() const override { return symbol_table_; }

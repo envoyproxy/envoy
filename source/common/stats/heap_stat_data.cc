@@ -60,7 +60,7 @@ void HeapStatDataAllocator::free(HeapStatData& data) {
 void HeapStatDataAllocator::debugPrint() {
   Thread::LockGuard lock(mutex_);
   for (HeapStatData* heap_stat_data : stats_) {
-    std::cout << heap_stat_data->statName().toString(symbolTable()) << std::endl;
+    std::cout << symbolTable().toString(heap_stat_data->statName()) << std::endl;
   }
   std::cout << std::flush;
 }

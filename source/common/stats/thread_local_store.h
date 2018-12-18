@@ -206,7 +206,7 @@ private:
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
     ScopePtr createScope(const std::string& name) override {
-      return parent_.createScope(prefix_.statName().toString(symbolTable()) + "." + name);
+      return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }
     const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
     SymbolTable& symbolTable() override { return parent_.symbolTable(); }
