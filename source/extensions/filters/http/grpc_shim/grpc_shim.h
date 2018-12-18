@@ -18,7 +18,8 @@ namespace GrpcShim {
 class GrpcShim : public Envoy::Http::PassThroughFilter {
 public:
   explicit GrpcShim(std::string upstream_content_type, bool withhold_grpc_frames)
-      : upstream_content_type_(std::move(upstream_content_type)), withhold_grpc_frames_(withhold_grpc_frames) {}
+      : upstream_content_type_(std::move(upstream_content_type)),
+        withhold_grpc_frames_(withhold_grpc_frames) {}
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& buffer, bool end_stream) override;
