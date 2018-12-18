@@ -663,12 +663,7 @@ def _com_github_google_jwt_verify():
     )
 
 def _foreign_cc_dependencies():
-    http_archive(
-        name = "rules_foreign_cc",
-        strip_prefix = "rules_foreign_cc-master",
-        # TODO(htuch): Pin to SHA or release.
-        url = "https://github.com/bazelbuild/rules_foreign_cc/archive/master.zip",
-    )
+    _repository_impl("rules_foreign_cc")
 
 def _apply_dep_blacklist(ctxt, recipes):
     newlist = []
