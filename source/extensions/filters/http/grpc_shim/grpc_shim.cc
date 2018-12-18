@@ -15,36 +15,36 @@
 
 #include "absl/strings/str_cat.h"
 
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcShim {
+
 namespace {
-Envoy::Grpc::Status::GrpcStatus grpcStatusFromHeaders(Envoy::Http::HeaderMap& headers) {
-  const auto http_response_status = Envoy::Http::Utility::getResponseStatus(headers);
+Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::HeaderMap& headers) {
+  const auto http_response_status = Http::Utility::getResponseStatus(headers);
 
   // Notably, we treat an upstream 200 as a successful response. This differs
   // from the standard but is key in being able to transform a successful
   // upstream HTTP response into a gRPC response.
   if (http_response_status == 200) {
-    return Envoy::Grpc::Status::GrpcStatus::Ok;
+    return Grpc::Status::GrpcStatus::Ok;
   } else {
-    return Envoy::Grpc::Utility::httpToGrpcStatus(http_response_status);
+    return Grpc::Utility::httpToGrpcStatus(http_response_status);
   }
 }
 
-void adjustContentLength(Envoy::Http::HeaderMap& headers,
+void adjustContentLength(Http::HeaderMap& headers,
                          std::function<uint64_t(uint64_t value)> adjustment) {
   auto length_header = headers.ContentLength();
   if (length_header != nullptr) {
     uint64_t length;
-    if (Envoy::StringUtil::atoul(length_header->value().c_str(), length)) {
+    if (StringUtil::atoul(length_header->value().c_str(), length)) {
       length_header->value(adjustment(length));
     }
   }
 }
 } // namespace
-
-namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
-namespace GrpcShim {
 
 Http::FilterHeadersStatus GrpcShim::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   // Short circuit if header only.
