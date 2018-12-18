@@ -1,5 +1,6 @@
 #include <string>
 
+#include "common/common/mutex_tracer_impl.h"
 #include "common/memory/stats.h"
 #include "common/stats/symbol_table_impl.h"
 
@@ -7,6 +8,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/blocking_counter.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -25,12 +27,14 @@ protected:
   }
 
   SymbolVec getSymbols(StatName stat_name) {
-    return SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.numBytes());
+    return SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
   }
-  std::string decodeSymbolVec(const SymbolVec& symbol_vec) { return table_.decode(symbol_vec); }
+  std::string decodeSymbolVec(const SymbolVec& symbol_vec) {
+    return table_.decodeSymbolVec(symbol_vec);
+  }
   Symbol monotonicCounter() { return table_.monotonicCounter(); }
   std::string encodeDecode(absl::string_view stat_name) {
-    return makeStat(stat_name).toString(table_);
+    return table_.toString(makeStat(stat_name));
   }
 
   StatNameStorage makeStatStorage(absl::string_view name) { return StatNameStorage(name, table_); }
@@ -54,8 +58,8 @@ TEST_F(StatNameTest, TestArbitrarySymbolRoundtrip) {
   }
 }
 
-TEST_F(StatNameTest, TestMillionSymbolsRoundtrip) {
-  for (int i = 0; i < 1 * 1000 * 1000; ++i) {
+TEST_F(StatNameTest, Test100kSymbolsRoundtrip) {
+  for (int i = 0; i < 100 * 1000; ++i) {
     const std::string stat_name = absl::StrCat("symbol_", i);
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
@@ -79,8 +83,8 @@ TEST_F(StatNameTest, TestSuccessfulDecode) {
   std::string stat_name = "foo.bar.baz";
   StatName stat_name_1(makeStat(stat_name));
   StatName stat_name_2(makeStat(stat_name));
-  EXPECT_EQ(stat_name_1.toString(table_), stat_name_2.toString(table_));
-  EXPECT_EQ(stat_name_1.toString(table_), stat_name);
+  EXPECT_EQ(table_.toString(stat_name_1), table_.toString(stat_name_2));
+  EXPECT_EQ(table_.toString(stat_name_1), stat_name);
 }
 
 TEST_F(StatNameTest, TestBadDecodes) {
@@ -104,7 +108,7 @@ TEST_F(StatNameTest, TestBadDecodes) {
 TEST_F(StatNameTest, TestDifferentStats) {
   StatName stat_name_1(makeStat("foo.bar"));
   StatName stat_name_2(makeStat("bar.foo"));
-  EXPECT_NE(stat_name_1.toString(table_), stat_name_2.toString(table_));
+  EXPECT_NE(table_.toString(stat_name_1), table_.toString(stat_name_2));
   EXPECT_NE(stat_name_1, stat_name_2);
 }
 
@@ -230,8 +234,8 @@ TEST_F(StatNameTest, StoringWithoutStatNameStorage) {
   StatName hello(storage.get());
   StatName goodbye(storage.get() + goodbye_offset);
 
-  EXPECT_EQ("hello.world", hello.toString(table_));
-  EXPECT_EQ("goodbye.world", goodbye.toString(table_));
+  EXPECT_EQ("hello.world", table_.toString(hello));
+  EXPECT_EQ("goodbye.world", table_.toString(goodbye));
 
   // If we don't explicitly call free() on the the StatName objects the
   // SymbolTable will assert on destruction.
@@ -269,47 +273,133 @@ TEST_F(StatNameTest, Sort) {
 
 TEST_F(StatNameTest, Concat2) {
   StatNameJoiner joiner(makeStat("a.b"), makeStat("c.d"));
-  EXPECT_EQ("a.b.c.d", joiner.statName().toString(table_));
+  EXPECT_EQ("a.b.c.d", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, ConcatFirstEmpty) {
   StatNameJoiner joiner(makeStat(""), makeStat("c.d"));
-  EXPECT_EQ("c.d", joiner.statName().toString(table_));
+  EXPECT_EQ("c.d", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, ConcatSecondEmpty) {
   StatNameJoiner joiner(makeStat("a.b"), makeStat(""));
-  EXPECT_EQ("a.b", joiner.statName().toString(table_));
+  EXPECT_EQ("a.b", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, ConcatAllEmpty) {
   StatNameJoiner joiner(makeStat(""), makeStat(""));
-  EXPECT_EQ("", joiner.statName().toString(table_));
+  EXPECT_EQ("", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, Join3) {
   StatNameJoiner joiner({makeStat("a.b"), makeStat("c.d"), makeStat("e.f")});
-  EXPECT_EQ("a.b.c.d.e.f", joiner.statName().toString(table_));
+  EXPECT_EQ("a.b.c.d.e.f", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, Join3FirstEmpty) {
   StatNameJoiner joiner({makeStat(""), makeStat("c.d"), makeStat("e.f")});
-  EXPECT_EQ("c.d.e.f", joiner.statName().toString(table_));
+  EXPECT_EQ("c.d.e.f", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, Join3SecondEmpty) {
   StatNameJoiner joiner({makeStat("a.b"), makeStat(""), makeStat("e.f")});
-  EXPECT_EQ("a.b.e.f", joiner.statName().toString(table_));
+  EXPECT_EQ("a.b.e.f", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, Join3ThirdEmpty) {
   StatNameJoiner joiner({makeStat("a.b"), makeStat("c.d"), makeStat("")});
-  EXPECT_EQ("a.b.c.d", joiner.statName().toString(table_));
+  EXPECT_EQ("a.b.c.d", table_.toString(joiner.statName()));
 }
 
 TEST_F(StatNameTest, JoinAllEmpty) {
   StatNameJoiner joiner({makeStat(""), makeStat(""), makeStat("")});
-  EXPECT_EQ("", joiner.statName().toString(table_));
+  EXPECT_EQ("", table_.toString(joiner.statName()));
+}
+
+namespace {
+
+// This class functions like absl::Notification except the usage of SignalAll()
+// appears to trigger tighter simultaneous wakeups in multiple threads. Note
+// that the synchronization mechanism in
+//     https://github.com/abseil/abseil-cpp/blob/master/absl/synchronization/notification.h
+// has timing properties that do not seem to trigger the race condition in
+// SymbolTable::toSymbol() where the find() under read-lock fails, but by the
+// time the insert() under write-lock occurs, the symbol has been added by
+// another thread.
+class Notifier {
+public:
+  Notifier() : cond_(false) {}
+
+  void notify() {
+    absl::MutexLock lock(&mutex_);
+    cond_ = true;
+    cond_var_.SignalAll();
+  }
+
+  void wait() {
+    absl::MutexLock lock(&mutex_);
+    while (!cond_) {
+      cond_var_.Wait(&mutex_);
+    }
+  }
+
+private:
+  absl::Mutex mutex_;
+  bool cond_ GUARDED_BY(mutex_);
+  absl::CondVar cond_var_;
+};
+
+} // namespace
+
+TEST_F(StatNameTest, RacingSymbolCreation) {
+  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+  MutexTracerImpl& mutex_tracer = MutexTracerImpl::getOrCreateTracer();
+
+  // Make 100 threads, each of which will race to encode an overlapping set of
+  // symbols, triggering corner-cases in SymbolTable::toSymbol.
+  constexpr int num_threads = 100;
+  std::vector<Thread::ThreadPtr> threads;
+  threads.reserve(num_threads);
+  Notifier creation, access, wait;
+  absl::BlockingCounter creates(num_threads), accesses(num_threads);
+  for (int i = 0; i < num_threads; ++i) {
+    threads.push_back(
+        thread_factory.createThread([this, i, &creation, &access, &wait, &creates, &accesses]() {
+          // Rotate between 20 different symbols to try to get some
+          // contention. Based on a logging print statement in
+          // SymbolTable::toSymbol(), this appears to trigger creation-races,
+          // even when compiled with optimization.
+          std::string stat_name_string = absl::StrCat("symbol", i % 20);
+
+          // Block each thread on waking up a common condition variable,
+          // so we make it likely to race on creation.
+          creation.wait();
+          StatNameTempStorage initial(stat_name_string, table_);
+          creates.DecrementCount();
+
+          access.wait();
+          StatNameTempStorage second(stat_name_string, table_);
+          accesses.DecrementCount();
+
+          wait.wait();
+        }));
+  }
+  creation.notify();
+  creates.Wait();
+
+  int64_t create_contentions = mutex_tracer.numContentions();
+  std::cerr << "Number of contentions: " << create_contentions << std::endl;
+
+  // But when we access the already-existing symbols, we guarantee that no
+  // further mutex contentions occur.
+  access.notify();
+  accesses.Wait();
+  EXPECT_EQ(create_contentions, mutex_tracer.numContentions());
+
+  wait.notify();
+  for (auto& thread : threads) {
+    thread->join();
+  }
 }
 
 // Tests the memory savings realized from using symbol tables with 1k clusters. This
@@ -354,12 +444,8 @@ TEST(SymbolTableTest, Memory) {
     std::cerr << "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0."
               << std::endl;
   } else {
-    // In manual tests, string memory used 7759488 in this example, and
-    // symbol-table mem used 1739672. Setting the benchmark at 7759488/4 =
-    // 1939872, which should allow for some slop and platform dependence
-    // in the allocation library.
-
     EXPECT_LT(symbol_table_mem_used, string_mem_used / 4);
+    EXPECT_LT(symbol_table_mem_used, 1740000); // Dec 16, 2018: 1734552 bytes.
   }
 }
 

@@ -72,6 +72,7 @@ envoy_cc_test(
     srcs = ["symbol_table_impl_test.cc"],
     deps = [
         ":stat_test_utility_lib",
+        "//source/common/common:mutex_tracer_lib",
         "//source/common/memory:stats_lib",
         "//source/common/stats:symbol_table_lib",
         "//test/mocks/stats:stats_mocks",
