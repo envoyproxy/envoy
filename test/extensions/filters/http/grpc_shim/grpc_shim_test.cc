@@ -31,8 +31,8 @@ namespace GrpcShim {
 
 class GrpcShimTest : public testing::Test {
 protected:
-  void initialize() {
-    filter_ = std::make_unique<GrpcShim>("application/x-protobuf", true);
+  void initialize(bool withhold_grpc_headers = true) {
+    filter_ = std::make_unique<GrpcShim>("application/x-protobuf", withhold_grpc_headers);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -107,6 +107,65 @@ TEST_F(GrpcShimTest, NoGrpcRequest) {
   buffer.add("test", 4);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
   EXPECT_EQ(4, buffer.length());
+}
+
+// Verifies that if we receive a gRPC request but have configured the filter to not handle the gRPC
+// frames, then the data should not be modified.
+TEST_F(GrpcShimTest, GrpcRequestNoManageFrameHeader) {
+  initialize(false);
+  decoder_callbacks_.is_grpc_request_ = true;
+
+  {
+    EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+    Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
+                                     {"content-length", "25"},
+                                     {":path", "/testing.ExampleService/SendData"}});
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "25"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+  }
+
+  {
+    // We should not mutate the request data.
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abcdefgh", 8);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
+    EXPECT_EQ("abcdefgh", buffer.toString());
+  }
+
+  {
+    Http::TestHeaderMapImpl trailers;
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
+  }
+
+  // We should not modify the content-length.
+  Http::TestHeaderMapImpl headers(
+      {{":status", "200"}, {"content-length", "30"}, {"content-type", "application/x-protobuf"}});
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "30"));
+
+  {
+    // We should not drain the buffer, nor stop iteration.
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abc", 3);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, false));
+    EXPECT_EQ(3, buffer.length());
+  }
+
+  {
+    // Last call should also not modify the buffer.
+    Http::TestHeaderMapImpl trailers;
+    EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
+
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("ghj", 3);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, true));
+    EXPECT_EQ(3, buffer.length());
+    EXPECT_THAT(trailers, HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
+  }
 }
 
 // Tests that a gRPC is downgraded to application/x-protobuf and upgraded back

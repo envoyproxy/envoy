@@ -66,7 +66,7 @@ Http::FilterHeadersStatus GrpcShim::decodeHeaders(Http::HeaderMap& headers, bool
     headers.ContentType()->value(upstream_content_type_);
     headers.insertAccept().value(upstream_content_type_);
 
-    if (use_binary_octet_) {
+    if (withhold_grpc_frames_) {
       // Adjust the content-length header to account for us removing the gRPC frame header.
       adjustContentLength(headers, [](auto size) { return size - Grpc::GRPC_FRAME_HEADER_SIZE; });
     }
@@ -80,7 +80,7 @@ Http::FilterHeadersStatus GrpcShim::decodeHeaders(Http::HeaderMap& headers, bool
 }
 
 Http::FilterDataStatus GrpcShim::decodeData(Buffer::Instance& buffer, bool) {
-  if (enabled_ && use_binary_octet_ && !prefix_stripped_) {
+  if (enabled_ && withhold_grpc_frames_ && !prefix_stripped_) {
     // Fail the request if the body is too small to possibly contain a gRPC frame.
     if (buffer.length() < Grpc::GRPC_FRAME_HEADER_SIZE) {
       decoder_callbacks_->sendLocalReply(Http::Code::OK, "invalid request body", nullptr,
@@ -118,7 +118,7 @@ Http::FilterHeadersStatus GrpcShim::encodeHeaders(Http::HeaderMap& headers, bool
     // Restore the content-type to match what the downstream sent.
     content_type->value(content_type_);
 
-    if (use_binary_octet_) {
+    if (withhold_grpc_frames_) {
       // Adjust content-length to account for the frame header that's added.
       adjustContentLength(headers,
                           [](auto length) { return length + Grpc::GRPC_FRAME_HEADER_SIZE; });
@@ -141,7 +141,7 @@ Http::FilterDataStatus GrpcShim::encodeData(Buffer::Instance& buffer, bool end_s
     auto& trailers = encoder_callbacks_->addEncodedTrailers();
     trailers.insertGrpcStatus().value(grpc_status_);
 
-    if (use_binary_octet_) {
+    if (withhold_grpc_frames_) {
       // Compute the size of the payload and construct the length prefix.
       //
       // We do this even if the upstream failed: If the response returned non-200,
@@ -166,7 +166,7 @@ Http::FilterDataStatus GrpcShim::encodeData(Buffer::Instance& buffer, bool end_s
   }
 
   // We only need to buffer if we're responsible for injecting the gRPC frame header.
-  if (use_binary_octet_) {
+  if (withhold_grpc_frames_) {
     // Buffer the response in a mutable buffer: we need to determine the size of the response
     // and modify it later on.
     buffer_.move(buffer);

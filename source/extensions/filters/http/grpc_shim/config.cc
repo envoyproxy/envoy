@@ -14,7 +14,7 @@ Http::FilterFactoryCb GrpcShimConfig::createFilterFactoryFromProtoTyped(
     const std::string&, Server::Configuration::FactoryContext&) {
   return [config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
-        std::make_unique<GrpcShim>(config.content_type(), config.use_binary_octet()));
+        std::make_unique<GrpcShim>(config.content_type(), config.withhold_grpc_frames()));
   };
 }
 
