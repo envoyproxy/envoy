@@ -27,8 +27,11 @@ public:
   // A utility function to chose a priority level based on a precomputed hash and
   // a priority vector in the style of per_priority_load_
   //
-  // Returns the priority, a number between 0 and per_priority_load.size()-1
-  static uint32_t choosePriority(uint64_t hash, const std::vector<uint32_t>& per_priority_load);
+  // Returns the priority, a number between 0 and per_priority_load.size()-1 as well as whether
+  // it came from the degraded priority list.
+  static std::pair<uint32_t, bool>
+  choosePriority(uint64_t hash, const std::vector<uint32_t>& per_priority_load,
+                 const std::vector<uint32_t>& degraded_per_priority_load);
 
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
@@ -59,10 +62,18 @@ protected:
                    Runtime::RandomGenerator& random,
                    const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
-  // Choose host set randomly, based on the per_priority_load_;
-  HostSet& chooseHostSet(LoadBalancerContext* context);
+  // Choose host set randomly, based on the per_priority_load_ and degraded_per_priority_load_.
+  // per_priority_load_ is consulted first, spilling over to degraded_per_priority_load_ if
+  // necessary. When a host set is selected based on degraded_per_priority_load_, only degraded
+  // hosts should be selected from that host set.
+  //
+  // @return host set to use and whether to use degraded hosts.
+  std::pair<HostSet&, bool> chooseHostSet(LoadBalancerContext* context);
 
   uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_[priority]; }
+  uint32_t percentageDegradedLoad(uint32_t priority) const {
+    return degraded_per_priority_load_[priority];
+  }
   bool isInPanic(uint32_t priority) const { return per_priority_panic_[priority]; }
 
   ClusterStats& stats_;
@@ -78,7 +89,9 @@ public:
   // priority levels.
   void static recalculatePerPriorityState(uint32_t priority, const PrioritySet& priority_set,
                                           PriorityLoad& priority_load,
-                                          std::vector<uint32_t>& per_priority_health);
+                                          PriorityLoad& degraded_priority_load,
+                                          std::vector<uint32_t>& per_priority_health,
+                                          std::vector<uint32_t>& per_priority_degraded);
   void recalculatePerPriorityPanic();
 
 protected:
@@ -88,14 +101,22 @@ protected:
   // Calculating normalized total health starts with summarizing all priorities' health values.
   // It can exceed 100%. For example if there are three priorities and each is 100% healthy, the
   // total of all priorities is 300%. Normalized total health is then capped at 100%.
-  static uint32_t calcNormalizedTotalHealth(std::vector<uint32_t>& per_priority_health) {
-    return std::min<uint32_t>(
-        std::accumulate(per_priority_health.begin(), per_priority_health.end(), 0), 100);
+  static uint32_t calcNormalizedTotalHealth(std::vector<uint32_t>& per_priority_health,
+                                            std::vector<uint32_t>& per_priority_degraded) {
+    const auto health = std::accumulate(per_priority_health.begin(), per_priority_health.end(), 0);
+    const auto degraded =
+        std::accumulate(per_priority_degraded.begin(), per_priority_degraded.end(), 0);
+
+    return std::min<uint32_t>(health + degraded, 100);
   }
-  // The percentage load (0-100) for each priority level
-  std::vector<uint32_t> per_priority_load_;
-  // The health (0-100) for each priority level.
+  // The percentage load (0-100) for each priority level when targeting healthy hosts.
+  PriorityLoad per_priority_load_;
+  // The percentage load (0-100) for each priority level when targeting degraded hosts.
+  PriorityLoad degraded_per_priority_load_;
+  // The health percentage (0-100) for each priority level.
   std::vector<uint32_t> per_priority_health_;
+  // The degraded percentage (0-100) for each priority level.
+  std::vector<uint32_t> per_priority_degraded_;
   // Levels which are in panic
   std::vector<bool> per_priority_panic_;
 };
@@ -142,20 +163,26 @@ protected:
       AllHosts,
       // All healthy hosts in the host set.
       HealthyHosts,
+      // All degraded hosts in the host set.
+      DegradedHosts,
       // Healthy hosts for locality @ locality_index.
       LocalityHealthyHosts,
+      // Degraded hosts for locality @ locality_index.
+      LocalityDegradedHosts,
     };
 
     HostsSource() {}
 
     HostsSource(uint32_t priority, SourceType source_type)
         : priority_(priority), source_type_(source_type) {
-      ASSERT(source_type == SourceType::AllHosts || source_type == SourceType::HealthyHosts);
+      ASSERT(source_type == SourceType::AllHosts || source_type == SourceType::HealthyHosts ||
+             source_type == SourceType::DegradedHosts);
     }
 
     HostsSource(uint32_t priority, SourceType source_type, uint32_t locality_index)
         : priority_(priority), source_type_(source_type), locality_index_(locality_index) {
-      ASSERT(source_type == SourceType::LocalityHealthyHosts);
+      ASSERT(source_type == SourceType::LocalityHealthyHosts ||
+             source_type == SourceType::LocalityDegradedHosts);
     }
 
     // Priority in PrioritySet.

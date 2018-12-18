@@ -28,7 +28,8 @@ private:
   void recalculatePerPriorityState(uint32_t priority, const Upstream::PrioritySet& priority_set) {
     // Recalcuate health and priority the same way the load balancer does it.
     Upstream::LoadBalancerBase::recalculatePerPriorityState(
-        priority, priority_set, per_priority_load_, per_priority_health_);
+        priority, priority_set, per_priority_load_, degraded_per_priority_load_,
+        per_priority_health_);
   }
 
   std::pair<std::vector<uint32_t>, uint32_t> adjustedHealth() const;
@@ -43,7 +44,9 @@ private:
   std::vector<uint32_t> attempted_priorities_;
   std::vector<bool> excluded_priorities_;
   Upstream::PriorityLoad per_priority_load_;
+  Upstream::PriorityLoad degraded_per_priority_load_;
   std::vector<uint32_t> per_priority_health_;
+  std::vector<uint32_t> per_priority_degraded_;
 };
 
 } // namespace Priority

@@ -222,15 +222,29 @@ void HostSetImpl::updateHosts(UpdateHostsParams&& update_hosts_params,
   healthy_hosts_per_locality_ = std::move(update_hosts_params.healthy_hosts_per_locality);
   degraded_hosts_per_locality_ = std::move(update_hosts_params.degraded_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
+
+  rebuildLocalityScheduler(locality_scheduler_, locality_entries_, *healthy_hosts_per_locality_,
+                           *healthy_hosts_);
+  rebuildLocalityScheduler(degraded_locality_scheduler_, degraded_locality_entries_,
+                           *degraded_hosts_per_locality_, *degraded_hosts_);
+
+  runUpdateCallbacks(hosts_added, hosts_removed);
+}
+
+void HostSetImpl::rebuildLocalityScheduler(
+    std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
+    std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
+    const HostsPerLocality& eligible_hosts_per_locality, const HostVector& hosts) {
   // Rebuild the locality scheduler by computing the effective weight of each
   // locality in this priority. The scheduler is reset by default, and is rebuilt only if we have
-  // locality weights (i.e. using EDS) and there is at least one healthy host in this priority.
+  // locality weights (i.e. using EDS) and there is at least one healthy or degraded host in this
+  // priority.
   //
-  // We omit building a scheduler when there are zero healthy hosts in the priority as all
-  // the localities will have zero effective weight. At selection time, we'll only ever try
-  // to select a host from such a priority if all priorities have zero healthy hosts. At
-  // that point we'll rely on other mechanisms such as panic mode to select a host,
-  // none of which rely on the scheduler.
+  // We omit building a scheduler when there are zero healthy or degrade hosts in the priority as
+  // all the localities will have zero effective weight. At selection time, we'll only ever try to
+  // select a host from such a priority if all priorities have zero healthy hosts. At that point
+  // we'll rely on other mechanisms such as panic mode to select a host, none of which rely on the
+  // scheduler.
   //
   // TODO(htuch): if the underlying locality index ->
   // envoy::api::v2::core::Locality hasn't changed in hosts_/healthy_hosts_, we
@@ -239,22 +253,21 @@ void HostSetImpl::updateHosts(UpdateHostsParams&& update_hosts_params,
   // apply the new weights.
   locality_scheduler_ = nullptr;
   if (hosts_per_locality_ != nullptr && locality_weights_ != nullptr &&
-      !locality_weights_->empty() && !healthy_hosts_->empty()) {
-    locality_scheduler_ = std::make_unique<EdfScheduler<LocalityEntry>>();
-    locality_entries_.clear();
+      !locality_weights_->empty() && !hosts.empty()) {
+    locality_scheduler = std::make_unique<EdfScheduler<LocalityEntry>>();
+    locality_entries.clear();
     for (uint32_t i = 0; i < hosts_per_locality_->get().size(); ++i) {
-      const double effective_weight = effectiveLocalityWeight(i);
+      const double effective_weight = effectiveLocalityWeight(i, eligible_hosts_per_locality);
       if (effective_weight > 0) {
-        locality_entries_.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
-        locality_scheduler_->add(effective_weight, locality_entries_.back());
+        locality_entries.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
+        locality_scheduler->add(effective_weight, locality_entries_.back());
       }
     }
     // If all effective weights were zero, reset the scheduler.
-    if (locality_scheduler_->empty()) {
-      locality_scheduler_ = nullptr;
+    if (locality_scheduler->empty()) {
+      locality_scheduler = nullptr;
     }
   }
-  runUpdateCallbacks(hosts_added, hosts_removed);
 }
 
 absl::optional<uint32_t> HostSetImpl::chooseLocality() {
@@ -317,11 +330,12 @@ HostSetImpl::partitionHosts(HostVectorConstSharedPtr hosts,
                            std::move(degraded_hosts), std::move(degraded_hosts_per_locality));
 }
 
-double HostSetImpl::effectiveLocalityWeight(uint32_t index) const {
+double HostSetImpl::effectiveLocalityWeight(uint32_t index,
+                                            const HostsPerLocality& eligible_hosts) const {
   ASSERT(locality_weights_ != nullptr);
   ASSERT(hosts_per_locality_ != nullptr);
   const auto& locality_hosts = hosts_per_locality_->get()[index];
-  const auto& locality_healthy_hosts = healthy_hosts_per_locality_->get()[index];
+  const auto& locality_healthy_hosts = eligible_hosts.get()[index];
   if (locality_hosts.empty()) {
     return 0.0;
   }
