@@ -308,13 +308,12 @@ ServerContextConfigImpl::ServerContextConfigImpl(
 
         return ret;
       }()) {
-  // TODO(PiotrSikora): Support multiple TLS certificates.
   if ((config.common_tls_context().tls_certificates().size() +
        config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
     throw EnvoyException("No TLS certificates found for server context");
-  } else if ((config.common_tls_context().tls_certificates().size() +
-              config.common_tls_context().tls_certificate_sds_secret_configs().size()) > 1) {
-    throw EnvoyException("A single TLS certificate is required for server contexts");
+  } else if (!config.common_tls_context().tls_certificates().empty() &&
+             !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {
+    throw EnvoyException("SDS and non-SDS TLS certificates may not be mixed in server contexts");
   }
 }
 
