@@ -186,7 +186,7 @@ ProtocolPtr Filter::createProtocol(ProtocolCallbacks& callback) {
   using Type = envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy;
   switch (protocol_type_) {
   case Type::Dubbo:
-    return std::make_unique<DubboProtocolImpl>(callback);
+    return NamedProtocolConfigFactory::getFactory(ProtocolType::Dubbo).createProtocol(callback);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
