@@ -16,7 +16,7 @@ namespace NetworkFilters {
 namespace DubboProxy {
 
 enum class ProtocolType : uint8_t {
-  Dubbo,
+  Dubbo = 0,
 
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST PROTOCOL TYPE
   LastProtocolType = Dubbo,
@@ -27,7 +27,11 @@ enum class ProtocolType : uint8_t {
  */
 class ProtocolNameValues {
 public:
-  typedef std::unordered_map<ProtocolType, std::string> ProtocolTypeNameMap;
+  struct ProtocolTypeHash {
+    template <typename T> std::size_t operator()(T t) const { return static_cast<std::size_t>(t); }
+  };
+
+  typedef std::unordered_map<ProtocolType, std::string, ProtocolTypeHash> ProtocolTypeNameMap;
 
   const ProtocolTypeNameMap protocolTypeNameMap = {
       {ProtocolType::Dubbo, "dubbo"},
