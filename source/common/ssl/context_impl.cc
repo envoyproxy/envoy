@@ -415,8 +415,20 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   const char* cipher = SSL_get_cipher_name(ssl);
   scope_.counter(fmt::format("ssl.ciphers.{}", std::string{cipher})).inc();
 
-  std::string protocol_version = std::string{SSL_get_version(ssl)};
-  scope_.counter(fmt::format("ssl.versions.{}", protocol_version)).inc();
+  const char* version = SSL_get_version(ssl);
+  scope_.counter(fmt::format("ssl.versions.{}", std::string{version})).inc();
+
+  uint16_t curve_id = SSL_get_curve_id(ssl);
+  if (curve_id) {
+    const char* curve = SSL_get_curve_name(curve_id);
+    scope_.counter(fmt::format("ssl.curves.{}", std::string{curve})).inc();
+  }
+
+  uint16_t sigalg_id = SSL_get_peer_signature_algorithm(ssl);
+  if (sigalg_id) {
+    const char* sigalg = SSL_get_signature_algorithm_name(sigalg_id, 1 /* include curve */);
+    scope_.counter(fmt::format("ssl.sigalgs.{}", std::string{sigalg})).inc();
+  }
 
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
   if (!cert.get()) {
