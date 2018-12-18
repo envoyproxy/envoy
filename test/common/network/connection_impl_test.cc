@@ -1166,7 +1166,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
 class FakeReadFilter : public Network::ReadFilter {
 public:
   FakeReadFilter() {}
-  ~FakeReadFilter(){
+  ~FakeReadFilter() {
     EXPECT_TRUE(callbacks_ != nullptr);
     EXPECT_TRUE(callbacks_->connection().state() != Network::Connection::State::Open);
   }
@@ -1176,13 +1176,10 @@ public:
     return Network::FilterStatus::Continue;
   }
 
-  Network::FilterStatus onNewConnection() {
-    return Network::FilterStatus::Continue;
-  }
+  Network::FilterStatus onNewConnection() { return Network::FilterStatus::Continue; }
 
-  void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) {
-    callbacks_ = &callbacks;
-  }
+  void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) { callbacks_ = &callbacks; }
+
 private:
   ReadFilterCallbacks* callbacks_{nullptr};
 };
