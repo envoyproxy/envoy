@@ -26,6 +26,7 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
@@ -230,9 +231,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, EmptyFilter) {
   )EOF";
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromJson(json), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
+  EXPECT_EQ(std::chrono::milliseconds(15000),
+            manager_->listeners().front().get().listenerFiltersTimeout());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, DefaultListenerPerConnectionBufferLimit) {
@@ -243,7 +246,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, DefaultListenerPerConnectionBuffe
   }
   )EOF";
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromJson(json), "", true);
   EXPECT_EQ(1024 * 1024U, manager_->listeners().back().get().perConnectionBufferLimitBytes());
 }
@@ -257,7 +260,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SetListenerPerConnectionBufferLim
   }
   )EOF";
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromJson(json), "", true);
   EXPECT_EQ(8192U, manager_->listeners().back().get().perConnectionBufferLimitBytes());
 }
@@ -280,7 +283,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SslContext) {
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromJson(json), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -357,7 +360,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
   const std::string json = R"EOF(
   {
     "address": "tcp://127.0.0.1:1234",
-    "bind_to_port": false,
     "filters": [
       {
         "name" : "stats_test",
@@ -367,12 +369,28 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
   }
   )EOF";
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, false));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromJson(json), "", true);
   manager_->listeners().front().get().listenerScope().counter("foo").inc();
 
   EXPECT_EQ(1UL, server_.stats_store_.counter("bar").value());
   EXPECT_EQ(1UL, server_.stats_store_.counter("listener.127.0.0.1_1234.foo").value());
+}
+
+TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
+  const std::string json = R"EOF(
+    name: "foo"
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 10000 }
+    filter_chains:
+    - filters:
+    listener_filters_timeout: 0s
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(json), "", true));
+  EXPECT_EQ(std::chrono::milliseconds(),
+            manager_->listeners().front().get().listenerFiltersTimeout());
 }
 
 TEST_F(ListenerManagerImplTest, ReversedWriteFilterOrder) {
@@ -384,7 +402,7 @@ TEST_F(ListenerManagerImplTest, ReversedWriteFilterOrder) {
     - filters:
   )EOF";
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(json), "", true));
   EXPECT_TRUE(manager_->listeners().front().get().reverseWriteFilterOrder());
 }
@@ -404,7 +422,7 @@ TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
 
   ListenerHandle* listener_foo =
       expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   checkStats(1, 0, 0, 0, 1, 0);
 
@@ -425,7 +443,7 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(false);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
   checkStats(1, 0, 0, 0, 1, 0);
 
@@ -475,7 +493,7 @@ TEST_F(ListenerManagerImplTest, AddListenerOnIpv4OnlySetups) {
   EXPECT_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillOnce(Return(Api::SysCallIntResult{5, 0}));
   EXPECT_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
 
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
   checkStats(1, 0, 0, 0, 1, 0);
@@ -505,7 +523,7 @@ TEST_F(ListenerManagerImplTest, AddListenerOnIpv6OnlySetups) {
   EXPECT_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillOnce(Return(Api::SysCallIntResult{5, 0}));
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
 
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
   checkStats(1, 0, 0, 0, 1, 0);
@@ -528,7 +546,7 @@ TEST_F(ListenerManagerImplTest, UpdateRemoveNotModifiableListener) {
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(false);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", false));
   checkStats(1, 0, 0, 0, 1, 0);
   checkConfigDump(R"EOF(
@@ -599,7 +617,7 @@ filter_chains: {}
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(false);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "version1", true));
   checkStats(1, 0, 0, 0, 1, 0);
@@ -741,7 +759,7 @@ filter_chains: {}
   )EOF";
 
   ListenerHandle* listener_bar = expectListenerCreate(false);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_bar_yaml), "version4", true));
@@ -762,7 +780,7 @@ filter_chains: {}
   )EOF";
 
   ListenerHandle* listener_baz = expectListenerCreate(true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   EXPECT_CALL(listener_baz->target_, initialize(_));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_baz_yaml), "version5", true));
@@ -868,7 +886,7 @@ TEST_F(ListenerManagerImplTest, AddDrainingListener) {
   ON_CALL(*listener_factory_.socket_, localAddress()).WillByDefault(ReturnRef(local_address));
 
   ListenerHandle* listener_foo = expectListenerCreate(false);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
   worker_->callAddCompletion(true);
@@ -912,7 +930,7 @@ TEST_F(ListenerManagerImplTest, CantBindSocket) {
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true))
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _))
       .WillOnce(Throw(EnvoyException("can't bind")));
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_THROW(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true),
@@ -934,7 +952,7 @@ TEST_F(ListenerManagerImplTest, ListenerDraining) {
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(false);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
   worker_->callAddCompletion(true);
@@ -986,7 +1004,7 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   EXPECT_CALL(listener_foo->target_, initialize(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
   EXPECT_EQ(0UL, manager_->listeners().size());
@@ -1000,7 +1018,7 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
 
   // Add foo again and initialize it.
   listener_foo = expectListenerCreate(true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   EXPECT_CALL(listener_foo->target_, initialize(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
   checkStats(2, 0, 1, 1, 0, 0);
@@ -1059,7 +1077,7 @@ TEST_F(ListenerManagerImplTest, AddListenerFailure) {
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(false);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
 
@@ -1080,8 +1098,7 @@ TEST_F(ListenerManagerImplTest, StatsNameValidCharacterTest) {
   const std::string json = R"EOF(
   {
     "address": "tcp://[::1]:10000",
-    "filters": [],
-    "bind_to_port": false
+    "filters": []
   }
   )EOF";
 
@@ -1089,59 +1106,6 @@ TEST_F(ListenerManagerImplTest, StatsNameValidCharacterTest) {
   manager_->listeners().front().get().listenerScope().counter("foo").inc();
 
   EXPECT_EQ(1UL, server_.stats_store_.counter("listener.[__1]_10000.foo").value());
-}
-
-TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
-  InSequence s;
-
-  EXPECT_CALL(*worker_, start(_));
-  manager_->startWorkers(guard_dog_);
-
-  // Add foo listener into warming.
-  const std::string listener_foo_json = R"EOF(
-  {
-    "name": "foo",
-    "address": "tcp://0.0.0.0:1234",
-    "filters": [],
-    "bind_to_port": false
-  }
-  )EOF";
-
-  ListenerHandle* listener_foo = expectListenerCreate(true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, false));
-  EXPECT_CALL(listener_foo->target_, initialize(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
-
-  // Add bar with same non-binding address. Should fail.
-  const std::string listener_bar_json = R"EOF(
-  {
-    "name": "bar",
-    "address": "tcp://0.0.0.0:1234",
-    "filters": [],
-    "bind_to_port": false
-  }
-  )EOF";
-
-  ListenerHandle* listener_bar = expectListenerCreate(true);
-  EXPECT_CALL(*listener_bar, onDestroy());
-  EXPECT_THROW_WITH_MESSAGE(
-      manager_->addOrUpdateListener(parseListenerFromJson(listener_bar_json), "", true),
-      EnvoyException,
-      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
-
-  // Move foo to active and then try to add again. This should still fail.
-  EXPECT_CALL(*worker_, addListener(_, _));
-  listener_foo->target_.callback_();
-  worker_->callAddCompletion(true);
-
-  listener_bar = expectListenerCreate(true);
-  EXPECT_CALL(*listener_bar, onDestroy());
-  EXPECT_THROW_WITH_MESSAGE(
-      manager_->addOrUpdateListener(parseListenerFromJson(listener_bar_json), "", true),
-      EnvoyException,
-      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
-
-  EXPECT_CALL(*listener_foo, onDestroy());
 }
 
 TEST_F(ListenerManagerImplTest, EarlyShutdown) {
@@ -1171,7 +1135,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -1216,7 +1180,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -1261,7 +1225,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -1306,7 +1270,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -1347,7 +1311,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -1388,7 +1352,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -1455,7 +1419,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -1530,7 +1494,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -1610,7 +1574,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -1699,7 +1663,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -1768,7 +1732,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -1811,7 +1775,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -1856,7 +1820,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -1921,7 +1885,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferent
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -1956,7 +1920,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -2031,7 +1995,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsFilterChainWithoutTlsInspector
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2058,7 +2022,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniFilterChainWithoutTlsInspector
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2085,7 +2049,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, AlpnFilterChainWithoutTlsInspecto
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2113,7 +2077,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CustomTransportProtocolWithSniWit
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2126,40 +2090,52 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CustomTransportProtocolWithSniWit
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInline) {
-  const std::string yaml = R"EOF(
+  const std::string cert = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_chain.pem"));
+  const std::string pkey = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns3_key.pem"));
+  const std::string ca = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+  const std::string yaml = absl::StrCat(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - tls_context:
         common_tls_context:
           tls_certificates:
-            - certificate_chain: { inline_string: "-----BEGIN CERTIFICATE-----\nMIIDGjCCAoOgAwIBAgIJALE/9j8tvBGNMA0GCSqGSIb3DQEBCwUAMIGDMQswCQYD\nVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5j\naXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UECwwQTHlmdCBFbmdpbmVlcmluZzEd\nMBsGA1UEAwwUVGVzdCBJbnRlcm1lZGlhdGUgQ0EwHhcNMTgwMTE1MjI0MDI3WhcN\nMjAwMTE1MjI0MDI3WjB6MQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5p\nYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UE\nCwwQTHlmdCBFbmdpbmVlcmluZzEUMBIGA1UEAwwLVGVzdCBTZXJ2ZXIwgZ8wDQYJ\nKoZIhvcNAQEBBQADgY0AMIGJAoGBALGG70n/nfIB64LH6jraqxpJ3EUO+gL/KkHG\n4+/hQMMZpehPdcHa7vj1efBgaaddtjRZ3GLSSF968O19EbMwjQl1Azwn3Ql8SddQ\nhyW30/Q/jgY54MnDBGgb5xhb7tdfjGvZ+lKapu9FypTcrre/wXSwBSsmm2me0CCN\nAZKddyMzAgMBAAGjgZ0wgZowDAYDVR0TAQH/BAIwADALBgNVHQ8EBAMCBeAwHQYD\nVR0lBBYwFAYIKwYBBQUHAwIGCCsGAQUFBwMBMB4GA1UdEQQXMBWCE3NlcnZlcjEu\nZXhhbXBsZS5jb20wHQYDVR0OBBYEFBZcRXhGXlFghYQ9/R6yF7XTHzkxMB8GA1Ud\nIwQYMBaAFIuDOLnI5iZPpH230VFAuWeNYuWdMA0GCSqGSIb3DQEBCwUAA4GBAFZg\n6ZznS3KuEus6ZJsLJH7J0BMKmpdj5hM0M++TBnP8LVy73ETc95Y2sxvB/B2c7f2v\nwjz4nGd5O3kkiVlMrQ44GPUKrO3/Ltix+MT3ixuF7Z7vLFKwkIG2d0RXJVVb1MOM\nw1bmtABHf8sVAFF6RZtjshWSaZYvIhiG1FedV4Vw\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIC3jCCAkegAwIBAgIJAJvUixVO/5pTMA0GCSqGSIb3DQEBCwUAMHYxCzAJBgNV\nBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp\nc2NvMQ0wCwYDVQQKEwRMeWZ0MRkwFwYDVQQLExBMeWZ0IEVuZ2luZWVyaW5nMRAw\nDgYDVQQDEwdUZXN0IENBMB4XDTE4MDExNTIyNDAyN1oXDTI4MDExMzIyNDAyN1ow\ngYMxCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRYwFAYDVQQHDA1T\nYW4gRnJhbmNpc2NvMQ0wCwYDVQQKDARMeWZ0MRkwFwYDVQQLDBBMeWZ0IEVuZ2lu\nZWVyaW5nMR0wGwYDVQQDDBRUZXN0IEludGVybWVkaWF0ZSBDQTCBnzANBgkqhkiG\n9w0BAQEFAAOBjQAwgYkCgYEAxd1kOhV+/2n+rJWKvrtkyyqkWgBXXhH15G9cusaR\nzJtwxsvtPRYZ9nTc+A6GDFgZ0TS1sq/WJXfs3guMpFObXU+tSlezxHVRpWPTXKff\nhblqtZMPKW5q5LmOHxKi8GUxwDnEeAiZmzstGCYkRKn+GmLYe26vFGBw4MvM89Vm\necMCAwEAAaNmMGQwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYw\nHQYDVR0OBBYEFIuDOLnI5iZPpH230VFAuWeNYuWdMB8GA1UdIwQYMBaAFDt4pFFP\nFoSTHEgoegytK5ZByn15MA0GCSqGSIb3DQEBCwUAA4GBAGO77sBFzn63pM2Oy4XS\n+FEcFj/lB4vBh4r8jtzdf5EMaKUeXY9i57MTryPTJZRFXW6BuQ/B3hiOW2fwkCdL\neHd0MwGv95cn1PCWZh1IidVrtrDeu0oLxhRk5mcflaaLBuGADUD3Y1ms2sl90Ean\n6C+0EHH2O6Emesx9IhPZRx4H\n-----END CERTIFICATE-----" }
-              private_key: { inline_string: "-----BEGIN RSA PRIVATE KEY-----\nMIICXgIBAAKBgQCxhu9J/53yAeuCx+o62qsaSdxFDvoC/ypBxuPv4UDDGaXoT3XB\n2u749XnwYGmnXbY0Wdxi0khfevDtfRGzMI0JdQM8J90JfEnXUIclt9P0P44GOeDJ\nwwRoG+cYW+7XX4xr2fpSmqbvRcqU3K63v8F0sAUrJptpntAgjQGSnXcjMwIDAQAB\nAoGAJk4kQcZLEVYCuDRkwRA/zStUwP3rSkw+lPTSaAcljzNwjgDfOtX/rG5jQk+7\nXGanEwK0wAn5nciMReIvuIdoVt7zEtFygZ7D3yKh+Ywu0AYC8TaiszAaL0efMnAW\nMtpgyrAoMB4bFON3oyNVZM161+cdrU0PrEDqh+GHl8abpokCQQDfn2jE3WmS/a36\n2Dt/e3yjNE/4xDshAcHkNmF+jpcB66bls5ZU5Yv07RUVExQ30fw3v+ADMxmNYg2f\nqpAF2getAkEAyzr9GwgdKeruErwlLhMOG327zTcZlHZXU5Q378/S3bKi3c/voGCb\nexKjxRBZTzSw5hfrOzbCEpMLcwZaoBiyXwJBAJAH2XAq98vQDpXpXfEPNUjc8cFV\niowI2LxHdmYQKxz2jemW0PXfX1Siuxh20GffnOa/c+Y7rHKOvB2hut+5/YUCQQCF\nnBx2vxjdTBSEwKj455IoxLrJKeZpUnwK+LDluo35Ls4gYeo6WAkgGpsMnbj5d7yt\nKSB/Z3qj14R5dL3z7wilAkEAp78JPrvWP5zc3YOmmr9s8IQ3almspwnlh1mdcgoX\n4rHe3U4jRZwE6fw8W9G4QsFRlez1Re6g8T7yoFXiZETGqQ==\n-----END RSA PRIVATE KEY-----" }
+            - certificate_chain: { inline_string: ")EOF",
+                                        absl::CEscape(cert), R"EOF(" }
+              private_key: { inline_string: ")EOF",
+                                        absl::CEscape(pkey), R"EOF(" }
           validation_context:
-              trusted_ca: { inline_string: "-----BEGIN CERTIFICATE-----\nMIICzTCCAjagAwIBAgIJAOrzsOodDleaMA0GCSqGSIb3DQEBCwUAMHYxCzAJBgNV\nBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp\nc2NvMQ0wCwYDVQQKEwRMeWZ0MRkwFwYDVQQLExBMeWZ0IEVuZ2luZWVyaW5nMRAw\nDgYDVQQDEwdUZXN0IENBMB4XDTE3MDcwOTAxMzkzMloXDTI3MDcwNzAxMzkzMlow\ndjELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNh\nbiBGcmFuY2lzY28xDTALBgNVBAoTBEx5ZnQxGTAXBgNVBAsTEEx5ZnQgRW5naW5l\nZXJpbmcxEDAOBgNVBAMTB1Rlc3QgQ0EwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJ\nAoGBAJuJh8N5TheTHLKOxsLSAfiIu9VDeKPsV98KRJJaYCMoaof3j9wBs65HzIat\nAunuV4DVZZ2c/x7/v741oWadYd3yqL7XSzQaeBvhXi+wv3g17FYrdxaowG7cfmsh\ngCp7/9TRW0bRGL6Qp6od/u62L8dprdHXxnck/+sZMupam9YrAgMBAAGjYzBhMA8G\nA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMB0GA1UdDgQWBBQ7eKRRTxaE\nkxxIKHoMrSuWQcp9eTAfBgNVHSMEGDAWgBQ7eKRRTxaEkxxIKHoMrSuWQcp9eTAN\nBgkqhkiG9w0BAQsFAAOBgQCN00/2k9k8HNeJ8eYuFH10jnc+td7+OaYWpRSEKCS7\nux3KAu0UFt90mojEMClt4Y6uP4oXTWbRzMzAgQHldHU8Gkj8tYnv7mToX7Bh/xdc\n19epzjCmo/4Q6+16GZZvltiFjkkHSZEVI5ggljy1QdMIPRegsKKmX9mjZSCSSXD6\nSA==\n-----END CERTIFICATE-----" }
-  )EOF";
+              trusted_ca: { inline_string: ")EOF",
+                                        absl::CEscape(ca), R"EOF(" }
+  )EOF");
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateChainInlinePrivateKeyFilename) {
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
+  const std::string cert = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_chain.pem"));
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - tls_context:
         common_tls_context:
           tls_certificates:
-            - certificate_chain: { inline_string: "-----BEGIN CERTIFICATE-----\nMIIDGjCCAoOgAwIBAgIJALE/9j8tvBGNMA0GCSqGSIb3DQEBCwUAMIGDMQswCQYD\nVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5j\naXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UECwwQTHlmdCBFbmdpbmVlcmluZzEd\nMBsGA1UEAwwUVGVzdCBJbnRlcm1lZGlhdGUgQ0EwHhcNMTgwMTE1MjI0MDI3WhcN\nMjAwMTE1MjI0MDI3WjB6MQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5p\nYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UE\nCwwQTHlmdCBFbmdpbmVlcmluZzEUMBIGA1UEAwwLVGVzdCBTZXJ2ZXIwgZ8wDQYJ\nKoZIhvcNAQEBBQADgY0AMIGJAoGBALGG70n/nfIB64LH6jraqxpJ3EUO+gL/KkHG\n4+/hQMMZpehPdcHa7vj1efBgaaddtjRZ3GLSSF968O19EbMwjQl1Azwn3Ql8SddQ\nhyW30/Q/jgY54MnDBGgb5xhb7tdfjGvZ+lKapu9FypTcrre/wXSwBSsmm2me0CCN\nAZKddyMzAgMBAAGjgZ0wgZowDAYDVR0TAQH/BAIwADALBgNVHQ8EBAMCBeAwHQYD\nVR0lBBYwFAYIKwYBBQUHAwIGCCsGAQUFBwMBMB4GA1UdEQQXMBWCE3NlcnZlcjEu\nZXhhbXBsZS5jb20wHQYDVR0OBBYEFBZcRXhGXlFghYQ9/R6yF7XTHzkxMB8GA1Ud\nIwQYMBaAFIuDOLnI5iZPpH230VFAuWeNYuWdMA0GCSqGSIb3DQEBCwUAA4GBAFZg\n6ZznS3KuEus6ZJsLJH7J0BMKmpdj5hM0M++TBnP8LVy73ETc95Y2sxvB/B2c7f2v\nwjz4nGd5O3kkiVlMrQ44GPUKrO3/Ltix+MT3ixuF7Z7vLFKwkIG2d0RXJVVb1MOM\nw1bmtABHf8sVAFF6RZtjshWSaZYvIhiG1FedV4Vw\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIC3jCCAkegAwIBAgIJAJvUixVO/5pTMA0GCSqGSIb3DQEBCwUAMHYxCzAJBgNV\nBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp\nc2NvMQ0wCwYDVQQKEwRMeWZ0MRkwFwYDVQQLExBMeWZ0IEVuZ2luZWVyaW5nMRAw\nDgYDVQQDEwdUZXN0IENBMB4XDTE4MDExNTIyNDAyN1oXDTI4MDExMzIyNDAyN1ow\ngYMxCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRYwFAYDVQQHDA1T\nYW4gRnJhbmNpc2NvMQ0wCwYDVQQKDARMeWZ0MRkwFwYDVQQLDBBMeWZ0IEVuZ2lu\nZWVyaW5nMR0wGwYDVQQDDBRUZXN0IEludGVybWVkaWF0ZSBDQTCBnzANBgkqhkiG\n9w0BAQEFAAOBjQAwgYkCgYEAxd1kOhV+/2n+rJWKvrtkyyqkWgBXXhH15G9cusaR\nzJtwxsvtPRYZ9nTc+A6GDFgZ0TS1sq/WJXfs3guMpFObXU+tSlezxHVRpWPTXKff\nhblqtZMPKW5q5LmOHxKi8GUxwDnEeAiZmzstGCYkRKn+GmLYe26vFGBw4MvM89Vm\necMCAwEAAaNmMGQwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYw\nHQYDVR0OBBYEFIuDOLnI5iZPpH230VFAuWeNYuWdMB8GA1UdIwQYMBaAFDt4pFFP\nFoSTHEgoegytK5ZByn15MA0GCSqGSIb3DQEBCwUAA4GBAGO77sBFzn63pM2Oy4XS\n+FEcFj/lB4vBh4r8jtzdf5EMaKUeXY9i57MTryPTJZRFXW6BuQ/B3hiOW2fwkCdL\neHd0MwGv95cn1PCWZh1IidVrtrDeu0oLxhRk5mcflaaLBuGADUD3Y1ms2sl90Ean\n6C+0EHH2O6Emesx9IhPZRx4H\n-----END CERTIFICATE-----" }
-              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem" }
-  )EOF",
+            - private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_key.pem" }
+              certificate_chain: { inline_string: ")EOF",
+                                                                    absl::CEscape(cert), R"EOF(" }
+  )EOF"),
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -2172,14 +2148,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateIncomplete) {
     - tls_context:
         common_tls_context:
           tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem" }
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_chain.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_THROW_WITH_MESSAGE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true), EnvoyException,
       TestEnvironment::substitute("Failed to load incomplete certificate from {{ test_rundir }}"
-                                  "/test/common/ssl/test_data/san_dns_chain3.pem, ",
+                                  "/test/common/ssl/test_data/san_dns3_chain.pem, ",
                                   Network::Address::IpVersion::v4));
 }
 
@@ -2192,7 +2168,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidCertificateC
         common_tls_context:
           tls_certificates:
             - certificate_chain: { inline_string: "invalid" }
-              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -2201,17 +2177,23 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidCertificateC
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidIntermediateCA) {
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
+  const std::string leaf = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns3_cert.pem"));
+  const std::string yaml = TestEnvironment::substitute(
+      absl::StrCat(
+          R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - tls_context:
         common_tls_context:
           tls_certificates:
-            - certificate_chain: { inline_string: "-----BEGIN CERTIFICATE-----\nMIIDGjCCAoOgAwIBAgIJALE/9j8tvBGNMA0GCSqGSIb3DQEBCwUAMIGDMQswCQYD\nVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5j\naXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UECwwQTHlmdCBFbmdpbmVlcmluZzEd\nMBsGA1UEAwwUVGVzdCBJbnRlcm1lZGlhdGUgQ0EwHhcNMTgwMTE1MjI0MDI3WhcN\nMjAwMTE1MjI0MDI3WjB6MQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5p\nYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UE\nCwwQTHlmdCBFbmdpbmVlcmluZzEUMBIGA1UEAwwLVGVzdCBTZXJ2ZXIwgZ8wDQYJ\nKoZIhvcNAQEBBQADgY0AMIGJAoGBALGG70n/nfIB64LH6jraqxpJ3EUO+gL/KkHG\n4+/hQMMZpehPdcHa7vj1efBgaaddtjRZ3GLSSF968O19EbMwjQl1Azwn3Ql8SddQ\nhyW30/Q/jgY54MnDBGgb5xhb7tdfjGvZ+lKapu9FypTcrre/wXSwBSsmm2me0CCN\nAZKddyMzAgMBAAGjgZ0wgZowDAYDVR0TAQH/BAIwADALBgNVHQ8EBAMCBeAwHQYD\nVR0lBBYwFAYIKwYBBQUHAwIGCCsGAQUFBwMBMB4GA1UdEQQXMBWCE3NlcnZlcjEu\nZXhhbXBsZS5jb20wHQYDVR0OBBYEFBZcRXhGXlFghYQ9/R6yF7XTHzkxMB8GA1Ud\nIwQYMBaAFIuDOLnI5iZPpH230VFAuWeNYuWdMA0GCSqGSIb3DQEBCwUAA4GBAFZg\n6ZznS3KuEus6ZJsLJH7J0BMKmpdj5hM0M++TBnP8LVy73ETc95Y2sxvB/B2c7f2v\nwjz4nGd5O3kkiVlMrQ44GPUKrO3/Ltix+MT3ixuF7Z7vLFKwkIG2d0RXJVVb1MOM\nw1bmtABHf8sVAFF6RZtjshWSaZYvIhiG1FedV4Vw\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\ninvalid" }
-              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem" }
-  )EOF",
-                                                       Network::Address::IpVersion::v4);
+            - certificate_chain: { inline_string: ")EOF",
+          absl::CEscape(leaf),
+          R"EOF(\n-----BEGIN CERTIFICATE-----\nDEFINITELY_INVALID_CERTIFICATE\n-----END CERTIFICATE-----" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_key.pem" }
+  )EOF"),
+      Network::Address::IpVersion::v4);
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
                             EnvoyException, "Failed to load certificate chain from <inline>");
@@ -2225,7 +2207,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidPrivateKey) 
     - tls_context:
         common_tls_context:
           tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem" }
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_chain.pem" }
               private_key: { inline_string: "invalid" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
@@ -2242,8 +2224,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidTrustedCA) {
     - tls_context:
         common_tls_context:
           tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem" }
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_chain.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns3_key.pem" }
           validation_context:
               trusted_ca: { inline_string: "invalid" }
   )EOF",
@@ -2293,7 +2275,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2379,7 +2361,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2449,7 +2431,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
                             EnvoyException,
@@ -2516,7 +2498,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
                                                        Network::Address::IpVersion::v6);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2586,7 +2568,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFailIP
   )EOF",
                                                        Network::Address::IpVersion::v6);
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
                             EnvoyException,
@@ -2605,13 +2587,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
     - filters:
   )EOF",
                                                        Network::Address::IpVersion::v4);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true))
-      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr,
-                           const Network::Socket::OptionsSharedPtr& options,
-                           bool) -> Network::SocketSharedPtr {
-        EXPECT_EQ(options, nullptr);
-        return listener_factory_.socket_;
-      }));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _))
+      .WillOnce(
+          Invoke([&](Network::Address::InstanceConstSharedPtr,
+                     const Network::Socket::OptionsSharedPtr& options) -> Network::SocketSharedPtr {
+            EXPECT_EQ(options, nullptr);
+            return listener_factory_.socket_;
+          }));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -2636,17 +2618,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
   )EOF",
                                                        Network::Address::IpVersion::v4);
   if (ENVOY_SOCKET_IP_TRANSPARENT.has_value()) {
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, true))
-        .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
-                                const Network::Socket::OptionsSharedPtr& options,
-                                bool) -> Network::SocketSharedPtr {
-          EXPECT_NE(options.get(), nullptr);
-          EXPECT_EQ(options->size(), 2);
-          EXPECT_TRUE(
-              Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                            envoy::api::v2::core::SocketOption::STATE_PREBIND));
-          return listener_factory_.socket_;
-        }));
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _))
+        .WillOnce(Invoke(
+            [this](Network::Address::InstanceConstSharedPtr,
+                   const Network::Socket::OptionsSharedPtr& options) -> Network::SocketSharedPtr {
+              EXPECT_NE(options.get(), nullptr);
+              EXPECT_EQ(options->size(), 2);
+              EXPECT_TRUE(
+                  Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                                envoy::api::v2::core::SocketOption::STATE_PREBIND));
+              return listener_factory_.socket_;
+            }));
     // Expecting the socket option to bet set twice, once pre-bind, once post-bind.
     EXPECT_CALL(os_sys_calls,
                 setsockopt_(_, ENVOY_SOCKET_IP_TRANSPARENT.value().first,
@@ -2687,17 +2669,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
   )EOF",
                                                        Network::Address::IpVersion::v4);
   if (ENVOY_SOCKET_IP_FREEBIND.has_value()) {
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, true))
-        .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
-                                const Network::Socket::OptionsSharedPtr& options,
-                                bool) -> Network::SocketSharedPtr {
-          EXPECT_NE(options.get(), nullptr);
-          EXPECT_EQ(options->size(), 1);
-          EXPECT_TRUE(
-              Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                            envoy::api::v2::core::SocketOption::STATE_PREBIND));
-          return listener_factory_.socket_;
-        }));
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _))
+        .WillOnce(Invoke(
+            [this](Network::Address::InstanceConstSharedPtr,
+                   const Network::Socket::OptionsSharedPtr& options) -> Network::SocketSharedPtr {
+              EXPECT_NE(options.get(), nullptr);
+              EXPECT_EQ(options->size(), 1);
+              EXPECT_TRUE(
+                  Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                                envoy::api::v2::core::SocketOption::STATE_PREBIND));
+              return listener_factory_.socket_;
+            }));
     EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_IP_FREEBIND.value().first,
                                           ENVOY_SOCKET_IP_FREEBIND.value().second, _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
@@ -2734,17 +2716,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
     ]
   )EOF",
                                                        Network::Address::IpVersion::v4);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true))
-      .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
-                              const Network::Socket::OptionsSharedPtr& options,
-                              bool) -> Network::SocketSharedPtr {
-        EXPECT_NE(options.get(), nullptr);
-        EXPECT_EQ(options->size(), 3);
-        EXPECT_TRUE(
-            Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                          envoy::api::v2::core::SocketOption::STATE_PREBIND));
-        return listener_factory_.socket_;
-      }));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _))
+      .WillOnce(Invoke(
+          [this](Network::Address::InstanceConstSharedPtr,
+                 const Network::Socket::OptionsSharedPtr& options) -> Network::SocketSharedPtr {
+            EXPECT_NE(options.get(), nullptr);
+            EXPECT_EQ(options->size(), 3);
+            EXPECT_TRUE(
+                Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                              envoy::api::v2::core::SocketOption::STATE_PREBIND));
+            return listener_factory_.socket_;
+          }));
   EXPECT_CALL(os_sys_calls, setsockopt_(_, 1, 2, _, sizeof(int)))
       .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
         EXPECT_EQ(3, *static_cast<const int*>(optval));
@@ -2777,7 +2759,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, AddressResolver) {
 
   Registry::InjectFactory<Network::Address::Resolver> register_resolver(mock_resolver);
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -2799,13 +2781,15 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CRLFilename) {
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, CRLInline) {
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
+  const std::string crl = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl"));
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
@@ -2816,12 +2800,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CRLInline) {
               private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
           validation_context:
             trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
-            crl: { inline_string: "-----BEGIN X509 CRL-----\nMIIBbDCB1gIBATANBgkqhkiG9w0BAQsFADB2MQswCQYDVQQGEwJVUzETMBEGA1UE\nCBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNjbzENMAsGA1UEChME\nTHlmdDEZMBcGA1UECxMQTHlmdCBFbmdpbmVlcmluZzEQMA4GA1UEAxMHVGVzdCBD\nQRcNMTcxMjIwMTcxNDA4WhcNMjcxMjE4MTcxNDA4WjAcMBoCCQDZy/Qp7iAfHxcN\nMTcxMjIwMTcxMjU0WqAOMAwwCgYDVR0UBAMCAQAwDQYJKoZIhvcNAQELBQADgYEA\nOTn5Fgb44xtFd9QGtbTElZ3iwdlcOxRHjgQMd+ydzEEZRMzMgb4/NmEsgXAsxbrx\ntKmpgll8TblscitkglvGk8s4obi/OtgxNIvn+7pOBTjmrgJkcktBUDEWRbLZjsZx\nyH+5teBZ0tH0tVy914QeGitZFV8awK1hlJwlAz9g/jo=\n-----END X509 CRL-----" }
-  )EOF",
+            crl: { inline_string: ")EOF",
+                                                                    absl::CEscape(crl), R"EOF(" }
+  )EOF"),
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }

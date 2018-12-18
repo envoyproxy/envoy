@@ -19,6 +19,10 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/conn_pool.h"
+#include "test/mocks/http/stream.h"
+#include "test/mocks/http/stream_decoder.h"
+#include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -53,29 +57,6 @@ public:
   MOCK_METHOD1(newStream, StreamDecoder&(StreamEncoder& response_encoder));
 };
 
-class MockStreamDecoder : public StreamDecoder {
-public:
-  MockStreamDecoder();
-  ~MockStreamDecoder();
-
-  void decode100ContinueHeaders(HeaderMapPtr&& headers) override {
-    decode100ContinueHeaders_(headers);
-  }
-  void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override {
-    decodeHeaders_(headers, end_stream);
-  }
-  void decodeTrailers(HeaderMapPtr&& trailers) override { decodeTrailers_(trailers); }
-
-  void decodeMetadata(MetadataMapPtr&& metadata_map) override { decodeMetadata_(metadata_map); }
-
-  // Http::StreamDecoder
-  MOCK_METHOD2(decodeHeaders_, void(HeaderMapPtr& headers, bool end_stream));
-  MOCK_METHOD1(decode100ContinueHeaders_, void(HeaderMapPtr& headers));
-  MOCK_METHOD2(decodeData, void(Buffer::Instance& data, bool end_stream));
-  MOCK_METHOD1(decodeTrailers_, void(HeaderMapPtr& trailers));
-  MOCK_METHOD1(decodeMetadata_, void(MetadataMapPtr& metadata_map));
-};
-
 class MockStreamCallbacks : public StreamCallbacks {
 public:
   MockStreamCallbacks();
@@ -85,50 +66,6 @@ public:
   MOCK_METHOD1(onResetStream, void(StreamResetReason reason));
   MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
-};
-
-class MockStream : public Stream {
-public:
-  MockStream();
-  ~MockStream();
-
-  // Http::Stream
-  MOCK_METHOD1(addCallbacks, void(StreamCallbacks& callbacks));
-  MOCK_METHOD1(removeCallbacks, void(StreamCallbacks& callbacks));
-  MOCK_METHOD1(resetStream, void(StreamResetReason reason));
-  MOCK_METHOD1(readDisable, void(bool disable));
-  MOCK_METHOD2(setWriteBufferWatermarks, void(uint32_t, uint32_t));
-  MOCK_METHOD0(bufferLimit, uint32_t());
-
-  std::list<StreamCallbacks*> callbacks_{};
-
-  void runHighWatermarkCallbacks() {
-    for (auto* callback : callbacks_) {
-      callback->onAboveWriteBufferHighWatermark();
-    }
-  }
-
-  void runLowWatermarkCallbacks() {
-    for (auto* callback : callbacks_) {
-      callback->onBelowWriteBufferLowWatermark();
-    }
-  }
-};
-
-class MockStreamEncoder : public StreamEncoder {
-public:
-  MockStreamEncoder();
-  ~MockStreamEncoder();
-
-  // Http::StreamEncoder
-  MOCK_METHOD1(encode100ContinueHeaders, void(const HeaderMap& headers));
-  MOCK_METHOD2(encodeHeaders, void(const HeaderMap& headers, bool end_stream));
-  MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
-  MOCK_METHOD1(encodeTrailers, void(const HeaderMap& trailers));
-  MOCK_METHOD1(encodeMetadata, void(const MetadataMap& metadata_map));
-  MOCK_METHOD0(getStream, Stream&());
-
-  testing::NiceMock<MockStream> stream_;
 };
 
 class MockServerConnection : public ServerConnection {
@@ -439,34 +376,6 @@ public:
 } // namespace Http
 
 namespace Http {
-namespace ConnectionPool {
-
-class MockCancellable : public Cancellable {
-public:
-  MockCancellable();
-  ~MockCancellable();
-
-  // Http::ConnectionPool::Cancellable
-  MOCK_METHOD0(cancel, void());
-};
-
-class MockInstance : public Instance {
-public:
-  MockInstance();
-  ~MockInstance();
-
-  // Http::ConnectionPool::Instance
-  MOCK_CONST_METHOD0(protocol, Http::Protocol());
-  MOCK_METHOD1(addDrainedCallback, void(DrainedCb cb));
-  MOCK_METHOD0(drainConnections, void());
-  MOCK_METHOD2(newStream, Cancellable*(Http::StreamDecoder& response_decoder,
-                                       Http::ConnectionPool::Callbacks& callbacks));
-
-  std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
-      new testing::NiceMock<Upstream::MockHostDescription>()};
-};
-
-} // namespace ConnectionPool
 
 template <typename HeaderMapT>
 class HeaderValueOfMatcherImpl : public testing::MatcherInterface<HeaderMapT> {

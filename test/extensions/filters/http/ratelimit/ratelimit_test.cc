@@ -5,6 +5,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/config/filter_json.h"
+#include "common/http/context_impl.h"
 #include "common/http/headers.h"
 
 #include "extensions/filters/http/ratelimit/ratelimit.h"
@@ -51,7 +52,8 @@ public:
     envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
     MessageUtil::loadFromYaml(yaml, proto_config);
 
-    config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_));
+    config_.reset(
+        new FilterConfig(proto_config, local_info_, stats_store_, runtime_, http_context_));
 
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
@@ -89,6 +91,7 @@ public:
   NiceMock<Router::MockRateLimitPolicyEntry> vh_rate_limit_;
   std::vector<RateLimit::Descriptor> descriptor_{{{{"descriptor_key", "descriptor_value"}}}};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Http::ContextImpl http_context_;
 };
 
 TEST_F(HttpRateLimitFilterTest, BadConfig) {

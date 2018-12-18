@@ -94,7 +94,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
     // in 100%. If 80% of hosts are healty, that priority's health is still 100% (80%*1.4=112% and
     // capped at 100%).
     per_priority_health[priority] =
-        std::min<uint32_t>(100, (host_set.overprovisioning_factor() *
+        std::min<uint32_t>(100, (host_set.overprovisioningFactor() *
                                  host_set.healthyHosts().size() / host_set.hosts().size()));
   }
 

@@ -22,7 +22,6 @@
 
 #include "common/config/grpc_mux_impl.h"
 #include "common/http/async_client_impl.h"
-#include "common/upstream/eds_subscription_factory.h"
 #include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -40,9 +39,10 @@ public:
                             Ssl::ContextManager& ssl_context_manager,
                             Event::Dispatcher& main_thread_dispatcher,
                             const LocalInfo::LocalInfo& local_info,
-                            Secret::SecretManager& secret_manager, Api::Api& api)
-      : main_thread_dispatcher_(main_thread_dispatcher), api_(api), runtime_(runtime),
-        stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
+                            Secret::SecretManager& secret_manager, Api::Api& api,
+                            Http::Context& http_context)
+      : main_thread_dispatcher_(main_thread_dispatcher), api_(api), http_context_(http_context),
+        runtime_(runtime), stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
         ssl_context_manager_(ssl_context_manager), local_info_(local_info),
         secret_manager_(secret_manager) {}
 
@@ -73,6 +73,7 @@ public:
 protected:
   Event::Dispatcher& main_thread_dispatcher_;
   Api::Api& api_;
+  Http::Context& http_context_;
 
 private:
   Runtime::Loader& runtime_;
@@ -83,7 +84,6 @@ private:
   Ssl::ContextManager& ssl_context_manager_;
   const LocalInfo::LocalInfo& local_info_;
   Secret::SecretManager& secret_manager_;
-  Upstream::EdsSubscriptionFactory eds_subscription_factory_;
 };
 
 /**
@@ -170,8 +170,8 @@ public:
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                     Api::Api& api);
+                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin, Api::Api& api,
+                     Http::Context& http_context);
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
@@ -312,10 +312,7 @@ private:
     void drainTcpConnPools(HostSharedPtr old_host, TcpConnPoolsContainer& container);
     void removeTcpConn(const HostConstSharedPtr& host, Network::ClientConnection& connection);
     static void updateClusterMembership(const std::string& name, uint32_t priority,
-                                        HostVectorConstSharedPtr hosts,
-                                        HostVectorConstSharedPtr healthy_hosts,
-                                        HostsPerLocalityConstSharedPtr hosts_per_locality,
-                                        HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                                        HostSet::UpdateHostsParams&& update_hosts_params,
                                         LocalityWeightsConstSharedPtr locality_weights,
                                         const HostVector& hosts_added,
                                         const HostVector& hosts_removed, ThreadLocal::Slot& tls);
@@ -447,6 +444,7 @@ private:
   TimeSource& time_source_;
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
+  Http::Context& http_context_;
 };
 
 } // namespace Upstream

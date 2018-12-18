@@ -16,6 +16,8 @@ Every listener has a statistics tree rooted at *listener.<address>.* with the fo
    downstream_cx_destroy, Counter, Total destroyed connections
    downstream_cx_active, Gauge, Total active connections
    downstream_cx_length_ms, Histogram, Connection length milliseconds
+   downstream_pre_cx_timeout, Counter, Sockets that timed out during listener filter processing
+   downstream_pre_cx_active, Gauge, Sockets currently undergoing listener filter processing
    no_filter_chain_match, Counter, Total connections that didn't match any filter chain
    ssl.connection_error, Counter, Total TLS connection errors not including failed certificate verifications
    ssl.handshake, Counter, Total successful TLS connection handshakes
@@ -25,7 +27,8 @@ Every listener has a statistics tree rooted at *listener.<address>.* with the fo
    ssl.fail_verify_error, Counter, Total TLS connections that failed CA verification
    ssl.fail_verify_san, Counter, Total TLS connections that failed SAN verification
    ssl.fail_verify_cert_hash, Counter, Total TLS connections that failed certificate pinning verification
-   ssl.cipher.<cipher>, Counter, Total TLS connections that used <cipher>
+   ssl.ciphers.<cipher>, Counter, Total TLS connections that used <cipher>
+   ssl.versions.<version>, Counter, Total successful handshakes that used protocol <version>
 
 Listener manager
 ----------------

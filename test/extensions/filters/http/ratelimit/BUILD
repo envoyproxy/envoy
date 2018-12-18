@@ -19,6 +19,7 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/config:filter_json_lib",
+        "//source/common/http:context_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
         "//source/extensions/filters/http/ratelimit:ratelimit_lib",

@@ -135,6 +135,7 @@ protected:
     std::string getCertChainFileName() const { return cert_chain_file_path_; };
     void addClientValidationContext(const CertificateValidationContextConfig& config,
                                     bool require_client_cert);
+    bool isCipherEnabled(uint16_t cipher_id, uint16_t client_version);
   };
 
   // This is always non-empty, with the first context used for all new SSL
@@ -154,6 +155,7 @@ protected:
   std::string ca_file_path_;
   std::string cert_chain_file_path_;
   TimeSource& time_source_;
+  const unsigned tls_max_version_;
 };
 
 typedef std::shared_ptr<ContextImpl> ContextImplSharedPtr;
@@ -186,6 +188,7 @@ private:
                          unsigned int inlen);
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt);
+  bool isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
   // ClientHello details.
   enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);

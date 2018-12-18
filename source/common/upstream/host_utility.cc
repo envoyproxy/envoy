@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Upstream {
 
 std::string HostUtility::healthFlagsToString(const Host& host) {
-  if (host.healthy()) {
+  if (host.health() == Host::Health::Healthy) {
     return "healthy";
   }
 

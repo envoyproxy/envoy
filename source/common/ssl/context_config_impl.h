@@ -91,10 +91,14 @@ private:
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {
 public:
-  explicit ClientContextConfigImpl(
-      const envoy::api::v2::auth::UpstreamTlsContext& config,
+  ClientContextConfigImpl(
+      const envoy::api::v2::auth::UpstreamTlsContext& config, absl::string_view sigalgs,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
-  explicit ClientContextConfigImpl(
+  ClientContextConfigImpl(
+      const envoy::api::v2::auth::UpstreamTlsContext& config,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context)
+      : ClientContextConfigImpl(config, "", secret_provider_context) {}
+  ClientContextConfigImpl(
       const Json::Object& config,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
 
@@ -102,19 +106,21 @@ public:
   const std::string& serverNameIndication() const override { return server_name_indication_; }
   bool allowRenegotiation() const override { return allow_renegotiation_; }
   size_t maxSessionKeys() const override { return max_session_keys_; }
+  const std::string& signingAlgorithmsForTest() const override { return sigalgs_; }
 
 private:
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
   const size_t max_session_keys_;
+  const std::string sigalgs_;
 };
 
 class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextConfig {
 public:
-  explicit ServerContextConfigImpl(
+  ServerContextConfigImpl(
       const envoy::api::v2::auth::DownstreamTlsContext& config,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
-  explicit ServerContextConfigImpl(
+  ServerContextConfigImpl(
       const Json::Object& config,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
 

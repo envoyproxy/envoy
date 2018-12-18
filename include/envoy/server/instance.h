@@ -8,6 +8,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/mutex_tracer.h"
 #include "envoy/event/timer.h"
+#include "envoy/http/context.h"
 #include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/listen_socket.h"
@@ -182,9 +183,9 @@ public:
   virtual Stats::Store& stats() PURE;
 
   /**
-   * @return the server-wide http tracer.
+   * @return the server-wide http context.
    */
-  virtual Tracing::HttpTracer& httpTracer() PURE;
+  virtual Http::Context& httpContext() PURE;
 
   /**
    * @return ThreadLocal::Instance& the thread local storage engine for the server. This is used to
