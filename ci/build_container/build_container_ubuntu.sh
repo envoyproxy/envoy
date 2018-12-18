@@ -29,5 +29,5 @@ setcap cap_net_raw,cap_net_admin=eip /usr/sbin/tcpdump
 # virtualenv
 pip install virtualenv
 
-EXPECTED_CXX_VERSION="g++ (Ubuntu 5.4.0-6ubuntu1~16.04.10) 5.4.0 20160609" ./build_container_common.sh
+EXPECTED_CXX_VERSION="g++ (Ubuntu 5.4.0-6ubuntu1~16.04.11) 5.4.0 20160609" ./build_container_common.sh
 
