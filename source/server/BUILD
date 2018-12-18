@@ -4,7 +4,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-    "envoy_select_boringssl",
     "envoy_select_hot_restart",
 )
 
@@ -321,7 +320,7 @@ envoy_cc_library(
         "//source/server:overload_manager_lib",
         "//source/server/http:admin_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
-    ] + envoy_select_boringssl(["//source/common/ssl:isfips_lib"]),
+    ],
 )
 
 envoy_cc_library(
