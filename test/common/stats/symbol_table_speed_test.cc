@@ -50,41 +50,29 @@ void symbolTableTest(benchmark::State& state) {
 
   // Make 100 threads, each of which will race to encode an overlapping set of
   // symbols, triggering corner-cases in SymbolTable::toSymbol.
-  constexpr int num_threads = 100;
+  constexpr int num_threads = 20;
   std::vector<Thread::ThreadPtr> threads;
   threads.reserve(num_threads);
-  Notifier creation, access, wait;
-  absl::BlockingCounter creates(num_threads), accesses(num_threads);
+  Notifier access, wait;
+  absl::BlockingCounter accesses(num_threads);
   SymbolTable table;
+  const absl::string_view stat_name_string = "here.is.a.stat.name";
+  StatNameStorage initial(stat_name_string, table);
+
   for (int i = 0; i < num_threads; ++i) {
     threads.push_back(
-        thread_factory.createThread([i, &creation, &access, &creates, &accesses, &state, &table]() {
-          // Rotate between 20 different symbols to try to get some
-          // contention. Based on a logging print statement in
-          // contention. Based on a logging print statement in
-          // SymbolTable::toSymbol(), this appears to trigger creation-races,
-          // even when compiled with optimization.
-          std::string stat_name_string = absl::StrCat("symbol", i % 20);
-
+        thread_factory.createThread([&access, &accesses, &state, &table, &stat_name_string]() {
           // Block each thread on waking up a common condition variable,
-          // so we make it likely to race on creation.
-          creation.wait();
-          StatNameStorage initial(stat_name_string, table);
-          creates.DecrementCount();
+          // so we make it likely to race on access.
           access.wait();
 
           for (auto _ : state) {
-            for (int j = 0; j < 100; ++j) {
-              StatNameStorage second(stat_name_string, table);
-              second.free(table);
-            }
+            StatNameStorage second(stat_name_string, table);
+            second.free(table);
           }
-          initial.free(table);
           accesses.DecrementCount();
         }));
   }
-  creation.notify();
-  creates.Wait();
 
   // But when we access the already-existing symbols, we guarantee that no
   // further mutex contentions occur.
@@ -94,6 +82,8 @@ void symbolTableTest(benchmark::State& state) {
   for (auto& thread : threads) {
     thread->join();
   }
+
+  initial.free(table);
 }
 
 } // namespace Stats
