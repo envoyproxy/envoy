@@ -1,0 +1,7 @@
+// NOLINT(namespace-envoy)
+constexpr char TEST_EXPIRED_SAN_URI_CERT_HASH[] =
+    "01b0d11baa149f0ec36e9bef2d31aca960bb648ab8026e3b4d1f7d014ff18a6d";
+constexpr char TEST_EXPIRED_SAN_URI_CERT_SPKI[] = "RdPaALSmcp989omHpVD3/LCgJRhnPr1T+X4m2zGKPBY=";
+constexpr char TEST_EXPIRED_SAN_URI_CERT_SERIAL[] = "b8b5ecc898f21251";
+constexpr char TEST_EXPIRED_SAN_URI_CERT_NOT_BEFORE[] = "Dec 18 01:50:37 2018 GMT";
+constexpr char TEST_EXPIRED_SAN_URI_CERT_NOT_AFTER[] = "Dec 18 01:50:37 2017 GMT";

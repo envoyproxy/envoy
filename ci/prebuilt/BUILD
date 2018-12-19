@@ -28,6 +28,26 @@ cc_library(
 )
 
 cc_library(
+    name = "boringcrypto_fips",
+    srcs = [
+        "thirdparty_build/lib/libcrypto.a",
+    ],
+    hdrs = glob(["thirdparty_build/include/openssl/**/*.h"]),
+    defines = ["BORINGSSL_FIPS"],
+    includes = ["thirdparty_build/include"],
+)
+
+cc_library(
+    name = "boringssl_fips",
+    srcs = [
+        "thirdparty_build/lib/libssl.a",
+    ],
+    hdrs = glob(["thirdparty_build/include/openssl/**/*.h"]),
+    includes = ["thirdparty_build/include"],
+    deps = [":boringcrypto_fips"],
+)
+
+cc_library(
     name = "event",
     srcs = select({
         ":windows_x86_64": ["thirdparty_build/lib/event.lib"],
@@ -43,9 +63,9 @@ cc_library(
         ":windows_x86_64": ["thirdparty_build/lib/luajit.lib"],
         "//conditions:default": ["thirdparty_build/lib/libluajit-5.1.a"],
     }),
-    hdrs = glob(["thirdparty_build/include/luajit-2.0/*"]),
+    hdrs = glob(["thirdparty_build/include/luajit-2.1/*"]),
     includes = ["thirdparty_build/include"],
-    # TODO(mattklein123): We should strip luajit-2.0 here for consumers. However, if we do that
+    # TODO(mattklein123): We should strip luajit-2.1 here for consumers. However, if we do that
     # the headers get included using -I vs. -isystem which then causes old-style-cast warnings.
 )
 

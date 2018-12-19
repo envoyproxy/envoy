@@ -105,8 +105,13 @@ getCertificateValidationContextConfigProvider(
 } // namespace
 
 const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
+#ifndef BORINGSSL_FIPS
     "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"
     "[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:"
+#else // BoringSSL FIPS
+    "ECDHE-ECDSA-AES128-GCM-SHA256:"
+    "ECDHE-RSA-AES128-GCM-SHA256:"
+#endif
     "ECDHE-ECDSA-AES128-SHA:"
     "ECDHE-RSA-AES128-SHA:"
     "AES128-GCM-SHA256:"
@@ -118,7 +123,11 @@ const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
     "AES256-GCM-SHA384:"
     "AES256-SHA";
 
-const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES = "X25519:P-256";
+const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES =
+#ifndef BORINGSSL_FIPS
+    "X25519:"
+#endif
+    "P-256";
 
 ContextConfigImpl::ContextConfigImpl(
     const envoy::api::v2::auth::CommonTlsContext& config,
@@ -252,11 +261,12 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
 }
 
 ClientContextConfigImpl::ClientContextConfigImpl(
-    const envoy::api::v2::auth::UpstreamTlsContext& config,
+    const envoy::api::v2::auth::UpstreamTlsContext& config, absl::string_view sigalgs,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : ContextConfigImpl(config.common_tls_context(), factory_context),
       server_name_indication_(config.sni()), allow_renegotiation_(config.allow_renegotiation()),
-      max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)) {
+      max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)),
+      sigalgs_(sigalgs) {
   // BoringSSL treats this as a C string, so embedded NULL characters will not
   // be handled correctly.
   if (server_name_indication_.find('\0') != std::string::npos) {
@@ -307,13 +317,12 @@ ServerContextConfigImpl::ServerContextConfigImpl(
 
         return ret;
       }()) {
-  // TODO(PiotrSikora): Support multiple TLS certificates.
   if ((config.common_tls_context().tls_certificates().size() +
        config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
     throw EnvoyException("No TLS certificates found for server context");
-  } else if ((config.common_tls_context().tls_certificates().size() +
-              config.common_tls_context().tls_certificate_sds_secret_configs().size()) > 1) {
-    throw EnvoyException("A single TLS certificate is required for server contexts");
+  } else if (!config.common_tls_context().tls_certificates().empty() &&
+             !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {
+    throw EnvoyException("SDS and non-SDS TLS certificates may not be mixed in server contexts");
   }
 }
 

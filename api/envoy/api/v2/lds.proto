@@ -96,6 +96,8 @@ message Listener {
     // port. An additional filter chain must be created for every original
     // destination port this listener may redirect to in v2, with the original
     // port specified in the FilterChainMatch destination_port field.
+    //
+    // [#comment:TODO(PiotrSikora): Remove this once verified that we no longer need it.]
     google.protobuf.BoolValue bind_to_port = 1;
   }
 

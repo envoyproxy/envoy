@@ -41,7 +41,9 @@ message TlsParameters {
 
   // If specified, the TLS listener will only support the specified `cipher list
   // <https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html#Cipher-suite-configuration>`_.
-  // If not specified, the default list:
+  // If not specified, the default list will be used.
+  //
+  // In non-FIPS builds, the default cipher list is:
   //
   // .. code-block:: none
   //
@@ -58,11 +60,39 @@ message TlsParameters {
   //   AES256-GCM-SHA384
   //   AES256-SHA
   //
-  // will be used.
+  // In builds using :ref:`BoringSSL FIPS <arch_overview_ssl_fips>`, the default cipher list is:
+  //
+  // .. code-block:: none
+  //
+  //   ECDHE-ECDSA-AES128-GCM-SHA256
+  //   ECDHE-RSA-AES128-GCM-SHA256
+  //   ECDHE-ECDSA-AES128-SHA
+  //   ECDHE-RSA-AES128-SHA
+  //   AES128-GCM-SHA256
+  //   AES128-SHA
+  //   ECDHE-ECDSA-AES256-GCM-SHA384
+  //   ECDHE-RSA-AES256-GCM-SHA384
+  //   ECDHE-ECDSA-AES256-SHA
+  //   ECDHE-RSA-AES256-SHA
+  //   AES256-GCM-SHA384
+  //   AES256-SHA
   repeated string cipher_suites = 3;
 
   // If specified, the TLS connection will only support the specified ECDH
-  // curves. If not specified, the default curves (X25519, P-256) will be used.
+  // curves. If not specified, the default curves will be used.
+  //
+  // In non-FIPS builds, the default curves are:
+  //
+  // .. code-block:: none
+  //
+  //   X25519
+  //   P-256
+  //
+  // In builds using :ref:`BoringSSL FIPS <arch_overview_ssl_fips>`, the default curve is:
+  //
+  // .. code-block:: none
+  //
+  //   P-256
   repeated string ecdh_curves = 4;
 }
 
@@ -73,7 +103,8 @@ message TlsCertificate {
   // The TLS private key.
   core.DataSource private_key = 2;
 
-  // [#not-implemented-hide:]
+  // The password to decrypt the TLS private key. If this field is not set, it is assumed that the
+  // TLS private key is not password encrypted.
   core.DataSource password = 3;
 
   // [#not-implemented-hide:]
@@ -226,8 +257,8 @@ message CommonTlsContext {
   // TLS protocol versions, cipher suites etc.
   TlsParameters tls_params = 1;
 
-  // Multiple TLS certificates can be associated with the same context.
-  // E.g. to allow both RSA and ECDSA certificates, two TLS certificates can be configured.
+  // :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>` can be associated with the
+  // same context to allow both RSA and ECDSA certificates.
   //
   // Only a single TLS certificate is supported in client contexts. In server contexts, the first
   // RSA certificate is used for clients that only support RSA and the first ECDSA certificate is
@@ -235,7 +266,8 @@ message CommonTlsContext {
   repeated TlsCertificate tls_certificates = 2;
 
   // Configs for fetching TLS certificates via SDS API.
-  repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6;
+  repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
+      [(validate.rules).repeated .max_items = 1];
 
   message CombinedCertificateValidationContext {
     // How to validate peer certificates.
