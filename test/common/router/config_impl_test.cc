@@ -2236,6 +2236,49 @@ TEST(RouteMatcherTest, Shadow) {
                     .runtimeKey());
 }
 
+TEST(RouteConfigurationV2, RequestMirrorPolicy) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: mirror
+    domains: [mirror.lyft.com]
+    routes:
+      - match: { prefix: "/"}
+        route:
+          cluster: foo
+          request_mirror_policy:
+            cluster: foo_mirror
+            runtime_key: will_be_ignored
+            runtime_fraction:
+               default_value:
+                 numerator: 20
+                 denominator: HUNDRED
+               runtime_key: mirror_key
+
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+
+  EXPECT_EQ("foo_mirror", config.route(genHeaders("mirror.lyft.com", "/foo", "GET"), 0)
+                              ->routeEntry()
+                              ->shadowPolicy()
+                              .cluster());
+
+  // `runtime_fraction` takes precedence over the deprecated `runtime_key` field.
+  EXPECT_EQ("mirror_key", config.route(genHeaders("mirror.lyft.com", "/foo", "GET"), 0)
+                              ->routeEntry()
+                              ->shadowPolicy()
+                              .runtimeKey());
+
+  const auto& default_value = config.route(genHeaders("mirror.lyft.com", "/foo", "GET"), 0)
+                                  ->routeEntry()
+                                  ->shadowPolicy()
+                                  .defaultValue();
+  EXPECT_EQ(20, default_value.numerator());
+  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED, default_value.denominator());
+}
+
 TEST(RouteMatcherTest, Retry) {
   const std::string json = R"EOF(
 {
