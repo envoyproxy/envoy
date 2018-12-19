@@ -8,11 +8,11 @@ StaticConfigProviderImplBase::StaticConfigProviderImplBase(
     ConfigProviderManagerImplBase& config_provider_manager)
     : last_updated_(factory_context.timeSource().systemTime()),
       config_provider_manager_(config_provider_manager) {
-  config_provider_manager_.static_config_providers_.insert(this);
+  config_provider_manager_.bindStaticConfigProvider(this);
 }
 
 StaticConfigProviderImplBase::~StaticConfigProviderImplBase() {
-  config_provider_manager_.static_config_providers_.erase(this);
+  config_provider_manager_.unbindStaticConfigProvider(this);
 }
 
 ConfigSubscriptionInstanceBase::~ConfigSubscriptionInstanceBase() {
@@ -67,7 +67,8 @@ void ConfigSubscriptionInstanceBase::bindConfigProvider(DynamicConfigProviderImp
 }
 
 ConfigProviderManagerImplBase::ConfigProviderManagerImplBase(Server::Admin& admin,
-                                                             const std::string& config_name) {
+                                                             const std::string& config_name)
+    : owner_tid_(Thread::currentThreadId()) {
   config_tracker_entry_ =
       admin.getConfigTracker().add(config_name, [this] { return dumpConfigs(); });
   // ConfigTracker keys must be unique. We are asserting that no one has stolen the key

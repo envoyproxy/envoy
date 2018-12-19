@@ -11,6 +11,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/config/utility.h"
+#include "common/common/thread.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -90,8 +91,12 @@ class DynamicConfigProviderImplBase;
  *
  * To do so, this class keeps track of a set of dynamic config providers associated with an
  * underlying subscription; providers are bound/unbound as needed as they are created and destroyed.
- * This is done to avoid exposing shared ownership semantics to the external API (see
- * ConfigProvider).
+ *
+ * Dynamic config providers and subscriptions are split to avoid lifetime issues with arguments
+ * required by the config providers. An example is the Server::Configuration::FactoryContext, which
+ * is owned by listeners and therefore may be destroyed while an associated config provider is still
+ * in use (see #3960). This split enables single ownership of the config providers, while enabling
+ * shared ownership of the underlying subscription.
  *
  * This class can not be instantiated directly; instead, it provides the foundation for
  * dynamic config subscription implementations which derive from it.
@@ -274,6 +279,15 @@ private:
  * lifetime of subscriptions and dynamic config providers, along with determining which
  * subscriptions should be associated with newly instantiated providers.
  *
+ * The implementation of this class is not thread safe. Note that StaticConfigProviderImplBase and
+ * ConfigSubscriptionInstanceBase call the corresponding {bind,unbind}* functions exposed by this
+ * class.
+ *
+ * All config processing is done on the main thread, so instantiation of *ConfigProvider* objects
+ * via createStaticConfigProvider() and createXdsConfigProvider() is naturally thread safe. Care
+ * must be taken with regards to destruction of these objects, since it must also happen on the main
+ * thread.
+ *
  * This class can not be instantiated directly; instead, it provides the foundation for
  * dynamic config provider implementations which derive from it.
  */
@@ -316,6 +330,8 @@ protected:
                                      std::function<ConfigSubscriptionInstanceBaseSharedPtr(
                                          const std::string&, ConfigProviderManagerImplBase&)>
                                          subscription_factory_fn) {
+    ASSERT(owner_tid_ == Thread::currentThreadId());
+
     static_assert(std::is_base_of<ConfigSubscriptionInstanceBase, T>::value,
                   "T must be a subclass of ConfigSubscriptionInstanceBase");
 
@@ -333,8 +349,8 @@ protected:
 
       bindSubscription(manager_identifier, subscription);
     } else {
-      // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
-      // in the RdsRouteConfigSubscription destructor, and the single threaded nature
+      // Because the ConfigProviderManagerImplBase's weak_ptrs only get cleaned up
+      // in the ConfigSubscriptionInstanceBase destructor, and the single threaded nature
       // of this code, locking the weak_ptr will not fail.
       subscription = it->second.lock();
     }
@@ -346,11 +362,23 @@ protected:
 private:
   void bindSubscription(const std::string& manager_identifier,
                         ConfigSubscriptionInstanceBaseSharedPtr& subscription) {
+    ASSERT(owner_tid_ == Thread::currentThreadId());
     config_subscriptions_.insert({manager_identifier, subscription});
   }
 
   void unbindSubscription(const std::string& manager_identifier) {
+    ASSERT(owner_tid_ == Thread::currentThreadId());
     config_subscriptions_.erase(manager_identifier);
+  }
+
+  void bindStaticConfigProvider(StaticConfigProviderImplBase* provider) {
+    ASSERT(owner_tid_ == Thread::currentThreadId());
+    static_config_providers_.insert(provider);
+  }
+
+  void unbindStaticConfigProvider(StaticConfigProviderImplBase* provider) {
+    ASSERT(owner_tid_ == Thread::currentThreadId());
+    static_config_providers_.erase(provider);
   }
 
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
@@ -359,6 +387,7 @@ private:
   ConfigSubscriptionMap config_subscriptions_;
   ConfigProviderSet static_config_providers_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
+  Thread::ThreadId owner_tid_{};
 
   // See comment for friend classes in the ConfigSubscriptionInstanceBase for more details on the
   // use of friends.
