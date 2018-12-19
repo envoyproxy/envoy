@@ -19,7 +19,8 @@ supported Lua version is mostly 5.1 with some 5.2 features. See the `LuaJIT docu
 
 The filter only supports loading Lua code in-line in the configuration. If local filesystem code
 is desired, a trivial in-line script can be used to load the rest of the code from the local
-environment.
+environment. Example :repo:`/examples/lua-file`.
+
 
 The design of the filter and Lua support at a high level is as follows:
 
@@ -127,7 +128,7 @@ more details on the supported API.
 Complete example
 ----------------
 
-A complete example using Docker is available in :repo:`/examples/lua`.
+A complete example using Docker is available in :repo:`/examples/lua` and :repo:`/examples/lua-file`.
 
 Stream handle API
 -----------------
