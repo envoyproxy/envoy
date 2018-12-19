@@ -38,7 +38,7 @@ emailAddress_max                = 64
 EOF
 ) > "${OPENSSL_CONF}"
 
-openssl genrsa -out "${TEST_CERT_DIR}/unittestkey.pem" 1024
+openssl genrsa -out "${TEST_CERT_DIR}/unittestkey.pem" 2048
 openssl req -new -key "${TEST_CERT_DIR}/unittestkey.pem" -out "${TEST_CERT_DIR}/unittestcert.csr" \
     -sha256 <<EOF
 US

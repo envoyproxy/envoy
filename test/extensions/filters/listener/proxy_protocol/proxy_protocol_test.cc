@@ -62,13 +62,17 @@ public:
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
-  // Listener
+  // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::Socket& socket() override { return socket_; }
+  const Network::Socket& socket() const override { return socket_; }
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
-  uint32_t perConnectionBufferLimitBytes() override { return 0; }
+  uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+  std::chrono::milliseconds listenerFiltersTimeout() const override {
+    return std::chrono::milliseconds();
+  }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
@@ -891,9 +895,13 @@ public:
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::Socket& socket() override { return socket_; }
+  const Network::Socket& socket() const override { return socket_; }
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
-  uint32_t perConnectionBufferLimitBytes() override { return 0; }
+  uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+  std::chrono::milliseconds listenerFiltersTimeout() const override {
+    return std::chrono::milliseconds();
+  }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }

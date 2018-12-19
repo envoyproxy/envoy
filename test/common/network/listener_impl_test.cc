@@ -58,7 +58,6 @@ class ListenerImplDeathTest : public testing::TestWithParam<Address::IpVersion> 
 INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplDeathTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
-
 TEST_P(ListenerImplDeathTest, ErrorCallback) {
   EXPECT_DEATH_LOG_TO_STDERR(errorCallbackTest(GetParam()), ".*listener accept failure.*");
 }
@@ -102,6 +101,17 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsSuccess) {
   EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_LISTENING))
       .WillOnce(Return(true));
   TestListenerImpl listener(dispatcher_, socket, listener_callbacks, true, false);
+}
+
+// Test that socket options are set after the listener is setup.
+TEST_P(ListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
+  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockConnectionHandler connection_handler;
+
+  Network::UdpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
+                                  true);
+  std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
+  socket.addOption(option);
 }
 
 // Test that an exception is thrown if there is an error setting socket options.

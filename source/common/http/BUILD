@@ -17,6 +17,7 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:async_client_interface",
         "//include/envoy/http:codec_interface",
+        "//include/envoy/http:context_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",
         "//include/envoy/router:router_interface",
@@ -93,6 +94,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "context_lib",
+    srcs = ["context_impl.cc"],
+    hdrs = ["context_impl.h"],
+    deps = [
+        ":codes_lib",
+        "//include/envoy/http:context_interface",
+        "//source/common/tracing:http_tracer_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_pool_base_lib",
     srcs = ["conn_pool_base.cc"],
     hdrs = ["conn_pool_base.h"],
@@ -137,6 +149,7 @@ envoy_cc_library(
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codec_interface",
+        "//include/envoy/http:context_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -150,7 +163,6 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/stats:timespan",
-        "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/buffer:buffer_lib",

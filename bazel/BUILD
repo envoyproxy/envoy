@@ -128,3 +128,23 @@ config_setting(
     name = "force_libcpp",
     values = {"define": "force_libcpp=enabled"},
 )
+
+config_setting(
+    name = "boringssl_fips",
+    constraint_values = [
+        "@bazel_tools//platforms:linux",
+        "@bazel_tools//platforms:x86_64",
+    ],
+    values = {"define": "boringssl=fips"},
+)
+
+# Alias pointing to the selected version of BoringSSL:
+# - BoringSSL FIPS from @envoy_deps//:boringssl_fips,
+# - non-FIPS BoringSSL from @boringssl//:ssl.
+alias(
+    name = "boringssl",
+    actual = select({
+        "//bazel:boringssl_fips": "@envoy_deps//:boringssl_fips",
+        "//conditions:default": "@boringssl//:ssl",
+    }),
+)

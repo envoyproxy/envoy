@@ -21,6 +21,8 @@
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -77,14 +79,17 @@ public:
 };
 
 /**
- * Implementation of Server::Configuration::Main that reads a configuration from a JSON file.
+ * Implementation of Server::Configuration::Main that reads a configuration from
+ * a JSON file.
  */
 class MainImpl : Logger::Loggable<Logger::Id::config>, public Main {
 public:
   /**
-   * Initialize the configuration. This happens here vs. the constructor because the initialization
-   * will call through the server into the config to get the cluster manager so the config object
-   * must be created already.
+   * MainImpl is created in two phases. In the first phase it is
+   * default-constructed without a configuration as part of the server. The
+   * server won't be fully populated yet. initialize() applies the
+   * configuration in the second phase, as it requires a fully populated server.
+   *
    * @param bootstrap v2 bootstrap proto.
    * @param server supplies the owning server.
    * @param cluster_manager_factory supplies the cluster manager creation factory.
@@ -95,7 +100,6 @@ public:
   // Server::Configuration::Main
   Upstream::ClusterManager* clusterManager() override { return cluster_manager_.get(); }
   Tracing::HttpTracer& httpTracer() override { return *http_tracer_; }
-  RateLimit::ClientFactory& rateLimitClientFactory() override { return *ratelimit_client_factory_; }
   std::list<Stats::SinkPtr>& statsSinks() override { return stats_sinks_; }
   std::chrono::milliseconds statsFlushInterval() const override { return stats_flush_interval_; }
   std::chrono::milliseconds wdMissTimeout() const override { return watchdog_miss_timeout_; }
@@ -119,12 +123,12 @@ private:
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   Tracing::HttpTracerPtr http_tracer_;
   std::list<Stats::SinkPtr> stats_sinks_;
-  RateLimit::ClientFactoryPtr ratelimit_client_factory_;
   std::chrono::milliseconds stats_flush_interval_;
   std::chrono::milliseconds watchdog_miss_timeout_;
   std::chrono::milliseconds watchdog_megamiss_timeout_;
   std::chrono::milliseconds watchdog_kill_timeout_;
   std::chrono::milliseconds watchdog_multikill_timeout_;
+  Extensions::Filters::Common::RateLimit::ClientFactoryPtr ratelimit_client_factory_;
 };
 
 /**

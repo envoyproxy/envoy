@@ -222,6 +222,18 @@ void TestUtility::createSymlink(const std::string& target, const std::string& li
   ASSERT_NE(rc, 0);
 #endif
 }
+
+// static
+std::tm TestUtility::parseTimestamp(const std::string& format, const std::string& time_str) {
+  std::tm timestamp{};
+  const char* parsed_to = strptime(time_str.c_str(), format.c_str(), &timestamp);
+
+  EXPECT_EQ(parsed_to, time_str.c_str() + time_str.size())
+      << " from failing to parse timestamp \"" << time_str << "\" with format string \"" << format
+      << "\"";
+  return timestamp;
+}
+
 void ConditionalInitializer::setReady() {
   Thread::LockGuard lock(mutex_);
   EXPECT_FALSE(ready_);
@@ -328,13 +340,13 @@ bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nul
 namespace Stats {
 
 MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options)
-    : alloc_(stats_options) {
+    : TestAllocator(stats_options) {
   ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
-    return alloc_.alloc(name);
+    return TestAllocator::alloc(name);
   }));
 
   ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
-    return alloc_.free(data);
+    return TestAllocator::free(data);
   }));
 
   EXPECT_CALL(*this, alloc(absl::string_view("stats.overflow")));

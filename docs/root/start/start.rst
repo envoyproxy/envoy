@@ -146,6 +146,7 @@ features. The following sandboxes are available:
 .. toctree::
     :maxdepth: 1
 
+    sandboxes/cors
     sandboxes/front_proxy
     sandboxes/zipkin_tracing
     sandboxes/jaeger_tracing
@@ -164,3 +165,4 @@ source distributions that target specific use cases.
     :maxdepth: 1
 
     distro/ambassador
+    distro/gloo

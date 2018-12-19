@@ -2,6 +2,7 @@
 
 #include "common/config/filter_json.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
 #include "extensions/filters/network/ratelimit/config.h"
 
 #include "test/mocks/server/mocks.h"
@@ -10,6 +11,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -35,6 +37,21 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectJson) {
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::MockInstance> instance;
+
+  // Return the same singleton manager as instance so that config can be found there.
+  EXPECT_CALL(context, singletonManager()).WillOnce(ReturnRef(instance.singletonManager()));
+
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(
+          instance, instance.clusterManager().grpcAsyncClientManager(),
+          envoy::config::bootstrap::v2::Bootstrap());
+
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+
   RateLimitConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
@@ -57,6 +74,21 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
   Envoy::Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::MockInstance> instance;
+
+  // Return the same singleton manager as instance so that config can be found there.
+  EXPECT_CALL(context, singletonManager()).WillOnce(ReturnRef(instance.singletonManager()));
+
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(
+          instance, instance.clusterManager().grpcAsyncClientManager(),
+          envoy::config::bootstrap::v2::Bootstrap());
+
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+
   RateLimitConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
@@ -78,6 +110,21 @@ TEST(RateLimitFilterConfigTest, RatelimitEmptyProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RateLimitConfigFactory factory;
+  NiceMock<Server::MockInstance> instance;
+
+  // Return the same singleton manager as instance so that config can be found there.
+  EXPECT_CALL(context, singletonManager()).WillOnce(ReturnRef(instance.singletonManager()));
+
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(
+          instance, instance.clusterManager().grpcAsyncClientManager(),
+          envoy::config::bootstrap::v2::Bootstrap());
+
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+
   envoy::config::filter::network::rate_limit::v2::RateLimit proto_config =
       *dynamic_cast<envoy::config::filter::network::rate_limit::v2::RateLimit*>(
           factory.createEmptyConfigProto().get());
