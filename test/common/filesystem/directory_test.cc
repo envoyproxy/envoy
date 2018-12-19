@@ -198,23 +198,23 @@ TEST_F(DirectoryTest, DirectoryWithEmptyDirectory) {
 TEST(DirectoryIteratorImpl, NonExistingDir) {
   const std::string dir_path("some/non/existing/dir");
 
-#if !defined(WIN32)
-  EXPECT_THROW_WITH_MESSAGE(
-      DirectoryIteratorImpl dir_iterator(dir_path), EnvoyException,
-      fmt::format("unable to open directory {}: No such file or directory", dir_path));
-#else
+#ifdef WIN32
   EXPECT_THROW_WITH_MESSAGE(
       DirectoryIteratorImpl dir_iterator(dir_path), EnvoyException,
       fmt::format("unable to open directory {}: {}", dir_path, ERROR_PATH_NOT_FOUND));
+#else
+  EXPECT_THROW_WITH_MESSAGE(
+      DirectoryIteratorImpl dir_iterator(dir_path), EnvoyException,
+      fmt::format("unable to open directory {}: No such file or directory", dir_path));
 #endif
 }
 
 // Test that we correctly handle trailing path separators
 TEST(Directory, DirectoryHasTrailingPathSeparator) {
-#if !defined(WIN32)
-  const std::string dir_path(TestEnvironment::temporaryPath("envoy_test") + "/");
-#else
+#ifdef WIN32
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test") + "\\");
+#else
+  const std::string dir_path(TestEnvironment::temporaryPath("envoy_test") + "/");
 #endif
   TestUtility::createDirectory(dir_path);
 

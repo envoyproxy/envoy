@@ -5,6 +5,7 @@
 #include <list>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
@@ -22,8 +23,8 @@ namespace Event {
  */
 class DispatcherImpl : Logger::Loggable<Logger::Id::main>, public Dispatcher {
 public:
-  explicit DispatcherImpl(TimeSystem& time_system);
-  DispatcherImpl(TimeSystem& time_system, Buffer::WatermarkFactoryPtr&& factory);
+  explicit DispatcherImpl(TimeSystem& time_system, Api::Api& api);
+  DispatcherImpl(TimeSystem& time_system, Buffer::WatermarkFactoryPtr&& factory, Api::Api& api);
   ~DispatcherImpl();
 
   /**
@@ -62,12 +63,13 @@ private:
   void runPostCallbacks();
 
   // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
-  // dispatcher run loop is executing on. We allow run_tid_ == 0 for tests where we don't invoke
-  // run().
-  bool isThreadSafe() const { return run_tid_ == 0 || run_tid_ == Thread::currentThreadId(); }
+  // dispatcher run loop is executing on. We allow run_tid_ == nullptr for tests where we don't
+  // invoke run().
+  bool isThreadSafe() const { return run_tid_ == nullptr || run_tid_->isCurrentThreadId(); }
 
+  Api::Api& api_;
   TimeSystem& time_system_;
-  Thread::ThreadId run_tid_{};
+  Thread::ThreadIdPtr run_tid_;
   Buffer::WatermarkFactoryPtr buffer_factory_;
   Libevent::BasePtr base_;
   SchedulerPtr scheduler_;
