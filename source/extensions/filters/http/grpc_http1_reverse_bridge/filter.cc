@@ -1,9 +1,5 @@
 #include "extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 
-#include <netinet/in.h>
-
-#include "envoy/common/platform.h"
-
 #include "common/common/enum_to_int.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
@@ -12,8 +8,6 @@
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
-
-#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
