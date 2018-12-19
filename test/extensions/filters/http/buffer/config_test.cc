@@ -16,11 +16,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
-TEST(BufferFilterFactoryTest, ValidateFail) {
+TEST(BufferFilterFactoryTest, BufferProtoValidByDefault) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(BufferFilterFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::http::buffer::v2::Buffer(), "stats", context),
-               ProtoValidationException);
+  BufferFilterFactory().createFilterFactoryFromProto(
+      envoy::config::filter::http::buffer::v2::Buffer(), "stats", context);
 }
 
 TEST(BufferFilterFactoryTest, BufferFilterCorrectJson) {

@@ -23,8 +23,8 @@ BufferFilterSettings::BufferFilterSettings(
     const envoy::config::filter::http::buffer::v2::Buffer& proto_config)
     : disabled_(false),
       max_request_bytes_(static_cast<uint64_t>(proto_config.max_request_bytes().value())),
-      max_request_time_(
-          std::chrono::seconds(PROTOBUF_GET_SECONDS_REQUIRED(proto_config, max_request_time))) {}
+      max_request_time_(std::chrono::seconds(
+          DurationUtil::durationToSeconds((proto_config).max_request_time()))) {}
 
 BufferFilterSettings::BufferFilterSettings(
     const envoy::config::filter::http::buffer::v2::BufferPerRoute& proto_config)
