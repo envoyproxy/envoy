@@ -151,9 +151,13 @@ public:
   bool checkAndApplyConfig(const Protobuf::Message& config_proto, const std::string& config_name,
                            const std::string& version_info);
 
-  const std::unordered_set<const DynamicConfigProviderImplBase*> dynamic_config_providers() const {
-    return std::unordered_set<const DynamicConfigProviderImplBase*>(
-        dynamic_config_providers_.begin(), dynamic_config_providers_.end());
+  /**
+   * Returns one of the bound dynamic config providers.
+   * @return const DynamicConfigProviderImplBase* a const pointer to a
+   *         bound DynamicConfigProviderImplBase or nullptr when there are none.
+   */
+  const DynamicConfigProviderImplBase* getAnyBoundDynamicConfigProvider() const {
+    return !dynamic_config_providers_.empty() ? *dynamic_config_providers_.begin() : nullptr;
   }
 
 protected:

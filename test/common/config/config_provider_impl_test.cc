@@ -170,8 +170,10 @@ public:
         });
 
     ConfigProvider::ConfigConstSharedPtr initial_config;
-    if (!subscription->dynamic_config_providers().empty()) {
-      initial_config = (*subscription->dynamic_config_providers().begin())->getConfig();
+    const DynamicConfigProviderImplBase* provider =
+        subscription->getAnyBoundDynamicConfigProvider();
+    if (provider) {
+      initial_config = provider->getConfig();
     }
     return std::make_unique<DummyDynamicConfigProvider>(std::move(subscription), initial_config,
                                                         factory_context);
