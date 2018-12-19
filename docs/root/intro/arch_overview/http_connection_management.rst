@@ -169,7 +169,6 @@ A sample redirect flow might look like this:
    request.
 
 
-=======
 Timeouts
 --------
 
