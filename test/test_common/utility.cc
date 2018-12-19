@@ -222,6 +222,18 @@ void TestUtility::createSymlink(const std::string& target, const std::string& li
   ASSERT_NE(rc, 0);
 #endif
 }
+
+// static
+std::tm TestUtility::parseTimestamp(const std::string& format, const std::string& time_str) {
+  std::tm timestamp{};
+  const char* parsed_to = strptime(time_str.c_str(), format.c_str(), &timestamp);
+
+  EXPECT_EQ(parsed_to, time_str.c_str() + time_str.size())
+      << " from failing to parse timestamp \"" << time_str << "\" with format string \"" << format
+      << "\"";
+  return timestamp;
+}
+
 void ConditionalInitializer::setReady() {
   Thread::LockGuard lock(mutex_);
   EXPECT_FALSE(ready_);

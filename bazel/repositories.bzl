@@ -11,6 +11,7 @@ load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
+NO_BORINGSSL_FIPS = "boringssl_fips"
 
 # go version for rules_go
 GO_VERSION = "1.10.4"
@@ -260,6 +261,12 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
                 actual = path + ":" + t,
             )
 
+    # Binding for //external:ssl pointing to the selected version of BoringSSL.
+    native.bind(
+        name = "ssl",
+        actual = "@envoy//bazel:boringssl",
+    )
+
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
@@ -299,10 +306,6 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
 
 def _boringssl():
     _repository_impl("boringssl")
-    native.bind(
-        name = "ssl",
-        actual = "@boringssl//:ssl",
-    )
 
 def _com_github_bombela_backward():
     _repository_impl(
@@ -577,16 +580,25 @@ def _com_github_google_jwt_verify():
 
 def _apply_dep_blacklist(ctxt, recipes):
     newlist = []
-    skip_list = dict()
+    skip_list = []
     if _is_linux_ppc(ctxt):
-        skip_list = PPC_SKIP_TARGETS
+        skip_list += PPC_SKIP_TARGETS.keys()
+    if not _is_linux_x86_64(ctxt):
+        skip_list.append(NO_BORINGSSL_FIPS)
     for t in recipes:
-        if t not in skip_list.keys():
+        if t not in skip_list:
             newlist.append(t)
     return newlist
 
-def _is_linux_ppc(ctxt):
-    if ctxt.os.name != "linux":
-        return False
+def _is_linux(ctxt):
+    return ctxt.os.name == "linux"
+
+def _is_arch(ctxt, arch):
     res = ctxt.execute(["uname", "-m"])
-    return "ppc" in res.stdout
+    return arch in res.stdout
+
+def _is_linux_ppc(ctxt):
+    return _is_linux(ctxt) and _is_arch(ctxt, "ppc")
+
+def _is_linux_x86_64(ctxt):
+    return _is_linux(ctxt) and _is_arch(ctxt, "x86_64")

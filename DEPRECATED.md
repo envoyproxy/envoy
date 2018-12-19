@@ -12,6 +12,10 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * Order of execution of the HTTP encoder filter chain has been reversed. Prior to this release cycle it was incorrect, see [#4599](https://github.com/envoyproxy/envoy/issues/4599). In the 1.9.0 release cycle we introduced `bugfix_reverse_encode_order` in [http_connection_manager.proto] (https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto) to temporarily support both old and new behaviors. Note this boolean field is deprecated.
 * Use of the v1 REST_LEGACY ApiConfigSource is deprecated.
 * Use of std::hash in the ring hash load balancer is deprecated.
+* Use of `rate_limit_service` configuration in the [bootstrap configuration](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/bootstrap/v2/bootstrap.proto) is deprecated.
+* Use of `runtime_key` in `RequestMirrorPolicy`, found in
+  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto)
+  is deprecated. Set the `runtime_fraction` field instead.
 * Use of buffer filter `max_request_time` is deprecated. Use the new http connection manager `request_timeout` field instead.
 
 ## Version 1.8.0 (Oct 4, 2018)

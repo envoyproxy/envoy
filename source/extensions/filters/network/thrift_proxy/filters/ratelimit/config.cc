@@ -26,15 +26,22 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
   ASSERT(!proto_config.domain().empty());
   ConfigSharedPtr config(new Config(proto_config, context.localInfo(), context.scope(),
                                     context.runtime(), context.clusterManager()));
-  const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
+  const std::chrono::milliseconds timeout =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
   Filters::Common::RateLimit::ClientFactoryPtr client_factory =
       Filters::Common::RateLimit::rateLimitClientFactory(context);
-  return [client_factory, timeout_ms,
+  // If ratelimit service config is provided in both bootstrap and filter, we should validate that
+  // they are same.
+  Filters::Common::RateLimit::validateRateLimitConfig<
+      const envoy::config::filter::thrift::rate_limit::v2alpha1::RateLimit&>(proto_config,
+                                                                             client_factory);
+
+  return [client_factory, proto_config, &context, timeout,
           config](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
-    // When we introduce rate limit service config in filters, we should validate here that it
-    // matches with bootstrap.
     callbacks.addDecoderFilter(std::make_shared<Filter>(
-        config, client_factory->create(std::chrono::milliseconds(timeout_ms))));
+        config,
+        Filters::Common::RateLimit::rateLimitClient(
+            client_factory, context, proto_config.rate_limit_service().grpc_service(), timeout)));
   };
 }
 

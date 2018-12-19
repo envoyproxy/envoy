@@ -119,3 +119,13 @@ envoy_cc_library(
         "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:dubbo_proxy_cc",
     ],
 )
+
+envoy_cc_library(
+    name = "metadata_lib",
+    hdrs = ["metadata.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":protocol_interface",
+        "//source/common/http:header_map_lib",
+    ],
+)
