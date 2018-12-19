@@ -115,6 +115,18 @@ generate_rsa_key selfsigned_rsa_1024 1024
 generate_selfsigned_x509_cert selfsigned_rsa_1024
 rm -f selfsigned_rsa_1024_cert.cfg
 
+# Generate selfsigned_rsa_3072.pem
+cp -f selfsigned_cert.cfg selfsigned_rsa_3072_cert.cfg
+generate_rsa_key selfsigned_rsa_3072 3072
+generate_selfsigned_x509_cert selfsigned_rsa_3072
+rm -f selfsigned_rsa_3072_cert.cfg
+
+# Generate selfsigned_rsa_4096.pem
+cp -f selfsigned_cert.cfg selfsigned_rsa_4096_cert.cfg
+generate_rsa_key selfsigned_rsa_4096 4096
+generate_selfsigned_x509_cert selfsigned_rsa_4096
+rm -f selfsigned_rsa_4096_cert.cfg
+
 # Generate selfsigned_ecdsa_p256_cert.pem.
 cp -f selfsigned_cert.cfg selfsigned_ecdsa_p256_cert.cfg
 generate_ecdsa_key selfsigned_ecdsa_p256

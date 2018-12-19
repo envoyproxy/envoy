@@ -41,7 +41,9 @@ message TlsParameters {
 
   // If specified, the TLS listener will only support the specified `cipher list
   // <https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html#Cipher-suite-configuration>`_.
-  // If not specified, the default list:
+  // If not specified, the default list will be used.
+  //
+  // In non-FIPS builds, the default cipher list is:
   //
   // .. code-block:: none
   //
@@ -58,11 +60,39 @@ message TlsParameters {
   //   AES256-GCM-SHA384
   //   AES256-SHA
   //
-  // will be used.
+  // In builds using :ref:`BoringSSL FIPS <arch_overview_ssl_fips>`, the default cipher list is:
+  //
+  // .. code-block:: none
+  //
+  //   ECDHE-ECDSA-AES128-GCM-SHA256
+  //   ECDHE-RSA-AES128-GCM-SHA256
+  //   ECDHE-ECDSA-AES128-SHA
+  //   ECDHE-RSA-AES128-SHA
+  //   AES128-GCM-SHA256
+  //   AES128-SHA
+  //   ECDHE-ECDSA-AES256-GCM-SHA384
+  //   ECDHE-RSA-AES256-GCM-SHA384
+  //   ECDHE-ECDSA-AES256-SHA
+  //   ECDHE-RSA-AES256-SHA
+  //   AES256-GCM-SHA384
+  //   AES256-SHA
   repeated string cipher_suites = 3;
 
   // If specified, the TLS connection will only support the specified ECDH
-  // curves. If not specified, the default curves (X25519, P-256) will be used.
+  // curves. If not specified, the default curves will be used.
+  //
+  // In non-FIPS builds, the default curves are:
+  //
+  // .. code-block:: none
+  //
+  //   X25519
+  //   P-256
+  //
+  // In builds using :ref:`BoringSSL FIPS <arch_overview_ssl_fips>`, the default curve is:
+  //
+  // .. code-block:: none
+  //
+  //   P-256
   repeated string ecdh_curves = 4;
 }
 
