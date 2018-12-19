@@ -38,7 +38,7 @@ public:
 
     EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
-    EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
+    EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle));
 
     EXPECT_CALL(dispatcher_,
                 createFileEvent_(_, _, Event::FileTriggerType::Edge,

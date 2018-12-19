@@ -20,11 +20,12 @@ public:
 
   // Network::Socket
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
-  IoHandlePtr& ioHandle() override { return io_handle_; }
+  IoHandle& ioHandle() override { return *io_handle_; }
+  const IoHandle& ioHandle() const override { return *io_handle_; }
   void close() override {
     if (io_handle_->fd() != -1) {
       ::close(io_handle_->fd());
-      *io_handle_ = -1;
+      io_handle_->close();
     }
   }
   void ensureOptions() {

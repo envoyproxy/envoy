@@ -83,7 +83,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
       ConnectionImpl(dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
                      Network::Test::createRawBufferSocket(), false),
-      ".*assert failure: ioHandle\\(\\)->fd\\(\\) != -1.*");
+      ".*assert failure: ioHandle\\(\\).fd\\(\\) != -1.*");
 }
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {

@@ -49,9 +49,14 @@ public:
   virtual ~TransportSocketCallbacks() {}
 
   /**
-   * @return adddress of the I/O handle associated with the connection.
+   * @return reference to the I/O handle associated with the connection.
    */
-  virtual IoHandlePtr& ioHandle() PURE;
+  virtual IoHandle& ioHandle() PURE;
+
+  /**
+   * @return const reference to the I/O handle associated with the connection.
+   */
+  virtual const IoHandle& ioHandle() const PURE;
 
   /**
    * @return Network::Connection& the connection interface.

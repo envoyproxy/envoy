@@ -19,14 +19,7 @@ public:
   // TODO(sbelair2) remove fd() method
   virtual int fd() const PURE;
 
-  /**
-   * @param the socket file descriptor to set in the handle. Assigns an fd from
-   * an external socket operation such as from libevent or the dispatcher after construction
-   *
-   * TODO(sbelair2):  To be removed when the IoSocketHandle derivative is integrated
-   * and the fd is fully abstracted from clients.
-   */
-  virtual void operator=(int fd) PURE;
+  virtual void close() PURE;
 };
 typedef std::unique_ptr<IoHandle> IoHandlePtr;
 

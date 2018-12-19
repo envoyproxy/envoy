@@ -11,10 +11,6 @@ namespace Network {
 class IoSocketHandle : public IoHandle {
 public:
   IoSocketHandle(int fd = -1) : fd_(fd) {}
-  IoSocketHandle(IoHandlePtr&& io_handle) {
-    fd_ = io_handle->fd();
-    io_handle.release();
-  }
 
   ~IoSocketHandle() {}
 
@@ -26,6 +22,8 @@ public:
    */
   int fd() const override { return fd_; }
 
+  void close() override { fd_ = -1; }
+
   /**
    * @param the socket file descriptor to set in the handle. Assigns an fd
    * from an external socket operation such as from libevent or the dispatcher after construction
@@ -33,7 +31,7 @@ public:
    * TODO(sbelair2)  To be removed when the IoSocketHandle derivative is integrated
    * and the fd is fully abstracted from clients.
    */
-  void operator=(int fd) override { fd_ = fd; }
+  void operator=(int fd) { fd_ = fd; }
 
 private:
   int fd_;

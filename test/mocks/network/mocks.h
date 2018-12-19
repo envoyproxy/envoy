@@ -192,7 +192,8 @@ public:
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
-  MOCK_METHOD0(ioHandle, IoHandlePtr&());
+  MOCK_METHOD0(ioHandle, IoHandle&());
+  MOCK_CONST_METHOD0(ioHandle, IoHandle&());
   MOCK_METHOD0(close, void());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr& option));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr& options));
@@ -235,7 +236,8 @@ public:
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr&));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr&));
   MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());
-  MOCK_METHOD0(ioHandle, IoHandlePtr&());
+  MOCK_METHOD0(ioHandle, IoHandle&());
+  MOCK_CONST_METHOD0(ioHandle, IoHandle&());
   MOCK_METHOD0(close, void());
 
   IoHandlePtr io_handle_;
@@ -359,7 +361,8 @@ public:
   MockTransportSocketCallbacks();
   ~MockTransportSocketCallbacks();
 
-  MOCK_METHOD0(ioHandle, IoHandlePtr&());
+  MOCK_METHOD0(ioHandle, IoHandle&());
+  MOCK_CONST_METHOD0(ioHandle, IoHandle&());
   MOCK_METHOD0(connection, Connection&());
   MOCK_METHOD0(shouldDrainReadBuffer, bool());
   MOCK_METHOD0(setReadBufferReady, void());

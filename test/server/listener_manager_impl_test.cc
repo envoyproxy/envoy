@@ -2292,9 +2292,9 @@ class OriginalDstTestFilter : public Extensions::ListenerFilters::OriginalDst::O
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
-  static Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>();
-  Network::IoHandlePtr io_handle_ret = std::make_unique<Network::IoSocketHandle>(0);
-  EXPECT_CALL(*listener_factory_.socket_, ioHandle()).WillOnce(ReturnRef(io_handle_ret));
+  static Network::IoSocketHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>();
+  Network::IoHandlePtr io_handle_tmp = std::make_unique<Network::IoSocketHandle>(0);
+  EXPECT_CALL(*listener_factory_.socket_, ioHandle()).WillOnce(ReturnRef(*io_handle_tmp));
 
   class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
   public:
@@ -2308,7 +2308,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
       EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
           .WillOnce(Invoke(
               [](Network::Socket& socket, envoy::api::v2::core::SocketOption::SocketState) -> bool {
-                *io_handle = socket.ioHandle()->fd();
+                *io_handle = socket.ioHandle().fd();
                 return true;
               }));
       context.addListenSocketOption(std::move(option));
@@ -2430,9 +2430,9 @@ class OriginalDstTestFilterIPv6
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
-  static Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>();
-  Network::IoHandlePtr io_handle_ret = std::make_unique<Network::IoSocketHandle>(0);
-  EXPECT_CALL(*listener_factory_.socket_, ioHandle()).WillOnce(ReturnRef(io_handle_ret));
+  static Network::IoSocketHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>();
+  Network::IoHandlePtr io_handle_tmp = std::make_unique<Network::IoSocketHandle>(0);
+  EXPECT_CALL(*listener_factory_.socket_, ioHandle()).WillOnce(ReturnRef(*io_handle_tmp));
 
   class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
   public:
@@ -2446,7 +2446,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
       EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
           .WillOnce(Invoke(
               [](Network::Socket& socket, envoy::api::v2::core::SocketOption::SocketState) -> bool {
-                *io_handle = socket.ioHandle()->fd();
+                *io_handle = socket.ioHandle().fd();
                 return true;
               }));
       context.addListenSocketOption(std::move(option));

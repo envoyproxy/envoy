@@ -27,9 +27,14 @@ public:
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * @return IoHandlePtr for the underlying connnection
+   * @return IoHandle for the underlying connnection
    */
-  virtual IoHandlePtr& ioHandle() PURE;
+  virtual IoHandle& ioHandle() PURE;
+
+  /**
+   * @return const IoHandle for the underlying connnection
+   */
+  virtual const IoHandle& ioHandle() const PURE;
 
   /**
    * Close the underlying socket.

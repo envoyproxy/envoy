@@ -105,7 +105,7 @@ MockListenSocket::MockListenSocket()
       local_address_(new Address::Ipv4Instance(80)) {
   ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
-  ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(io_handle_));
+  ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
 }
 
 MockListenSocket::~MockListenSocket() {}
@@ -121,7 +121,7 @@ MockConnectionSocket::MockConnectionSocket()
       remote_address_(new Address::Ipv4Instance(80)) {
   ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
   ON_CALL(*this, remoteAddress()).WillByDefault(ReturnRef(remote_address_));
-  ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(io_handle_));
+  ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
 }
 
 MockConnectionSocket::~MockConnectionSocket() {}
