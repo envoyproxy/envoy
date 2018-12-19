@@ -103,6 +103,10 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) { testEnvoyProxyMult
 
 TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) { testEnvoyProxyInvalidMetadata(); }
 
+TEST_P(Http2MetadataIntegrationTest, TestConsumeAndInsertResponseMetadata) {
+  testConsumeAndInsertResponseMetadata();
+}
+
 TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
   testEnvoyMultipleMetadataReachSizeLimit();
 }

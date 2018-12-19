@@ -87,6 +87,15 @@ enum class FilterTrailersStatus {
 };
 
 /**
+ * Return codes for encode metadata filter invocations. Metadata currently can not stop filter
+ * iteration.
+ */
+enum class FilterMetadataStatus {
+  // Continue filter chain iteration.
+  Continue,
+};
+
+/**
  * The stream filter callbacks are passed to all filters to use for writing response data and
  * interacting with the underlying stream in general.
  */
@@ -442,6 +451,13 @@ public:
   virtual HeaderMap& addEncodedTrailers() PURE;
 
   /**
+   * Adds encoded metadata.
+   *
+   * @return a reference to a vector of metadata maps, where a new metadata map can be added.
+   */
+  virtual MetadataMapVector& addEncodedMetadata() PURE;
+
+  /**
    * Called when an encoder filter goes over its high watermark.
    */
   virtual void onEncoderFilterAboveWriteBufferHighWatermark() PURE;
@@ -507,6 +523,15 @@ public:
    * @param trailers supplies the trailers to be encoded.
    */
   virtual FilterTrailersStatus encodeTrailers(HeaderMap& trailers) PURE;
+
+  /**
+   * Called with metadata to be encoded. New metadata can be added directly to metadata_map or
+   * through addEncodedMetadata() interface.
+   *
+   * @param metadata_map supplies the metadata to be encoded.
+   * @return FilterMetadataStatus, which currently is always FilterMetadataStatus::Continue;
+   */
+  virtual FilterMetadataStatus encodeMetadata(MetadataMap& metadata_map) PURE;
 
   /**
    * Called by the filter manager once to initialize the filter callbacks that the filter should
