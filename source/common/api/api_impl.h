@@ -27,7 +27,7 @@ public:
                                        Thread::BasicLockable& lock) override;
   bool fileExists(const std::string& path) override;
   std::string fileReadToEnd(const std::string& path) override;
-  Thread::ThreadPtr createThread(std::function<void()> thread_routine) override;
+  Thread::ThreadFactory& threadFactory() override;
   Filesystem::Instance& fileSystem() { return file_system_; }
 
 private:
