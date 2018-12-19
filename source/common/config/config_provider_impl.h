@@ -16,10 +16,10 @@
 namespace Envoy {
 namespace Config {
 
-// This file provides a set of base classes, (StaticConfigProviderImpl, DynamicConfigProviderImpl,
-// ConfigProviderManagerImpl, ConfigSubscriptionInstance), conforming to the
-// ConfigProvider/ConfigProviderManager interfaces, which in tandem provide a framework for
-// implementing static and dynamic configuration for Envoy.
+// This file provides a set of base classes, (StaticConfigProviderImplBase,
+// DynamicConfigProviderImplBase, ConfigProviderManagerImplBase, ConfigSubscriptionInstanceBase),
+// conforming to the ConfigProvider/ConfigProviderManager interfaces, which in tandem provide a
+// framework for implementing static and dynamic configuration for Envoy.
 //
 // Dynamic configuration is distributed via xDS APIs (see
 // https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md). The framework exposed
@@ -34,27 +34,29 @@ namespace Config {
 // A blueprint to follow for implementing static and dynamic config providers is as follows:
 //
 // For both:
-//   1) Create a class derived from ConfigProviderManagerImpl and implement the required interface.
+//   1) Create a class derived from ConfigProviderManagerImplBase and implement the required
+//   interface.
 //      When implementing createXdsConfigProvider(), it is expected that getSubscription<T>() will
-//      be called to fetch either an existing ConfigSubscriptionInstance if the config source
+//      be called to fetch either an existing ConfigSubscriptionInstanceBase if the config source
 //      configuration matches, or a newly instantiated subscription otherwise.
 //
 // For static providers:
-//   1) Create a class derived from StaticConfigProviderImpl and implement the required interface.
+//   1) Create a class derived from StaticConfigProviderImplBase and implement the required
+//   interface.
 //
 // For dynamic (xDS) providers:
-//   1) Create a class derived from DynamicConfigProviderImpl and implement the required interface.
-//   2) Create a class derived from ConfigSubscriptionInstance; this is the entity responsible for
-//   owning and managing the Envoy::Config::Subscription<ConfigProto> that provides the underlying
-//   config subscription.
+//   1) Create a class derived from DynamicConfigProviderImplBase and implement the required
+//   interface. 2) Create a class derived from ConfigSubscriptionInstanceBase; this is the entity
+//   responsible for owning and managing the Envoy::Config::Subscription<ConfigProto> that provides
+//   the underlying config subscription.
 //     - When subscription callbacks (onConfigUpdate, onConfigUpdateFailed) are issued by the
-//     underlying subscription, the corresponding ConfigSubscriptionInstance functions must be
+//     underlying subscription, the corresponding ConfigSubscriptionInstanceBase functions must be
 //     called as well.
 //     - On a successful config update, checkAndApplyConfig() should be called to instantiate the
 //     new config implementation and propagate it to the shared config providers and all
 //     worker threads.
 
-class ConfigProviderManagerImpl;
+class ConfigProviderManagerImplBase;
 
 /**
  * ConfigProvider implementation for statically specified configuration.
@@ -62,25 +64,25 @@ class ConfigProviderManagerImpl;
  * This class can not be instantiated directly; instead, it provides the foundation for
  * static config provider implementations which derive from it.
  */
-class StaticConfigProviderImpl : public ConfigProvider {
+class StaticConfigProviderImplBase : public ConfigProvider {
 public:
-  StaticConfigProviderImpl() = delete;
+  StaticConfigProviderImplBase() = delete;
 
-  virtual ~StaticConfigProviderImpl();
+  virtual ~StaticConfigProviderImplBase();
 
   // Envoy::Config::ConfigProvider
   SystemTime lastUpdated() const override { return last_updated_; }
 
 protected:
-  StaticConfigProviderImpl(Server::Configuration::FactoryContext& factory_context,
-                           ConfigProviderManagerImpl& config_provider_manager);
+  StaticConfigProviderImplBase(Server::Configuration::FactoryContext& factory_context,
+                               ConfigProviderManagerImplBase& config_provider_manager);
 
 private:
   SystemTime last_updated_;
-  ConfigProviderManagerImpl& config_provider_manager_;
+  ConfigProviderManagerImplBase& config_provider_manager_;
 };
 
-class DynamicConfigProviderImpl;
+class DynamicConfigProviderImplBase;
 
 /**
  * Provides generic functionality required by all dynamic ConfigProvider subscriptions, including
@@ -94,17 +96,17 @@ class DynamicConfigProviderImpl;
  * This class can not be instantiated directly; instead, it provides the foundation for
  * dynamic config subscription implementations which derive from it.
  */
-class ConfigSubscriptionInstance : public Init::Target,
-                                   protected Logger::Loggable<Logger::Id::config> {
+class ConfigSubscriptionInstanceBase : public Init::Target,
+                                       protected Logger::Loggable<Logger::Id::config> {
 public:
   struct LastConfigInfo {
     uint64_t last_config_hash_;
     std::string last_config_version_;
   };
 
-  ConfigSubscriptionInstance() = delete;
+  ConfigSubscriptionInstanceBase() = delete;
 
-  virtual ~ConfigSubscriptionInstance();
+  virtual ~ConfigSubscriptionInstanceBase();
 
   // Init::Target
   void initialize(std::function<void()> callback) override {
@@ -149,16 +151,16 @@ public:
   bool checkAndApplyConfig(const Protobuf::Message& config_proto, const std::string& config_name,
                            const std::string& version_info);
 
-  const std::unordered_set<const DynamicConfigProviderImpl*> dynamic_config_providers() const {
-    return std::unordered_set<const DynamicConfigProviderImpl*>(dynamic_config_providers_.begin(),
-                                                                dynamic_config_providers_.end());
+  const std::unordered_set<const DynamicConfigProviderImplBase*> dynamic_config_providers() const {
+    return std::unordered_set<const DynamicConfigProviderImplBase*>(
+        dynamic_config_providers_.begin(), dynamic_config_providers_.end());
   }
 
 protected:
-  ConfigSubscriptionInstance(const std::string& name, const std::string& manager_identifier,
-                             ConfigProviderManagerImpl& config_provider_manager,
-                             TimeSource& time_source, const SystemTime& last_updated,
-                             const LocalInfo::LocalInfo& local_info)
+  ConfigSubscriptionInstanceBase(const std::string& name, const std::string& manager_identifier,
+                                 ConfigProviderManagerImplBase& config_provider_manager,
+                                 TimeSource& time_source, const SystemTime& last_updated,
+                                 const LocalInfo::LocalInfo& local_info)
       : name_(name), manager_identifier_(manager_identifier),
         config_provider_manager_(config_provider_manager), time_source_(time_source),
         last_updated_(last_updated) {
@@ -172,17 +174,17 @@ protected:
 private:
   void registerInitTarget(Init::Manager& init_manager) { init_manager.registerTarget(*this); }
 
-  void bindConfigProvider(DynamicConfigProviderImpl* provider);
+  void bindConfigProvider(DynamicConfigProviderImplBase* provider);
 
-  void unbindConfigProvider(DynamicConfigProviderImpl* provider) {
+  void unbindConfigProvider(DynamicConfigProviderImplBase* provider) {
     dynamic_config_providers_.erase(provider);
   }
 
   const std::string name_;
   std::function<void()> initialize_callback_;
-  std::unordered_set<DynamicConfigProviderImpl*> dynamic_config_providers_;
+  std::unordered_set<DynamicConfigProviderImplBase*> dynamic_config_providers_;
   const std::string manager_identifier_;
-  ConfigProviderManagerImpl& config_provider_manager_;
+  ConfigProviderManagerImplBase& config_provider_manager_;
   TimeSource& time_source_;
   SystemTime last_updated_;
   absl::optional<LastConfigInfo> config_info_;
@@ -192,13 +194,13 @@ private:
   // them.
   //
   // TODO(AndresGuedez): Investigate whether a shared ownership model avoiding the <shared_ptr>s and
-  // instead centralizing lifetime management in the ConfigProviderManagerImpl with explicit
+  // instead centralizing lifetime management in the ConfigProviderManagerImplBase with explicit
   // reference counting would be more maintainable.
-  friend class DynamicConfigProviderImpl;
-  friend class ConfigProviderManagerImpl;
+  friend class DynamicConfigProviderImplBase;
+  friend class ConfigProviderManagerImplBase;
 };
 
-using ConfigSubscriptionInstanceSharedPtr = std::shared_ptr<ConfigSubscriptionInstance>;
+using ConfigSubscriptionInstanceBaseSharedPtr = std::shared_ptr<ConfigSubscriptionInstanceBase>;
 
 /**
  * Provides generic functionality required by all dynamic config providers, including distribution
@@ -207,11 +209,11 @@ using ConfigSubscriptionInstanceSharedPtr = std::shared_ptr<ConfigSubscriptionIn
  * This class can not be instantiated directly; instead, it provides the foundation for
  * dynamic config provider implementations which derive from it.
  */
-class DynamicConfigProviderImpl : public ConfigProvider {
+class DynamicConfigProviderImplBase : public ConfigProvider {
 public:
-  DynamicConfigProviderImpl() = delete;
+  DynamicConfigProviderImplBase() = delete;
 
-  virtual ~DynamicConfigProviderImpl() { subscription_->unbindConfigProvider(this); }
+  virtual ~DynamicConfigProviderImplBase() { subscription_->unbindConfigProvider(this); }
 
   // Envoy::Config::ConfigProvider
   SystemTime lastUpdated() const override { return subscription_->lastUpdated(); }
@@ -245,11 +247,11 @@ public:
   }
 
 protected:
-  DynamicConfigProviderImpl(ConfigSubscriptionInstanceSharedPtr&& subscription,
-                            Server::Configuration::FactoryContext& factory_context)
+  DynamicConfigProviderImplBase(ConfigSubscriptionInstanceBaseSharedPtr&& subscription,
+                                Server::Configuration::FactoryContext& factory_context)
       : subscription_(subscription), tls_(factory_context.threadLocal().allocateSlot()) {}
 
-  const ConfigSubscriptionInstanceSharedPtr& subscription() const { return subscription_; }
+  const ConfigSubscriptionInstanceBaseSharedPtr& subscription() const { return subscription_; }
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
@@ -259,7 +261,7 @@ private:
     ConfigProvider::ConfigConstSharedPtr config_;
   };
 
-  ConfigSubscriptionInstanceSharedPtr subscription_;
+  ConfigSubscriptionInstanceBaseSharedPtr subscription_;
   ThreadLocal::SlotPtr tls_;
 };
 
@@ -271,11 +273,11 @@ private:
  * This class can not be instantiated directly; instead, it provides the foundation for
  * dynamic config provider implementations which derive from it.
  */
-class ConfigProviderManagerImpl : public ConfigProviderManager, public Singleton::Instance {
+class ConfigProviderManagerImplBase : public ConfigProviderManager, public Singleton::Instance {
 public:
-  ConfigProviderManagerImpl() = delete;
+  ConfigProviderManagerImplBase() = delete;
 
-  virtual ~ConfigProviderManagerImpl() {}
+  virtual ~ConfigProviderManagerImplBase() {}
 
   /**
    * This is invoked by the /config_dump admin handler.
@@ -287,9 +289,9 @@ public:
 protected:
   using ConfigProviderSet = std::unordered_set<ConfigProvider*>;
   using ConfigSubscriptionMap =
-      std::unordered_map<std::string, std::weak_ptr<ConfigSubscriptionInstance>>;
+      std::unordered_map<std::string, std::weak_ptr<ConfigSubscriptionInstanceBase>>;
 
-  ConfigProviderManagerImpl(Server::Admin& admin, const std::string& config_name);
+  ConfigProviderManagerImplBase(Server::Admin& admin, const std::string& config_name);
 
   const ConfigProviderSet& static_config_providers() const { return static_config_providers_; }
 
@@ -305,15 +307,15 @@ protected:
    * @return std::shared_ptr<T> an existing (if a match is found) or newly allocated subscription.
    */
   template <typename T>
-  std::shared_ptr<T>
-  getSubscription(const Protobuf::Message& config_source_proto, Init::Manager& init_manager,
-                  std::function<ConfigSubscriptionInstanceSharedPtr(const std::string&,
-                                                                    ConfigProviderManagerImpl&)>
-                      subscription_factory_fn) {
-    static_assert(std::is_base_of<ConfigSubscriptionInstance, T>::value,
-                  "T must be a subclass of ConfigSubscriptionInstance");
+  std::shared_ptr<T> getSubscription(const Protobuf::Message& config_source_proto,
+                                     Init::Manager& init_manager,
+                                     std::function<ConfigSubscriptionInstanceBaseSharedPtr(
+                                         const std::string&, ConfigProviderManagerImplBase&)>
+                                         subscription_factory_fn) {
+    static_assert(std::is_base_of<ConfigSubscriptionInstanceBase, T>::value,
+                  "T must be a subclass of ConfigSubscriptionInstanceBase");
 
-    ConfigSubscriptionInstanceSharedPtr subscription;
+    ConfigSubscriptionInstanceBaseSharedPtr subscription;
     const std::string manager_identifier = config_source_proto.SerializeAsString();
 
     auto it = config_subscriptions_.find(manager_identifier);
@@ -339,7 +341,7 @@ protected:
 
 private:
   void bindSubscription(const std::string& manager_identifier,
-                        ConfigSubscriptionInstanceSharedPtr& subscription) {
+                        ConfigSubscriptionInstanceBaseSharedPtr& subscription) {
     config_subscriptions_.insert({manager_identifier, subscription});
   }
 
@@ -354,10 +356,10 @@ private:
   ConfigProviderSet static_config_providers_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 
-  // See comment for friend classes in the ConfigSubscriptionInstance for more details on the use
-  // of friends.
-  friend class ConfigSubscriptionInstance;
-  friend class StaticConfigProviderImpl;
+  // See comment for friend classes in the ConfigSubscriptionInstanceBase for more details on the
+  // use of friends.
+  friend class ConfigSubscriptionInstanceBase;
+  friend class StaticConfigProviderImplBase;
 };
 
 } // namespace Config
