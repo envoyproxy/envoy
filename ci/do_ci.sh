@@ -157,9 +157,9 @@ elif [[ "$1" == "bazel.compiletimeoptions" ]]; then
   echo "bazel with different compiletime options build with tests..."
   cd "${ENVOY_CI_DIR}"
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c fastbuild //source/exe:envoy-static
+  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //source/exe:envoy-static
   echo "Building and testing..."
-  bazel test ${BAZEL_TEST_OPTIONS} ${COMPILE_TIME_OPTIONS} -c fastbuild //test/...
+  bazel test ${BAZEL_TEST_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //test/...
   exit 0
 elif [[ "$1" == "bazel.ipv6_tests" ]]; then
   # This is around until Circle supports IPv6. We try to run a limited set of IPv6 tests as fast
