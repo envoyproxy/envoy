@@ -161,7 +161,8 @@ private:
       parent_.decodeHeaders(this, *parent_.request_headers_, end_stream);
     }
     void doData(bool end_stream) override {
-      parent_.decodeData(this, *parent_.buffered_request_data_, end_stream);
+      Buffer::WatermarkBufferPtr data(std::move(parent_.buffered_request_data_));
+      parent_.decodeData(this, *data, end_stream);
     }
     void doTrailers() override { parent_.decodeTrailers(this, *parent_.request_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.request_trailers_; }
@@ -232,7 +233,8 @@ private:
       parent_.encodeHeaders(this, *parent_.response_headers_, end_stream);
     }
     void doData(bool end_stream) override {
-      parent_.encodeData(this, *parent_.buffered_response_data_, end_stream);
+      Buffer::WatermarkBufferPtr data(std::move(parent_.buffered_response_data_));
+      parent_.encodeData(this, *data, end_stream);
     }
     void doTrailers() override { parent_.encodeTrailers(this, *parent_.response_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.response_trailers_; }

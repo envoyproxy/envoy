@@ -2768,7 +2768,11 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
 
   // The filter is a streaming filter. Sending 4 bytes should hit the
   // watermark limit and disable reads on the stream.
-  EXPECT_CALL(stream_, readDisable(true));
+  // It is called twice because ActiveStream::buffered_request_data
+  // is filled twice; doData() move the data to a temp buffer, and it is
+  // passed to filter::decodeData, it fills the ActiveStream::buffered_request_data
+  // again.
+  EXPECT_CALL(stream_, readDisable(true)).Times(2);
   sendRequestHeadersAndData();
 
   // Change the limit so the buffered data is below the new watermark. The
@@ -3145,9 +3149,9 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithAllContinue) {
       }));
 
   EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+      .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(*decoder_filters_[2], decodeData(_, true))
-      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+      .WillOnce(Return(FilterDataStatus::Continue));
 
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, true)).Times(0);
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, true)).Times(0);
@@ -3185,10 +3189,10 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithContinueDecoding) {
       }));
 
   EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+      .WillOnce(Return(FilterHeadersStatus::Continue));
   // This fail, it is called twice.
   EXPECT_CALL(*decoder_filters_[2], decodeData(_, true))
-      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+      .WillOnce(Return(FilterDataStatus::Continue));
 
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, true)).Times(0);
   // This fail, it is called once
