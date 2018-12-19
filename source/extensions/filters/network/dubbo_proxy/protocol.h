@@ -43,7 +43,7 @@ public:
       return itor->second;
     }
 
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 };
 
