@@ -83,6 +83,7 @@ Version history
 * tls: added support for CRLs in :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
 * tls: added support for :ref:`multiple server TLS certificates <arch_overview_ssl_cert_select>`.
 * tls: added support for :ref:`password encrypted private keys <envoy_api_field_auth.TlsCertificate.password>`.
+* tls: added the ability to build :ref:`BoringSSL FIPS <arch_overview_ssl_fips>` using ``--define boringssl=fips`` Bazel option.
 * tls: removed support for ECDSA certificates with curves other than P-256.
 * tls: removed support for RSA certificates with keys smaller than 2048-bits.
 * tracing: added support to the Zipkin tracer for the :ref:`b3 <config_http_conn_man_headers_b3>` single header format.
