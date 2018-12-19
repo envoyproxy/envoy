@@ -33,7 +33,6 @@ public:
   static int peekUint8(Buffer::Instance& buffer, uint64_t& offset, uint8_t& val);
   static int peekUint16(Buffer::Instance& buffer, uint64_t& offset, uint16_t& val);
   static int peekUint32(Buffer::Instance& buffer, uint64_t& offset, uint32_t& val);
-  static int peekUint64(Buffer::Instance& buffer, uint64_t& offset, uint64_t& val);
   static int peekBySize(Buffer::Instance& buffer, uint64_t& offset, int len, int& val);
   static int peekLengthEncodedInteger(Buffer::Instance& buffer, uint64_t& offset, int& val);
   static int peekBytes(Buffer::Instance& buffer, uint64_t& offset, int skip_bytes);

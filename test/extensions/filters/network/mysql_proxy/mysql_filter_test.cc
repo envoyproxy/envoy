@@ -793,7 +793,8 @@ TEST_F(MySQLFilterTest, MySqlLoginAndQueryTest) {
 
   srv_resp_data = encodeClientLoginResp(MYSQL_RESP_OK, 0, 1);
   Buffer::InstancePtr create_index_resp_data(new Buffer::OwnedImpl(srv_resp_data));
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*create_index_resp_data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue,
+            filter_->onData(*create_index_resp_data, false));
   EXPECT_EQ(MySQLSession::State::MYSQL_REQ, filter_->getSession().getState());
 
   mysql_cmd_encode.setCmd(Command::Cmd::COM_FIELD_LIST);
@@ -810,7 +811,6 @@ TEST_F(MySQLFilterTest, MySqlLoginAndQueryTest) {
   Buffer::InstancePtr field_list_resp_data(new Buffer::OwnedImpl(srv_resp_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*field_list_resp_data, false));
   EXPECT_EQ(MySQLSession::State::MYSQL_REQ, filter_->getSession().getState());
-
 }
 
 } // namespace MySQLProxy

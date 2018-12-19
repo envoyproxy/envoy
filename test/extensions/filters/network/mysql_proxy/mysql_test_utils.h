@@ -1,4 +1,5 @@
 #pragma once
+#include <fmt/format.h>
 #include <iostream>
 
 namespace Envoy {
@@ -22,11 +23,7 @@ public:
   static std::string getSalt() { return "!@salt#$"; }
   static std::string getAuthResp() { return "p4$$w0r6"; }
   static std::string getVersion() {
-    std::string ver(std::to_string(MYSQL_VER_MAJOR));
-    ver.append(".");
-    ver.append(std::to_string(MYSQL_VER_MINOR));
-    ver.append(".");
-    ver.append(std::to_string(MYSQL_VER_VAR));
+    std::string ver = fmt::format("{0}.{1}.{2}", MYSQL_VER_MAJOR, MYSQL_VER_MINOR, MYSQL_VER_VAR);
     return ver;
   }
 

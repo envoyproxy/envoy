@@ -71,15 +71,6 @@ int BufferHelper::peekUint32(Buffer::Instance& buffer, uint64_t& offset, uint32_
   return MYSQL_SUCCESS;
 }
 
-int BufferHelper::peekUint64(Buffer::Instance& buffer, uint64_t& offset, uint64_t& val) {
-  if (buffer.length() < (offset + sizeof(uint64_t))) {
-    return MYSQL_FAILURE;
-  }
-  buffer.copyOut(offset, sizeof(uint64_t), &val);
-  offset += sizeof(uint64_t);
-  return MYSQL_SUCCESS;
-}
-
 int BufferHelper::peekBySize(Buffer::Instance& buffer, uint64_t& offset, int len, int& val) {
   if (buffer.length() < (offset + len)) {
     return MYSQL_FAILURE;
