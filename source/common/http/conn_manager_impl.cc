@@ -1219,7 +1219,9 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
 
   // Now encode metadata via the codec.
   if (!metadata_map->empty()) {
-    response_encoder_->encodeMetadata(*metadata_map);
+    MetadataMapVector metadata_map_vector;
+    metadata_map_vector.push_back(std::move(metadata_map));
+    response_encoder_->encodeMetadata(metadata_map_vector);
   }
   // metadata_map destroyed when function returns.
 }
@@ -1413,9 +1415,13 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
   state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
     const Router::RouteEntry::UpgradeMap* upgrade_map = nullptr;
-    if (cached_route_.value() && cached_route_.value()->routeEntry()) {
+
+    // We must check if the 'cached_route_' optional is populated since this function can be called
+    // early via sendLocalReply(), before the cached route is populated.
+    if (cached_route_.has_value() && cached_route_.value() && cached_route_.value()->routeEntry()) {
       upgrade_map = &cached_route_.value()->routeEntry()->upgradeMap();
     }
+
     if (connection_manager_.config_.filterFactory().createUpgradeFilterChain(
             upgrade->value().c_str(), upgrade_map, *this)) {
       state_.successful_upgrade_ = true;

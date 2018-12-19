@@ -9,6 +9,7 @@ load(
     "envoy_cc_win32_library",
     "envoy_include_prefix",
     "envoy_package",
+    "envoy_select_boringssl",
 )
 
 envoy_package()
@@ -75,7 +76,7 @@ envoy_cc_library(
 envoy_basic_cc_library(
     name = "fmt_lib",
     hdrs = ["fmt.h"],
-    include_prefix = envoy_include_prefix(PACKAGE_NAME),
+    include_prefix = envoy_include_prefix(package_name()),
 )
 
 envoy_cc_library(
@@ -249,6 +250,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "version_lib",
     srcs = ["version.cc"],
+    copts = envoy_select_boringssl(
+        ["-DENVOY_SSL_VERSION=\\\"BoringSSL-FIPS\\\""],
+        ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
+    ),
     linkstamp = "version_linkstamp.cc",
     deps = [
         ":version_includes",

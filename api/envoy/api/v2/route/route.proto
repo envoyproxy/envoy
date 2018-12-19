@@ -346,7 +346,7 @@ message RouteMatch {
   // .. note::
   //
   //    Parsing this field is implemented such that the runtime key's data may be represented
-  //    as a FractionalPercent proto represented as JSON/YAM and may also be represented as an
+  //    as a FractionalPercent proto represented as JSON/YAML and may also be represented as an
   //    integer with the assumption that the value is an integral percentage out of 100. For
   //    instance, a runtime key lookup returning the value "42" would parse as a FractionalPercent
   //    whose numerator is 42 and denominator is HUNDRED. This preserves legacy semantics.
@@ -615,7 +615,35 @@ message RouteAction {
     // 0.01% of requests to be mirrored. If the runtime key is specified in the
     // configuration but not present in runtime, 0 is the default and thus 0% of
     // requests will be mirrored.
-    string runtime_key = 2;
+    //
+    // .. attention::
+    //
+    //   **This field is deprecated**. Set the
+    //   :ref:`runtime_fraction
+    //   <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_fraction>` field instead.
+    string runtime_key = 2 [deprecated = true];
+
+    // If both :ref:`runtime_key
+    // <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_key>` and this field are not
+    // specified, all requests to the target cluster will be mirrored.
+    //
+    // If specified, this field takes precedence over the `runtime_key` field and requests must also
+    // fall under the percentage of matches indicated by this field.
+    //
+    // For some fraction N/D, a random number in the range [0,D) is selected. If the
+    // number is <= the value of the numberator N, or if the key is not present, the default
+    // value, the request will be mirrored.
+    //
+    // .. note::
+    //
+    //   Parsing this field is implemented such that the runtime key's data may be represented
+    //   as a :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` proto represented
+    //   as JSON/YAML and may also be represented as an integer with the assumption that the value
+    //   is an integral percentage out of 100. For instance, a runtime key lookup returning the
+    //   value "42" would parse as a `FractionalPercent` whose numerator is 42 and denominator is
+    //   HUNDRED. This is behaviour is different to that of the deprecated `runtime_key` field,
+    //   where the implicit denominator is 10000.
+    core.RuntimeFractionalPercent runtime_fraction = 3;
   }
 
   // Indicates that the route has a request mirroring policy.

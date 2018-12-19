@@ -53,6 +53,11 @@ timeout: "1.337s"
           instance, instance.clusterManager().grpcAsyncClientManager(),
           envoy::config::bootstrap::v2::Bootstrap());
 
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+
   RateLimitFilterConfig factory;
   auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   NetworkFilters::ThriftProxy::ThriftFilters::MockFilterChainFactoryCallbacks filter_callback;

@@ -61,4 +61,31 @@ message GrpcJsonTranscoder {
   // the match the upstream gRPC service. Note: This means that routes for gRPC services that are
   // not transcoded cannot be used in combination with *match_incoming_request_route*.
   bool match_incoming_request_route = 5;
+
+  // A list of query parameters to be ignored for transcoding method mapping.
+  // By default, the transcoder filter will not transcode a request if there are any
+  // unknown/invalid query parameters.
+  //
+  // Example :
+  //
+  // .. code-block:: proto
+  //
+  //     service Bookstore {
+  //       rpc GetShelf(GetShelfRequest) returns (Shelf) {
+  //         option (google.api.http) = {
+  //           get: "/shelves/{shelf}"
+  //         };
+  //       }
+  //     }
+  //
+  //     message GetShelfRequest {
+  //       int64 shelf = 1;
+  //     }
+  //
+  //     message Shelf {}
+  //
+  // The request ``/shelves/100?foo=bar`` will not be mapped to ``GetShelf``` because variable
+  // binding for ``foo`` is not defined. Adding ``foo`` to ``ignored_query_parameters`` will allow
+  // the same request to be mapped to ``GetShelf``.
+  repeated string ignored_query_parameters = 6;
 }

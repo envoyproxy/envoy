@@ -402,6 +402,11 @@ RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& di
       instance.shutdown();
     });
 
+    sigint_ = dispatcher.listenForSignal(SIGINT, [&instance]() {
+      ENVOY_LOG(warn, "caught SIGINT");
+      instance.shutdown();
+    });
+
     sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
       ENVOY_LOG(warn, "caught SIGUSR1");
       access_log_manager.reopen();

@@ -146,7 +146,7 @@ bool EdsClusterImpl::updateHostsPerLocality(
   // out of the locality scheduler, we discover their new weights. We don't currently have a shared
   // object for locality weights that we can update here, we should add something like this to
   // improve performance and scalability of locality weight updates.
-  if (host_set.overprovisioning_factor() != overprovisioning_factor ||
+  if (host_set.overprovisioningFactor() != overprovisioning_factor ||
       updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             updated_hosts, all_hosts_) ||
       locality_weights_map != new_locality_weights_map) {
