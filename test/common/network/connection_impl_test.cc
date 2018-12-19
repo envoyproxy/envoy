@@ -1163,6 +1163,28 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
   callback();
 }
 
+class FakeReadFilter : public Network::ReadFilter {
+public:
+  FakeReadFilter() {}
+  ~FakeReadFilter() {
+    EXPECT_TRUE(callbacks_ != nullptr);
+    // The purpose is to verify that when FilterManger is destructed, ConnectionSocketImpl is not
+    // destructed, and ConnectionSocketImpl can still be accessed via ReadFilterCallbacks.
+    EXPECT_TRUE(callbacks_->connection().state() != Network::Connection::State::Open);
+  }
+
+  Network::FilterStatus onData(Buffer::Instance& data, bool) {
+    data.drain(data.length());
+    return Network::FilterStatus::Continue;
+  }
+
+  Network::FilterStatus onNewConnection() { return Network::FilterStatus::Continue; }
+
+  void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) { callbacks_ = &callbacks; }
+
+private:
+  ReadFilterCallbacks* callbacks_{nullptr};
+};
 class MockTransportConnectionImplTest : public testing::Test {
 public:
   MockTransportConnectionImplTest() {
@@ -1204,6 +1226,21 @@ public:
   Event::FileReadyCb file_ready_cb_;
   TransportSocketCallbacks* transport_socket_callbacks_;
 };
+
+// The purpose of this case is to verify the destructor order of the object.
+// FilterManager relies on ConnectionSocketImpl, so the FilterManager can be
+// destructed after the ConnectionSocketImpl is destructed.
+//
+// Ref: https://github.com/envoyproxy/envoy/issues/5313
+TEST_F(MockTransportConnectionImplTest, ObjectDestructOrder) {
+  connection_->addReadFilter(std::make_shared<Network::FakeReadFilter>());
+  connection_->enableHalfClose(true);
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .Times(2)
+      .WillRepeatedly(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
+  file_ready_cb_(Event::FileReadyType::Read);
+  file_ready_cb_(Event::FileReadyType::Read);
+}
 
 // Test that BytesSentCb is invoked at the correct times
 TEST_F(MockTransportConnectionImplTest, BytesSentCallback) {
