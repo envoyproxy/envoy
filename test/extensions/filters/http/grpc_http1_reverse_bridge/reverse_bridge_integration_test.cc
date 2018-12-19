@@ -16,10 +16,10 @@ namespace Envoy {
 
 // Tests a downstream HTTP2 client sending gRPC requests that are converted into HTTP/1.1 for a
 // HTTP1 upstream.
-class GrpcShimIntegrationTest : public HttpIntegrationTest,
-                                public testing::TestWithParam<Network::Address::IpVersion> {
+class ReverseBridgeIntegrationTest : public HttpIntegrationTest,
+                                     public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  GrpcShimIntegrationTest()
+  ReverseBridgeIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(), realTime()) {}
 
   void SetUp() override {
@@ -27,7 +27,7 @@ public:
 
     const std::string filter =
         R"EOF(
-name: envoy.filters.http.grpc_shim
+name: envoy.filters.http.grpc_http1_reverse_bridge
 config:
   content_type: application/x-protobuf
   withhold_grpc_frames: true
@@ -44,13 +44,13 @@ config:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, GrpcShimIntegrationTest,
+INSTANTIATE_TEST_CASE_P(IpVersions, ReverseBridgeIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
 // Verifies that we don't do anything with the request when it's hitting a route that
 // doesn't enable the shim.
-TEST_P(GrpcShimIntegrationTest, EnabledRoute) {
+TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   Http::TestHeaderMapImpl request_headers({{":scheme", "http"},

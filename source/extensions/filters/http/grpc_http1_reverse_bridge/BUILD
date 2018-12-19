@@ -9,9 +9,9 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "grpc_shim_lib",
-    srcs = ["grpc_shim.cc"],
-    hdrs = ["grpc_shim.h"],
+    name = "filter_lib",
+    srcs = ["filter.cc"],
+    hdrs = ["filter.h"],
     deps = [
         "//include/envoy/http:filter_interface",
         "//source/common/common:enum_to_int",
@@ -29,12 +29,12 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":grpc_shim_lib",
+        ":filter_lib",
         "//include/envoy/http:filter_interface",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/http/grpc_shim/v2alpha1:grpc_shim_cc",
+        "@envoy_api//envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1:config_cc",
     ],
 )

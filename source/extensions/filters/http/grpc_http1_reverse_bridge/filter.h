@@ -12,12 +12,12 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace GrpcShim {
+namespace GrpcHttp1ReverseBridge {
 
 // When enabled, will downgrade an incoming gRPC http request into a h/1.1 request.
-class GrpcShim : public Envoy::Http::PassThroughFilter {
+class Filter : public Envoy::Http::PassThroughFilter {
 public:
-  explicit GrpcShim(std::string upstream_content_type, bool withhold_grpc_frames)
+  explicit Filter(std::string upstream_content_type, bool withhold_grpc_frames)
       : upstream_content_type_(std::move(upstream_content_type)),
         withhold_grpc_frames_(withhold_grpc_frames) {}
   // Http::StreamDecoderFilter
@@ -40,7 +40,7 @@ private:
   // buffer we instead maintain our own.
   Buffer::OwnedImpl buffer_{};
 };
-} // namespace GrpcShim
+} // namespace GrpcHttp1ReverseBridge
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

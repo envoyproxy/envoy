@@ -7,7 +7,7 @@
 #include "common/grpc/codec.h"
 #include "common/http/header_map_impl.h"
 
-#include "extensions/filters/http/grpc_shim/grpc_shim.h"
+#include "extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/http/mocks.h"
@@ -27,17 +27,17 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace GrpcShim {
+namespace GrpcHttp1ReverseBridge {
 
-class GrpcShimTest : public testing::Test {
+class ReverseBridgeTest : public testing::Test {
 protected:
   void initialize(bool withhold_grpc_headers = true) {
-    filter_ = std::make_unique<GrpcShim>("application/x-protobuf", withhold_grpc_headers);
+    filter_ = std::make_unique<Filter>("application/x-protobuf", withhold_grpc_headers);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  std::unique_ptr<GrpcShim> filter_;
+  std::unique_ptr<Filter> filter_;
   std::shared_ptr<Router::MockRoute> route_ = std::make_shared<Router::MockRoute>();
   Router::RouteSpecificFilterConfig filter_config_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
@@ -45,7 +45,7 @@ protected:
 };
 
 // Verifies that an incoming request with too small a request body will immediately fail.
-TEST_F(GrpcShimTest, InvalidGrcpRequest) {
+TEST_F(ReverseBridgeTest, InvalidGrcpRequest) {
   initialize();
   decoder_callbacks_.is_grpc_request_ = true;
 
@@ -75,7 +75,7 @@ TEST_F(GrpcShimTest, InvalidGrcpRequest) {
 }
 
 // Tests that the filter passes a non-GRPC request through without modification.
-TEST_F(GrpcShimTest, NoGrpcRequest) {
+TEST_F(ReverseBridgeTest, NoGrpcRequest) {
   initialize();
 
   {
@@ -111,7 +111,7 @@ TEST_F(GrpcShimTest, NoGrpcRequest) {
 
 // Verifies that if we receive a gRPC request but have configured the filter to not handle the gRPC
 // frames, then the data should not be modified.
-TEST_F(GrpcShimTest, GrpcRequestNoManageFrameHeader) {
+TEST_F(ReverseBridgeTest, GrpcRequestNoManageFrameHeader) {
   initialize(false);
   decoder_callbacks_.is_grpc_request_ = true;
 
@@ -170,7 +170,7 @@ TEST_F(GrpcShimTest, GrpcRequestNoManageFrameHeader) {
 
 // Tests that a gRPC is downgraded to application/x-protobuf and upgraded back
 // to gRPC.
-TEST_F(GrpcShimTest, GrpcRequest) {
+TEST_F(ReverseBridgeTest, GrpcRequest) {
   initialize();
   decoder_callbacks_.is_grpc_request_ = true;
 
@@ -249,8 +249,8 @@ TEST_F(GrpcShimTest, GrpcRequest) {
 
 // Tests that a gRPC is downgraded to application/x-protobuf and upgraded back
 // to gRPC and that content length headers are not required.
-// Same as GrpcShimTest.GrpcRequest except no content-length header is passed.
-TEST_F(GrpcShimTest, GrpcRequestNoContentLength) {
+// Same as ReverseBridgeTest.GrpcRequest except no content-length header is passed.
+TEST_F(ReverseBridgeTest, GrpcRequestNoContentLength) {
   initialize();
   decoder_callbacks_.is_grpc_request_ = true;
 
@@ -329,7 +329,7 @@ TEST_F(GrpcShimTest, GrpcRequestNoContentLength) {
 // Tests that a gRPC is downgraded to application/x-protobuf and upgraded back
 // to gRPC, and that the upstream 400 is converted into an internal (13)
 // grpc-status.
-TEST_F(GrpcShimTest, GrpcRequestInternalError) {
+TEST_F(ReverseBridgeTest, GrpcRequestInternalError) {
   initialize();
   decoder_callbacks_.is_grpc_request_ = true;
 
@@ -402,7 +402,7 @@ TEST_F(GrpcShimTest, GrpcRequestInternalError) {
 
 // Tests that a gRPC is downgraded to application/x-protobuf and that if the response
 // has an invalid content type we respond with a useful error message.
-TEST_F(GrpcShimTest, GrpcRequestBadResponse) {
+TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
   initialize();
   decoder_callbacks_.is_grpc_request_ = true;
 
@@ -440,10 +440,10 @@ TEST_F(GrpcShimTest, GrpcRequestBadResponse) {
   EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Status, "200"));
   EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
   EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcMessage,
-                                     "envoy grpc-shim: upstream responded with unsupported "
+                                     "envoy reverse bridge: upstream responded with unsupported "
                                      "content-type application/json, status code 400"));
 }
-} // namespace GrpcShim
+} // namespace GrpcHttp1ReverseBridge
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

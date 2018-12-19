@@ -1,4 +1,4 @@
-#include "extensions/filters/http/grpc_shim/grpc_shim.h"
+#include "extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 
 #include <netinet/in.h>
 
@@ -18,7 +18,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace GrpcShim {
+namespace GrpcHttp1ReverseBridge {
 
 namespace {
 Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::HeaderMap& headers) {
@@ -46,7 +46,7 @@ void adjustContentLength(Http::HeaderMap& headers,
 }
 } // namespace
 
-Http::FilterHeadersStatus GrpcShim::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   // Short circuit if header only.
   if (end_stream) {
     return Http::FilterHeadersStatus::Continue;
@@ -79,7 +79,7 @@ Http::FilterHeadersStatus GrpcShim::decodeHeaders(Http::HeaderMap& headers, bool
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterDataStatus GrpcShim::decodeData(Buffer::Instance& buffer, bool) {
+Http::FilterDataStatus Filter::decodeData(Buffer::Instance& buffer, bool) {
   if (enabled_ && withhold_grpc_frames_ && !prefix_stripped_) {
     // Fail the request if the body is too small to possibly contain a gRPC frame.
     if (buffer.length() < Grpc::GRPC_FRAME_HEADER_SIZE) {
@@ -96,16 +96,17 @@ Http::FilterDataStatus GrpcShim::decodeData(Buffer::Instance& buffer, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterHeadersStatus GrpcShim::encodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) {
   if (enabled_) {
     auto content_type = headers.ContentType();
 
     // If the response from upstream does not have the correct content-type,
     // perform an early return with a useful error message in grpc-message.
     if (content_type->value().getStringView() != upstream_content_type_) {
-      const auto grpc_message = fmt::format(
-          "envoy grpc-shim: upstream responded with unsupported content-type {}, status code {}",
-          content_type->value().getStringView(), headers.Status()->value().getStringView());
+      const auto grpc_message = fmt::format("envoy reverse bridge: upstream responded with "
+                                            "unsupported content-type {}, status code {}",
+                                            content_type->value().getStringView(),
+                                            headers.Status()->value().getStringView());
 
       headers.insertGrpcMessage().value(grpc_message);
       headers.insertGrpcStatus().value(Envoy::Grpc::Status::GrpcStatus::Unknown);
@@ -131,7 +132,7 @@ Http::FilterHeadersStatus GrpcShim::encodeHeaders(Http::HeaderMap& headers, bool
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterDataStatus GrpcShim::encodeData(Buffer::Instance& buffer, bool end_stream) {
+Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_stream) {
   if (!enabled_) {
     return Http::FilterDataStatus::Continue;
   }
@@ -176,7 +177,7 @@ Http::FilterDataStatus GrpcShim::encodeData(Buffer::Instance& buffer, bool end_s
   }
 }
 
-} // namespace GrpcShim
+} // namespace GrpcHttp1ReverseBridge
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
