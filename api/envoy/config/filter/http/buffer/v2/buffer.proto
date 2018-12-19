@@ -20,13 +20,8 @@ message Buffer {
   // The maximum number of seconds that the filter will wait for a complete
   // request before returning a 408 response.
   // This is deprecated in favour of http conn manager request timeouts.
-  google.protobuf.Duration max_request_time = 2 [
-    deprecated = true,
-    (validate.rules).duration = {
-      gt: {}
-    },
-    (gogoproto.stdduration) = true
-  ];
+  google.protobuf.Duration max_request_time = 2
+      [deprecated = true, (validate.rules).duration = {gt: {}}, (gogoproto.stdduration) = true];
 }
 
 message BufferPerRoute {
