@@ -47,8 +47,8 @@ public:
 class EnvoyGoogleAsyncClientImplTest : public testing::Test {
 public:
   EnvoyGoogleAsyncClientImplTest()
-      : dispatcher_(test_time_.timeSystem()), stats_store_(new Stats::IsolatedStoreImpl),
-        api_(Api::createApiForTest(*stats_store_)), scope_(stats_store_),
+      : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest(*stats_store_)),
+        dispatcher_(test_time_.timeSystem(), *api_), scope_(stats_store_),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     envoy::api::v2::core::GrpcService config;
     auto* google_grpc = config.mutable_google_grpc();
@@ -60,9 +60,9 @@ public:
   }
 
   DangerousDeprecatedTestTime test_time_;
-  Event::DispatcherImpl dispatcher_;
   Stats::IsolatedStoreImpl* stats_store_; // Ownership transerred to scope_.
   Api::ApiPtr api_;
+  Event::DispatcherImpl dispatcher_;
   Stats::ScopeSharedPtr scope_;
   std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
   MockStubFactory stub_factory_;
