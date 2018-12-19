@@ -183,6 +183,7 @@ if __name__ == "__main__":
   errors += checkUnfixableError("condvar_wait_for.cc", real_time_inject_error)
   errors += checkUnfixableError("sleep.cc", real_time_inject_error)
   errors += checkUnfixableError("std_atomic_free_functions.cc", "std::atomic_*")
+  errors += checkUnfixableError("std_get_time.cc", "std::get_time")
   errors += checkUnfixableError("no_namespace_envoy.cc",
                                 "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
   errors += checkUnfixableError("proto.BUILD", "unexpected direct external dependency on protobuf")

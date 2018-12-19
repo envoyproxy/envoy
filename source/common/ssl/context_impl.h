@@ -169,6 +169,7 @@ public:
 
 private:
   int newSessionKey(SSL_SESSION* session);
+  uint16_t parseSigningAlgorithmsForTest(const std::string& sigalgs);
 
   const std::string server_name_indication_;
   const bool allow_renegotiation_;

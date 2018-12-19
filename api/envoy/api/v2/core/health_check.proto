@@ -146,6 +146,11 @@ message HealthCheck {
     // message. See `gRPC health-checking overview
     // <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`_ for more information.
     string service_name = 1;
+
+    // The value of the :authority header in the gRPC health check request. If
+    // left empty (default value), the name of the cluster this health check is associated
+    // with will be used.
+    string authority = 2;
   }
 
   // Custom health check.

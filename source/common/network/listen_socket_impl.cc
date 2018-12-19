@@ -38,10 +38,13 @@ void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsShar
   }
 }
 
-void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& options) {
+void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& options,
+                                   bool bind_to_port) {
   setListenSocketOptions(options);
 
-  doBind();
+  if (bind_to_port) {
+    doBind();
+  }
 }
 
 template <>

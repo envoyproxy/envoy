@@ -110,10 +110,10 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
 
 Network::ListenerPtr
 DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbacks& cb,
-                               bool hand_off_restored_destination_connections) {
+                               bool bind_to_port, bool hand_off_restored_destination_connections) {
   ASSERT(isThreadSafe());
-  return Network::ListenerPtr{
-      new Network::ListenerImpl(*this, socket, cb, hand_off_restored_destination_connections)};
+  return Network::ListenerPtr{new Network::ListenerImpl(*this, socket, cb, bind_to_port,
+                                                        hand_off_restored_destination_connections)};
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
