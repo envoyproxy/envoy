@@ -331,21 +331,17 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
     ASSERT_TRUE(
         fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests.back()));
   }
-  for (uint32_t i = 0; i < num_requests; ++i) {
-    if (i != 0) {
-      ASSERT_TRUE(upstream_requests[i]->waitForEndStream(*dispatcher_));
-      upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-      upstream_requests[i]->encodeData(100, false);
-    }
+  for (uint32_t i = 1; i < num_requests; ++i) {
+    ASSERT_TRUE(upstream_requests[i]->waitForEndStream(*dispatcher_));
+    upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+    upstream_requests[i]->encodeData(100, false);
   }
   // Close the connection.
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   // Ensure the streams are all reset successfully.
-  for (uint32_t i = 0; i < num_requests; ++i) {
-    if (i != 0) {
-      responses[i]->waitForReset();
-    }
+  for (uint32_t i = 1; i < num_requests; ++i) {
+    responses[i]->waitForReset();
   }
 }
 
