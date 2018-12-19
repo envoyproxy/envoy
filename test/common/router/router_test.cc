@@ -1925,6 +1925,48 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
+TEST_F(RouterTest, InternalRedirectRejectedOnSecondPass) {
+  enableRedirects();
+  default_request_headers_.insertEnvoyOriginalUrl().value(std::string("http://www.foo.com"));
+  sendRequest();
+
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+
+  Buffer::OwnedImpl data("1234567890");
+  response_decoder_->decodeData(data, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+}
+
+TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
+  enableRedirects();
+  sendRequest();
+
+  redirect_headers_->insertLocation().value(std::string(""));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+
+  Buffer::OwnedImpl data("1234567890");
+  response_decoder_->decodeData(data, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+}
+
+TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
+  enableRedirects();
+  sendRequest();
+
+  redirect_headers_->insertLocation().value(std::string("h"));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+
+  Buffer::OwnedImpl data("1234567890");
+  response_decoder_->decodeData(data, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+}
+
 TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
   enableRedirects();
 
@@ -1972,20 +2014,37 @@ TEST_F(RouterTest, InternalRedirectRejectedWithCrossSchemeRedirect) {
 
   sendRequest();
 
-  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
-  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
-  Buffer::OwnedImpl data("1234567890");
-  response_decoder_->decodeData(data, true);
+  redirect_headers_->insertLocation().value(std::string("https://www.foo.com"));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
 }
 
-TEST_F(RouterTest, InternalRedirectSucceeded) {
+TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
+  enableRedirects();
+  default_request_headers_.insertForwardedProto().value(std::string("http"));
+  sendRequest();
+
+  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  // In production, the HCM recreateStream would have called this.
+  router_.onDestroy();
+}
+
+TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
+  Ssl::MockConnection ssl_connection;
   enableRedirects();
 
   sendRequest();
 
+  redirect_headers_->insertLocation().value(std::string("https://www.foo.com"));
+  EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(&ssl_connection));
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);

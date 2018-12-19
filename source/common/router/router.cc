@@ -34,12 +34,12 @@ namespace {
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 
 bool schemeIsHttp(const Http::HeaderMap& downstream_headers,
-                  const Network::Connection* connection) {
+                  const Network::Connection& connection) {
   if (downstream_headers.ForwardedProto() && downstream_headers.ForwardedProto()->value().c_str() ==
                                                  Http::Headers::get().SchemeValues.Http) {
     return true;
   }
-  if (connection && !connection->ssl()) {
+  if (!connection.ssl()) {
     return true;
   }
   return false;
@@ -47,7 +47,7 @@ bool schemeIsHttp(const Http::HeaderMap& downstream_headers,
 
 bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_headers,
                                               const Http::HeaderEntry& internal_redirect,
-                                              const Network::Connection* connection) {
+                                              const Network::Connection& connection) {
   // Envoy does not currently support multiple rounds of redirects.
   if (downstream_headers.EnvoyOriginalUrl()) {
     return false;
@@ -62,10 +62,9 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
     return false;
   }
 
-  ASSERT(connection);
   bool scheme_is_http = schemeIsHttp(downstream_headers, connection);
   if (scheme_is_http && absolute_url.scheme() == Http::Headers::get().SchemeValues.Https) {
-    // Don't allow serving HTTP responses over TLS.
+    // Don't allow serving TLS responses over plaintext.
     return false;
   }
 
@@ -697,7 +696,7 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
     retry_state_.reset();
   }
 
-  if (response_code == 302 &&
+  if (static_cast<Http::Code>(response_code) == Http::Code::Found &&
       route_entry_->internalRedirectAction() == InternalRedirectAction::Handle &&
       setupRedirect(*headers)) {
     return;
@@ -855,7 +854,7 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers) {
       !callbacks_->decodingBuffer() && // Redirects woth body not yet supported.
       location != nullptr &&
       convertRequestHeadersForInternalRedirect(*downstream_headers_, *location,
-                                               callbacks_->connection()) &&
+                                               *callbacks_->connection()) &&
       callbacks_->recreateStream()) {
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return true;

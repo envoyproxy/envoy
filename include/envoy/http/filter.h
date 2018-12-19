@@ -331,7 +331,7 @@ public:
   // responsible for handling or terminating the original stream.
   //
   // This is currently limited to
-  //   - streams which are streams which are completely read
+  //   - streams which are completely read
   //   - streams which do not have a request body.
   //
   // Note that HttpConnectionManager sanitization will *not* be performed on the

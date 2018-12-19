@@ -140,6 +140,10 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // must be done after deleting the stream since the stream refers to the connection and must be
   // deleted first.
   bool reset_stream = false;
+  // If the response encoder is still associated with the stream, reset the stream. The exception
+  // here is when Envoy "ends" the stream by calling recreateStream at which point recreateStream
+  // explicitly nulls out response_encoder to avoid the downstream being notified of the
+  // Envoy-internal stream instance being ended.
   if (stream.response_encoder_ != nullptr &&
       (!stream.state_.remote_complete_ || !stream.state_.local_complete_)) {
     // Indicate local is complete at this point so that if we reset during a continuation, we don't
@@ -1727,7 +1731,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermark
 }
 
 bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
-  // Because the router's and the HCM view of if the stream has a body and if
+  // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check those values here.
   if (!complete() || parent_.stream_info_.bytesReceived() != 0) {
     return false;
