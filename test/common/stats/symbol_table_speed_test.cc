@@ -74,8 +74,10 @@ void symbolTableTest(benchmark::State& state) {
           access.wait();
 
           for (auto _ : state) {
-            StatNameStorage second(stat_name_string, table);
-            second.free(table);
+            for (int j = 0; j < 100; ++j) {
+              StatNameStorage second(stat_name_string, table);
+              second.free(table);
+            }
           }
           initial.free(table);
           accesses.DecrementCount();
