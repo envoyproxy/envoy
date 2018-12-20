@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/pure.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
