@@ -15,7 +15,6 @@ Version history
 * circuit-breaker: added cx_open, rq_pending_open, rq_open and rq_retry_open gauges to expose live
   state via :ref:`circuit breakers statistics <config_cluster_manager_cluster_stats_circuit_breakers>`.
 * cluster: set a default of 1s for :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>`.
-* config: removed deprecated_v1 bind_to_port option.
 * config: removed support for the v1 API.
 * config: added support for :ref:`rate limiting<envoy_api_msg_core.RateLimitSettings>` discovery request calls.
 * cors: added :ref: `invalid/valid stats <cors-statistics>` to filter.
@@ -70,17 +69,23 @@ Version history
 * router: added support for not retrying :ref:`rate limited requests<config_http_filters_router_x-envoy-ratelimited>`. Rate limit filter now sets the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>`
   header so the rate limited requests that may have been retried earlier will not be retried with this change.
 * router: added support for enabling upgrades on a :ref:`per-route <envoy_api_field_route.RouteAction.upgrade_configs>` basis.
+* router: support configuring a default fraction of mirror traffic via
+  :ref:`runtime_fraction <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_key>`.
 * sandbox: added :ref:`cors sandbox <install_sandboxes_cors>`.
+* server: added `SIGINT` (Ctrl-C) handler to gracefully shutdown Envoy like `SIGTERM`.
 * stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
 * stream: renamed `perRequestState` to `filterState` in `StreamInfo`.
 * stream: added `downstreamDirectRemoteAddress` to `StreamInfo`.
 * thrift_proxy: introduced thrift rate limiter filter
-* tls: added ssl.versions.<version> to :ref:`listener metrics <config_listener_stats>` to track TLS versions in use.
+* tls: added ssl.curves.<curve>, ssl.sigalgs.<sigalg> and ssl.versions.<version> to
+  :ref:`listener metrics <config_listener_stats>` to track TLS algorithms and versions in use.
 * tls: added support for :ref:`client-side session resumption <envoy_api_field_auth.UpstreamTlsContext.max_session_keys>`.
 * tls: added support for CRLs in :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
+* tls: added support for :ref:`multiple server TLS certificates <arch_overview_ssl_cert_select>`.
 * tls: added support for :ref:`password encrypted private keys <envoy_api_field_auth.TlsCertificate.password>`.
+* tls: added the ability to build :ref:`BoringSSL FIPS <arch_overview_ssl_fips>` using ``--define boringssl=fips`` Bazel option.
 * tls: removed support for ECDSA certificates with curves other than P-256.
 * tls: removed support for RSA certificates with keys smaller than 2048-bits.
 * tracing: added support to the Zipkin tracer for the :ref:`b3 <config_http_conn_man_headers_b3>` single header format.

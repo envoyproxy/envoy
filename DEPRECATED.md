@@ -13,6 +13,9 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * Use of the v1 REST_LEGACY ApiConfigSource is deprecated.
 * Use of std::hash in the ring hash load balancer is deprecated.
 * Use of `rate_limit_service` configuration in the [bootstrap configuration](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/bootstrap/v2/bootstrap.proto) is deprecated.
+* Use of `runtime_key` in `RequestMirrorPolicy`, found in
+  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto)
+  is deprecated. Set the `runtime_fraction` field instead.
 
 ## Version 1.8.0 (Oct 4, 2018)
 
