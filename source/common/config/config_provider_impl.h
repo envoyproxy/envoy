@@ -71,8 +71,6 @@ class ConfigProviderManagerImplBase;
  */
 class StaticConfigProviderImplBase : public ConfigProvider {
 public:
-  StaticConfigProviderImplBase() = delete;
-
   virtual ~StaticConfigProviderImplBase();
 
   // Envoy::Config::ConfigProvider
@@ -112,8 +110,6 @@ public:
     uint64_t last_config_hash_;
     std::string last_config_version_;
   };
-
-  ConfigSubscriptionInstanceBase() = delete;
 
   virtual ~ConfigSubscriptionInstanceBase();
 
@@ -224,8 +220,6 @@ using ConfigSubscriptionInstanceBaseSharedPtr = std::shared_ptr<ConfigSubscripti
  */
 class DynamicConfigProviderImplBase : public ConfigProvider {
 public:
-  DynamicConfigProviderImplBase() = delete;
-
   virtual ~DynamicConfigProviderImplBase() { subscription_->unbindConfigProvider(this); }
 
   // Envoy::Config::ConfigProvider
@@ -297,8 +291,6 @@ private:
  */
 class ConfigProviderManagerImplBase : public ConfigProviderManager, public Singleton::Instance {
 public:
-  ConfigProviderManagerImplBase() = delete;
-
   virtual ~ConfigProviderManagerImplBase() {}
 
   /**
