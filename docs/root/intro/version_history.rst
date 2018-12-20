@@ -35,6 +35,7 @@ Version history
   value to override the default HTTP to gRPC status mapping.
 * http: no longer close the TCP connection when a HTTP/1 request is retried due
   to a response with empty body.
+* http: added support for more gRPC content-type headers in :ref:`gRPC bridge filter <config_http_filters_grpc_bridge>`, like application/grpc+proto.
 * listeners: all listener filters are now governed by the :ref:`listener_filters_timeout
   <envoy_api_field_Listener.listener_filters_timeout>` setting. The hard coded 15s timeout in
   the :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` is superseded by
