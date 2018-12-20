@@ -249,7 +249,7 @@ public:
     const auto sign_extension_bits =
         std::is_signed<T>::value && Size < sizeof(T) && bytes[most_significant_read_byte] < 0
             ? static_cast<T>(static_cast<typename std::make_unsigned<T>::type>(all_bits_enabled)
-                             << (Size * CHAR_BIT))
+                             << ((Size % sizeof(T)) * CHAR_BIT))
             : static_cast<T>(0);
 
     return fromEndianness<Endianness>(static_cast<T>(result)) | sign_extension_bits;
