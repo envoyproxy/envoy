@@ -238,7 +238,8 @@ private:
    * @param sv the individual string to be encoded as a symbol.
    * @return Symbol the encoded string.
    */
-  Symbol toSymbol(absl::string_view sv);
+  bool toSymbolReadLockHeld(absl::string_view sv, Symbol& symbol) SHARED_LOCKS_REQUIRED(lock_);
+  Symbol toSymbolWriteLockHeld(absl::string_view sv) EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   /**
    * Convenience function for decode(), decoding one symbol at a time.

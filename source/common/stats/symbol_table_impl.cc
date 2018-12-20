@@ -131,9 +131,42 @@ SymbolEncoding SymbolTable::encode(const absl::string_view name) {
   std::vector<absl::string_view> tokens = absl::StrSplit(name, '.');
   std::vector<Symbol> symbols;
   symbols.reserve(tokens.size());
+  const size_t nsymbols = tokens.size();
+  size_t write_index = nsymbols;
 
-  for (absl::string_view token : tokens) {
-    symbols.push_back(toSymbol(token));
+  {
+    absl::ReaderMutexLock lock(&lock_);
+    Symbol symbol;
+    for (size_t i = 0; i < nsymbols; ++i) {
+      if (toSymbolReadLockHeld(tokens[i], symbol)) {
+        symbols.push_back(symbol);
+      } else {
+        write_index = i;
+        break;
+      }
+    }
+  }
+
+  if (write_index != nsymbols) {
+    // If the find() under read-lock failed, we need to release it and take a
+    // write-lock. Note that another thread may race to insert the symbol during
+    // this window of time with the lock released, so we need to check again
+    // under write-lock, which we do by proactively allocating the string and
+    // attempting to insert it into the encode_map. If that worked, we also
+    // write the decode-map, transferring the ownership of the string to the
+    // decode-map value.
+
+    // TODO(jmarantz): we could use __builtin_expect here to avoid any production
+    // overhead in clang and g++ but should incorporate that into some portability
+    // macros in a separate PR.
+    if (write_lock_test_hook_ != nullptr) {
+      write_lock_test_hook_();
+    }
+
+    absl::MutexLock lock(&lock_);
+    for (size_t i = write_index, n = tokens.size(); i < n; ++i) {
+      symbols.push_back(toSymbolWriteLockHeld(tokens[i]));
+    }
   }
 
   // Now efficiently encode the array of 32-bit symbols into a uint8_t array.
@@ -180,57 +213,71 @@ void SymbolTable::free(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolStorage.
   SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
-  absl::MutexLock lock(&lock_); // Takes write-lock as we may mutate decode_map_ and encode_map_.
-  for (Symbol symbol : symbols) {
-    auto decode_search = decode_map_.find(symbol);
-    ASSERT(decode_search != decode_map_.end());
+  // First just take a read-lock. If none of the symbols needs to be freed
+  // we don't need an exclusive-lock.
+  const size_t nsymbols = symbols.size();
+  size_t write_index = nsymbols;
+  {
+    absl::ReaderMutexLock lock(&lock_);
+    for (size_t i = 0; i < nsymbols; ++i) {
+      auto decode_search = decode_map_.find(symbols[i]);
+      ASSERT(decode_search != decode_map_.end());
 
-    auto encode_search = encode_map_.find(decode_search->second.get());
-    ASSERT(encode_search != encode_map_.end());
+      auto encode_search = encode_map_.find(decode_search->second.get());
+      ASSERT(encode_search != encode_map_.end());
 
-    --encode_search->second->ref_count_;
+      // The atomic pre-decrement and compare to zero is critical here. If we
+      // decrement first and then test, multiple threads might concurrently
+      // conclude they held the last reference to the symbol, resulting in
+      // a double-free.
+      if (--encode_search->second->ref_count_ == 0) {
+        // We hold only a read-lock, so we can't mutate the map. Instead
+        // we'll do another pass below with a write-lock. First, we
+        // re-increment ref_count_ here, so that our behavior is correct
+        // if another thread adds a reference to the symbol in between
+        // our release of the read-lock and acquisition of the write-lock.
+        ++encode_search->second->ref_count_;
+        write_index = i;
+        break;
+      }
+    }
+  }
 
-    // If that was the last remaining client usage of the symbol, erase the the current
-    // mappings and add the now-unused symbol to the reuse pool.
-    if (encode_search->second->ref_count_ == 0) {
-      decode_map_.erase(decode_search);
-      encode_map_.erase(encode_search);
-      pool_.push(symbol);
+  if (write_index != nsymbols) {
+    absl::MutexLock lock(&lock_);
+    for (size_t i = write_index; i < nsymbols; ++i) {
+      Symbol symbol = symbols[i];
+      auto decode_search = decode_map_.find(symbol);
+      ASSERT(decode_search != decode_map_.end());
+
+      auto encode_search = encode_map_.find(decode_search->second.get());
+      ASSERT(encode_search != encode_map_.end());
+
+      if (--encode_search->second->ref_count_ == 0) {
+        decode_map_.erase(decode_search);
+        encode_map_.erase(encode_search);
+        pool_.push(symbol);
+      }
     }
   }
 }
 
-Symbol SymbolTable::toSymbol(absl::string_view sv) {
-  {
-    // First try to find the symbol with just a read-lock, so concurrent
-    // lookups for an already-allocated symbol do not contend.
-    absl::ReaderMutexLock lock(&lock_);
-    auto encode_find = encode_map_.find(sv);
-    if (encode_find != encode_map_.end()) {
-      // Increment the refcount of the already existing symbol. Note that the
-      // ref_count_ is atomic to allow incrementing it under read-lock.
-      SharedSymbol& shared_symbol = *encode_find->second;
-      ++(shared_symbol.ref_count_);
-      return shared_symbol.symbol_;
-    }
+bool SymbolTable::toSymbolReadLockHeld(absl::string_view sv, Symbol& symbol) {
+  // First try to find the symbol with just a read-lock, so concurrent
+  // lookups for an already-allocated symbol do not contend.
+  auto encode_find = encode_map_.find(sv);
+  if (encode_find == encode_map_.end()) {
+    return false;
   }
+  // Increment the refcount of the already existing symbol. Note that the
+  // ref_count_ is atomic to allow incrementing it under read-lock.
+  SharedSymbol& shared_symbol = *encode_find->second;
+  ++(shared_symbol.ref_count_);
+  symbol = shared_symbol.symbol_;
+  return true;
+}
 
-  // TODO(jmarantz): we could use __builtin_expect here to avoid any production
-  // overhead in clang and g++ but should incorporate that into some portability
-  // macros in a separate PR.
-  if (write_lock_test_hook_ != nullptr) {
-    write_lock_test_hook_();
-  }
-
-  // If the find() under read-lock failed, we need to release it and take a
-  // write-lock. Note that another thread may race to insert the symbol during
-  // this window of time with the lock released, so we need to check again
-  // under write-lock, which we do by proactively allocating the string and
-  // attempting to insert it into the encode_map. If that worked, we also
-  // write the decode-map, transferring the ownership of the string to the
-  // decode-map value.
-  absl::MutexLock lock(&lock_);
-
+Symbol SymbolTable::toSymbolWriteLockHeld(absl::string_view sv) {
   // If the string segment doesn't already exist, create the actual string as a
   // nul-terminated char-array and insert into encode_map_, and then insert a
   // string_view pointing to it in the encode_map_. This allows us to only store
