@@ -110,6 +110,28 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2NormalResponse) {
                      .value());
 }
 
+TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2ContentTypeGrpcPlusProto) {
+  protocol_ = Http::Protocol::Http2;
+
+  Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc+proto"},
+                                          {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  Http::TestHeaderMapImpl response_trailers{{"grpc-status", "0"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.success")
+                     .value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
+                     .value());
+}
+
 TEST_F(GrpcHttp1BridgeFilterTest, NotHandlingHttp2) {
   protocol_ = Http::Protocol::Http2;
 
