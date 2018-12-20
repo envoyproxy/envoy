@@ -251,7 +251,7 @@ void HostSetImpl::rebuildLocalityScheduler(
   // could just update locality_weight_ without rebuilding. Similar to how host
   // level WRR works, we would age out the existing entries via picks and lazily
   // apply the new weights.
-  locality_scheduler_ = nullptr;
+  locality_scheduler = nullptr;
   if (hosts_per_locality_ != nullptr && locality_weights_ != nullptr &&
       !locality_weights_->empty() && !hosts.empty()) {
     locality_scheduler = std::make_unique<EdfScheduler<LocalityEntry>>();
