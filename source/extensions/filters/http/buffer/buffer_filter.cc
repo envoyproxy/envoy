@@ -35,7 +35,7 @@ BufferFilterSettings::BufferFilterSettings(
               : 0),
       max_request_time_(std::chrono::seconds(
           proto_config.has_buffer()
-              ? PROTOBUF_GET_SECONDS_REQUIRED(proto_config.buffer(), max_request_time)
+              ? DurationUtil::durationToSeconds(proto_config.buffer().max_request_time())
               : 0)) {}
 
 BufferFilterConfig::BufferFilterConfig(
@@ -82,7 +82,9 @@ Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap&, bool end
 
   callbacks_->setDecoderBufferLimit(settings_->maxRequestBytes());
   request_timeout_ = callbacks_->dispatcher().createTimer([this]() -> void { onRequestTimeout(); });
-  request_timeout_->enableTimer(settings_->maxRequestTime());
+  if (settings_->maxRequestTime().count() != 0) {
+    request_timeout_->enableTimer(settings_->maxRequestTime());
+  }
 
   return Http::FilterHeadersStatus::StopIteration;
 }
