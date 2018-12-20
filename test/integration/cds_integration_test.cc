@@ -53,34 +53,12 @@ static_resources:
       socket_address:
         address: 127.0.0.1
         port_value: 0
-  listeners:
-  - name: http
-    address:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
-    filter_chains:
-      filters:
-        name: envoy.http_connection_manager
-        config:
-          stat_prefix: config_test
-          http_filters:
-            name: envoy.router
-          codec_type: HTTP2
-          route_config:
-            virtual_hosts:
-              name: integration
-              routes:
-              - route:
-                  cluster: my_cds_cluster
-                match:
-                  prefix: "/"
-              domains: "*"
-            name: route_config_0
 )EOF";
+const std::string kClusterName = "cluster_0";
 
 class CdsIntegrationTest : public XdsIntegrationTestBase,
-                           public Grpc::GrpcClientIntegrationParamTest {
+                           public Grpc::GrpcClientIntegrationParamTest,
+                           public Envoy::Upstream::ClusterUpdateCallbacks {
 public:
   CdsIntegrationTest()
       : XdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, ipVersion(), kConfig) {}
@@ -114,7 +92,38 @@ public:
       http2_protocol_options: {{}}
     )EOF",
                     name, name, Network::Test::getLoopbackAddressString(ipVersion()),
-                    fake_upstreams_[1]->localAddress()->ip()->port()));
+                    // fake_upstreams_[1] is the CDS server, [0] is the regular upstream.
+                    fake_upstreams_[0]->localAddress()->ip()->port()));
+  }
+
+  envoy::api::v2::Listener buildListener(const std::string& name, const std::string& cluster) {
+    return TestUtility::parseYaml<envoy::api::v2::Listener>(fmt::format(
+        R"EOF(
+      name: {}
+      address:
+        socket_address:
+          address: {}
+          port_value: 0
+      filter_chains:
+        filters:
+          name: envoy.http_connection_manager
+          config:
+            stat_prefix: config_test
+            http_filters:
+              name: envoy.router
+            codec_type: HTTP2
+            route_config:
+              virtual_hosts:
+                name: integration
+                routes:
+                - route:
+                    cluster: {}
+                  match:
+                    prefix: "/"
+                domains: "*"
+              name: route_config_0
+    )EOF",
+        name, Network::Test::getLoopbackAddressString(ipVersion()), cluster));
   }
 
   // Overridden to insert this stuff into the initialize() at the very beginning of
@@ -134,31 +143,79 @@ public:
     // 3) It creates and starts an IntegrationTestServer - the thing that wraps the almost-actual
     //    Envoy used in the tests.
     // 4) Bringing up the server usually entails waiting to ensure that any listeners specified in
-    //    the bootstrap config have come up. However, you might need to defer that to later, which
-    //    this test does (using defer_listener_wait_ and waitUntilListenersReady()).
-    // 5) It registers those listeners' names+ports in a port map, to be retrieved by lookupPort().
-    defer_listener_wait_ = true;
+    //    the bootstrap config have come up, and registering them in a port map (see lookupPort()).
+    //    However, this test needs to defer all of that to later.
     XdsIntegrationTestBase::initialize();
 
     // Create the regular (i.e. not an xDS server) upstream. We create it manually here after
     // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
     // cluster in the bootstrap config - which we don't want since we're testing dynamic CDS!
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
+    // HACK: In order to use the HttpIntegrationTest cases unmodified,
+    //       HttpIntegrationTest::waitForNextUpstreamRequest() needs to find the regular upstream
+    //       in the 0th position.
+    fake_upstreams_.push_back(std::move(fake_upstreams_[0]));
+    fake_upstreams_[0] = std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP2,
+                                                        version_, timeSystem(), enable_half_close_);
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
-    // Causes xds_connection_ to be filled with a newly constructed FakeHttpConnection.
-    AssertionResult result =
-        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
+    // These ClusterManager update callbacks are involved in spooky thread-local storage stuff, and
+    // therefore their installation must be scheduled by post() for some reason.
+    Upstream::ClusterUpdateCallbacksHandlePtr cb_handle;
+    ConditionalInitializer cb_added;
+    test_server_->server().dispatcher().post([this, &cb_added, &cb_handle]() -> void {
+      // Prepare to be notified by the cluster manager that it processed our upcoming CDS response.
+      cb_handle =
+          test_server_->server().clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
+      cb_added.setReady();
+    });
+    cb_added.waitReady();
+
+    // Now that the upstream has been created, process Envoy's request to discover it.
+    AssertionResult result = // xds_connection_ is filled with the new FakeHttpConnection.
+        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, xds_connection_);
     RELEASE_ASSERT(result, result.message());
     result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result, result.message());
     xds_stream_->startGrpcStream();
-
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
     sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
-                                                   {buildCluster("cluster_0")}, "1");
+                                                   {buildCluster(kClusterName)}, "1");
+
+    // We can continue the test once we're sure that Envoy's ClusterManager has made use of
+    // the DiscoveryResponse describing cluster_0 that we sent.
+    cluster_added_by_cm_.waitReady();
+
+    // Manually create a listener, add it to the cluster manager, register its port in the
+    // test framework's downstream listener port map, and finally wait for it to start listening.
+    //
+    // Why do all of this manually? Because it's unworkable to specify this listener statically in
+    // the bootstrap config. Its route is meant to point to the regular data upstream. To specificy
+    // that route statically, the regular upstream (cluster_0) would have to be specified
+    // statically - but the whole point of this test is to have Envoy dynamically discover it!
+    ConditionalInitializer listener_added_by_worker;
+    ConditionalInitializer listener_added_by_manager;
+    test_server_->setOnWorkerListenerAddedCb(
+        [&listener_added_by_worker]() -> void { listener_added_by_worker.setReady(); });
+    test_server_->server().dispatcher().post([this, &listener_added_by_manager]() -> void {
+      EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(
+          buildListener("http", kClusterName), "", true));
+      listener_added_by_manager.setReady();
+    });
+    listener_added_by_worker.waitReady();
+    listener_added_by_manager.waitReady();
+
+    registerTestServerPorts({"http"});
     test_server_->waitUntilListenersReady();
   }
+
+  // Upstream::ClusterUpdateCallbacks
+  void onClusterAddOrUpdate(Envoy::Upstream::ThreadLocalCluster& cluster) override {
+    if (cluster.info()->name() == kClusterName) {
+      cluster_added_by_cm_.setReady();
+    }
+  }
+  void onClusterRemoval(const std::string&) override {}
+  ConditionalInitializer cluster_added_by_cm_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
