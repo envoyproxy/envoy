@@ -5,7 +5,7 @@ option go_package = "v2";
 
 import "validate/validate.proto";
 
-// [#protodoc-title: Extensions gRPC Shim]
+// [#protodoc-title: Extensions gRPC Http1 Reverse Bridge]
 // gRPC reverse bridge filter configuration
 message FilterConfig {
   // The content-type to pass to the upstream when the gRPC shim filter is applied.

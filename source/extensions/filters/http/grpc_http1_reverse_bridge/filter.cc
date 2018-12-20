@@ -149,12 +149,9 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
       std::array<uint8_t, Grpc::GRPC_FRAME_HEADER_SIZE> frame;
       Grpc::Encoder().newFrame(Grpc::GRPC_FH_DEFAULT, length, frame);
 
-      Buffer::OwnedImpl prefix_buffer;
-      prefix_buffer.add(frame.data(), frame.size());
-      prefix_buffer.move(buffer_);
-      prefix_buffer.move(buffer);
-
-      buffer.move(prefix_buffer);
+      buffer.prepend(buffer_);
+      Buffer::OwnedImpl frame_buffer(frame.data(), frame.size());
+      buffer.prepend(frame_buffer);
     }
 
     return Http::FilterDataStatus::Continue;
