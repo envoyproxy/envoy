@@ -180,6 +180,7 @@ public:
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
     sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                    {buildCluster(kClusterName)}, "1");
+    fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
 
     // We can continue the test once we're sure that Envoy's ClusterManager has made use of
     // the DiscoveryResponse describing cluster_0 that we sent.
