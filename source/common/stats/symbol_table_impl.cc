@@ -183,51 +183,20 @@ void SymbolTable::free(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolStorage.
   SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
-  // First just take a read-lock. If none of the symbols needs to be freed
-  // we don't need an exclusive-lock.
-  const size_t nsymbols = symbols.size();
-  size_t write_index = nsymbols;
-  {
-    Thread::LockGuard lock(lock_);
-    for (size_t i = 0; i < nsymbols; ++i) {
-      auto decode_search = decode_map_.find(symbols[i]);
-      ASSERT(decode_search != decode_map_.end());
+  Thread::LockGuard lock(lock_);
+  for (Symbol symbol : symbols) {
+    auto decode_search = decode_map_.find(symbol);
+    ASSERT(decode_search != decode_map_.end());
 
-      auto encode_search = encode_map_.find(decode_search->second.get());
-      ASSERT(encode_search != encode_map_.end());
+    auto encode_search = encode_map_.find(decode_search->second.get());
+    ASSERT(encode_search != encode_map_.end());
 
-      // The atomic pre-decrement and compare to zero is critical here. If we
-      // decrement first and then test, multiple threads might concurrently
-      // conclude they held the last reference to the symbol, resulting in
-      // a double-free.
-      if (--encode_search->second->ref_count_ == 0) {
-        // We hold only a read-lock, so we can't mutate the map. Instead
-        // we'll do another pass below with a write-lock. First, we
-        // re-increment ref_count_ here, so that our behavior is correct
-        // if another thread adds a reference to the symbol in between
-        // our release of the read-lock and acquisition of the write-lock.
-        ++encode_search->second->ref_count_;
-        write_index = i;
-        break;
-      }
-    }
-  }
-
-  if (write_index != nsymbols) {
-    Thread::LockGuard lock(lock_);
-    for (size_t i = write_index; i < nsymbols; ++i) {
-      Symbol symbol = symbols[i];
-      auto decode_search = decode_map_.find(symbol);
-      ASSERT(decode_search != decode_map_.end());
-
-      auto encode_search = encode_map_.find(decode_search->second.get());
-      ASSERT(encode_search != encode_map_.end());
-
-      if (--encode_search->second->ref_count_ == 0) {
-        decode_map_.erase(decode_search);
-        encode_map_.erase(encode_search);
-        pool_.push(symbol);
-      }
+    SharedSymbol& shared_symbol = *encode_search->second;
+    --shared_symbol.ref_count_;
+    if (shared_symbol.ref_count_ == 0) {
+      decode_map_.erase(decode_search);
+      encode_map_.erase(encode_search);
+      pool_.push(symbol);
     }
   }
 }
@@ -251,9 +220,8 @@ Symbol SymbolTable::toSymbol(absl::string_view sv) {
     ASSERT(decode_insert.second);
     newSymbol();
   } else {
-    // If the insertion didn't take place -- due to another thread racing to
-    // insert the same symbmol after we drop the read-lock above -- we can
-    // return the shared symbol, but we must bump the refcount.
+    // If the insertion didn't take place, return the actual value at that location and up the
+    // refcount at that location
     ++(shared_symbol.ref_count_);
   }
   return shared_symbol.symbol_;

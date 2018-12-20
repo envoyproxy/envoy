@@ -225,7 +225,7 @@ private:
     SharedSymbol(Symbol symbol) : symbol_(symbol), ref_count_(1) {}
 
     Symbol symbol_;
-    std::atomic<uint32_t> ref_count_;
+    uint32_t ref_count_;
   };
 
   // This must be called during both encode() and free().
