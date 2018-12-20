@@ -253,6 +253,13 @@ void ConditionalInitializer::waitReady() {
   ready_ = false;
 }
 
+void ConditionalInitializer::wait() {
+  Thread::LockGuard lock(mutex_);
+  while (!ready_) {
+    cv_.wait(mutex_);
+  }
+}
+
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
 ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
 

@@ -191,9 +191,13 @@ void SymbolTable::free(const StatName& stat_name) {
     auto encode_search = encode_map_.find(*decode_search->second);
     ASSERT(encode_search != encode_map_.end());
 
-    SharedSymbol& shared_symbol = encode_search->second;
-    --shared_symbol.ref_count_;
-    if (shared_symbol.ref_count_ == 0) {
+    // If that was the last remaining client usage of the symbol, erase the the
+    // current mappings and add the now-unused symbol to the reuse pool.
+    //
+    // The "if (--EXPR.ref_count_)" pattern speeds up BM_CreateRace by 20% in
+    // symbol_table_speed_test.cc, relative to breaking out the decrement into a
+    // separate step, likely due to the non-trivial dereferences in EXPR.
+    if (--encode_search->second.ref_count_ == 0) {
       decode_map_.erase(decode_search);
       encode_map_.erase(encode_search);
       pool_.push(symbol);
@@ -206,10 +210,10 @@ Symbol SymbolTable::toSymbol(absl::string_view sv) {
   auto encode_find = encode_map_.find(sv);
   // If the string segment doesn't already exist,
   if (encode_find == encode_map_.end()) {
-    // If the string segment doesn't already exist, create the actual string as a
-    // nul-terminated char-array and insert into encode_map_, and then insert a
-    // string_view pointing to it in the encode_map_. This allows us to only store
-    // the string once.
+    // We create the actual string, place it in the decode_map_, and then insert
+    // a string_view pointing to it in the encode_map_. This allows us to only
+    // store the string once. We use unique_ptr so copies are not made as
+    // flat_hash_map moves values arond.
     auto str = std::make_unique<std::string>(std::string(sv));
     auto encode_insert = encode_map_.insert({*str, SharedSymbol(next_symbol_)});
     ASSERT(encode_insert.second);

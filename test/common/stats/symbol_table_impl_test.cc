@@ -316,42 +316,7 @@ TEST_F(StatNameTest, JoinAllEmpty) {
   EXPECT_EQ("", joiner.statName().toString(table_));
 }
 
-namespace {
-
-// This class functions like absl::Notification except the usage of SignalAll()
-// appears to trigger tighter simultaneous wakeups in multiple threads. Note
-// that the synchronization mechanism in
-//     https://github.com/abseil/abseil-cpp/blob/master/absl/synchronization/notification.h
-// has timing properties that do not seem to trigger the race condition in
-// SymbolTable::toSymbol() where the find() under read-lock fails, but by the
-// time the insert() under write-lock occurs, the symbol has been added by
-// another thread.
-class Notifier {
-public:
-  Notifier() : cond_(false) {}
-
-  void notify() {
-    absl::MutexLock lock(&mutex_);
-    cond_ = true;
-    cond_var_.SignalAll();
-  }
-
-  void wait() {
-    absl::MutexLock lock(&mutex_);
-    while (!cond_) {
-      cond_var_.Wait(&mutex_);
-    }
-  }
-
-private:
-  absl::Mutex mutex_;
-  bool cond_ GUARDED_BY(mutex_);
-  absl::CondVar cond_var_;
-};
-
-} // namespace
-
-TEST_F(StatNameTest, NoMutexContentionOnExistingSymbols) {
+TEST_F(StatNameTest, MutexContentionOnExistingSymbols) {
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   MutexTracerImpl& mutex_tracer = MutexTracerImpl::getOrCreateTracer();
 
@@ -360,7 +325,7 @@ TEST_F(StatNameTest, NoMutexContentionOnExistingSymbols) {
   constexpr int num_threads = 100;
   std::vector<Thread::ThreadPtr> threads;
   threads.reserve(num_threads);
-  Notifier creation, access, wait;
+  ConditionalInitializer creation, access, wait;
   absl::BlockingCounter creates(num_threads), accesses(num_threads);
   for (int i = 0; i < num_threads; ++i) {
     threads.push_back(
@@ -384,7 +349,7 @@ TEST_F(StatNameTest, NoMutexContentionOnExistingSymbols) {
           wait.wait();
         }));
   }
-  creation.notify();
+  creation.setReady();
   creates.Wait();
 
   int64_t create_contentions = mutex_tracer.numContentions();
@@ -392,11 +357,28 @@ TEST_F(StatNameTest, NoMutexContentionOnExistingSymbols) {
 
   // But when we access the already-existing symbols, we guarantee that no
   // further mutex contentions occur.
-  access.notify();
+  access.setReady();
   accesses.Wait();
-  // EXPECT_EQ(create_contentions, mutex_tracer.numContentions());
 
-  wait.notify();
+  // In a perfect world, we could use reader-locks in the SymbolTable
+  // implementation, and there should be zero additional contentions
+  // after latching 'create_contentions' above. And we can definitely
+  // have this world, but this slows down BM_CreateRace in
+  // symbol_table_speed_test.cc, even on a 72-core machine.
+  //
+  // Thus it is better to avoid symbol-table contention by refactoring
+  // all stat-creation code to symbolize all stat string elements at
+  // construction, as composition does not require a lock.
+  //
+  // See this commit
+  // https://github.com/envoyproxy/envoy/pull/5321/commits/ef712d0f5a11ff49831c1935e8a2ef8a0a935bc9
+  // for a working reader-lock implementation, which would pass this EXPECT:
+  //     EXPECT_EQ(create_contentions, mutex_tracer.numContentions());
+  //
+  // Note also that we cannot guarantee there *will* be contentions
+  // as a machine or OS is free to run all threads serially.
+
+  wait.setReady();
   for (auto& thread : threads) {
     thread->join();
   }
@@ -445,7 +427,7 @@ TEST(SymbolTableTest, Memory) {
                    "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0.");
   } else {
     EXPECT_LT(symbol_table_mem_used, string_mem_used / 4);
-    EXPECT_LT(symbol_table_mem_used, 1740000); // Dec 16, 2018: 1734552 bytes.
+    EXPECT_LT(symbol_table_mem_used, 1750000); // Dec 16, 2018: 1744280 bytes.
   }
 }
 

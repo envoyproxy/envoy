@@ -1,5 +1,7 @@
 // Note: this should be run with --compilation_mode=opt, and would benefit from a
 // quiescent system with disabled cstate power management.
+//
+// NOLINT(namespace-envoy)
 
 #include "common/common/logger.h"
 #include "common/common/thread.h"
@@ -10,54 +12,19 @@
 #include "absl/synchronization/blocking_counter.h"
 #include "testing/base/public/benchmark.h"
 
-namespace {
-
-// This class functions like absl::Notification except the usage of SignalAll()
-// appears to trigger tighter simultaneous wakeups in multiple threads. Note
-// that the synchronization mechanism in
-//     https://github.com/abseil/abseil-cpp/blob/master/absl/synchronization/notification.h
-// has timing properties that seem to resultl in fewer collisions.
-class Notifier {
-public:
-  Notifier() : cond_(false) {}
-
-  void notify() {
-    absl::MutexLock lock(&mutex_);
-    cond_ = true;
-    cond_var_.SignalAll();
-  }
-
-  void wait() {
-    absl::MutexLock lock(&mutex_);
-    while (!cond_) {
-      cond_var_.Wait(&mutex_);
-    }
-  }
-
-private:
-  absl::Mutex mutex_;
-  bool cond_ GUARDED_BY(mutex_);
-  absl::CondVar cond_var_;
-};
-
-} // namespace
-
-namespace Envoy {
-namespace Stats {
-
-void symbolTableTest(benchmark::State& state) {
-  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+static void BM_CreateRace(benchmark::State& state) {
+  Envoy::Thread::ThreadFactory& thread_factory = Envoy::Thread::threadFactoryForTest();
 
   // Make 100 threads, each of which will race to encode an overlapping set of
   // symbols, triggering corner-cases in SymbolTable::toSymbol.
   constexpr int num_threads = 36;
-  std::vector<Thread::ThreadPtr> threads;
+  std::vector<Envoy::Thread::ThreadPtr> threads;
   threads.reserve(num_threads);
-  Notifier access, wait;
+  Envoy::ConditionalInitializer access, wait;
   absl::BlockingCounter accesses(num_threads);
-  SymbolTable table;
+  Envoy::Stats::SymbolTable table;
   const absl::string_view stat_name_string = "here.is.a.stat.name";
-  StatNameStorage initial(stat_name_string, table);
+  Envoy::Stats::StatNameStorage initial(stat_name_string, table);
 
   for (int i = 0; i < num_threads; ++i) {
     threads.push_back(
@@ -67,7 +34,7 @@ void symbolTableTest(benchmark::State& state) {
           access.wait();
 
           for (auto _ : state) {
-            StatNameStorage second(stat_name_string, table);
+            Envoy::Stats::StatNameStorage second(stat_name_string, table);
             second.free(table);
           }
           accesses.DecrementCount();
@@ -76,7 +43,7 @@ void symbolTableTest(benchmark::State& state) {
 
   // But when we access the already-existing symbols, we guarantee that no
   // further mutex contentions occur.
-  access.notify();
+  access.setReady();
   accesses.Wait();
 
   for (auto& thread : threads) {
@@ -85,11 +52,6 @@ void symbolTableTest(benchmark::State& state) {
 
   initial.free(table);
 }
-
-} // namespace Stats
-} // namespace Envoy
-
-static void BM_CreateRace(benchmark::State& state) { Envoy::Stats::symbolTableTest(state); }
 BENCHMARK(BM_CreateRace);
 
 int main(int argc, char** argv) {
