@@ -234,6 +234,10 @@ protected:
   // True if test will use a fixed RNG value.
   bool deterministic_{};
 
+  // If true, initialize() will not waitUntilListenersReady() (i.e. listeners mentioned in the
+  // bootstrap config). Useful in cases where initialize() is too early for this wait.
+  bool defer_listener_wait_{false};
+
 private:
   // The type for the Envoy-to-backend connection
   FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};

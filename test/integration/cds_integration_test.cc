@@ -26,6 +26,11 @@ using testing::IsSubstring;
 namespace Envoy {
 namespace {
 
+// NOTE: it is required that the listener be named 'http'! Down in the various guts that do the
+//       bidding of BaseIntegrationTest::createEnvoy(), a list of service names - taken from the
+//       names of the listeners - is registered into a listener (i.e. downstream-facing) port map.
+//       The various HttpIntegrationTest tests expect to look up in that port map a service called
+//       'http'.
 const std::string kConfig = R"EOF(
 admin:
   access_log_path: /dev/null
@@ -42,18 +47,36 @@ dynamic_resources:
           cluster_name: my_cds_cluster
 static_resources:
   clusters:
-  - name: cluster_0
-    http2_protocol_options: {}
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
   - name: my_cds_cluster
     http2_protocol_options: {}
     hosts:
       socket_address:
         address: 127.0.0.1
         port_value: 0
+  listeners:
+  - name: http
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+    filter_chains:
+      filters:
+        name: envoy.http_connection_manager
+        config:
+          stat_prefix: config_test
+          http_filters:
+            name: envoy.router
+          codec_type: HTTP2
+          route_config:
+            virtual_hosts:
+              name: integration
+              routes:
+              - route:
+                  cluster: my_cds_cluster
+                match:
+                  prefix: "/"
+              domains: "*"
+            name: route_config_0
 )EOF";
 
 class CdsIntegrationTest : public XdsIntegrationTestBase,
@@ -91,56 +114,57 @@ public:
       http2_protocol_options: {{}}
     )EOF",
                     name, name, Network::Test::getLoopbackAddressString(ipVersion()),
-                    fake_upstreams_[0]->localAddress()->ip()->port()));
+                    fake_upstreams_[1]->localAddress()->ip()->port()));
   }
 
-  void initializeCds() {
+  // Overridden to insert this stuff into the initialize() at the very beginning of
+  // HttpIntegrationTest::testRouterRequestAndResponseWithBody().
+  void initialize() override {
+    // Controls how many fake_upstreams_.emplace_back(new FakeUpstream) will happen in
+    // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
+    // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
+    // config that you use!
+    setUpstreamCount(1);                                  // the CDS cluster
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2); // CDS uses gRPC uses HTTP2.
+
+    // BaseIntegrationTest::initialize() does many things:
+    // 1) It appends to fake_upstreams_ as many as you asked for via setUpstreamCount().
+    // 2) It updates your bootstrap config with the ports your fake upstreams are actually listening
+    //    on (since you're supposed to leave them as 0).
+    // 3) It creates and starts an IntegrationTestServer - the thing that wraps the almost-actual
+    //    Envoy used in the tests.
+    // 4) Bringing up the server usually entails waiting to ensure that any listeners specified in
+    //    the bootstrap config have come up. However, you might need to defer that to later, which
+    //    this test does (using defer_listener_wait_ and waitUntilListenersReady()).
+    // 5) It registers those listeners' names+ports in a port map, to be retrieved by lookupPort().
+    defer_listener_wait_ = true;
     XdsIntegrationTestBase::initialize();
 
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(false);
-    fake_upstreams_[1]->set_allow_unexpected_disconnects(false);
+    // Create the regular (i.e. not an xDS server) upstream. We create it manually here after
+    // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
+    // cluster in the bootstrap config - which we don't want since we're testing dynamic CDS!
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
+                                                  timeSystem(), enable_half_close_));
+
     // Causes xds_connection_ to be filled with a newly constructed FakeHttpConnection.
     AssertionResult result =
-        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, xds_connection_);
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
     RELEASE_ASSERT(result, result.message());
     result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result, result.message());
     xds_stream_->startGrpcStream();
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
+    sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                   {buildCluster("cluster_0")}, "1");
+    test_server_->waitUntilListenersReady();
   }
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(CdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  // Controls how many fake_upstreams_.emplace_back(new FakeUpstream) will happen in
-  // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
-  // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
-  // config that you use!
-  setUpstreamCount(2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-
-  initializeCds();
-
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
-  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
-                                                 {buildCluster("cluster_0")}, "1");
-  // Adapted from HttpIntegrationTest::testRouterRequestAndResponseWithBody(1024, 512, false).
-  int request_size = 1024;
-  int response_size = 512;
-  codec_client_ =
-      makeHttpConnection(makeClientConnection(fake_upstreams_[0]->localAddress()->ip()->port()));
-  Http::TestHeaderMapImpl request_headers{
-      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
-      {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
-  auto response = sendRequestAndWaitForResponse(request_headers, request_size,
-                                                default_response_headers_, response_size);
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(request_size, upstream_request_->bodyLength());
-
-  ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_EQ(response_size, response->body().size());
-
+  testRouterRequestAndResponseWithBody(1024, 512, false);
   cleanupUpstreamAndDownstream();
   fake_upstream_connection_ = nullptr;
 }
