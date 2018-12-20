@@ -50,7 +50,7 @@ void symbolTableTest(benchmark::State& state) {
 
   // Make 100 threads, each of which will race to encode an overlapping set of
   // symbols, triggering corner-cases in SymbolTable::toSymbol.
-  constexpr int num_threads = 20;
+  constexpr int num_threads = 36;
   std::vector<Thread::ThreadPtr> threads;
   threads.reserve(num_threads);
   Notifier access, wait;

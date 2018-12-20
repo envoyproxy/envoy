@@ -46,6 +46,20 @@ constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
 
+class LOCKABLE PthreadRWLock {
+public:
+  PthreadRWLock();
+  ~PthreadRWLock();
+  void Lock() EXCLUSIVE_LOCK_FUNCTION();
+  void Unlock() UNLOCK_FUNCTION();
+  void ReaderLock() SHARED_LOCK_FUNCTION();
+  void ReaderUnlock() UNLOCK_FUNCTION();
+
+ private:
+  pthread_rwlock_t rwlock_;
+  pthread_rwlockattr_t attr_;
+};
+
 /**
  * Represents an 8-bit encoding of a vector of symbols, used as a transient
  * representation during encoding and prior to retained allocation.
@@ -154,9 +168,12 @@ public:
    * @return uint64_t the number of symbols in the symbol table.
    */
   uint64_t numSymbols() const {
-    absl::ReaderMutexLock lock(&lock_);
+    //absl::ReaderMutexLock lock(&lock_);
+    lock_.ReaderLock();
     ASSERT(encode_map_.size() == decode_map_.size());
-    return encode_map_.size();
+    uint64_t sz = encode_map_.size();
+    lock_.ReaderUnlock();
+    return sz;
   }
 
   /**
@@ -228,7 +245,8 @@ private:
   };
 
   // This must be held during both encode() and free().
-  mutable absl::Mutex lock_;
+  //mutable absl::Mutex lock_;
+  mutable PthreadRWLock lock_;
 
   std::string decodeSymbolVec(const SymbolVec& symbols) const;
 
@@ -252,10 +270,7 @@ private:
   // Stages a new symbol for use. To be called after a successful insertion.
   void newSymbol();
 
-  Symbol monotonicCounter() {
-    absl::ReaderMutexLock lock(&lock_);
-    return monotonic_counter_;
-  }
+  Symbol monotonicCounter() { return monotonic_counter_; }
 
   /**
    * Sets hook to be called on symbol lookup when the symbol needs to be
@@ -275,7 +290,7 @@ private:
   Symbol next_symbol_ GUARDED_BY(lock_);
 
   // If the free pool is exhausted, we monotonically increase this counter.
-  Symbol monotonic_counter_ GUARDED_BY(lock_);
+  Symbol monotonic_counter_;
 
   // Bimap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
