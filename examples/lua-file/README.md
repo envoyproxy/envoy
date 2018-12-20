@@ -1,7 +1,7 @@
 In this example, we show how to use a lua file in an Envoy Lua filter.
  The Envoy proxy [configuration](./envoy.yaml) includes a lua
-filter that contains two functions namely
-`envoy_on_request(request_handle)` as documented
+filter that runs code on every request via the
+`envoy_on_request(request_handle)` function, as documented
 [here](https://www.envoyproxy.io/docs/envoy/latest/configuration/http_filters/lua_filter).
 This function calls an imported [lua file](./foo.lua) that we copied into the container on build.
 
