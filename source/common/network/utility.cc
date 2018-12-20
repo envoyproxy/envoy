@@ -250,7 +250,7 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
   // connection. However, this is a rare exception and such assumption results in big
   // performance optimization.
   if (remote_address->type() == Envoy::Network::Address::Type::Pipe ||
-      remote_address == socket.localAddress() || isLoopbackAddress(*remote_address)) {
+      *remote_address == *socket.localAddress() || isLoopbackAddress(*remote_address)) {
     return true;
   }
 
@@ -276,7 +276,7 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
       auto local_address = Address::addressFromSockAddr(
           *addr, (af_look_up == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
 
-      if (remote_address == local_address) {
+      if (*remote_address == *local_address) {
         return true;
       }
     }
