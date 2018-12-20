@@ -1,6 +1,9 @@
 Version history
 ---------------
 
+1.10.0 (pending)
+================
+
 1.9.0
 ===============
 * access log: added a :ref:`JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format.

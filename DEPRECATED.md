@@ -6,6 +6,8 @@ As of release 1.3.0, Envoy will follow a
 The following features have been DEPRECATED and will be removed in the specified release cycle.
 A logged warning is expected for each deprecated item that is in deprecation window.
 
+## Version 1.10.0 (pending)
+
 ## Version 1.9.0
 
 * Order of execution of the network write filter chain has been reversed. Prior to this release cycle it was incorrect, see [#4599](https://github.com/envoyproxy/envoy/issues/4599). In the 1.9.0 release cycle we introduced `bugfix_reverse_write_filter_order` in [lds.proto] (https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/lds.proto) to temporarily support both old and new behaviors. Note this boolean field is deprecated.
