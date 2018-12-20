@@ -16,11 +16,20 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
-TEST(BufferFilterFactoryTest, ValidateFail) {
+TEST(BufferFilterFactoryTest, BufferFilterCorrectWithoutRequestTime) {
+  std::string json_string = R"EOF(
+  {
+    "max_request_bytes" : 1028
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(BufferFilterFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::http::buffer::v2::Buffer(), "stats", context),
-               ProtoValidationException);
+  BufferFilterFactory factory;
+  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
 }
 
 TEST(BufferFilterFactoryTest, BufferFilterCorrectJson) {
