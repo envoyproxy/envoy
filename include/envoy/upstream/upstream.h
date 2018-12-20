@@ -45,6 +45,8 @@ public:
     FAILED_OUTLIER_CHECK = 0x02,
     // The host is currently marked as unhealthy by EDS.
     FAILED_EDS_HEALTH = 0x04,
+    // The host is currently marked as degraded through active health checking.
+    DEGRADED_ACTIVE_HC = 0x08,
   };
 
   enum class ActiveHealthFailureType {

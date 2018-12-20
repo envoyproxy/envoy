@@ -194,8 +194,13 @@ public:
     outlier_detector_ = std::move(outlier_detector);
   }
   Host::Health health() const override {
-    // TODO(snowp): Support degraded.
-    return health_flags_ ? Host::Health::Unhealthy : Host::Health::Healthy;
+    if (!health_flags_) {
+      return Host::Health::Healthy;
+    }
+    if (healthFlagGet(HealthFlag::DEGRADED_ACTIVE_HC)) {
+      return Host::Health::Degraded;
+    }
+    return Host::Health::Unhealthy;
   }
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight) override;
