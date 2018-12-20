@@ -105,8 +105,13 @@ getCertificateValidationContextConfigProvider(
 } // namespace
 
 const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
+#ifndef BORINGSSL_FIPS
     "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"
     "[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:"
+#else // BoringSSL FIPS
+    "ECDHE-ECDSA-AES128-GCM-SHA256:"
+    "ECDHE-RSA-AES128-GCM-SHA256:"
+#endif
     "ECDHE-ECDSA-AES128-SHA:"
     "ECDHE-RSA-AES128-SHA:"
     "AES128-GCM-SHA256:"
@@ -118,7 +123,11 @@ const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
     "AES256-GCM-SHA384:"
     "AES256-SHA";
 
-const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES = "X25519:P-256";
+const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES =
+#ifndef BORINGSSL_FIPS
+    "X25519:"
+#endif
+    "P-256";
 
 ContextConfigImpl::ContextConfigImpl(
     const envoy::api::v2::auth::CommonTlsContext& config,

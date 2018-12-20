@@ -43,7 +43,7 @@ ValidationInstance::ValidationInstance(Options& options, Event::TimeSystem& time
     : options_(options), time_system_(time_system), stats_store_(store),
       api_(new Api::ValidationImpl(options.fileFlushIntervalMsec(), thread_factory, store)),
       dispatcher_(api_->allocateDispatcher(time_system)),
-      singleton_manager_(new Singleton::ManagerImpl()),
+      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
       access_log_manager_(*api_, *dispatcher_, access_log_lock), mutex_tracer_(nullptr) {
   try {
     initialize(options, local_address, component_factory);

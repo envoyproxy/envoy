@@ -58,7 +58,7 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
       api_(new Api::Impl(options.fileFlushIntervalMsec(), thread_factory, store)),
       secret_manager_(std::make_unique<Secret::SecretManagerImpl>()),
       dispatcher_(api_->allocateDispatcher(time_system)),
-      singleton_manager_(new Singleton::ManagerImpl()),
+      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks, time_system),
@@ -461,7 +461,7 @@ void InstanceImpl::run() {
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
-  auto watchdog = guard_dog_->createWatchDog(Thread::currentThreadId());
+  auto watchdog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");

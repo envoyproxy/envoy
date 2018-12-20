@@ -161,10 +161,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/protocolbuffers/protobuf/archive/fa252ec2a54acb24ddc87d48fed1ecfd458445fd.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
-        sha256 = "9765764644d74af9a9654f7fb90cf2bc7228014664668719a589a4677967ca09",
-        strip_prefix = "grpc-httpjson-transcoding-05a15e4ecd0244a981fdf0348a76658def62fa9c",
-        # 2018-05-30
-        urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/05a15e4ecd0244a981fdf0348a76658def62fa9c.tar.gz"],
+        sha256 = "dedd76b0169eb8c72e479529301a1d9b914a4ccb4d2b5ddb4ebe92d63a7b2152",
+        strip_prefix = "grpc-httpjson-transcoding-64d6ac985360b624d8e95105701b64a3814794cd",
+        # 2018-12-19
+        urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/64d6ac985360b624d8e95105701b64a3814794cd.tar.gz"],
     ),
     com_github_golang_protobuf = dict(
         # TODO(sesmith177): Remove this dependency when both:
