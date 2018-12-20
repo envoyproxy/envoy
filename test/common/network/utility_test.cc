@@ -212,6 +212,24 @@ TEST(NetworkUtility, LocalConnection) {
   local_addr.reset(new Network::Address::Ipv6Instance("fabc::42"));
   remote_addr.reset(new Network::Address::Ipv6Instance("fabc::42"));
   EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4", 80));
+  remote_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4", 23413));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv6Instance("fabc::42", 80));
+  remote_addr.reset(new Network::Address::Ipv6Instance("fabc::42", 23413));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4", 80));
+  remote_addr.reset(new Network::Address::Ipv4Instance(
+      Utility::getLocalAddress(Address::IpVersion::v4)->ip()->addressAsString(), 23413));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv6Instance("fabc::42", 80));
+  remote_addr.reset(new Network::Address::Ipv6Instance(
+      Utility::getLocalAddress(Address::IpVersion::v6)->ip()->addressAsString(), 23413));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
 }
 
 TEST(NetworkUtility, InternalAddress) {

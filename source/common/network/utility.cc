@@ -249,8 +249,13 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
   // while the client is not actually local. Example could be an iptables intercepted
   // connection. However, this is a rare exception and such assumption results in big
   // performance optimization.
-  if (remote_address->type() == Envoy::Network::Address::Type::Pipe ||
-      *remote_address == *socket.localAddress() || isLoopbackAddress(*remote_address)) {
+  if (remote_address->type() != Envoy::Network::Address::Type::Ip ||
+      isLoopbackAddress(*remote_address) ||
+      (remote_address->ip()->version() == Address::IpVersion::v4
+           ? remote_address->ip()->ipv4()->address() ==
+                 socket.localAddress()->ip()->ipv4()->address()
+           : remote_address->ip()->ipv6()->address() ==
+                 socket.localAddress()->ip()->ipv6()->address())) {
     return true;
   }
 
@@ -272,12 +277,17 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
     }
 
     if (ifa->ifa_addr->sa_family == af_look_up) {
-      const auto* addr = reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      auto local_address = Address::addressFromSockAddr(
-          *addr, (af_look_up == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
-
-      if (*remote_address == *local_address) {
-        return true;
+      if (af_look_up == AF_INET) {
+        const auto* addr = reinterpret_cast<const struct sockaddr_in*>(ifa->ifa_addr);
+        if (remote_address->ip()->ipv4()->address() == addr->sin_addr.s_addr) {
+          return true;
+        }
+      } else {
+        const auto* addr = reinterpret_cast<const struct sockaddr_in6*>(ifa->ifa_addr);
+        absl::uint128 v6addr = remote_address->ip()->ipv6()->address();
+        if (memcmp(&v6addr, &addr->sin6_addr.s6_addr, sizeof(absl::uint128)) == 0) {
+          return true;
+        }
       }
     }
   }
