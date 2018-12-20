@@ -46,6 +46,7 @@ HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 
 SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
+VERSION_HISTORY_DOC = "docs/root/intro/version_history.rst"
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -195,9 +196,34 @@ def hasInvalidAngleBracketDirectory(line):
   subdir = path[0:slash]
   return subdir in SUBDIR_SET
 
+VERSION_HISTORY_NEW_LINE_REGEX = re.compile('\* [a-z \-_]*: [a-z:`]')
+
+
+def checkVersionFileContents(file_path, error_messages):
+  file_handle = fileinput.input(file_path);
+  for line_number, line in enumerate(file_handle):
+    def reportError(message):
+      error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
+
+    # We stop line checks at a somewhat arbitrary point to avoid rewriting very old release notes
+    # to the new format.  If we get to the point a single Envoy release is more than 400 lines we'll
+    # have to adjust this for it to be effective.
+    if line_number > 400:
+      break;
+
+    if line.startswith('*') and not VERSION_HISTORY_NEW_LINE_REGEX.match(line):
+      reportError("Version history line malformed. "
+                  "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s" % line)
+  file_handle.close()
+
 
 def checkFileContents(file_path, checker):
   error_messages = []
+
+  if VERSION_HISTORY_DOC in file_path:
+    # Version file checking has enough special cased logic to merit its own checks.
+    checkVersionFileContents(file_path, error_messages)
+
   for line_number, line in enumerate(fileinput.input(file_path)):
 
     def reportError(message):
