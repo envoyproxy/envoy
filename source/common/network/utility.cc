@@ -250,8 +250,8 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
   // connection. However, this is a rare exception and such assumption results in big
   // performance optimization.
   if (remote_address->type() != Envoy::Network::Address::Type::Ip ||
-      isLoopbackAddress(*remote_address) ||
-      isSameIPAddress(*remote_address, *socket.localAddress())) {
+      isSameIPAddress(*remote_address, *socket.localAddress()) ||
+      isLoopbackAddress(*remote_address)) {
     return true;
   }
 
