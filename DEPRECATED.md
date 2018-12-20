@@ -16,7 +16,7 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * Use of `runtime_key` in `RequestMirrorPolicy`, found in
   [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto)
   is deprecated. Set the `runtime_fraction` field instead.
-* Use of buffer filter `max_request_time` is deprecated. Use the new http connection manager `request_timeout` field instead.
+* Use of buffer filter `max_request_time` is deprecated. in favor of http connection manager of :ref:request timeouts <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_timeout>
 
 ## Version 1.8.0 (Oct 4, 2018)
 

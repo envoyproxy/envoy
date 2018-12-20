@@ -19,7 +19,8 @@ message Buffer {
 
   // The maximum number of seconds that the filter will wait for a complete
   // request before returning a 408 response.
-  // This is deprecated in favour of http conn manager request timeouts.
+  // deprecated in favor of http connection manager of :ref:request timeouts
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_timeout>
   google.protobuf.Duration max_request_time = 2
       [deprecated = true, (validate.rules).duration = {gt: {}}, (gogoproto.stdduration) = true];
 }
