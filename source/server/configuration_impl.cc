@@ -57,12 +57,14 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(
       bootstrap, server.stats(), server.threadLocal(), server.runtime(), server.random(),
       server.localInfo(), server.accessLogManager(), server.admin());
+  std::cerr<<"done building CM"<<std::endl;//TODO REMOVE
   const auto& listeners = bootstrap.static_resources().listeners();
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
   for (ssize_t i = 0; i < listeners.size(); i++) {
     ENVOY_LOG(debug, "listener #{}:", i);
     server.listenerManager().addOrUpdateListener(listeners[i], "", false);
   }
+  std::cerr<<"done adding listeners"<<std::endl;//TODO REMOVE
 
   stats_flush_interval_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_flush_interval, 5000));
@@ -78,6 +80,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
 
   initializeTracers(bootstrap.tracing(), server);
+  std::cerr<<"done initializing tracers"<<std::endl;//TODO REMOVE
 
   if (bootstrap.has_rate_limit_service()) {
     ratelimit_client_factory_ = std::make_unique<RateLimit::GrpcFactoryImpl>(
@@ -85,8 +88,9 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
   } else {
     ratelimit_client_factory_ = std::make_unique<RateLimit::NullFactoryImpl>();
   }
-
+  std::cerr<<"done making ratelimit factory"<<std::endl;//TODO REMOVE
   initializeStatsSinks(bootstrap, server);
+  std::cerr<<"done initializing stats sinks"<<std::endl;//TODO REMOVE
 }
 
 void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& configuration,

@@ -229,6 +229,11 @@ public:
                          const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                          ClusterManager& cm));
 
+  MOCK_METHOD3(createIncrementalCds,
+               CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config,
+                         const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
+                         ClusterManager& cm));
+
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
 };

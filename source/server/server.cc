@@ -64,9 +64,10 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr) {
-
+  std::cerr<<"!?@#!?@#DOES IT GET STARTED AT ALL?"<<std::endl;
   try {
     if (!options.logPath().empty()) {
+      std::cerr<<"logPath not empty, doing something"<<std::endl;
       try {
         file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
             options.logPath(), access_log_manager_, Logger::Registry::getSink());
@@ -76,8 +77,11 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
       }
     }
 
+    std::cerr<<"initialiing restarter"<<std::endl;
     restarter_.initialize(*dispatcher_, *this);
+    std::cerr<<"creating drainManager"<<std::endl;
     drain_manager_ = component_factory.createDrainManager(*this);
+    std::cerr<<"initializing inside of server.cc InstanceImpl"<<std::endl;
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
@@ -119,7 +123,7 @@ Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_->clus
 Tracing::HttpTracer& InstanceImpl::httpTracer() { return config_->httpTracer(); }
 
 void InstanceImpl::drainListeners() {
-  ENVOY_LOG(info, "closing and draining listeners");
+  ENVOY_LOG(error, "closing and draining listeners");
   listener_manager_->stopListeners();
   drain_manager_->startDrainSequence(nullptr);
 }
@@ -173,6 +177,7 @@ InstanceUtil::BootstrapVersion
 InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                                   Options& options) {
   try {
+    std::cerr << "LOADING BOOTSTRAP FROM " << options.configPath() << std::endl;
     if (!options.configPath().empty()) {
       MessageUtil::loadFromFile(options.configPath(), bootstrap);
     }
@@ -202,34 +207,36 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
 void InstanceImpl::initialize(Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
-  ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
+  ENVOY_LOG(error, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
             restarter_.version());
 
-  ENVOY_LOG(info, "statically linked extensions:");
-  ENVOY_LOG(info, "  access_loggers: {}",
+  ENVOY_LOG(error, "statically linked extensions:");
+  ENVOY_LOG(error, "  access_loggers: {}",
             Registry::FactoryRegistry<Configuration::AccessLogInstanceFactory>::allFactoryNames());
   ENVOY_LOG(
       info, "  filters.http: {}",
       Registry::FactoryRegistry<Configuration::NamedHttpFilterConfigFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  filters.listener: {}",
+  ENVOY_LOG(error, "  filters.listener: {}",
             Registry::FactoryRegistry<
                 Configuration::NamedListenerFilterConfigFactory>::allFactoryNames());
   ENVOY_LOG(
       info, "  filters.network: {}",
       Registry::FactoryRegistry<Configuration::NamedNetworkFilterConfigFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  stat_sinks: {}",
+  ENVOY_LOG(error, "  stat_sinks: {}",
             Registry::FactoryRegistry<Configuration::StatsSinkFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  tracers: {}",
+  ENVOY_LOG(error, "  tracers: {}",
             Registry::FactoryRegistry<Configuration::TracerFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  transport_sockets.downstream: {}",
+  ENVOY_LOG(error, "  transport_sockets.downstream: {}",
             Registry::FactoryRegistry<
                 Configuration::DownstreamTransportSocketConfigFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  transport_sockets.upstream: {}",
+  ENVOY_LOG(error, "  transport_sockets.upstream: {}",
             Registry::FactoryRegistry<
                 Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
 
   // Handle configuration that needs to take place prior to the main configuration load.
+  std::cerr<<"starting loadBootstrapConfig"<<std::endl;
   InstanceUtil::loadBootstrapConfig(bootstrap_, options);
+  std::cerr<<"finished loadBootstrapConfig"<<std::endl;
   bootstrap_config_update_time_ = time_system_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
@@ -244,6 +251,7 @@ void InstanceImpl::initialize(Options& options,
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
 
   failHealthcheck(false);
+  std::cerr<<"unfailed health check"<<std::endl;
 
   uint64_t version_int;
   if (!StringUtil::atoul(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
@@ -257,7 +265,11 @@ void InstanceImpl::initialize(Options& options,
       bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
       options.serviceNodeName());
 
+  std::cerr<<"about to create initial_config"<<std::endl;
+  
   Configuration::InitialImpl initial_config(bootstrap_);
+  
+  std::cerr<<"got near the initial_config admin parse"<<std::endl;
 
   HotRestart::ShutdownParentAdminInfo info;
   info.original_start_time_ = original_start_time_;
@@ -268,18 +280,20 @@ void InstanceImpl::initialize(Options& options,
     if (initial_config.admin().accessLogPath().empty()) {
       throw EnvoyException("An admin access log path is required for a listening server.");
     }
-    ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
+    ENVOY_LOG(error, "admin address: {}", initial_config.admin().address()->asString());
     admin_->startHttpListener(initial_config.admin().accessLogPath(), options.adminAddressPath(),
                               initial_config.admin().address(),
                               stats_store_.createScope("listener.admin."));
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
   }
+  std::cerr<<"made admin"<<std::endl;
   config_tracker_entry_ =
       admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
   if (initial_config.admin().address()) {
     admin_->addListenerToHandler(handler_.get());
   }
+  std::cerr<<"made admin and added listener to handler"<<std::endl;
 
   loadServerFlags(initial_config.flagsPath());
 
@@ -290,6 +304,8 @@ void InstanceImpl::initialize(Options& options,
   // Workers get created first so they register for thread local updates.
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_,
                                                             worker_factory_, time_system_);
+  
+  std::cerr<<"made listener_manager"<<std::endl;
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -359,12 +375,12 @@ void InstanceImpl::startWorkers() {
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
   if (config.runtime()) {
-    ENVOY_LOG(info, "runtime symlink: {}", config.runtime()->symlinkRoot());
-    ENVOY_LOG(info, "runtime subdirectory: {}", config.runtime()->subdirectory());
+    ENVOY_LOG(error, "runtime symlink: {}", config.runtime()->symlinkRoot());
+    ENVOY_LOG(error, "runtime subdirectory: {}", config.runtime()->subdirectory());
 
     std::string override_subdirectory =
         config.runtime()->overrideSubdirectory() + "/" + server.localInfo().clusterName();
-    ENVOY_LOG(info, "runtime override subdirectory: {}", override_subdirectory);
+    ENVOY_LOG(error, "runtime override subdirectory: {}", override_subdirectory);
 
     Api::OsSysCallsPtr os_sys_calls(new Api::OsSysCallsImpl);
     return std::make_unique<Runtime::DiskBackedLoaderImpl>(
@@ -382,9 +398,9 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
     return;
   }
 
-  ENVOY_LOG(info, "server flags path: {}", flags_path.value());
+  ENVOY_LOG(error, "server flags path: {}", flags_path.value());
   if (api_->fileExists(flags_path.value() + "/drain")) {
-    ENVOY_LOG(info, "starting server in drain mode");
+    ENVOY_LOG(error, "starting server in drain mode");
     failHealthcheck(true);
   }
 }
@@ -428,7 +444,7 @@ RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& di
     // so we pause RDS until we've completed all the callbacks.
     cm.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
 
-    ENVOY_LOG(info, "all clusters initialized. initializing init manager");
+    ENVOY_LOG(error, "all clusters initialized. initializing init manager");
 
     // Note: the lamda below should not capture "this" since the RunHelper object may
     // have been destructed by the time it gets executed.
@@ -456,11 +472,11 @@ void InstanceImpl::run() {
                                             [this]() -> void { startWorkers(); });
 
   // Run the main dispatch loop waiting to exit.
-  ENVOY_LOG(info, "starting main dispatch loop");
+  ENVOY_LOG(error, "starting main dispatch loop");
   auto watchdog = guard_dog_->createWatchDog(Thread::Thread::currentThreadId());
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  ENVOY_LOG(info, "main dispatch loop exited");
+  ENVOY_LOG(error, "main dispatch loop exited");
   guard_dog_->stopWatching(watchdog);
   watchdog.reset();
 
@@ -500,7 +516,7 @@ void InstanceImpl::terminate() {
   handler_.reset();
   thread_local_.shutdownThread();
   restarter_.shutdown();
-  ENVOY_LOG(info, "exiting");
+  ENVOY_LOG(error, "exiting");
   ENVOY_FLUSH_LOG();
 }
 

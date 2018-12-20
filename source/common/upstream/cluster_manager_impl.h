@@ -65,6 +65,10 @@ public:
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                       const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                       ClusterManager& cm) override;
+  CdsApiPtr createIncrementalCds(
+      const envoy::api::v2::core::ConfigSource& cds_config,
+      const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
+      ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
 
 protected:
@@ -173,6 +177,7 @@ public:
   void setInitializedCb(std::function<void()> callback) override {
     init_helper_.setInitializedCb(callback);
   }
+
   ClusterInfoMap clusters() override {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
     ClusterInfoMap clusters_map;

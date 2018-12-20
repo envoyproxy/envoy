@@ -38,14 +38,16 @@ public:
       throw EnvoyException(
           "envoy::api::v2::core::ConfigSource specifier must be kApiConfigSource.");
     }
-    if (config.api_config_source().api_type() != envoy::api::v2::core::ApiConfigSource::GRPC) {
-      throw EnvoyException("Incremental xDS must use gRPC.");
-    }
+// TODO should be reduntant if we do add this enum value    if (config.api_config_source().api_type() != envoy::api::v2::core::ApiConfigSource::INCREMENTAL_GRPC) {
+//      throw EnvoyException("Incremental xDS must use gRPC.");
+//    }
+    std::cerr<<"in subscriptionFromConfigSource. passed initial checks."<<std::endl;
 
     IncrementalSubscriptionStats stats = Utility::generateIncrementalStats(scope);
     ControlPlaneStats control_plane_stats = Utility::generateControlPlaneStats(scope);
     Utility::checkApiConfigSourceSubscriptionBackingCluster(cm.clusters(),
                                                             config.api_config_source());
+    std::cerr<<"in subscriptionFromConfigSource. passed other checks."<<std::endl;
     return std::make_unique<IncrementalSubscriptionImpl<ResourceType>>(
         local_info,
         Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),

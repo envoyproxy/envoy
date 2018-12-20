@@ -223,10 +223,13 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
 }
 
 HttpIntegrationTest::~HttpIntegrationTest() {
+  std::cerr<<"started ~HttpIntegrationTest"<<std::endl;
   cleanupUpstreamAndDownstream();
+  std::cerr<<"~HttpIntegrationTest cleanupUpstreamAndDownstream finished"<<std::endl;
   test_server_.reset();
   fake_upstream_connection_.reset();
   fake_upstreams_.clear();
+  std::cerr<<"finished ~HttpIntegrationTest"<<std::endl;
 }
 
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
@@ -307,9 +310,12 @@ void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
     uint64_t request_size, uint64_t response_size, bool big_header,
     ConnectionCreationFunction* create_connection) {
+  std::cerr<<"BEGIN testRouterRequestAndResponseWithBody"<<std::endl;
   initialize();
+  std::cerr<<"testRouterRequestAndResponseWithBody INITIALIZED"<<std::endl;
   codec_client_ = makeHttpConnection(
       create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));
+  std::cerr<<"testRouterRequestAndResponseWithBody MADE CONNECTION"<<std::endl;
   Http::TestHeaderMapImpl request_headers{
       {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
       {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
@@ -318,13 +324,14 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
   }
   auto response = sendRequestAndWaitForResponse(request_headers, request_size,
                                                 default_response_headers_, response_size);
-
+  std::cerr<<"testRouterRequestAndResponseWithBody GOT RESPONSE"<<std::endl;
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
 
   ASSERT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_EQ(response_size, response->body().size());
+  std::cerr<<"testRouterRequestAndResponseWithBody DONE"<<std::endl;
 }
 
 void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(

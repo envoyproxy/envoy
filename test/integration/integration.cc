@@ -249,15 +249,18 @@ void BaseIntegrationTest::initialize() {
   initialized_ = true;
 
   createUpstreams();
+  std::cerr << "YES this initialize() is being called, i am not crazy" << std::endl;//TODO REMOVE
   createEnvoy();
 }
 
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
     if (autonomous_upstream_) {
+      std::cerr<<"making an autonomous upstream"<<std::endl;
       fake_upstreams_.emplace_back(
           new AutonomousUpstream(0, upstream_protocol_, version_, *time_system_));
     } else {
+      std::cerr<<"making a fake upstream"<<std::endl;
       fake_upstreams_.emplace_back(
           new FakeUpstream(0, upstream_protocol_, version_, *time_system_, enable_half_close_));
     }
@@ -265,19 +268,23 @@ void BaseIntegrationTest::createUpstreams() {
 }
 
 void BaseIntegrationTest::createEnvoy() {
+  std::cerr << "CREATEENVOY starting"<<std::endl;
   std::vector<uint32_t> ports;
   for (auto& upstream : fake_upstreams_) {
     if (upstream->localAddress()->ip()) {
       ports.push_back(upstream->localAddress()->ip()->port());
+      std::cerr << "will finalize with port "<<upstream->localAddress()->ip()->port()<<std::endl;
     }
   }
   config_helper_.finalize(ports);
+  std::cerr << "CREATEENVOY config helper finalized"<<std::endl;
 
   ENVOY_LOG_MISC(debug, "Running Envoy with configuration {}",
                  config_helper_.bootstrap().DebugString());
 
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
       "bootstrap.json", MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  std::cerr << TestEnvironment::readFileToStringForTest(bootstrap_path) << std::endl;
 
   std::vector<std::string> named_ports;
   const auto& static_resources = config_helper_.bootstrap().static_resources();
@@ -343,8 +350,11 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
+  std::cerr<<"createGeneratedApiTestServer START"<<std::endl;//TODO REMOVE
+  // AH HAH!!!!!!!!!! IT IS HERE!!!!!!!!! HERE IS WHERE IT GOES WRONG
   test_server_ = IntegrationTestServer::create(
       bootstrap_path, version_, pre_worker_start_test_steps_, deterministic_, *time_system_);
+  std::cerr<<"createGeneratedApiTestServer test_server_ created"<<std::endl;//TODO REMOVE
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0) {
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.
@@ -355,6 +365,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
 
 void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                                               const std::vector<std::string>& port_names) {
+  std::cerr<<"createApiTestServer"<<std::endl;//TODO REMOVE
   const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
       api_filesystem_config.eds_path_, port_map_, version_);
   const std::string cds_path = TestEnvironment::temporaryFileSubstitute(

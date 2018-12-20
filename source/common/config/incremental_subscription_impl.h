@@ -39,7 +39,7 @@ public:
         local_info_(local_info), async_client_(std::move(async_client)),
         service_method_(service_method), rate_limiting_enabled_(rate_limit_settings.enabled_),
         stats_(stats), control_plane_stats_(control_plane_stats) {
-
+std::cerr<<"making a IncrementalSubscriptionImpl"<<std::endl;
     retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
     if (rate_limiting_enabled_) {
       // Default Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
@@ -51,10 +51,13 @@ public:
         std::make_unique<JitteredBackOffStrategy>(50,    // TODO RETRY_INITIAL_DELAY_MS,
                                                   30000, // TODO RETRY_MAX_DELAY_MS,
                                                   random);
+std::cerr<<"!!!ESTABLISHING STREAM!"<<std::endl;
+    establishNewStream();
+std::cerr<<"DONE!!!ESTABLISHING STREAM!"<<std::endl;
   }
 
   // GRPC ACTUAL STREAM HANDLING STUFF
-  void start() { establishNewStream(); }
+//  void start() { establishNewStream(); }
 
   void setRetryTimer() {
     retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
@@ -214,7 +217,9 @@ public:
       ENVOY_LOG(warn, "incremental config for {} rejected: {}", type_url_, e->what());
     }
     stats_.update_attempt_.inc();
-    callbacks_->onIncrementalConfigFailed(e);
+    if (callbacks_) {
+      callbacks_->onIncrementalConfigFailed(e);
+    }
   }
 
   // Grpc::TypedAsyncStreamCallbacks
@@ -259,6 +264,7 @@ public:
   // TODO can combine with updateResources unless API needs to expose them both
   void start(const std::vector<std::string>& resources,
              IncrementalSubscriptionCallbacks<ResourceType>& callbacks) override {
+    std::cerr<<"called the start that doesnt seem to start anything"<<std::endl;
     callbacks_ = &callbacks;
 
     subscribe(resources);

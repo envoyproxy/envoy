@@ -283,10 +283,21 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   // TODO TODO create incremental here...... maybe distinguish from vanilla by checking the
   // api_config_source field of cds_config? in turn, grpc_services, and then i'm guessing
   // target_specifier.(need to check both i guess: cluster_name for EnvoyGrpc, and target_uri for
-  // GoogleGrpc). We can now potentially create the CDS API once the backing cluster exists.
+  // GoogleGrpc).
+  // We can now potentially create the CDS API once the backing cluster exists.
   if (bootstrap.dynamic_resources().has_cds_config()) {
-    cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), eds_config_, *this);
+    const auto& cds_config = bootstrap.dynamic_resources().cds_config();
+    if (cds_config.config_source_specifier_case() ==  
+            envoy::api::v2::core::ConfigSource::kApiConfigSource &&
+        cds_config.api_config_source().api_type() ==
+            envoy::api::v2::core::ApiConfigSource::INCREMENTAL_GRPC) {
+      std::cerr<<"***CM: creating INCREMENTAL!!! CDS"<<std::endl;
+      cds_api_ = factory_.createIncrementalCds(cds_config, eds_config_, *this);
+    } else {  
+      cds_api_ = factory_.createCds(cds_config, eds_config_, *this);
+    }
     init_helper_.setCds(cds_api_.get());
+    std::cerr<<"***CM: done with creating CDS"<<std::endl;
   } else {
     init_helper_.setCds(nullptr);
   }
@@ -297,12 +308,15 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   for (auto& cluster : active_clusters_) {
     init_helper_.addCluster(*cluster.second->cluster_);
   }
+  std::cerr<<"***CM: added "<<active_clusters_.size()<<" clusters"<<std::endl;
 
   // Potentially move to secondary initialization on the static bootstrap clusters if all primary
   // clusters have already initialized. (E.g., if all static).
   init_helper_.onStaticLoadComplete();
+  std::cerr<<"***CM: static load completed"<<std::endl;
 
   ads_mux_->start();
+  std::cerr<<"***CM: ads mux started"<<std::endl;
 
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
@@ -313,6 +327,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                                                 ->create(),
                                             main_thread_dispatcher);
   }
+  std::cerr<<"***CM: load stats reporter thing done if any"<<std::endl;
 }
 
 ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
@@ -1212,11 +1227,15 @@ ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
 CdsApiPtr ProdClusterManagerFactory::createCds(
     const envoy::api::v2::core::ConfigSource& cds_config,
     const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm) {
-  // TODO intelligently choose one or the other
+  return CdsApiImpl::create(cds_config, eds_config, cm, main_thread_dispatcher_, random_,
+                            local_info_, stats_);
+}
+
+CdsApiPtr ProdClusterManagerFactory::createIncrementalCds(
+    const envoy::api::v2::core::ConfigSource& cds_config,
+    const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm) {
   return CdsIncremental::create(cds_config, eds_config, cm, main_thread_dispatcher_, random_,
                                 local_info_, stats_);
-  //  return CdsApiImpl::create(cds_config, eds_config, cm, main_thread_dispatcher_, random_,
-  //                            local_info_, stats_);
 }
 
 } // namespace Upstream

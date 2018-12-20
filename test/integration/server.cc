@@ -49,8 +49,11 @@ IntegrationTestServer::create(const std::string& config_path,
                               const Network::Address::IpVersion version,
                               std::function<void()> pre_worker_start_test_steps, bool deterministic,
                               Event::TestTimeSystem& time_system) {
+  std::cerr<<"constructing IntegrationTestServer"<<std::endl;
   IntegrationTestServerPtr server{new IntegrationTestServer(time_system, config_path)};
+  std::cerr<<"starting IntegrationTestServer"<<std::endl;
   server->start(version, pre_worker_start_test_steps, deterministic);
+  std::cerr<<"startED IntegrationTestServer"<<std::endl;
   return server;
 }
 
@@ -66,18 +69,21 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
   if (pre_worker_start_test_steps != nullptr) {
     pre_worker_start_test_steps();
   }
-
+ENVOY_LOG(info,"waitReady");
   // Wait for the server to be created and the number of initial listeners to wait for to be set.
   server_set_.waitReady();
-
+ENVOY_LOG(info,"waitReady DONE");
+// TODO REMOVE RIGHT HERE!!!!!!!!! RIGHT HERE IS WHERE IT HANGS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   // Now wait for the initial listeners to actually be listening on the worker. At this point
   // the server is up and ready for testing.
   Thread::LockGuard guard(listeners_mutex_);
+std::cerr<<"pending_listeners_ = "<<pending_listeners_<<std::endl;
   while (pending_listeners_ != 0) {
+    std::cerr<<"waiting for pending_listeners_: "<<pending_listeners_<<std::endl;
     listeners_cv_.wait(listeners_mutex_); // Safe since CondVar::wait won't throw.
   }
   ENVOY_LOG(info, "listener wait complete");
-
+  std::cerr<<"waited for listeners"<<std::endl;
   // If we are capturing, spin up tcpdump.
   const auto capture_path = TestEnvironment::getOptionalEnvVar("CAPTURE_PATH");
   if (capture_path) {
@@ -131,7 +137,9 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic) {
+  std::cerr<<"threadRoutine BEGIN"<<std::endl;
   OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version));
+  std::cerr<<"created OptionsImpl"<<std::endl;
   Server::HotRestartNopImpl restarter;
   Thread::MutexBasicLockable lock;
 
@@ -146,16 +154,23 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   } else {
     random_generator = std::make_unique<Runtime::RandomGeneratorImpl>();
   }
+  std::cerr<<"about to create InstanceImpl"<<std::endl;
   server_ = std::make_unique<Server::InstanceImpl>(
       options, time_system_, Network::Utility::getLocalAddress(version), *this, restarter,
       stats_store, lock, *this, std::move(random_generator), tls);
+  std::cerr<<"finished creating InstanceImpl"<<std::endl;
   pending_listeners_ = server_->listenerManager().listeners().size();
+  std::cerr<<"pending_listeners_ size"<<pending_listeners_<<std::endl;
   ENVOY_LOG(info, "waiting for {} test server listeners", pending_listeners_);
+  if (server_ == nullptr)
+    std::cerr<<"how is this nullptr after a make_unique?"<<std::endl;
   // This is technically thread unsafe (assigning to a shared_ptr accessed
   // across threads), but because we synchronize below on server_set, the only
   // consumer on the main test thread in ~IntegrationTestServer will not race.
-  admin_address_ = server_->admin().socket().localAddress();
+  admin_address_ = server_->admin().socket().localAddress(); // TODO TODO TODO SEGFAULT HERE
+  std::cerr<<"about to run setReady"<<std::endl;
   server_set_.setReady();
+  std::cerr<<"about to run server_"<<std::endl;
   server_->run();
   server_.reset();
   stat_store_ = nullptr;

@@ -52,6 +52,7 @@ public:
     }
     case envoy::api::v2::core::ConfigSource::kApiConfigSource: {
       const envoy::api::v2::core::ApiConfigSource& api_config_source = config.api_config_source();
+      std::cerr<<"YUP vanilla does checkApiConfigSourceSubscriptionBackingCluster() too"<<std::endl;//TODO REMOVE
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cm.clusters(), api_config_source);
       switch (api_config_source.api_type()) {
       case envoy::api::v2::core::ApiConfigSource::REST_LEGACY:
