@@ -175,7 +175,7 @@ void SymbolTable::incRefCount(const StatName& stat_name) {
     auto encode_search = encode_map_.find(decode_search->second.get());
     ASSERT(encode_search != encode_map_.end());
 
-    ++encode_search->second->ref_count_;
+    ++encode_search->second.ref_count_;
   }
 }
 
@@ -191,7 +191,7 @@ void SymbolTable::free(const StatName& stat_name) {
     auto encode_search = encode_map_.find(decode_search->second.get());
     ASSERT(encode_search != encode_map_.end());
 
-    SharedSymbol& shared_symbol = *encode_search->second;
+    SharedSymbol& shared_symbol = encode_search->second;
     --shared_symbol.ref_count_;
     if (shared_symbol.ref_count_ == 0) {
       decode_map_.erase(decode_search);
@@ -211,8 +211,8 @@ Symbol SymbolTable::toSymbol(absl::string_view sv) {
   StringUtil::strlcpy(str.get(), sv.data(), size);
 
   auto encode_insert =
-      encode_map_.insert({str.get(), std::make_unique<SharedSymbol>(next_symbol_)});
-  SharedSymbol& shared_symbol = *encode_insert.first->second;
+      encode_map_.insert({str.get(), SharedSymbol(next_symbol_)});
+  SharedSymbol& shared_symbol = encode_insert.first->second;
 
   if (encode_insert.second) {
     // The insertion took place.
@@ -271,7 +271,7 @@ void SymbolTable::debugPrint() const {
   std::sort(symbols.begin(), symbols.end());
   for (Symbol symbol : symbols) {
     const char* token = decode_map_.find(symbol)->second.get();
-    const SharedSymbol& shared_symbol = *encode_map_.find(token)->second;
+    const SharedSymbol& shared_symbol = encode_map_.find(token)->second;
     ENVOY_LOG_MISC(info, "{}: '{}' ({})", symbol, token, shared_symbol.ref_count_);
   }
 }
