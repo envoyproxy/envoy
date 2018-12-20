@@ -69,7 +69,8 @@ typedef std::unique_ptr<ResponseMessageImpl> ResponseMessageImplPtr;
 class DubboProtocolImpl : public Protocol {
 public:
   DubboProtocolImpl(ProtocolCallbacks& callbacks) : callbacks_(callbacks) {}
-  const std::string& name() const override { return ProtocolNames::get().Dubbo; }
+  const std::string& name() const override { return ProtocolNames::get().fromType(type()); }
+  ProtocolType type() const override { return ProtocolType::Dubbo; }
   virtual bool decode(Buffer::Instance& buffer, Protocol::Context* context) override;
 
   static constexpr uint8_t MessageSize = 16;
