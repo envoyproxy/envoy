@@ -26,11 +26,6 @@ using testing::IsSubstring;
 namespace Envoy {
 namespace {
 
-// NOTE: it is required that the listener be named 'http'! Down in the various guts that do the
-//       bidding of BaseIntegrationTest::createEnvoy(), a list of service names - taken from the
-//       names of the listeners - is registered into a listener (i.e. downstream-facing) port map.
-//       The various HttpIntegrationTest tests expect to look up in that port map a service called
-//       'http'.
 const std::string kConfig = R"EOF(
 admin:
   access_log_path: /dev/null
