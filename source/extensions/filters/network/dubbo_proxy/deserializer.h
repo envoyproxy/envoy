@@ -1,7 +1,12 @@
 #pragma once
 
+#include <string>
+#include <unordered_map>
+
 #include "envoy/buffer/buffer.h"
 
+#include "common/common/assert.h"
+#include "common/config/utility.h"
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -9,15 +14,39 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
+enum class DeserializerType : uint8_t {
+  Hessian = 0,
+  Json = 1,
+
+  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST PROTOCOL TYPE
+  LastDeserializerType = Json,
+};
+
 /**
  * Names of available deserializer implementations.
  */
 class DeserializerNameValues {
 public:
-  // hessian deserializer
-  const std::string Hessian = "hessian";
-  // json deserializer
-  const std::string Json = "json";
+  struct DeserializerTypeHash {
+    template <typename T> std::size_t operator()(T t) const { return static_cast<std::size_t>(t); }
+  };
+
+  typedef std::unordered_map<DeserializerType, std::string, DeserializerTypeHash>
+      DeserializerTypeNameMap;
+
+  const DeserializerTypeNameMap deserializerTypeNameMap = {
+      {DeserializerType::Hessian, "hessian"},
+      {DeserializerType::Json, "json"},
+  };
+
+  const std::string& fromType(DeserializerType type) const {
+    const auto& itor = deserializerTypeNameMap.find(type);
+    if (itor != deserializerTypeNameMap.end()) {
+      return itor->second;
+    }
+
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 };
 
 typedef ConstSingleton<DeserializerNameValues> DeserializerNames;
@@ -59,6 +88,12 @@ public:
    * @return std::string containing the serialization name.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return DeserializerType the deserializer type
+   */
+  virtual DeserializerType type() const PURE;
+
   /**
    * deserialize an rpc call
    * If successful, the RpcInvocation removed from the buffer
@@ -81,6 +116,55 @@ public:
 };
 
 typedef std::unique_ptr<Deserializer> DeserializerPtr;
+
+/**
+ * Implemented by each Dubbo deserialize and registered via Registry::registerFactory or the
+ * convenience class RegisterFactory.
+ */
+class NamedDeserializerConfigFactory {
+public:
+  virtual ~NamedDeserializerConfigFactory() {}
+
+  /**
+   * Create a particular Dubbo deserializer.
+   * @return DeserializerPtr the transport
+   */
+  virtual DeserializerPtr createDeserializer() PURE;
+
+  /**
+   * @return std::string the identifying name for a particular implementation of Dubbo deserializer
+   * produced by the factory.
+   */
+  virtual std::string name() PURE;
+
+  /**
+   * Convenience method to lookup a factory by type.
+   * @param TransportType the transport type
+   * @return NamedDeserializerConfigFactory& for the TransportType
+   */
+  static NamedDeserializerConfigFactory& getFactory(DeserializerType type) {
+    const std::string& name = DeserializerNames::get().fromType(type);
+    return Envoy::Config::Utility::getAndCheckFactory<NamedDeserializerConfigFactory>(name);
+  }
+};
+
+/**
+ * DeserializerFactoryBase provides a template for a trivial NamedDeserializerConfigFactory.
+ */
+template <class DeserializerImpl>
+class DeserializerFactoryBase : public NamedDeserializerConfigFactory {
+  DeserializerPtr createDeserializer() override {
+    return std::move(std::make_unique<DeserializerImpl>());
+  }
+
+  std::string name() override { return name_; }
+
+protected:
+  DeserializerFactoryBase(DeserializerType type) : name_(DeserializerNames::get().fromType(type)) {}
+
+private:
+  const std::string name_;
+};
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

@@ -60,6 +60,8 @@ envoy_cc_library(
     ],
     deps = [
         "//include/envoy/buffer:buffer_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
     ],
 )
