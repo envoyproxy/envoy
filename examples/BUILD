@@ -29,7 +29,6 @@ filegroup(
         "jaeger-tracing/service1-envoy-jaeger.yaml",
         "jaeger-tracing/service2-envoy-jaeger.yaml",
         "lua-file/envoy.yaml",
-        "lua-file/foo.lua",
         "lua/envoy.yaml",
         "zipkin-tracing/deprecated_v1/front-envoy-zipkin-v1.json",
         "zipkin-tracing/deprecated_v1/service1-envoy-zipkin-v1.json",
@@ -38,4 +37,7 @@ filegroup(
         "zipkin-tracing/service1-envoy-zipkin.yaml",
         "zipkin-tracing/service2-envoy-zipkin.yaml",
     ],
+    deps = [
+        "lua-file/foo.lua",
+    ]
 )
