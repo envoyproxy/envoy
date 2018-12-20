@@ -17,15 +17,15 @@ Version history
 * cluster: set a default of 1s for :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>`.
 * config: removed support for the v1 API.
 * config: added support for :ref:`rate limiting<envoy_api_msg_core.RateLimitSettings>` discovery request calls.
-* cors: added :ref: `invalid/valid stats <cors-statistics>` to filter.
+* cors: added :ref:`invalid/valid stats <cors-statistics>` to filter.
 * ext-authz: added support for providing per route config - optionally disable the filter and provide context extensions.
 * fault: removed integer percentage support.
 * grpc-json: added support for :ref:`ignoring query parameters
   <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.ignored_query_parameters>`.
-* health check: Added :ref: 'logging health check failure events <envoy_api_field_core.HealthCheck.always_log_health_check_failures>'.
+* health check: added :ref:`logging health check failure events <envoy_api_field_core.HealthCheck.always_log_health_check_failures>`.
 * health check: added ability to set :ref:`authority header value
   <envoy_api_field_core.HealthCheck.GrpcHealthCheck.authority>` for gRPC health check.
-* http: Added HTTP/2 WebSocket proxying via :ref:`extended CONNECT <envoy_api_field_core.Http2ProtocolOptions.allow_connect>`.
+* http: added HTTP/2 WebSocket proxying via :ref:`extended CONNECT <envoy_api_field_core.Http2ProtocolOptions.allow_connect>`.
 * http: added limits to the number and length of header modifications in all fields request_headers_to_add and response_headers_to_add. These limits are very high and should only be used as a last-resort safeguard.
 * http: added support for a :ref:`request timeout <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_timeout>`. The timeout is disabled by default.
 * http: no longer adding whitespace when appending X-Forwarded-For headers. **Warning**: this is not
