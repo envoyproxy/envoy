@@ -172,7 +172,7 @@ void SymbolTable::incRefCount(const StatName& stat_name) {
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
 
-    auto encode_search = encode_map_.find(decode_search->second.get());
+    auto encode_search = encode_map_.find(*decode_search->second);
     ASSERT(encode_search != encode_map_.end());
 
     ++encode_search->second.ref_count_;
@@ -188,7 +188,7 @@ void SymbolTable::free(const StatName& stat_name) {
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
 
-    auto encode_search = encode_map_.find(decode_search->second.get());
+    auto encode_search = encode_map_.find(*decode_search->second);
     ASSERT(encode_search != encode_map_.end());
 
     SharedSymbol& shared_symbol = encode_search->second;
@@ -202,34 +202,35 @@ void SymbolTable::free(const StatName& stat_name) {
 }
 
 Symbol SymbolTable::toSymbol(absl::string_view sv) {
-  // If the string segment doesn't already exist, create the actual string as a
-  // nul-terminated char-array and insert into encode_map_, and then insert a
-  // string_view pointing to it in the encode_map_. This allows us to only store
-  // the string once.
-  size_t size = sv.size() + 1;
-  std::unique_ptr<char[]> str = std::make_unique<char[]>(size);
-  StringUtil::strlcpy(str.get(), sv.data(), size);
-
-  auto encode_insert = encode_map_.insert({str.get(), SharedSymbol(next_symbol_)});
-  SharedSymbol& shared_symbol = encode_insert.first->second;
-
-  if (encode_insert.second) {
-    // The insertion took place.
+  Symbol result;
+  auto encode_find = encode_map_.find(sv);
+  // If the string segment doesn't already exist,
+  if (encode_find == encode_map_.end()) {
+    // If the string segment doesn't already exist, create the actual string as a
+    // nul-terminated char-array and insert into encode_map_, and then insert a
+    // string_view pointing to it in the encode_map_. This allows us to only store
+    // the string once.
+    auto str = std::make_unique<std::string>(std::string(sv));
+    auto encode_insert = encode_map_.insert({*str, SharedSymbol(next_symbol_)});
+    ASSERT(encode_insert.second);
     auto decode_insert = decode_map_.insert({next_symbol_, std::move(str)});
     ASSERT(decode_insert.second);
+
+    result = next_symbol_;
     newSymbol();
   } else {
     // If the insertion didn't take place, return the actual value at that location and up the
     // refcount at that location
-    ++(shared_symbol.ref_count_);
+    result = encode_find->second.symbol_;
+    ++(encode_find->second.ref_count_);
   }
-  return shared_symbol.symbol_;
+  return result;
 }
 
 absl::string_view SymbolTable::fromSymbol(const Symbol symbol) const SHARED_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
   RELEASE_ASSERT(search != decode_map_.end(), "no such symbol");
-  return absl::string_view(search->second.get());
+  return absl::string_view(*search->second);
 }
 
 void SymbolTable::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
@@ -269,7 +270,7 @@ void SymbolTable::debugPrint() const {
   }
   std::sort(symbols.begin(), symbols.end());
   for (Symbol symbol : symbols) {
-    const char* token = decode_map_.find(symbol)->second.get();
+    std::string& token = *decode_map_.find(symbol)->second;
     const SharedSymbol& shared_symbol = encode_map_.find(token)->second;
     ENVOY_LOG_MISC(info, "{}: '{}' ({})", symbol, token, shared_symbol.ref_count_);
   }
