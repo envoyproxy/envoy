@@ -47,7 +47,8 @@ namespace Config {
 //
 // For dynamic (xDS) providers:
 //   1) Create a class derived from DynamicConfigProviderImplBase and implement the required
-//   interface. 2) Create a class derived from ConfigSubscriptionInstanceBase; this is the entity
+//   interface.
+//   2) Create a class derived from ConfigSubscriptionInstanceBase; this is the entity
 //   responsible for owning and managing the Envoy::Config::Subscription<ConfigProto> that provides
 //   the underlying config subscription.
 //     - When subscription callbacks (onConfigUpdate, onConfigUpdateFailed) are issued by the
@@ -61,6 +62,9 @@ class ConfigProviderManagerImplBase;
 
 /**
  * ConfigProvider implementation for statically specified configuration.
+ *
+ * TODO(AndresGuedez): support sharing of config protos and config impls, as is
+ * done with the DynamicConfigProviderImplBase.
  *
  * This class can not be instantiated directly; instead, it provides the foundation for
  * static config provider implementations which derive from it.
@@ -198,9 +202,9 @@ private:
   SystemTime last_updated_;
   absl::optional<LastConfigInfo> config_info_;
 
-  // Subscriptions, dynamic config providers and config provider managers are tightly coupled with
-  // the current shared ownership model; use friend classes to explicitly denote the binding between
-  // them.
+  // ConfigSubscriptionInstanceBase, DynamicConfigProviderImplBase and ConfigProviderManagerImplBase
+  // are tightly coupled with the current shared ownership model; use friend classes to explicitly
+  // denote the binding between them.
   //
   // TODO(AndresGuedez): Investigate whether a shared ownership model avoiding the <shared_ptr>s and
   // instead centralizing lifetime management in the ConfigProviderManagerImplBase with explicit
@@ -311,9 +315,9 @@ protected:
 
   ConfigProviderManagerImplBase(Server::Admin& admin, const std::string& config_name);
 
-  const ConfigProviderSet& static_config_providers() const { return static_config_providers_; }
+  const ConfigProviderSet& staticConfigProviders() const { return static_config_providers_; }
 
-  const ConfigSubscriptionMap& config_subscriptions() const { return config_subscriptions_; }
+  const ConfigSubscriptionMap& configSubscriptions() const { return config_subscriptions_; }
 
   /**
    * Returns the subscription associated with the config_source_proto; if none exists, a new one is
@@ -386,6 +390,7 @@ private:
   // Then the lifetime management stuff is centralized and opaque.
   ConfigSubscriptionMap config_subscriptions_;
   ConfigProviderSet static_config_providers_;
+
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   Thread::ThreadId owner_tid_{};
 

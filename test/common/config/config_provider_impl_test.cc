@@ -129,7 +129,7 @@ public:
   // Envoy::Config::ConfigProviderManagerImplBase
   ProtobufTypes::MessagePtr dumpConfigs() const override {
     auto config_dump = std::make_unique<test::common::config::DummyConfigsDump>();
-    for (const auto& element : config_subscriptions()) {
+    for (const auto& element : configSubscriptions()) {
       auto subscription = element.second.lock();
       ASSERT(subscription);
 
@@ -143,7 +143,7 @@ public:
       }
     }
 
-    for (const auto& provider : static_config_providers()) {
+    for (const auto& provider : staticConfigProviders()) {
       ASSERT(provider->configProtoInfo<test::common::config::DummyConfig>());
       auto* static_config = config_dump->mutable_static_dummy_configs()->Add();
       static_config->mutable_dummy_config()->MergeFrom(

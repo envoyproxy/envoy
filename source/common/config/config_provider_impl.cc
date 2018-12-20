@@ -47,7 +47,9 @@ bool ConfigSubscriptionInstanceBase::checkAndApplyConfig(const Protobuf::Message
     // This makes it safe to call any of the provider's onConfigProtoUpdate() to get a new config
     // impl, which can then be passed to all providers.
     if (new_config == nullptr) {
-      new_config = provider->onConfigProtoUpdate(config_proto);
+      if ((new_config = provider->onConfigProtoUpdate(config_proto)) == nullptr) {
+        return false;
+      }
     }
     provider->onConfigUpdate(new_config);
   }
