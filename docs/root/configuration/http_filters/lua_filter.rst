@@ -21,7 +21,6 @@ The filter only supports loading Lua code in-line in the configuration. If local
 is desired, a trivial in-line script can be used to load the rest of the code from the local
 environment. Example :repo:`/examples/lua-file`.
 
-
 The design of the filter and Lua support at a high level is as follows:
 
 * All Lua environments are :ref:`per worker thread <arch_overview_threading>`. This means that
