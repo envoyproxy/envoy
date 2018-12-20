@@ -153,6 +153,14 @@ public:
   static bool isLoopbackAddress(const Address::Instance& address);
 
   /**
+   * Check if the addresses are the same IP address.
+   * @param address1 IP address to check.
+   * @param address2 IP address to check.
+   * @return true if so, otherwise false
+   */
+  static bool isSameIPAddress(const Address::Instance& address1, const Address::Instance& address2);
+
+  /**
    * @return Address::InstanceConstSharedPtr an address that represents the canonical IPv4 loopback
    *         address (i.e. "127.0.0.1"). Note that the range "127.0.0.0/8" is all defined as the
    *         loopback range, but the address typically used (e.g. in tests) is "127.0.0.1".

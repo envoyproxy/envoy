@@ -251,11 +251,7 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
   // performance optimization.
   if (remote_address->type() != Envoy::Network::Address::Type::Ip ||
       isLoopbackAddress(*remote_address) ||
-      (remote_address->ip()->version() == Address::IpVersion::v4
-           ? remote_address->ip()->ipv4()->address() ==
-                 socket.localAddress()->ip()->ipv4()->address()
-           : remote_address->ip()->ipv6()->address() ==
-                 socket.localAddress()->ip()->ipv6()->address())) {
+      isSameIPAddress(*remote_address, *socket.localAddress())) {
     return true;
   }
 
@@ -341,6 +337,21 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
                   "sizeof(absl::uint128) != sizeof(in6addr_loopback)");
     absl::uint128 addr = address.ip()->ipv6()->address();
     return 0 == memcmp(&addr, &in6addr_loopback, sizeof(in6addr_loopback));
+  }
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
+
+bool Utility::isSameIPAddress(const Address::Instance& address1,
+                              const Address::Instance& address2) {
+  if (address1.type() != Address::Type::Ip ||
+      address1.ip()->version() != address2.ip()->version()) {
+    return false;
+  }
+
+  if (address1.ip()->version() == Address::IpVersion::v4) {
+    return address1.ip()->ipv4()->address() == address2.ip()->ipv4()->address();
+  } else if (address1.ip()->version() == Address::IpVersion::v6) {
+    return address1.ip()->ipv6()->address() == address2.ip()->ipv6()->address();
   }
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
