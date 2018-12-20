@@ -9,37 +9,31 @@
 #include "common/config/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "extensions/filters/network/dubbo_proxy/message.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
-
-enum class DeserializerType : uint8_t {
-  Hessian = 0,
-  Json = 1,
-
-  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST PROTOCOL TYPE
-  LastDeserializerType = Json,
-};
 
 /**
  * Names of available deserializer implementations.
  */
 class DeserializerNameValues {
 public:
-  struct DeserializerTypeHash {
+  struct SerializationTypeHash {
     template <typename T> std::size_t operator()(T t) const { return static_cast<std::size_t>(t); }
   };
 
-  typedef std::unordered_map<DeserializerType, std::string, DeserializerTypeHash>
+  typedef std::unordered_map<SerializationType, std::string, SerializationTypeHash>
       DeserializerTypeNameMap;
 
   const DeserializerTypeNameMap deserializerTypeNameMap = {
-      {DeserializerType::Hessian, "hessian"},
-      {DeserializerType::Json, "json"},
+      {SerializationType::Hessian, "hessian"},
+      {SerializationType::Json, "json"},
   };
 
-  const std::string& fromType(DeserializerType type) const {
+  const std::string& fromType(SerializationType type) const {
     const auto& itor = deserializerTypeNameMap.find(type);
     if (itor != deserializerTypeNameMap.end()) {
       return itor->second;
@@ -90,9 +84,9 @@ public:
   virtual const std::string& name() const PURE;
 
   /**
-   * @return DeserializerType the deserializer type
+   * @return SerializationType the deserializer type
    */
-  virtual DeserializerType type() const PURE;
+  virtual SerializationType type() const PURE;
 
   /**
    * deserialize an rpc call
@@ -142,7 +136,7 @@ public:
    * @param TransportType the transport type
    * @return NamedDeserializerConfigFactory& for the TransportType
    */
-  static NamedDeserializerConfigFactory& getFactory(DeserializerType type) {
+  static NamedDeserializerConfigFactory& getFactory(SerializationType type) {
     const std::string& name = DeserializerNames::get().fromType(type);
     return Envoy::Config::Utility::getAndCheckFactory<NamedDeserializerConfigFactory>(name);
   }
@@ -160,7 +154,8 @@ class DeserializerFactoryBase : public NamedDeserializerConfigFactory {
   std::string name() override { return name_; }
 
 protected:
-  DeserializerFactoryBase(DeserializerType type) : name_(DeserializerNames::get().fromType(type)) {}
+  DeserializerFactoryBase(SerializationType type)
+      : name_(DeserializerNames::get().fromType(type)) {}
 
 private:
   const std::string name_;

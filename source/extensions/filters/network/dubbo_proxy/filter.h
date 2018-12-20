@@ -128,7 +128,7 @@ private:
   DubboFilterStats stats_;
 
   ProtocolType protocol_type_;
-  DeserializerType deserializer_type_;
+  SerializationType serialization_type_;
 
   TimeSource& time_source_;
 };

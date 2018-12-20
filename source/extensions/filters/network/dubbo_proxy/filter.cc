@@ -41,19 +41,19 @@ ProtocolType lookupProtocolType(ConfigProtocolType config_type) {
 using ConfigSerializationType =
     envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_SerializationType;
 
-typedef std::map<ConfigSerializationType, DeserializerType> DeserializerTypeMap;
+typedef std::map<ConfigSerializationType, SerializationType> SerializationTypeMap;
 
-static const DeserializerTypeMap& deserializerTypeMap() {
-  CONSTRUCT_ON_FIRST_USE(DeserializerTypeMap,
+static const SerializationTypeMap& serializationTypeMap() {
+  CONSTRUCT_ON_FIRST_USE(SerializationTypeMap,
                          {
                              {ConfigSerializationType::DubboProxy_SerializationType_Hessian2,
-                              DeserializerType::Hessian},
+                              SerializationType::Hessian},
                          });
 }
 
-DeserializerType lookupDeserializerType(ConfigSerializationType type) {
-  const auto& iter = deserializerTypeMap().find(type);
-  if (iter == deserializerTypeMap().end()) {
+SerializationType lookupSerializationType(ConfigSerializationType type) {
+  const auto& iter = serializationTypeMap().find(type);
+  if (iter == serializationTypeMap().end()) {
     throw EnvoyException(fmt::format("unknown deserializer {}",
                                      envoy::extensions::filters::network::dubbo_proxy::v2alpha1::
                                          DubboProxy_SerializationType_Name(type)));
@@ -68,7 +68,7 @@ Filter::Filter(const std::string& stat_prefix, ConfigProtocolType protocol_type,
                ConfigSerializationType serialization_type, Stats::Scope& scope,
                TimeSource& time_source)
     : stats_(generateStats(stat_prefix, scope)), protocol_type_(lookupProtocolType(protocol_type)),
-      deserializer_type_(lookupDeserializerType(serialization_type)), time_source_(time_source) {}
+      serialization_type_(lookupSerializationType(serialization_type)), time_source_(time_source) {}
 
 Filter::~Filter() = default;
 
@@ -238,7 +238,7 @@ ProtocolPtr Filter::createProtocol(ProtocolCallbacks& callback) {
 }
 
 DeserializerPtr Filter::createDeserializer() {
-  return NamedDeserializerConfigFactory::getFactory(deserializer_type_).createDeserializer();
+  return NamedDeserializerConfigFactory::getFactory(serialization_type_).createDeserializer();
 }
 
 } // namespace DubboProxy

@@ -125,9 +125,9 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
 
 TEST(HessianProtocolTest, HessianDeserializerConfigFactory) {
   auto deserializer =
-      NamedDeserializerConfigFactory::getFactory(DeserializerType::Hessian).createDeserializer();
+      NamedDeserializerConfigFactory::getFactory(SerializationType::Hessian).createDeserializer();
   EXPECT_EQ(deserializer->name(), "hessian");
-  EXPECT_EQ(deserializer->type(), DeserializerType::Hessian);
+  EXPECT_EQ(deserializer->type(), SerializationType::Hessian);
 }
 
 } // namespace DubboProxy

@@ -87,7 +87,7 @@ RpcResultPtr HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buf
 
 class HessianDeserializerConfigFactory : public DeserializerFactoryBase<HessianDeserializerImpl> {
 public:
-  HessianDeserializerConfigFactory() : DeserializerFactoryBase(DeserializerType::Hessian) {}
+  HessianDeserializerConfigFactory() : DeserializerFactoryBase(SerializationType::Hessian) {}
 };
 
 /**
