@@ -10,8 +10,8 @@
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/config/utility.h"
 #include "common/common/thread.h"
+#include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
