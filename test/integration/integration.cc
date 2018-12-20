@@ -360,6 +360,9 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
   test_server_ = IntegrationTestServer::create(
       bootstrap_path, version_, pre_worker_start_test_steps_, deterministic_, *time_system_, *api_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0) {
+    // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
+    // needs to know about the bound listener ports.
+    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
     registerTestServerPorts(port_names);
   }
 }
