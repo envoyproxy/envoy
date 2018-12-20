@@ -3145,9 +3145,9 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithAllContinue) {
       }));
 
   EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+      .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(*decoder_filters_[2], decodeData(_, true))
-      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+      .WillOnce(Return(FilterDataStatus::Continue));
 
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, true)).Times(0);
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, true)).Times(0);
@@ -3185,10 +3185,10 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithContinueDecoding) {
       }));
 
   EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+      .WillOnce(Return(FilterHeadersStatus::Continue));
   // This fail, it is called twice.
   EXPECT_CALL(*decoder_filters_[2], decodeData(_, true))
-      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+      .WillOnce(Return(FilterDataStatus::Continue));
 
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, true)).Times(0);
   // This fail, it is called once

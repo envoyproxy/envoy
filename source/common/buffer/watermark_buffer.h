@@ -39,6 +39,24 @@ public:
   void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
   uint32_t highWatermark() const { return high_watermark_; }
 
+  void incAddOperations() { total_add_op_++; }
+  bool hasNewData() const { return total_add_op_ > consumed_add_op_; }
+  class ConsumeAddOpertions {
+  public:
+    explicit ConsumeAddOpertions(WatermarkBuffer& buf) : buf_(buf) {
+      old_add_op_ = buf_.total_add_op_;
+    }
+    ~ConsumeAddOpertions() {
+      if (old_add_op_ > buf_.consumed_add_op_) {
+        buf_.consumed_add_op_ = old_add_op_;
+      }
+    }
+
+  private:
+    WatermarkBuffer& buf_;
+    uint32_t old_add_op_;
+  };
+
 private:
   void checkHighWatermark();
   void checkLowWatermark();
@@ -54,6 +72,10 @@ private:
   // True between the time above_high_watermark_ has been called until above_high_watermark_ has
   // been called.
   bool above_high_watermark_called_{false};
+
+  // Followings are used to detect any new data has been added to the buffer
+  uint32_t total_add_op_{1};
+  uint32_t consumed_add_op_{0};
 };
 
 typedef std::unique_ptr<WatermarkBuffer> WatermarkBufferPtr;
