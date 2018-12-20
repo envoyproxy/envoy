@@ -15,7 +15,7 @@ namespace {
 
 class DummyConfigProviderManager;
 
-class StaticDummyConfigProvider : public Envoy::Config::StaticConfigProviderImplBase {
+class StaticDummyConfigProvider : public ImmutableConfigProviderImplBase {
 public:
   StaticDummyConfigProvider(const test::common::config::DummyConfig& config_proto,
                             Server::Configuration::FactoryContext& factory_context,
@@ -81,14 +81,14 @@ public:
   DummyConfig(const test::common::config::DummyConfig&) {}
 };
 
-class DummyDynamicConfigProvider : public DynamicConfigProviderImplBase {
+class DummyDynamicConfigProvider : public MutableConfigProviderImplBase {
 public:
   DummyDynamicConfigProvider(DummyConfigSubscriptionSharedPtr&& subscription,
                              ConfigConstSharedPtr initial_config,
                              Server::Configuration::FactoryContext& factory_context)
-      : DynamicConfigProviderImplBase(std::move(subscription), factory_context),
+      : MutableConfigProviderImplBase(std::move(subscription), factory_context),
         subscription_(static_cast<DummyConfigSubscription*>(
-            DynamicConfigProviderImplBase::subscription().get())) {
+            MutableConfigProviderImplBase::subscription().get())) {
     initialize(initial_config);
   }
 
@@ -96,7 +96,7 @@ public:
 
   DummyConfigSubscription& subscription() { return *subscription_; }
 
-  // Envoy::Config::DynamicConfigProviderImplBase
+  // Envoy::Config::MutableConfigProviderImplBase
   ConfigProvider::ConfigConstSharedPtr
   onConfigProtoUpdate(const Protobuf::Message& config) override {
     return std::make_shared<DummyConfig>(
@@ -143,7 +143,7 @@ public:
       }
     }
 
-    for (const auto& provider : staticConfigProviders()) {
+    for (const auto* provider : immutableConfigProviders(ConfigProviderInstanceType::Static)) {
       ASSERT(provider->configProtoInfo<test::common::config::DummyConfig>());
       auto* static_config = config_dump->mutable_static_dummy_configs()->Add();
       static_config->mutable_dummy_config()->MergeFrom(
@@ -170,8 +170,8 @@ public:
         });
 
     ConfigProvider::ConfigConstSharedPtr initial_config;
-    const DynamicConfigProviderImplBase* provider =
-        subscription->getAnyBoundDynamicConfigProvider();
+    const MutableConfigProviderImplBase* provider =
+        subscription->getAnyBoundMutableConfigProvider();
     if (provider) {
       initial_config = provider->getConfig();
     }
@@ -193,7 +193,8 @@ StaticDummyConfigProvider::StaticDummyConfigProvider(
     const test::common::config::DummyConfig& config_proto,
     Server::Configuration::FactoryContext& factory_context,
     DummyConfigProviderManager& config_provider_manager)
-    : StaticConfigProviderImplBase(factory_context, config_provider_manager),
+    : ImmutableConfigProviderImplBase(factory_context, config_provider_manager,
+                                      ConfigProviderInstanceType::Static),
       config_(std::make_shared<DummyConfig>(config_proto)), config_proto_(config_proto) {}
 
 DummyConfigSubscription::DummyConfigSubscription(

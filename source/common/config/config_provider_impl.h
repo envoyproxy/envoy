@@ -17,10 +17,11 @@
 namespace Envoy {
 namespace Config {
 
-// This file provides a set of base classes, (StaticConfigProviderImplBase,
-// DynamicConfigProviderImplBase, ConfigProviderManagerImplBase, ConfigSubscriptionInstanceBase),
+// This file provides a set of base classes, (ImmutableConfigProviderImplBase,
+// MutableConfigProviderImplBase, ConfigProviderManagerImplBase, ConfigSubscriptionInstanceBase),
 // conforming to the ConfigProvider/ConfigProviderManager interfaces, which in tandem provide a
-// framework for implementing static and dynamic configuration for Envoy.
+// framework for implementing statically defined (i.e., immutable) and dynamic (mutable via
+// subscriptions) configuration for Envoy.
 //
 // Dynamic configuration is distributed via xDS APIs (see
 // https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md). The framework exposed
@@ -32,7 +33,7 @@ namespace Config {
 // This approach enables linear memory scalability based primarily on the size of the configuration
 // set.
 //
-// A blueprint to follow for implementing static and dynamic config providers is as follows:
+// A blueprint to follow for implementing {im,}mutable config providers is as follows:
 //
 // For both:
 //   1) Create a class derived from ConfigProviderManagerImplBase and implement the required
@@ -41,12 +42,12 @@ namespace Config {
 //      be called to fetch either an existing ConfigSubscriptionInstanceBase if the config source
 //      configuration matches, or a newly instantiated subscription otherwise.
 //
-// For static providers:
-//   1) Create a class derived from StaticConfigProviderImplBase and implement the required
+// For immutable providers:
+//   1) Create a class derived from ImmutableConfigProviderImplBase and implement the required
 //   interface.
 //
-// For dynamic (xDS) providers:
-//   1) Create a class derived from DynamicConfigProviderImplBase and implement the required
+// For mutable (xDS) providers:
+//   1) Create a class derived from MutableConfigProviderImplBase and implement the required
 //   interface.
 //   2) Create a class derived from ConfigSubscriptionInstanceBase; this is the entity
 //   responsible for owning and managing the Envoy::Config::Subscription<ConfigProto> that provides
@@ -61,47 +62,67 @@ namespace Config {
 class ConfigProviderManagerImplBase;
 
 /**
- * ConfigProvider implementation for statically specified configuration.
+ * Specifies the type of config associated with a ConfigProvider.
+ */
+enum class ConfigProviderInstanceType {
+  // Configuration defined as a static resource in the bootstrap config.
+  Static,
+  // Configuration defined inline in a resource that may be specified statically or obtained via
+  // xDS.
+  Inline,
+  // Configuration obtained from an xDS subscription.
+  xDS
+};
+// Required for fmt::format().
+std::ostream& operator<<(std::ostream& os, ConfigProviderInstanceType type);
+
+/**
+ * ConfigProvider implementation for immutable configuration.
  *
  * TODO(AndresGuedez): support sharing of config protos and config impls, as is
- * done with the DynamicConfigProviderImplBase.
+ * done with the MutableConfigProviderImplBase.
  *
  * This class can not be instantiated directly; instead, it provides the foundation for
- * static config provider implementations which derive from it.
+ * immutable config provider implementations which derive from it.
  */
-class StaticConfigProviderImplBase : public ConfigProvider {
+class ImmutableConfigProviderImplBase : public ConfigProvider {
 public:
-  virtual ~StaticConfigProviderImplBase();
+  virtual ~ImmutableConfigProviderImplBase();
 
   // Envoy::Config::ConfigProvider
   SystemTime lastUpdated() const override { return last_updated_; }
 
+  ConfigProviderInstanceType type() const { return type_; }
+
 protected:
-  StaticConfigProviderImplBase(Server::Configuration::FactoryContext& factory_context,
-                               ConfigProviderManagerImplBase& config_provider_manager);
+  ImmutableConfigProviderImplBase(Server::Configuration::FactoryContext& factory_context,
+                                  ConfigProviderManagerImplBase& config_provider_manager,
+                                  ConfigProviderInstanceType type);
 
 private:
   SystemTime last_updated_;
   ConfigProviderManagerImplBase& config_provider_manager_;
+  ConfigProviderInstanceType type_;
 };
 
-class DynamicConfigProviderImplBase;
+class MutableConfigProviderImplBase;
 
 /**
- * Provides generic functionality required by all dynamic ConfigProvider subscriptions, including
+ * Provides generic functionality required by all xDS ConfigProvider subscriptions, including
  * shared lifetime management via shared_ptr.
  *
- * To do so, this class keeps track of a set of dynamic config providers associated with an
- * underlying subscription; providers are bound/unbound as needed as they are created and destroyed.
+ * To do so, this class keeps track of a set of MutableConfigProviderImplBase instances associated
+ * with an underlying subscription; providers are bound/unbound as needed as they are created and
+ * destroyed.
  *
- * Dynamic config providers and subscriptions are split to avoid lifetime issues with arguments
+ * xDS config providers and subscriptions are split to avoid lifetime issues with arguments
  * required by the config providers. An example is the Server::Configuration::FactoryContext, which
  * is owned by listeners and therefore may be destroyed while an associated config provider is still
  * in use (see #3960). This split enables single ownership of the config providers, while enabling
  * shared ownership of the underlying subscription.
  *
  * This class can not be instantiated directly; instead, it provides the foundation for
- * dynamic config subscription implementations which derive from it.
+ * config subscription implementations which derive from it.
  */
 class ConfigSubscriptionInstanceBase : public Init::Target,
                                        protected Logger::Loggable<Logger::Id::config> {
@@ -157,12 +178,12 @@ public:
                            const std::string& version_info);
 
   /**
-   * Returns one of the bound dynamic config providers.
-   * @return const DynamicConfigProviderImplBase* a const pointer to a
-   *         bound DynamicConfigProviderImplBase or nullptr when there are none.
+   * Returns one of the bound mutable config providers.
+   * @return const MutableConfigProviderImplBase* a const pointer to a
+   *         bound MutableConfigProviderImplBase or nullptr when there are none.
    */
-  const DynamicConfigProviderImplBase* getAnyBoundDynamicConfigProvider() const {
-    return !dynamic_config_providers_.empty() ? *dynamic_config_providers_.begin() : nullptr;
+  const MutableConfigProviderImplBase* getAnyBoundMutableConfigProvider() const {
+    return !mutable_config_providers_.empty() ? *mutable_config_providers_.begin() : nullptr;
   }
 
 protected:
@@ -183,29 +204,29 @@ protected:
 private:
   void registerInitTarget(Init::Manager& init_manager) { init_manager.registerTarget(*this); }
 
-  void bindConfigProvider(DynamicConfigProviderImplBase* provider);
+  void bindConfigProvider(MutableConfigProviderImplBase* provider);
 
-  void unbindConfigProvider(DynamicConfigProviderImplBase* provider) {
-    dynamic_config_providers_.erase(provider);
+  void unbindConfigProvider(MutableConfigProviderImplBase* provider) {
+    mutable_config_providers_.erase(provider);
   }
 
   const std::string name_;
   std::function<void()> initialize_callback_;
-  std::unordered_set<DynamicConfigProviderImplBase*> dynamic_config_providers_;
+  std::unordered_set<MutableConfigProviderImplBase*> mutable_config_providers_;
   const std::string manager_identifier_;
   ConfigProviderManagerImplBase& config_provider_manager_;
   TimeSource& time_source_;
   SystemTime last_updated_;
   absl::optional<LastConfigInfo> config_info_;
 
-  // ConfigSubscriptionInstanceBase, DynamicConfigProviderImplBase and ConfigProviderManagerImplBase
+  // ConfigSubscriptionInstanceBase, MutableConfigProviderImplBase and ConfigProviderManagerImplBase
   // are tightly coupled with the current shared ownership model; use friend classes to explicitly
   // denote the binding between them.
   //
   // TODO(AndresGuedez): Investigate whether a shared ownership model avoiding the <shared_ptr>s and
   // instead centralizing lifetime management in the ConfigProviderManagerImplBase with explicit
   // reference counting would be more maintainable.
-  friend class DynamicConfigProviderImplBase;
+  friend class MutableConfigProviderImplBase;
   friend class ConfigProviderManagerImplBase;
 };
 
@@ -218,9 +239,9 @@ using ConfigSubscriptionInstanceBaseSharedPtr = std::shared_ptr<ConfigSubscripti
  * This class can not be instantiated directly; instead, it provides the foundation for
  * dynamic config provider implementations which derive from it.
  */
-class DynamicConfigProviderImplBase : public ConfigProvider {
+class MutableConfigProviderImplBase : public ConfigProvider {
 public:
-  virtual ~DynamicConfigProviderImplBase() { subscription_->unbindConfigProvider(this); }
+  virtual ~MutableConfigProviderImplBase() { subscription_->unbindConfigProvider(this); }
 
   // Envoy::Config::ConfigProvider
   SystemTime lastUpdated() const override { return subscription_->lastUpdated(); }
@@ -254,7 +275,7 @@ public:
   }
 
 protected:
-  DynamicConfigProviderImplBase(ConfigSubscriptionInstanceBaseSharedPtr&& subscription,
+  MutableConfigProviderImplBase(ConfigSubscriptionInstanceBaseSharedPtr&& subscription,
                                 Server::Configuration::FactoryContext& factory_context)
       : subscription_(subscription), tls_(factory_context.threadLocal().allocateSlot()) {}
 
@@ -277,9 +298,9 @@ private:
  * lifetime of subscriptions and dynamic config providers, along with determining which
  * subscriptions should be associated with newly instantiated providers.
  *
- * The implementation of this class is not thread safe. Note that StaticConfigProviderImplBase and
- * ConfigSubscriptionInstanceBase call the corresponding {bind,unbind}* functions exposed by this
- * class.
+ * The implementation of this class is not thread safe. Note that ImmutableConfigProviderImplBase
+ * and ConfigSubscriptionInstanceBase call the corresponding {bind,unbind}* functions exposed by
+ * this class.
  *
  * All config processing is done on the main thread, so instantiation of *ConfigProvider* objects
  * via createStaticConfigProvider() and createXdsConfigProvider() is naturally thread safe. Care
@@ -296,20 +317,27 @@ public:
   /**
    * This is invoked by the /config_dump admin handler.
    * @return ProtobufTypes::MessagePtr the config dump proto corresponding to the associated
-   *                                   {static,dynamic} config providers.
+   *                                   config providers.
    */
   virtual ProtobufTypes::MessagePtr dumpConfigs() const PURE;
 
 protected:
   using ConfigProviderSet = std::unordered_set<ConfigProvider*>;
+  using ConfigProviderMap =
+      std::unordered_map<ConfigProviderInstanceType, std::unique_ptr<ConfigProviderSet>>;
   using ConfigSubscriptionMap =
       std::unordered_map<std::string, std::weak_ptr<ConfigSubscriptionInstanceBase>>;
 
   ConfigProviderManagerImplBase(Server::Admin& admin, const std::string& config_name);
 
-  const ConfigProviderSet& staticConfigProviders() const { return static_config_providers_; }
-
   const ConfigSubscriptionMap& configSubscriptions() const { return config_subscriptions_; }
+
+  /**
+   * Returns the set of bound ImmutableConfigProviderImplBase-derived providers of a given type.
+   * @param type supplies the type of config providers to return.
+   * @return const ConfigProviderSet* the set of config providers corresponding to the type.
+   */
+  const ConfigProviderSet& immutableConfigProviders(ConfigProviderInstanceType type) const;
 
   /**
    * Returns the subscription associated with the config_source_proto; if none exists, a new one is
@@ -367,21 +395,14 @@ private:
     config_subscriptions_.erase(manager_identifier);
   }
 
-  void bindStaticConfigProvider(StaticConfigProviderImplBase* provider) {
-    ASSERT(owner_tid_ == Thread::currentThreadId());
-    static_config_providers_.insert(provider);
-  }
-
-  void unbindStaticConfigProvider(StaticConfigProviderImplBase* provider) {
-    ASSERT(owner_tid_ == Thread::currentThreadId());
-    static_config_providers_.erase(provider);
-  }
+  void bindImmutableConfigProvider(ImmutableConfigProviderImplBase* provider);
+  void unbindImmutableConfigProvider(ImmutableConfigProviderImplBase* provider);
 
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
   // as in ConfigTracker. I.e. the ProviderImpls would have an EntryOwner for these lists
   // Then the lifetime management stuff is centralized and opaque.
   ConfigSubscriptionMap config_subscriptions_;
-  ConfigProviderSet static_config_providers_;
+  ConfigProviderMap immutable_config_providers_map_;
 
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   Thread::ThreadId owner_tid_{};
@@ -389,7 +410,7 @@ private:
   // See comment for friend classes in the ConfigSubscriptionInstanceBase for more details on the
   // use of friends.
   friend class ConfigSubscriptionInstanceBase;
-  friend class StaticConfigProviderImplBase;
+  friend class ImmutableConfigProviderImplBase;
 };
 
 } // namespace Config
