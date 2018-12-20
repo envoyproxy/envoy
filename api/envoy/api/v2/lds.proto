@@ -6,6 +6,7 @@ option java_generic_services = true;
 
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
+import "envoy/api/v2/core/config_source.proto";
 import "envoy/api/v2/discovery.proto";
 import "envoy/api/v2/listener/listener.proto";
 
@@ -37,7 +38,7 @@ service ListenerDiscoveryService {
   }
 }
 
-// [#comment:next free field: 16]
+// [#comment:next free field: 17]
 message Listener {
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
@@ -57,10 +58,21 @@ message Listener {
   // :ref:`FilterChainMatch <envoy_api_msg_listener.FilterChainMatch>` criteria is used on a
   // connection.
   //
+  // Precisely one of filter_chains and fdcs_config must be set.
+  //
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
-  repeated listener.FilterChain filter_chains = 3
-      [(validate.rules).repeated .min_items = 1, (gogoproto.nullable) = false];
+  repeated listener.FilterChain filter_chains = 3 [(gogoproto.nullable) = false];
+
+  message FcdsConfig {
+    core.ConfigSource fds_config = 1;
+
+    // Optional alternative to the listener name to present to FCDS.
+    string filter_chain_name = 2;
+  }
+
+  // Precisely one of filter_chains and fdcs_config must be set.
+  FcdsConfig fcds_config = 17;
 
   // If a connection is redirected using *iptables*, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to

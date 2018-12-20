@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package envoy.api.v2;
+
+option java_generic_services = true;
+
+import "envoy/api/v2/discovery.proto";
+
+import "google/api/annotations.proto";
+import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.equal_all) = true;
+
+// [#protodoc-title: Filter Chain Discovery Service]
+
+// The resource_names field in DiscoveryRequest specifies a listener.
+// The resources field in DiscoveryResponse is values of type listener.FilterChain.
+service FilterChainDiscoveryService {
+  rpc StreamRoutes(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
+  }
+
+  rpc IncrementalFilterChains(stream IncrementalDiscoveryRequest)
+      returns (stream IncrementalDiscoveryResponse) {
+  }
+
+  rpc FetchFilterChains(DiscoveryRequest) returns (DiscoveryResponse) {
+    option (google.api.http) = {
+      post: "/v2/discovery:filterchains"
+      body: "*"
+    };
+  }
+}
+

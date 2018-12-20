@@ -98,6 +98,24 @@ api_go_grpc_library(
 )
 
 api_proto_library_internal(
+    name = "fcds",
+    srcs = ["fcds.proto"],
+    has_services = 1,
+    visibility = [":friends"],
+    deps = [
+        ":discovery",
+    ],
+)
+
+api_go_grpc_library(
+    name = "fcds",
+    proto = ":fcds",
+    deps = [
+        ":discovery_go_proto",
+    ],
+)
+
+api_proto_library_internal(
     name = "lds",
     srcs = ["lds.proto"],
     has_services = 1,
@@ -106,6 +124,7 @@ api_proto_library_internal(
         ":discovery",
         "//envoy/api/v2/core:address",
         "//envoy/api/v2/core:base",
+        "//envoy/api/v2/core:config_source",
         "//envoy/api/v2/listener",
     ],
 )
@@ -117,6 +136,7 @@ api_go_grpc_library(
         ":discovery_go_proto",
         "//envoy/api/v2/core:address_go_proto",
         "//envoy/api/v2/core:base_go_proto",
+        "//envoy/api/v2/core:config_source_go_proto",
         "//envoy/api/v2/listener:listener_go_proto",
     ],
 )
