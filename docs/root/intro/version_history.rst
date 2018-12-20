@@ -1,7 +1,7 @@
 Version history
 ---------------
 
-1.9.0 (pending)
+1.9.0
 ===============
 * access log: added a :ref:`JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format.
 * access log: added dynamic metadata to access log messages streamed over gRPC.
