@@ -55,11 +55,7 @@ private:
     ~HttpActiveHealthCheckSession();
 
     void onResponseComplete();
-    enum class HealthCheckResult {
-      Succeeded,
-      Degraded,
-      Failed
-    };
+    enum class HealthCheckResult { Succeeded, Degraded, Failed };
     HealthCheckResult healthCheckResult();
 
     // ActiveHealthCheckSession
