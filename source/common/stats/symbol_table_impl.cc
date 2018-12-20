@@ -131,46 +131,12 @@ SymbolEncoding SymbolTable::encode(const absl::string_view name) {
   std::vector<absl::string_view> tokens = absl::StrSplit(name, '.');
   std::vector<Symbol> symbols;
   symbols.reserve(tokens.size());
-  const size_t nsymbols = tokens.size();
-  size_t write_index = nsymbols;
 
   {
-    //absl::ReaderMutexLock lock(&lock_);
-    lock_.ReaderLock();
-    Symbol symbol;
-    for (size_t i = 0; i < nsymbols; ++i) {
-      if (toSymbolReadLockHeld(tokens[i], symbol)) {
-        symbols.push_back(symbol);
-      } else {
-        write_index = i;
-        break;
-      }
+    Thread::LockGuard lock(lock_);
+    for (auto& token : tokens) {
+      symbols.push_back(toSymbol(token));
     }
-    lock_.ReaderUnlock();
-  }
-
-  if (write_index != nsymbols) {
-    // If the find() under read-lock failed, we need to release it and take a
-    // write-lock. Note that another thread may race to insert the symbol during
-    // this window of time with the lock released, so we need to check again
-    // under write-lock, which we do by proactively allocating the string and
-    // attempting to insert it into the encode_map. If that worked, we also
-    // write the decode-map, transferring the ownership of the string to the
-    // decode-map value.
-
-    // TODO(jmarantz): we could use __builtin_expect here to avoid any production
-    // overhead in clang and g++ but should incorporate that into some portability
-    // macros in a separate PR.
-    if (write_lock_test_hook_ != nullptr) {
-      write_lock_test_hook_();
-    }
-
-    //absl::MutexLock lock(&lock_);
-    lock_.Lock();
-    for (size_t i = write_index, n = tokens.size(); i < n; ++i) {
-      symbols.push_back(toSymbolWriteLockHeld(tokens[i]));
-    }
-    lock_.Unlock();
   }
 
   // Now efficiently encode the array of 32-bit symbols into a uint8_t array.
@@ -189,12 +155,10 @@ std::string SymbolTable::decodeSymbolVec(const SymbolVec& symbols) const {
   name_tokens.reserve(symbols.size());
   {
     // Hold the lock only while decoding symbols.
-    //absl::ReaderMutexLock lock(&lock_);
-    lock_.ReaderLock();
+    Thread::LockGuard lock(lock_);
     for (Symbol symbol : symbols) {
       name_tokens.push_back(fromSymbol(symbol));
     }
-    lock_.ReaderUnlock();
   }
   return absl::StrJoin(name_tokens, ".");
 }
@@ -203,8 +167,7 @@ void SymbolTable::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolStorage.
   SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
-  //absl::ReaderMutexLock lock(&lock_);
-  lock_.ReaderLock();
+  Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
@@ -214,7 +177,6 @@ void SymbolTable::incRefCount(const StatName& stat_name) {
 
     ++encode_search->second->ref_count_;
   }
-  lock_.ReaderUnlock();
 }
 
 void SymbolTable::free(const StatName& stat_name) {
@@ -226,8 +188,7 @@ void SymbolTable::free(const StatName& stat_name) {
   const size_t nsymbols = symbols.size();
   size_t write_index = nsymbols;
   {
-    //absl::ReaderMutexLock lock(&lock_);
-    lock_.ReaderLock();
+    Thread::LockGuard lock(lock_);
     for (size_t i = 0; i < nsymbols; ++i) {
       auto decode_search = decode_map_.find(symbols[i]);
       ASSERT(decode_search != decode_map_.end());
@@ -250,12 +211,10 @@ void SymbolTable::free(const StatName& stat_name) {
         break;
       }
     }
-    lock_.ReaderUnlock();
   }
 
   if (write_index != nsymbols) {
-    //absl::MutexLock lock(&lock_);
-    lock_.Lock();
+    Thread::LockGuard lock(lock_);
     for (size_t i = write_index; i < nsymbols; ++i) {
       Symbol symbol = symbols[i];
       auto decode_search = decode_map_.find(symbol);
@@ -270,26 +229,10 @@ void SymbolTable::free(const StatName& stat_name) {
         pool_.push(symbol);
       }
     }
-    lock_.ReaderUnlock();
   }
 }
 
-bool SymbolTable::toSymbolReadLockHeld(absl::string_view sv, Symbol& symbol) {
-  // First try to find the symbol with just a read-lock, so concurrent
-  // lookups for an already-allocated symbol do not contend.
-  auto encode_find = encode_map_.find(sv);
-  if (encode_find == encode_map_.end()) {
-    return false;
-  }
-  // Increment the refcount of the already existing symbol. Note that the
-  // ref_count_ is atomic to allow incrementing it under read-lock.
-  SharedSymbol& shared_symbol = *encode_find->second;
-  ++(shared_symbol.ref_count_);
-  symbol = shared_symbol.symbol_;
-  return true;
-}
-
-Symbol SymbolTable::toSymbolWriteLockHeld(absl::string_view sv) {
+Symbol SymbolTable::toSymbol(absl::string_view sv) {
   // If the string segment doesn't already exist, create the actual string as a
   // nul-terminated char-array and insert into encode_map_, and then insert a
   // string_view pointing to it in the encode_map_. This allows us to only store
@@ -312,14 +255,6 @@ Symbol SymbolTable::toSymbolWriteLockHeld(absl::string_view sv) {
     // insert the same symbmol after we drop the read-lock above -- we can
     // return the shared symbol, but we must bump the refcount.
     ++(shared_symbol.ref_count_);
-
-    // Note: this condition is hard to hit in tests as it requires a tight race
-    // between multiple threads concurrently creating the same symbol.
-    // Uncommenting this line can help rapidly determine coverage during
-    // development. StatNameTest.RacingSymbolCreation hits this occasionally
-    // when testing with optimization, and frequently with fastbuild and debug.
-    //
-    // ENVOY_LOG_MISC(info, "Covered insertion race");
   }
   return shared_symbol.symbol_;
 }
@@ -350,10 +285,8 @@ bool SymbolTable::lessThan(const StatName& a, const StatName& b) const {
   SymbolVec bv = SymbolEncoding::decodeSymbols(b.data(), b.dataSize());
   for (uint64_t i = 0, n = std::min(av.size(), bv.size()); i < n; ++i) {
     if (av[i] != bv[i]) {
-      //absl::ReaderMutexLock lock(&lock_);
-      lock_.ReaderLock();
+      Thread::LockGuard lock(lock_);
       bool ret = fromSymbol(av[i]) < fromSymbol(bv[i]);
-      lock_.ReaderUnlock();
       return ret;
     }
   }
@@ -362,8 +295,7 @@ bool SymbolTable::lessThan(const StatName& a, const StatName& b) const {
 
 #ifndef ENVOY_CONFIG_COVERAGE
 void SymbolTable::debugPrint() const {
-  //absl::ReaderMutexLock lock(&lock_);
-  lock_.ReaderLock();
+  Thread::LockGuard lock(lock_);
   std::vector<Symbol> symbols;
   for (const auto& p : decode_map_) {
     symbols.push_back(p.first);
@@ -374,7 +306,6 @@ void SymbolTable::debugPrint() const {
     const SharedSymbol& shared_symbol = *encode_map_.find(token)->second;
     ENVOY_LOG_MISC(info, "{}: '{}' ({})", symbol, token, shared_symbol.ref_count_);
   }
-  lock_.ReaderUnlock();
 }
 #endif
 
@@ -428,44 +359,6 @@ StatNameJoiner::StatNameJoiner(const std::vector<StatName>& stat_names) {
 uint8_t* StatNameJoiner::alloc(uint64_t num_bytes) {
   bytes_ = std::make_unique<uint8_t[]>(num_bytes + StatNameSizeEncodingBytes);
   return saveLengthToBytesReturningNext(num_bytes, bytes_.get());
-}
-
-
-PthreadRWLock::PthreadRWLock() {
-  pthread_rwlockattr_init(&attr_);
-  // POSIX does not provide any sort of guarantee that prevents writer
-  // starvation for reader-writer locks. On, Linux one can avoid
-  // writer starvation as long as readers are non-recursive via the
-  // call below. (PTHREAD_RWLOCK_PREFER_WRITER_NP does not work).
-  //
-  // Other OS's (FreeBSD, Darwin, OpenSolaris) documentation suggests
-  // that they prefer writers by default.
-#ifdef linux
-  pthread_rwlockattr_setkind_np(&attr_,
-                                PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP);
-#endif
-  pthread_rwlock_init(&rwlock_, &attr_);
-}
-
-PthreadRWLock::~PthreadRWLock() {
-  pthread_rwlockattr_destroy(&attr_);
-  pthread_rwlock_destroy(&rwlock_);
-}
-
-void PthreadRWLock::Lock() {
-  pthread_rwlock_wrlock(&rwlock_);
-}
-
-void PthreadRWLock::Unlock() {
-  pthread_rwlock_unlock(&rwlock_);
-}
-
-void PthreadRWLock::ReaderLock() {
-  pthread_rwlock_rdlock(&rwlock_);
-}
-
-void PthreadRWLock::ReaderUnlock() {
-  pthread_rwlock_unlock(&rwlock_);
 }
 
 } // namespace Stats

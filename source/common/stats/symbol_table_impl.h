@@ -46,20 +46,6 @@ constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
 
-class LOCKABLE PthreadRWLock {
-public:
-  PthreadRWLock();
-  ~PthreadRWLock();
-  void Lock() EXCLUSIVE_LOCK_FUNCTION();
-  void Unlock() UNLOCK_FUNCTION();
-  void ReaderLock() SHARED_LOCK_FUNCTION();
-  void ReaderUnlock() UNLOCK_FUNCTION();
-
- private:
-  pthread_rwlock_t rwlock_;
-  pthread_rwlockattr_t attr_;
-};
-
 /**
  * Represents an 8-bit encoding of a vector of symbols, used as a transient
  * representation during encoding and prior to retained allocation.
@@ -168,11 +154,9 @@ public:
    * @return uint64_t the number of symbols in the symbol table.
    */
   uint64_t numSymbols() const {
-    //absl::ReaderMutexLock lock(&lock_);
-    lock_.ReaderLock();
+    Thread::LockGuard lock(lock_);
     ASSERT(encode_map_.size() == decode_map_.size());
     uint64_t sz = encode_map_.size();
-    lock_.ReaderUnlock();
     return sz;
   }
 
@@ -244,9 +228,8 @@ private:
     std::atomic<uint32_t> ref_count_;
   };
 
-  // This must be held during both encode() and free().
-  //mutable absl::Mutex lock_;
-  mutable PthreadRWLock lock_;
+  // This must be called during both encode() and free().
+  mutable Thread::MutexBasicLockable lock_;
 
   std::string decodeSymbolVec(const SymbolVec& symbols) const;
 
@@ -256,8 +239,7 @@ private:
    * @param sv the individual string to be encoded as a symbol.
    * @return Symbol the encoded string.
    */
-  bool toSymbolReadLockHeld(absl::string_view sv, Symbol& symbol) SHARED_LOCKS_REQUIRED(lock_);
-  Symbol toSymbolWriteLockHeld(absl::string_view sv) EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  Symbol toSymbol(absl::string_view sv) EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   /**
    * Convenience function for decode(), decoding one symbol at a time.
@@ -271,19 +253,6 @@ private:
   void newSymbol();
 
   Symbol monotonicCounter() { return monotonic_counter_; }
-
-  /**
-   * Sets hook to be called on symbol lookup when the symbol needs to be
-   * created, and we are dropping the read-lock on lock_ and have yet to
-   * pick up the write lock. This makes it possible to deterministically
-   * reproduce a write-race to ensure it's handled properly. See test
-   * StatNameTest.SymbolCreationRace.
-   *
-   * Note that the condition is often hit, non-determinstically, by
-   * StatNameTest.NoMutexContentionOnExistingSymbols, depending on
-   * compiler optimization settings and the machine running the tests.
-   */
-  void setWriteLockTestHook(std::function<void()> f) { write_lock_test_hook_ = f; }
 
   // Stores the symbol to be used at next insertion. This should exist ahead of insertion time so
   // that if insertion succeeds, the value written is the correct one.
@@ -305,8 +274,6 @@ private:
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
-
-  std::function<void()> write_lock_test_hook_;
 };
 
 /**
