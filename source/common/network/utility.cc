@@ -274,14 +274,14 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
 
     if (ifa->ifa_addr->sa_family == af_look_up) {
       if (af_look_up == AF_INET) {
-        const auto* addr = reinterpret_cast<const struct sockaddr_in*>(ifa->ifa_addr);
-        if (remote_address->ip()->ipv4()->address() == addr->sin_addr.s_addr) {
+        const auto* if_addr = reinterpret_cast<const struct sockaddr_in*>(ifa->ifa_addr);
+        if (remote_address->ip()->ipv4()->address() == if_addr->sin_addr.s_addr) {
           return true;
         }
       } else {
-        const auto* addr = reinterpret_cast<const struct sockaddr_in6*>(ifa->ifa_addr);
-        absl::uint128 v6addr = remote_address->ip()->ipv6()->address();
-        if (memcmp(&v6addr, &addr->sin6_addr.s6_addr, sizeof(absl::uint128)) == 0) {
+        const auto* if_addr = reinterpret_cast<const struct sockaddr_in6*>(ifa->ifa_addr);
+        const absl::uint128 remote_v6addr = remote_address->ip()->ipv6()->address();
+        if (memcmp(&remote_v6addr, &if_addr->sin6_addr.s6_addr, sizeof(absl::uint128)) == 0) {
           return true;
         }
       }
@@ -343,14 +343,15 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
 
 bool Utility::isSameIPAddress(const Address::Instance& address1,
                               const Address::Instance& address2) {
-  if (address1.type() != Address::Type::Ip ||
-      address1.ip()->version() != address2.ip()->version()) {
+  ASSERT(address1.type() == Address::Type::Ip);
+  if (address1.ip()->version() != address2.ip()->version()) {
     return false;
   }
 
-  if (address1.ip()->version() == Address::IpVersion::v4) {
+  switch (address1.ip()->version()) {
+  case Address::IpVersion::v4:
     return address1.ip()->ipv4()->address() == address2.ip()->ipv4()->address();
-  } else if (address1.ip()->version() == Address::IpVersion::v6) {
+  case Address::IpVersion::v6:
     return address1.ip()->ipv6()->address() == address2.ip()->ipv6()->address();
   }
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
