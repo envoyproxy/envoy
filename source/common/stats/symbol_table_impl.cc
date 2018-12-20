@@ -210,8 +210,7 @@ Symbol SymbolTable::toSymbol(absl::string_view sv) {
   std::unique_ptr<char[]> str = std::make_unique<char[]>(size);
   StringUtil::strlcpy(str.get(), sv.data(), size);
 
-  auto encode_insert =
-      encode_map_.insert({str.get(), SharedSymbol(next_symbol_)});
+  auto encode_insert = encode_map_.insert({str.get(), SharedSymbol(next_symbol_)});
   SharedSymbol& shared_symbol = encode_insert.first->second;
 
   if (encode_insert.second) {
