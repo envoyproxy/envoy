@@ -134,7 +134,7 @@ be used for that purpose.
 We call metadata that need to be forwarded to downstream the response metadata.
 Response metadata can be received from upstream or generated locally.
 
-Response metadata is generally a hop by hop message, so envoy doesn't
+Response metadata is generally a hop by hop message, so Envoy doesn't
 need to hold response metadata locally to wait for some events or data. As a result,
 filters handling response metadata don't need to stop the filter iteration and wait, instead response
 metadata can be forwarded through codec as soon as they are
@@ -145,7 +145,7 @@ codec. In this section, we focus on response metadata handling.
 
 We first explain how response metadata get consumed or proxied.
 In function EnvoyConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilter\* filter,
-MetadataMapPtr&& metadata\_map\_ptr), envoy passes response metadata received from upstream to filters by
+MetadataMapPtr&& metadata\_map\_ptr), Envoy passes response metadata received from upstream to filters by
 calling the following filter interface:
 
 FilterMetadatasStatus StreamEncoderFilter::encodeMetadata(MetadataMapVector& metadata\_map).
