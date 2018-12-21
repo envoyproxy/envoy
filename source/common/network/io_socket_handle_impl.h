@@ -15,12 +15,12 @@ public:
   // TODO(sbelair2) Call close() in destructor
   ~IoSocketHandle() {}
 
-   // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
+  // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
   int fd() const override { return fd_; }
 
   void close() override { fd_ = -1; }
 
-   // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
+  // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
   void operator=(int fd) { fd_ = fd; }
 
 private:
