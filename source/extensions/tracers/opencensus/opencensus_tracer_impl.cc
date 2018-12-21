@@ -44,8 +44,9 @@ private:
   ::opencensus::trace::Sampler* GetSampler(bool is_sampled) {
     static ::opencensus::trace::AlwaysSampler always_sampler;
     static ::opencensus::trace::NeverSampler never_sampler;
-    if (is_sampled)
+    if (is_sampled) {
       return &always_sampler;
+    }
     return &never_sampler;
   }
 
