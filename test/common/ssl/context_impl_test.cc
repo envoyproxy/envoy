@@ -619,10 +619,60 @@ TEST(ClientContextConfigImplTest, RSA1024Cert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
-                          EnvoyException,
-                          "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, "
-                          "only RSA certificates with 2048-bit or larger keys are supported");
+  EXPECT_THROW_WITH_REGEX(
+      manager.createSslClientContext(store, client_context_config), EnvoyException,
+      "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, only RSA certificates "
+#ifdef BORINGSSL_FIPS
+      "with 2048-bit or 3072-bit keys are supported in FIPS mode");
+#else
+      "with 2048-bit or larger keys are supported");
+#endif
+}
+
+// Validate that 3072-bit RSA ceritificates load successfully.
+TEST(ClientContextConfigImplTest, RSA3072Cert) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_rsa_3072_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_rsa_3072_key.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  manager.createSslClientContext(store, client_context_config);
+}
+
+// Validate that 4096-bit RSA ceritificates load successfully in non-FIPS builds, but are rejected
+// in FIPS builds.
+TEST(ClientContextConfigImplTest, RSA4096Cert) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_rsa_4096_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_rsa_4096_key.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+#ifdef BORINGSSL_FIPS
+  EXPECT_THROW_WITH_REGEX(
+      manager.createSslClientContext(store, client_context_config), EnvoyException,
+      "Failed to load certificate chain from .*selfsigned_rsa_4096_cert.pem, only RSA certificates "
+      "with 2048-bit or 3072-bit keys are supported in FIPS mode");
+#else
+  manager.createSslClientContext(store, client_context_config);
+#endif
 }
 
 // Validate that P256 ECDSA certs load.

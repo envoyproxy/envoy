@@ -124,7 +124,14 @@ ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& con
   }
 
   cluster_ = config.request_mirror_policy().cluster();
-  runtime_key_ = config.request_mirror_policy().runtime_key();
+
+  if (config.request_mirror_policy().has_runtime_fraction()) {
+    runtime_key_ = config.request_mirror_policy().runtime_fraction().runtime_key();
+    default_value_ = config.request_mirror_policy().runtime_fraction().default_value();
+  } else {
+    runtime_key_ = config.request_mirror_policy().runtime_key();
+    default_value_.set_numerator(0);
+  }
 }
 
 class HashMethodImplBase : public HashPolicyImpl::HashMethod {

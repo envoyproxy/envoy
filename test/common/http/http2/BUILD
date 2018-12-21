@@ -33,6 +33,7 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
+    shard_count = 5,
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/http:exception_lib",
