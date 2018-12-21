@@ -86,7 +86,7 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressBleachesPort) {
 
   NiceMock<Network::MockConnectionSocket> socket;
   const auto expected_address = Network::Utility::parseInternetAddress("1.2.3.4");
-  EXPECT_CALL(socket, setLocalAddress(PointeesEq(expected_address), _));
+  EXPECT_CALL(socket, setLocalAddress(PointeesEq(expected_address)));
 
   option->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
 }

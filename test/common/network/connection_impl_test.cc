@@ -860,7 +860,7 @@ TEST_P(ConnectionImplTest, BindFromSocketTest) {
   auto option = std::make_shared<NiceMock<MockSocketOption>>();
   EXPECT_CALL(*option, setOption(_, Eq(envoy::api::v2::core::SocketOption::STATE_PREBIND)))
       .WillOnce(Invoke([&](Socket& socket, envoy::api::v2::core::SocketOption::SocketState) {
-        socket.setLocalAddress(new_source_address, false);
+        socket.setLocalAddress(new_source_address);
         return true;
       }));
 
