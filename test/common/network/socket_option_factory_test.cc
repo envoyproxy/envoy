@@ -43,6 +43,8 @@ protected:
     return;                                                                                        \
   }
 
+// TODO(klarose): Simplify these tests once https://github.com/envoyproxy/envoy/pull/5351 is merged.
+
 TEST_F(SocketOptionFactoryTest, TestBuildSocketMarkOptions) {
 
   // use a shared_ptr due to applyOptions requiring one
