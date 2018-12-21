@@ -182,16 +182,6 @@ elif [[ "$1" == "bazel.ipv6_tests" ]]; then
     //test/integration/... //test/common/network/...
   exit 0
 elif [[ "$1" == "bazel.api" ]]; then
-  # verify that all api proto files have correct proto options for java
-  for f in $(find "${ENVOY_SRCDIR}/api" -name "*.proto"); do
-    if ! grep -q "option java_multiple_files = true;" "${f}" ; then
-      echo "option java_multiple_files = true not set in $f"; exit 1
-    fi
-    if ! grep -q "option java_package = \"io.envoyproxy.envoy" "${f}" ; then
-      echo "option java_package not set correctly in $f"; exit 1
-    fi
-  done
-
   setup_clang_toolchain
   cd "${ENVOY_CI_DIR}"
   echo "Building API..."
