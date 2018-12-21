@@ -10,14 +10,8 @@
 
 #include "common/common/logger.h"
 
-#include "absl/types/optional.h"
-
 namespace Envoy {
 namespace Network {
-
-// Optional variant of setsockopt(2) optname. The idea here is that if the option is not supported
-// on a platform, we can make this the empty value. This allows us to avoid proliferation of #ifdef.
-typedef absl::optional<std::pair<int, int>> SocketOptionName;
 
 #ifdef IP_TRANSPARENT
 #define ENVOY_SOCKET_IP_TRANSPARENT                                                                \
@@ -100,6 +94,10 @@ public:
 
   // The common socket options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override {}
+
+  absl::optional<Details>
+  getOptionDetails(const Socket& socket,
+                   envoy::api::v2::core::SocketOption::SocketState state) const override;
 
   bool isSupported() const;
 
