@@ -10,23 +10,6 @@
 namespace Envoy {
 namespace Thread {
 
-typedef int32_t ThreadId;
-
-/**
- * Get current thread id.
- */
-ThreadId currentThreadId();
-
-/**
- * Implementation of ThreadFactory
- */
-class ThreadFactoryImpl : public ThreadFactory {
-public:
-  ThreadFactoryImpl() {}
-
-  ThreadPtr createThread(std::function<void()> thread_routine) override;
-};
-
 /**
  * Implementation of BasicLockable
  */

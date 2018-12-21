@@ -30,7 +30,8 @@ typedef FilesystemSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment>
 class FilesystemSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   FilesystemSubscriptionTestHarness()
-      : path_(TestEnvironment::temporaryPath("eds.json")), dispatcher_(test_time_.timeSystem()),
+      : path_(TestEnvironment::temporaryPath("eds.json")),
+        api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_),
         subscription_(dispatcher_, path_, stats_) {}
 
   ~FilesystemSubscriptionTestHarness() { EXPECT_EQ(0, ::unlink(path_.c_str())); }
@@ -97,6 +98,8 @@ public:
 
   const std::string path_;
   std::string version_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;

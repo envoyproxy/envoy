@@ -63,6 +63,7 @@ envoy_cc_library(
     ],
     deps = [
         ":libevent_lib",
+        "//include/envoy/api:api_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
