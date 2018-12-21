@@ -34,6 +34,8 @@ envoy_cc_library(
     hdrs = ["protocol.h"],
     deps = [
         ":buffer_helper_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
     ],
 )
