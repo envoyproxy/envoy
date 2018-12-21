@@ -10,6 +10,16 @@
 namespace Envoy {
 namespace Thread {
 
+class ThreadId {
+public:
+  virtual ~ThreadId() {}
+
+  virtual std::string debugString() const PURE;
+  virtual bool isCurrentThreadId() const PURE;
+};
+
+typedef std::unique_ptr<ThreadId> ThreadIdPtr;
+
 class Thread {
 public:
   virtual ~Thread() {}
@@ -34,6 +44,11 @@ public:
    * @param thread_routine supplies the function to invoke in the thread.
    */
   virtual ThreadPtr createThread(std::function<void()> thread_routine) PURE;
+
+  /**
+   * Return the current system thread ID
+   */
+  virtual ThreadIdPtr currentThreadId() PURE;
 };
 
 /**

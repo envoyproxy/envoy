@@ -1,5 +1,7 @@
 #include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
 
+#include "envoy/registry/registry.h"
+
 #include "common/common/assert.h"
 
 namespace Envoy {
@@ -112,6 +114,16 @@ bool DubboProtocolImpl::decode(Buffer::Instance& buffer, Protocol::Context* cont
   buffer.drain(MessageSize);
   return true;
 }
+
+class DubboProtocolConfigFactory : public ProtocolFactoryBase<DubboProtocolImpl> {
+public:
+  DubboProtocolConfigFactory() : ProtocolFactoryBase(ProtocolType::Dubbo) {}
+};
+
+/**
+ * Static registration for the Dubbo protocol. @see RegisterFactory.
+ */
+static Registry::RegisterFactory<DubboProtocolConfigFactory, NamedProtocolConfigFactory> register_;
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

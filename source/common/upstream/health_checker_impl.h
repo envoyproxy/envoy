@@ -338,6 +338,7 @@ private:
 
   const Protobuf::MethodDescriptor& service_method_;
   absl::optional<std::string> service_name_;
+  absl::optional<std::string> authority_value_;
 };
 
 /**
