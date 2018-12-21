@@ -73,8 +73,7 @@ void ConfigSubscriptionInstanceBase::bindConfigProvider(MutableConfigProviderImp
 }
 
 ConfigProviderManagerImplBase::ConfigProviderManagerImplBase(Server::Admin& admin,
-                                                             const std::string& config_name)
-    : owner_tid_(Thread::currentThreadId()) {
+                                                             const std::string& config_name) {
   config_tracker_entry_ =
       admin.getConfigTracker().add(config_name, [this] { return dumpConfigs(); });
   // ConfigTracker keys must be unique. We are asserting that no one has stolen the key
@@ -95,15 +94,14 @@ ConfigProviderManagerImplBase::immutableConfigProviders(ConfigProviderInstanceTy
 
 void ConfigProviderManagerImplBase::bindImmutableConfigProvider(
     ImmutableConfigProviderImplBase* provider) {
-  ASSERT(owner_tid_ == Thread::currentThreadId() &&
-         (provider->type() == ConfigProviderInstanceType::Static ||
-          provider->type() == ConfigProviderInstanceType::Inline));
+  ASSERT(provider->type() == ConfigProviderInstanceType::Static ||
+         provider->type() == ConfigProviderInstanceType::Inline);
   ConfigProviderMap::iterator it;
   if ((it = immutable_config_providers_map_.find(provider->type())) ==
       immutable_config_providers_map_.end()) {
-    immutable_config_providers_map_.insert(
-        {provider->type(),
-         std::make_unique<ConfigProviderSet>(std::initializer_list<ConfigProvider*>({provider}))});
+    immutable_config_providers_map_.insert(std::make_pair(
+        provider->type(),
+        std::make_unique<ConfigProviderSet>(std::initializer_list<ConfigProvider*>({provider}))));
   } else {
     it->second->insert(provider);
   }
@@ -111,9 +109,8 @@ void ConfigProviderManagerImplBase::bindImmutableConfigProvider(
 
 void ConfigProviderManagerImplBase::unbindImmutableConfigProvider(
     ImmutableConfigProviderImplBase* provider) {
-  ASSERT(owner_tid_ == Thread::currentThreadId() &&
-         (provider->type() == ConfigProviderInstanceType::Static ||
-          provider->type() == ConfigProviderInstanceType::Inline));
+  ASSERT(provider->type() == ConfigProviderInstanceType::Static ||
+         provider->type() == ConfigProviderInstanceType::Inline);
   ConfigProviderMap::iterator it = immutable_config_providers_map_.find(provider->type());
   RELEASE_ASSERT(it != immutable_config_providers_map_.end(),
                  fmt::format("trying to unbind config provider, but failed to find type = {}",

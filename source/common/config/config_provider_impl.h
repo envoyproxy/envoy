@@ -11,6 +11,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/thread.h"
+#include "common/common/utility.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -73,6 +74,7 @@ enum class ConfigProviderInstanceType {
   // Configuration obtained from an xDS subscription.
   xDS
 };
+
 // Required for fmt::format().
 std::ostream& operator<<(std::ostream& os, ConfigProviderInstanceType type);
 
@@ -323,8 +325,8 @@ public:
 
 protected:
   using ConfigProviderSet = std::unordered_set<ConfigProvider*>;
-  using ConfigProviderMap =
-      std::unordered_map<ConfigProviderInstanceType, std::unique_ptr<ConfigProviderSet>>;
+  using ConfigProviderMap = std::unordered_map<ConfigProviderInstanceType,
+                                               std::unique_ptr<ConfigProviderSet>, EnumClassHash>;
   using ConfigSubscriptionMap =
       std::unordered_map<std::string, std::weak_ptr<ConfigSubscriptionInstanceBase>>;
 
@@ -354,8 +356,6 @@ protected:
                                      std::function<ConfigSubscriptionInstanceBaseSharedPtr(
                                          const std::string&, ConfigProviderManagerImplBase&)>
                                          subscription_factory_fn) {
-    ASSERT(owner_tid_ == Thread::currentThreadId());
-
     static_assert(std::is_base_of<ConfigSubscriptionInstanceBase, T>::value,
                   "T must be a subclass of ConfigSubscriptionInstanceBase");
 
@@ -386,12 +386,10 @@ protected:
 private:
   void bindSubscription(const std::string& manager_identifier,
                         ConfigSubscriptionInstanceBaseSharedPtr& subscription) {
-    ASSERT(owner_tid_ == Thread::currentThreadId());
     config_subscriptions_.insert({manager_identifier, subscription});
   }
 
   void unbindSubscription(const std::string& manager_identifier) {
-    ASSERT(owner_tid_ == Thread::currentThreadId());
     config_subscriptions_.erase(manager_identifier);
   }
 
@@ -405,7 +403,6 @@ private:
   ConfigProviderMap immutable_config_providers_map_;
 
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
-  Thread::ThreadId owner_tid_{};
 
   // See comment for friend classes in the ConfigSubscriptionInstanceBase for more details on the
   // use of friends.
