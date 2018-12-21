@@ -140,6 +140,7 @@ def checkNamespace(file_path):
       return ["Unable to find Envoy namespace or NOLINT(namespace-envoy) for file: %s" % file_path]
   return []
 
+
 def checkJavaProtoOptions(file_path):
   java_multiple_files = False
   java_package_correct = False
@@ -151,6 +152,7 @@ def checkJavaProtoOptions(file_path):
     if java_multiple_files and java_package_correct:
       return []
   return ["Java proto options are not set correctly for file: %s" % file_path]
+
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
 def whitelistedForProtobufDeps(file_path):
