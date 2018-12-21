@@ -63,7 +63,7 @@ variable must be set for bazel builds. This can be accomplished setting
 ```
 
 either on the command line when running `bazel build`/`bazel test` or
-in your `bazelrc` file.
+in your `$HOME/.bazelrc` file.
 
 3. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
 and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
