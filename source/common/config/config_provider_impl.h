@@ -75,9 +75,6 @@ enum class ConfigProviderInstanceType {
   xDS
 };
 
-// Required for fmt::format().
-std::ostream& operator<<(std::ostream& os, ConfigProviderInstanceType type);
-
 /**
  * ConfigProvider implementation for immutable configuration.
  *

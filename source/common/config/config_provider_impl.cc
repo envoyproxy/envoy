@@ -3,10 +3,6 @@
 namespace Envoy {
 namespace Config {
 
-std::ostream& operator<<(std::ostream& os, ConfigProviderInstanceType type) {
-  return os << static_cast<int>(type);
-}
-
 ImmutableConfigProviderImplBase::ImmutableConfigProviderImplBase(
     Server::Configuration::FactoryContext& factory_context,
     ConfigProviderManagerImplBase& config_provider_manager, ConfigProviderInstanceType type)
