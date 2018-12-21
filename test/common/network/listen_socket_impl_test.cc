@@ -123,19 +123,20 @@ TEST_P(ListenSocketImplTestTcp, BindSpecificPort) { testBindSpecificPort(); }
  * A simple implementation to test some of ListenSocketImpl's accessors without requiring
  * stack interaction.
  */
-class TestListenSocket: public ListenSocketImpl {
+class TestListenSocket : public ListenSocketImpl {
 public:
-  TestListenSocket(Network::Address::InstanceConstSharedPtr address): ListenSocketImpl(-1, address) {}
+  TestListenSocket(Network::Address::InstanceConstSharedPtr address)
+      : ListenSocketImpl(-1, address) {}
 };
 
 TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
   std::string address_str = "10.1.2.3";
-  if(version_ == Network::Address::IpVersion::v6) {
+  if (version_ == Network::Address::IpVersion::v6) {
     address_str = "1::2";
   }
 
   Network::Address::InstanceConstSharedPtr address =
-    Network::Utility::parseInternetAddress(address_str);
+      Network::Utility::parseInternetAddress(address_str);
 
   TestListenSocket socket(Network::Utility::getIpv4AnyAddress());
 
