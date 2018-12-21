@@ -13,10 +13,33 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
+using ConfigProtocolType =
+    envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_ProtocolType;
+
+typedef std::map<ConfigProtocolType, ProtocolType> ProtocolTypeMap;
+
+static const ProtocolTypeMap& protocolTypeMap() {
+  CONSTRUCT_ON_FIRST_USE(
+      ProtocolTypeMap, {
+                           {ConfigProtocolType::DubboProxy_ProtocolType_Dubbo, ProtocolType::Dubbo},
+                       });
+}
+
+ProtocolType lookupProtocol(ConfigProtocolType config_type) {
+  const auto& iter = protocolTypeMap().find(config_type);
+  if (iter == protocolTypeMap().end()) {
+    throw EnvoyException(fmt::format(
+        "unknown protocol {}",
+        envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_ProtocolType_Name(
+            config_type)));
+  }
+  return iter->second;
+}
+
 Filter::Filter(const std::string& stat_prefix, ConfigProtocolType protocol_type,
                ConfigSerializationType serialization_type, Stats::Scope& scope,
                TimeSource& time_source)
-    : stats_(generateStats(stat_prefix, scope)), protocol_type_(protocol_type),
+    : stats_(generateStats(stat_prefix, scope)), protocol_type_(lookupProtocol(protocol_type)),
       serialization_type_(serialization_type), time_source_(time_source) {}
 
 Filter::~Filter() = default;
@@ -183,13 +206,7 @@ DecoderPtr Filter::createDecoder(ProtocolCallbacks& prot_callback) {
 }
 
 ProtocolPtr Filter::createProtocol(ProtocolCallbacks& callback) {
-  using Type = envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy;
-  switch (protocol_type_) {
-  case Type::Dubbo:
-    return std::make_unique<DubboProtocolImpl>(callback);
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  return NamedProtocolConfigFactory::getFactory(protocol_type_).createProtocol(callback);
 }
 
 DeserializerPtr Filter::createDeserializer() {

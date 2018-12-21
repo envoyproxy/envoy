@@ -54,7 +54,8 @@ curl -sLO https://dl.google.com/go/go"$VERSION"."$PLATFORM".tar.gz \
   && echo "$SHA256" go"$VERSION"."$PLATFORM".tar.gz | sha256sum --check
 tar xf go"$VERSION"."$PLATFORM".tar.gz
 
-export PATH="$PWD/go/bin:$PATH"
+export GOROOT="$PWD/go"
+export PATH="$GOROOT/bin:$PATH"
 
 if [[ `go version | awk '{print $3}'` != "go$VERSION" ]]; then
   echo "ERROR: Go version doesn't match."
