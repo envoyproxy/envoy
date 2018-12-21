@@ -26,9 +26,10 @@ bool SocketOptionImpl::setOption(Socket& socket,
 absl::optional<Socket::Option::Details>
 SocketOptionImpl::getOptionDetails(const Socket&,
                                    envoy::api::v2::core::SocketOption::SocketState state) const {
-  if (state != in_state_) {
+  if (state != in_state_ || !isSupported()) {
     return absl::nullopt;
   }
+
   Socket::Option::Details info;
   info.name_ = optname_;
   info.value_ = value_;

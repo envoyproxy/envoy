@@ -52,6 +52,15 @@ TEST_F(SocketOptionImplTest, GetOptionDetailsFailureWrongState) {
       socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_BOUND);
   EXPECT_FALSE(result.has_value());
 }
+
+TEST_F(SocketOptionImplTest, GetUnsupportedOptReturnsNullopt) {
+  SocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_LISTENING,
+                                 Network::SocketOptionName(absl::nullopt), 5};
+
+  auto result =
+      socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_LISTENING);
+  EXPECT_FALSE(result.has_value());
+}
 } // namespace
 } // namespace Network
 } // namespace Envoy
