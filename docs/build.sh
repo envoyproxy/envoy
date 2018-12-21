@@ -117,6 +117,7 @@ PROTO_RST="
   /envoy/data/accesslog/v2/accesslog/envoy/data/accesslog/v2/accesslog.proto.rst
   /envoy/data/core/v2alpha/health_check_event/envoy/data/core/v2alpha/health_check_event.proto.rst
   /envoy/data/tap/v2alpha/capture/envoy/data/tap/v2alpha/capture.proto.rst
+  /envoy/data/cluster/v2alpha/outlier_detection_event/envoy/data/cluster/v2alpha/outlier_detection_event.proto.rst
   /envoy/service/accesslog/v2/als/envoy/service/accesslog/v2/als.proto.rst
   /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/attribute_context.proto.rst
   /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/external_auth.proto.rst

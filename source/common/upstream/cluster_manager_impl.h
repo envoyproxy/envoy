@@ -61,10 +61,10 @@ public:
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
                       Network::TransportSocketOptionsSharedPtr transport_socket_options) override;
-  ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                                    Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                    AccessLog::AccessLogManager& log_manager,
-                                    bool added_via_api) override;
+  ClusterSharedPtr
+  clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                   Outlier::OutlierDetectionEventLoggerSharedPtr outlier_event_logger,
+                   AccessLog::AccessLogManager& log_manager, bool added_via_api) override;
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                       const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                       ClusterManager& cm) override;
@@ -430,7 +430,7 @@ private:
   ClusterMap warming_clusters_;
   absl::optional<envoy::api::v2::core::ConfigSource> eds_config_;
   envoy::api::v2::core::BindConfig bind_config_;
-  Outlier::EventLoggerSharedPtr outlier_event_logger_;
+  Outlier::OutlierDetectionEventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;

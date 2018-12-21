@@ -70,12 +70,14 @@ with the minimum required request volume in an interval is less than the
 :ref:`outlier_detection.success_rate_minimum_hosts<envoy_api_field_cluster.OutlierDetection.success_rate_minimum_hosts>`
 value.
 
+.. _arch_overview_outlier_detection_logging:
+
 Ejection event logging
 ----------------------
 
 A log of outlier ejection events can optionally be produced by Envoy. This is extremely useful
 during daily operations since global stats do not provide enough information on which hosts are
-being ejected and for what reasons. The log uses a JSON format with one object per line:
+being ejected and for what reasons. The log is structured as JSON dumps of `OutlierDetectionEvent messages <envoy_api_msg_cluster.OutlierDetectionEvent>`
 
 .. code-block:: json
 

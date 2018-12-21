@@ -56,14 +56,14 @@ class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
   TestClusterManagerFactory() {
     ON_CALL(*this, clusterFromProto_(_, _, _, _, _))
-        .WillByDefault(Invoke([&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                                  Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                  AccessLog::AccessLogManager& log_manager,
-                                  bool added_via_api) -> ClusterSharedPtr {
-          return ClusterImplBase::create(
-              cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
-              dispatcher_, log_manager, local_info_, outlier_event_logger, added_via_api);
-        }));
+        .WillByDefault(Invoke(
+            [&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                Outlier::OutlierDetectionEventLoggerSharedPtr outlier_event_logger,
+                AccessLog::AccessLogManager& log_manager, bool added_via_api) -> ClusterSharedPtr {
+              return ClusterImplBase::create(
+                  cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
+                  dispatcher_, log_manager, local_info_, outlier_event_logger, added_via_api);
+            }));
   }
 
   Http::ConnectionPool::InstancePtr
@@ -79,10 +79,10 @@ public:
     return Tcp::ConnectionPool::InstancePtr{allocateTcpConnPool_(host)};
   }
 
-  ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                                    Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                    AccessLog::AccessLogManager& log_manager,
-                                    bool added_via_api) override {
+  ClusterSharedPtr
+  clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                   Outlier::OutlierDetectionEventLoggerSharedPtr outlier_event_logger,
+                   AccessLog::AccessLogManager& log_manager, bool added_via_api) override {
     return clusterFromProto_(cluster, cm, outlier_event_logger, log_manager, added_via_api);
   }
 
@@ -113,7 +113,7 @@ public:
   MOCK_METHOD1(allocateTcpConnPool_, Tcp::ConnectionPool::Instance*(HostConstSharedPtr host));
   MOCK_METHOD5(clusterFromProto_,
                ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                                Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                Outlier::OutlierDetectionEventLoggerSharedPtr outlier_event_logger,
                                 AccessLog::AccessLogManager& log_manager, bool added_via_api));
   MOCK_METHOD0(createCds_, CdsApi*());
 

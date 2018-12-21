@@ -8,6 +8,7 @@ Version history
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
 * cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
+* outlier_detection: added support for :ref:`outlier detection event logging <arch_overview_outlier_detection_logging>`.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
 
 1.9.0

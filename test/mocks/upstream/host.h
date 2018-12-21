@@ -5,6 +5,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/api/v2/cluster/outlier_detection.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "test/mocks/upstream/cluster_info.h"
@@ -30,13 +31,14 @@ public:
   MOCK_METHOD1(successRate, void(double new_success_rate));
 };
 
-class MockEventLogger : public EventLogger {
+class MockEventLogger : public OutlierDetectionEventLogger {
 public:
   MockEventLogger();
   ~MockEventLogger();
 
-  MOCK_METHOD4(logEject, void(HostDescriptionConstSharedPtr host, Detector& detector,
-                              EjectionType type, bool enforced));
+  MOCK_METHOD4(logEject,
+               void(HostDescriptionConstSharedPtr host, Detector& detector,
+                    envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced));
   MOCK_METHOD1(logUneject, void(HostDescriptionConstSharedPtr host));
 };
 

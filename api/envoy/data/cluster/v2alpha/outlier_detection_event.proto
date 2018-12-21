@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package envoy.data.cluster.v2alpha;
+option java_package = "io.envoyproxy.envoy.data.cluster.v2alpha";
+option java_multiple_files = true;
+
+import "google/protobuf/timestamp.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: Health check logging events]
+// :ref:`Outlier detection logging <arch_overview_outlier_detection_logging>`.
+
+message OutlierDetectionEvent {
+
+  OutlierEjectionType type = 1 [(validate.rules).enum.defined_only = true];
+
+  // Timestamp for event.
+  google.protobuf.Timestamp timestamp = 2 [(gogoproto.stdtime) = true];
+
+  int64 secs_since_last_action = 3 [(validate.rules).int64.gte = 0];
+
+  string cluster_name = 4 [(validate.rules).string.min_bytes = 1];
+
+  string upstream_url = 5 [(validate.rules).string.min_bytes = 1];
+
+  string action = 6 [(validate.rules).string.min_bytes = 1];
+
+  int32 num_ejections = 7 [(validate.rules).int32.gte = 0];
+
+  bool enforced = 8;
+
+  oneof event {
+    option (validate.required) = true;
+
+    OutlierEjectSuccessRate eject_success_rate_event = 9;
+
+    OutlierEjectConsecutive eject_consecutive_event = 10;
+  }
+}
+
+enum OutlierEjectionType {
+  CONSECUTIVE_5XX = 0;
+  CONSECUTIVE_GATEWAY_FAILURE = 1;
+  SUCCESS_RATE = 2;
+}
+
+message OutlierEjectSuccessRate {
+
+  int32 host_success_rate = 1 [(validate.rules).int32.lte = 100];
+  int32 cluster_average_success_rate = 2 [(validate.rules).int32.lte = 100];
+  int32 cluster_success_rate_ejection_threshold = 3 [(validate.rules).int32.lte = 100];
+}
+
+message OutlierEjectConsecutive {
+}

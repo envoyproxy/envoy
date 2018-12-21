@@ -49,7 +49,7 @@ public:
   static DetectorSharedPtr createForCluster(Cluster& cluster,
                                             const envoy::api::v2::Cluster& cluster_config,
                                             Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                                            EventLoggerSharedPtr event_logger);
+                                            OutlierDetectionEventLoggerSharedPtr event_logger);
 };
 
 /**
@@ -214,7 +214,7 @@ public:
   static std::shared_ptr<DetectorImpl>
   create(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-         EventLoggerSharedPtr event_logger);
+         OutlierDetectionEventLoggerSharedPtr event_logger);
   ~DetectorImpl();
 
   void onConsecutive5xx(HostSharedPtr host);
@@ -230,20 +230,22 @@ public:
 private:
   DetectorImpl(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-               EventLoggerSharedPtr event_logger);
+               OutlierDetectionEventLoggerSharedPtr event_logger);
 
   void addHostMonitor(HostSharedPtr host);
   void armIntervalTimer();
   void checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor, MonotonicTime now);
-  void ejectHost(HostSharedPtr host, EjectionType type);
+  void ejectHost(HostSharedPtr host, envoy::data::cluster::v2alpha::OutlierEjectionType type);
   static DetectionStats generateStats(Stats::Scope& scope);
   void initialize(const Cluster& cluster);
-  void onConsecutiveErrorWorker(HostSharedPtr host, EjectionType type);
-  void notifyMainThreadConsecutiveError(HostSharedPtr host, EjectionType type);
+  void onConsecutiveErrorWorker(HostSharedPtr host,
+                                envoy::data::cluster::v2alpha::OutlierEjectionType type);
+  void notifyMainThreadConsecutiveError(HostSharedPtr host,
+                                        envoy::data::cluster::v2alpha::OutlierEjectionType type);
   void onIntervalTimer();
   void runCallbacks(HostSharedPtr host);
-  bool enforceEjection(EjectionType type);
-  void updateEnforcedEjectionStats(EjectionType type);
+  bool enforceEjection(envoy::data::cluster::v2alpha::OutlierEjectionType type);
+  void updateEnforcedEjectionStats(envoy::data::cluster::v2alpha::OutlierEjectionType type);
   void processSuccessRateEjections();
 
   DetectorConfig config_;
@@ -254,25 +256,28 @@ private:
   Event::TimerPtr interval_timer_;
   std::list<ChangeStateCb> callbacks_;
   std::unordered_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
-  EventLoggerSharedPtr event_logger_;
+  OutlierDetectionEventLoggerSharedPtr event_logger_;
   double success_rate_average_;
   double success_rate_ejection_threshold_;
 };
 
-class EventLoggerImpl : public EventLogger {
+class OutlierDetectionEventLoggerImpl : public OutlierDetectionEventLogger {
 public:
-  EventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
-                  TimeSource& time_source)
+  OutlierDetectionEventLoggerImpl(AccessLog::AccessLogManager& log_manager,
+                                  const std::string& file_name, TimeSource& time_source)
       : file_(log_manager.createAccessLog(file_name)), time_source_(time_source) {}
 
-  // Upstream::Outlier::EventLogger
-  void logEject(HostDescriptionConstSharedPtr host, Detector& detector, EjectionType type,
-                bool enforced) override;
+  // Upstream::Outlier::OutlierDetectionEventLogger
+  void logEject(HostDescriptionConstSharedPtr host, Detector& detector,
+                envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced) override;
+
   void logUneject(HostDescriptionConstSharedPtr host) override;
 
 private:
-  std::string typeToString(EjectionType type);
   int secsSinceLastAction(const absl::optional<MonotonicTime>& lastActionTime, MonotonicTime now);
+  void setCommonEventParams(HostDescriptionConstSharedPtr host,
+                            envoy::data::cluster::v2alpha::OutlierDetectionEvent& event,
+                            absl::optional<MonotonicTime>& time);
 
   Filesystem::FileSharedPtr file_;
   TimeSource& time_source_;
