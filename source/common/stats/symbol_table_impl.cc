@@ -132,6 +132,8 @@ SymbolEncoding SymbolTable::encode(const absl::string_view name) {
   std::vector<Symbol> symbols;
   symbols.reserve(tokens.size());
 
+  // Now take the lock and populate the Symbol objects, which involves bumping
+  // ref-counts in this.
   {
     Thread::LockGuard lock(lock_);
     for (auto& token : tokens) {
