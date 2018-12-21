@@ -309,7 +309,11 @@ void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
     uint64_t request_size, uint64_t response_size, bool big_header,
     ConnectionCreationFunction* create_connection) {
-  initialize();
+  // This is called multiple times per test in cds_integration_test. Only call
+  // initialize() the first time.
+  if (!initialized()) {
+    initialize();
+  }
   codec_client_ = makeHttpConnection(
       create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));
   Http::TestHeaderMapImpl request_headers{

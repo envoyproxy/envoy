@@ -16,6 +16,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 using testing::AssertionFailure;
@@ -151,35 +152,39 @@ public:
     fake_upstreams_.push_back(std::move(fake_upstreams_[0]));
     fake_upstreams_[0] = std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP2,
                                                         version_, timeSystem(), enable_half_close_);
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(false);
 
     // These ClusterManager update callbacks are involved in spooky thread-local storage stuff, and
     // therefore their installation must be scheduled by post() for some reason.
-    Upstream::ClusterUpdateCallbacksHandlePtr cb_handle;
-    ConditionalInitializer cb_added;
-    test_server_->server().dispatcher().post([this, &cb_added, &cb_handle]() -> void {
+    absl::Notification cb_added;
+    test_server_->server().dispatcher().post([this, &cb_added]() -> void {
       // Prepare to be notified by the cluster manager that it processed our upcoming CDS response.
-      cb_handle =
+      cb_handle_ =
           test_server_->server().clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
-      cb_added.setReady();
+      cb_added.Notify();
     });
-    cb_added.waitReady();
+    cb_added.WaitForNotification();
 
     // Now that the upstream has been created, process Envoy's request to discover it.
+    // (First, we have to let Envoy establish its connection to the CDS server.)
     AssertionResult result = // xds_connection_ is filled with the new FakeHttpConnection.
         fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, xds_connection_);
     RELEASE_ASSERT(result, result.message());
     result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result, result.message());
     xds_stream_->startGrpcStream();
+    fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
+
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
     sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                    {buildCluster(kClusterName)}, "1");
-    fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
-
     // We can continue the test once we're sure that Envoy's ClusterManager has made use of
     // the DiscoveryResponse describing cluster_0 that we sent.
-    cluster_added_by_cm_.waitReady();
+    {
+      absl::MutexLock lock(&mu_);
+      absl::Condition condition(&cm_knows_about_cluster_);
+      mu_.Await(condition);
+    }
 
     // Manually create a listener, add it to the cluster manager, register its port in the
     // test framework's downstream listener port map, and finally wait for it to start listening.
@@ -188,17 +193,17 @@ public:
     // the bootstrap config. Its route is meant to point to the regular data upstream. To specificy
     // that route statically, the regular upstream (cluster_0) would have to be specified
     // statically - but the whole point of this test is to have Envoy dynamically discover it!
-    ConditionalInitializer listener_added_by_worker;
-    ConditionalInitializer listener_added_by_manager;
+    absl::Notification listener_added_by_worker;
+    absl::Notification listener_added_by_manager;
     test_server_->setOnWorkerListenerAddedCb(
-        [&listener_added_by_worker]() -> void { listener_added_by_worker.setReady(); });
+        [&listener_added_by_worker]() -> void { listener_added_by_worker.Notify(); });
     test_server_->server().dispatcher().post([this, &listener_added_by_manager]() -> void {
       EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(
           buildListener("http", kClusterName), "", true));
-      listener_added_by_manager.setReady();
+      listener_added_by_manager.Notify();
     });
-    listener_added_by_worker.waitReady();
-    listener_added_by_manager.waitReady();
+    listener_added_by_worker.WaitForNotification();
+    listener_added_by_manager.WaitForNotification();
 
     registerTestServerPorts({"http"});
     test_server_->waitUntilListenersReady();
@@ -207,19 +212,80 @@ public:
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(Envoy::Upstream::ThreadLocalCluster& cluster) override {
     if (cluster.info()->name() == kClusterName) {
-      cluster_added_by_cm_.setReady();
+      absl::MutexLock lock(&mu_);
+      cm_knows_about_cluster_ = true;
     }
   }
-  void onClusterRemoval(const std::string&) override {}
-  ConditionalInitializer cluster_added_by_cm_;
+  void onClusterRemoval(const std::string& cluster_name) override {
+    if (cluster_name == kClusterName) {
+      absl::MutexLock lock(&mu_);
+      cm_knows_about_cluster_ = false;
+      cluster_removed_.Notify();
+    }
+  }
+  bool cm_knows_about_cluster_ GUARDED_BY(mu_) = false;
+  absl::Mutex mu_;
+  absl::Notification cluster_removed_;
+  Upstream::ClusterUpdateCallbacksHandlePtr cb_handle_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
 
-TEST_P(CdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
+// 1) Envoy starts up with no static clusters (other than the CDS-over-gRPC server).
+// 2) Envoy is told of a cluster via CDS.
+// 3) We send Envoy a request, which we verify is properly proxied to and served by that cluster.
+// 4) Envoy is told that cluster is gone.
+// 5) We send Envoy a request, which should 503.
+// 6) Envoy is told that the cluster is back.
+// 7) We send Envoy a request, which we verify is properly proxied to and served by that cluster.
+TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
+  // Calls our initialize(), which includes establishing a listener, route, and cluster.
   testRouterRequestAndResponseWithBody(1024, 512, false);
+
+  // Tell Envoy that cluster_0 is gone.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster, {}, "42");
+  // We can continue the test once we're sure that Envoy's ClusterManager has made use of
+  // the DiscoveryResponse that says cluster_0 is gone.
+  cluster_removed_.WaitForNotification();
+
+  // Now that cluster_0 is gone, the listener (with its routing to cluster_0) should 503.
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
+  fake_upstream_connection_ = nullptr;
+
+  // Tell Envoy that cluster_0 is back.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}));
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster(kClusterName)}, "413");
+
+  // We can continue the test once we're sure that Envoy's ClusterManager has made use of
+  // the DiscoveryResponse describing cluster_0 that we sent.
+  // TODO(fredlas) ALSO NEED TO WAIT FOR..... something else.
+  // absl::SleepFor(absl::Seconds(1));
+  // TODO(fredlas) AH HAH!!!!!!!!!!!! [source/common/upstream/cluster_manager_impl.cc:1104] no
+  // healthy host for HTTP connection pool
+  //               is the difference between good and bad runs!!!
+  {
+    absl::MutexLock lock(&mu_);
+    absl::Condition condition(&cm_knows_about_cluster_);
+    mu_.Await(condition);
+  }
+
+  // Does *not* call our initialize().
+  testRouterRequestAndResponseWithBody(1024, 512, false);
+
   cleanupUpstreamAndDownstream();
   fake_upstream_connection_ = nullptr;
+
+  // If you leave this destruction to the text fixture dtor, there will be a segfault in the
+  // middle of the *next* parameter-run of the test. Dtor order issue with the cluster manager?
+  cb_handle_.reset();
 }
 
 } // namespace
