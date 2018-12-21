@@ -23,28 +23,13 @@ namespace Grpc {
 
 bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
   const Http::HeaderEntry* content_type = headers.ContentType();
-  if (content_type == nullptr) {
-    return false;
-  }
-  // Fail fast if this is not gRPC.
-  if (!StringUtil::startsWith(content_type->value().c_str(),
-                              Http::Headers::get().ContentTypeValues.Grpc)) {
-    return false;
-  }
-  // Exact match with application/grpc. This and the above case are likely the
-  // two most common encountered.
-  if (content_type->value() == Http::Headers::get().ContentTypeValues.Grpc.c_str()) {
-    return true;
-  }
-  // Prefix match with application/grpc+. It's not sufficient to rely on the an
-  // application/grpc prefix match, since there are related content types such as
-  // application/grpc-web.
-  if (content_type->value().size() > Http::Headers::get().ContentTypeValues.Grpc.size() &&
-      content_type->value().c_str()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+') {
-    return true;
-  }
-  // This must be something like application/grpc-web.
-  return false;
+  // Content type is gRPC if it is exactly "application/grpc" or starts with
+  // "application/grpc+". Specifically, something like application/grpc-web is not gRPC.
+  return content_type != nullptr &&
+         StringUtil::startsWith(content_type->value().c_str(),
+                                Http::Headers::get().ContentTypeValues.Grpc) &&
+         (content_type->value().size() == Http::Headers::get().ContentTypeValues.Grpc.size() ||
+          content_type->value().c_str()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }
 
 bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_stream) {
