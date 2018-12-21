@@ -690,6 +690,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   decodeHeaders(nullptr, *request_headers_, end_stream);
 
+  if (active_span_) {
+    // Inject the active span's tracing context into the request headers.
+    active_span_->injectContext(*request_headers_);
+  }
+
   // Reset it here for both global and overridden cases.
   resetIdleTimer();
 }
@@ -744,9 +749,6 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
       request_headers_->removeEnvoyDecoratorOperation();
     }
   }
-
-  // Inject the active span's tracing context into the request headers.
-  active_span_->injectContext(*request_headers_);
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,
