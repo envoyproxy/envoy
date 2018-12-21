@@ -8,7 +8,7 @@ namespace Network {
 
 std::unique_ptr<Socket::Options>
 SocketOptionFactory::buildTcpKeepaliveOptions(Network::TcpKeepaliveConfig keepalive_config) {
-  std::unique_ptr<Socket::Options> options = absl::make_unique<Socket::Options>();
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
       envoy::api::v2::core::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_KEEPALIVE, 1));
 
@@ -31,7 +31,7 @@ SocketOptionFactory::buildTcpKeepaliveOptions(Network::TcpKeepaliveConfig keepal
 }
 
 std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpFreebindOptions() {
-  std::unique_ptr<Socket::Options> options = absl::make_unique<Socket::Options>();
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<Network::AddrFamilyAwareSocketOptionImpl>(
       envoy::api::v2::core::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_FREEBIND,
       ENVOY_SOCKET_IPV6_FREEBIND, 1));
@@ -39,7 +39,7 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpFreebindOptions() {
 }
 
 std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpTransparentOptions() {
-  std::unique_ptr<Socket::Options> options = absl::make_unique<Socket::Options>();
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<Network::AddrFamilyAwareSocketOptionImpl>(
       envoy::api::v2::core::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_TRANSPARENT,
       ENVOY_SOCKET_IPV6_TRANSPARENT, 1));
@@ -50,7 +50,7 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpTransparentOptions(
 }
 
 std::unique_ptr<Socket::Options> SocketOptionFactory::buildSocketMarkOptions(uint32_t mark) {
-  std::unique_ptr<Socket::Options> options = absl::make_unique<Socket::Options>();
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
   // we need this to happen prior to binding or prior to connecting. In both cases, PREBIND will
   // fire.
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
@@ -60,7 +60,7 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildSocketMarkOptions(uin
 
 std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
     const Protobuf::RepeatedPtrField<envoy::api::v2::core::SocketOption>& socket_options) {
-  auto options = absl::make_unique<Socket::Options>();
+  auto options = std::make_unique<Socket::Options>();
   for (const auto& socket_option : socket_options) {
     std::string buf;
     int int_value;
@@ -87,7 +87,7 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
 
 std::unique_ptr<Socket::Options>
 SocketOptionFactory::buildTcpFastOpenOptions(uint32_t queue_length) {
-  std::unique_ptr<Socket::Options> options = absl::make_unique<Socket::Options>();
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
       envoy::api::v2::core::SocketOption::STATE_LISTENING, ENVOY_SOCKET_TCP_FASTOPEN,
       queue_length));
