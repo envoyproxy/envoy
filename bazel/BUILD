@@ -144,7 +144,7 @@ config_setting(
 alias(
     name = "boringssl",
     actual = select({
-        "//bazel:boringssl_fips": "@envoy_deps//:boringssl_fips",
+        "//bazel:boringssl_fips": "//external:boringssl_fips",
         "//conditions:default": "@boringssl//:ssl",
     }),
 )
