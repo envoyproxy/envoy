@@ -49,12 +49,12 @@ public:
   virtual ~TransportSocketCallbacks() {}
 
   /**
-   * @return reference to the I/O handle associated with the connection.
+   * @return reference to the IoHandle associated with the connection.
    */
   virtual IoHandle& ioHandle() PURE;
 
   /**
-   * @return const reference to the I/O handle associated with the connection.
+   * @return const reference to the IoHandle associated with the connection.
    */
   virtual const IoHandle& ioHandle() const PURE;
 

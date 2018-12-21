@@ -12,25 +12,15 @@ class IoSocketHandle : public IoHandle {
 public:
   IoSocketHandle(int fd = -1) : fd_(fd) {}
 
+  // TODO(sbelair2) Call close() in destructor
   ~IoSocketHandle() {}
 
-  /**
-   * TODO(sbelair2)  To be removed when the IoSocketHandle derivative is integrated
-   * and the fd is fully abstracted from clients.
-   *
-   * @return the socket's file descriptor in the handle.
-   */
+   // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
   int fd() const override { return fd_; }
 
   void close() override { fd_ = -1; }
 
-  /**
-   * @param the socket file descriptor to set in the handle. Assigns an fd
-   * from an external socket operation such as from libevent or the dispatcher after construction
-   *
-   * TODO(sbelair2)  To be removed when the IoSocketHandle derivative is integrated
-   * and the fd is fully abstracted from clients.
-   */
+   // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
   void operator=(int fd) { fd_ = fd; }
 
 private:

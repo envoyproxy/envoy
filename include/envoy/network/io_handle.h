@@ -16,9 +16,16 @@ public:
 
   virtual ~IoHandle() {}
 
-  // TODO(sbelair2) remove fd() method
+  /**
+   * Return data associated with IoHandle.
+   *
+   * TODO(sbelair2) remove fd() method
+   */
   virtual int fd() const PURE;
 
+  /**
+   * Clean up IoHandle resources
+   */
   virtual void close() PURE;
 };
 typedef std::unique_ptr<IoHandle> IoHandlePtr;
